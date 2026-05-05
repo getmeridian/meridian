@@ -1,7 +1,7 @@
 # website — Astro static site (getmeridian.org)
 
 ```bash
-cd website && npm install && npm run build   # Astro + Pagefind
+cd website && pnpm install && pnpm run build   # Astro + Pagefind
 ```
 
 ## Design decisions
@@ -14,11 +14,14 @@ cd website && npm install && npm run build   # Astro + Pagefind
 
 **Machine-readable endpoints** — `/llms.txt` (AI index), `/llms-full.txt` (all docs concatenated), `/md/[slug]` (raw markdown per doc), `/context-hub.md`. These make the project AI-native.
 
+**pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a one-week release age, and allows build scripts only for explicitly trusted packages.
+
 ## Website ↔ CLI relationship
 
 - **App links**: `src/data/apps.json` is SOT. CI validates against template + Python constants.
 - **AI docs**: en/ markdown → `make ai-docs` → bundled `ai-reference.md`. CI generates automatically.
 - **install.sh**: deployed to `getmeridian.org/install.sh` by CI release workflow.
+- **Studio contracts**: `pnpm run contracts:generate` builds `src/studio/generated/` from checked-in `contracts/meridian/v1`. Static Studio consumes these directly; executable Studio will use the same types through a local adapter.
 
 ## Pitfalls
 

@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "DeployNodeState": {
+      "additionalProperties": false,
+      "description": "Existing node state relevant to redeploy planning.",
+      "properties": {
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "ws_path": {
+          "default": "",
+          "title": "Ws Path",
+          "type": "string"
+        },
+        "xhttp_path": {
+          "default": "",
+          "title": "Xhttp Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip"
+      ],
+      "title": "DeployNodeState",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Cluster state projection required by deploy planning.",
+  "properties": {
+    "existing_node": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DeployNodeState"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "is_configured": {
+      "title": "Is Configured",
+      "type": "boolean"
+    },
+    "node_count": {
+      "default": 0,
+      "title": "Node Count",
+      "type": "integer"
+    },
+    "panel_secret_path": {
+      "default": "",
+      "title": "Panel Secret Path",
+      "type": "string"
+    },
+    "panel_sub_path": {
+      "default": "",
+      "title": "Panel Sub Path",
+      "type": "string"
+    },
+    "relay_count": {
+      "default": 0,
+      "title": "Relay Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "is_configured"
+  ],
+  "title": "DeployClusterState",
+  "type": "object"
+}

@@ -6,13 +6,13 @@ no credential sync, no rollback. One API call per operation.
 
 from __future__ import annotations
 
-import re
-
 import typer
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_cluster, make_panel
+from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, error_context, fail, info, is_json_mode, ok
+from meridian.core.command_inputs import ClientNameRequest
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
@@ -24,14 +24,7 @@ from meridian.renderers import emit_json
 
 def _validate_client_name(name: str) -> None:
     """Validate client name format. Exits on invalid."""
-    if not name:
-        fail("Client name is required", hint="Usage: meridian client add NAME", hint_type="user")
-    if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", name):
-        fail(
-            f"Client name '{name}' is invalid",
-            hint="Use letters, numbers, hyphens, and underscores.",
-            hint_type="user",
-        )
+    validate_command_input(ClientNameRequest, "Invalid client name", name=name)
 
 
 def _format_status(status: str) -> str:

@@ -1,0 +1,12 @@
+{
+  "schema": "meridian.workflow-catalog/v1",
+  "workflows": [
+    {
+      "id": "deploy",
+      "ready_request_schema": "deploy-request",
+      "stability": "preview",
+      "summary": "Collect deploy target, camouflage, branding, and first-client settings.",
+      "title": "Deploy Meridian server"
+    }
+  ]
+}

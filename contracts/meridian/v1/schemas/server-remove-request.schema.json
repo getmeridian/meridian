@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "Request to remove a known server.",
+  "properties": {
+    "query": {
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Query",
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "ServerRemoveRequest",
+  "type": "object"
+}

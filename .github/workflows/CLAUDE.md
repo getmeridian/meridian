@@ -6,6 +6,8 @@
 
 **CI jobs**: Python Tests (3.10 + 3.12 matrix), Lint, Type Check, Validate (templates + app links + VERSION + CHANGELOG + deploy CLI flags + PWA demo), Shell (shellcheck), System Lab (multi-node Docker deploy), Website Build.
 
+**Website package manager** — website CI uses pnpm with `website/pnpm-lock.yaml`; keep supply-chain guardrails in `website/pnpm-workspace.yaml`.
+
 **VERSION-driven releases** — read VERSION file, check if git tag exists. If missing: detect semver change, extract CHANGELOG section, push tag, create Release. Idempotent — safe to re-run.
 
 **OIDC publishing** — Pages deploy uses trusted publisher (no token). PyPI requires `environment: pypi` approval gate + OIDC. No long-lived secrets.
@@ -15,6 +17,7 @@
 - **Validate job** — single job checks templates render, app links match across surfaces, VERSION is valid semver, CHANGELOG has an entry, deploy CLI flags are documented in cli-reference.md. Catches drift between docs and code.
 - **System lab depends on lint+test** — syntax must be clean before spinning up Docker. Saves CI minutes on obvious failures.
 - **PWA demo validation** — CI generates a demo PWA page and verifies all required files exist, SW is disabled for static hosting, and client HTML renders correctly.
+- **Contract drift checks** — Python validate runs `scripts/export_contracts.py --check`; website build runs `pnpm run contracts:check`.
 
 ## Pitfalls
 

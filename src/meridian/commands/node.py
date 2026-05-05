@@ -12,7 +12,9 @@ import secrets
 import typer
 
 from meridian.commands._helpers import format_traffic, load_cluster, make_panel
+from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.deploy_planning import compute_deploy_ports
 from meridian.remnawave import RemnawaveError
 
@@ -30,6 +32,18 @@ def run_add(
     yes: bool = False,
 ) -> None:
     """Provision and add a new node to the fleet."""
+    request = validate_command_input(
+        NodeAddRequest,
+        "Invalid node add request",
+        ip=ip,
+        name=name,
+        user=user,
+        ssh_port=ssh_port,
+        sni=sni,
+        domain=domain,
+        harden=harden,
+        yes=yes,
+    )
     from meridian.commands.resolve import ensure_server_connection, resolve_server
     from meridian.commands.setup import (
         DEFAULT_SNI,
@@ -39,31 +53,28 @@ def run_add(
     from meridian.config import SERVERS_FILE
     from meridian.servers import ServerRegistry
 
-    if not ip:
-        fail("Node IP address is required", hint="Usage: meridian node add IP", hint_type="user")
-
     cluster = load_cluster()
 
     # Check for duplicate
-    existing = cluster.find_node(ip)
+    existing = cluster.find_node(request.ip)
     if existing is not None:
         fail(
-            f"Node {ip} already exists in cluster",
-            hint=f"Use: meridian deploy {ip} to redeploy",
+            f"Node {request.ip} already exists in cluster",
+            hint=f"Use: meridian deploy {request.ip} to redeploy",
             hint_type="user",
         )
 
     # Resolve and connect
     registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
+    resolved = resolve_server(registry, explicit_ip=request.ip, user=request.user, port=request.ssh_port)
     ensure_server_connection(resolved)
 
-    node_name = name or ip
-    effective_sni = sni or DEFAULT_SNI
+    node_name = request.name or request.ip
+    effective_sni = request.sni or DEFAULT_SNI
 
     info(f"Adding node {resolved.ip} ({node_name})...")
 
-    if not yes:
+    if not request.yes:
         if not confirm(f"Provision and add node at {resolved.ip}?"):
             raise typer.Exit(1)
 
@@ -77,9 +88,9 @@ def run_add(
     _run_provisioner(
         resolved=resolved,
         cluster=cluster,
-        domain=domain,
+        domain=request.domain,
         sni=effective_sni,
-        harden=harden,
+        harden=request.harden,
         is_panel_host=False,
         secret_path=cluster.panel.secret_path,
         xhttp_port=ports.xhttp_port,
@@ -95,7 +106,7 @@ def run_add(
     _setup_new_node(
         resolved=resolved,
         cluster=cluster,
-        domain=domain,
+        domain=request.domain,
         sni=effective_sni,
         reality_port=ports.reality_port,
         xhttp_port=ports.xhttp_port,
@@ -111,12 +122,12 @@ def run_add(
     new_node = cluster.find_node(resolved.ip)
     if new_node is not None:
         # Apply the user-requested name override (matches reconciler semantics).
-        if name and new_node.name != name:
-            new_node.name = name
+        if request.name and new_node.name != request.name:
+            new_node.name = request.name
             cluster.save()
         from meridian.operations import hybrid_sync_desired_nodes_add
 
-        hybrid_sync_desired_nodes_add(cluster, new_node, ssh_user=user, ssh_port=ssh_port)
+        hybrid_sync_desired_nodes_add(cluster, new_node, ssh_user=request.user, ssh_port=request.ssh_port)
 
     ok(f"Node {resolved.ip} provisioned and added to cluster")
 
@@ -135,10 +146,11 @@ def run_check(ip_or_name: str, user: str = "") -> None:
 
     from meridian.ssh import ServerConnection, SSHError
 
+    request = validate_command_input(NodeTargetRequest, "Invalid node check request", ip_or_name=ip_or_name, user=user)
     cluster = load_cluster()
-    node = cluster.find_node(ip_or_name)
+    node = cluster.find_node(request.ip_or_name)
     if node is None:
-        fail(f"Node '{ip_or_name}' not found", hint="Check: meridian node list", hint_type="user")
+        fail(f"Node '{request.ip_or_name}' not found", hint="Check: meridian node list", hint_type="user")
 
     err_console.print()
     info(f"Checking node {node.ip} ({node.name or 'unnamed'})...")
@@ -164,7 +176,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
         all_ok = False
 
     # 2. SSH connectivity
-    ssh_user = user or node.ssh_user or "root"
+    ssh_user = request.user or node.ssh_user or "root"
     try:
         conn = ServerConnection(ip=node.ip, user=ssh_user, port=node.ssh_port)
         conn.check_ssh()
@@ -344,15 +356,14 @@ def run_list() -> None:
 
 def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
     """Remove a node from the fleet."""
-    if not ip_or_name:
-        fail("Node IP or name is required", hint="Usage: meridian node remove IP_OR_NAME", hint_type="user")
+    request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
 
     cluster = load_cluster()
 
-    node = cluster.find_node(ip_or_name)
+    node = cluster.find_node(request.ip_or_name)
     if node is None:
         fail(
-            f"Node '{ip_or_name}' not found",
+            f"Node '{request.ip_or_name}' not found",
             hint="Check node list with: meridian node list",
             hint_type="user",
         )

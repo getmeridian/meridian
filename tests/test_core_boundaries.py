@@ -6,11 +6,18 @@ import ast
 from pathlib import Path
 
 CORE_DIR = Path(__file__).resolve().parents[1] / "src" / "meridian" / "core"
+ENGINE_DIR = Path(__file__).resolve().parents[1] / "src" / "meridian" / "engine"
 FORBIDDEN_IMPORTS = (
     "meridian.commands",
     "meridian.console",
     "rich",
     "typer",
+)
+ENGINE_FORBIDDEN_IMPORTS = FORBIDDEN_IMPORTS + (
+    "meridian.provision",
+    "meridian.remnawave",
+    "meridian.renderers",
+    "meridian.ssh",
 )
 
 
@@ -31,5 +38,15 @@ def test_core_does_not_import_cli_or_rendering_modules() -> None:
         for module in _imported_module_names(path):
             if any(module == forbidden or module.startswith(f"{forbidden}.") for forbidden in FORBIDDEN_IMPORTS):
                 violations.append(f"{path.relative_to(CORE_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_engine_does_not_import_commands_or_runtime_adapters() -> None:
+    violations: list[str] = []
+    for path in sorted(ENGINE_DIR.rglob("*.py")):
+        for module in _imported_module_names(path):
+            if any(module == forbidden or module.startswith(f"{forbidden}.") for forbidden in ENGINE_FORBIDDEN_IMPORTS):
+                violations.append(f"{path.relative_to(ENGINE_DIR)} imports {module}")
 
     assert violations == []

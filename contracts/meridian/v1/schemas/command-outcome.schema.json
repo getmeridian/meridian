@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "Structured command outcome for process clients.",
+  "properties": {
+    "category": {
+      "anyOf": [
+        {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "none",
+          "type": "string"
+        }
+      ],
+      "title": "Category"
+    },
+    "exit_code": {
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "meaning": {
+      "title": "Meaning",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "changed",
+        "no_changes",
+        "failed",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "exit_code",
+    "category",
+    "meaning"
+  ],
+  "title": "CommandOutcome",
+  "type": "object"
+}

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import ipaddress
-import re
-
 from meridian.core.deploy import DeployRequest
-
-_CLIENT_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
-_LOCAL_TARGETS = {"local", "locally"}
+from meridian.core.inputs import (
+    is_ip_deploy_target,
+    is_local_deploy_target,
+    validate_name_value,
+)
 
 
 class DeployValidationError(ValueError):
@@ -19,30 +18,17 @@ class DeployValidationError(ValueError):
         self.hint = hint
 
 
-def is_local_deploy_target(value: str) -> bool:
-    """Return True for deploy targets that mean the current machine."""
-    return value.lower() in _LOCAL_TARGETS
-
-
-def is_ip_deploy_target(value: str) -> bool:
-    """Return True when a deploy target is a valid IP address."""
-    try:
-        ipaddress.ip_address(value)
-        return True
-    except ValueError:
-        return False
-
-
 def normalize_client_name(client_name: str) -> str:
     """Validate and default the first deploy client name."""
     if not client_name:
         return "default"
-    if not _CLIENT_NAME_RE.match(client_name):
+    try:
+        return validate_name_value(client_name)
+    except ValueError as exc:
         raise DeployValidationError(
             f"Client name '{client_name}' is invalid",
-            hint="Use letters, numbers, hyphens, and underscores.",
-        )
-    return client_name
+            hint=str(exc),
+        ) from exc
 
 
 def validate_deploy_target(target: str) -> None:
@@ -71,6 +57,4 @@ def normalize_deploy_request(request: DeployRequest) -> DeployRequest:
             "Deploy target is required",
             hint="Enter a server IP address or run the interactive wizard.",
         )
-    if request.ip:
-        validate_deploy_target(request.ip)
     return request.model_copy(update={"client_name": normalize_client_name(request.client_name)})

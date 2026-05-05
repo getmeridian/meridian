@@ -8,8 +8,18 @@ from pydantic import BaseModel, Field, RootModel
 
 from meridian.core.apply import ApplyActionResult, ApplyCounts, ApplyResult
 from meridian.core.clients import ClientListResult, ClientShowResult
+from meridian.core.command_inputs import (
+    ClientNameRequest,
+    NodeAddRequest,
+    NodeTargetRequest,
+    RelayDeployRequest,
+    RelayTargetRequest,
+    ServerAddRequest,
+    ServerRemoveRequest,
+)
 from meridian.core.deploy import DeployRequest, DeployResult, DeployWorkflowAnswers
 from meridian.core.deploy_planning import DeployClusterState, DeployNodeState, DeployPlan, DeployPorts
+from meridian.core.events import EVENT_TYPES
 from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, RemoteCommandResult, RemoteTarget
 from meridian.core.fleet import FleetInventory, FleetStatus
 from meridian.core.models import (
@@ -23,7 +33,7 @@ from meridian.core.models import (
     Summary,
 )
 from meridian.core.plan import PlanActionResult, PlanCounts, PlanResult
-from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
+from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 
 class EmptyData(CoreModel):
@@ -64,6 +74,19 @@ class ApiWorkflowResult(CoreModel):
 
     name: str
     workflow: WorkflowPlan
+
+
+class EventTypeCatalog(CoreModel):
+    """Public event types emitted by meridian-core operation streams."""
+
+    schema_version: Literal["meridian.event-types/v1"] = Field(default="meridian.event-types/v1", alias="schema")
+    event_schema: str = "event"
+    types: list[str]
+
+
+def event_type_catalog() -> dict[str, Any]:
+    """Return the public event type catalog."""
+    return EventTypeCatalog(types=list(EVENT_TYPES)).model_dump(mode="json", by_alias=True)
 
 
 class _ContractEnvelope(CoreModel):
@@ -133,10 +156,17 @@ class DeployCommandData(RootModel[DeployResult | DeployPlan]):
     """
 
 
-class _DeploySuccessEnvelope(_ContractEnvelope):
+class _DeployChangedEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
-    status: Literal["changed", "ok"]
-    data: DeployResult | DeployPlan
+    status: Literal["changed"]
+    data: DeployResult
+    errors: list[MeridianError] = Field(max_length=0)
+
+
+class _DeployPlanEnvelope(_ContractEnvelope):
+    command: Literal["deploy"]
+    status: Literal["ok"]
+    data: DeployPlan
     errors: list[MeridianError] = Field(max_length=0)
 
 
@@ -148,7 +178,9 @@ class _DeployTerminalEnvelope(_ContractEnvelope):
 
 
 class DeployOutputEnvelope(
-    RootModel[Annotated[_DeploySuccessEnvelope | _DeployTerminalEnvelope, Field(discriminator="status")]]
+    RootModel[
+        Annotated[_DeployChangedEnvelope | _DeployPlanEnvelope | _DeployTerminalEnvelope, Field(discriminator="status")]
+    ]
 ):
     """Envelope schema for `meridian deploy --json`."""
 
@@ -421,6 +453,13 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
+    "client-name-request": ClientNameRequest,
+    "server-add-request": ServerAddRequest,
+    "server-remove-request": ServerRemoveRequest,
+    "node-add-request": NodeAddRequest,
+    "node-target-request": NodeTargetRequest,
+    "relay-deploy-request": RelayDeployRequest,
+    "relay-target-request": RelayTargetRequest,
     "deploy-command-data": DeployCommandData,
     "deploy-envelope": DeployOutputEnvelope,
     "deploy-request": DeployRequest,
@@ -436,9 +475,11 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "put-bytes-spec": PutBytesSpec,
     "put-text-spec": PutTextSpec,
     "workflow-plan": WorkflowPlan,
+    "workflow-catalog-entry": WorkflowCatalogEntry,
     "input-field": InputField,
     "input-option": InputOption,
     "input-section": InputSection,
+    "event-type-catalog": EventTypeCatalog,
     "schema-catalog-entry": SchemaCatalogEntry,
     "empty-data": EmptyData,
     "plan-result": PlanResult,

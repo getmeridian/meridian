@@ -17,7 +17,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh (Let's Encrypt) + Xray (VLESS+Reality) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm). Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state; optional real-VM harness at `tests/realvm/` for Hetzner-backed integration testing. Website at `getmeridian.org` built with Astro. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm). Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, while executable Studio will need a localhost Engine. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 
@@ -35,12 +35,15 @@ Every folder with distinct architectural concerns has a `CLAUDE.md`. AI assistan
 ```
 CLAUDE.md                               — this file (vision, manifest, conventions)
 AGENTS.md                               — cross-tool agent discovery pointer
+contracts/CLAUDE.md                     — generated meridian-core contract artifacts
 README.md                               — public project landing
 ROADMAP.md                              — thematic direction + follow-up issue links
 SECURITY.md / CONTRIBUTING.md           — public policies
+scripts/CLAUDE.md                       — repository automation and contract export
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── commands/CLAUDE.md                  — per-subcommand pattern
+├── engine/CLAUDE.md                    — local Engine use-case boundary
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
 ├── reconciler/CLAUDE.md                — compute_plan purity + executor ordering
@@ -58,6 +61,7 @@ website/CLAUDE.md                       — Astro rationale, i18n strategy
 ├── src/layouts/CLAUDE.md               — Base/Docs/BlogPost shells, RTL
 ├── src/pages/CLAUDE.md                 — dynamic routing, machine-readable endpoints
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
+├── src/studio/CLAUDE.md                — generated Studio contracts, future adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
 
 .github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
@@ -83,7 +87,7 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 - **Self-hosted everything**: zero external requests (fonts, JS, CSS). Target regions block CDNs
 - **Commit per change**: each logical change gets its own commit; include `Refs: uburuntu/meridian#NN` footer when resolving an issue
 - **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
-- **context7 MCP**: check library docs before writing code that depends on external packages
+- **ctx7 CLI**: check library docs before writing code that depends on external packages
 
 ## Community & public communication
 

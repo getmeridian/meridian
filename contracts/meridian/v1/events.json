@@ -1,0 +1,22 @@
+{
+  "event_schema": "event",
+  "schema": "meridian.event-types/v1",
+  "types": [
+    "command.started",
+    "command.completed",
+    "command.failed",
+    "plan.computed",
+    "plan.action.started",
+    "plan.action.completed",
+    "plan.action.failed",
+    "plan.action.skipped",
+    "provision.step.started",
+    "provision.step.completed",
+    "provision.step.failed",
+    "ssh.command.completed",
+    "state.loaded",
+    "state.saved",
+    "warning",
+    "error"
+  ]
+}

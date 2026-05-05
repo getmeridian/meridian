@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "ClientListSummary": {
+      "additionalProperties": false,
+      "description": "Aggregate client counts for dashboards.",
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "integer"
+        },
+        "clients": {
+          "title": "Clients",
+          "type": "integer"
+        },
+        "disabled": {
+          "title": "Disabled",
+          "type": "integer"
+        },
+        "expired": {
+          "title": "Expired",
+          "type": "integer"
+        },
+        "limited": {
+          "title": "Limited",
+          "type": "integer"
+        },
+        "other": {
+          "title": "Other",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clients",
+        "active",
+        "disabled",
+        "limited",
+        "expired",
+        "other"
+      ],
+      "title": "ClientListSummary",
+      "type": "object"
+    },
+    "ClientRecord": {
+      "additionalProperties": false,
+      "description": "Redacted client metadata suitable for list views.",
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "last_seen": {
+          "title": "Last Seen",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_used_bytes": {
+          "title": "Traffic Used Bytes",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "uuid",
+        "status",
+        "traffic_used_bytes",
+        "traffic_limit_bytes",
+        "created_at",
+        "last_seen"
+      ],
+      "title": "ClientRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for listing clients.",
+  "properties": {
+    "clients": {
+      "items": {
+        "$ref": "#/$defs/ClientRecord"
+      },
+      "title": "Clients",
+      "type": "array"
+    },
+    "summary": {
+      "$ref": "#/$defs/ClientListSummary"
+    }
+  },
+  "required": [
+    "summary"
+  ],
+  "title": "ClientListResult",
+  "type": "object"
+}

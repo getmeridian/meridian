@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from meridian.core.events import CoreEventType
+
 OutputStatus = Literal["ok", "changed", "no_changes", "failed", "cancelled"]
 ErrorCategory = Literal["user", "system", "bug", "cancelled"]
 EventLevel = Literal["debug", "info", "warning", "error"]
@@ -73,7 +75,7 @@ class Event(CoreModel):
     seq: int
     time: str
     level: EventLevel
-    type: str
+    type: CoreEventType
     phase: str = ""
     resource: ResourceRef | None = None
     message: str = ""

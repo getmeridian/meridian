@@ -20,7 +20,7 @@ from meridian.core.services.fleet import (
     collect_fleet_inventory,
     collect_fleet_status,
 )
-from meridian.core.services.workflows import WorkflowNotFoundError, collect_workflow
+from meridian.core.services.workflows import WorkflowNotFoundError, collect_workflow, workflow_catalog
 
 __all__ = [
     "ClientPanelClient",
@@ -42,4 +42,5 @@ __all__ = [
     "collect_fleet_status",
     "collect_workflow",
     "deploy_server",
+    "workflow_catalog",
 ]

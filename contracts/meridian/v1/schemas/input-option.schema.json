@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "One selectable value for a workflow field.",
+  "properties": {
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "label": {
+      "title": "Label",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "string"
+    }
+  },
+  "required": [
+    "value",
+    "label"
+  ],
+  "title": "InputOption",
+  "type": "object"
+}

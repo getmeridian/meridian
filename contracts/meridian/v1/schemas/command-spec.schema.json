@@ -1,0 +1,93 @@
+{
+  "additionalProperties": false,
+  "description": "One shell command request for a remote executor.",
+  "properties": {
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "cwd": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cwd"
+    },
+    "env": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Env",
+      "type": "object"
+    },
+    "ok_codes": {
+      "default": [
+        0
+      ],
+      "items": {
+        "type": "integer"
+      },
+      "title": "Ok Codes",
+      "type": "array"
+    },
+    "operation_name": {
+      "default": "",
+      "title": "Operation Name",
+      "type": "string"
+    },
+    "retries": {
+      "default": 1,
+      "title": "Retries",
+      "type": "integer"
+    },
+    "retry_delay": {
+      "default": 0.0,
+      "title": "Retry Delay",
+      "type": "number"
+    },
+    "sensitive": {
+      "default": false,
+      "title": "Sensitive",
+      "type": "boolean"
+    },
+    "stdin": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stdin"
+    },
+    "sudo": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sudo"
+    },
+    "timeout": {
+      "default": 30,
+      "title": "Timeout",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "command"
+  ],
+  "title": "CommandSpec",
+  "type": "object"
+}

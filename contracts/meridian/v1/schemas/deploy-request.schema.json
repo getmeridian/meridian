@@ -1,0 +1,107 @@
+{
+  "additionalProperties": false,
+  "description": "Trusted local request for deploying or redeploying a Meridian server.",
+  "properties": {
+    "client_name": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Client Name",
+      "type": "string"
+    },
+    "color": {
+      "default": "",
+      "title": "Color",
+      "type": "string"
+    },
+    "decoy": {
+      "default": "",
+      "title": "Decoy",
+      "type": "string"
+    },
+    "domain": {
+      "default": "",
+      "title": "Domain",
+      "type": "string"
+    },
+    "geo_block": {
+      "default": true,
+      "title": "Geo Block",
+      "type": "boolean"
+    },
+    "harden": {
+      "default": true,
+      "title": "Harden",
+      "type": "boolean"
+    },
+    "icon": {
+      "default": "",
+      "title": "Icon",
+      "type": "string"
+    },
+    "ip": {
+      "anyOf": [
+        {
+          "format": "ipv4",
+          "type": "string"
+        },
+        {
+          "format": "ipv6",
+          "type": "string"
+        },
+        {
+          "pattern": "^$|^[Ll][Oo][Cc][Aa][Ll](?:[Ll][Yy])?$",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "title": "Ip"
+    },
+    "pq": {
+      "default": false,
+      "title": "Pq",
+      "type": "boolean"
+    },
+    "requested_server": {
+      "default": "",
+      "pattern": "^\\S*$",
+      "title": "Requested Server",
+      "type": "string"
+    },
+    "server_name": {
+      "default": "",
+      "title": "Server Name",
+      "type": "string"
+    },
+    "sni": {
+      "default": "",
+      "title": "Sni",
+      "type": "string"
+    },
+    "ssh_port": {
+      "default": 22,
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Ssh Port",
+      "type": "integer"
+    },
+    "user": {
+      "default": "root",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    },
+    "warp": {
+      "default": false,
+      "title": "Warp",
+      "type": "boolean"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "title": "DeployRequest",
+  "type": "object"
+}

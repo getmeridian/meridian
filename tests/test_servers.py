@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
+import typer
+
+from meridian.commands.server import run_add
+from meridian.console import set_json_mode, set_quiet_mode
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 
 
@@ -129,3 +135,22 @@ class TestServerRegistry:
         raw = servers_file.read_text()
         assert "# My servers" in raw
         assert "5.6.7.8" in raw
+
+
+def test_server_add_invalid_input_prints_readable_validation_error(capsys: pytest.CaptureFixture[str]) -> None:
+    set_json_mode(False)
+    set_quiet_mode(False)
+
+    with (
+        patch("meridian.commands.server.ServerConnection") as mock_connection,
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_add("not-an-ip")
+
+    captured = capsys.readouterr()
+    assert exc_info.value.exit_code == 2
+    assert "Invalid server add request" in captured.err
+    assert "ip: Enter a valid IP address." in captured.err
+    assert "ValidationError" not in captured.err
+    assert "pydantic" not in captured.err.lower()
+    mock_connection.assert_not_called()

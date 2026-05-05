@@ -16,14 +16,15 @@ import yaml
 
 from meridian.cluster import ClusterConfig, ProtocolKey, RelayEntry
 from meridian.commands._helpers import load_cluster, make_panel
+from meridian.commands._validation import validate_command_input
 from meridian.config import (
     CREDS_BASE,
     RELAY_SERVICE_NAME,
     SERVERS_FILE,
-    is_ip,
     sanitize_ip_for_path,
 )
 from meridian.console import confirm, err_console, fail, info, line, ok, warn
+from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
@@ -237,21 +238,29 @@ def run_deploy(
     ssh_port: int = 22,
 ) -> None:
     """Deploy a relay node that forwards traffic to an exit server."""
-    if not is_ip(relay_ip):
-        fail(f"Invalid relay IP: {relay_ip}", hint="Enter a valid IP address", hint_type="user")
-    if relay_name and not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", relay_name):
-        fail(f"Invalid relay name: {relay_name}", hint="Use letters, numbers, hyphens, underscores", hint_type="user")
+    request = validate_command_input(
+        RelayDeployRequest,
+        "Invalid relay deploy request",
+        relay_ip=relay_ip,
+        exit_arg=exit_arg,
+        user=user,
+        relay_name=relay_name,
+        listen_port=listen_port,
+        yes=yes,
+        sni=sni,
+        ssh_port=ssh_port,
+    )
 
     cluster = load_cluster()
     registry = ServerRegistry(SERVERS_FILE)
-    exit_ip = _find_exit_node(cluster, exit_arg)
+    exit_ip = _find_exit_node(cluster, request.exit_arg)
     exit_node = cluster.find_node(exit_ip)
     if exit_node is None:
         fail(f"Exit node {exit_ip} not found in cluster", hint_type="bug")
-    if cluster.find_relay(relay_ip) is not None:
+    if cluster.find_relay(request.relay_ip) is not None:
         fail(
-            f"Relay {relay_ip} is already in the cluster",
-            hint=f"To re-deploy, remove first: meridian relay remove {relay_ip}",
+            f"Relay {request.relay_ip} is already in the cluster",
+            hint=f"To re-deploy, remove first: meridian relay remove {request.relay_ip}",
             hint_type="user",
         )
 
@@ -263,20 +272,20 @@ def run_deploy(
     err_console.print()
 
     # Same-server warning
-    if relay_ip == exit_ip:
-        if listen_port == 443:
+    if request.relay_ip == exit_ip:
+        if request.listen_port == 443:
             fail(
                 "Relay and exit are the same server -- port 443 is already in use",
                 hint="Try: --port 8443",
                 hint_type="user",
             )
-        warn(f"Relay and exit are the same ({relay_ip}). Fine for testing, not for production.")
+        warn(f"Relay and exit are the same ({request.relay_ip}). Fine for testing, not for production.")
 
     ok(f"Exit node verified: {exit_ip}")
 
     # Connect to relay
-    info(f"Connecting to relay server: {relay_ip}")
-    relay_conn = ServerConnection(ip=relay_ip, user=user, port=ssh_port)
+    info(f"Connecting to relay server: {request.relay_ip}")
+    relay_conn = ServerConnection(ip=request.relay_ip, user=request.user, port=request.ssh_port)
     try:
         relay_conn.check_ssh()
     except SSHError as exc:
@@ -285,23 +294,23 @@ def run_deploy(
     ok("SSH OK")
 
     # Check if relay port is already in use
-    port_check = relay_conn.run(f"ss -tlnp sport = :{listen_port} 2>/dev/null", timeout=10)
-    if port_check.returncode == 0 and f":{listen_port}" in port_check.stdout:
+    port_check = relay_conn.run(f"ss -tlnp sport = :{request.listen_port} 2>/dev/null", timeout=10)
+    if port_check.returncode == 0 and f":{request.listen_port}" in port_check.stdout:
         # Extract process name
         process_name = process_info = ""
         for ss_line in port_check.stdout.strip().splitlines()[1:]:
-            if f":{listen_port}" in ss_line and "users:" in ss_line:
+            if f":{request.listen_port}" in ss_line and "users:" in ss_line:
                 process_info = ss_line.split("users:")[1].strip().strip("()")
                 m = re.search(r'"([^"]*)"', process_info)
                 process_name = m.group(1) if m else ""
                 break
         if process_name == "realm":
-            warn(f"Previous relay service found on port {listen_port} -- stopping it")
+            warn(f"Previous relay service found on port {request.listen_port} -- stopping it")
             relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
             relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
             ok("Previous relay service stopped")
         else:
-            msg = f"Port {listen_port} is already in use"
+            msg = f"Port {request.listen_port} is already in use"
             if process_info:
                 msg += f" by {process_info}"
             fail(msg, hint="Try: --port <OTHER_PORT>", hint_type="system")
@@ -314,7 +323,7 @@ def run_deploy(
         ok("Relay -> exit connectivity confirmed")
 
     # Determine relay SNI target
-    relay_sni = sni
+    relay_sni = request.sni
     if not relay_sni:
         from rich.status import Status
 
@@ -325,7 +334,7 @@ def run_deploy(
         err_console.print("  [dim]Finding optimal Reality SNI target near the relay server...[/dim]")
 
         with Status("  [cyan]-> Scanning relay subnet...[/cyan]", console=err_console, spinner="dots"):
-            candidates = scan_for_sni(relay_conn, relay_ip)
+            candidates = scan_for_sni(relay_conn, request.relay_ip)
 
         if candidates:
             from meridian.console import choose
@@ -348,25 +357,31 @@ def run_deploy(
     from meridian.config import REALM_VERSION
 
     summary = (
-        f"Relay:  {user}@{relay_ip}:{listen_port}  |  Exit: {exit_ip}:443\n"
-        f"Engine: Realm v{REALM_VERSION}  |  Name: {relay_name or '(auto)'}  |  SNI: {relay_sni}\n\n"
-        f"  Client -> {relay_ip}:{listen_port} -> {exit_ip}:443 -> Internet\n"
+        f"Relay:  {request.user}@{request.relay_ip}:{request.listen_port}  |  Exit: {exit_ip}:443\n"
+        f"Engine: Realm v{REALM_VERSION}  |  Name: {request.relay_name or '(auto)'}  |  SNI: {relay_sni}\n\n"
+        f"  Client -> {request.relay_ip}:{request.listen_port} -> {exit_ip}:443 -> Internet\n"
         f"  Encryption: end-to-end (relay cannot read content)"
     )
     err_console.print()
     err_console.print(Panel(summary, title="[bold]Relay deployment plan[/bold]", border_style="cyan", padding=(0, 2)))
     err_console.print()
 
-    if not yes:
-        if not confirm(f"Deploy relay to {user}@{relay_ip}?"):
+    if not request.yes:
+        if not confirm(f"Deploy relay to {request.user}@{request.relay_ip}?"):
             raise typer.Exit(1)
 
     # Run relay provisioner (Realm install -- panel-agnostic)
     from meridian.provision.relay import RelayContext, build_relay_steps
     from meridian.provision.steps import Provisioner
 
-    ctx = RelayContext(relay_ip=relay_ip, exit_ip=exit_ip, exit_port=443, listen_port=listen_port, user=user)
-    info(f"Configuring relay at {relay_ip}...")
+    ctx = RelayContext(
+        relay_ip=request.relay_ip,
+        exit_ip=exit_ip,
+        exit_port=443,
+        listen_port=request.listen_port,
+        user=request.user,
+    )
+    info(f"Configuring relay at {request.relay_ip}...")
     err_console.print()
 
     results = Provisioner(build_relay_steps(ctx)).run(relay_conn, ctx)
@@ -381,7 +396,14 @@ def run_deploy(
     panel = make_panel(cluster)
     with panel:
         info("Creating relay host entries in panel...")
-        host_uuids = _create_relay_hosts(panel, cluster, relay_ip, listen_port, relay_sni, relay_name)
+        host_uuids = _create_relay_hosts(
+            panel,
+            cluster,
+            request.relay_ip,
+            request.listen_port,
+            relay_sni,
+            request.relay_name,
+        )
     if not host_uuids:
         fail(
             "No host entries created -- check that inbounds are configured",
@@ -397,7 +419,7 @@ def run_deploy(
             exit_conn.check_ssh()
         except SSHError as exc:
             fail(f"Cannot SSH to exit node {exit_ip}: {exc}", hint="Check exit node SSH access", hint_type="system")
-        if not _deploy_relay_nginx(exit_conn, relay_sni, relay_ip, relay_name):
+        if not _deploy_relay_nginx(exit_conn, relay_sni, request.relay_ip, request.relay_name):
             fail(
                 "Relay nginx routing update failed on the exit server",
                 hint="Fix nginx on the exit and retry.",
@@ -406,21 +428,29 @@ def run_deploy(
 
     # Save RelayEntry to cluster.yml
     relay_entry = RelayEntry(
-        ip=relay_ip,
-        name=relay_name,
-        port=listen_port,
+        ip=request.relay_ip,
+        name=request.relay_name,
+        port=request.listen_port,
         exit_node_ip=exit_ip,
         host_uuids=host_uuids,
         sni=relay_sni,
-        ssh_user=user,
-        ssh_port=ssh_port,
+        ssh_user=request.user,
+        ssh_port=request.ssh_port,
     )
     cluster.backup()
     cluster.relays.append(relay_entry)
     cluster.save()
-    _save_relay_local(relay_ip, exit_ip, 443, listen_port)
-    if relay_ip != exit_ip:
-        registry.add(ServerEntry(host=relay_ip, user=user, name=relay_name, role=SERVER_ROLE_RELAY, port=ssh_port))
+    _save_relay_local(request.relay_ip, exit_ip, 443, request.listen_port)
+    if request.relay_ip != exit_ip:
+        registry.add(
+            ServerEntry(
+                host=request.relay_ip,
+                user=request.user,
+                name=request.relay_name,
+                role=SERVER_ROLE_RELAY,
+                port=request.ssh_port,
+            )
+        )
 
     # Hybrid sync — mirror the relay into desired_relays when the user manages
     # relays declaratively. Use the exit node's name when available so the
@@ -435,15 +465,14 @@ def run_deploy(
 
     # Success output
     err_console.print()
-    ok(f"Relay {relay_ip} forwarding to exit {exit_ip}")
-    err_console.print(
-        f"  [dim]Client -> {relay_ip}:{listen_port} (domestic) -> {exit_ip}:443 (abroad) -> Internet[/dim]"
-    )
+    ok(f"Relay {request.relay_ip} forwarding to exit {exit_ip}")
+    relay_route = f"Client -> {request.relay_ip}:{request.listen_port} (domestic) -> {exit_ip}:443 (abroad) -> Internet"
+    err_console.print(f"  [dim]{relay_route}[/dim]")
     err_console.print("  [dim]Subscriptions auto-update -- clients get relay URLs on next sync.[/dim]")
     err_console.print()
     err_console.print("  [bold]Next steps:[/bold]")
     err_console.print("    meridian client add alice          [dim]# relay URLs included[/dim]")
-    err_console.print(f"    meridian relay check {relay_ip}    [dim]# verify relay health[/dim]")
+    err_console.print(f"    meridian relay check {request.relay_ip}    [dim]# verify relay health[/dim]")
     err_console.print("    meridian relay list                [dim]# list all relays[/dim]")
     err_console.print()
     line()
@@ -546,28 +575,37 @@ def run_remove(
     yes: bool = False,
 ) -> None:
     """Remove a relay node."""
-    if not is_ip(relay_ip):
-        fail(f"Invalid relay IP: {relay_ip}", hint="Enter a valid IP address", hint_type="user")
+    request = validate_command_input(
+        RelayTargetRequest,
+        "Invalid relay remove request",
+        relay_ip=relay_ip,
+        exit_arg=exit_arg,
+        user=user,
+        yes=yes,
+    )
 
     cluster = load_cluster()
     registry = ServerRegistry(SERVERS_FILE)
 
     # Find relay entry
-    relay_entry = cluster.find_relay(relay_ip)
+    relay_entry = cluster.find_relay(request.relay_ip)
     if relay_entry is None:
-        fail(f"Relay {relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
+        fail(f"Relay {request.relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
 
     # Verify exit_arg matches if specified
-    if exit_arg:
-        if relay_entry.exit_node_ip != _find_exit_node(cluster, exit_arg):
-            fail(f"Relay {relay_ip} is attached to exit {relay_entry.exit_node_ip}, not {exit_arg}", hint_type="user")
+    if request.exit_arg:
+        if relay_entry.exit_node_ip != _find_exit_node(cluster, request.exit_arg):
+            fail(
+                f"Relay {request.relay_ip} is attached to exit {relay_entry.exit_node_ip}, not {request.exit_arg}",
+                hint_type="user",
+            )
 
-    if not yes:
-        relay_label = relay_entry.name or relay_ip
+    if not request.yes:
+        relay_label = relay_entry.name or request.relay_ip
         if not confirm(f"Remove relay {relay_label} from exit {relay_entry.exit_node_ip}?"):
             raise typer.Exit(1)
 
-    relay_user = _relay_registry_user(registry, relay_ip, user)
+    relay_user = _relay_registry_user(registry, request.relay_ip, request.user)
 
     # Delete Remnawave hosts
     with make_panel(cluster) as panel:
@@ -587,32 +625,32 @@ def run_remove(
             warn(f"Could not connect to exit node {exit_node.ip} -- nginx not cleaned up")
 
     # Stop service on relay
-    info(f"Stopping relay service on {relay_ip}...")
+    info(f"Stopping relay service on {request.relay_ip}...")
     try:
-        relay_conn = ServerConnection(ip=relay_ip, user=relay_user, port=relay_entry.ssh_port)
+        relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
         relay_conn.check_ssh()
         relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
         relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
         ok("Relay service stopped")
     except (SSHError, OSError):
-        warn(f"Could not connect to relay {relay_ip} -- service may still be running")
+        warn(f"Could not connect to relay {request.relay_ip} -- service may still be running")
 
     # Remove from cluster.yml and local state
-    cluster.relays = [r for r in cluster.relays if r.ip != relay_ip]
+    cluster.relays = [r for r in cluster.relays if r.ip != request.relay_ip]
     cluster.backup()
     cluster.save()
 
     # Hybrid sync — drop from desired_relays (only if managed declaratively).
     from meridian.operations import hybrid_sync_desired_relays_remove
 
-    hybrid_sync_desired_relays_remove(cluster, relay_ip)
+    hybrid_sync_desired_relays_remove(cluster, request.relay_ip)
 
-    relay_file = CREDS_BASE / sanitize_ip_for_path(relay_ip) / "relay.yml"
+    relay_file = CREDS_BASE / sanitize_ip_for_path(request.relay_ip) / "relay.yml"
     if relay_file.exists():
         relay_file.unlink()
-    if relay_ip != relay_entry.exit_node_ip:
-        registry.remove(relay_ip)
-    ok(f"Relay {relay_ip} removed")
+    if request.relay_ip != relay_entry.exit_node_ip:
+        registry.remove(request.relay_ip)
+    ok(f"Relay {request.relay_ip} removed")
     err_console.print()
 
 
@@ -622,28 +660,33 @@ def run_check(
     user: str = "",
 ) -> None:
     """Check health of a relay node."""
-    if not is_ip(relay_ip):
-        fail(f"Invalid relay IP: {relay_ip}", hint="Enter a valid IP address", hint_type="user")
+    request = validate_command_input(
+        RelayTargetRequest,
+        "Invalid relay check request",
+        relay_ip=relay_ip,
+        exit_arg=exit_arg,
+        user=user,
+    )
 
     cluster = load_cluster()
     registry = ServerRegistry(SERVERS_FILE)
 
-    relay_entry = cluster.find_relay(relay_ip)
+    relay_entry = cluster.find_relay(request.relay_ip)
     if relay_entry is None:
-        fail(f"Relay {relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
+        fail(f"Relay {request.relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
 
-    info(f"Checking relay: {relay_entry.name or relay_ip} -> exit: {relay_entry.exit_node_ip}")
+    info(f"Checking relay: {relay_entry.name or request.relay_ip} -> exit: {relay_entry.exit_node_ip}")
     err_console.print()
     all_ok = True
-    relay_user = _relay_registry_user(registry, relay_ip, user)
+    relay_user = _relay_registry_user(registry, request.relay_ip, request.user)
 
     # 1. SSH connectivity to relay
     try:
-        relay_conn = ServerConnection(ip=relay_ip, user=relay_user, port=relay_entry.ssh_port)
+        relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
         relay_conn.check_ssh()
         ok("SSH to relay: connected")
     except (SSHError, OSError):
-        err_console.print(f"  [red bold]x[/red bold] SSH to relay: failed ({relay_ip})")
+        err_console.print(f"  [red bold]x[/red bold] SSH to relay: failed ({request.relay_ip})")
         warn("Cannot proceed without SSH -- check SSH key and user")
         return
 
@@ -667,8 +710,8 @@ def run_check(
     # 4. Local -> relay TCP connectivity
     from meridian.ssh import tcp_connect
 
-    if tcp_connect(relay_ip, relay_entry.port):
-        ok(f"Local -> relay TCP: reachable ({relay_ip}:{relay_entry.port})")
+    if tcp_connect(request.relay_ip, relay_entry.port):
+        ok(f"Local -> relay TCP: reachable ({request.relay_ip}:{relay_entry.port})")
     else:
         err_console.print("  [red bold]x[/red bold] Local -> relay TCP: unreachable")
         all_ok = False

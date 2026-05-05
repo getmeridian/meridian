@@ -15,9 +15,12 @@ a duplicate source of truth.
 
 ```
 CLAUDE.md                               — project spine: vision, manifest, conventions
+contracts/CLAUDE.md                     — generated meridian-core contracts
+scripts/CLAUDE.md                       — repository automation
 
 src/meridian/CLAUDE.md                  — Python CLI architecture
   commands/CLAUDE.md                    — per-subcommand pattern
+  engine/CLAUDE.md                      — local Engine use-case boundary
   provision/CLAUDE.md                   — step pipeline + idempotency
   infra/CLAUDE.md                       — CloudProvider abstract + per-cloud impls
   reconciler/CLAUDE.md                  — plan / apply purity + executor
@@ -30,7 +33,7 @@ tests/CLAUDE.md                         — testing philosophy
 
 website/CLAUDE.md                       — Astro rationale, i18n
   src/components/ src/content/docs/ src/i18n/ src/layouts/ src/styles/CLAUDE.md
-  src/pages/CLAUDE.md + src/pages/blog/CLAUDE.md
+  src/pages/CLAUDE.md + src/pages/blog/CLAUDE.md + src/studio/CLAUDE.md
 
 .github/workflows/CLAUDE.md             — CI / release pipeline
 ```

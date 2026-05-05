@@ -1,0 +1,67 @@
+{
+  "additionalProperties": false,
+  "description": "Request to deploy a relay node.",
+  "properties": {
+    "exit_arg": {
+      "default": "",
+      "pattern": "^\\S*$",
+      "title": "Exit Arg",
+      "type": "string"
+    },
+    "listen_port": {
+      "default": 443,
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Listen Port",
+      "type": "integer"
+    },
+    "relay_ip": {
+      "anyOf": [
+        {
+          "format": "ipv4",
+          "type": "string"
+        },
+        {
+          "format": "ipv6",
+          "type": "string"
+        }
+      ],
+      "title": "Relay Ip"
+    },
+    "relay_name": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Relay Name",
+      "type": "string"
+    },
+    "sni": {
+      "default": "",
+      "title": "Sni",
+      "type": "string"
+    },
+    "ssh_port": {
+      "default": 22,
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Ssh Port",
+      "type": "integer"
+    },
+    "user": {
+      "default": "root",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "relay_ip"
+  ],
+  "title": "RelayDeployRequest",
+  "type": "object"
+}

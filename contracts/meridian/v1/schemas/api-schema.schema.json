@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "Result for `meridian api schema NAME --envelope`.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "schema": {
+      "additionalProperties": true,
+      "title": "Schema",
+      "type": "object"
+    }
+  },
+  "required": [
+    "name",
+    "schema"
+  ],
+  "title": "ApiSchemaResult",
+  "type": "object"
+}

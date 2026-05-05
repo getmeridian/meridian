@@ -30,18 +30,23 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
 
       - name: Build Astro site
         run: |
           cd website
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7

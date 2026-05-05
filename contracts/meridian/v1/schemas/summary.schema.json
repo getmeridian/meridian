@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+  "properties": {
+    "changed": {
+      "default": false,
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+    },
+    "text": {
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "text"
+  ],
+  "title": "Summary",
+  "type": "object"
+}

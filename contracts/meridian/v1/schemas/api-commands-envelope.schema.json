@@ -1,0 +1,486 @@
+{
+  "$defs": {
+    "ApiCommandsResult": {
+      "additionalProperties": false,
+      "description": "Result for `meridian api commands --json`.",
+      "properties": {
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/CommandCatalogEntry"
+          },
+          "title": "Commands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "commands"
+      ],
+      "title": "ApiCommandsResult",
+      "type": "object"
+    },
+    "CommandCatalogEntry": {
+      "additionalProperties": false,
+      "description": "Command contract entry with optional embedded schemas.",
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Argv",
+          "type": "array"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "data_schema": {
+          "title": "Data Schema",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "envelope": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Envelope"
+        },
+        "envelope_schema": {
+          "title": "Envelope Schema",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "error_schema": {
+          "title": "Error Schema",
+          "type": "string"
+        },
+        "exit_codes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Exit Codes",
+          "type": "object"
+        },
+        "failure_data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Data"
+        },
+        "failure_data_schema": {
+          "title": "Failure Data Schema",
+          "type": "string"
+        },
+        "machine_flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Machine Flags",
+          "type": "array"
+        },
+        "outcomes": {
+          "items": {
+            "$ref": "#/$defs/CommandOutcome"
+          },
+          "title": "Outcomes",
+          "type": "array"
+        },
+        "stability": {
+          "enum": [
+            "stable",
+            "preview"
+          ],
+          "title": "Stability",
+          "type": "string"
+        },
+        "statuses": {
+          "items": {
+            "enum": [
+              "ok",
+              "changed",
+              "no_changes",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "title": "Statuses",
+          "type": "array"
+        }
+      },
+      "required": [
+        "command",
+        "argv",
+        "envelope_schema",
+        "data_schema",
+        "failure_data_schema",
+        "error_schema",
+        "statuses",
+        "outcomes",
+        "exit_codes",
+        "machine_flags",
+        "stability",
+        "description"
+      ],
+      "title": "CommandCatalogEntry",
+      "type": "object"
+    },
+    "CommandOutcome": {
+      "additionalProperties": false,
+      "description": "Structured command outcome for process clients.",
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "enum": [
+                "user",
+                "system",
+                "bug",
+                "cancelled"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "none",
+              "type": "string"
+            }
+          ],
+          "title": "Category"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meaning": {
+          "title": "Meaning",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "changed",
+            "no_changes",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "exit_code",
+        "category",
+        "meaning"
+      ],
+      "title": "CommandOutcome",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by failed or cancelled envelopes.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "MeridianError": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_ApiCommandsSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "api.commands",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ApiCommandsResult"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ApiCommandsSuccessEnvelope",
+      "type": "object"
+    },
+    "_ApiCommandsTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "api.commands",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ApiCommandsTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian api commands --json`.",
+  "discriminator": {
+    "mapping": {
+      "cancelled": "#/$defs/_ApiCommandsTerminalEnvelope",
+      "failed": "#/$defs/_ApiCommandsTerminalEnvelope",
+      "ok": "#/$defs/_ApiCommandsSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_ApiCommandsSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_ApiCommandsTerminalEnvelope"
+    }
+  ],
+  "title": "ApiCommandsOutputEnvelope"
+}

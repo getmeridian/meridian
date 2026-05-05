@@ -1,0 +1,44 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "actions": {
+      "title": "Actions",
+      "type": "integer"
+    },
+    "adds": {
+      "title": "Adds",
+      "type": "integer"
+    },
+    "destructive": {
+      "title": "Destructive",
+      "type": "integer"
+    },
+    "from_extras": {
+      "title": "From Extras",
+      "type": "integer"
+    },
+    "removes": {
+      "title": "Removes",
+      "type": "integer"
+    },
+    "replacements": {
+      "title": "Replacements",
+      "type": "integer"
+    },
+    "updates": {
+      "title": "Updates",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "actions",
+    "adds",
+    "updates",
+    "replacements",
+    "removes",
+    "destructive",
+    "from_extras"
+  ],
+  "title": "PlanCounts",
+  "type": "object"
+}

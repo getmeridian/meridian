@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "Request to register a known server.",
+  "properties": {
+    "ip": {
+      "anyOf": [
+        {
+          "format": "ipv4",
+          "type": "string"
+        },
+        {
+          "format": "ipv6",
+          "type": "string"
+        }
+      ],
+      "title": "Ip"
+    },
+    "name": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "user": {
+      "default": "root",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ip"
+  ],
+  "title": "ServerAddRequest",
+  "type": "object"
+}

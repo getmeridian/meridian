@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "description": "Transport-neutral result for remote command and file operations.",
+  "properties": {
+    "args": {
+      "title": "Args"
+    },
+    "attempts": {
+      "default": 1,
+      "title": "Attempts",
+      "type": "integer"
+    },
+    "duration_ms": {
+      "default": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "operation_name": {
+      "default": "",
+      "title": "Operation Name",
+      "type": "string"
+    },
+    "redacted_command": {
+      "default": "",
+      "title": "Redacted Command",
+      "type": "string"
+    },
+    "returncode": {
+      "title": "Returncode",
+      "type": "integer"
+    },
+    "stderr": {
+      "default": "",
+      "title": "Stderr",
+      "type": "string"
+    },
+    "stdout": {
+      "default": "",
+      "title": "Stdout",
+      "type": "string"
+    },
+    "sudo": {
+      "default": false,
+      "title": "Sudo",
+      "type": "boolean"
+    },
+    "timed_out": {
+      "default": false,
+      "title": "Timed Out",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "returncode"
+  ],
+  "title": "RemoteCommandResult",
+  "type": "object"
+}

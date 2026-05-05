@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "Deterministic per-node port layout.",
+  "properties": {
+    "reality_port": {
+      "title": "Reality Port",
+      "type": "integer"
+    },
+    "wss_port": {
+      "title": "Wss Port",
+      "type": "integer"
+    },
+    "xhttp_port": {
+      "title": "Xhttp Port",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "xhttp_port",
+    "reality_port",
+    "wss_port"
+  ],
+  "title": "DeployPorts",
+  "type": "object"
+}

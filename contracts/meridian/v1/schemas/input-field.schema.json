@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "InputOption": {
+      "additionalProperties": false,
+      "description": "One selectable value for a workflow field.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ],
+      "title": "InputOption",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One UI-renderable input field requested by a workflow.",
+  "properties": {
+    "default": {
+      "default": null,
+      "title": "Default"
+    },
+    "help_text": {
+      "default": "",
+      "title": "Help Text",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "boolean",
+        "choice",
+        "confirmation"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "label": {
+      "title": "Label",
+      "type": "string"
+    },
+    "options": {
+      "items": {
+        "$ref": "#/$defs/InputOption"
+      },
+      "title": "Options",
+      "type": "array"
+    },
+    "required": {
+      "default": false,
+      "title": "Required",
+      "type": "boolean"
+    },
+    "secret": {
+      "default": false,
+      "title": "Secret",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "label",
+    "kind"
+  ],
+  "title": "InputField",
+  "type": "object"
+}

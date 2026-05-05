@@ -16,7 +16,9 @@
 
 **Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer. Every error must be actionable.
 
-**Pinned version tuple** — `config.py` pins every Remnawave image (`backend`, `node`, `subscription-page`) and the SDK, plus external binaries (`XRAY_VERSION`, `REALM_VERSION`) and the Pebble test CA. The whole tuple moves together: bumping `backend` without matching `node` is unsupported by upstream Remnawave, and mismatched `SDK` vs backend will silently drop data (see Pitfalls). The tested set lives in `CHANGELOG.md` under each release's "Remnawave compatibility matrix". `acme.sh` is the one intentional exception — it ships via `curl | sh` from the project's installer and has no stable release-tag convention.
+**Engine boundary** — `meridian.engine` owns command-free runtime use cases only when a local executable surface needs them. Static Studio does not need Engine; executable Studio will need it for SSH, files, secrets, events, and cancellation.
+
+**Pinned version tuple** — `config.py` pins Remnawave images/SDK plus external binaries. Move the tuple together and update the CHANGELOG compatibility matrix; mismatched Remnawave backend/node/SDK versions silently lose data.
 
 ## What's done well
 

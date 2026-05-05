@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from meridian.core.deploy import DeployRequest
 from meridian.core.deploy_validation import (
@@ -30,6 +31,21 @@ def test_validate_deploy_target_accepts_ip_and_local() -> None:
 def test_validate_deploy_target_rejects_bad_target() -> None:
     with pytest.raises(DeployValidationError, match="Invalid IP address"):
         validate_deploy_target("not-an-ip")
+
+
+def test_deploy_request_rejects_invalid_ip_at_model_boundary() -> None:
+    with pytest.raises(ValidationError, match="valid IP address"):
+        DeployRequest(ip="not-an-ip")
+
+
+def test_deploy_request_rejects_invalid_ssh_user_at_model_boundary() -> None:
+    with pytest.raises(ValidationError, match="letters, numbers"):
+        DeployRequest(ip="198.51.100.10", user="bad user!")
+
+
+def test_deploy_request_rejects_invalid_ssh_port_at_model_boundary() -> None:
+    with pytest.raises(ValidationError):
+        DeployRequest(ip="198.51.100.10", ssh_port=70000)
 
 
 def test_normalize_deploy_request_rejects_ip_and_server_together() -> None:

@@ -1,0 +1,35 @@
+{
+  "additionalProperties": false,
+  "description": "Identity of the machine an executor talks to.",
+  "properties": {
+    "host": {
+      "title": "Host",
+      "type": "string"
+    },
+    "local": {
+      "default": false,
+      "title": "Local",
+      "type": "boolean"
+    },
+    "port": {
+      "default": 22,
+      "title": "Port",
+      "type": "integer"
+    },
+    "transport": {
+      "default": "ssh",
+      "title": "Transport",
+      "type": "string"
+    },
+    "user": {
+      "default": "root",
+      "title": "User",
+      "type": "string"
+    }
+  },
+  "required": [
+    "host"
+  ],
+  "title": "RemoteTarget",
+  "type": "object"
+}

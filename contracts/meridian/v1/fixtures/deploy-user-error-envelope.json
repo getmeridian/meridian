@@ -1,0 +1,29 @@
+{
+  "command": "deploy",
+  "data": {},
+  "duration_ms": 0,
+  "errors": [
+    {
+      "category": "user",
+      "cause": {},
+      "code": "MERIDIAN_DEPLOY_INPUT_REQUIRED",
+      "details": {},
+      "exit_code": 2,
+      "hint": "Collect the deploy workflow fields, then pass a confirmed deploy request.",
+      "message": "Deploy request is incomplete",
+      "retryable": true
+    }
+  ],
+  "exit_code": 2,
+  "meridian_version": "4.0.0",
+  "operation_id": "op-fixture-deploy-user-error",
+  "schema": "meridian.output/v1",
+  "started_at": "2026-05-04T21:00:00Z",
+  "status": "failed",
+  "summary": {
+    "changed": false,
+    "counts": {},
+    "text": "Deploy request is incomplete"
+  },
+  "warnings": []
+}

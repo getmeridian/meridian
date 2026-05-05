@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from meridian.core.output import OperationContext
     from meridian.core.reporters import Reporter
     from meridian.remnawave import MeridianPanel
-    from meridian.ssh import ServerConnection
 
 StepStatus = Literal["ok", "changed", "skipped", "failed"]
 
@@ -153,7 +152,7 @@ class Step(TypingProtocol):
     @property
     def name(self) -> str: ...
 
-    def run(self, conn: ServerConnection, ctx: Any) -> StepResult: ...
+    def run(self, conn: Any, ctx: Any) -> StepResult: ...
 
 
 class Provisioner:
@@ -164,7 +163,7 @@ class Provisioner:
 
     def run(
         self,
-        conn: ServerConnection,
+        conn: Any,
         ctx: Any,
         *,
         reporter: Reporter | None = None,

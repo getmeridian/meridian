@@ -138,6 +138,9 @@ jobs:
       - name: Verify _PWA_APPS matches apps.json
         run: uv run python tests/validate_apps_sync.py
 
+      - name: Verify generated Meridian contracts are current
+        run: uv run python scripts/export_contracts.py --check
+
   shellcheck:
     name: Shell
     runs-on: ubuntu-latest
@@ -182,17 +185,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
 
       - name: Build Astro site
-        run: cd website && npm ci && npm run build
+        run: |
+          cd website
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
 
       - name: Type-check Astro components
-        run: cd website && npx astro check --minimumSeverity warning
+        run: cd website && pnpm exec astro check --minimumSeverity warning
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7

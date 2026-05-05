@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Empty data object used by failed or cancelled envelopes.",
+  "properties": {},
+  "title": "EmptyData",
+  "type": "object"
+}

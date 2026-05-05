@@ -51,3 +51,13 @@ class WorkflowPlan(CoreModel):
     fields: list[InputField] = Field(default_factory=list)
     sections: list[InputSection] = Field(default_factory=list)
     ready_request_schema: str = ""
+
+
+class WorkflowCatalogEntry(CoreModel):
+    """Discoverable workflow contract metadata."""
+
+    id: str
+    title: str
+    summary: str
+    ready_request_schema: str
+    stability: Literal["stable", "preview"] = "preview"

@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "description": "Aggregate counts for apply execution.",
+  "properties": {
+    "actions": {
+      "title": "Actions",
+      "type": "integer"
+    },
+    "failed": {
+      "title": "Failed",
+      "type": "integer"
+    },
+    "skipped": {
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "succeeded": {
+      "title": "Succeeded",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "actions",
+    "succeeded",
+    "failed",
+    "skipped"
+  ],
+  "title": "ApplyCounts",
+  "type": "object"
+}

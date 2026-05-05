@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from meridian.core.deploy import (
     DeployRequest,
@@ -14,6 +15,7 @@ from meridian.core.deploy import (
 from meridian.core.output import OperationContext
 from meridian.core.reporters import CaptureReporter
 from meridian.core.services.deploy import deploy_server
+from meridian.core.validation import validation_error_hint
 
 
 def _result() -> DeployResult:
@@ -143,3 +145,47 @@ def test_apply_deploy_workflow_answers_updates_request() -> None:
     assert updated.geo_block is False
     assert updated.yes is True
     assert updated.ssh_port == 2222
+
+
+def test_apply_deploy_workflow_answers_maps_confirmation_to_yes() -> None:
+    request = DeployRequest()
+
+    updated = apply_deploy_workflow_answers(request, DeployWorkflowAnswers(ip="198.51.100.10", confirm=True))
+    unconfirmed = apply_deploy_workflow_answers(request, DeployWorkflowAnswers(ip="198.51.100.10", confirm=False))
+
+    assert updated.yes is True
+    assert unconfirmed.yes is False
+
+
+def test_deploy_workflow_answers_validate_human_readable_input_errors() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        DeployWorkflowAnswers(ip="not-an-ip", user="bad user", client_name="bad name!")
+
+    hint = validation_error_hint(exc_info.value)
+    assert "ip: Enter a valid IP address, or use 'local' when running Meridian on the target server." in hint
+    assert "user: Use letters, numbers, dots, hyphens, and underscores." in hint
+    assert "client_name: Use letters, numbers, hyphens, and underscores." in hint
+
+
+def test_apply_deploy_workflow_answers_revalidates_constructed_answers() -> None:
+    request = DeployRequest()
+    answers = DeployWorkflowAnswers.model_construct(
+        ip="198.51.100.10",
+        user="bad user",
+        sni="www.microsoft.com",
+        domain="",
+        harden=True,
+        client_name="default",
+        server_name="Family VPN",
+        icon="",
+        color="ocean",
+        pq=False,
+        warp=False,
+        geo_block=True,
+        confirm=True,
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        apply_deploy_workflow_answers(request, answers)
+
+    assert "user: Use letters, numbers, dots, hyphens, and underscores." in validation_error_hint(exc_info.value)

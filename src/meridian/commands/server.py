@@ -4,36 +4,37 @@ from __future__ import annotations
 
 import shutil
 
+from meridian.commands._validation import validate_command_input
 from meridian.config import CREDS_BASE, SERVERS_FILE, sanitize_ip_for_path
 from meridian.console import err_console, fail, info, line, ok, warn
+from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 
 
 def run_add(ip: str, name: str = "", user: str = "root") -> None:
     """Register a server, verify SSH, and fetch credentials."""
-    if name and not _valid_name(name):
-        fail("Server name must be alphanumeric (hyphens and underscores allowed)", hint_type="user")
+    request = validate_command_input(ServerAddRequest, "Invalid server add request", ip=ip, name=name, user=user)
 
     registry = ServerRegistry(SERVERS_FILE)
-    conn = ServerConnection(ip=ip, user=user, local_mode=False)
+    conn = ServerConnection(ip=request.ip, user=request.user, local_mode=False)
 
-    info(f"Connecting to {ip}...")
+    info(f"Connecting to {request.ip}...")
     try:
         conn.check_ssh()
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
 
     # Fetch credentials from server
-    creds_dir = CREDS_BASE / sanitize_ip_for_path(ip)
+    creds_dir = CREDS_BASE / sanitize_ip_for_path(request.ip)
     creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     if conn.fetch_credentials(creds_dir):
         ok("Fetched credentials from server")
     else:
         warn("No credentials found on server (run meridian deploy first)")
 
-    registry.add(ServerEntry(host=ip, user=user, name=name))
-    ok(f"Server added: {name or ip}")
+    registry.add(ServerEntry(host=request.ip, user=request.user, name=request.name))
+    ok(f"Server added: {request.name or request.ip}")
 
 
 def run_list() -> None:
@@ -56,27 +57,19 @@ def run_list() -> None:
 
 def run_remove(query: str) -> None:
     """Remove a server by IP or name, including local credentials."""
+    request = validate_command_input(ServerRemoveRequest, "Invalid server remove request", query=query)
     registry = ServerRegistry(SERVERS_FILE)
 
-    entry = registry.find(query)
+    entry = registry.find(request.query)
     if not entry:
-        fail(f"Server '{query}' not found", hint_type="user")
+        fail(f"Server '{request.query}' not found", hint_type="user")
 
     host = entry.host
-    registry.remove(query)
+    registry.remove(request.query)
 
     # Remove local credentials
     creds_dir = CREDS_BASE / sanitize_ip_for_path(host)
     if creds_dir.exists():
         shutil.rmtree(creds_dir)
 
-    ok(f"Server removed: {query}")
-
-
-def _valid_name(name: str) -> bool:
-    """Check that name is alphanumeric with hyphens/underscores."""
-    if not name:
-        return True
-    if not name[0].isalnum():
-        return False
-    return all(c.isalnum() or c in "-_" for c in name)
+    ok(f"Server removed: {request.query}")

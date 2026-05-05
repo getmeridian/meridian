@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic import Field
+
 from meridian.config import DEFAULT_SNI
+from meridian.core.inputs import DeployIpValue, NameValue, OptionalSelectorValue, SshUserValue
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
@@ -15,14 +18,14 @@ DeployMode = Literal["first_deploy", "redeploy"]
 class DeployRequest(CoreModel):
     """Trusted local request for deploying or redeploying a Meridian server."""
 
-    ip: str = ""
+    ip: DeployIpValue = ""
     domain: str = ""
     sni: str = ""
-    client_name: str = ""
-    user: str = "root"
+    client_name: NameValue = ""
+    user: SshUserValue = "root"
     yes: bool = False
     harden: bool = True
-    requested_server: str = ""
+    requested_server: OptionalSelectorValue = ""
     server_name: str = ""
     icon: str = ""
     color: str = ""
@@ -30,18 +33,18 @@ class DeployRequest(CoreModel):
     pq: bool = False
     warp: bool = False
     geo_block: bool = True
-    ssh_port: int = 22
+    ssh_port: int = Field(default=22, ge=1, le=65535)
 
 
 class DeployWorkflowAnswers(CoreModel):
     """Answers collected by a deploy wizard renderer."""
 
-    ip: str = ""
-    user: str = "root"
+    ip: DeployIpValue = ""
+    user: SshUserValue = "root"
     sni: str = ""
     domain: str = ""
     harden: bool = True
-    client_name: str = ""
+    client_name: NameValue = ""
     server_name: str = ""
     icon: str = ""
     color: str = ""
@@ -93,8 +96,9 @@ def build_deploy_workflow(request: DeployRequest) -> WorkflowPlan:
 
 def apply_deploy_workflow_answers(request: DeployRequest, answers: DeployWorkflowAnswers) -> DeployRequest:
     """Return a deploy request updated with renderer-collected wizard answers."""
-    return request.model_copy(
-        update={
+    data = request.model_dump(mode="python")
+    data.update(
+        {
             "ip": answers.ip,
             "domain": answers.domain,
             "sni": answers.sni,
@@ -107,8 +111,10 @@ def apply_deploy_workflow_answers(request: DeployRequest, answers: DeployWorkflo
             "pq": answers.pq,
             "warp": answers.warp,
             "geo_block": answers.geo_block,
+            "yes": request.yes or answers.confirm,
         }
     )
+    return DeployRequest.model_validate(data)
 
 
 def _deploy_input_fields(request: DeployRequest) -> list[InputField]:

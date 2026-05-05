@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "DeployPlan": {
+      "additionalProperties": false,
+      "description": "Core-owned deploy plan consumed by provisioning and panel adapters.",
+      "properties": {
+        "info_page_path": {
+          "title": "Info Page Path",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "first_deploy",
+            "redeploy"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "node_count": {
+          "title": "Node Count",
+          "type": "integer"
+        },
+        "ports": {
+          "$ref": "#/$defs/DeployPorts"
+        },
+        "relay_count": {
+          "title": "Relay Count",
+          "type": "integer"
+        },
+        "secret_path": {
+          "title": "Secret Path",
+          "type": "string"
+        },
+        "server_ip": {
+          "title": "Server Ip",
+          "type": "string"
+        },
+        "ws_path": {
+          "title": "Ws Path",
+          "type": "string"
+        },
+        "xhttp_path": {
+          "title": "Xhttp Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "server_ip",
+        "ports",
+        "secret_path",
+        "xhttp_path",
+        "ws_path",
+        "info_page_path",
+        "node_count",
+        "relay_count"
+      ],
+      "title": "DeployPlan",
+      "type": "object"
+    },
+    "DeployPorts": {
+      "additionalProperties": false,
+      "description": "Deterministic per-node port layout.",
+      "properties": {
+        "reality_port": {
+          "title": "Reality Port",
+          "type": "integer"
+        },
+        "wss_port": {
+          "title": "Wss Port",
+          "type": "integer"
+        },
+        "xhttp_port": {
+          "title": "Xhttp Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "xhttp_port",
+        "reality_port",
+        "wss_port"
+      ],
+      "title": "DeployPorts",
+      "type": "object"
+    },
+    "DeployResult": {
+      "additionalProperties": false,
+      "description": "Result returned after a deploy/redeploy operation completes.",
+      "properties": {
+        "client_name": {
+          "title": "Client Name",
+          "type": "string"
+        },
+        "connection_page_path": {
+          "title": "Connection Page Path",
+          "type": "string"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "geo_block": {
+          "title": "Geo Block",
+          "type": "boolean"
+        },
+        "harden": {
+          "title": "Harden",
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "first_deploy",
+            "redeploy"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "node_count": {
+          "title": "Node Count",
+          "type": "integer"
+        },
+        "panel_secret_path": {
+          "title": "Panel Secret Path",
+          "type": "string"
+        },
+        "panel_url": {
+          "title": "Panel Url",
+          "type": "string"
+        },
+        "pq": {
+          "title": "Pq",
+          "type": "boolean"
+        },
+        "relay_count": {
+          "title": "Relay Count",
+          "type": "integer"
+        },
+        "server_ip": {
+          "title": "Server Ip",
+          "type": "string"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "warp": {
+          "title": "Warp",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "mode",
+        "server_ip",
+        "ssh_user",
+        "ssh_port",
+        "domain",
+        "sni",
+        "client_name",
+        "harden",
+        "pq",
+        "warp",
+        "geo_block",
+        "panel_url",
+        "panel_secret_path",
+        "connection_page_path",
+        "node_count",
+        "relay_count",
+        "summary"
+      ],
+      "title": "DeployResult",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/DeployResult"
+    },
+    {
+      "$ref": "#/$defs/DeployPlan"
+    }
+  ],
+  "description": "Success data for `meridian deploy --json`.\n\nNormal execution returns DeployResult. Dry-run returns DeployPlan.",
+  "title": "DeployCommandData"
+}

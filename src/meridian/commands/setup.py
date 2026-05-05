@@ -64,19 +64,17 @@ from meridian.core.deploy import (
     build_deploy_workflow,
 )
 from meridian.core.deploy_planning import (
-    DeployClusterState,
-    DeployNodeState,
     DeployPlan,
-    DeployPlanningError,
-    build_deploy_plan,
 )
-from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request, validate_deploy_target
+from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.execution import RemoteExecutor
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.reporters import Reporter, emit_event
 from meridian.core.services.deploy import deploy_server
+from meridian.core.validation import wrap_validation_error
+from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
 from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.renderers import emit_json
 from meridian.servers import ServerEntry, ServerRegistry
@@ -122,7 +120,7 @@ def run(
         request = (
             _load_deploy_request(request_path)
             if request_path
-            else DeployRequest(
+            else _build_deploy_request_or_fail(
                 ip=ip,
                 domain=domain,
                 sni=sni,
@@ -184,7 +182,11 @@ def run(
             )
 
         if dry_run:
-            plan = _plan_deploy_request(request, dry_run=True)
+            registry = ServerRegistry(SERVERS_FILE)
+            try:
+                plan = dry_run_deploy_request(request, cluster=ClusterConfig.load(), registry=registry)
+            except EngineError as exc:
+                fail(str(exc), hint=exc.hint, hint_type=exc.category)
             _emit_deploy_started_event(reporter, operation, dry_run=True)
             _emit_deploy_completed_event(reporter, operation, plan, dry_run=True)
             if final_json:
@@ -231,7 +233,17 @@ def _load_deploy_request(source: str) -> DeployRequest:
     try:
         return DeployRequest.model_validate_json(text)
     except ValidationError as exc:
-        fail("Invalid deploy request JSON", hint=str(exc), hint_type="user")
+        error = wrap_validation_error("Invalid deploy request JSON", exc)
+        fail(str(error), hint=error.hint, hint_type="user")
+
+
+def _build_deploy_request_or_fail(**fields: Any) -> DeployRequest:
+    """Build a DeployRequest and convert model errors into CLI-facing hints."""
+    try:
+        return DeployRequest(**fields)
+    except ValidationError as exc:
+        error = wrap_validation_error("Invalid deploy request", exc)
+        fail(str(error), hint=error.hint, hint_type="user")
 
 
 def _normalize_deploy_request_or_fail(request: DeployRequest) -> DeployRequest:
@@ -239,67 +251,6 @@ def _normalize_deploy_request_or_fail(request: DeployRequest) -> DeployRequest:
         return normalize_deploy_request(request)
     except DeployValidationError as exc:
         fail(str(exc), hint=exc.hint, hint_type="user")
-
-
-def _resolve_deploy_target(registry: ServerRegistry, request: DeployRequest) -> tuple[str, str]:
-    """Resolve request target to concrete server IP/local keyword and SSH user."""
-    server_ip = request.ip
-    ssh_user = request.user
-    if request.requested_server:
-        if is_local_keyword(request.requested_server):
-            server_ip = request.requested_server
-        else:
-            entry = registry.find(request.requested_server)
-            if not entry:
-                if is_ip(request.requested_server):
-                    server_ip = request.requested_server
-                else:
-                    raise DeployValidationError(
-                        f"Server '{request.requested_server}' not found",
-                        hint="See registered servers: meridian server list",
-                    )
-            else:
-                server_ip = entry.host
-                if request.user == "root" and entry.user:
-                    ssh_user = entry.user
-
-    try:
-        validate_deploy_target(server_ip)
-    except DeployValidationError:
-        raise
-    return server_ip, ssh_user
-
-
-def _deploy_cluster_state(cluster: ClusterConfig, server_ip: str) -> DeployClusterState:
-    existing_node = cluster.find_node(server_ip)
-    return DeployClusterState(
-        is_configured=cluster.is_configured,
-        panel_secret_path=cluster.panel.secret_path,
-        panel_sub_path=cluster.panel.sub_path,
-        existing_node=(
-            DeployNodeState(
-                ip=existing_node.ip,
-                xhttp_path=existing_node.xhttp_path,
-                ws_path=existing_node.ws_path,
-            )
-            if existing_node is not None
-            else None
-        ),
-        node_count=len(cluster.nodes),
-        relay_count=len(cluster.relays),
-    )
-
-
-def _plan_deploy_request(request: DeployRequest, *, dry_run: bool = False) -> DeployPlan:
-    """Resolve and plan a deploy request without opening SSH."""
-    request = _normalize_deploy_request_or_fail(request)
-    registry = ServerRegistry(SERVERS_FILE)
-    try:
-        server_ip, _ = _resolve_deploy_target(registry, request)
-        token_hex = (lambda n: "0" * (n * 2)) if dry_run else secrets.token_hex
-        return build_deploy_plan(server_ip, _deploy_cluster_state(ClusterConfig.load(), server_ip), token_hex=token_hex)
-    except (DeployPlanningError, DeployValidationError) as exc:
-        fail(str(exc), hint=getattr(exc, "hint", ""), hint_type="user")
 
 
 def _emit_deploy_json(result: DeployResult | DeployPlan, *, operation: OperationContext, status: OutputStatus) -> None:
@@ -381,15 +332,15 @@ def _execute_deploy_request(
 
     registry = ServerRegistry(SERVERS_FILE)
     try:
-        server_ip, ssh_user = _resolve_deploy_target(registry, request)
-    except DeployValidationError as exc:
-        fail(str(exc), hint=exc.hint, hint_type="user")
+        target = resolve_deploy_target(request, registry)
+    except EngineError as exc:
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
 
     # Resolve and prepare SSH connection
     resolved = resolve_server(
         registry,
-        explicit_ip=server_ip,
-        user=ssh_user,
+        explicit_ip=target.server_ip,
+        user=target.ssh_user,
         port=ssh_port,
     )
     resolved = ensure_server_connection(resolved)
@@ -406,12 +357,13 @@ def _execute_deploy_request(
     cluster = ClusterConfig.load()
 
     try:
-        deploy_plan = build_deploy_plan(
-            resolved.ip,
-            _deploy_cluster_state(cluster, resolved.ip),
+        deploy_plan = plan_deploy_request(
+            request.model_copy(update={"ip": resolved.ip, "requested_server": ""}),
+            cluster=cluster,
+            registry=registry,
         )
-    except DeployPlanningError as exc:
-        fail(str(exc), hint=exc.hint, hint_type="user")
+    except EngineError as exc:
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
 
     is_first_deploy = deploy_plan.mode == "first_deploy"
     is_redeploy = deploy_plan.mode == "redeploy"

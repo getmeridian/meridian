@@ -1,0 +1,85 @@
+{
+  "additionalProperties": false,
+  "description": "Write bytes to a remote path.",
+  "properties": {
+    "atomic": {
+      "default": true,
+      "title": "Atomic",
+      "type": "boolean"
+    },
+    "create_parent": {
+      "default": false,
+      "title": "Create Parent",
+      "type": "boolean"
+    },
+    "data": {
+      "format": "binary",
+      "title": "Data",
+      "type": "string"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
+    "operation_name": {
+      "default": "write file",
+      "title": "Operation Name",
+      "type": "string"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
+    "remote_path": {
+      "title": "Remote Path",
+      "type": "string"
+    },
+    "sensitive": {
+      "default": false,
+      "title": "Sensitive",
+      "type": "boolean"
+    },
+    "sudo": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sudo"
+    },
+    "timeout": {
+      "default": 30,
+      "title": "Timeout",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "remote_path",
+    "data"
+  ],
+  "title": "PutBytesSpec",
+  "type": "object"
+}

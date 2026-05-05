@@ -36,11 +36,15 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "api-workflow-envelope" in names
     assert "client-list-envelope" in names
     assert "client-show-envelope" in names
+    assert "client-name-request" in names
     assert "deploy-command-data" in names
     assert "deploy-envelope" in names
     assert "deploy-request" in names
     assert "deploy-result" in names
     assert "deploy-workflow-answers" in names
+    assert "server-add-request" in names
+    assert "node-add-request" in names
+    assert "relay-deploy-request" in names
     assert "deploy-plan" in names
     assert "deploy-ports" in names
     assert "deploy-cluster-state" in names
@@ -68,6 +72,28 @@ def test_schema_for_output_envelope_uses_wire_aliases() -> None:
     assert "schema" in schema["properties"]
     assert "schema_version" not in schema["properties"]
     assert schema["properties"]["status"]["enum"] == ["ok", "changed", "no_changes", "failed", "cancelled"]
+
+
+def test_request_schemas_expose_model_validation_constraints() -> None:
+    server_add = schema_for("server-add-request")["properties"]
+    deploy = schema_for("deploy-request")["properties"]
+    workflow_answers = schema_for("deploy-workflow-answers")["properties"]
+
+    assert server_add["ip"]["anyOf"] == [
+        {"format": "ipv4", "type": "string"},
+        {"format": "ipv6", "type": "string"},
+    ]
+    assert server_add["user"]["pattern"] == r"^[a-zA-Z0-9._-]+$"
+    assert server_add["user"]["minLength"] == 1
+    assert server_add["name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+    assert deploy["ip"]["anyOf"] == [
+        {"format": "ipv4", "type": "string"},
+        {"format": "ipv6", "type": "string"},
+        {"pattern": r"^$|^[Ll][Oo][Cc][Aa][Ll](?:[Ll][Yy])?$", "type": "string"},
+    ]
+    assert deploy["client_name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+    assert workflow_answers["ip"]["anyOf"] == deploy["ip"]["anyOf"]
+    assert workflow_answers["user"]["pattern"] == deploy["user"]["pattern"]
 
 
 def test_command_envelope_schema_binds_command_to_typed_data() -> None:
@@ -311,6 +337,30 @@ def test_deploy_command_envelope_accepts_result_and_dry_run_plan() -> None:
 
     assert parsed_plan.root.status == "ok"
     assert parsed_plan.root.data.mode == "first_deploy"
+
+    with pytest.raises(ValidationError):
+        DeployOutputEnvelope.model_validate(
+            command_envelope(
+                command="deploy",
+                data=result.model_dump(mode="json"),
+                summary=result.summary,
+                status="ok",
+                exit_code=0,
+                timer=OperationTimer(started_at="2026-05-04T21:00:00Z", operation_id="op-deploy-bad-result"),
+            ).model_dump(mode="json", by_alias=True)
+        )
+
+    with pytest.raises(ValidationError):
+        DeployOutputEnvelope.model_validate(
+            command_envelope(
+                command="deploy",
+                data=plan.model_dump(mode="json"),
+                summary="Deploy plan",
+                status="changed",
+                exit_code=0,
+                timer=OperationTimer(started_at="2026-05-04T21:00:00Z", operation_id="op-deploy-bad-plan"),
+            ).model_dump(mode="json", by_alias=True)
+        )
 
 
 def test_unknown_schema_name_is_actionable() -> None:

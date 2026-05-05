@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from meridian import __version__
+from meridian.core.events import CoreEventType
 from meridian.core.models import (
     Event,
     EventLevel,
@@ -143,7 +144,7 @@ class EventStream:
 
     def event(
         self,
-        event_type: str,
+        event_type: CoreEventType,
         *,
         level: EventLevel = "info",
         phase: str = "",
@@ -168,7 +169,7 @@ class EventStream:
 
     def record(
         self,
-        event_type: str,
+        event_type: CoreEventType,
         *,
         level: EventLevel = "info",
         phase: str = "",
