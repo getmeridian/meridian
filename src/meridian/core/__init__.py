@@ -77,9 +77,11 @@ from meridian.core.execution import (
 )
 from meridian.core.fleet import FleetInventory, FleetSources, FleetStatus, FleetTopology, RelayHostRef
 from meridian.core.inputs import (
+    CountryCodeValue,
     DeployIpValue,
     IPAddressValue,
     NameValue,
+    OptionalCountryCodeValue,
     OptionalSelectorValue,
     OptionalServerReferenceValue,
     OptionalSshUserValue,
@@ -141,7 +143,6 @@ from meridian.core.servers import (
     ServerConnectionDraft,
     ServerKeyPolicy,
     ServerProfile,
-    ServerRoleIntent,
     ServerSource,
     ServerValidateRequest,
     ServerValidateResult,
@@ -170,6 +171,13 @@ from meridian.core.services import (
     collect_workflow,
     deploy_server,
     workflow_catalog,
+)
+from meridian.core.topology import (
+    RoutingPolicyDraft,
+    ServerCapability,
+    TopologyServerCapabilities,
+    TrafficRouteRule,
+    TrafficScope,
 )
 from meridian.core.validation import CoreInputError, validation_error_hint, wrap_validation_error
 from meridian.core.workflow import InputField, InputKind, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
@@ -200,6 +208,7 @@ __all__ = [
     "COMMAND_FAILED",
     "COMMAND_STARTED",
     "CommandSpec",
+    "CountryCodeValue",
     "CoreModel",
     "CoreInputError",
     "CoreEventType",
@@ -241,6 +250,7 @@ __all__ = [
     "NoopReporter",
     "OutputEnvelope",
     "OutputStatus",
+    "OptionalCountryCodeValue",
     "OptionalSelectorValue",
     "OptionalServerReferenceValue",
     "OptionalSshUserValue",
@@ -266,6 +276,7 @@ __all__ = [
     "PutTextSpec",
     "PortValue",
     "RequiredNameValue",
+    "RoutingPolicyDraft",
     "RelayHealthChecker",
     "RelayDeployRequest",
     "ResourceRef",
@@ -287,16 +298,19 @@ __all__ = [
     "ServerAuthState",
     "ServerBootstrapKeyRequest",
     "ServerBootstrapKeyResult",
+    "ServerCapability",
     "ServerConnectionDraft",
     "ServerKeyPolicy",
     "ServerProfile",
     "ServerReferenceValue",
     "ServerRemoveRequest",
-    "ServerRoleIntent",
     "ServerSource",
     "ServerTitleValue",
     "ServerValidateRequest",
     "ServerValidateResult",
+    "TopologyServerCapabilities",
+    "TrafficRouteRule",
+    "TrafficScope",
     "collect_client_list",
     "collect_client_show",
     "deploy_server",

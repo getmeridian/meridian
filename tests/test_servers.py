@@ -182,7 +182,7 @@ def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest
     mock_connection.assert_not_called()
 
 
-def test_server_add_persists_role_and_port(servers_file: Path, tmp_path: Path) -> None:
+def test_server_add_persists_custom_port(servers_file: Path, tmp_path: Path) -> None:
     with (
         patch("meridian.commands.server.SERVERS_FILE", servers_file),
         patch("meridian.commands.server.CREDS_BASE", tmp_path / "credentials"),
@@ -191,12 +191,11 @@ def test_server_add_persists_role_and_port(servers_file: Path, tmp_path: Path) -
         conn = mock_connection.return_value
         conn.fetch_credentials.return_value = False
 
-        run_add("198.51.100.10", name="relay-a", user="ubuntu", ssh_port=2222, role="relay")
+        run_add("198.51.100.10", name="edge-a", user="ubuntu", ssh_port=2222)
 
     mock_connection.assert_called_once_with(ip="198.51.100.10", user="ubuntu", local_mode=False, port=2222)
-    entry = ServerRegistry(servers_file).find("relay-a")
+    entry = ServerRegistry(servers_file).find("edge-a")
     assert entry is not None
-    assert entry.role == SERVER_ROLE_RELAY
     assert entry.port == 2222
 
 

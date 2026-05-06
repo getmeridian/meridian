@@ -4,7 +4,6 @@ const FIELD_LABELS = {
   client_name: "First client",
   host: "Server IP address",
   ip: "Server IP address",
-  role_intent: "Server role",
   sni: "Camouflage target",
   ssh_port: "SSH port",
   ssh_user: "SSH user",
@@ -47,7 +46,6 @@ export function buildServerConnectionDraft(formState) {
     host: String(formState.host ?? "").trim(),
     ssh_user: String(formState.ssh_user ?? "root").trim(),
     ssh_port: Number.isNaN(parsedPort) ? rawPort : parsedPort,
-    role_intent: String(formState.role_intent ?? "exit").trim() || "exit",
   };
 }
 
@@ -97,12 +95,11 @@ export function buildServerCliCommands(draft) {
   const customPort = Number.isInteger(port) && port !== 22;
   const sshPort = customPort ? ` -p ${port}` : "";
   const addPort = customPort ? ` --ssh-port ${port}` : "";
-  const role = draft.role_intent === "relay" ? " --role relay" : "";
   const cliName = slugifyTitle(draft.title);
   return {
     connect: `ssh${sshPort} ${shellQuote(target)}`,
     copyKey: `ssh-copy-id${sshPort} ${shellQuote(target)}`,
-    save: `meridian server add ${shellQuote(draft.host)} --name ${shellQuote(cliName)} --user ${shellQuote(draft.ssh_user)}${addPort}${role}`,
+    save: `meridian server add ${shellQuote(draft.host)} --name ${shellQuote(cliName)} --user ${shellQuote(draft.ssh_user)}${addPort}`,
   };
 }
 

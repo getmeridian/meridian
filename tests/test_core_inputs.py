@@ -18,6 +18,7 @@ from meridian.core.servers import (
     ServerValidateRequest,
     profile_from_draft,
 )
+from meridian.core.topology import RoutingPolicyDraft, TopologyServerCapabilities, TrafficRouteRule
 from meridian.core.validation import validation_error_hint, wrap_validation_error
 
 
@@ -105,6 +106,51 @@ def test_server_bootstrap_key_request_keeps_password_out_of_public_contract() ->
         ServerBootstrapKeyRequest(server_ref="Demo server", key_policy="use_existing")
 
     assert "Paste a public key when reusing an existing SSH key." in validation_error_hint(exc_info.value)
+
+
+def test_routing_policy_allows_relay_that_is_also_country_exit() -> None:
+    policy = RoutingPolicyDraft(
+        servers=[
+            TopologyServerCapabilities(
+                server_ref="ru-edge",
+                capabilities=["relay", "exit"],
+                region="ru",
+            )
+        ],
+        routes=[
+            TrafficRouteRule(
+                id="ru",
+                traffic="country",
+                country_codes=["ru"],
+                entry_server_ref="ru-edge",
+                exit_server_ref="ru-edge",
+            )
+        ],
+    )
+
+    assert policy.servers[0].capabilities == ["relay", "exit"]
+    assert policy.servers[0].region == "RU"
+    assert policy.routes[0].country_codes == ["RU"]
+    assert policy.routes[0].entry_server_ref == policy.routes[0].exit_server_ref
+
+
+def test_routing_policy_rejects_missing_route_capabilities_readably() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        RoutingPolicyDraft(
+            servers=[TopologyServerCapabilities(server_ref="ru-edge", capabilities=["relay"])],
+            routes=[
+                TrafficRouteRule(
+                    id="ru",
+                    traffic="country",
+                    country_codes=["RU"],
+                    entry_server_ref="ru-edge",
+                    exit_server_ref="ru-edge",
+                )
+            ],
+        )
+
+    hint = validation_error_hint(exc_info.value)
+    assert "Route ru needs ru-edge to have exit capability." in hint
 
 
 def test_relay_deploy_request_validates_names_ports_and_exit_selector() -> None:

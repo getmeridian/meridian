@@ -47,15 +47,6 @@
       "title": "Last Validated At",
       "type": "string"
     },
-    "role": {
-      "default": "exit",
-      "enum": [
-        "exit",
-        "relay"
-      ],
-      "title": "Role",
-      "type": "string"
-    },
     "source": {
       "default": "manual",
       "enum": [

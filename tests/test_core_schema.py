@@ -47,9 +47,12 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "server-bootstrap-key-result" in names
     assert "server-connection-draft" in names
     assert "server-profile" in names
+    assert "routing-policy-draft" in names
     assert "node-add-request" in names
     assert "server-validate-request" in names
     assert "server-validate-result" in names
+    assert "topology-server-capabilities" in names
+    assert "traffic-route-rule" in names
     assert "relay-deploy-request" in names
     assert "deploy-plan" in names
     assert "deploy-ports" in names
@@ -111,6 +114,17 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     assert deploy["requested_server"]["pattern"] == r"^$|^[^\r\n\t]+$"
     assert workflow_answers["ip"]["anyOf"] == deploy["ip"]["anyOf"]
     assert workflow_answers["user"]["pattern"] == deploy["user"]["pattern"]
+
+
+def test_topology_schemas_model_capabilities_and_country_routes() -> None:
+    server_capabilities = schema_for("topology-server-capabilities")["properties"]
+    route_rule = schema_for("traffic-route-rule")["properties"]
+
+    assert server_capabilities["capabilities"]["items"]["enum"] == ["panel", "exit", "relay"]
+    assert server_capabilities["region"]["pattern"] == r"^$|^[A-Za-z]{2}$"
+    assert route_rule["country_codes"]["items"]["pattern"] == r"^[A-Za-z]{2}$"
+    assert route_rule["entry_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
+    assert route_rule["exit_server_ref"]["minLength"] == 1
 
 
 def test_server_onboarding_schemas_expose_cross_field_constraints() -> None:

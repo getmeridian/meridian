@@ -65,6 +65,11 @@ flowchart LR
 
 A relay node is a lightweight TCP forwarder running [Realm](https://github.com/zhboner/realm). The client connects to the relay's domestic IP, which forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext.
 
+The current CLI stores nodes and relays separately, but the core contract
+direction is capabilities plus routing policy. A single server can have both
+relay and exit capability; for example, a regional RU server can be the relay
+entry and also the exit for RU-destination traffic.
+
 ## How Reality protocol works
 
 1. Server generates an **x25519 keypair**. Public key is shared with clients, private key stays on server.

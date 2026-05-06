@@ -41,6 +41,7 @@ from meridian.core.servers import (
     ServerValidateRequest,
     ServerValidateResult,
 )
+from meridian.core.topology import RoutingPolicyDraft, TopologyServerCapabilities, TrafficRouteRule
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 
@@ -470,6 +471,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "server-remove-request": ServerRemoveRequest,
     "server-validate-request": ServerValidateRequest,
     "server-validate-result": ServerValidateResult,
+    "routing-policy-draft": RoutingPolicyDraft,
+    "topology-server-capabilities": TopologyServerCapabilities,
+    "traffic-route-rule": TrafficRouteRule,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
     "relay-deploy-request": RelayDeployRequest,

@@ -144,7 +144,6 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
         "--parallel",
         "--request",
         "--events",
-        "--role",
     }
     for arg in args:
         if skip_next:
@@ -431,12 +430,11 @@ def server_add_cmd(
     name: str = typer.Option("", "--name", help="Display name"),
     user: str = typer.Option("root", "--user", "-u", help="SSH user"),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port on the server"),
-    role: str = typer.Option("exit", "--role", help="Server role: exit or relay"),
 ) -> None:
     """Add a known server."""
     from meridian.commands.server import run_add
 
-    run_add(ip, name, user, ssh_port=ssh_port, role=role)
+    run_add(ip, name, user, ssh_port=ssh_port)
 
 
 @server_app.command("list")

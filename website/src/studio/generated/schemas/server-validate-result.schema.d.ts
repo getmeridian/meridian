@@ -15,7 +15,6 @@ export type Id = string;
 export type KeyPath = string;
 export type LastError = string;
 export type LastValidatedAt = string;
-export type Role = "exit" | "relay";
 export type Source = "manual" | "legacy" | "engine" | "imported";
 export type SshPort = number;
 export type SshUser = string;
@@ -43,7 +42,6 @@ export interface ServerProfile {
   key_path?: KeyPath;
   last_error?: LastError;
   last_validated_at?: LastValidatedAt;
-  role?: Role;
   source?: Source;
   ssh_port?: SshPort;
   ssh_user?: SshUser;

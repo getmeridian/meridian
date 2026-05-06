@@ -44,12 +44,15 @@ panel and not a remote daemon.
 - Exposed validation constraints in generated JSON Schemas without changing
   runtime error text.
 - Added server onboarding contracts for title, server IP, SSH user, SSH port,
-  role intent, validation results, key-bootstrap metadata, and saved profiles.
+  validation results, key-bootstrap metadata, and saved profiles.
 - Added a static Studio server setup step with draft JSON, SSH test,
   `ssh-copy-id`, and legacy `meridian server add` commands without password or
   key material in the browser.
 - Added a v2 server-profile store foundation and let deploy target resolution
   use saved profile titles/IDs/IPs with SSH port metadata.
+- Removed single-purpose server purpose selection from onboarding and added initial
+  topology contracts for capabilities plus routing policy, including routes
+  where one regional server can be both relay entry and exit.
 - Verified backend tests, ruff, mypy, contract checks, Astro check, and website
   build after the contract/Pydantic slice.
 
@@ -59,8 +62,7 @@ panel and not a remote daemon.
 
 Make server connection setup a first-class Studio journey before deploy.
 
-- Add servers as individual setup steps: title, IP, SSH user, SSH port, and role
-  intent.
+- Add servers as individual setup steps: title, IP, SSH user, and SSH port.
 - Validate reachability separately from deploy. Users should know whether SSH
   works before Meridian plans anything.
 - Support password-based first connection for beginners, then guide them into
@@ -129,8 +131,9 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
   assumptions, domain/CDN warnings, leak-risk diagnostics.
 - Add recovery flows for partial deploys, missing local state, stale SNI, backups,
   and safe retry guidance.
-- Model topology as servers with roles (`panel`, `exit`, `relay`) before adding
-  graph UI, split routing, relay fan-out, or multi-exit policy.
+- Model topology as capabilities plus routing policy, not one fixed role per
+  server. A machine may relay traffic and also be an exit for a regional route
+  such as RU traffic.
 - Make client handoff first-class: create clients, preview pages, QR/deeplinks,
   import guidance, rotation, disable, and update flows.
 
@@ -182,10 +185,9 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
   both equally?
 - What advanced SSH operations should become public escape hatches, and what
   guardrails do they require?
-- Which routing policy scope is v1: per-domain category, per-country domain
-  lists, per-node default egress, or all of these later?
-- Should role terminology in config become explicit now (`panel`, `exit`,
-  `relay`) or wait until topology work begins?
+- Which routing policy scope is first-class in v1: per-domain category,
+  per-country domain lists, per-node default egress, or a smaller first slice
+  that maps cleanly to Remnawave/Xray without making beginners edit raw YAML?
 - How much SSH key management should Meridian own: generate a dedicated key,
   reuse an existing user key, or support both with clear defaults?
 - Should server references be stored as friendly titles, stable IDs, raw IPs, or

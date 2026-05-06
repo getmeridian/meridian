@@ -2,8 +2,26 @@
 import Base from '../layouts/Base.astro';
 import { deployWorkflow, serverOnboardingWorkflow } from '../studio/generated';
 
-const deployFieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field]));
-const serverFieldsById = new Map(serverOnboardingWorkflow.fields.map((field) => [field.id, field]));
+type StudioInputKind = 'text' | 'boolean' | 'choice' | 'confirmation';
+type StudioInputOption = {
+  readonly description?: string;
+  readonly label: string;
+  readonly value: string;
+};
+type StudioInputField = {
+  readonly default?: unknown;
+  readonly help_text?: string;
+  readonly id: string;
+  readonly kind: StudioInputKind;
+  readonly label: string;
+  readonly options: readonly StudioInputOption[];
+  readonly required?: boolean;
+};
+
+const deployFields = deployWorkflow.fields as readonly StudioInputField[];
+const serverFields = serverOnboardingWorkflow.fields as readonly StudioInputField[];
+const deployFieldsById = new Map(deployFields.map((field) => [field.id, field]));
+const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]));
 ---
 
 <Base

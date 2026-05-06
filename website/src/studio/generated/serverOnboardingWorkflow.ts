@@ -41,27 +41,6 @@ export const serverOnboardingWorkflow = {
       "options": [],
       "required": true,
       "secret": false
-    },
-    {
-      "default": "exit",
-      "help_text": "",
-      "id": "role_intent",
-      "kind": "choice",
-      "label": "Server role",
-      "options": [
-        {
-          "description": "",
-          "label": "Exit",
-          "value": "exit"
-        },
-        {
-          "description": "",
-          "label": "Relay",
-          "value": "relay"
-        }
-      ],
-      "required": true,
-      "secret": false
     }
   ],
   "id": "server-onboarding",
@@ -74,8 +53,7 @@ export const serverOnboardingWorkflow = {
         "title",
         "host",
         "ssh_user",
-        "ssh_port",
-        "role_intent"
+        "ssh_port"
       ],
       "id": "connection",
       "title": "Connection"

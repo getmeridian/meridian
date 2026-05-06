@@ -17,7 +17,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm). Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, while executable Studio will need a localhost Engine. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, while executable Studio will need a localhost Engine. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 

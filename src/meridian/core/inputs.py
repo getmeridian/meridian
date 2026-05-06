@@ -30,6 +30,8 @@ _LOCAL_TARGETS = {"local", "locally"}
 _SERVER_TITLE_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 80, "pattern": r"^[^\r\n\t]+$"}
 _SERVER_REF_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 120, "pattern": r"^[^\r\n\t]+$"}
 _OPTIONAL_SERVER_REF_SCHEMA = {"type": "string", "maxLength": 120, "pattern": r"^$|^[^\r\n\t]+$"}
+_COUNTRY_CODE_SCHEMA = {"type": "string", "minLength": 2, "maxLength": 2, "pattern": r"^[A-Za-z]{2}$"}
+_OPTIONAL_COUNTRY_CODE_SCHEMA = {"type": "string", "maxLength": 2, "pattern": r"^$|^[A-Za-z]{2}$"}
 
 
 def is_local_deploy_target(value: str) -> bool:
@@ -143,6 +145,21 @@ def validate_optional_server_reference_value(value: str) -> str:
     return validate_server_reference_value(value)
 
 
+def validate_country_code_value(value: str) -> str:
+    """Validate an ISO-3166 alpha-2 country code and normalize to uppercase."""
+    normalized = value.strip().upper()
+    if len(normalized) != 2 or not normalized.isalpha() or not normalized.isascii():
+        raise ValueError("Use a two-letter country code such as RU.")
+    return normalized
+
+
+def validate_optional_country_code_value(value: str) -> str:
+    """Validate an optional ISO-3166 alpha-2 country code."""
+    if not value:
+        return value
+    return validate_country_code_value(value)
+
+
 IPAddressValue = Annotated[
     str,
     WithJsonSchema(_IP_ADDRESS_SCHEMA),
@@ -197,5 +214,15 @@ OptionalServerReferenceValue = Annotated[
     str,
     WithJsonSchema(_OPTIONAL_SERVER_REF_SCHEMA),
     AfterValidator(validate_optional_server_reference_value),
+]
+CountryCodeValue = Annotated[
+    str,
+    WithJsonSchema(_COUNTRY_CODE_SCHEMA),
+    AfterValidator(validate_country_code_value),
+]
+OptionalCountryCodeValue = Annotated[
+    str,
+    WithJsonSchema(_OPTIONAL_COUNTRY_CODE_SCHEMA),
+    AfterValidator(validate_optional_country_code_value),
 ]
 PortValue = Annotated[int, Field(ge=1, le=65535)]

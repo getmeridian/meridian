@@ -17,9 +17,8 @@ from meridian.core.inputs import (
     SshUserValue,
 )
 from meridian.core.models import CoreModel
-from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
+from meridian.core.workflow import InputField, InputSection, WorkflowPlan
 
-ServerRoleIntent = Literal["exit", "relay"]
 ServerAuthState = Literal["unknown", "validated", "key_ready", "failed"]
 ServerSource = Literal["manual", "legacy", "engine", "imported"]
 ServerKeyPolicy = Literal["generate_meridian", "use_existing"]
@@ -32,7 +31,6 @@ class ServerConnectionDraft(CoreModel):
     host: IPAddressValue
     ssh_user: SshUserValue = "root"
     ssh_port: PortValue = 22
-    role_intent: ServerRoleIntent = "exit"
 
 
 class ServerProfile(CoreModel):
@@ -43,7 +41,6 @@ class ServerProfile(CoreModel):
     host: IPAddressValue
     ssh_user: SshUserValue = "root"
     ssh_port: PortValue = 22
-    role: ServerRoleIntent = "exit"
     auth_state: ServerAuthState = "unknown"
     last_validated_at: str = ""
     last_error: str = ""
@@ -152,7 +149,6 @@ def profile_from_draft(
         host=draft.host,
         ssh_user=draft.ssh_user,
         ssh_port=draft.ssh_port,
-        role=draft.role_intent,
         auth_state=auth_state,
         source=source,
     )
@@ -193,17 +189,6 @@ def build_server_onboarding_workflow() -> WorkflowPlan:
             default="22",
             help_text="Use 22 unless your VPS provider gave you a custom SSH port.",
         ),
-        InputField(
-            id="role_intent",
-            label="Server role",
-            kind="choice",
-            required=True,
-            default="exit",
-            options=[
-                InputOption(value="exit", label="Exit"),
-                InputOption(value="relay", label="Relay"),
-            ],
-        ),
     ]
     return WorkflowPlan(
         id="server-onboarding",
@@ -216,7 +201,7 @@ def build_server_onboarding_workflow() -> WorkflowPlan:
                 id="connection",
                 title="Connection",
                 description="The minimum details needed before Meridian can validate SSH.",
-                field_ids=["title", "host", "ssh_user", "ssh_port", "role_intent"],
+                field_ids=["title", "host", "ssh_user", "ssh_port"],
             )
         ],
         ready_request_schema="server-connection-draft",

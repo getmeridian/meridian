@@ -21,15 +21,6 @@
       "title": "Name",
       "type": "string"
     },
-    "role": {
-      "default": "exit",
-      "enum": [
-        "exit",
-        "relay"
-      ],
-      "title": "Role",
-      "type": "string"
-    },
     "ssh_port": {
       "default": 22,
       "maximum": 65535,

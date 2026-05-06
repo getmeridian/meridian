@@ -6,7 +6,6 @@
  */
 
 export type Host = string;
-export type RoleIntent = "exit" | "relay";
 export type SshPort = number;
 export type SshUser = string;
 export type Title = string;
@@ -16,7 +15,6 @@ export type Title = string;
  */
 export interface ServerConnectionDraft {
   host: Host;
-  role_intent?: RoleIntent;
   ssh_port?: SshPort;
   ssh_user?: SshUser;
   title: Title;

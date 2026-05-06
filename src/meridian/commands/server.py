@@ -12,7 +12,7 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 
 
-def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22, role: str = "exit") -> None:
+def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22) -> None:
     """Register a server, verify SSH, and fetch credentials."""
     request = validate_command_input(
         ServerAddRequest,
@@ -21,7 +21,6 @@ def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22, rol
         name=name,
         user=user,
         ssh_port=ssh_port,
-        role=role,
     )
 
     registry = ServerRegistry(SERVERS_FILE)
@@ -41,9 +40,7 @@ def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22, rol
     else:
         warn("No credentials found on server (run meridian deploy first)")
 
-    registry.add(
-        ServerEntry(host=request.ip, user=request.user, name=request.name, role=request.role, port=request.ssh_port)
-    )
+    registry.add(ServerEntry(host=request.ip, user=request.user, name=request.name, port=request.ssh_port))
     ok(f"Server added: {request.name or request.ip}")
 
 

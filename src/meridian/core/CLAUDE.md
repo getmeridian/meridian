@@ -10,7 +10,8 @@
 - **Pydantic at API boundaries** - public request/result/event/error/service contracts validate, serialize, and export JSON Schema from Pydantic v2 models.
 - **Deploy planning is pure** - mode, ports, reusable paths, and request validation are computed before adapters perform SSH or panel I/O.
 - **Input models fail early** - CLI and Engine adapters should validate typed core request models at the boundary, then pass trusted objects inward.
-- **Server onboarding is UX-shaped** - collect titles, server IPs, SSH user/port, role intent, and stable references before mapping into storage or deploy requests.
+- **Server onboarding is UX-shaped** - collect titles, server IPs, SSH user/port, and stable references before mapping into storage or deploy requests.
+- **Topology uses capabilities plus policy** - a server may be both relay and exit; routing rules decide where traffic exits.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
 

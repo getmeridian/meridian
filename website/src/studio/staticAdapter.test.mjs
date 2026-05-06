@@ -90,7 +90,6 @@ test("builds a server connection draft from onboarding state", () => {
 
   assert.deepEqual(draft, {
     host: "198.51.100.10",
-    role_intent: "exit",
     ssh_port: 2222,
     ssh_user: "ubuntu",
     title: "Family VPN",
@@ -121,7 +120,6 @@ test("builds static server setup commands without storing secrets", () => {
   assert.deepEqual(
     buildServerCliCommands({
       host: "198.51.100.10",
-      role_intent: "exit",
       ssh_port: 2222,
       ssh_user: "ubuntu",
       title: "Family VPN",
@@ -131,19 +129,6 @@ test("builds static server setup commands without storing secrets", () => {
       copyKey: "ssh-copy-id -p 2222 ubuntu@198.51.100.10",
       save: "meridian server add 198.51.100.10 --name family-vpn --user ubuntu --ssh-port 2222",
     },
-  );
-});
-
-test("builds relay setup command with role flag", () => {
-  assert.equal(
-    buildServerCliCommands({
-      host: "198.51.100.20",
-      role_intent: "relay",
-      ssh_port: 22,
-      ssh_user: "root",
-      title: "Relay",
-    }).save,
-    "meridian server add 198.51.100.20 --name relay --user root --role relay",
   );
 });
 

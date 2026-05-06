@@ -17,15 +17,6 @@ export const serverConnectionDraftSchema = {
       ],
       "title": "Host"
     },
-    "role_intent": {
-      "default": "exit",
-      "enum": [
-        "exit",
-        "relay"
-      ],
-      "title": "Role Intent",
-      "type": "string"
-    },
     "ssh_port": {
       "default": 22,
       "maximum": 65535,

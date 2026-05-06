@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "One routing rule that maps traffic to an exit, optionally through a relay entry.",
+  "properties": {
+    "country_codes": {
+      "items": {
+        "maxLength": 2,
+        "minLength": 2,
+        "pattern": "^[A-Za-z]{2}$",
+        "type": "string"
+      },
+      "title": "Country Codes",
+      "type": "array"
+    },
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "entry_server_ref": {
+      "default": "",
+      "maxLength": 120,
+      "pattern": "^$|^[^\\r\\n\\t]+$",
+      "title": "Entry Server Ref",
+      "type": "string"
+    },
+    "exit_server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Exit Server Ref",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "traffic": {
+      "default": "default",
+      "enum": [
+        "default",
+        "country"
+      ],
+      "title": "Traffic",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "exit_server_ref"
+  ],
+  "title": "TrafficRouteRule",
+  "type": "object"
+}

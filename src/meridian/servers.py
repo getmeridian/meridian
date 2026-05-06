@@ -217,7 +217,6 @@ class ServerProfileStore:
                 host=entry.host,
                 ssh_user=entry.user,
                 ssh_port=entry.port,
-                role_intent="relay" if entry.role == SERVER_ROLE_RELAY else "exit",
             )
             profiles.append(profile_from_draft(draft, source="legacy"))
         return profiles
