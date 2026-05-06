@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pydantic import ValidationError
@@ -18,8 +18,13 @@ class CoreInputError(ValueError):
 
 def validation_error_hint(exc: ValidationError) -> str:
     """Format Pydantic validation errors as compact field-specific hints."""
+    return validation_errors_hint(exc.errors())
+
+
+def validation_errors_hint(errors: Iterable[Mapping[str, Any]]) -> str:
+    """Format Pydantic/FastAPI validation error dictionaries as compact hints."""
     lines: list[str] = []
-    for error in exc.errors():
+    for error in errors:
         field = _format_location(error.get("loc", ()))
         message = _format_message(error)
         lines.append(f"{field}: {message}" if field else message)
@@ -36,7 +41,10 @@ def _format_location(location: Any) -> str:
         return ""
     if not isinstance(location, tuple):
         return str(location)
-    return ".".join(str(part) for part in location)
+    parts = [str(part) for part in location]
+    if parts and parts[0] in {"body", "query", "path"}:
+        parts = parts[1:]
+    return ".".join(parts)
 
 
 def _format_message(error: Mapping[str, Any]) -> str:

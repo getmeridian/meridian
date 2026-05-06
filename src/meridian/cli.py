@@ -140,6 +140,8 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
         "--sni",
         "--user",
         "--ssh-port",
+        "--port",
+        "--assets-dir",
         "--prune-extras",
         "--parallel",
         "--request",
@@ -180,6 +182,23 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
     if positionals[:2] in (["client", "list"], ["client", "show"], ["fleet", "status"], ["fleet", "inventory"]):
         return True
     return positionals[0] == "api"
+
+
+# =============================================================================
+# Studio
+# =============================================================================
+
+
+@app.command("studio")
+def studio_cmd(
+    port: int = typer.Option(0, "--port", help="Localhost port; 0 picks an available high port"),
+    assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
+    no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),
+) -> None:
+    """Open Meridian Studio with the localhost Engine API."""
+    from meridian.commands.studio import run
+
+    run(port=port, assets_dir=assets_dir, no_open=no_open)
 
 
 # =============================================================================

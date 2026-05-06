@@ -4,7 +4,7 @@
 
 **Generated contracts first** — `generated/` is built from `contracts/meridian/v1` with `pnpm run contracts:generate`.
 
-**Static first** — Studio should prove the deploy workflow as a static request builder/demo before adding localhost execution.
+**Static plus local Engine** — Static Studio remains the safe fallback; executable Studio talks to `meridian studio` for localhost-only SSH, files, secrets, operations, and dry-runs.
 
 **Adapters over contracts** — Static, LocalEngine, Mock, Desktop, and Mobile adapters consume generated contracts rather than command modules.
 
@@ -12,11 +12,12 @@
 
 - Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
 - Static adapter logic is pure browser-safe JavaScript with Node tests; it does not store operator input.
-- Server setup stays static-safe by rendering drafts and commands only; password/key bootstrap waits for Engine.
+- LocalEngine adapter detects `meridian studio` and uses CSRF-protected typed endpoints without breaking static hosting.
 
 ## Pitfalls
 
 - Do not hand-edit `generated/`; change Python contracts, export contracts, then regenerate.
 - Do not let Astro concerns leak into `meridian.core`.
-- Do not add Engine assumptions to static Studio; use generated fixtures, exported requests, copied CLI, or pasted output.
+- Keep Engine assumptions behind adapters; static Studio still uses generated fixtures, exported requests, copied CLI, or pasted output.
 - Do not persist deploy form state or pasted machine output in browser storage or URLs.
+- Never include SSH passwords in draft JSON, copied commands, generated contracts, storage, or URLs.

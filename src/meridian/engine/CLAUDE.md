@@ -6,11 +6,12 @@
 - **Core is the contract source** - Engine calls `meridian.core` validation, planning, models, reporters, and events instead of redefining request/result shapes.
 - **Adapters stay explicit** - Filesystem state, server registries, SSH, panel clients, and future HTTP handlers are passed in or isolated behind small runtime helpers.
 - **Only for execution** - Static Studio can use generated contracts without Engine. Engine is for local executable UI mode: SSH, files, secrets, operation state, events, and cancellation.
-- **No HTTP yet** - The initial Engine package owns deploy planning and dry-run orchestration only. Localhost API, operation registry, SSE, and cancellation come later.
+- **Localhost API first** - `meridian studio` serves a FastAPI app on `127.0.0.1` with contract/workflow discovery, server onboarding actions, and deploy dry-run.
 
 ## Pitfalls
 
 - Do not import `commands.resolve`; it creates CLI output, process exits, and SSH connections at import/use time.
 - Do not expose raw shell, arbitrary file access, or unredacted secrets from Engine APIs.
 - Keep human wording and terminal rendering in CLI adapters.
-- Keep localhost security hostile-by-default when HTTP arrives: Host/Origin checks, CSRF, no permissive CORS.
+- Keep localhost security hostile-by-default: Host/Origin checks, CSRF, no permissive CORS.
+- Keep password bootstrap one-time only: no generated contracts, logs, events, browser storage, or profile persistence.

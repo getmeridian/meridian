@@ -40,6 +40,7 @@ class TestCLIBasics:
         assert result.exit_code == 0
         output = _strip_ansi(result.output)
         assert "deploy" in output
+        assert "studio" in output
         assert "client" in output
         assert "server" in output
 
@@ -60,6 +61,28 @@ class TestSubcommandHelp:
         assert "--events" in output
         assert "--request" in output
         assert "--dry-run" in output
+
+    def test_studio_help(self) -> None:
+        result = runner.invoke(app, ["studio", "--help"])
+        assert result.exit_code == 0
+        output = _strip_ansi(result.output)
+        assert "--port" in output
+        assert "--assets-dir" in output
+        assert "--no-open" in output
+
+    def test_studio_command_delegates_to_runner(self, monkeypatch) -> None:
+        called: dict[str, object] = {}
+
+        def fake_run(*, port: int, assets_dir: str, no_open: bool) -> None:
+            called.update({"port": port, "assets_dir": assets_dir, "no_open": no_open})
+
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr("meridian.commands.studio.run", fake_run)
+
+        result = runner.invoke(app, ["studio", "--port", "9876", "--assets-dir", "website/dist", "--no-open"])
+
+        assert result.exit_code == 0
+        assert called == {"port": 9876, "assets_dir": "website/dist", "no_open": True}
 
     def test_client_help(self) -> None:
         result = runner.invoke(app, ["client", "--help"])

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import builtins
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -94,14 +96,18 @@ class ServerRegistry:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text("\n".join(lines) + "\n" if lines else "")
 
-    def list(self) -> list[ServerEntry]:
-        """Return all registered servers."""
-        entries = []
+    def _read_legacy_entries(self) -> list[ServerEntry]:
+        entries: list[ServerEntry] = []
         for raw in self._read_lines():
             entry = ServerEntry.from_line(raw)
             if entry:
                 entries.append(entry)
         return entries
+
+    def list(self) -> list[ServerEntry]:
+        """Return all registered servers."""
+        entries = self._read_legacy_entries()
+        return _merge_server_entries(entries, _profile_entries(_read_profiles_file(self.path.with_suffix(".json"))))
 
     def count(self) -> int:
         return len(self.list())
@@ -125,6 +131,16 @@ class ServerRegistry:
             new_lines.append(raw)
         new_lines.append(str(entry))
         self._write_lines(new_lines)
+        if entry.role != SERVER_ROLE_EXIT:
+            return
+        profile_store = ServerProfileStore(self.path.with_suffix(".json"), legacy_path=self.path)
+        draft = ServerConnectionDraft(
+            title=entry.name or entry.host,
+            host=entry.host,
+            ssh_user=entry.user,
+            ssh_port=entry.port,
+        )
+        profile_store.upsert(profile_from_draft(draft))
 
     def remove(self, query: str) -> bool:
         """Remove a server by IP or name. Returns True if found and removed."""
@@ -139,7 +155,8 @@ class ServerRegistry:
             new_lines.append(raw)
         if removed:
             self._write_lines(new_lines)
-        return removed
+        removed_profile = ServerProfileStore(self.path.with_suffix(".json"), legacy_path=self.path).remove(query)
+        return removed or removed_profile
 
 
 class ServerProfileStore:
@@ -151,11 +168,12 @@ class ServerProfileStore:
 
     def list(self) -> list[ServerProfile]:
         """Return saved server profiles, migrating readable legacy entries in memory."""
-        if self.path.exists():
-            return self._read_profiles()
+        profiles: list[ServerProfile] = []
         if self.legacy_path and self.legacy_path.exists():
-            return self._legacy_profiles()
-        return []
+            profiles.extend(self._legacy_profiles())
+        if self.path.exists():
+            profiles.extend(self._read_profiles())
+        return _merge_profiles(profiles)
 
     def find(self, query: str) -> ServerProfile | None:
         """Find a server by stable ID, title, or host."""
@@ -190,28 +208,38 @@ class ServerProfileStore:
         return True
 
     def _read_profiles(self) -> builtins.list[ServerProfile]:
-        payload = json.loads(self.path.read_text(encoding="utf-8"))
-        raw_profiles = payload.get("servers", []) if isinstance(payload, dict) else []
-        profiles: builtins.list[ServerProfile] = []
-        for raw in raw_profiles:
-            try:
-                profiles.append(ServerProfile.model_validate(raw))
-            except ValidationError:
-                continue
-        return profiles
+        return _read_profiles_file(self.path)
 
     def _write_profiles(self, profiles: builtins.list[ServerProfile]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self.path.parent.chmod(0o700)
+        except PermissionError:
+            pass
         payload: dict[str, Any] = {
             "schema": SERVER_REGISTRY_SCHEMA,
             "servers": [profile.model_dump(mode="json") for profile in profiles],
         }
-        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        data = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8") + b"\n"
+        fd, tmp = tempfile.mkstemp(dir=str(self.path.parent), suffix=".tmp")
+        try:
+            os.write(fd, data)
+            os.fsync(fd)
+            os.close(fd)
+            fd = -1
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, self.path)
+        except BaseException:
+            if fd >= 0:
+                os.close(fd)
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
 
     def _legacy_profiles(self) -> builtins.list[ServerProfile]:
         assert self.legacy_path is not None
         profiles: builtins.list[ServerProfile] = []
-        for entry in ServerRegistry(self.legacy_path).list():
+        for entry in ServerRegistry(self.legacy_path)._read_legacy_entries():
             draft = ServerConnectionDraft(
                 title=entry.name or entry.host,
                 host=entry.host,
@@ -220,3 +248,48 @@ class ServerProfileStore:
             )
             profiles.append(profile_from_draft(draft, source="legacy"))
         return profiles
+
+
+def _read_profiles_file(path: Path) -> builtins.list[ServerProfile]:
+    if not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    raw_profiles = payload.get("servers", []) if isinstance(payload, dict) else []
+    profiles: builtins.list[ServerProfile] = []
+    for raw in raw_profiles:
+        try:
+            profiles.append(ServerProfile.model_validate(raw))
+        except ValidationError:
+            continue
+    return profiles
+
+
+def _profile_entries(profiles: list[ServerProfile]) -> list[ServerEntry]:
+    return [
+        ServerEntry(host=profile.host, user=profile.ssh_user, name=profile.title, port=profile.ssh_port)
+        for profile in profiles
+    ]
+
+
+def _merge_server_entries(entries: list[ServerEntry], extra: list[ServerEntry]) -> list[ServerEntry]:
+    merged: list[ServerEntry] = []
+    for entry in [*entries, *extra]:
+        merged = [
+            existing
+            for existing in merged
+            if existing.host != entry.host and (not entry.name or existing.name != entry.name)
+        ]
+        merged.append(entry)
+    return merged
+
+
+def _merge_profiles(profiles: list[ServerProfile]) -> list[ServerProfile]:
+    merged: list[ServerProfile] = []
+    for profile in profiles:
+        merged = [
+            existing
+            for existing in merged
+            if existing.id != profile.id and existing.title != profile.title and existing.host != profile.host
+        ]
+        merged.append(profile)
+    return merged

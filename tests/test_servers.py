@@ -115,6 +115,20 @@ class TestServerRegistry:
         reg.add(ServerEntry("1.2.3.4", "root", "myserver"))
         assert reg.find("nonexistent") is None
 
+    def test_list_reads_v2_profiles_for_cli_compat(self, servers_file: Path) -> None:
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        )
+        ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
+        reg = ServerRegistry(servers_file)
+
+        entry = reg.find("Family VPN")
+
+        assert entry is not None
+        assert entry.host == "198.51.100.10"
+        assert entry.user == "ubuntu"
+        assert entry.port == 2222
+
     def test_remove_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("1.2.3.4", "root", "s1"))
@@ -220,6 +234,7 @@ class TestServerProfileStore:
         store.upsert(profile_from_draft(ServerConnectionDraft(title="Edge", host="198.51.100.10")))
 
         assert f'"schema": "{SERVER_REGISTRY_SCHEMA}"' in path.read_text()
+        assert path.stat().st_mode & 0o777 == 0o600
 
     def test_store_reads_legacy_servers_as_profiles_without_rewriting(self, servers_file: Path) -> None:
         servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
@@ -234,3 +249,12 @@ class TestServerProfileStore:
         assert profiles[0].ssh_port == 2222
         assert profiles[0].source == "legacy"
         assert not store.path.exists()
+
+    def test_store_merges_legacy_profiles_when_json_exists(self, servers_file: Path) -> None:
+        servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
+        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+        store.upsert(profile_from_draft(ServerConnectionDraft(title="Panel", host="198.51.100.20")))
+
+        profiles = store.list()
+
+        assert {profile.title for profile in profiles} == {"edge", "Panel"}

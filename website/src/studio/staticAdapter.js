@@ -60,8 +60,12 @@ export function validateServerConnectionDraft(request, schema, workflow) {
 function validateRequest(request, schema, workflow) {
   const errors = [];
   const requiredFields = workflow.fields.filter((field) => field.required && field.id !== "confirm");
+  const requestHasServerReference = typeof request.requested_server === "string" && request.requested_server.trim() !== "";
 
   for (const field of requiredFields) {
+    if (requestHasServerReference && (field.id === "ip" || field.id === "user")) {
+      continue;
+    }
     const value = request[field.id];
     if (value === undefined || value === null || String(value).trim() === "") {
       errors.push({ field: field.id, message: `${field.label} is required.` });

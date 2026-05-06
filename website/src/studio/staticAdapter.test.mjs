@@ -72,6 +72,20 @@ test("validates request fields with readable messages", () => {
   ]));
 });
 
+test("allows deploy request validation by saved server reference", () => {
+  const request = buildDeployRequest({
+    ...initialFormState(workflow),
+    ip: "",
+    requested_server: "srv-demo",
+    user: "",
+  });
+
+  const errors = validateDeployRequest(request, deployRequestSchema, workflow);
+
+  assert.equal(errors.some((error) => error.field === "ip"), false);
+  assert.equal(errors.some((error) => error.field === "user"), false);
+});
+
 test("builds request-file CLI commands", () => {
   assert.deepEqual(buildCliCommands(), {
     deploy: "meridian deploy --request deploy.json --json --events=jsonl",

@@ -53,6 +53,13 @@ panel and not a remote daemon.
 - Removed single-purpose server purpose selection from onboarding and added initial
   topology contracts for capabilities plus routing policy, including routes
   where one regional server can be both relay entry and exit.
+- Started executable Studio with `meridian studio`, a localhost-only FastAPI
+  Engine API, contract/workflow discovery, saved server reads, server save,
+  SSH validation, password-assisted key bootstrap, and deploy dry-run.
+- Added a LocalEngine Studio adapter so `/studio/` can call Engine actions when
+  launched locally while keeping the static command-copy fallback.
+- Unified Studio and CLI server references through the v2 server profile store
+  with legacy registry compatibility and private atomic writes.
 - Verified backend tests, ruff, mypy, contract checks, Astro check, and website
   build after the contract/Pydantic slice.
 
@@ -64,15 +71,20 @@ Make server connection setup a first-class Studio journey before deploy.
 
 - Add servers as individual setup steps: title, IP, SSH user, and SSH port.
 - Validate reachability separately from deploy. Users should know whether SSH
-  works before Meridian plans anything.
+  works before Meridian plans anything. **Started:** Engine exposes
+  `/api/v1/servers/validate` with specific SSH hints.
 - Support password-based first connection for beginners, then guide them into
-  proper key-based SSH.
+  proper key-based SSH. **Started:** Engine accepts a one-time password secret
+  for key bootstrap and does not include it in generated contracts or draft JSON.
 - Generate or select an SSH key, install the public key on the server, verify
-  key login, and clearly explain what changed.
+  key login, and clearly explain what changed. **Started:** generated Meridian
+  keys are installed and verified with a pinned identity; reused public keys are
+  not falsely marked verified without a matching private key.
 - Keep password handling Engine-only when executable mode arrives; static Studio
   may model the flow and copy CLI commands, but must not store passwords.
 - Save reusable server references so deploy/relay/recovery flows can target a
   server by title or IP instead of repeatedly asking for raw connection details.
+  **Started:** Engine saves v2 server profiles from Studio drafts.
 - Make server connection errors friendly: wrong port, refused auth, missing sudo,
   first-login host key prompts, and blocked network should produce specific next
   actions.
@@ -113,13 +125,16 @@ Only after the static UI proves the server/deploy workflow:
 
 If Studio needs "click Deploy", add a localhost-only Engine API.
 
-- Bind to `127.0.0.1` on a random high port.
-- Serve bundled Studio assets from the Python package.
+- Bind to `127.0.0.1` on a random high port. **Started:** `meridian studio`.
+- Serve bundled Studio assets from the Python package. **Partially started:**
+  current executable mode serves a provided/dist asset directory and exposes a
+  clear missing-assets page.
 - Expose typed `/api/v1/*` endpoints for schema/workflow discovery, validation,
   dry-run, start operation, operation status, event replay/SSE, result, and
-  cancel.
+  cancel. **Started:** health, schemas, workflows, server list, deploy dry-run.
 - Include server endpoints for add/list/validate/bootstrap-key so the UI can
-  onboard multiple servers before choosing deploy targets.
+  onboard multiple servers before choosing deploy targets. **Started:** list,
+  save, validate, and bootstrap-key endpoints are wired into Studio.
 - Use exact Host allowlists, strict Origin/Sec-Fetch checks, no permissive CORS,
   CSRF protection for mutating endpoints, no-store API responses, and CSP.
 - Do not expose raw shell, arbitrary file read/write, generic SSH, proxy

@@ -11,6 +11,8 @@ CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
 CREDS_BASE = MERIDIAN_HOME / "credentials"  # legacy (3.x migration only)
 CACHE_DIR = MERIDIAN_HOME / "cache"
 SERVERS_FILE = MERIDIAN_HOME / "servers"  # legacy (3.x migration only)
+SERVER_PROFILES_FILE = MERIDIAN_HOME / "servers.json"
+MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
 SERVER_CREDS_DIR = Path("/etc/meridian")
 SERVER_NODE_CONFIG = SERVER_CREDS_DIR / "node.yml"  # server-side identity
 

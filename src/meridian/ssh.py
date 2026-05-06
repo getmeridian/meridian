@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shlex
 import shutil
@@ -111,6 +112,15 @@ def ensure_multiplex_dir() -> None:
     """Create the SSH control socket directory if it doesn't exist."""
     sock_dir = Path.home() / ".meridian" / "ssh"
     sock_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+
+def ensure_askpass_script() -> Path:
+    """Create the local askpass helper used for short-lived password SSH."""
+    script = Path.home() / ".meridian" / "ssh" / "askpass.sh"
+    script.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    script.write_text("#!/bin/sh\nprintf '%s\\n' \"$MERIDIAN_SSH_PASSWORD\"\n", encoding="utf-8")
+    script.chmod(0o700)
+    return script
 
 
 def scp_host(ip: str) -> str:
@@ -252,11 +262,15 @@ class ServerConnection:
         local_mode: bool = False,
         port: int = 22,
         multiplex: bool = True,
+        identity_file: str = "",
+        password: str = "",
     ) -> None:
         self.ip = ip
         self.user = user
         self.port = port
         self.local_mode = local_mode
+        self.identity_file = identity_file
+        self.password = password
         self.needs_sudo = False  # on-server non-root — run commands via sudo
         self.multiplex = multiplex
         if multiplex and not local_mode:
@@ -277,9 +291,18 @@ class ServerConnection:
 
     @property
     def _ssh_opts(self) -> list[str]:
-        opts = list(SSH_OPTS)
+        opts = [
+            "-o",
+            "BatchMode=no" if self.password else "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "StrictHostKeyChecking=accept-new" if self.password else "StrictHostKeyChecking=yes",
+        ]
         if self.multiplex and not self.local_mode:
             opts.extend(SSH_MULTIPLEX_OPTS)
+        if self.identity_file:
+            opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
         if self.port != 22:
             opts.extend(["-p", str(self.port)])
         return opts
@@ -287,9 +310,18 @@ class ServerConnection:
     @property
     def _scp_opts(self) -> list[str]:
         """SSH options for SCP commands (uses -P for port, not -p)."""
-        opts = list(SSH_OPTS)
+        opts = [
+            "-o",
+            "BatchMode=no" if self.password else "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "StrictHostKeyChecking=accept-new" if self.password else "StrictHostKeyChecking=yes",
+        ]
         if self.multiplex and not self.local_mode:
             opts.extend(SSH_MULTIPLEX_OPTS)
+        if self.identity_file:
+            opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
         if self.port != 22:
             opts.extend(["-P", str(self.port)])
         return opts
@@ -425,6 +457,17 @@ class ServerConnection:
                     # first layer of quoting. sudo -n sh -c adds a second layer.
                     remote_command = f"sudo -n sh -c {shlex.quote(remote_command)}"
                 cmd = ["ssh", *self._ssh_opts, f"{self.user}@{self.ip}", remote_command]
+                process_env = None
+                if self.password:
+                    process_env = os.environ.copy()
+                    process_env.update(
+                        {
+                            "DISPLAY": process_env.get("DISPLAY") or "meridian",
+                            "MERIDIAN_SSH_PASSWORD": self.password,
+                            "SSH_ASKPASS": str(ensure_askpass_script()),
+                            "SSH_ASKPASS_REQUIRE": "force",
+                        }
+                    )
                 try:
                     completed = subprocess.run(
                         cmd,
@@ -433,6 +476,7 @@ class ServerConnection:
                         timeout=timeout,
                         stdin=subprocess.DEVNULL if input is None else None,
                         input=input,
+                        env=process_env,
                     )
                 except subprocess.TimeoutExpired:
                     timed_out = True

@@ -179,7 +179,12 @@ from meridian.core.topology import (
     TrafficRouteRule,
     TrafficScope,
 )
-from meridian.core.validation import CoreInputError, validation_error_hint, wrap_validation_error
+from meridian.core.validation import (
+    CoreInputError,
+    validation_error_hint,
+    validation_errors_hint,
+    wrap_validation_error,
+)
 from meridian.core.workflow import InputField, InputKind, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 __all__ = [
@@ -340,6 +345,7 @@ __all__ = [
     "validate_command_envelope",
     "validate_deploy_target",
     "validation_error_hint",
+    "validation_errors_hint",
     "wrap_validation_error",
     "WorkflowPlan",
     "WorkflowNotFoundError",

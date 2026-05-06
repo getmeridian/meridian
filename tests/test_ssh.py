@@ -79,6 +79,33 @@ class TestServerConnectionRun:
             assert "ConnectTimeout=10" in cmd
             assert "StrictHostKeyChecking=yes" in cmd
 
+    def test_remote_can_pin_identity_file(self) -> None:
+        conn = ServerConnection(ip="198.51.100.10", user="deploy", identity_file="/tmp/meridian_ed25519")
+        with patch("meridian.ssh.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+            conn.run("whoami")
+
+        cmd = mock_run.call_args[0][0]
+        assert "-i" in cmd
+        assert "/tmp/meridian_ed25519" in cmd
+        assert "IdentitiesOnly=yes" in cmd
+
+    def test_remote_password_uses_askpass_without_batch_mode(self) -> None:
+        conn = ServerConnection(ip="198.51.100.10", user="root", password="secret")
+        with (
+            patch("meridian.ssh.ensure_askpass_script", return_value=Path("/tmp/askpass")),
+            patch("meridian.ssh.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+            conn.run("whoami")
+
+        cmd = mock_run.call_args[0][0]
+        kwargs = mock_run.call_args[1]
+        assert "BatchMode=no" in cmd
+        assert "StrictHostKeyChecking=accept-new" in cmd
+        assert kwargs["env"]["SSH_ASKPASS"] == "/tmp/askpass"
+        assert kwargs["env"]["MERIDIAN_SSH_PASSWORD"] == "secret"
+
     def test_stdin_devnull(self) -> None:
         conn = ServerConnection(ip="1.2.3.4")
         with patch("meridian.ssh.subprocess.run") as mock_run:

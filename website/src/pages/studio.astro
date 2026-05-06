@@ -35,9 +35,9 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
         <h1 id="studio-title">Deploy request workbench</h1>
         <p class="studio__summary">{deployWorkflow.summary}</p>
       </div>
-      <div class="studio__status-strip" aria-label="Studio mode">
+      <div class="studio__status-strip" id="studio-mode" aria-label="Studio mode">
         <span class="studio__status-dot" aria-hidden="true"></span>
-        <span>Contract mode</span>
+        <span id="studio-mode-label">Contract mode</span>
       </div>
     </section>
 
@@ -114,6 +114,17 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
             </div>
           </div>
           <div class="studio__command-list">
+            <div class="studio__engine-actions" id="studio-server-engine-actions" hidden>
+              <label class="studio__field studio__engine-password" for="studio-engine-password">
+                <span class="studio__label-row">
+                  <span>SSH password</span>
+                </span>
+                <input id="studio-engine-password" type="password" autocomplete="current-password" />
+              </label>
+              <button class="studio__primary" type="button" id="studio-engine-save-server">Save</button>
+              <button class="studio__primary" type="button" id="studio-engine-validate-server">Validate SSH</button>
+              <button class="studio__primary" type="button" id="studio-engine-bootstrap-key">Prepare key</button>
+            </div>
             <button class="studio__command" type="button" id="studio-copy-server-connect">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 17l6-6-6-6"></path>
@@ -137,6 +148,7 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
               <span id="studio-server-save-command"></span>
             </button>
           </div>
+          <p class="studio__copy-status" id="studio-engine-status" aria-live="polite"></p>
           <p class="studio__copy-status" id="studio-server-copy-status" aria-live="polite"></p>
         </div>
       </aside>
@@ -151,6 +163,14 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
           </div>
           <output class="studio__validation-pill" id="studio-validation-pill">Ready</output>
         </div>
+        <label class="studio__field studio__engine-server-select" id="studio-engine-server-field" for="studio-engine-server" hidden>
+          <span class="studio__label-row">
+            <span>Saved server</span>
+          </span>
+          <select id="studio-engine-server">
+            <option value="">Use raw connection fields</option>
+          </select>
+        </label>
 
         {deployWorkflow.sections.map((section) => (
           <fieldset class="studio__section">
@@ -230,6 +250,7 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
               <h2>Commands</h2>
             </div>
           </div>
+          <button class="studio__primary" type="button" id="studio-engine-dry-run" hidden>Dry-run</button>
           <div class="studio__command-list">
             <button class="studio__command" type="button" id="studio-copy-dry-run">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -295,6 +316,7 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
 </Base>
 
 <script>
+  import { connectLocalEngine, enginePost } from '../studio/localEngineAdapter.js';
   import {
     buildCliCommands,
     buildDeployRequest,
@@ -316,10 +338,18 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     studioFixtures,
   } from '../studio/generated';
 
+  const studioMode = document.getElementById('studio-mode') as HTMLElement;
+  const studioModeLabel = document.getElementById('studio-mode-label') as HTMLElement;
   const serverForm = document.getElementById('studio-server-form') as HTMLFormElement;
   const serverJson = document.getElementById('studio-server-json') as HTMLElement;
   const serverErrorsEl = document.getElementById('studio-server-errors') as HTMLElement;
   const serverValidationPill = document.getElementById('studio-server-validation-pill') as HTMLElement;
+  const serverEngineActions = document.getElementById('studio-server-engine-actions') as HTMLElement;
+  const engineSaveServer = document.getElementById('studio-engine-save-server') as HTMLButtonElement;
+  const engineValidateServer = document.getElementById('studio-engine-validate-server') as HTMLButtonElement;
+  const engineBootstrapKey = document.getElementById('studio-engine-bootstrap-key') as HTMLButtonElement;
+  const enginePassword = document.getElementById('studio-engine-password') as HTMLInputElement;
+  const engineStatus = document.getElementById('studio-engine-status') as HTMLElement;
   const serverConnectCommand = document.getElementById('studio-server-connect-command') as HTMLElement;
   const serverKeyCommand = document.getElementById('studio-server-key-command') as HTMLElement;
   const serverSaveCommand = document.getElementById('studio-server-save-command') as HTMLElement;
@@ -328,11 +358,14 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
   const copyServerSave = document.getElementById('studio-copy-server-save') as HTMLButtonElement;
   const serverCopyStatus = document.getElementById('studio-server-copy-status') as HTMLElement;
   const form = document.getElementById('studio-form') as HTMLFormElement;
+  const engineServerField = document.getElementById('studio-engine-server-field') as HTMLElement;
+  const engineServerSelect = document.getElementById('studio-engine-server') as HTMLSelectElement;
   const requestJson = document.getElementById('studio-request-json') as HTMLElement;
   const errorsEl = document.getElementById('studio-errors') as HTMLElement;
   const validationPill = document.getElementById('studio-validation-pill') as HTMLElement;
   const dryRunCommand = document.getElementById('studio-dry-run-command') as HTMLElement;
   const deployCommand = document.getElementById('studio-deploy-command') as HTMLElement;
+  const engineDryRun = document.getElementById('studio-engine-dry-run') as HTMLButtonElement;
   const copyDryRun = document.getElementById('studio-copy-dry-run') as HTMLButtonElement;
   const copyDeploy = document.getElementById('studio-copy-deploy') as HTMLButtonElement;
   const copyStatus = document.getElementById('studio-copy-status') as HTMLElement;
@@ -344,6 +377,8 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
   const parseOutput = document.getElementById('studio-parse-output') as HTMLButtonElement;
   const parseStatus = document.getElementById('studio-parse-status') as HTMLElement;
   const commands = buildCliCommands();
+  let engine: Awaited<ReturnType<typeof connectLocalEngine>> = null;
+  let savedServers: Array<Record<string, any>> = [];
 
   function collectServerState() {
     const state: Record<string, string | boolean> = {};
@@ -376,6 +411,9 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     copyServerConnect.disabled = !ready;
     copyServerKey.disabled = !ready;
     copyServerSave.disabled = !ready;
+    engineSaveServer.disabled = !ready;
+    engineValidateServer.disabled = !ready;
+    engineBootstrapKey.disabled = !ready;
     serverValidationPill.textContent = ready ? 'Ready to test' : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
     serverValidationPill.dataset.state = ready ? 'ok' : 'error';
     renderServerErrors(errors);
@@ -383,13 +421,18 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
   }
 
   function updateRequest() {
-    const request = buildDeployRequest(collectState());
+    const request = buildDeployRequest(collectState()) as Record<string, any>;
+    if (engineServerSelect.value) {
+      request.requested_server = engineServerSelect.value;
+      request.ip = '';
+    }
     const errors = validateDeployRequest(request, deployRequestSchema, deployWorkflow);
     const ready = errors.length === 0;
 
     requestJson.textContent = formatJson(request);
     dryRunCommand.textContent = commands.dryRun;
     deployCommand.textContent = commands.deploy;
+    engineDryRun.disabled = !ready;
     copyDeploy.disabled = !ready || request.yes !== true;
     validationPill.textContent = ready ? (request.yes ? 'Ready to run' : 'Dry-run ready') : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
     validationPill.dataset.state = ready ? 'ok' : 'error';
@@ -432,6 +475,58 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     resultJson.textContent = formatJson(envelope);
   }
 
+  function renderApiPayload(payload: Record<string, any>, label: string) {
+    const body = payload.result ?? payload.server ?? payload.plan ?? payload;
+    const failed = body.auth_ok === false || body.verified === false;
+    result.dataset.status = failed ? 'failed' : 'ok';
+    const status = document.createElement('strong');
+    status.textContent = failed ? 'needs action' : 'ok';
+    const text = document.createElement('span');
+    text.textContent = label;
+    const hints = document.createElement('small');
+    hints.textContent = Array.isArray(body.hints) && body.hints.length > 0 ? body.hints.join(' ') : payload.schema;
+    result.replaceChildren(status, text, hints);
+    resultJson.textContent = formatJson(payload);
+  }
+
+  async function refreshSavedServers() {
+    if (!engine) return;
+    try {
+      const response = await fetch('/api/v1/servers', {
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      savedServers = Array.isArray(payload.servers) ? payload.servers : [];
+      const current = engineServerSelect.value;
+      const options = [
+        new Option('Use raw connection fields', ''),
+        ...savedServers.map((server) => new Option(`${server.title} (${server.host})`, server.id)),
+      ];
+      engineServerSelect.replaceChildren(...options);
+      if (savedServers.some((server) => server.id === current)) {
+        engineServerSelect.value = current;
+      }
+      engineServerField.hidden = savedServers.length === 0;
+      updateRequest();
+    } catch {
+      engineServerField.hidden = true;
+    }
+  }
+
+  function renderEngineError(error: unknown) {
+    result.dataset.status = 'failed';
+    const status = document.createElement('strong');
+    status.textContent = 'failed';
+    const text = document.createElement('span');
+    text.textContent = error instanceof Error ? error.message.split('\n')[0] : 'Engine request failed.';
+    const hint = document.createElement('small');
+    hint.textContent = error instanceof Error ? error.message.split('\n').slice(1).join(' ') : '';
+    result.replaceChildren(status, text, hint);
+    resultJson.textContent = error instanceof Error ? error.message : 'Engine request failed.';
+  }
+
   function renderTimeline(events: readonly Record<string, any>[]) {
     const items = (timelineFromEvents(events) as Array<{
       level: string;
@@ -472,13 +567,69 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     }, 1500);
   }
 
+  async function initLocalEngine() {
+    engine = await connectLocalEngine();
+    if (!engine) {
+      studioMode.dataset.state = 'static';
+    studioModeLabel.textContent = 'Contract mode';
+    serverEngineActions.hidden = true;
+    engineDryRun.hidden = true;
+    engineServerField.hidden = true;
+    return;
+  }
+    studioMode.dataset.state = 'engine';
+    studioModeLabel.textContent = 'Local Engine';
+    serverEngineActions.hidden = false;
+    engineDryRun.hidden = false;
+    refreshSavedServers();
+    updateServerDraft();
+    updateRequest();
+  }
+
+  async function runEngineAction(label: string, action: () => Promise<Record<string, any>>) {
+    if (!engine) return;
+    engineStatus.textContent = `${label} running`;
+    try {
+      const payload = await action();
+      engineStatus.textContent = `${label} complete`;
+      renderApiPayload(payload, label);
+      refreshSavedServers();
+    } catch (error) {
+      engineStatus.textContent = `${label} failed`;
+      renderEngineError(error);
+    }
+  }
+
   serverForm.addEventListener('input', updateServerDraft);
   form.addEventListener('input', updateRequest);
+  engineServerSelect.addEventListener('change', updateRequest);
   copyServerConnect.addEventListener('click', () => copyServerText(updateServerDraft().connect, 'SSH command'));
   copyServerKey.addEventListener('click', () => copyServerText(updateServerDraft().copyKey, 'Key command'));
   copyServerSave.addEventListener('click', () => copyServerText(updateServerDraft().save, 'Save command'));
+  engineSaveServer.addEventListener('click', () =>
+    runEngineAction('Server save', () => enginePost(engine, '/api/v1/servers', buildServerConnectionDraft(collectServerState()))),
+  );
+  engineValidateServer.addEventListener('click', () =>
+    runEngineAction('SSH validation', () =>
+      enginePost(engine, '/api/v1/servers/validate', { draft: buildServerConnectionDraft(collectServerState()) }),
+    ),
+  );
+  engineBootstrapKey.addEventListener('click', () =>
+    runEngineAction('Key setup', async () => {
+      const draft = buildServerConnectionDraft(collectServerState());
+      const saved = await enginePost(engine, '/api/v1/servers', draft);
+      return enginePost(engine, '/api/v1/servers/bootstrap-key', {
+        key_policy: 'generate_meridian',
+        password: enginePassword.value,
+        server_ref: saved.server?.id ?? draft.title,
+      });
+    }),
+  );
   copyDryRun.addEventListener('click', () => copyText(commands.dryRun, 'Dry-run command'));
   copyDeploy.addEventListener('click', () => copyText(commands.deploy, 'Deploy command'));
+  engineDryRun.addEventListener('click', () =>
+    runEngineAction('Deploy dry-run', () => enginePost(engine, '/api/v1/deploy/dry-run', updateRequest())),
+  );
   downloadRequest.addEventListener('click', () => {
     const request = updateRequest();
     const url = URL.createObjectURL(new Blob([formatJson(request) + '\n'], { type: 'application/json' }));
@@ -529,6 +680,7 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
   updateRequest();
   renderEnvelope(studioFixtures.deployDryRunEnvelope);
   renderTimeline(studioFixtures.deployDryRunEvents);
+  initLocalEngine();
 </script>
 
 <style>
@@ -809,6 +961,21 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     gap: 10px;
   }
 
+  .studio__engine-actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .studio__engine-actions[hidden] {
+    display: none;
+  }
+
+  .studio__engine-password,
+  .studio__engine-server-select {
+    grid-column: 1 / -1;
+  }
+
   .studio__command {
     font-family: var(--mono);
     font-size: 0.78rem;
@@ -817,6 +984,7 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     width: 100%;
   }
 
+  .studio__primary:disabled,
   .studio__command:disabled {
     cursor: not-allowed;
     opacity: 0.45;
@@ -974,6 +1142,10 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
 
     .studio__segmented {
       flex-wrap: wrap;
+    }
+
+    .studio__engine-actions {
+      grid-template-columns: 1fr;
     }
   }
 </style>

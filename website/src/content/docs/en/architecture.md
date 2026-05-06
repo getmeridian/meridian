@@ -88,6 +88,16 @@ Meridian stores every fleet detail in a single `cluster.yml` at `~/.meridian/clu
 
 Remnawave's own state (users, hosts, config profile, internal squads) lives in its PostgreSQL database on the panel host. Meridian reads and writes that state through the official REST API using the pinned `remnawave` Python SDK. The panel database is the source of truth for clients; `cluster.yml` is the source of truth for fleet topology.
 
+## Meridian Studio and local Engine
+
+Static Studio consumes generated contracts and can build request files without a
+local process. Executable Studio starts with `meridian studio`, binds a FastAPI
+Engine to `127.0.0.1`, and exposes only narrow typed endpoints for contract
+discovery, saved server reads, server setup, SSH validation, one-time
+password-assisted key bootstrap, and deploy dry-runs. SSH, filesystem, secrets,
+operations, and cancellation stay behind that localhost Engine rather than
+running in the browser.
+
 ## Docker container layout
 
 **On the panel host** (the first `meridian deploy` target):
