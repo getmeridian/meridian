@@ -14,6 +14,13 @@ installation and control API with multiple clients on top.
 - **Engine** is only justified for executable local mode. Static Studio does not
   need it. Engine exists when a browser UI needs local SSH, filesystem state,
   secrets, operation execution, cancellation, and event streaming.
+- **Beginner onboarding starts with servers, not deploy flags.** A new user should
+  add one server at a time, prove SSH connectivity, optionally bootstrap
+  password-based SSH into key-based SSH, title the server, and reuse it by
+  reference in later deploy/relay/recovery flows.
+- **UX is authoritative.** YAML files, Pydantic models, generated schemas, and
+  command flags are implementation contracts; they must bend to the ideal user
+  journey, not force users through storage-shaped forms.
 
 The near-term product proof is **deploy + verify + recover**, not a generic admin
 panel and not a remote daemon.
@@ -41,26 +48,47 @@ panel and not a remote daemon.
 
 ## Next Milestones
 
-### 1. Static Studio Prototype
+### 1. Studio Server Onboarding
 
-Build `/studio/` inside the Astro website as a real first screen, not a landing
-page.
+Make server connection setup a first-class Studio journey before deploy.
+
+- Add servers as individual setup steps: title, IP, SSH user, SSH port, and role
+  intent.
+- Validate reachability separately from deploy. Users should know whether SSH
+  works before Meridian plans anything.
+- Support password-based first connection for beginners, then guide them into
+  proper key-based SSH.
+- Generate or select an SSH key, install the public key on the server, verify
+  key login, and clearly explain what changed.
+- Keep password handling Engine-only when executable mode arrives; static Studio
+  may model the flow and copy CLI commands, but must not store passwords.
+- Save reusable server references so deploy/relay/recovery flows can target a
+  server by title or IP instead of repeatedly asking for raw connection details.
+- Make server connection errors friendly: wrong port, refused auth, missing sudo,
+  first-login host key prompts, and blocked network should produce specific next
+  actions.
+
+### 2. Static Studio Deploy Assistant
+
+Build `/studio/` into a real first-screen deploy assistant, not a landing page.
 
 - Render `deployWorkflow` sections and fields from generated contracts.
 - Build a `DeployRequest` JSON object from form state.
 - Map the confirmation field to `yes`.
 - Validate required fields and schema-exposed IP/name/user/port constraints.
+- Prefer server references when available; raw IP/user/port entry is a fallback,
+  not the main beginner path.
 - Export `deploy.json`.
 - Copy equivalent dry-run and deploy CLI commands.
 - Render fixture-backed dry-run output and event timeline.
 - Parse pasted `--json` envelopes and `--events=jsonl` streams into a status
   and timeline view.
-- Stay static: no localhost API, cookies, CSRF, SSE, SSH, file I/O, or operation
-  registry in this slice.
+- Stay static until executable mode: no localhost API, cookies, CSRF, SSE, SSH,
+  file I/O, operation registry, password storage, or key material in the browser.
 
-### 2. Operation Runtime
+### 3. Operation Runtime
 
-Only after the static UI proves the workflow:
+Only after the static UI proves the server/deploy workflow:
 
 - Add in-memory operation IDs, snapshots, replayable event streams, terminal
   result cache, and best-effort cancellation at step boundaries.
@@ -69,8 +97,10 @@ Only after the static UI proves the workflow:
   future contract.
 - Add reporter hooks for apply/provision action start, completion, failure, and
   redaction.
+- Add operation types for server validation and SSH key bootstrap before deploy
+  execution.
 
-### 3. Local Executable Studio Mode
+### 4. Local Executable Studio Mode
 
 If Studio needs "click Deploy", add a localhost-only Engine API.
 
@@ -79,12 +109,14 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
 - Expose typed `/api/v1/*` endpoints for schema/workflow discovery, validation,
   dry-run, start operation, operation status, event replay/SSE, result, and
   cancel.
+- Include server endpoints for add/list/validate/bootstrap-key so the UI can
+  onboard multiple servers before choosing deploy targets.
 - Use exact Host allowlists, strict Origin/Sec-Fetch checks, no permissive CORS,
   CSRF protection for mutating endpoints, no-store API responses, and CSP.
 - Do not expose raw shell, arbitrary file read/write, generic SSH, proxy
   endpoints, or unredacted secrets.
 
-### 4. Product Expansion
+### 5. Product Expansion
 
 - Add verification evidence: port checks, Reality reachability, SNI/cert
   assumptions, domain/CDN warnings, leak-risk diagnostics.
@@ -99,8 +131,10 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
 
 - Keep `meridian.core` free of Typer, Rich, prompt, process exit, and command
   module imports.
-- Keep Pydantic models as the source of truth for public contracts and generated
-  schemas.
+- Keep Pydantic models as the source of truth for public wire validation and
+  generated schemas, not as the source of truth for product flow design.
+- Keep YAML/config storage as persistence, not the UX model. If a better flow
+  needs smaller request objects, add them and adapt to storage behind the scenes.
 - Keep generated TypeScript as consumer output only; never hand-edit
   `website/src/studio/generated`.
 - Keep JSON/API modes non-interactive by default. Missing input returns a
@@ -112,6 +146,8 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
 - Keep every mutating executable flow behind a plan, confirmation boundary,
   operation ID, event stream, terminal envelope, retry guidance, and CLI
   equivalent.
+- Keep password and private key material out of static Studio. Executable Studio
+  may handle them only through Engine-owned short-lived operations.
 
 ## Backlog Constraints To Preserve
 
@@ -125,6 +161,8 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
   DNS sidecars, and advanced SSH escape hatches.
 - Onboarding must absorb real platform friction: Windows/WSL, password-only VPS
   access, custom SSH ports, domains, nginx, and fallback explanations.
+- Server setup must be teachable: password SSH, key bootstrap, SSH port changes,
+  sudo checks, host key prompts, and multi-server naming are part of the product.
 - AI/MCP automation should be adapters over narrow typed operations, not generic
   shell access.
 
@@ -141,3 +179,7 @@ If Studio needs "click Deploy", add a localhost-only Engine API.
   lists, per-node default egress, or all of these later?
 - Should role terminology in config become explicit now (`panel`, `exit`,
   `relay`) or wait until topology work begins?
+- How much SSH key management should Meridian own: generate a dedicated key,
+  reuse an existing user key, or support both with clear defaults?
+- Should server references be stored as friendly titles, stable IDs, raw IPs, or
+  all three with one display name?

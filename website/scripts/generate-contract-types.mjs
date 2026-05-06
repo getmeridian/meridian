@@ -16,6 +16,14 @@ async function readJson(relativePath) {
   return JSON.parse(await readFile(path.join(contractsRoot, relativePath), "utf8"));
 }
 
+async function readJsonl(relativePath) {
+  const content = await readFile(path.join(contractsRoot, relativePath), "utf8");
+  return content
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
+}
+
 function stableTs(value) {
   return JSON.stringify(value, null, 2);
 }
@@ -65,7 +73,24 @@ async function generate(outputDir) {
 
   const deployWorkflow = await readJson("workflows/deploy.json");
   await writeManifest(outputDir, "deployWorkflow.ts", "deployWorkflow", deployWorkflow);
-  await writeFile(path.join(outputDir, "index.ts"), `${header}export * from "./commands";\nexport * from "./deployWorkflow";\nexport * from "./events";\nexport * from "./workflows";\n`, "utf8");
+  await writeManifest(
+    outputDir,
+    "deployRequestSchema.ts",
+    "deployRequestSchema",
+    await readJson("schemas/deploy-request.schema.json"),
+  );
+  await writeManifest(outputDir, "fixtures.ts", "studioFixtures", {
+    deployDryRunEnvelope: await readJson("fixtures/deploy-dry-run-envelope.json"),
+    deployDryRunEvents: await readJsonl("fixtures/deploy-dry-run-events.jsonl"),
+    deployEvents: await readJsonl("fixtures/deploy-events.jsonl"),
+    deploySuccessEnvelope: await readJson("fixtures/deploy-success-envelope.json"),
+    deployUserErrorEnvelope: await readJson("fixtures/deploy-user-error-envelope.json"),
+  });
+  await writeFile(
+    path.join(outputDir, "index.ts"),
+    `${header}export * from "./commands";\nexport * from "./deployRequestSchema";\nexport * from "./deployWorkflow";\nexport * from "./events";\nexport * from "./fixtures";\nexport * from "./workflows";\n`,
+    "utf8",
+  );
 }
 
 function listFiles(root, base = root) {

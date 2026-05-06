@@ -11,9 +11,11 @@
 ## What's done well
 
 - Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
+- Static adapter logic is pure browser-safe JavaScript with Node tests; it does not store operator input.
 
 ## Pitfalls
 
 - Do not hand-edit `generated/`; change Python contracts, export contracts, then regenerate.
 - Do not let Astro concerns leak into `meridian.core`.
 - Do not add Engine assumptions to static Studio; use generated fixtures, exported requests, copied CLI, or pasted output.
+- Do not persist deploy form state or pasted machine output in browser storage or URLs.

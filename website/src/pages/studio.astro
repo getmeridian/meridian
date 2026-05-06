@@ -1,0 +1,779 @@
+---
+import Base from '../layouts/Base.astro';
+import { deployWorkflow } from '../studio/generated';
+
+const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field]));
+---
+
+<Base
+  title="Meridian Studio"
+  description="Contract-driven Meridian deploy request builder and output viewer."
+>
+  <main id="main" class="studio">
+    <section class="studio__header" aria-labelledby="studio-title">
+      <div class="studio__header-main">
+        <p class="studio__eyebrow">Static Studio</p>
+        <h1 id="studio-title">Deploy request workbench</h1>
+        <p class="studio__summary">{deployWorkflow.summary}</p>
+      </div>
+      <div class="studio__status-strip" aria-label="Studio mode">
+        <span class="studio__status-dot" aria-hidden="true"></span>
+        <span>Contract mode</span>
+      </div>
+    </section>
+
+    <section class="studio__workspace" aria-label="Deploy workflow">
+      <form class="studio__form" id="studio-form">
+        <div class="studio__panel-head">
+          <div>
+            <p class="studio__panel-kicker">Workflow</p>
+            <h2>{deployWorkflow.title}</h2>
+          </div>
+          <output class="studio__validation-pill" id="studio-validation-pill">Ready</output>
+        </div>
+
+        {deployWorkflow.sections.map((section) => (
+          <fieldset class="studio__section">
+            <legend>
+              <span>{section.title}</span>
+              {section.description && <small>{section.description}</small>}
+            </legend>
+            <div class="studio__fields">
+              {section.field_ids.map((fieldId) => {
+                const field = fieldsById.get(fieldId);
+                if (!field) return null;
+                const inputId = `studio-field-${field.id}`;
+                return (
+                  <label class={`studio__field studio__field--${field.kind}`} for={inputId}>
+                    <span class="studio__label-row">
+                      <span>{field.label}</span>
+                      {field.required && <span class="studio__required">Required</span>}
+                    </span>
+                    {field.kind === 'boolean' || field.kind === 'confirmation' ? (
+                      <span class="studio__switch">
+                        <input
+                          id={inputId}
+                          type="checkbox"
+                          data-studio-field={field.id}
+                          data-studio-kind={field.kind}
+                          checked={field.default === true}
+                        />
+                        <span aria-hidden="true"></span>
+                      </span>
+                    ) : field.kind === 'choice' ? (
+                      <select id={inputId} data-studio-field={field.id} data-studio-kind={field.kind}>
+                        {field.options.map((option) => (
+                          <option value={option.value} selected={option.value === field.default}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={inputId}
+                        type="text"
+                        data-studio-field={field.id}
+                        data-studio-kind={field.kind}
+                        value={String(field.default ?? '')}
+                      />
+                    )}
+                    {field.help_text && <small>{field.help_text}</small>}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ))}
+      </form>
+
+      <aside class="studio__side" aria-label="Generated request and commands">
+        <div class="studio__panel">
+          <div class="studio__panel-head">
+            <div>
+              <p class="studio__panel-kicker">Request</p>
+              <h2>deploy.json</h2>
+            </div>
+            <button class="studio__icon-button" type="button" id="studio-download-request" title="Download deploy.json" aria-label="Download deploy.json">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+              </svg>
+            </button>
+          </div>
+          <div class="studio__errors" id="studio-errors" hidden></div>
+          <pre class="studio__code" id="studio-request-json"></pre>
+        </div>
+
+        <div class="studio__panel">
+          <div class="studio__panel-head">
+            <div>
+              <p class="studio__panel-kicker">CLI equivalent</p>
+              <h2>Commands</h2>
+            </div>
+          </div>
+          <div class="studio__command-list">
+            <button class="studio__command" type="button" id="studio-copy-dry-run">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="studio-dry-run-command"></span>
+            </button>
+            <button class="studio__command" type="button" id="studio-copy-deploy">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6"></path>
+              </svg>
+              <span id="studio-deploy-command"></span>
+            </button>
+          </div>
+          <p class="studio__copy-status" id="studio-copy-status" aria-live="polite"></p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="studio__workspace studio__workspace--lower" aria-label="Output preview">
+      <div class="studio__panel">
+        <div class="studio__panel-head">
+          <div>
+            <p class="studio__panel-kicker">Preview</p>
+            <h2>Result</h2>
+          </div>
+          <div class="studio__segmented" role="group" aria-label="Fixture preview">
+            <button type="button" data-fixture="dry-run">Dry-run</button>
+            <button type="button" data-fixture="success">Success</button>
+            <button type="button" data-fixture="error">Error</button>
+          </div>
+        </div>
+        <div class="studio__result" id="studio-result"></div>
+        <pre class="studio__code studio__code--short" id="studio-result-json"></pre>
+      </div>
+
+      <div class="studio__panel">
+        <div class="studio__panel-head">
+          <div>
+            <p class="studio__panel-kicker">Events</p>
+            <h2>Timeline</h2>
+          </div>
+        </div>
+        <ol class="studio__timeline" id="studio-timeline"></ol>
+      </div>
+    </section>
+
+    <section class="studio__paste" aria-label="Pasted machine output">
+      <div class="studio__panel">
+        <div class="studio__panel-head">
+          <div>
+            <p class="studio__panel-kicker">Parser</p>
+            <h2>Pasted output</h2>
+          </div>
+          <button class="studio__primary" type="button" id="studio-parse-output">Parse</button>
+        </div>
+        <textarea id="studio-paste" spellcheck="false"></textarea>
+        <p class="studio__parse-status" id="studio-parse-status" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+</Base>
+
+<script>
+  import {
+    buildCliCommands,
+    buildDeployRequest,
+    formatJson,
+    parseEnvelope,
+    parseEventStream,
+    summarizeEnvelope,
+    timelineFromEvents,
+    validateDeployRequest,
+  } from '../studio/staticAdapter.js';
+  import { deployRequestSchema, deployWorkflow, studioFixtures } from '../studio/generated';
+
+  const form = document.getElementById('studio-form') as HTMLFormElement;
+  const requestJson = document.getElementById('studio-request-json') as HTMLElement;
+  const errorsEl = document.getElementById('studio-errors') as HTMLElement;
+  const validationPill = document.getElementById('studio-validation-pill') as HTMLElement;
+  const dryRunCommand = document.getElementById('studio-dry-run-command') as HTMLElement;
+  const deployCommand = document.getElementById('studio-deploy-command') as HTMLElement;
+  const copyDryRun = document.getElementById('studio-copy-dry-run') as HTMLButtonElement;
+  const copyDeploy = document.getElementById('studio-copy-deploy') as HTMLButtonElement;
+  const copyStatus = document.getElementById('studio-copy-status') as HTMLElement;
+  const downloadRequest = document.getElementById('studio-download-request') as HTMLButtonElement;
+  const result = document.getElementById('studio-result') as HTMLElement;
+  const resultJson = document.getElementById('studio-result-json') as HTMLElement;
+  const timeline = document.getElementById('studio-timeline') as HTMLOListElement;
+  const paste = document.getElementById('studio-paste') as HTMLTextAreaElement;
+  const parseOutput = document.getElementById('studio-parse-output') as HTMLButtonElement;
+  const parseStatus = document.getElementById('studio-parse-status') as HTMLElement;
+  const commands = buildCliCommands();
+
+  function collectState() {
+    const state: Record<string, string | boolean> = {};
+    form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-studio-field]').forEach((input) => {
+      const field = input.dataset.studioField!;
+      state[field] = input instanceof HTMLInputElement && input.type === 'checkbox' ? input.checked : input.value;
+    });
+    return state;
+  }
+
+  function updateRequest() {
+    const request = buildDeployRequest(collectState());
+    const errors = validateDeployRequest(request, deployRequestSchema, deployWorkflow);
+    const ready = errors.length === 0;
+
+    requestJson.textContent = formatJson(request);
+    dryRunCommand.textContent = commands.dryRun;
+    deployCommand.textContent = commands.deploy;
+    copyDeploy.disabled = !ready || request.yes !== true;
+    validationPill.textContent = ready ? (request.yes ? 'Ready to run' : 'Dry-run ready') : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
+    validationPill.dataset.state = ready ? 'ok' : 'error';
+    renderErrors(errors);
+    return request;
+  }
+
+  function renderErrors(errors: { field: string; message: string }[]) {
+    errorsEl.hidden = errors.length === 0;
+    errorsEl.replaceChildren(
+      ...errors.map((error) => {
+        const item = document.createElement('p');
+        item.textContent = `${error.field}: ${error.message}`;
+        return item;
+      }),
+    );
+  }
+
+  function renderEnvelope(envelope: Record<string, any>) {
+    const summary = summarizeEnvelope(envelope);
+    result.dataset.status = summary.status;
+    result.innerHTML = `
+      <strong>${summary.status}</strong>
+      <span>${summary.text}</span>
+      <small>${summary.changed ? 'Changes expected' : 'No immediate changes'}</small>
+    `;
+    resultJson.textContent = formatJson(envelope);
+  }
+
+  function renderTimeline(events: readonly Record<string, any>[]) {
+    const items = (timelineFromEvents(events) as Array<{
+      level: string;
+      message: string;
+      phase: string;
+      seq: number;
+      type: string;
+    }>).map((event) => {
+      const item = document.createElement('li');
+      item.className = `studio__timeline-item studio__timeline-item--${event.level}`;
+      item.innerHTML = `
+        <span>${event.seq}</span>
+        <div>
+          <strong>${event.message}</strong>
+          <small>${event.phase} · ${event.type}</small>
+        </div>
+      `;
+      return item;
+    });
+    timeline.replaceChildren(...items);
+  }
+
+  async function copyText(text: string, label: string) {
+    await navigator.clipboard.writeText(text);
+    copyStatus.textContent = `${label} copied`;
+    window.setTimeout(() => {
+      copyStatus.textContent = '';
+    }, 1500);
+  }
+
+  form.addEventListener('input', updateRequest);
+  copyDryRun.addEventListener('click', () => copyText(commands.dryRun, 'Dry-run command'));
+  copyDeploy.addEventListener('click', () => copyText(commands.deploy, 'Deploy command'));
+  downloadRequest.addEventListener('click', () => {
+    const request = updateRequest();
+    const url = URL.createObjectURL(new Blob([formatJson(request) + '\n'], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'deploy.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-fixture]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.dataset.fixture === 'success') {
+        renderEnvelope(studioFixtures.deploySuccessEnvelope);
+        renderTimeline(studioFixtures.deployEvents);
+      } else if (button.dataset.fixture === 'error') {
+        renderEnvelope(studioFixtures.deployUserErrorEnvelope);
+        renderTimeline([]);
+      } else {
+        renderEnvelope(studioFixtures.deployDryRunEnvelope);
+        renderTimeline(studioFixtures.deployDryRunEvents);
+      }
+    });
+  });
+
+  parseOutput.addEventListener('click', () => {
+    try {
+      const text = paste.value.trim();
+      if (!text) {
+        parseStatus.textContent = 'No output pasted';
+        return;
+      }
+      if (text.includes('\n')) {
+        const events = parseEventStream(text);
+        renderTimeline(events);
+        parseStatus.textContent = `${events.length} events parsed`;
+      } else {
+        const envelope = parseEnvelope(text);
+        renderEnvelope(envelope);
+        parseStatus.textContent = 'Envelope parsed';
+      }
+    } catch (error) {
+      parseStatus.textContent = error instanceof Error ? error.message : 'Could not parse output';
+    }
+  });
+
+  updateRequest();
+  renderEnvelope(studioFixtures.deployDryRunEnvelope);
+  renderTimeline(studioFixtures.deployDryRunEvents);
+</script>
+
+<style>
+  .studio {
+    width: min(1440px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 28px 0 56px;
+  }
+
+  .studio__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 22px 0 26px;
+  }
+
+  .studio__header-main {
+    max-width: 760px;
+  }
+
+  .studio__eyebrow,
+  .studio__panel-kicker {
+    color: var(--ac);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .studio h1 {
+    font-size: 2.35rem;
+    letter-spacing: 0;
+  }
+
+  .studio h2 {
+    font-family: var(--body);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    margin: 0;
+  }
+
+  .studio__summary {
+    color: var(--t2);
+    margin-top: 8px;
+    max-width: 640px;
+  }
+
+  .studio__status-strip,
+  .studio__validation-pill {
+    align-items: center;
+    background: var(--ok2);
+    border: 1px solid color-mix(in srgb, var(--ok), transparent 70%);
+    border-radius: 999px;
+    color: var(--ok);
+    display: inline-flex;
+    font-size: 0.82rem;
+    font-weight: 700;
+    gap: 8px;
+    min-height: 34px;
+    padding: 6px 12px;
+    white-space: nowrap;
+  }
+
+  .studio__status-dot {
+    background: var(--ok);
+    border-radius: 50%;
+    height: 8px;
+    width: 8px;
+  }
+
+  .studio__workspace {
+    align-items: start;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
+  }
+
+  .studio__workspace--lower {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
+    margin-top: 18px;
+  }
+
+  .studio__form,
+  .studio__panel {
+    background: var(--s1);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-sm);
+    padding: 18px;
+  }
+
+  .studio__panel-head {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .studio__validation-pill[data-state="error"] {
+    background: var(--err2);
+    border-color: color-mix(in srgb, var(--err), transparent 70%);
+    color: var(--err);
+  }
+
+  .studio__section {
+    border: 0;
+    border-top: 1px solid var(--b1);
+    margin-top: 18px;
+    padding-top: 18px;
+  }
+
+  .studio__section legend {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 12px;
+    width: 100%;
+  }
+
+  .studio__section legend span {
+    font-weight: 800;
+  }
+
+  .studio__section legend small,
+  .studio__field small {
+    color: var(--t2);
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .studio__fields {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .studio__field {
+    display: grid;
+    gap: 7px;
+  }
+
+  .studio__label-row {
+    align-items: center;
+    display: flex;
+    font-size: 0.9rem;
+    font-weight: 700;
+    justify-content: space-between;
+  }
+
+  .studio__required {
+    color: var(--t3);
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .studio input[type="text"],
+  .studio select,
+  .studio textarea {
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    color: var(--t1);
+    font: inherit;
+    min-height: 42px;
+    padding: 9px 11px;
+    width: 100%;
+  }
+
+  .studio textarea {
+    font-family: var(--mono);
+    min-height: 150px;
+    resize: vertical;
+  }
+
+  .studio__switch {
+    align-items: center;
+    display: flex;
+    min-height: 42px;
+  }
+
+  .studio__switch input {
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .studio__switch span {
+    background: var(--s3);
+    border: 1px solid var(--b2);
+    border-radius: 999px;
+    cursor: pointer;
+    height: 28px;
+    position: relative;
+    transition: background 0.12s;
+    width: 52px;
+  }
+
+  .studio__switch span::after {
+    background: var(--s1);
+    border-radius: 50%;
+    box-shadow: var(--shadow-sm);
+    content: "";
+    height: 22px;
+    left: 2px;
+    position: absolute;
+    top: 2px;
+    transition: transform 0.12s;
+    width: 22px;
+  }
+
+  .studio__switch input:checked + span {
+    background: var(--ac);
+    border-color: var(--ac);
+  }
+
+  .studio__switch input:checked + span::after {
+    transform: translateX(24px);
+  }
+
+  .studio__side {
+    display: grid;
+    gap: 18px;
+  }
+
+  .studio__icon-button,
+  .studio__primary,
+  .studio__segmented button,
+  .studio__command {
+    align-items: center;
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    color: var(--t1);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-weight: 700;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 11px;
+  }
+
+  .studio__icon-button {
+    justify-content: center;
+    padding: 8px;
+    width: 38px;
+  }
+
+  .studio svg {
+    fill: none;
+    height: 16px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 16px;
+  }
+
+  .studio__primary {
+    background: var(--ac);
+    border-color: var(--ac);
+    color: #fff;
+  }
+
+  .studio__command-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .studio__command {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    justify-content: flex-start;
+    text-align: left;
+    width: 100%;
+  }
+
+  .studio__command:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .studio__copy-status,
+  .studio__parse-status {
+    color: var(--t2);
+    font-size: 0.85rem;
+    min-height: 1.4em;
+    padding-top: 8px;
+  }
+
+  .studio__errors {
+    background: var(--err2);
+    border: 1px solid color-mix(in srgb, var(--err), transparent 72%);
+    border-radius: var(--r);
+    color: var(--err);
+    display: grid;
+    font-size: 0.88rem;
+    gap: 5px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+  }
+
+  .studio__errors[hidden] {
+    display: none;
+  }
+
+  .studio__code {
+    background: var(--code-bg);
+    border: 1px solid var(--code-br);
+    border-radius: var(--r);
+    color: var(--t1);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    max-height: 420px;
+    overflow: auto;
+    padding: 12px;
+    white-space: pre-wrap;
+  }
+
+  .studio__code--short {
+    max-height: 260px;
+  }
+
+  .studio__segmented {
+    display: flex;
+    gap: 6px;
+  }
+
+  .studio__segmented button {
+    font-size: 0.82rem;
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .studio__result {
+    align-items: center;
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    display: grid;
+    gap: 2px;
+    margin-bottom: 12px;
+    min-height: 82px;
+    padding: 14px;
+  }
+
+  .studio__result strong {
+    color: var(--ok);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+  }
+
+  .studio__result[data-status="failed"] strong {
+    color: var(--err);
+  }
+
+  .studio__result span {
+    font-weight: 800;
+  }
+
+  .studio__result small {
+    color: var(--t2);
+  }
+
+  .studio__timeline {
+    display: grid;
+    gap: 10px;
+    list-style: none;
+    max-height: 448px;
+    overflow: auto;
+  }
+
+  .studio__timeline-item {
+    align-items: start;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 30px 1fr;
+  }
+
+  .studio__timeline-item > span {
+    align-items: center;
+    background: var(--ac2);
+    border: 1px solid color-mix(in srgb, var(--ac), transparent 70%);
+    border-radius: 50%;
+    color: var(--ac);
+    display: flex;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    height: 30px;
+    justify-content: center;
+    width: 30px;
+  }
+
+  .studio__timeline-item strong {
+    display: block;
+    line-height: 1.35;
+  }
+
+  .studio__timeline-item small {
+    color: var(--t2);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+  }
+
+  .studio__paste {
+    padding: 18px 0 0;
+  }
+
+  @media (max-width: 1040px) {
+    .studio__workspace,
+    .studio__workspace--lower {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .studio {
+      width: min(100% - 20px, 1440px);
+    }
+
+    .studio__header,
+    .studio__panel-head {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .studio__fields {
+      grid-template-columns: 1fr;
+    }
+
+    .studio__segmented {
+      flex-wrap: wrap;
+    }
+  }
+</style>
