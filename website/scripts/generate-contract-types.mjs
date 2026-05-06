@@ -31,7 +31,7 @@ function stableTs(value) {
 async function writeManifest(outputDir, filename, exportName, value) {
   await writeFile(
     path.join(outputDir, filename),
-    `${header}export const ${exportName} = ${stableTs(value)} as const;\n`,
+    `${header}export const ${exportName} = ${stableTs(value)};\n`,
     "utf8",
   );
 }
@@ -67,31 +67,31 @@ async function generate(outputDir) {
   await mkdir(outputDir, { recursive: true });
 
   await copyGeneratedTypes(outputDir);
-  await writeManifest(outputDir, "commands.ts", "commandCatalog", await readJson("commands.json"));
-  await writeManifest(outputDir, "events.ts", "eventTypeCatalog", await readJson("events.json"));
-  await writeManifest(outputDir, "workflows.ts", "workflowCatalog", await readJson("workflows/index.json"));
+  await writeManifest(outputDir, "commands.js", "commandCatalog", await readJson("commands.json"));
+  await writeManifest(outputDir, "events.js", "eventTypeCatalog", await readJson("events.json"));
+  await writeManifest(outputDir, "workflows.js", "workflowCatalog", await readJson("workflows/index.json"));
 
   const deployWorkflow = await readJson("workflows/deploy.json");
-  await writeManifest(outputDir, "deployWorkflow.ts", "deployWorkflow", deployWorkflow);
+  await writeManifest(outputDir, "deployWorkflow.js", "deployWorkflow", deployWorkflow);
   await writeManifest(
     outputDir,
-    "serverOnboardingWorkflow.ts",
+    "serverOnboardingWorkflow.js",
     "serverOnboardingWorkflow",
     await readJson("workflows/server-onboarding.json"),
   );
   await writeManifest(
     outputDir,
-    "deployRequestSchema.ts",
+    "deployRequestSchema.js",
     "deployRequestSchema",
     await readJson("schemas/deploy-request.schema.json"),
   );
   await writeManifest(
     outputDir,
-    "serverConnectionDraftSchema.ts",
+    "serverConnectionDraftSchema.js",
     "serverConnectionDraftSchema",
     await readJson("schemas/server-connection-draft.schema.json"),
   );
-  await writeManifest(outputDir, "fixtures.ts", "studioFixtures", {
+  await writeManifest(outputDir, "fixtures.js", "studioFixtures", {
     deployDryRunEnvelope: await readJson("fixtures/deploy-dry-run-envelope.json"),
     deployDryRunEvents: await readJsonl("fixtures/deploy-dry-run-events.jsonl"),
     deployEvents: await readJsonl("fixtures/deploy-events.jsonl"),
@@ -99,8 +99,8 @@ async function generate(outputDir) {
     deployUserErrorEnvelope: await readJson("fixtures/deploy-user-error-envelope.json"),
   });
   await writeFile(
-    path.join(outputDir, "index.ts"),
-    `${header}export * from "./commands";\nexport * from "./deployRequestSchema";\nexport * from "./deployWorkflow";\nexport * from "./events";\nexport * from "./fixtures";\nexport * from "./serverConnectionDraftSchema";\nexport * from "./serverOnboardingWorkflow";\nexport * from "./workflows";\n`,
+    path.join(outputDir, "index.js"),
+    `${header}export * from "./commands.js";\nexport * from "./deployRequestSchema.js";\nexport * from "./deployWorkflow.js";\nexport * from "./events.js";\nexport * from "./fixtures.js";\nexport * from "./serverConnectionDraftSchema.js";\nexport * from "./serverOnboardingWorkflow.js";\nexport * from "./workflows.js";\n`,
     "utf8",
   );
 }

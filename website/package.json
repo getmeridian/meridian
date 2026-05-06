@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.33.3",
   "scripts": {
     "dev": "uv run --project .. meridian dev preview --output public/demo 2>/dev/null; astro dev",
-    "build": "node scripts/validate-mermaid.mjs && pnpm run studio:test && astro build && pagefind --site dist",
+    "build": "node scripts/validate-mermaid.mjs && pnpm run studio:test && astro build && node scripts/check-runtime-assets.mjs && pagefind --site dist",
     "contracts:generate": "node scripts/generate-contract-types.mjs",
     "contracts:check": "node scripts/generate-contract-types.mjs --check",
     "studio:test": "node --test src/studio/*.test.mjs",

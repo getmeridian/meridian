@@ -45,4 +45,4 @@ export const serverConnectionDraftSchema = {
   ],
   "title": "ServerConnectionDraft",
   "type": "object"
-} as const;
+};

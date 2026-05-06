@@ -18,7 +18,14 @@ from meridian.core.servers import (
     ServerValidateRequest,
     profile_from_draft,
 )
-from meridian.core.topology import RoutingPolicyDraft, TopologyServerCapabilities, TrafficRouteRule
+from meridian.core.topology import (
+    RegionalTrafficDecision,
+    RoutingPolicyDraft,
+    TopologyBuilderDraft,
+    TopologyServerCapabilities,
+    TrafficRouteRule,
+    route_cards,
+)
 from meridian.core.validation import validation_error_hint, wrap_validation_error
 
 
@@ -134,6 +141,29 @@ def test_routing_policy_allows_relay_that_is_also_country_exit() -> None:
     assert policy.routes[0].entry_server_ref == policy.routes[0].exit_server_ref
 
 
+def test_routing_policy_allows_separate_relay_and_exit_for_country_route() -> None:
+    policy = RoutingPolicyDraft(
+        servers=[
+            TopologyServerCapabilities(server_ref="ru-relay", capabilities=["relay"], region="RU"),
+            TopologyServerCapabilities(server_ref="de-exit", capabilities=["exit"], region="DE"),
+        ],
+        routes=[
+            TrafficRouteRule(
+                id="ru",
+                traffic="country",
+                country_codes=["RU"],
+                entry_server_ref="ru-relay",
+                exit_server_ref="de-exit",
+            )
+        ],
+    )
+
+    card = route_cards(policy)[0]
+
+    assert card.sentence == "RU traffic -> ru-relay relay -> de-exit exit"
+    assert card.warnings == ["RU traffic exits through DE, not RU."]
+
+
 def test_routing_policy_rejects_missing_route_capabilities_readably() -> None:
     with pytest.raises(ValidationError) as exc_info:
         RoutingPolicyDraft(
@@ -151,6 +181,101 @@ def test_routing_policy_rejects_missing_route_capabilities_readably() -> None:
 
     hint = validation_error_hint(exc_info.value)
     assert "Route ru needs ru-edge to have exit capability." in hint
+
+
+def test_routing_policy_rejects_missing_entry_relay_capability_readably() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        RoutingPolicyDraft(
+            servers=[
+                TopologyServerCapabilities(server_ref="ru-edge", capabilities=["exit"]),
+                TopologyServerCapabilities(server_ref="de-exit", capabilities=["exit"]),
+            ],
+            routes=[
+                TrafficRouteRule(
+                    id="ru",
+                    traffic="country",
+                    country_codes=["RU"],
+                    entry_server_ref="ru-edge",
+                    exit_server_ref="de-exit",
+                )
+            ],
+        )
+
+    assert "Route ru needs ru-edge to have relay capability." in validation_error_hint(exc_info.value)
+
+
+def test_routing_policy_rejects_invalid_route_shapes_readably() -> None:
+    with pytest.raises(ValidationError) as missing_country:
+        TrafficRouteRule(id="ru", traffic="country", exit_server_ref="de-exit")
+    with pytest.raises(ValidationError) as default_with_country:
+        TrafficRouteRule(id="default", traffic="default", country_codes=["RU"], exit_server_ref="de-exit")
+    with pytest.raises(ValidationError) as blocked_with_exit:
+        TrafficRouteRule(id="ru", traffic="country", action="block", country_codes=["RU"], exit_server_ref="de-exit")
+
+    assert "Choose at least one country code" in validation_error_hint(missing_country.value)
+    assert "Country codes only apply to country routes" in validation_error_hint(default_with_country.value)
+    assert "Blocked routes cannot use entry or exit servers" in validation_error_hint(blocked_with_exit.value)
+
+
+def test_topology_builder_compiles_ru_decision_into_route_card() -> None:
+    draft = TopologyBuilderDraft(
+        servers=[
+            TopologyServerCapabilities(server_ref="ru-edge", capabilities=["relay", "exit"], region="RU"),
+        ],
+        regional_traffic=[
+            RegionalTrafficDecision(
+                id="ru",
+                country_codes=["RU"],
+                mode="regional_exit",
+                entry_server_ref="ru-edge",
+                exit_server_ref="ru-edge",
+            )
+        ],
+    )
+
+    policy = draft.to_routing_policy()
+    cards = route_cards(policy)
+
+    assert policy.routes[0].entry_server_ref == "ru-edge"
+    assert policy.routes[0].exit_server_ref == "ru-edge"
+    assert cards[0].sentence == "RU traffic -> ru-edge regional exit"
+
+
+def test_topology_builder_supports_blocked_regional_traffic() -> None:
+    draft = TopologyBuilderDraft(
+        regional_traffic=[
+            RegionalTrafficDecision(id="ru", country_codes=["RU"], mode="block"),
+        ],
+    )
+
+    policy = draft.to_routing_policy()
+
+    assert policy.routes[0].action == "block"
+    assert route_cards(policy)[0].sentence == "RU traffic -> Blocked"
+
+
+def test_routing_policy_rejects_duplicate_identity_readably() -> None:
+    with pytest.raises(ValidationError) as duplicate_capability:
+        TopologyServerCapabilities(server_ref="ru-edge", capabilities=["relay", "relay"])
+    with pytest.raises(ValidationError) as duplicate_server:
+        RoutingPolicyDraft(
+            servers=[
+                TopologyServerCapabilities(server_ref="ru-edge", capabilities=["relay"]),
+                TopologyServerCapabilities(server_ref="ru-edge", capabilities=["exit"]),
+            ]
+        )
+    with pytest.raises(ValidationError) as duplicate_route:
+        RoutingPolicyDraft(
+            servers=[TopologyServerCapabilities(server_ref="de-exit", capabilities=["exit"])],
+            routes=[
+                TrafficRouteRule(id="default", exit_server_ref="de-exit"),
+                TrafficRouteRule(id="default", exit_server_ref="de-exit"),
+            ],
+        )
+
+    assert "List each server capability once" in validation_error_hint(duplicate_capability.value)
+    assert "Server ru-edge is listed more than once" in validation_error_hint(duplicate_server.value)
+    assert "Route default is listed more than once" in validation_error_hint(duplicate_route.value)
 
 
 def test_relay_deploy_request_validates_names_ports_and_exit_selector() -> None:

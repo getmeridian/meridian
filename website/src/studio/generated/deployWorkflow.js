@@ -145,10 +145,10 @@ export const deployWorkflow = {
     },
     {
       "default": true,
-      "help_text": "Recommended to reduce server-IP exposure to Russian services.",
+      "help_text": "Blocks RU destinations on this server. Regional exit routing is configured separately.",
       "id": "geo_block",
       "kind": "boolean",
-      "label": "Geo-block Russian traffic",
+      "label": "Block RU traffic",
       "options": [],
       "required": false,
       "secret": false
@@ -212,4 +212,4 @@ export const deployWorkflow = {
   ],
   "summary": "Collect deploy target, camouflage, branding, and first-client settings.",
   "title": "Deploy Meridian server"
-} as const;
+};

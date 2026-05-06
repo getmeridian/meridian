@@ -107,4 +107,4 @@ export const deployRequestSchema = {
   },
   "title": "DeployRequest",
   "type": "object"
-} as const;
+};

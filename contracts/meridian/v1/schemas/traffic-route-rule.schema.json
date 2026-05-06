@@ -2,6 +2,15 @@
   "additionalProperties": false,
   "description": "One routing rule that maps traffic to an exit, optionally through a relay entry.",
   "properties": {
+    "action": {
+      "default": "route",
+      "enum": [
+        "route",
+        "block"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
     "country_codes": {
       "items": {
         "maxLength": 2,
@@ -25,9 +34,9 @@
       "type": "string"
     },
     "exit_server_ref": {
+      "default": "",
       "maxLength": 120,
-      "minLength": 1,
-      "pattern": "^[^\\r\\n\\t]+$",
+      "pattern": "^$|^[^\\r\\n\\t]+$",
       "title": "Exit Server Ref",
       "type": "string"
     },
@@ -48,8 +57,7 @@
     }
   },
   "required": [
-    "id",
-    "exit_server_ref"
+    "id"
   ],
   "title": "TrafficRouteRule",
   "type": "object"

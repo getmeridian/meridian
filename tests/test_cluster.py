@@ -158,6 +158,29 @@ class TestClusterValidation:
         errors = cfg.validate()
         assert any("duplicate relay endpoint" in e for e in errors)
 
+    def test_duplicate_relay_identity_detected(self) -> None:
+        cfg = ClusterConfig(
+            nodes=[NodeEntry(ip=_IP_A)],
+            relays=[
+                RelayEntry(ip=_IP_B, name="ru moscow", port=443, exit_node_ip=_IP_A),
+                RelayEntry(ip=_IP_C, name="ru-moscow", port=443, exit_node_ip=_IP_A),
+            ],
+        )
+
+        errors = cfg.validate()
+
+        assert any("duplicate relay identity" in e for e in errors)
+
+    def test_desired_relay_same_host_as_desired_node_is_rejected(self) -> None:
+        cfg = ClusterConfig(
+            desired_nodes=[DesiredNode(host=_IP_A, name="ru-edge")],
+            desired_relays=[DesiredRelay(host=_IP_A, name="ru-edge-relay", exit_node="ru-edge")],
+        )
+
+        errors = cfg.validate()
+
+        assert any("Use capability routing for same-server relay+exit designs" in e for e in errors)
+
     def test_multiple_panel_hosts_detected(self) -> None:
         cfg = ClusterConfig(
             nodes=[
@@ -321,6 +344,18 @@ class TestClusterYAMLRoundTrip:
         assert r.name == "msk-relay"
         assert r.exit_node == "finland"
         assert r.sni == "www.cloudflare.com"
+
+    def test_duplicate_desired_relay_identity_detected(self) -> None:
+        cfg = ClusterConfig(
+            desired_relays=[
+                DesiredRelay(host=_IP_A, name="ru moscow", exit_node="finland"),
+                DesiredRelay(host=_IP_B, name="ru-moscow", exit_node="finland"),
+            ],
+        )
+
+        errors = cfg.validate()
+
+        assert any("desired_relays[1].name creates a duplicate relay identity" in e for e in errors)
 
     def test_subscription_page_round_trip(self, tmp_path: Path) -> None:
         cfg = _configured_cluster(subscription_page=SubscriptionPageConfig(enabled=True, path="abcdef0123456789"))

@@ -61,4 +61,4 @@ export const serverOnboardingWorkflow = {
   ],
   "summary": "Name one server, validate SSH details, and prepare it for key-based access.",
   "title": "Add a server"
-} as const;
+};

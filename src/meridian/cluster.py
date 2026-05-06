@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import asdict, dataclass, field
@@ -393,6 +394,7 @@ class ClusterConfig:
 
         # Relay validations
         relay_endpoints: set[tuple[str, int]] = set()
+        relay_labels: set[str] = set()
         for i, relay in enumerate(self.relays):
             label = f"relays[{i}]"
             if relay.ip and not _is_valid_ip(relay.ip):
@@ -409,6 +411,11 @@ class ClusterConfig:
                 if endpoint in relay_endpoints:
                     errors.append(f"{label}: duplicate relay endpoint {relay.ip}:{relay.port}")
                 relay_endpoints.add(endpoint)
+            relay_label = _relay_label_value(relay.name, relay.ip)
+            if relay_label:
+                if relay_label in relay_labels:
+                    errors.append(f"{label}.name creates a duplicate relay identity: {relay_label}")
+                relay_labels.add(relay_label)
 
         # Panel host uniqueness — at most one node can be panel host
         panel_hosts = [i for i, n in enumerate(self.nodes) if n.is_panel_host]
@@ -444,11 +451,23 @@ class ClusterConfig:
 
         if self.desired_relays is not None:
             desired_relay_hosts: list[str] = []
+            desired_relay_labels: set[str] = set()
+            desired_node_hosts = {node.host for node in self.desired_nodes or [] if node.host}
             for i, dr in enumerate(self.desired_relays):
                 if dr.host:
                     if dr.host in desired_relay_hosts:
                         errors.append(f"desired_relays[{i}].host is a duplicate: {dr.host}")
                     desired_relay_hosts.append(dr.host)
+                    if dr.host in desired_node_hosts:
+                        errors.append(
+                            f"desired_relays[{i}].host also appears in desired_nodes: {dr.host}. "
+                            "Use capability routing for same-server relay+exit designs."
+                        )
+                relay_label = _relay_label_value(dr.name, dr.host)
+                if relay_label:
+                    if relay_label in desired_relay_labels:
+                        errors.append(f"desired_relays[{i}].name creates a duplicate relay identity: {relay_label}")
+                    desired_relay_labels.add(relay_label)
 
         return errors
 
@@ -608,6 +627,12 @@ def _strip_none(d: dict[str, Any]) -> dict[str, Any]:
 def _stringify_keys(d: dict[Any, Any]) -> dict[str, Any]:
     """Convert all dict keys to plain strings (handles StrEnum keys)."""
     return {str(k): v for k, v in d.items()}
+
+
+def _relay_label_value(name: str, ip: str) -> str:
+    """Return the relay identity used by nginx/Remnawave remark names."""
+    value = name or ip
+    return re.sub(r"[^a-zA-Z0-9_-]", "-", value) if value else ""
 
 
 def _serialize_dataclass(obj: Any) -> dict[str, Any]:

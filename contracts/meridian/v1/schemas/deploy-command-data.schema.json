@@ -95,6 +95,11 @@
           "title": "Connection Page Path",
           "type": "string"
         },
+        "connection_page_url": {
+          "default": "",
+          "title": "Connection Page Url",
+          "type": "string"
+        },
         "domain": {
           "title": "Domain",
           "type": "string"
@@ -151,8 +156,18 @@
           "title": "Ssh User",
           "type": "string"
         },
+        "subscription_url": {
+          "default": "",
+          "title": "Subscription Url",
+          "type": "string"
+        },
         "summary": {
           "title": "Summary",
+          "type": "string"
+        },
+        "test_command": {
+          "default": "",
+          "title": "Test Command",
           "type": "string"
         },
         "warp": {

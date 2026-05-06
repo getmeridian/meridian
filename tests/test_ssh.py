@@ -102,9 +102,15 @@ class TestServerConnectionRun:
         cmd = mock_run.call_args[0][0]
         kwargs = mock_run.call_args[1]
         assert "BatchMode=no" in cmd
-        assert "StrictHostKeyChecking=accept-new" in cmd
+        assert "StrictHostKeyChecking=yes" in cmd
+        assert conn.multiplex is False
         assert kwargs["env"]["SSH_ASKPASS"] == "/tmp/askpass"
         assert kwargs["env"]["MERIDIAN_SSH_PASSWORD"] == "secret"
+
+    def test_remote_identity_file_disables_multiplexing(self) -> None:
+        conn = ServerConnection(ip="198.51.100.10", user="root", identity_file="/tmp/meridian_ed25519")
+
+        assert conn.multiplex is False
 
     def test_stdin_devnull(self) -> None:
         conn = ServerConnection(ip="1.2.3.4")

@@ -12,6 +12,7 @@ export type DeployOutputEnvelope = _DeployChangedEnvelope | _DeployPlanEnvelope 
 export type Command = "deploy";
 export type ClientName = string;
 export type ConnectionPagePath = string;
+export type ConnectionPageUrl = string;
 export type Domain = string;
 export type GeoBlock = boolean;
 export type Harden = boolean;
@@ -25,7 +26,9 @@ export type ServerIp = string;
 export type Sni = string;
 export type SshPort = number;
 export type SshUser = string;
+export type SubscriptionUrl = string;
 export type Summary = string;
+export type TestCommand = string;
 export type Warp = boolean;
 export type DurationMs = number;
 /**
@@ -105,6 +108,7 @@ export interface _DeployChangedEnvelope {
 export interface DeployResult {
   client_name: ClientName;
   connection_page_path: ConnectionPagePath;
+  connection_page_url?: ConnectionPageUrl;
   domain: Domain;
   geo_block: GeoBlock;
   harden: Harden;
@@ -118,7 +122,9 @@ export interface DeployResult {
   sni: Sni;
   ssh_port: SshPort;
   ssh_user: SshUser;
+  subscription_url?: SubscriptionUrl;
   summary: Summary;
+  test_command?: TestCommand;
   warp: Warp;
 }
 /**

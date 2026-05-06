@@ -133,7 +133,7 @@ def scp_host(ip: str) -> str:
 def _host_key_known(ip: str, port: int = 22) -> bool:
     """Check if the host key for this IP is already in known_hosts."""
     # ssh-keygen -F uses [host]:port notation for non-default ports
-    lookup = f"[{ip}]:{port}" if port != 22 else ip
+    lookup = host_key_lookup(ip, port)
     try:
         result = subprocess.run(
             ["ssh-keygen", "-F", lookup],
@@ -145,6 +145,16 @@ def _host_key_known(ip: str, port: int = 22) -> bool:
         return result.returncode == 0 and bool(result.stdout.strip())
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
+
+
+def host_key_known(ip: str, port: int = 22) -> bool:
+    """Public wrapper for checking known_hosts without prompting."""
+    return _host_key_known(ip, port)
+
+
+def host_key_lookup(ip: str, port: int = 22) -> str:
+    """Return the OpenSSH known_hosts lookup string for a host/port."""
+    return f"[{ip}]:{port}" if port != 22 else ip
 
 
 def _verify_host_key(ip: str, port: int = 22) -> bool:
@@ -272,8 +282,8 @@ class ServerConnection:
         self.identity_file = identity_file
         self.password = password
         self.needs_sudo = False  # on-server non-root — run commands via sudo
-        self.multiplex = multiplex
-        if multiplex and not local_mode:
+        self.multiplex = multiplex and not identity_file and not password
+        if self.multiplex and not local_mode:
             ensure_multiplex_dir()
 
     def __enter__(self) -> ServerConnection:
@@ -297,7 +307,7 @@ class ServerConnection:
             "-o",
             "ConnectTimeout=10",
             "-o",
-            "StrictHostKeyChecking=accept-new" if self.password else "StrictHostKeyChecking=yes",
+            "StrictHostKeyChecking=yes",
         ]
         if self.multiplex and not self.local_mode:
             opts.extend(SSH_MULTIPLEX_OPTS)
@@ -316,7 +326,7 @@ class ServerConnection:
             "-o",
             "ConnectTimeout=10",
             "-o",
-            "StrictHostKeyChecking=accept-new" if self.password else "StrictHostKeyChecking=yes",
+            "StrictHostKeyChecking=yes",
         ]
         if self.multiplex and not self.local_mode:
             opts.extend(SSH_MULTIPLEX_OPTS)

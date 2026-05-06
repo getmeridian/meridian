@@ -210,6 +210,7 @@ def resolve_server(
     ip = ""
     registry_user = ""
     registry_port = 22
+    registry_key_path = ""
     local_mode = False
 
     # 1. Explicit IP argument or 'local' keyword takes highest priority
@@ -232,6 +233,7 @@ def resolve_server(
             if entry:
                 registry_user = entry.user
                 registry_port = entry.port
+                registry_key_path = entry.key_path
 
     # 2. --server flag (resolve via registry, or 'local' keyword)
     elif requested_server:
@@ -252,6 +254,7 @@ def resolve_server(
                 ip = entry.host
                 registry_user = entry.user
                 registry_port = entry.port
+                registry_key_path = entry.key_path
             elif is_ip(requested_server):
                 ip = requested_server
             else:
@@ -276,6 +279,7 @@ def resolve_server(
                 ip = entry.host
                 registry_user = entry.user
                 registry_port = entry.port
+                registry_key_path = entry.key_path
                 label = f"{entry.name} ({ip})" if entry.name else ip
                 info(f"Using server: {label}")
 
@@ -306,11 +310,19 @@ def resolve_server(
 
     # Resolve port: explicit flag > registry > default 22
     resolved_port = port if port else registry_port
+    resolved_key_path = registry_key_path if registry_key_path and (not user or user == registry_user) else ""
 
     # Determine creds_dir
     creds_dir = creds_dir_for(ip, local_mode=local_mode)
 
-    conn = ServerConnection(ip=ip, user=resolved_user, local_mode=local_mode, port=resolved_port)
+    conn = ServerConnection(
+        ip=ip,
+        user=resolved_user,
+        local_mode=local_mode,
+        port=resolved_port,
+        identity_file="" if local_mode else resolved_key_path,
+        multiplex=not resolved_key_path,
+    )
 
     return ResolvedServer(
         ip=ip,

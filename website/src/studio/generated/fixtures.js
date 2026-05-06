@@ -123,6 +123,7 @@ export const studioFixtures = {
     "data": {
       "client_name": "default",
       "connection_page_path": "connect",
+      "connection_page_url": "",
       "domain": "vpn.example",
       "geo_block": true,
       "harden": true,
@@ -136,7 +137,9 @@ export const studioFixtures = {
       "sni": "www.microsoft.com",
       "ssh_port": 22,
       "ssh_user": "root",
+      "subscription_url": "[redacted]",
       "summary": "Deploy completed for 198.51.100.10",
+      "test_command": "",
       "warp": false
     },
     "duration_ms": 0,
@@ -186,4 +189,4 @@ export const studioFixtures = {
     },
     "warnings": []
   }
-} as const;
+};

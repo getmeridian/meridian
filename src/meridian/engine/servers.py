@@ -185,7 +185,11 @@ def validate_server_connection(
     detected_os = _detect_os(conn)
     sudo_ok = _check_sudo(profile, conn)
     hints = [] if sudo_ok else [_sudo_hint(profile)]
-    validated = _with_validation_state(profile, auth_state="validated", last_error="")
+    validated = _with_validation_state(
+        profile,
+        auth_state="validated" if sudo_ok else "failed",
+        last_error="" if sudo_ok else _sudo_hint(profile),
+    )
     store.upsert(validated)
     return ServerValidateResult(
         server=validated,
@@ -214,6 +218,16 @@ def bootstrap_server_key(
     else:
         public_key = _normalize_public_key(request.public_key)
         key_path = ""
+
+    if password and not host_key_known(profile.host, profile.ssh_port):
+        raise EngineError(
+            "SSH host key is not trusted yet",
+            hint=(
+                "Before sending the one-time SSH password, verify the server fingerprint from your VPS provider. "
+                f"Then run `{_ssh_command(profile)}` once and accept it only if it matches."
+            ),
+            category="user",
+        )
 
     conn = connection_factory(profile, password=password)
     install = conn.run(_install_public_key_command(public_key), timeout=20, sudo=False, sensitive=True)
@@ -364,8 +378,9 @@ def _ssh_failure_hints(profile: ServerProfile, result: CommandResultLike) -> lis
         ]
     if "host key verification failed" in text or "known_hosts" in text:
         return [
-            "Trust the server host key from a terminal first: "
-            f"`ssh-keyscan -p {profile.ssh_port} {shlex.quote(profile.host)} >> ~/.ssh/known_hosts`."
+            "Verify the SSH fingerprint in your VPS provider console, then trust it from Terminal with "
+            f"`{_ssh_command(profile)}`. "
+            f"OpenSSH stores it as {host_key_lookup(profile.host, profile.ssh_port)!r}."
         ]
     if "permission denied" in text or "publickey" in text:
         return [
@@ -398,6 +413,27 @@ def _ssh_copy_id_command(profile: ServerProfile) -> str:
     target = _ssh_target(profile)
     port = f" -p {profile.ssh_port}" if profile.ssh_port != 22 else ""
     return f"ssh-copy-id{port} {shlex.quote(target)}"
+
+
+def host_key_known(host: str, port: int = 22) -> bool:
+    """Check OpenSSH known_hosts without importing the SSH runtime adapter."""
+    lookup = host_key_lookup(host, port)
+    try:
+        result = subprocess.run(
+            ["ssh-keygen", "-F", lookup],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            stdin=subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
+def host_key_lookup(host: str, port: int = 22) -> str:
+    """Return the OpenSSH known_hosts lookup string for a host/port."""
+    return f"[{host}]:{port}" if port != 22 else host
 
 
 def _ssh_target(profile: ServerProfile) -> str:

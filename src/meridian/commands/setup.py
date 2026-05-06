@@ -490,6 +490,9 @@ def _execute_deploy_request(
         panel_url=cluster.panel.url,
         panel_secret_path=cluster.panel.secret_path,
         connection_page_path=cluster.panel.sub_path,
+        connection_page_url=str(cluster._extra.get("_page_url", "")),
+        subscription_url=str(cluster._extra.get("_subscription_url", "")),
+        test_command=f"meridian test {resolved.ip}",
         node_count=len(cluster.nodes),
         relay_count=len(cluster.relays),
         summary=f"Deploy completed for {resolved.ip}",
@@ -1015,7 +1018,15 @@ def _setup_first_deploy(
         except RemnawaveError as e:
             fail(f"Failed to register node: {e}", hint_type="system")
 
-        _deploy_node_container(resolved.conn, node_creds.secret_key)
+        if not _deploy_node_container(resolved.conn, node_creds.secret_key):
+            fail(
+                "Node container did not become healthy",
+                hint=(
+                    f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
+                    "docker logs remnawave-node --tail 50"
+                ),
+                hint_type="system",
+            )
 
         # Save node entry to cluster
         node_entry = NodeEntry(
@@ -1065,6 +1076,8 @@ def _setup_first_deploy(
                     if page_url:
                         ok("Connection page deployed")
                         cluster._extra["_page_url"] = page_url
+                    if sub_url:
+                        cluster._extra["_subscription_url"] = sub_url
                 except Exception:
                     pass  # Non-fatal — subscription URL still works
         except RemnawaveError as e:
@@ -1213,7 +1226,15 @@ def _setup_redeploy(
                         inbound_uuids=inbound_uuids,
                     )
                     node.uuid = node_creds.uuid
-                    _deploy_node_container(resolved.conn, node_creds.secret_key)
+                    if not _deploy_node_container(resolved.conn, node_creds.secret_key):
+                        fail(
+                            "Node container did not become healthy",
+                            hint=(
+                                f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
+                                "docker logs remnawave-node --tail 50"
+                            ),
+                            hint_type="system",
+                        )
             else:
                 warn("Node has no UUID — skipping panel verification")
 
@@ -1221,7 +1242,15 @@ def _setup_redeploy(
             if node.uuid:
                 secret_key = panel.get_node_secret_key()
                 if secret_key:
-                    _deploy_node_container(resolved.conn, secret_key)
+                    if not _deploy_node_container(resolved.conn, secret_key):
+                        fail(
+                            "Node container did not become healthy",
+                            hint=(
+                                f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
+                                "docker logs remnawave-node --tail 50"
+                            ),
+                            hint_type="system",
+                        )
 
             # Recreate hosts (idempotent)
             # Use provided values; only fall back to stored values if caller passed ""

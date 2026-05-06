@@ -691,4 +691,4 @@ export const commandCatalog = {
     }
   ],
   "schema": "meridian.command-catalog/v1"
-} as const;
+};

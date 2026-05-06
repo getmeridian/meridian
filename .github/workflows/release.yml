@@ -200,9 +200,27 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
       - name: Build package
         run: |
           pip install hatchling build
+          cd website
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
+          cd ..
+          cp VERSION website/dist/version
+          find website/dist -name .DS_Store -delete
           # Generate AI reference from human docs (not committed, built fresh)
           mkdir -p src/meridian/data
           for f in website/src/content/docs/en/cli-reference.md website/src/content/docs/en/architecture.md website/src/content/docs/en/troubleshooting.md website/src/content/docs/en/deploy.md website/src/content/docs/en/relay.md website/src/content/docs/en/recovery.md; do

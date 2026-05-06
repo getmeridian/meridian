@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type Action = "route" | "block";
 export type CountryCodes = string[];
 export type Enabled = boolean;
 export type EntryServerRef = string;
@@ -16,10 +17,11 @@ export type Traffic = "default" | "country";
  * One routing rule that maps traffic to an exit, optionally through a relay entry.
  */
 export interface TrafficRouteRule {
+  action?: Action;
   country_codes?: CountryCodes;
   enabled?: Enabled;
   entry_server_ref?: EntryServerRef;
-  exit_server_ref: ExitServerRef;
+  exit_server_ref?: ExitServerRef;
   id: Id;
   traffic?: Traffic;
 }

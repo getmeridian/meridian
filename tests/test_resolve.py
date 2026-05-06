@@ -16,7 +16,8 @@ from meridian.commands.resolve import (
     resolve_server,
 )
 from meridian.config import SERVER_CREDS_DIR
-from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
+from meridian.core.servers import ServerConnectionDraft, profile_from_draft
+from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerProfileStore, ServerRegistry
 
 
 class TestExplicitIP:
@@ -87,6 +88,32 @@ class TestServerFlag:
         reg.add(ServerEntry("1.2.3.4", "deploy", "prod"))
         result = resolve_server(reg, requested_server="prod")
         assert result.user == "deploy"
+
+    def test_server_by_profile_uses_saved_key_path(self, servers_file: Path) -> None:
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        ).model_copy(update={"key_path": "/tmp/meridian_ed25519"})
+        ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
+        reg = ServerRegistry(servers_file)
+
+        result = resolve_server(reg, requested_server=profile.id)
+
+        assert result.ip == "198.51.100.10"
+        assert result.user == "ubuntu"
+        assert result.conn.identity_file == "/tmp/meridian_ed25519"
+        assert result.conn.multiplex is False
+
+    def test_explicit_user_override_does_not_use_saved_key_path(self, servers_file: Path) -> None:
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        ).model_copy(update={"key_path": "/tmp/meridian_ed25519"})
+        ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
+        reg = ServerRegistry(servers_file)
+
+        result = resolve_server(reg, requested_server=profile.id, user="admin")
+
+        assert result.user == "admin"
+        assert result.conn.identity_file == ""
 
 
 class TestSingleServerAutoSelect:

@@ -1,328 +1,524 @@
 ---
 import Base from '../layouts/Base.astro';
-import { deployWorkflow, serverOnboardingWorkflow } from '../studio/generated';
+import { studioFaqs, studioHelp, studioJourneySteps } from '../studio/helpCatalog.js';
+import StudioHelp from '../studio/components/StudioHelp.astro';
+import { workflowOptions } from '../studio/contractDefaults.js';
+import { deployWorkflow } from '../studio/generated/index.js';
 
-type StudioInputKind = 'text' | 'boolean' | 'choice' | 'confirmation';
-type StudioInputOption = {
-  readonly description?: string;
-  readonly label: string;
-  readonly value: string;
-};
-type StudioInputField = {
-  readonly default?: unknown;
-  readonly help_text?: string;
-  readonly id: string;
-  readonly kind: StudioInputKind;
-  readonly label: string;
-  readonly options: readonly StudioInputOption[];
-  readonly required?: boolean;
-};
-
-const deployFields = deployWorkflow.fields as readonly StudioInputField[];
-const serverFields = serverOnboardingWorkflow.fields as readonly StudioInputField[];
-const deployFieldsById = new Map(deployFields.map((field) => [field.id, field]));
-const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]));
+const firstContext = studioJourneySteps[0];
+const colorOptions = workflowOptions(deployWorkflow, 'color');
 ---
 
 <Base
   title="Meridian Studio"
-  description="Contract-driven Meridian deploy request builder and output viewer."
+  description="Guided Meridian server setup and deploy assistant."
 >
   <main id="main" class="studio">
-    <section class="studio__header" aria-labelledby="studio-title">
-      <div class="studio__header-main">
-        <p class="studio__eyebrow">Static Studio</p>
-        <h1 id="studio-title">Deploy request workbench</h1>
-        <p class="studio__summary">{deployWorkflow.summary}</p>
+    <header class="studio__topbar" aria-labelledby="studio-title">
+      <div class="studio__brand">
+        <p class="studio__eyebrow">Meridian Studio</p>
+        <h1 id="studio-title">Set up your VPN server</h1>
       </div>
-      <div class="studio__status-strip" id="studio-mode" aria-label="Studio mode">
-        <span class="studio__status-dot" aria-hidden="true"></span>
-        <span id="studio-mode-label">Contract mode</span>
+      <div class="studio__top-status" aria-label="Studio status">
+        <div class="studio__mode" id="studio-mode" data-state="static" aria-live="polite">
+          <span class="studio__dot" aria-hidden="true"></span>
+          <span id="studio-mode-label">Static Studio</span>
+        </div>
+        <span class="studio__draft" id="studio-draft-status">Draft saved locally</span>
+        <button class="studio__ghost studio__ghost--small" type="button" id="open-command-sheet">Commands</button>
+        <button class="studio__ghost studio__ghost--small" type="button" id="studio-reset">Reset</button>
       </div>
-    </section>
+      <div class="studio__trust-strip" aria-label="Safety facts">
+        <span>Local actions run on this computer</span>
+        <span>SSH password is never saved</span>
+        <span>Deploy changes wait for review</span>
+      </div>
+    </header>
 
-    <section class="studio__workspace" aria-label="Server onboarding">
-      <form class="studio__form" id="studio-server-form">
-        <div class="studio__panel-head">
-          <div>
-            <p class="studio__panel-kicker">Server setup</p>
-            <h2>{serverOnboardingWorkflow.title}</h2>
-          </div>
-          <output class="studio__validation-pill" id="studio-server-validation-pill">Ready</output>
-        </div>
-
-        {serverOnboardingWorkflow.sections.map((section) => (
-          <fieldset class="studio__section">
-            <legend>
-              <span>{section.title}</span>
-              {section.description && <small>{section.description}</small>}
-            </legend>
-            <div class="studio__fields">
-              {section.field_ids.map((fieldId) => {
-                const field = serverFieldsById.get(fieldId);
-                if (!field) return null;
-                const inputId = `studio-server-field-${field.id}`;
-                return (
-                  <label class={`studio__field studio__field--${field.kind}`} for={inputId}>
-                    <span class="studio__label-row">
-                      <span>{field.label}</span>
-                      {field.required && <span class="studio__required">Required</span>}
-                    </span>
-                    {field.kind === 'choice' ? (
-                      <select id={inputId} data-server-field={field.id} data-studio-kind={field.kind}>
-                        {field.options.map((option) => (
-                          <option value={option.value} selected={option.value === field.default}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        id={inputId}
-                        type="text"
-                        data-server-field={field.id}
-                        data-studio-kind={field.kind}
-                        value={String(field.default ?? '')}
-                      />
-                    )}
-                    {field.help_text && <small>{field.help_text}</small>}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        ))}
-      </form>
-
-      <aside class="studio__side" aria-label="Server draft and setup commands">
-        <div class="studio__panel">
-          <div class="studio__panel-head">
-            <div>
-              <p class="studio__panel-kicker">Draft</p>
-              <h2>server.json</h2>
-            </div>
-          </div>
-          <div class="studio__errors" id="studio-server-errors" hidden></div>
-          <pre class="studio__code" id="studio-server-json"></pre>
-        </div>
-
-        <div class="studio__panel">
-          <div class="studio__panel-head">
-            <div>
-              <p class="studio__panel-kicker">Static setup</p>
-              <h2>Commands</h2>
-            </div>
-          </div>
-          <div class="studio__command-list">
-            <div class="studio__engine-actions" id="studio-server-engine-actions" hidden>
-              <label class="studio__field studio__engine-password" for="studio-engine-password">
-                <span class="studio__label-row">
-                  <span>SSH password</span>
+    <section class="studio__cockpit" aria-label="Guided Studio cockpit">
+      <aside class="studio__journey" aria-label="Setup journey">
+        <ol class="studio__steps" id="studio-steps">
+          {studioJourneySteps.map((step, index) => (
+            <li>
+              <button type="button" data-step-target={step.id}>
+                <span class="studio__step-index">{String(index + 1).padStart(2, '0')}</span>
+                <span>
+                  <strong>{step.label}</strong>
+                  <small class="studio__step-status" data-step-status>Ready</small>
                 </span>
-                <input id="studio-engine-password" type="password" autocomplete="current-password" />
+              </button>
+            </li>
+          ))}
+        </ol>
+      </aside>
+
+      <section class="studio__task">
+        <div class="studio__task-meta">
+          <span id="studio-current-step">Prepare: VPS basics</span>
+          <span>Guided setup</span>
+        </div>
+
+        <div class="studio__task-status" role="status" aria-live="polite">
+          <span>Status</span>
+          <strong id="status-title">Ready</strong>
+          <small id="status-detail">Studio is checking whether a local Engine is available.</small>
+        </div>
+
+        <details class="studio__step-help">
+          <summary>
+            <span>Need help with this step?</span>
+            <strong id="studio-context-title">{firstContext.contextTitle}</strong>
+          </summary>
+          <p id="studio-context-body">{firstContext.contextBody}</p>
+          <ul class="studio__context-list" id="studio-context-list">
+            {firstContext.contextItems.map((item) => <li>{item}</li>)}
+          </ul>
+        </details>
+
+        <article class="studio__screen" data-step-panel="welcome">
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Start here</p>
+            <h2>Copy the VPS details from your provider</h2>
+            <p>
+              Keep the provider page open. Studio only needs the server IP, SSH username, SSH port, and the first-login
+              password if the server does not already have your SSH key.
+            </p>
+          </div>
+
+          <div class="studio__mode-gate" id="studio-mode-gate" data-mode="static">
+            <div>
+              <strong id="mode-gate-title">Start Local Studio for the guided path</strong>
+              <p id="mode-gate-body">
+                This page can prepare commands, but saving servers, checking SSH, installing keys, and deploying need
+                the localhost Engine from <code>meridian studio</code>.
+              </p>
+            </div>
+            <button class="studio__secondary" type="button" id="mode-gate-command">Copy meridian studio</button>
+          </div>
+
+          <div class="studio__saved-start" id="saved-server-start" hidden>
+            <div>
+              <strong>Use a saved server</strong>
+              <p>Skip typing when this computer already knows a VPS.</p>
+            </div>
+            <div id="saved-server-start-list"></div>
+          </div>
+
+          <div class="studio__provider-grid" aria-label="Provider details to copy">
+            <div class="studio__detail-tile">
+              <span>Public IP</span>
+              <strong>198.51.100.10</strong>
+              <small>The internet-facing server address.</small>
+            </div>
+            <div class="studio__detail-tile">
+              <span>SSH user</span>
+              <strong>root or ubuntu</strong>
+              <small>The Linux login name from the provider.</small>
+            </div>
+            <div class="studio__detail-tile">
+              <span>SSH port</span>
+              <strong>22</strong>
+              <small>Use the provider value if it is different.</small>
+            </div>
+            <div class="studio__detail-tile">
+              <span>First password</span>
+              <strong>Used once</strong>
+              <small>Only needed to install a key in Local Studio.</small>
+            </div>
+          </div>
+
+          <div class="studio__faq">
+            <h3>Quick answers</h3>
+            {studioFaqs.welcome.map(([question, answer]) => (
+              <details>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+
+          <div class="studio__actionbar">
+            <button class="studio__primary" type="button" data-next-step="server">I have these details</button>
+          </div>
+        </article>
+
+        <article class="studio__screen" data-step-panel="server" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Connection details</p>
+            <h2>Paste the SSH command from your VPS provider</h2>
+            <p>Studio fills the technical fields from the command. Give the server a friendly title so you can recognize it later.</p>
+          </div>
+
+          <div class="studio__recommended-path studio__field-grid--server">
+            <label class="studio__field studio__field--wide" for="server-ssh-command">
+              <span>Paste SSH command <StudioHelp helpKey="sshCommandPaste" text={studioHelp.sshCommandPaste} /></span>
+              <input id="server-ssh-command" type="text" autocomplete="off" placeholder="ssh ubuntu@198.51.100.10 -p 2222" />
+              <small class="studio__field-help">Look for a command like this in your provider dashboard or welcome email.</small>
+            </label>
+            <div class="studio__parse-chips" id="ssh-command-preview" hidden></div>
+            <label class="studio__field studio__field--wide" for="server-title">
+              <span>Server title <StudioHelp helpKey="serverTitle" text={studioHelp.serverTitle} /></span>
+              <input id="server-title" type="text" autocomplete="off" placeholder="Family VPN" />
+              <small class="studio__field-help">Use a name you will recognize later, such as Family VPN or London VPS.</small>
+            </label>
+          </div>
+
+          <details class="studio__manual-entry">
+            <summary>I do not have an SSH command</summary>
+            <p>Enter the same details manually. They are usually shown as IP address, username, and port.</p>
+            <div class="studio__field-grid">
+              <label class="studio__field" for="server-host">
+                <span>Public IP <StudioHelp helpKey="serverPublicIp" text={studioHelp.serverPublicIp} /></span>
+                <input id="server-host" type="text" inputmode="numeric" autocomplete="off" placeholder="198.51.100.10" />
+                <small class="studio__field-help">Use the public internet address from the VPS provider.</small>
               </label>
-              <button class="studio__primary" type="button" id="studio-engine-save-server">Save</button>
-              <button class="studio__primary" type="button" id="studio-engine-validate-server">Validate SSH</button>
-              <button class="studio__primary" type="button" id="studio-engine-bootstrap-key">Prepare key</button>
+              <label class="studio__field" for="server-user">
+                <span>SSH username <StudioHelp helpKey="sshUsername" text={studioHelp.sshUsername} /></span>
+                <input id="server-user" type="text" autocomplete="username" placeholder="root" />
+                <small class="studio__field-help">Common values are root, ubuntu, debian, or admin.</small>
+              </label>
+              <label class="studio__field" for="server-port">
+                <span>SSH port <StudioHelp helpKey="sshPort" text={studioHelp.sshPort} /></span>
+                <input id="server-port" type="number" inputmode="numeric" min="1" max="65535" />
+                <small class="studio__field-help">Use 22 unless the provider gave you a different port.</small>
+              </label>
             </div>
-            <button class="studio__command" type="button" id="studio-copy-server-connect">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 17l6-6-6-6"></path>
-                <path d="M12 19h8"></path>
-              </svg>
-              <span id="studio-server-connect-command"></span>
-            </button>
-            <button class="studio__command" type="button" id="studio-copy-server-key">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M15 7a4 4 0 1 0 2 3.46L22 5l-3-3-5.5 5.5"></path>
-                <path d="M9 15l-2 2"></path>
-              </svg>
-              <span id="studio-server-key-command"></span>
-            </button>
-            <button class="studio__command" type="button" id="studio-copy-server-save">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path>
-                <path d="M17 21v-8H7v8"></path>
-                <path d="M7 3v5h8"></path>
-              </svg>
-              <span id="studio-server-save-command"></span>
-            </button>
+          </details>
+
+          <div class="studio__errors" id="server-errors" role="alert" aria-live="assertive" hidden></div>
+          <div class="studio__action-status" id="server-action-status" role="status" aria-live="polite" hidden></div>
+
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="welcome">Back</button>
+            <button class="studio__ghost" type="button" id="save-server">Save only</button>
+            <button class="studio__primary" type="button" id="save-and-validate">Check server access</button>
           </div>
-          <p class="studio__copy-status" id="studio-engine-status" aria-live="polite"></p>
-          <p class="studio__copy-status" id="studio-server-copy-status" aria-live="polite"></p>
-        </div>
-      </aside>
+        </article>
+
+        <article class="studio__screen" data-step-panel="connect" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">SSH check</p>
+            <h2>Confirm Meridian can reach the server</h2>
+            <p>This validation does not deploy anything. It checks reachability, authentication, and whether sudo works.</p>
+          </div>
+
+          <div class="studio__notice" id="saved-server-notice" role="status" aria-live="polite" hidden></div>
+          <div class="studio__facts" id="validation-facts" role="status" aria-live="polite" hidden></div>
+
+          <div class="studio__split-action" data-local-action>
+            <div>
+              <strong>Local Studio</strong>
+              <p>Runs the validation here and returns friendly next steps if something is wrong.</p>
+            </div>
+            <button class="studio__secondary" type="button" id="validate-server">Validate SSH</button>
+          </div>
+          <div class="studio__split-action" data-static-action>
+            <div>
+              <strong>Static fallback</strong>
+              <p>Copies the manual SSH command so you can test the same connection in Terminal.</p>
+            </div>
+            <button class="studio__ghost" type="button" id="copy-ssh-command">Copy SSH command</button>
+          </div>
+
+          <div class="studio__faq">
+            <h3>Troubleshooting</h3>
+            {studioFaqs.connect.map(([question, answer]) => (
+              <details>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="server">Back</button>
+            <button class="studio__secondary" type="button" id="confirm-manual-ssh" data-static-action>I checked SSH manually</button>
+            <button class="studio__primary" type="button" data-next-step="keys">Prepare key-based SSH</button>
+          </div>
+        </article>
+
+        <article class="studio__screen" data-step-panel="keys" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Secure access</p>
+            <h2>Use the password once, then use a key</h2>
+            <p>A private key stays on this computer. Its public key is installed on the server and verified immediately.</p>
+          </div>
+
+          <div class="studio__key-diagram" aria-label="SSH key explanation">
+            <div>
+              <span>Private key</span>
+              <strong>This computer</strong>
+              <small>Secret. Never pasted or uploaded.</small>
+            </div>
+            <div class="studio__key-arrow" aria-hidden="true">to</div>
+            <div>
+              <span>Public key</span>
+              <strong>Your VPS</strong>
+              <small>Safe to install on the server.</small>
+            </div>
+          </div>
+
+          <div class="studio__field-grid">
+            <label class="studio__field" for="server-password">
+              <span>One-time SSH password <StudioHelp helpKey="sshPassword" text={studioHelp.sshPassword} /></span>
+              <input id="server-password" type="password" autocomplete="off" data-lpignore="true" />
+            </label>
+            <label class="studio__choice-card" for="disable-password-auth">
+              <input id="disable-password-auth" type="checkbox" />
+              <span>
+                <strong>Ask deploy to disable password SSH later <StudioHelp helpKey="disablePasswordAuth" text={studioHelp.disablePasswordAuth} /></strong>
+                <small>{studioHelp.disablePasswordAuth}</small>
+              </span>
+            </label>
+          </div>
+
+          <div class="studio__action-status" id="key-action-status" role="status" aria-live="polite" hidden></div>
+
+          <div class="studio__split-action" data-local-action>
+            <div>
+              <strong>Recommended</strong>
+              <p>Generate a Meridian key, install its public half, then verify key login.</p>
+            </div>
+            <button class="studio__secondary" type="button" id="bootstrap-key">Install and verify key</button>
+          </div>
+          <div class="studio__split-action" data-static-action>
+            <div>
+              <strong>Manual fallback</strong>
+              <p>Copy the standard command if you prefer to do key setup in Terminal.</p>
+            </div>
+            <button class="studio__ghost" type="button" id="copy-key-command">Copy manual key command</button>
+          </div>
+
+          <div class="studio__faq">
+            <h3>Key basics</h3>
+            {studioFaqs.keys.map(([question, answer]) => (
+              <details>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="connect">Back</button>
+            <button class="studio__secondary" type="button" id="confirm-manual-key" data-static-action>I completed key setup</button>
+            <button class="studio__primary" type="button" data-next-step="deploy">Choose deploy options</button>
+          </div>
+        </article>
+
+        <article class="studio__screen" data-step-panel="deploy" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Safe defaults</p>
+            <h2>Choose what the first setup should create</h2>
+            <p>Start with the recommended options. Advanced camouflage and routing stay available in the command sheet.</p>
+          </div>
+
+          <label class="studio__field studio__field--wide" id="saved-server-field" for="saved-server" hidden>
+            <span>Use saved server <StudioHelp helpKey="savedServer" text={studioHelp.savedServer} /></span>
+            <select id="saved-server"></select>
+          </label>
+
+          <div class="studio__field-grid">
+            <label class="studio__field" for="deploy-server-name">
+              <span>Connection page name <StudioHelp helpKey="displayName" text={studioHelp.displayName} /></span>
+              <input id="deploy-server-name" type="text" placeholder="My VPN" />
+            </label>
+            <label class="studio__field" for="deploy-client-name">
+              <span>First client name <StudioHelp helpKey="clientName" text={studioHelp.clientName} /></span>
+              <input id="deploy-client-name" type="text" placeholder="default" />
+            </label>
+          </div>
+
+          <div class="studio__choice-grid">
+            <label class="studio__choice-card" for="deploy-harden">
+              <input id="deploy-harden" type="checkbox" />
+              <span>
+                <strong>Harden SSH and firewall <StudioHelp helpKey="hardening" text={studioHelp.hardening} /></strong>
+                <small>{studioHelp.hardening}</small>
+              </span>
+            </label>
+            <label class="studio__choice-card" for="deploy-geo-block">
+              <input id="deploy-geo-block" type="checkbox" />
+              <span>
+                <strong>Block RU traffic <StudioHelp helpKey="geoBlock" text={studioHelp.geoBlock} /></strong>
+                <small>{studioHelp.geoBlock}</small>
+              </span>
+            </label>
+          </div>
+
+          <details class="studio__advanced" id="deploy-advanced">
+            <summary>Advanced deploy settings</summary>
+            <div class="studio__field-grid">
+              <label class="studio__field" for="deploy-sni">
+                <span>Camouflage target <StudioHelp helpKey="sni" text={studioHelp.sni} /></span>
+                <input id="deploy-sni" type="text" />
+              </label>
+              <label class="studio__field" for="deploy-domain">
+                <span>Domain <StudioHelp helpKey="domain" text={studioHelp.domain} /></span>
+                <input id="deploy-domain" type="text" />
+              </label>
+              <label class="studio__field" for="deploy-color">
+                <span>Color palette <StudioHelp helpKey="color" text={studioHelp.color} /></span>
+                <select id="deploy-color">
+                  {colorOptions.map((option) => <option value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label class="studio__field" for="deploy-icon">
+                <span>Icon <StudioHelp helpKey="icon" text={studioHelp.icon} /></span>
+                <input id="deploy-icon" type="text" />
+              </label>
+              <label class="studio__choice-card" for="deploy-pq">
+                <input id="deploy-pq" type="checkbox" />
+                <span>
+                  <strong>Post-quantum encryption <StudioHelp helpKey="pq" text={studioHelp.pq} /></strong>
+                  <small>{studioHelp.pq}</small>
+                </span>
+              </label>
+              <label class="studio__choice-card" for="deploy-warp">
+                <input id="deploy-warp" type="checkbox" />
+                <span>
+                  <strong>Cloudflare WARP <StudioHelp helpKey="warp" text={studioHelp.warp} /></strong>
+                  <small>{studioHelp.warp}</small>
+                </span>
+              </label>
+            </div>
+          </details>
+
+          <div class="studio__action-status" id="deploy-preview-status" role="status" aria-live="polite" hidden></div>
+
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="keys">Back</button>
+            <button class="studio__primary" type="button" id="run-dry-run">Preview changes</button>
+          </div>
+        </article>
+
+        <article class="studio__screen" data-step-panel="review" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Confirmation boundary</p>
+            <h2>Review what Meridian will change</h2>
+            <p>Key setup may have installed a public SSH key already. VPN services, firewall changes, and SSH hardening wait for this deploy review.</p>
+          </div>
+
+          <div class="studio__review" id="review-summary"></div>
+          <div class="studio__action-status" id="plan-gate-status" role="status" aria-live="polite" hidden></div>
+
+          <label class="studio__confirm" for="confirm-deploy">
+            <input id="confirm-deploy" type="checkbox" />
+            <span>I reviewed this and want Meridian to change the server.</span>
+          </label>
+          <div class="studio__errors" id="deploy-errors" role="alert" aria-live="assertive" hidden></div>
+
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="deploy">Back</button>
+            <button class="studio__ghost" type="button" id="download-request">Download deploy.json</button>
+            <button class="studio__secondary" type="button" id="copy-deploy-command">Copy deploy command</button>
+            <button class="studio__primary" type="button" id="start-deploy">Start deploy</button>
+          </div>
+        </article>
+
+        <article class="studio__screen" data-step-panel="complete" hidden>
+          <div class="studio__screen-head">
+            <p class="studio__kicker">Evidence</p>
+            <h2>Progress and result</h2>
+            <p id="completion-copy">Run a dry-run or deploy to see operation evidence here.</p>
+          </div>
+          <div class="studio__progress-card" id="operation-progress-card" role="status" aria-live="polite" hidden></div>
+          <div class="studio__result" id="studio-result" data-status="idle" role="status" aria-live="polite"></div>
+          <div class="studio__action-center" id="deploy-action-center" hidden>
+            <div>
+              <strong>Next steps</strong>
+              <p id="deploy-action-copy">Finish with a connection test before adding relays or more complex routes.</p>
+            </div>
+            <div class="studio__action-center-buttons">
+              <button class="studio__primary" type="button" id="copy-invite-link">Copy invite link</button>
+              <button class="studio__secondary" type="button" id="copy-test-command">Copy test command</button>
+              <button class="studio__secondary" type="button" id="copy-add-device-command">Copy add-device command</button>
+            </div>
+            <ul class="studio__post-deploy-list" id="deploy-action-list"></ul>
+          </div>
+          <div class="studio__recovery-card" id="deploy-recovery-card" hidden>
+            <div>
+              <strong id="recovery-title">Recovery</strong>
+              <p id="recovery-copy">Studio will show the safest next step here if deploy fails.</p>
+            </div>
+            <div class="studio__action-center-buttons">
+              <button class="studio__primary" type="button" id="retry-deploy">Try deploy again</button>
+              <button class="studio__secondary" type="button" id="copy-diagnostics">Copy diagnostic report</button>
+            </div>
+          </div>
+          <ol class="studio__timeline" id="studio-timeline"></ol>
+          <div class="studio__actionbar">
+            <button class="studio__ghost" type="button" data-prev-step="review">Back</button>
+            <button class="studio__secondary" type="button" id="cancel-operation">Stop after current step</button>
+          </div>
+        </article>
+      </section>
     </section>
 
-    <section class="studio__workspace" aria-label="Deploy workflow">
-      <form class="studio__form" id="studio-form">
-        <div class="studio__panel-head">
-          <div>
-            <p class="studio__panel-kicker">Workflow</p>
-            <h2>{deployWorkflow.title}</h2>
-          </div>
-          <output class="studio__validation-pill" id="studio-validation-pill">Ready</output>
+    <dialog class="studio__sheet" id="command-sheet" aria-labelledby="command-sheet-title">
+      <div class="studio__sheet-head">
+        <div>
+          <p class="studio__kicker">Advanced drawer</p>
+          <h2 id="command-sheet-title">Command sheet</h2>
         </div>
-        <label class="studio__field studio__engine-server-select" id="studio-engine-server-field" for="studio-engine-server" hidden>
-          <span class="studio__label-row">
-            <span>Saved server</span>
-          </span>
-          <select id="studio-engine-server">
-            <option value="">Use raw connection fields</option>
-          </select>
-        </label>
+        <button class="studio__ghost studio__ghost--small" type="button" id="close-command-sheet">Close</button>
+      </div>
 
-        {deployWorkflow.sections.map((section) => (
-          <fieldset class="studio__section">
-            <legend>
-              <span>{section.title}</span>
-              {section.description && <small>{section.description}</small>}
-            </legend>
-            <div class="studio__fields">
-              {section.field_ids.map((fieldId) => {
-                const field = deployFieldsById.get(fieldId);
-                if (!field) return null;
-                const inputId = `studio-field-${field.id}`;
-                return (
-                  <label class={`studio__field studio__field--${field.kind}`} for={inputId}>
-                    <span class="studio__label-row">
-                      <span>{field.label}</span>
-                      {field.required && <span class="studio__required">Required</span>}
-                    </span>
-                    {field.kind === 'boolean' || field.kind === 'confirmation' ? (
-                      <span class="studio__switch">
-                        <input
-                          id={inputId}
-                          type="checkbox"
-                          data-studio-field={field.id}
-                          data-studio-kind={field.kind}
-                          checked={field.default === true}
-                        />
-                        <span aria-hidden="true"></span>
-                      </span>
-                    ) : field.kind === 'choice' ? (
-                      <select id={inputId} data-studio-field={field.id} data-studio-kind={field.kind}>
-                        {field.options.map((option) => (
-                          <option value={option.value} selected={option.value === field.default}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        id={inputId}
-                        type="text"
-                        data-studio-field={field.id}
-                        data-studio-kind={field.kind}
-                        value={String(field.default ?? '')}
-                      />
-                    )}
-                    {field.help_text && <small>{field.help_text}</small>}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        ))}
-      </form>
-
-      <aside class="studio__side" aria-label="Generated request and commands">
-        <div class="studio__panel">
+      <div class="studio__sheet-grid">
+        <section>
           <div class="studio__panel-head">
-            <div>
-              <p class="studio__panel-kicker">Request</p>
-              <h2>deploy.json</h2>
-            </div>
-            <button class="studio__icon-button" type="button" id="studio-download-request" title="Download deploy.json" aria-label="Download deploy.json">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
-              </svg>
-            </button>
+            <h3>Static fallback</h3>
+            <button class="studio__ghost studio__ghost--small" type="button" id="download-server">Download server.json</button>
+            <button class="studio__ghost studio__ghost--small" type="button" id="download-request-sheet">Download deploy.json</button>
           </div>
-          <div class="studio__errors" id="studio-errors" hidden></div>
-          <pre class="studio__code" id="studio-request-json"></pre>
-        </div>
-
-        <div class="studio__panel">
-          <div class="studio__panel-head">
-            <div>
-              <p class="studio__panel-kicker">CLI equivalent</p>
-              <h2>Commands</h2>
-            </div>
-          </div>
-          <button class="studio__primary" type="button" id="studio-engine-dry-run" hidden>Dry-run</button>
           <div class="studio__command-list">
-            <button class="studio__command" type="button" id="studio-copy-dry-run">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="9" y="9" width="11" height="11" rx="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span id="studio-dry-run-command"></span>
-            </button>
-            <button class="studio__command" type="button" id="studio-copy-deploy">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 12h14M13 6l6 6-6 6"></path>
-              </svg>
-              <span id="studio-deploy-command"></span>
-            </button>
+            <button class="studio__command" type="button" id="copy-save-command"><span id="save-command"></span></button>
+            <button class="studio__command" type="button" id="copy-dry-run-command"><span id="dry-run-command"></span></button>
           </div>
-          <p class="studio__copy-status" id="studio-copy-status" aria-live="polite"></p>
-        </div>
-      </aside>
-    </section>
+          <p class="studio__copy-status" id="copy-status" aria-live="polite"></p>
+        </section>
 
-    <section class="studio__workspace studio__workspace--lower" aria-label="Output preview">
-      <div class="studio__panel">
-        <div class="studio__panel-head">
-          <div>
-            <p class="studio__panel-kicker">Preview</p>
-            <h2>Result</h2>
+        <section>
+          <div class="studio__panel-head">
+            <h3>server.json</h3>
           </div>
-          <div class="studio__segmented" role="group" aria-label="Fixture preview">
-            <button type="button" data-fixture="dry-run">Dry-run</button>
-            <button type="button" data-fixture="success">Success</button>
-            <button type="button" data-fixture="error">Error</button>
-          </div>
-        </div>
-        <div class="studio__result" id="studio-result"></div>
-        <pre class="studio__code studio__code--short" id="studio-result-json"></pre>
-      </div>
+          <pre class="studio__code" id="server-json"></pre>
+        </section>
 
-      <div class="studio__panel">
-        <div class="studio__panel-head">
-          <div>
-            <p class="studio__panel-kicker">Events</p>
-            <h2>Timeline</h2>
+        <section>
+          <div class="studio__panel-head">
+            <h3>deploy.json</h3>
           </div>
-        </div>
-        <ol class="studio__timeline" id="studio-timeline"></ol>
-      </div>
-    </section>
+          <pre class="studio__code" id="request-json"></pre>
+        </section>
 
-    <section class="studio__paste" aria-label="Pasted machine output">
-      <div class="studio__panel">
-        <div class="studio__panel-head">
-          <div>
-            <p class="studio__panel-kicker">Parser</p>
-            <h2>Pasted output</h2>
+        <section>
+          <label class="studio__field" for="studio-paste">
+            <span>Pasted machine output <StudioHelp helpKey="pastedOutput" text={studioHelp.pastedOutput} /></span>
+            <textarea id="studio-paste" spellcheck="false"></textarea>
+          </label>
+          <div class="studio__sheet-actions">
+            <button class="studio__secondary" type="button" id="parse-output">Parse output</button>
           </div>
-          <button class="studio__primary" type="button" id="studio-parse-output">Parse</button>
-        </div>
-        <textarea id="studio-paste" spellcheck="false"></textarea>
-        <p class="studio__parse-status" id="studio-parse-status" aria-live="polite"></p>
+          <p class="studio__copy-status" id="parse-status" aria-live="polite"></p>
+        </section>
       </div>
-    </section>
+    </dialog>
   </main>
 </Base>
 
 <script>
-  import { connectLocalEngine, enginePost } from '../studio/localEngineAdapter.js';
+  // @ts-nocheck
+  import { studioJourneySteps } from '../studio/helpCatalog.js';
+  import { connectLocalEngine, engineGet, enginePost } from '../studio/localEngineAdapter.js';
   import {
     buildCliCommands,
-    buildDeployRequest,
+    buildCommandPack,
+    buildDeployRequestFromJourney,
     buildServerCliCommands,
     buildServerConnectionDraft,
     formatJson,
+    parseSshCommand,
     parseEnvelope,
     parseEventStream,
     summarizeEnvelope,
@@ -331,522 +527,1819 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     validateServerConnectionDraft,
   } from '../studio/staticAdapter.js';
   import {
+    clearJourneyDraft,
+    createDefaultJourneyState,
+    loadJourneyDraft,
+    saveJourneyDraft,
+  } from '../studio/storageAdapter.js';
+  import {
     deployRequestSchema,
     deployWorkflow,
     serverConnectionDraftSchema,
     serverOnboardingWorkflow,
-    studioFixtures,
   } from '../studio/generated';
 
-  const studioMode = document.getElementById('studio-mode') as HTMLElement;
-  const studioModeLabel = document.getElementById('studio-mode-label') as HTMLElement;
-  const serverForm = document.getElementById('studio-server-form') as HTMLFormElement;
-  const serverJson = document.getElementById('studio-server-json') as HTMLElement;
-  const serverErrorsEl = document.getElementById('studio-server-errors') as HTMLElement;
-  const serverValidationPill = document.getElementById('studio-server-validation-pill') as HTMLElement;
-  const serverEngineActions = document.getElementById('studio-server-engine-actions') as HTMLElement;
-  const engineSaveServer = document.getElementById('studio-engine-save-server') as HTMLButtonElement;
-  const engineValidateServer = document.getElementById('studio-engine-validate-server') as HTMLButtonElement;
-  const engineBootstrapKey = document.getElementById('studio-engine-bootstrap-key') as HTMLButtonElement;
-  const enginePassword = document.getElementById('studio-engine-password') as HTMLInputElement;
-  const engineStatus = document.getElementById('studio-engine-status') as HTMLElement;
-  const serverConnectCommand = document.getElementById('studio-server-connect-command') as HTMLElement;
-  const serverKeyCommand = document.getElementById('studio-server-key-command') as HTMLElement;
-  const serverSaveCommand = document.getElementById('studio-server-save-command') as HTMLElement;
-  const copyServerConnect = document.getElementById('studio-copy-server-connect') as HTMLButtonElement;
-  const copyServerKey = document.getElementById('studio-copy-server-key') as HTMLButtonElement;
-  const copyServerSave = document.getElementById('studio-copy-server-save') as HTMLButtonElement;
-  const serverCopyStatus = document.getElementById('studio-server-copy-status') as HTMLElement;
-  const form = document.getElementById('studio-form') as HTMLFormElement;
-  const engineServerField = document.getElementById('studio-engine-server-field') as HTMLElement;
-  const engineServerSelect = document.getElementById('studio-engine-server') as HTMLSelectElement;
-  const requestJson = document.getElementById('studio-request-json') as HTMLElement;
-  const errorsEl = document.getElementById('studio-errors') as HTMLElement;
-  const validationPill = document.getElementById('studio-validation-pill') as HTMLElement;
-  const dryRunCommand = document.getElementById('studio-dry-run-command') as HTMLElement;
-  const deployCommand = document.getElementById('studio-deploy-command') as HTMLElement;
-  const engineDryRun = document.getElementById('studio-engine-dry-run') as HTMLButtonElement;
-  const copyDryRun = document.getElementById('studio-copy-dry-run') as HTMLButtonElement;
-  const copyDeploy = document.getElementById('studio-copy-deploy') as HTMLButtonElement;
-  const copyStatus = document.getElementById('studio-copy-status') as HTMLElement;
-  const downloadRequest = document.getElementById('studio-download-request') as HTMLButtonElement;
-  const result = document.getElementById('studio-result') as HTMLElement;
-  const resultJson = document.getElementById('studio-result-json') as HTMLElement;
-  const timeline = document.getElementById('studio-timeline') as HTMLOListElement;
-  const paste = document.getElementById('studio-paste') as HTMLTextAreaElement;
-  const parseOutput = document.getElementById('studio-parse-output') as HTMLButtonElement;
-  const parseStatus = document.getElementById('studio-parse-status') as HTMLElement;
+  const steps = studioJourneySteps.map((step) => step.id);
+  const $ = (id) => document.getElementById(id);
+  const fields = {
+    title: $('server-title'),
+    host: $('server-host'),
+    user: $('server-user'),
+    port: $('server-port'),
+    sshCommand: $('server-ssh-command'),
+    password: $('server-password'),
+    disablePasswordAuth: $('disable-password-auth'),
+    savedServer: $('saved-server'),
+    serverName: $('deploy-server-name'),
+    clientName: $('deploy-client-name'),
+    harden: $('deploy-harden'),
+    geoBlock: $('deploy-geo-block'),
+    sni: $('deploy-sni'),
+    domain: $('deploy-domain'),
+    color: $('deploy-color'),
+    icon: $('deploy-icon'),
+    pq: $('deploy-pq'),
+    warp: $('deploy-warp'),
+    confirm: $('confirm-deploy'),
+  };
+  const els = {
+    mode: $('studio-mode'),
+    modeLabel: $('studio-mode-label'),
+    draftStatus: $('studio-draft-status'),
+    currentStep: $('studio-current-step'),
+    statusTitle: $('status-title'),
+    statusDetail: $('status-detail'),
+    contextTitle: $('studio-context-title'),
+    contextBody: $('studio-context-body'),
+    contextList: $('studio-context-list'),
+    serverErrors: $('server-errors'),
+    deployErrors: $('deploy-errors'),
+    sshCommandPreview: $('ssh-command-preview'),
+    modeGate: $('studio-mode-gate'),
+    modeGateTitle: $('mode-gate-title'),
+    modeGateBody: $('mode-gate-body'),
+    savedServerStart: $('saved-server-start'),
+    savedServerStartList: $('saved-server-start-list'),
+    serverActionStatus: $('server-action-status'),
+    validationFacts: $('validation-facts'),
+    keyActionStatus: $('key-action-status'),
+    deployPreviewStatus: $('deploy-preview-status'),
+    planGateStatus: $('plan-gate-status'),
+    savedServerField: $('saved-server-field'),
+    savedServerNotice: $('saved-server-notice'),
+    reviewSummary: $('review-summary'),
+    progressCard: $('operation-progress-card'),
+    result: $('studio-result'),
+    actionCenter: $('deploy-action-center'),
+    actionCopy: $('deploy-action-copy'),
+    actionList: $('deploy-action-list'),
+    copyInviteLink: $('copy-invite-link'),
+    copyTestCommand: $('copy-test-command'),
+    copyAddDeviceCommand: $('copy-add-device-command'),
+    recoveryCard: $('deploy-recovery-card'),
+    recoveryTitle: $('recovery-title'),
+    recoveryCopy: $('recovery-copy'),
+    retryDeploy: $('retry-deploy'),
+    copyDiagnostics: $('copy-diagnostics'),
+    timeline: $('studio-timeline'),
+    completionCopy: $('completion-copy'),
+    copyStatus: $('copy-status'),
+    parseStatus: $('parse-status'),
+    paste: $('studio-paste'),
+    serverJson: $('server-json'),
+    requestJson: $('request-json'),
+    saveCommand: $('save-command'),
+    dryRunCommand: $('dry-run-command'),
+    saveServer: $('save-server'),
+    saveAndValidate: $('save-and-validate'),
+    validateServer: $('validate-server'),
+    bootstrapKey: $('bootstrap-key'),
+    runDryRun: $('run-dry-run'),
+    startDeploy: $('start-deploy'),
+    cancelOperation: $('cancel-operation'),
+    commandSheet: $('command-sheet'),
+  };
   const commands = buildCliCommands();
-  let engine: Awaited<ReturnType<typeof connectLocalEngine>> = null;
-  let savedServers: Array<Record<string, any>> = [];
+  let journey = loadJourneyDraft(window.localStorage);
+  let engine = null;
+  let savedServers = [];
+  let savedServersLoaded = false;
+  let currentOperationId = journey.activeOperationId || '';
+  let lastEventSeq = 0;
+  let operationEvents = [];
+  let pollTimer = 0;
+  let latestPlan = null;
+  let latestPlanSource = '';
+  let lastDeployResult = null;
+  let lastFailure = null;
+  let lastTerminalOperationId = '';
+  let commandSheetReturnFocus = null;
+  let activityStatus = {
+    title: 'Ready',
+    detail: 'Studio is checking whether a local Engine is available.',
+  };
 
-  function collectServerState() {
-    const state: Record<string, string | boolean> = {};
-    serverForm.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-server-field]').forEach((input) => {
-      const field = input.dataset.serverField!;
-      state[field] = input instanceof HTMLInputElement && input.type === 'checkbox' ? input.checked : input.value;
+  function serverDraft() {
+    return buildServerConnectionDraft({
+      host: journey.server.host,
+      ssh_port: journey.server.ssh_port,
+      ssh_user: journey.server.ssh_user,
+      title: journey.server.title,
     });
-    return state;
   }
 
-  function collectState() {
-    const state: Record<string, string | boolean> = {};
-    form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-studio-field]').forEach((input) => {
-      const field = input.dataset.studioField!;
-      state[field] = input instanceof HTMLInputElement && input.type === 'checkbox' ? input.checked : input.value;
-    });
-    return state;
+  function deployRequest(confirm = false) {
+    return buildDeployRequestFromJourney({ ...journey, confirmDeploy: confirm });
   }
 
-  function updateServerDraft() {
-    const draft = buildServerConnectionDraft(collectServerState());
-    const errors = validateServerConnectionDraft(draft, serverConnectionDraftSchema, serverOnboardingWorkflow);
-    const ready = errors.length === 0;
-    const serverCommands = buildServerCliCommands(draft);
-
-    serverJson.textContent = formatJson(draft);
-    serverConnectCommand.textContent = serverCommands.connect;
-    serverKeyCommand.textContent = serverCommands.copyKey;
-    serverSaveCommand.textContent = serverCommands.save;
-    copyServerConnect.disabled = !ready;
-    copyServerKey.disabled = !ready;
-    copyServerSave.disabled = !ready;
-    engineSaveServer.disabled = !ready;
-    engineValidateServer.disabled = !ready;
-    engineBootstrapKey.disabled = !ready;
-    serverValidationPill.textContent = ready ? 'Ready to test' : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
-    serverValidationPill.dataset.state = ready ? 'ok' : 'error';
-    renderServerErrors(errors);
-    return serverCommands;
+  function requestSignature(request) {
+    return JSON.stringify(Object.keys(request).sort().reduce((sorted, key) => {
+      sorted[key] = request[key];
+      return sorted;
+    }, {}));
   }
 
-  function updateRequest() {
-    const request = buildDeployRequest(collectState()) as Record<string, any>;
-    if (engineServerSelect.value) {
-      request.requested_server = engineServerSelect.value;
-      request.ip = '';
+  function expectedDryRunServerIp(request) {
+    if (request.ip) return request.ip;
+    const selected = savedServers.find((server) =>
+      [server.id, server.title, server.host].includes(request.requested_server),
+    );
+    return selected?.host || '';
+  }
+
+  function persist() {
+    saveJourneyDraft(window.localStorage, journey);
+    els.draftStatus.textContent = 'Draft saved locally';
+  }
+
+  function setStep(step) {
+    const target = steps.includes(step) ? step : 'welcome';
+    const gate = stepGate(target);
+    if (!gate.allowed) {
+      setStatus('Finish this step first', gate.reason, 'warning');
+      showStatus(els.planGateStatus, 'Review is locked', gate.reason, 'warning');
+      return;
     }
-    const errors = validateDeployRequest(request, deployRequestSchema, deployWorkflow);
-    const ready = errors.length === 0;
-
-    requestJson.textContent = formatJson(request);
-    dryRunCommand.textContent = commands.dryRun;
-    deployCommand.textContent = commands.deploy;
-    engineDryRun.disabled = !ready;
-    copyDeploy.disabled = !ready || request.yes !== true;
-    validationPill.textContent = ready ? (request.yes ? 'Ready to run' : 'Dry-run ready') : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
-    validationPill.dataset.state = ready ? 'ok' : 'error';
-    renderErrors(errors);
-    return request;
+    journey.currentStep = target;
+    persist();
+    render();
+    window.requestAnimationFrame(() => focusCurrentStep());
   }
 
-  function renderServerErrors(errors: { field: string; message: string }[]) {
-    serverErrorsEl.hidden = errors.length === 0;
-    serverErrorsEl.replaceChildren(
+  function setStatus(title, detail, tone = 'ok') {
+    activityStatus = { title, detail };
+    els.statusTitle.textContent = title;
+    els.statusDetail.textContent = detail;
+    els.statusTitle.closest('.studio__task-status')?.setAttribute('data-tone', tone);
+  }
+
+  function stepGate(step) {
+    const order = steps.indexOf(step);
+    const serverErrors = validateServerConnectionDraft(serverDraft(), serverConnectionDraftSchema, serverOnboardingWorkflow);
+    const request = deployRequest(false);
+    const deployErrors = validateDeployRequest(request, deployRequestSchema, deployWorkflow);
+    if (step === 'review') {
+      if (deployErrors.length > 0) {
+        return { allowed: false, reason: 'Fix deploy options before previewing changes.' };
+      }
+      if (!latestPlan) {
+        return { allowed: false, reason: 'Run Preview changes so Studio has real plan evidence for this tab.' };
+      }
+      if (!journey.readiness.dryRunComplete || journey.lastDryRunSignature !== requestSignature(request)) {
+        return { allowed: false, reason: 'Preview changes with the current request before review.' };
+      }
+      return { allowed: true, reason: '' };
+    }
+    if (order <= steps.indexOf(journey.currentStep) || step === 'welcome' || step === 'server') {
+      return { allowed: true, reason: '' };
+    }
+    if (step === 'connect') {
+      return serverErrors.length === 0
+        ? { allowed: true, reason: '' }
+        : { allowed: false, reason: 'Enter a valid server title, public IP, SSH username, and SSH port first.' };
+    }
+    if (step === 'keys') {
+      return serverErrors.length === 0
+        ? { allowed: true, reason: '' }
+        : { allowed: false, reason: 'Enter valid server details before key setup.' };
+    }
+    if (step === 'deploy') {
+      return journey.readiness.sshValidated || journey.readiness.keyReady
+        ? { allowed: true, reason: '' }
+        : { allowed: false, reason: 'Meridian needs a confirmed server connection before deploy options matter.' };
+    }
+    return { allowed: true, reason: '' };
+  }
+
+  function render() {
+    document.querySelectorAll('[data-step-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.stepPanel !== journey.currentStep;
+    });
+    document.querySelectorAll('[data-step-target]').forEach((button) => {
+      const active = button.dataset.stepTarget === journey.currentStep;
+      const state = stepProgress(button.dataset.stepTarget);
+      const gate = stepGate(button.dataset.stepTarget);
+      const meta = studioJourneySteps.find((item) => item.id === button.dataset.stepTarget);
+      const label = meta ? `${meta.label}: ${meta.short}` : button.textContent?.trim() || 'Step';
+      button.setAttribute('aria-current', active ? 'step' : 'false');
+      button.setAttribute('aria-disabled', state === 'locked' ? 'true' : 'false');
+      button.setAttribute(
+        'aria-label',
+        state === 'locked'
+          ? `${label}: locked. ${gate.reason}`
+          : label,
+      );
+      button.dataset.state = state;
+      button.title = state === 'locked' ? gate.reason : '';
+      const status = button.querySelector('[data-step-status]');
+      if (status) status.textContent = stepStateLabel(state);
+    });
+
+    const step = studioJourneySteps.find((item) => item.id === journey.currentStep) ?? studioJourneySteps[0];
+    els.currentStep.textContent = `${step.label}: ${step.short}`;
+    els.contextTitle.textContent = step.contextTitle;
+    els.contextBody.textContent = step.contextBody;
+    els.contextList.replaceChildren(
+      ...step.contextItems.map((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        return li;
+      }),
+    );
+
+    fields.title.value = journey.server.title;
+    fields.host.value = journey.server.host;
+    fields.user.value = journey.server.ssh_user;
+    fields.port.value = String(journey.server.ssh_port);
+    fields.serverName.value = journey.deploy.server_name;
+    fields.clientName.value = journey.deploy.client_name;
+    fields.harden.checked = Boolean(journey.deploy.harden);
+    fields.geoBlock.checked = Boolean(journey.deploy.geo_block);
+    fields.sni.value = journey.deploy.sni;
+    fields.domain.value = journey.deploy.domain;
+    fields.color.value = journey.deploy.color;
+    fields.icon.value = journey.deploy.icon;
+    fields.pq.checked = Boolean(journey.deploy.pq);
+    fields.warp.checked = Boolean(journey.deploy.warp);
+    fields.confirm.checked = Boolean(journey.confirmDeploy);
+
+    renderSavedServers();
+    const draft = serverDraft();
+    const request = deployRequest();
+    const signature = requestSignature(request);
+    const serverErrors = validateServerConnectionDraft(draft, serverConnectionDraftSchema, serverOnboardingWorkflow);
+    const deployErrors = validateDeployRequest(request, deployRequestSchema, deployWorkflow);
+    const pack = buildCommandPack({ deployRequest: request, serverDraft: draft });
+
+    els.serverJson.textContent = formatJson(draft);
+    els.requestJson.textContent = formatJson(request);
+    els.saveCommand.textContent = pack.saveServer;
+    els.dryRunCommand.textContent = pack.dryRun;
+    renderErrors(els.serverErrors, serverErrors);
+    renderErrors(els.deployErrors, deployErrors);
+    renderReview(draft, request);
+    renderModeGate();
+    renderPlanGate(signature);
+
+    els.saveServer.disabled = !engine || serverErrors.length > 0;
+    els.saveAndValidate.disabled = !engine || serverErrors.length > 0;
+    els.validateServer.disabled = !engine || serverErrors.length > 0;
+    els.bootstrapKey.disabled = !engine || serverErrors.length > 0;
+    els.runDryRun.disabled = engine ? deployErrors.length > 0 : false;
+    els.startDeploy.disabled =
+      !engine ||
+      !latestPlan ||
+      deployErrors.length > 0 ||
+      !journey.confirmDeploy ||
+      !journey.readiness.dryRunComplete ||
+      journey.lastDryRunSignature !== signature;
+    els.cancelOperation.disabled = !currentOperationId || !engine;
+    document.querySelectorAll('[data-local-action]').forEach((element) => {
+      element.hidden = !engine;
+    });
+    document.querySelectorAll('[data-static-action]').forEach((element) => {
+      element.hidden = Boolean(engine);
+    });
+
+    els.mode.dataset.state = engine ? 'engine' : 'static';
+    els.modeLabel.textContent = engine ? 'Local Studio' : 'Static Studio';
+    els.statusTitle.textContent = activityStatus.title;
+    els.statusDetail.textContent = activityStatus.detail;
+  }
+
+  function stepProgress(step) {
+    if (step === journey.currentStep) return 'active';
+    if (step === 'welcome') return 'done';
+    if (step === 'server') return journey.readiness.serverSaved ? 'done' : 'available';
+    if (step === 'connect') return journey.readiness.sshValidated ? 'done' : stepGate(step).allowed ? 'available' : 'locked';
+    if (step === 'keys') return journey.readiness.keyReady ? 'done' : stepGate(step).allowed ? 'available' : 'locked';
+    if (step === 'deploy') return journey.readiness.dryRunComplete ? 'done' : stepGate(step).allowed ? 'available' : 'locked';
+    if (step === 'review') return stepGate(step).allowed ? 'available' : 'locked';
+    if (step === 'complete') return currentOperationId || journey.readiness.dryRunComplete ? 'available' : 'locked';
+    return 'available';
+  }
+
+  function stepStateLabel(state) {
+    if (state === 'active') return 'Current step';
+    if (state === 'done') return 'Done';
+    if (state === 'locked') return 'Locked';
+    return 'Ready';
+  }
+
+  function focusCurrentStep() {
+    const panel = document.querySelector(`[data-step-panel="${journey.currentStep}"]`);
+    const heading = panel?.querySelector('h2');
+    if (heading instanceof HTMLElement) {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({ preventScroll: true });
+    }
+  }
+
+  function renderModeGate() {
+    els.modeGate.dataset.mode = engine ? 'engine' : 'static';
+    els.modeGateTitle.textContent = engine ? 'Local Studio is connected' : 'Start Local Studio for the guided path';
+    $('mode-gate-command').textContent = engine ? 'Open command sheet' : 'Copy meridian studio';
+    const text = document.createElement('span');
+    text.textContent = engine
+      ? 'Save servers, check SSH, install keys, preview, and deploy from this computer.'
+      : 'Copy ';
+    if (!engine) {
+      const code = document.createElement('code');
+      code.textContent = 'meridian studio';
+      els.modeGateBody.replaceChildren(
+        text,
+        code,
+        document.createTextNode(', run it in Terminal, then keep this page open while it reconnects.'),
+      );
+      return;
+    }
+    els.modeGateBody.replaceChildren(text);
+  }
+
+  function renderPlanGate(signature) {
+    const requestChanged = journey.lastDryRunSignature && journey.lastDryRunSignature !== signature;
+    if (journey.readiness.dryRunComplete && !requestChanged && latestPlan) {
+      const source = latestPlanSource === 'static' ? 'Imported CLI dry-run' : 'Local Engine dry-run';
+      showStatus(els.planGateStatus, 'Preview ready', `${source} is loaded for this review. Confirm the changes to unlock deploy.`, 'ok');
+      return;
+    }
+    if (journey.readiness.dryRunComplete && !latestPlan) {
+      showStatus(els.planGateStatus, 'Preview evidence missing', 'Run Preview changes again so Studio can show the actual plan for this tab.', 'warning');
+      return;
+    }
+    if (requestChanged) {
+      showStatus(els.planGateStatus, 'Preview needs refresh', 'Deploy options changed. Preview changes again before starting deploy.', 'warning');
+      return;
+    }
+    showStatus(els.planGateStatus, 'Preview required', 'Use Preview changes before review so this page shows a real plan.', 'warning');
+  }
+
+  function renderSavedServers() {
+    els.savedServerField.hidden = savedServers.length === 0;
+    const current = journey.selectedServerId;
+    const options = [
+      new Option('Use the server entered above', ''),
+      ...savedServers.map((server) => new Option(`${server.title} (${server.host})`, server.id)),
+    ];
+    fields.savedServer.replaceChildren(...options);
+    if (savedServers.some((server) => server.id === current)) {
+      fields.savedServer.value = current;
+    } else if (savedServersLoaded) {
+      fields.savedServer.value = '';
+      journey.selectedServerId = '';
+    } else {
+      fields.savedServer.value = '';
+    }
+    const selected = savedServers.find((server) => server.id === journey.selectedServerId);
+    els.savedServerNotice.hidden = !selected;
+    els.savedServerNotice.textContent = selected
+      ? `Using saved server ${selected.title} at ${selected.host}:${selected.ssh_port}.`
+      : '';
+    renderSavedServerStart();
+  }
+
+  function renderSavedServerStart() {
+    const usable = savedServers.filter((server) => ['validated', 'key_ready'].includes(server.auth_state));
+    els.savedServerStart.hidden = usable.length === 0;
+    els.savedServerStartList.replaceChildren(
+      ...usable.map((server) => {
+        const button = document.createElement('button');
+        button.className = 'studio__saved-choice';
+        button.type = 'button';
+        button.dataset.useServer = server.id;
+        const title = document.createElement('strong');
+        const detail = document.createElement('span');
+        title.textContent = server.title;
+        detail.textContent = `${server.auth_state === 'key_ready' ? 'Key ready' : 'SSH checked'} · ${server.host}:${server.ssh_port}`;
+        button.replaceChildren(title, detail);
+        return button;
+      }),
+    );
+  }
+
+  function useSavedServer(serverId) {
+    const server = savedServers.find((item) => item.id === serverId);
+    if (!server) return;
+    journey.selectedServerId = server.id;
+    journey.readiness.serverSaved = true;
+    journey.readiness.sshValidated = ['validated', 'key_ready'].includes(server.auth_state);
+    journey.readiness.keyReady = server.auth_state === 'key_ready';
+    journey.server.title = server.title;
+    journey.server.host = server.host;
+    journey.server.ssh_user = server.ssh_user;
+    journey.server.ssh_port = server.ssh_port;
+    showStatus(
+      els.serverActionStatus,
+      'Saved server selected',
+      `${server.title} will be used for this deploy.`,
+      'ok',
+    );
+    persist();
+    setStep(journey.readiness.sshValidated ? 'deploy' : 'connect');
+  }
+
+  function renderErrors(container, errors) {
+    container.hidden = errors.length === 0;
+    container.replaceChildren(
       ...errors.map((error) => {
         const item = document.createElement('p');
-        item.textContent = `${error.field}: ${error.message}`;
+        item.textContent = error.message;
         return item;
       }),
     );
   }
 
-  function renderErrors(errors: { field: string; message: string }[]) {
-    errorsEl.hidden = errors.length === 0;
-    errorsEl.replaceChildren(
-      ...errors.map((error) => {
-        const item = document.createElement('p');
-        item.textContent = `${error.field}: ${error.message}`;
+  function showStatus(container, title, detail, tone = 'ok') {
+    container.hidden = false;
+    container.dataset.tone = tone;
+    const strong = document.createElement('strong');
+    const span = document.createElement('span');
+    strong.textContent = title;
+    span.textContent = detail || '';
+    container.replaceChildren(strong, span);
+  }
+
+  function hideStatus(container) {
+    container.hidden = true;
+    container.replaceChildren();
+  }
+
+  function renderValidationFacts(result) {
+    if (!result) {
+      els.validationFacts.hidden = true;
+      els.validationFacts.replaceChildren();
+      return;
+    }
+    const facts = [
+      ['Reached server', result.reachable, result.reachable ? 'The SSH port answered.' : 'Check the IP address, SSH port, and provider firewall.'],
+      ['Logged in', result.auth_ok, result.auth_ok ? 'The username and key/password worked.' : 'Check username, password, or key setup.'],
+      ['Sudo works', result.sudo_ok, result.sudo_ok ? 'Meridian can make system changes.' : 'Use root or a user with passwordless sudo.'],
+      ['Detected OS', Boolean(result.detected_os), result.detected_os || 'OS was not detected yet.'],
+    ];
+    els.validationFacts.hidden = false;
+    els.validationFacts.replaceChildren(
+      ...facts.map(([label, ok, detail]) => {
+        const item = document.createElement('div');
+        item.className = ok ? 'studio__fact studio__fact--ok' : 'studio__fact studio__fact--warn';
+        const title = document.createElement('strong');
+        const copy = document.createElement('span');
+        title.textContent = label;
+        copy.textContent = detail;
+        item.replaceChildren(title, copy);
         return item;
       }),
     );
   }
 
-  function renderEnvelope(envelope: Record<string, any>) {
-    const summary = summarizeEnvelope(envelope);
-    result.dataset.status = summary.status;
-    const status = document.createElement('strong');
-    status.textContent = summary.status;
-    const text = document.createElement('span');
-    text.textContent = summary.text;
-    const changed = document.createElement('small');
-    changed.textContent = summary.changed ? 'Changes expected' : 'No immediate changes';
-    result.replaceChildren(status, text, changed);
-    resultJson.textContent = formatJson(envelope);
-  }
-
-  function renderApiPayload(payload: Record<string, any>, label: string) {
-    const body = payload.result ?? payload.server ?? payload.plan ?? payload;
-    const failed = body.auth_ok === false || body.verified === false;
-    result.dataset.status = failed ? 'failed' : 'ok';
-    const status = document.createElement('strong');
-    status.textContent = failed ? 'needs action' : 'ok';
-    const text = document.createElement('span');
-    text.textContent = label;
-    const hints = document.createElement('small');
-    hints.textContent = Array.isArray(body.hints) && body.hints.length > 0 ? body.hints.join(' ') : payload.schema;
-    result.replaceChildren(status, text, hints);
-    resultJson.textContent = formatJson(payload);
+  function renderReview(draft, request) {
+    const previewReady = Boolean(journey.readiness.dryRunComplete && latestPlan);
+    const target = journey.selectedServerId || `${draft.title} (${draft.host}:${draft.ssh_port})`;
+    const ports = latestPlan?.ports
+      ? `Ports: Reality ${latestPlan.ports.reality_port}, WSS ${latestPlan.ports.wss_port}, XHTTP ${latestPlan.ports.xhttp_port}.`
+      : 'Ports appear after preview.';
+    const cards = [
+      {
+        title: 'Target',
+        badge: previewReady ? 'Previewed' : 'Needs preview',
+        detail: `${target}. Install target: ${latestPlan?.server_ip || request.ip || 'saved server'}.`,
+        tone: previewReady ? 'ok' : 'warning',
+      },
+      {
+        title: 'VPN services',
+        badge: latestPlan?.mode === 'redeploy' ? 'Update' : 'Install',
+        detail: `${latestPlan?.mode === 'redeploy' ? 'Updates existing Meridian services' : 'Installs Meridian services'} for ${request.server_name}. ${ports}`,
+        tone: 'change',
+      },
+      {
+        title: 'SSH and firewall',
+        badge: request.harden ? 'Will harden' : 'Hardening off',
+        detail: request.harden
+          ? 'Deploy may tighten SSH and firewall rules after key setup has been verified.'
+          : 'Deploy will avoid SSH hardening for this run. Use this when the VPS already hosts other services.',
+        tone: request.harden ? 'change' : 'quiet',
+      },
+      {
+        title: 'First device',
+        badge: 'Create profile',
+        detail: `Creates the first client profile named ${request.client_name}. Test one device before adding relays or route policy.`,
+        tone: 'ok',
+      },
+      {
+        title: 'Traffic rules',
+        badge: request.geo_block ? 'Block RU' : 'Default exit',
+        detail: request.geo_block
+          ? 'Blocks RU destinations on this server. Regional exits are configured separately.'
+          : 'Traffic uses the default exit until a route policy is configured.',
+        tone: request.geo_block ? 'warning' : 'quiet',
+      },
+      {
+        title: 'Evidence source',
+        badge: previewReady ? (latestPlanSource === 'static' ? 'CLI import' : 'Engine') : 'Missing',
+        detail: previewReady
+          ? 'This review is tied to the current deploy fields. Changing any option requires another preview.'
+          : 'Preview changes before deploying so this review is based on real plan evidence.',
+        tone: previewReady ? 'ok' : 'warning',
+      },
+    ];
+    els.reviewSummary.replaceChildren(
+      ...cards.map((card) => {
+        const item = document.createElement('article');
+        item.className = 'studio__impact-card';
+        item.dataset.tone = card.tone;
+        const top = document.createElement('div');
+        const title = document.createElement('strong');
+        const badge = document.createElement('span');
+        const detail = document.createElement('p');
+        title.textContent = card.title;
+        badge.textContent = card.badge;
+        detail.textContent = card.detail;
+        top.replaceChildren(title, badge);
+        item.replaceChildren(top, detail);
+        return item;
+      }),
+    );
   }
 
   async function refreshSavedServers() {
     if (!engine) return;
     try {
-      const response = await fetch('/api/v1/servers', {
-        cache: 'no-store',
-        headers: { accept: 'application/json' },
-      });
-      if (!response.ok) return;
-      const payload = await response.json();
+      const payload = await engineGet('/api/v1/servers');
       savedServers = Array.isArray(payload.servers) ? payload.servers : [];
-      const current = engineServerSelect.value;
-      const options = [
-        new Option('Use raw connection fields', ''),
-        ...savedServers.map((server) => new Option(`${server.title} (${server.host})`, server.id)),
-      ];
-      engineServerSelect.replaceChildren(...options);
-      if (savedServers.some((server) => server.id === current)) {
-        engineServerSelect.value = current;
-      }
-      engineServerField.hidden = savedServers.length === 0;
-      updateRequest();
+      savedServersLoaded = true;
     } catch {
-      engineServerField.hidden = true;
+      savedServers = [];
+      savedServersLoaded = true;
     }
+    render();
   }
 
-  function renderEngineError(error: unknown) {
-    result.dataset.status = 'failed';
-    const status = document.createElement('strong');
-    status.textContent = 'failed';
-    const text = document.createElement('span');
-    text.textContent = error instanceof Error ? error.message.split('\n')[0] : 'Engine request failed.';
-    const hint = document.createElement('small');
-    hint.textContent = error instanceof Error ? error.message.split('\n').slice(1).join(' ') : '';
-    result.replaceChildren(status, text, hint);
-    resultJson.textContent = error instanceof Error ? error.message : 'Engine request failed.';
-  }
-
-  function renderTimeline(events: readonly Record<string, any>[]) {
-    const items = (timelineFromEvents(events) as Array<{
-      level: string;
-      message: string;
-      phase: string;
-      seq: number;
-      type: string;
-    }>).map((event) => {
-      const item = document.createElement('li');
-      item.className = `studio__timeline-item studio__timeline-item--${event.level}`;
-      const seq = document.createElement('span');
-      seq.textContent = String(event.seq);
-      const body = document.createElement('div');
-      const message = document.createElement('strong');
-      message.textContent = event.message;
-      const meta = document.createElement('small');
-      meta.textContent = `${event.phase} · ${event.type}`;
-      body.replaceChildren(message, meta);
-      item.replaceChildren(seq, body);
-      return item;
-    });
-    timeline.replaceChildren(...items);
-  }
-
-  async function copyText(text: string, label: string) {
-    await navigator.clipboard.writeText(text);
-    copyStatus.textContent = `${label} copied`;
-    window.setTimeout(() => {
-      copyStatus.textContent = '';
-    }, 1500);
-  }
-
-  async function copyServerText(text: string, label: string) {
-    await navigator.clipboard.writeText(text);
-    serverCopyStatus.textContent = `${label} copied`;
-    window.setTimeout(() => {
-      serverCopyStatus.textContent = '';
-    }, 1500);
-  }
-
-  async function initLocalEngine() {
-    engine = await connectLocalEngine();
-    if (!engine) {
-      studioMode.dataset.state = 'static';
-    studioModeLabel.textContent = 'Contract mode';
-    serverEngineActions.hidden = true;
-    engineDryRun.hidden = true;
-    engineServerField.hidden = true;
-    return;
-  }
-    studioMode.dataset.state = 'engine';
-    studioModeLabel.textContent = 'Local Engine';
-    serverEngineActions.hidden = false;
-    engineDryRun.hidden = false;
-    refreshSavedServers();
-    updateServerDraft();
-    updateRequest();
-  }
-
-  async function runEngineAction(label: string, action: () => Promise<Record<string, any>>) {
-    if (!engine) return;
-    engineStatus.textContent = `${label} running`;
+  async function runAction(label, fn, options = {}) {
+    setStatus(`${label} running`, 'Please wait. Do not refresh this page while a local action is running.', 'running');
     try {
-      const payload = await action();
-      engineStatus.textContent = `${label} complete`;
-      renderApiPayload(payload, label);
-      refreshSavedServers();
+      const payload = await fn();
+      handleActionPayload(label, payload);
+      setStatus(`${label} complete`, summarizePayload(payload), 'ok');
+      renderPayload(payload);
+      await refreshSavedServers();
+      if (options.nextStep && (!options.requireReadiness || journey.readiness[options.requireReadiness])) {
+        setStep(options.nextStep);
+      }
     } catch (error) {
-      engineStatus.textContent = `${label} failed`;
       renderEngineError(error);
     }
   }
 
-  serverForm.addEventListener('input', updateServerDraft);
-  form.addEventListener('input', updateRequest);
-  engineServerSelect.addEventListener('change', updateRequest);
-  copyServerConnect.addEventListener('click', () => copyServerText(updateServerDraft().connect, 'SSH command'));
-  copyServerKey.addEventListener('click', () => copyServerText(updateServerDraft().copyKey, 'Key command'));
-  copyServerSave.addEventListener('click', () => copyServerText(updateServerDraft().save, 'Save command'));
-  engineSaveServer.addEventListener('click', () =>
-    runEngineAction('Server save', () => enginePost(engine, '/api/v1/servers', buildServerConnectionDraft(collectServerState()))),
-  );
-  engineValidateServer.addEventListener('click', () =>
-    runEngineAction('SSH validation', () =>
-      enginePost(engine, '/api/v1/servers/validate', { draft: buildServerConnectionDraft(collectServerState()) }),
-    ),
-  );
-  engineBootstrapKey.addEventListener('click', () =>
-    runEngineAction('Key setup', async () => {
-      const draft = buildServerConnectionDraft(collectServerState());
-      const saved = await enginePost(engine, '/api/v1/servers', draft);
-      return enginePost(engine, '/api/v1/servers/bootstrap-key', {
-        key_policy: 'generate_meridian',
-        password: enginePassword.value,
-        server_ref: saved.server?.id ?? draft.title,
-      });
-    }),
-  );
-  copyDryRun.addEventListener('click', () => copyText(commands.dryRun, 'Dry-run command'));
-  copyDeploy.addEventListener('click', () => copyText(commands.deploy, 'Deploy command'));
-  engineDryRun.addEventListener('click', () =>
-    runEngineAction('Deploy dry-run', () => enginePost(engine, '/api/v1/deploy/dry-run', updateRequest())),
-  );
-  downloadRequest.addEventListener('click', () => {
-    const request = updateRequest();
-    const url = URL.createObjectURL(new Blob([formatJson(request) + '\n'], { type: 'application/json' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'deploy.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  });
-
-  document.querySelectorAll<HTMLButtonElement>('[data-fixture]').forEach((button) => {
-    button.addEventListener('click', () => {
-      if (button.dataset.fixture === 'success') {
-        renderEnvelope(studioFixtures.deploySuccessEnvelope);
-        renderTimeline(studioFixtures.deployEvents);
-      } else if (button.dataset.fixture === 'error') {
-        renderEnvelope(studioFixtures.deployUserErrorEnvelope);
-        renderTimeline([]);
-      } else {
-        renderEnvelope(studioFixtures.deployDryRunEnvelope);
-        renderTimeline(studioFixtures.deployDryRunEvents);
+  function handleActionPayload(label, payload) {
+    if (payload.schema === 'meridian.server-profile/v1' && payload.server) {
+      journey.readiness.serverSaved = true;
+      journey.selectedServerId = payload.server.id || journey.selectedServerId;
+      showStatus(els.serverActionStatus, 'Server saved', `${payload.server.title} is ready for an SSH check.`, 'ok');
+      persist();
+      return;
+    }
+    if (payload.schema === 'meridian.server-validate/v1' && payload.result) {
+      const result = payload.result;
+      renderValidationFacts(result);
+      journey.readiness.sshValidated = Boolean(result.auth_ok && result.sudo_ok);
+      if (result.server?.id) {
+        journey.selectedServerId = result.server.id;
       }
-    });
-  });
+      showStatus(
+        els.serverActionStatus,
+        journey.readiness.sshValidated ? 'SSH works' : 'SSH needs attention',
+        summarizePayload(payload),
+        journey.readiness.sshValidated ? 'ok' : 'warning',
+      );
+      persist();
+      return;
+    }
+    if (payload.schema === 'meridian.server-bootstrap-key/v1' && payload.result) {
+      journey.readiness.keyReady = Boolean(payload.result.verified);
+      journey.readiness.sshValidated = journey.readiness.keyReady || journey.readiness.sshValidated;
+      if (payload.result.server?.id) {
+        journey.selectedServerId = payload.result.server.id;
+      }
+      showStatus(
+        els.keyActionStatus,
+        journey.readiness.keyReady ? 'Key login verified' : 'Public key installed',
+        summarizePayload(payload),
+        journey.readiness.keyReady ? 'ok' : 'warning',
+      );
+      persist();
+      return;
+    }
+    if (payload.schema === 'meridian.deploy-dry-run/v1' && payload.plan) {
+      latestPlan = payload.plan;
+      latestPlanSource = 'engine';
+      const signature = requestSignature(deployRequest(false));
+      journey.readiness.dryRunComplete = true;
+      journey.lastDryRunSignature = signature;
+      showStatus(els.deployPreviewStatus, 'Preview ready', summarizePayload(payload), 'ok');
+      persist();
+    }
+  }
 
-  parseOutput.addEventListener('click', () => {
+  function summarizePayload(payload) {
+    if (payload.schema === 'meridian.server-profile/v1' && payload.server) {
+      return `${payload.server.title} saved at ${payload.server.host}:${payload.server.ssh_port}.`;
+    }
+    if (payload.schema === 'meridian.server-validate/v1' && payload.result) {
+      if (payload.result.auth_ok && payload.result.sudo_ok) {
+        return `SSH and sudo work${payload.result.detected_os ? ` on ${payload.result.detected_os}` : ''}.`;
+      }
+      if (Array.isArray(payload.result.hints) && payload.result.hints.length > 0) {
+        return payload.result.hints.join(' ');
+      }
+      return 'SSH validation needs attention.';
+    }
+    if (payload.schema === 'meridian.server-bootstrap-key/v1' && payload.result) {
+      const base = payload.result.verified
+        ? 'Key login was verified. The password is no longer needed for Studio actions.'
+        : 'Public key was installed, but Studio could not verify private-key login yet.';
+      const warnings = Array.isArray(payload.result.warnings) ? payload.result.warnings : [];
+      return warnings.length > 0 ? `${base} ${warnings.join(' ')}` : base;
+    }
+    if (payload.schema === 'meridian.deploy-dry-run/v1' && payload.plan) {
+      return `Preview ready for ${payload.plan.server_ip}. Review the planned changes before deploy.`;
+    }
+    if (payload.schema === 'meridian.deploy-operation-result/v1' && payload.result) {
+      return payload.result.summary || `Deploy completed for ${payload.result.server_ip}.`;
+    }
+    const body = payload.result || payload.plan || payload.server || payload;
+    if (Array.isArray(body.hints) && body.hints.length > 0) return body.hints.join(' ');
+    if (body.summary) return body.summary;
+    if (body.mode && body.server_ip) return `Preview ready for ${body.server_ip}`;
+    return payload.schema || 'Action finished.';
+  }
+
+  function renderPayload(payload) {
+    if (payload.schema === 'meridian.deploy-operation-result/v1' && payload.result) {
+      renderDeploySuccess(payload.result);
+      return;
+    }
+    els.result.dataset.status = 'ok';
+    const title = document.createElement('strong');
+    const text = document.createElement('span');
+    const details = document.createElement('small');
+    const presentation = presentPayload(payload);
+    title.textContent = presentation.status;
+    text.textContent = presentation.title;
+    details.textContent = summarizePayload(payload);
+    els.result.replaceChildren(title, text, details);
+  }
+
+  function resetTerminalPanels() {
+    els.actionCenter.hidden = true;
+    els.recoveryCard.hidden = true;
+    els.progressCard.hidden = true;
+  }
+
+  function renderDeploySuccess(result, options = {}) {
+    lastDeployResult = result;
+    lastFailure = null;
+    els.result.dataset.status = options.afterCancel ? 'warning' : 'ok';
+    const title = document.createElement('strong');
+    const text = document.createElement('span');
+    const details = document.createElement('small');
+    title.textContent = options.afterCancel ? 'completed after stop request' : 'ready';
+    text.textContent = result.summary || `Deploy completed for ${result.server_ip}.`;
+    details.textContent = result.connection_page_url
+      ? 'The invite link is ready. Test one device before changing route policy or adding relays.'
+      : 'Deploy finished. Run a connection test before adding relays or more devices.';
+    els.result.replaceChildren(title, text, details);
+    renderActionCenter(result);
+  }
+
+  function renderActionCenter(result) {
+    const invite = result.connection_page_url || '';
+    const testCommand = result.test_command || `meridian test ${result.server_ip}`;
+    const addDeviceCommand = `meridian client add ${result.client_name && result.client_name !== 'default' ? 'new-device' : 'phone'}`;
+    const items = [
+      'Open the invite link on one device and connect.',
+      `Run ${testCommand} after the device connects.`,
+      'Add relays or regional route exits only after the first device works.',
+    ];
+    if (result.domain) {
+      items.push(`If you use Cloudflare for ${result.domain}, keep WebSockets enabled and SSL/TLS on Full (Strict).`);
+    }
+    els.actionCopy.textContent = invite
+      ? 'Copy the invite link first, then run a connection test from Terminal.'
+      : 'No invite URL was returned yet. Use the test command and client commands while recovery improves.';
+    els.actionList.replaceChildren(
+      ...items.map((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        return li;
+      }),
+    );
+    els.copyInviteLink.disabled = !invite;
+    els.copyInviteLink.dataset.copyValue = invite;
+    els.copyTestCommand.dataset.copyValue = testCommand;
+    els.copyAddDeviceCommand.dataset.copyValue = addDeviceCommand;
+    els.actionCenter.hidden = false;
+    els.recoveryCard.hidden = true;
+  }
+
+  function renderRecoveryCard(error, operationId = '') {
+    const message = error instanceof Error ? error.message : 'Deploy failed.';
+    const headline = message.split('\n')[0] || 'Deploy needs attention';
+    const hint = error?.hint || message.split('\n').slice(1).join(' ');
+    const retryable = Boolean(error?.retryable ?? true);
+    lastFailure = {
+      message: headline,
+      hint,
+      retryable,
+      operationId,
+    };
+    els.recoveryTitle.textContent = headline;
+    els.recoveryCopy.textContent = hint || recoveryMessageFor(headline, retryable);
+    els.retryDeploy.hidden = !retryable;
+    els.copyDiagnostics.hidden = !operationId || !engine;
+    els.recoveryCard.hidden = false;
+    els.actionCenter.hidden = true;
+  }
+
+  function recoveryMessageFor(message, retryable) {
+    if (/docker|container|compose/i.test(message)) {
+      return 'The server may be partially prepared. Re-running deploy is safe after checking the provider firewall and Docker logs.';
+    }
+    if (/ssh|permission|sudo/i.test(message)) {
+      return 'Fix SSH access first, then run the preview again before deploying.';
+    }
+    return retryable
+      ? 'Re-running deploy is safe after checking the message above.'
+      : 'This needs manual attention before retrying.';
+  }
+
+  function presentPayload(payload) {
+    if (payload.schema === 'meridian.server-profile/v1') {
+      return { status: 'saved', title: 'Server saved' };
+    }
+    if (payload.schema === 'meridian.server-validate/v1') {
+      return { status: payload.result?.auth_ok && payload.result?.sudo_ok ? 'ready' : 'check', title: 'SSH check complete' };
+    }
+    if (payload.schema === 'meridian.server-bootstrap-key/v1') {
+      return { status: payload.result?.verified ? 'ready' : 'check', title: 'SSH key setup complete' };
+    }
+    if (payload.schema === 'meridian.deploy-dry-run/v1') {
+      return { status: 'preview', title: 'Deploy preview ready' };
+    }
+    if (payload.schema === 'meridian.deploy-operation-result/v1') {
+      return { status: 'complete', title: 'Deploy finished' };
+    }
+    return { status: 'ok', title: 'Action complete' };
+  }
+
+  function renderEngineError(error, options = {}) {
+    const message = error instanceof Error ? error.message : 'Engine request failed.';
+    setStatus('Action failed', message, 'error');
+    els.result.dataset.status = 'failed';
+    const title = document.createElement('strong');
+    const text = document.createElement('span');
+    const details = document.createElement('small');
+    title.textContent = 'needs action';
+    text.textContent = message.split('\n')[0];
+    details.textContent = error?.hint || message.split('\n').slice(1).join(' ');
+    els.result.replaceChildren(title, text, details);
+    renderRecoveryCard(error, options.operationId || lastTerminalOperationId || currentOperationId);
+    showStatus(currentActionStatusContainer(), 'Action failed', text.textContent, 'error');
+  }
+
+  function currentActionStatusContainer() {
+    if (journey.currentStep === 'keys') return els.keyActionStatus;
+    if (['deploy', 'complete'].includes(journey.currentStep)) return els.deployPreviewStatus;
+    if (journey.currentStep === 'review') return els.planGateStatus;
+    return els.serverActionStatus;
+  }
+
+  function renderEnvelope(envelope) {
+    const summary = summarizeEnvelope(envelope);
+    els.result.dataset.status = summary.status;
+    const status = document.createElement('strong');
+    const text = document.createElement('span');
+    const changed = document.createElement('small');
+    status.textContent = summary.status;
+    text.textContent = summary.text;
+    changed.textContent = summary.changed ? 'Changes expected' : 'No immediate changes';
+    els.result.replaceChildren(status, text, changed);
+    setStep('complete');
+  }
+
+  function renderTimeline(events) {
+    renderProgressCard(events);
+    const items = timelineFromEvents(events).map((event) => {
+      const item = document.createElement('li');
+      item.className = `studio__timeline-item studio__timeline-item--${event.level}`;
+      const seq = document.createElement('span');
+      const body = document.createElement('div');
+      const message = document.createElement('strong');
+      const meta = document.createElement('small');
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      const data = document.createElement('pre');
+      seq.textContent = String(event.seq || '');
+      message.textContent = event.message || event.type;
+      meta.textContent = [event.phase, event.type, event.time].filter(Boolean).join(' · ');
+      summary.textContent = 'Details';
+      data.textContent = formatJson(event.data || {});
+      details.replaceChildren(summary, data);
+      body.replaceChildren(message, meta, details);
+      item.replaceChildren(seq, body);
+      return item;
+    });
+    els.timeline.replaceChildren(...items);
+  }
+
+  function renderProgressCard(events, snapshot = null) {
+    const latest = events.length > 0 ? events[events.length - 1] : snapshot?.latest_event;
+    if (!latest && !snapshot) {
+      els.progressCard.hidden = true;
+      return;
+    }
+    const data = latest?.data || {};
+    const step = data.step || latest?.message || snapshot?.state || 'Working';
+    const index = Number(data.index || 0);
+    const total = Number(data.total || 0);
+    const phase = latest?.phase || snapshot?.current_phase || 'deploy';
+    const state = snapshot?.state || 'running';
+    const title = document.createElement('strong');
+    const body = document.createElement('span');
+    const meta = document.createElement('small');
+    title.textContent = friendlyOperationState(state);
+    body.textContent = index > 0 && total > 0 ? `${step}, step ${index} of ${total}` : String(step);
+    meta.textContent =
+      state === 'running' || state === 'queued'
+        ? 'This can take a few minutes. Keep this tab open.'
+        : `${phase} · ${latest?.type || state}`;
+    els.progressCard.dataset.status = state;
+    els.progressCard.replaceChildren(title, body, meta);
+    els.progressCard.hidden = false;
+  }
+
+  function friendlyOperationState(state) {
+    if (state === 'queued') return 'Waiting to start';
+    if (state === 'running') return 'Deploy in progress';
+    if (state === 'cancel_requested') return 'Stopping after current step';
+    if (state === 'completed_after_cancel') return 'Completed after stop request';
+    if (state === 'cancelled') return 'Stopped before deploy';
+    if (state === 'failed') return 'Needs recovery';
+    if (state === 'succeeded') return 'Deploy complete';
+    return state;
+  }
+
+  async function startDeploy() {
+    const request = deployRequest(true);
+    journey.confirmDeploy = true;
+    lastDeployResult = null;
+    lastFailure = null;
+    lastTerminalOperationId = '';
+    resetTerminalPanels();
+    persist();
     try {
-      const text = paste.value.trim();
-      if (!text) {
-        parseStatus.textContent = 'No output pasted';
+      const payload = await enginePost(engine, '/api/v1/deploy/start', request);
+      currentOperationId = payload.operation?.id || '';
+      journey.activeOperationId = currentOperationId;
+      lastEventSeq = 0;
+      operationEvents = [];
+      persist();
+      els.completionCopy.textContent = 'Deploy started. Progress updates will appear below.';
+      setStep('complete');
+      pollOperation();
+    } catch (error) {
+      if (error?.operation?.id) {
+        currentOperationId = error.operation.id;
+        journey.activeOperationId = currentOperationId;
+        lastEventSeq = 0;
+        operationEvents = [];
+        persist();
+        setStatus('Deploy already running', 'Studio is resuming the active operation for this server.', 'running');
+        setStep('complete');
+        pollOperation();
         return;
       }
-      if (text.includes('\n')) {
-        const events = parseEventStream(text);
-        renderTimeline(events);
-        parseStatus.textContent = `${events.length} events parsed`;
-      } else {
-        const envelope = parseEnvelope(text);
-        renderEnvelope(envelope);
-        parseStatus.textContent = 'Envelope parsed';
+      renderEngineError(error);
+    }
+  }
+
+  async function pollOperation() {
+    if (!currentOperationId) return;
+    window.clearTimeout(pollTimer);
+    try {
+      const [statusPayload, eventsPayload, resultPayload] = await Promise.all([
+        engineGet(`/api/v1/operations/${currentOperationId}`),
+        engineGet(`/api/v1/operations/${currentOperationId}/events?after_seq=${lastEventSeq}`),
+        engineGet(`/api/v1/operations/${currentOperationId}/result`),
+      ]);
+      const state = statusPayload.operation?.state || 'running';
+      operationEvents = [...operationEvents, ...(eventsPayload.events || [])];
+      lastEventSeq = eventsPayload.latest_seq || statusPayload.operation?.last_seq || lastEventSeq;
+      renderTimeline(operationEvents);
+      renderProgressCard(operationEvents, statusPayload.operation);
+      setStatus(`Deploy ${state}`, 'Events below update automatically.', state === 'running' ? 'running' : 'ok');
+      if (state === 'succeeded' && resultPayload.result) {
+        renderPayload(resultPayload.result);
+        lastTerminalOperationId = currentOperationId;
+        journey.activeOperationId = '';
+        currentOperationId = '';
+        persist();
+        render();
+        return;
       }
+      if (state === 'completed_after_cancel' && resultPayload.result) {
+        renderDeploySuccess(resultPayload.result.result || resultPayload.result, { afterCancel: true });
+        lastTerminalOperationId = currentOperationId;
+        journey.activeOperationId = '';
+        currentOperationId = '';
+        persist();
+        render();
+        return;
+      }
+      if (state === 'failed' && resultPayload.error) {
+        const error = new Error([resultPayload.error.message, resultPayload.error.hint].filter(Boolean).join('\n'));
+        error.hint = resultPayload.error.hint || '';
+        error.retryable = Boolean(resultPayload.error.retryable);
+        error.category = resultPayload.error.category || 'system';
+        lastTerminalOperationId = currentOperationId;
+        renderEngineError(error, { operationId: currentOperationId });
+        journey.activeOperationId = '';
+        currentOperationId = '';
+        persist();
+        render();
+        return;
+      }
+      if (state === 'cancel_requested') {
+        setStatus('Cancel requested', 'Studio is waiting for the current Engine step to stop safely.', 'warning');
+      }
+      if (state === 'cancelled') {
+        showStatus(els.deployPreviewStatus, 'Operation stopped', 'Deploy did not start, or stopped before a terminal result was available.', 'warning');
+        setStatus('Operation stopped', 'Deploy did not start, or stopped before a terminal result was available.', 'warning');
+        lastTerminalOperationId = currentOperationId;
+        journey.activeOperationId = '';
+        currentOperationId = '';
+        persist();
+        render();
+        return;
+      }
+      pollTimer = window.setTimeout(pollOperation, 1200);
     } catch (error) {
-      parseStatus.textContent = error instanceof Error ? error.message : 'Could not parse output';
+      renderEngineError(error);
+    }
+  }
+
+  async function copy(text, label) {
+    await navigator.clipboard.writeText(text);
+    els.copyStatus.textContent = `${label} copied`;
+    setStatus(`${label} copied`, 'Paste it into Terminal when you are ready.', 'ok');
+    window.setTimeout(() => {
+      els.copyStatus.textContent = '';
+    }, 1600);
+  }
+
+  function downloadJson(filename, value) {
+    const url = URL.createObjectURL(new Blob([formatJson(value) + '\n'], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyDiagnostics() {
+    const operationId = lastFailure?.operationId || lastTerminalOperationId;
+    if (!engine || !operationId) return;
+    try {
+      const payload = await engineGet(`/api/v1/operations/${operationId}/diagnostics`);
+      await navigator.clipboard.writeText(payload.markdown || formatJson(payload));
+      setStatus('Diagnostics copied', 'The report is redacted and ready to paste into a support conversation.', 'ok');
+    } catch (error) {
+      renderEngineError(error, { operationId });
+    }
+  }
+
+  function syncFromInputs() {
+    const previousServer = requestSignature(journey.server);
+    journey.server.title = fields.title.value;
+    journey.server.host = fields.host.value;
+    journey.server.ssh_user = fields.user.value || 'root';
+    journey.server.ssh_port = Number(fields.port.value || 22);
+    journey.deploy.server_name = fields.serverName.value || 'My VPN';
+    journey.deploy.client_name = fields.clientName.value || 'default';
+    journey.deploy.harden = fields.harden.checked;
+    journey.deploy.geo_block = fields.geoBlock.checked;
+    journey.deploy.sni = fields.sni.value || 'www.microsoft.com';
+    journey.deploy.domain = fields.domain.value;
+    journey.deploy.color = fields.color.value || workflowOptions(deployWorkflow, 'color')[0]?.value || 'ocean';
+    journey.deploy.icon = fields.icon.value;
+    journey.deploy.pq = fields.pq.checked;
+    journey.deploy.warp = fields.warp.checked;
+    journey.confirmDeploy = fields.confirm.checked;
+    journey.selectedServerId = fields.savedServer.value;
+    const selected = savedServers.find((server) => server.id === journey.selectedServerId);
+    if (selected) {
+      journey.readiness.serverSaved = true;
+      journey.readiness.sshValidated = ['validated', 'key_ready'].includes(selected.auth_state);
+      journey.readiness.keyReady = selected.auth_state === 'key_ready';
+    } else if (previousServer !== requestSignature(journey.server)) {
+      journey.readiness.serverSaved = false;
+      journey.readiness.sshValidated = false;
+      journey.readiness.keyReady = false;
+    }
+    if (journey.lastDryRunSignature && journey.lastDryRunSignature !== requestSignature(deployRequest(false))) {
+      journey.readiness.dryRunComplete = false;
+      latestPlan = null;
+      latestPlanSource = '';
+    }
+    persist();
+    render();
+  }
+
+  function openCommandSheet() {
+    commandSheetReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (typeof els.commandSheet.showModal === 'function') {
+      els.commandSheet.showModal();
+    } else {
+      els.commandSheet.setAttribute('open', '');
+    }
+    window.requestAnimationFrame(() => $('close-command-sheet')?.focus());
+  }
+
+  function closeCommandSheet() {
+    if (typeof els.commandSheet.close === 'function') {
+      els.commandSheet.close();
+    } else {
+      els.commandSheet.removeAttribute('open');
+      restoreCommandSheetFocus();
+    }
+  }
+
+  function restoreCommandSheetFocus() {
+    if (commandSheetReturnFocus?.isConnected) {
+      commandSheetReturnFocus.focus();
+    }
+    commandSheetReturnFocus = null;
+  }
+
+  function renderSshCommandPreview(parsed, error = '') {
+    if (!fields.sshCommand.value.trim()) {
+      els.sshCommandPreview.hidden = true;
+      els.sshCommandPreview.replaceChildren();
+      return;
+    }
+    els.sshCommandPreview.hidden = false;
+    if (error) {
+      const item = document.createElement('span');
+      item.dataset.tone = 'warning';
+      item.textContent = error;
+      els.sshCommandPreview.replaceChildren(item);
+      return;
+    }
+    const chips = [
+      ['User', parsed.ssh_user],
+      ['IP', parsed.host],
+      ['Port', parsed.ssh_port],
+      ['Title', parsed.title],
+    ];
+    els.sshCommandPreview.replaceChildren(
+      ...chips.map(([label, value]) => {
+        const chip = document.createElement('span');
+        chip.textContent = `${label}: ${value}`;
+        return chip;
+      }),
+    );
+  }
+
+  function previewSshCommand() {
+    const text = fields.sshCommand.value.trim();
+    if (!text) {
+      renderSshCommandPreview(null);
+      return;
+    }
+    try {
+      renderSshCommandPreview(parseSshCommand(text));
+    } catch {
+      renderSshCommandPreview(null, 'Waiting for a full SSH command');
+    }
+  }
+
+  function importSshCommand() {
+    const text = fields.sshCommand.value.trim();
+    if (!text) return;
+    try {
+      const parsed = parseSshCommand(text);
+      journey.server.host = parsed.host;
+      journey.server.ssh_port = parsed.ssh_port;
+      journey.server.ssh_user = parsed.ssh_user;
+      if (!journey.server.title) {
+        journey.server.title = parsed.title;
+      }
+      renderSshCommandPreview(parsed);
+      showStatus(els.serverActionStatus, 'SSH command imported', 'Server fields were filled from the pasted command.', 'ok');
+      persist();
+      render();
+    } catch (error) {
+      showStatus(
+        els.serverActionStatus,
+        'Could not read SSH command',
+        error instanceof Error ? error.message : 'Paste a command like ssh ubuntu@198.51.100.10 -p 2222.',
+        'warning',
+      );
+    }
+  }
+
+  document.querySelectorAll('[data-next-step]').forEach((button) => {
+    button.addEventListener('click', () => setStep(button.dataset.nextStep));
+  });
+  document.querySelectorAll('[data-prev-step]').forEach((button) => {
+    button.addEventListener('click', () => setStep(button.dataset.prevStep));
+  });
+  document.querySelectorAll('[data-step-target]').forEach((button) => {
+    button.addEventListener('click', () => setStep(button.dataset.stepTarget));
+  });
+  els.savedServerStartList.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-use-server]') : null;
+    if (button instanceof HTMLElement) {
+      useSavedServer(button.dataset.useServer || '');
     }
   });
+  Object.values(fields).forEach((field) => {
+    if (field instanceof HTMLElement) {
+      field.addEventListener('input', syncFromInputs);
+      field.addEventListener('change', syncFromInputs);
+    }
+  });
+  fields.sshCommand.addEventListener('input', previewSshCommand);
+  fields.sshCommand.addEventListener('paste', () => window.setTimeout(importSshCommand, 0));
+  fields.sshCommand.addEventListener('change', importSshCommand);
 
-  updateServerDraft();
-  updateRequest();
-  renderEnvelope(studioFixtures.deployDryRunEnvelope);
-  renderTimeline(studioFixtures.deployDryRunEvents);
-  initLocalEngine();
+  $('studio-reset').addEventListener('click', () => {
+    journey = clearJourneyDraft(window.localStorage);
+    fields.password.value = '';
+    currentOperationId = '';
+    setStatus('Ready', engine ? 'Local Studio is available.' : 'Static command mode is active.', 'ok');
+    render();
+  });
+  $('open-command-sheet').addEventListener('click', openCommandSheet);
+  $('mode-gate-command').addEventListener('click', () => {
+    if (engine) {
+      openCommandSheet();
+      return;
+    }
+    copy('meridian studio', 'Local Studio command');
+  });
+  $('close-command-sheet').addEventListener('click', closeCommandSheet);
+  els.commandSheet.addEventListener('close', restoreCommandSheetFocus);
+  els.commandSheet.addEventListener('click', (event) => {
+    if (event.target === els.commandSheet) closeCommandSheet();
+  });
+  els.saveServer.addEventListener('click', () =>
+    runAction('Server save', () => enginePost(engine, '/api/v1/servers', serverDraft())),
+  );
+  els.saveAndValidate.addEventListener('click', async () => {
+    if (!engine) return;
+    setStatus('Saving and checking SSH', 'Studio is saving this server profile before validating the connection.', 'running');
+    try {
+      const saved = await enginePost(engine, '/api/v1/servers', serverDraft());
+      handleActionPayload('Server save', saved);
+      const body = { server_ref: saved.server?.id || journey.selectedServerId };
+      const validation = await enginePost(engine, '/api/v1/servers/validate', body);
+      handleActionPayload('SSH validation', validation);
+      renderPayload(validation);
+      await refreshSavedServers();
+      if (journey.readiness.sshValidated) {
+        setStatus('SSH works', summarizePayload(validation), 'ok');
+        setStep('keys');
+      } else {
+        setStatus('SSH needs attention', summarizePayload(validation), 'warning');
+        render();
+      }
+    } catch (error) {
+      renderEngineError(error);
+    }
+  });
+  els.validateServer.addEventListener('click', () =>
+    runAction('SSH validation', () => {
+      const body = journey.selectedServerId ? { server_ref: journey.selectedServerId } : { draft: serverDraft() };
+      return enginePost(engine, '/api/v1/servers/validate', body);
+    }, { nextStep: 'keys', requireReadiness: 'sshValidated' }),
+  );
+  els.bootstrapKey.addEventListener('click', async () => {
+    try {
+      await runAction('SSH key setup', async () => {
+        const saved = journey.selectedServerId
+          ? { server: { id: journey.selectedServerId } }
+          : await enginePost(engine, '/api/v1/servers', serverDraft());
+        return enginePost(engine, '/api/v1/servers/bootstrap-key', {
+          disable_password_auth: fields.disablePasswordAuth.checked,
+          key_policy: 'generate_meridian',
+          password: fields.password.value,
+          server_ref: saved.server?.id || journey.selectedServerId,
+        });
+      }, { nextStep: 'deploy', requireReadiness: 'keyReady' });
+    } finally {
+      fields.password.value = '';
+    }
+  });
+  $('confirm-manual-ssh').addEventListener('click', () => {
+    journey.readiness.sshValidated = true;
+    showStatus(els.serverActionStatus, 'Manual SSH check recorded', 'Studio will trust the SSH command you ran in Terminal.', 'ok');
+    persist();
+    setStep('keys');
+  });
+  $('confirm-manual-key').addEventListener('click', () => {
+    journey.readiness.keyReady = true;
+    showStatus(els.keyActionStatus, 'Manual key setup recorded', 'Studio will continue with deploy preparation.', 'ok');
+    persist();
+    setStep('deploy');
+  });
+  els.runDryRun.addEventListener('click', () => {
+    if (engine) {
+      runAction('Deploy dry-run', () => enginePost(engine, '/api/v1/deploy/dry-run', deployRequest(false)), {
+        nextStep: 'review',
+      });
+    } else {
+      showStatus(
+        els.deployPreviewStatus,
+        'Run the real dry-run command',
+        'Static Studio cannot execute deploy. Open the command sheet, run the dry-run command, then paste the JSON output here.',
+        'warning',
+      );
+      openCommandSheet();
+    }
+  });
+  els.startDeploy.addEventListener('click', startDeploy);
+  els.cancelOperation.addEventListener('click', () => {
+    if (engine && currentOperationId) {
+      runAction('Stop after current step', () => enginePost(engine, `/api/v1/operations/${currentOperationId}/cancel`, {}), {
+        nextStep: 'complete',
+      });
+    }
+  });
+  $('copy-ssh-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).connect, 'SSH command'));
+  $('copy-key-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).copyKey, 'Key command'));
+  $('copy-save-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).save, 'Save command'));
+  $('copy-dry-run-command').addEventListener('click', () => copy(commands.dryRun, 'Dry-run command'));
+  $('copy-deploy-command').addEventListener('click', () => copy(commands.deploy, 'Deploy command'));
+  $('download-server').addEventListener('click', () => downloadJson('server.json', serverDraft()));
+  $('download-request').addEventListener('click', () => downloadJson('deploy.json', deployRequest(false)));
+  $('download-request-sheet').addEventListener('click', () => downloadJson('deploy.json', deployRequest(false)));
+  els.copyInviteLink.addEventListener('click', () => copy(els.copyInviteLink.dataset.copyValue || '', 'Invite link'));
+  els.copyTestCommand.addEventListener('click', () => copy(els.copyTestCommand.dataset.copyValue || '', 'Test command'));
+  els.copyAddDeviceCommand.addEventListener('click', () =>
+    copy(els.copyAddDeviceCommand.dataset.copyValue || 'meridian client add phone', 'Add-device command'),
+  );
+  els.retryDeploy.addEventListener('click', () => startDeploy());
+  els.copyDiagnostics.addEventListener('click', copyDiagnostics);
+  $('parse-output').addEventListener('click', () => {
+    try {
+      const text = els.paste.value.trim();
+      if (!text) {
+        els.parseStatus.textContent = 'No output pasted';
+        return;
+      }
+      if (text.startsWith('{')) {
+        const envelope = parseEnvelope(text);
+        if (envelope.command === 'deploy' && envelope.summary?.text?.startsWith('Deploy plan:')) {
+          const expectedIp = expectedDryRunServerIp(deployRequest(false));
+          if (expectedIp && envelope.data?.server_ip && envelope.data.server_ip !== expectedIp) {
+            els.parseStatus.textContent = `That dry-run is for ${envelope.data.server_ip}, but this draft targets ${expectedIp}.`;
+            return;
+          }
+          latestPlan = envelope.data || null;
+          latestPlanSource = 'static';
+          journey.readiness.dryRunComplete = true;
+          journey.lastDryRunSignature = requestSignature(deployRequest(false));
+          persist();
+          showStatus(els.deployPreviewStatus, 'Preview imported', 'The pasted dry-run output is now the review source.', 'ok');
+          els.parseStatus.textContent = 'Dry-run preview imported';
+          closeCommandSheet();
+          setStep('review');
+        } else {
+          renderEnvelope(envelope);
+          els.parseStatus.textContent = 'Envelope parsed';
+        }
+      } else {
+        const events = parseEventStream(text);
+        renderTimeline(events);
+        els.parseStatus.textContent = `${events.length} events parsed`;
+      }
+    } catch (error) {
+      els.parseStatus.textContent = error instanceof Error ? error.message : 'Could not parse output';
+    }
+  });
+  connectLocalEngine().then(async (detected) => {
+    engine = detected;
+    journey.mode = engine ? 'engine' : 'static';
+    setStatus(
+      engine ? 'Local Studio available' : 'Static command mode',
+      engine
+        ? 'Save servers, install keys, preview, and deploy locally.'
+        : 'Generate commands and JSON. Launch `meridian studio` for guided actions.',
+    );
+    persist();
+    await refreshSavedServers();
+    if (engine && currentOperationId) {
+      setStatus('Resuming operation', 'Studio is reconnecting to the active deploy operation.', 'running');
+      setStep('complete');
+      pollOperation();
+    }
+    render();
+  });
+  if (!journey.currentStep) journey = createDefaultJourneyState();
+  render();
 </script>
 
-<style>
+<style is:global>
   .studio {
-    width: min(1440px, calc(100% - 32px));
+    --studio-accent-bg: #7a4d0a;
+    --studio-accent-ink: #fffaf2;
+    --studio-accent-soft: #7a4d0a14;
+    --studio-accent-text: #704605;
+    --studio-focus: #1f6feb;
+    line-height: 1.45;
     margin: 0 auto;
-    padding: 28px 0 56px;
+    padding: 10px 0 44px;
+    width: min(1180px, calc(100% - 32px));
   }
 
-  .studio__header {
-    display: flex;
-    align-items: flex-end;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .studio {
+      --studio-accent-bg: #f0c878;
+      --studio-accent-ink: #1c1608;
+      --studio-accent-soft: #f0c87818;
+      --studio-accent-text: #f2cf83;
+      --studio-focus: #87b7ff;
+    }
+  }
+
+  [data-theme="dark"] .studio {
+    --studio-accent-bg: #f0c878;
+    --studio-accent-ink: #1c1608;
+    --studio-accent-soft: #f0c87818;
+    --studio-accent-text: #f2cf83;
+    --studio-focus: #87b7ff;
+  }
+
+  .studio section {
+    padding: 0;
+  }
+
+  .studio__topbar {
+    align-items: center;
+    background: color-mix(in srgb, var(--bg), transparent 8%);
+    display: grid;
+    gap: 8px 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
     justify-content: space-between;
-    gap: 24px;
-    padding: 22px 0 26px;
+    padding: 8px 0 12px;
+    position: sticky;
+    top: 56px;
+    z-index: 80;
   }
 
-  .studio__header-main {
-    max-width: 760px;
+  .studio__brand {
+    min-width: 0;
   }
 
   .studio__eyebrow,
-  .studio__panel-kicker {
-    color: var(--ac);
+  .studio__kicker {
+    color: var(--studio-accent-text);
     font-family: var(--mono);
-    font-size: 0.7rem;
-    font-weight: 600;
+    font-size: 0.72rem;
+    font-weight: 800;
     letter-spacing: 0.08em;
-    margin-bottom: 6px;
+    margin: 0 0 5px;
     text-transform: uppercase;
   }
 
   .studio h1 {
-    font-size: 2.35rem;
+    font-size: clamp(1.45rem, 2vw, 2rem);
     letter-spacing: 0;
+    line-height: 1.08;
+    margin: 0;
   }
 
-  .studio h2 {
+  .studio h2,
+  .studio h3 {
     font-family: var(--body);
-    font-size: 1rem;
-    font-weight: 700;
     letter-spacing: 0;
     margin: 0;
   }
 
-  .studio__summary {
-    color: var(--t2);
-    margin-top: 8px;
-    max-width: 640px;
+  .studio h2 {
+    font-size: 1.08rem;
   }
 
-  .studio__status-strip,
-  .studio__validation-pill {
+  .studio h3 {
+    font-size: 0.94rem;
+  }
+
+  .studio p,
+  .studio small,
+  .studio__context-list {
+    color: var(--t2);
+  }
+
+  .studio__top-status {
     align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .studio__trust-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .studio__trust-strip span {
     background: var(--ok2);
-    border: 1px solid color-mix(in srgb, var(--ok), transparent 70%);
+    border: 1px solid color-mix(in srgb, var(--ok), transparent 76%);
     border-radius: 999px;
-    color: var(--ok);
+    color: var(--t1);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.2;
+    padding: 5px 9px;
+  }
+
+  .studio__mode,
+  .studio__draft {
+    align-items: center;
+    background: var(--s1);
+    border: 1px solid var(--b1);
+    border-radius: 999px;
     display: inline-flex;
-    font-size: 0.82rem;
-    font-weight: 700;
+    font-size: 0.84rem;
+    font-weight: 800;
     gap: 8px;
     min-height: 34px;
-    padding: 6px 12px;
+    padding: 6px 11px;
     white-space: nowrap;
   }
 
-  .studio__status-dot {
-    background: var(--ok);
+  .studio__draft {
+    color: var(--t2);
+    font-weight: 700;
+  }
+
+  .studio__dot {
+    background: var(--warn);
     border-radius: 50%;
     height: 8px;
     width: 8px;
   }
 
-  .studio__workspace {
+  .studio__mode[data-state="engine"] .studio__dot {
+    background: var(--ok);
+  }
+
+  .studio__cockpit {
     align-items: start;
     display: grid;
-    gap: 18px;
-    grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
+    gap: 14px;
+    grid-template-columns: 196px minmax(0, 860px);
+    justify-content: center;
   }
 
-  .studio__workspace + .studio__workspace {
-    margin-top: 18px;
+  .studio__journey {
+    position: sticky;
+    top: 124px;
   }
 
-  .studio__workspace--lower {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.8fr);
-    margin-top: 18px;
-  }
-
-  .studio__form,
-  .studio__panel {
+  .studio__journey {
     background: var(--s1);
     border: 1px solid var(--b1);
-    border-radius: var(--r);
+    border-radius: var(--r2);
     box-shadow: var(--shadow-sm);
-    padding: 18px;
+    padding: 8px;
   }
 
-  .studio__panel-head {
-    align-items: center;
-    display: flex;
-    gap: 14px;
-    justify-content: space-between;
-    margin-bottom: 16px;
-  }
-
-  .studio__validation-pill[data-state="error"] {
-    background: var(--err2);
-    border-color: color-mix(in srgb, var(--err), transparent 70%);
-    color: var(--err);
-  }
-
-  .studio__section {
-    border: 0;
-    border-top: 1px solid var(--b1);
-    margin-top: 18px;
-    padding-top: 18px;
-  }
-
-  .studio__section legend {
+  .studio__steps {
     display: grid;
-    gap: 2px;
-    margin-bottom: 12px;
+    gap: 5px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .studio__steps button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r);
+    color: var(--t2);
+    cursor: pointer;
+    display: grid;
+    font: inherit;
+    gap: 8px;
+    grid-template-columns: 30px minmax(0, 1fr) 12px;
+    padding: 8px;
+    text-align: left;
     width: 100%;
   }
 
-  .studio__section legend span {
+  .studio__steps button::after {
+    border-radius: 50%;
+    content: "";
+    height: 8px;
+    justify-self: end;
+    width: 8px;
+  }
+
+  .studio__steps button[data-state="active"]::after {
+    background: var(--studio-accent-bg);
+  }
+
+  .studio__steps button[data-state="available"]::after {
+    background: var(--t3);
+  }
+
+  .studio__steps button[data-state="locked"]::after {
+    background: transparent;
+    border: 1px solid var(--t3);
+  }
+
+  .studio__steps button[data-state="done"]::after {
+    background: var(--ok);
+  }
+
+  .studio__steps button[aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  .studio__steps button[aria-current="step"] {
+    background: var(--studio-accent-soft);
+    border-color: color-mix(in srgb, var(--studio-accent-bg), transparent 62%);
+    color: var(--t1);
+  }
+
+  .studio__steps button[data-state="locked"] {
+    color: var(--t3);
+  }
+
+  .studio__steps button[data-state="done"] .studio__step-index {
+    background: var(--ok2);
+    border-color: color-mix(in srgb, var(--ok), transparent 72%);
+    color: var(--ok);
+  }
+
+  .studio__step-index {
+    align-items: center;
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: 50%;
+    display: flex;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    height: 30px;
+    justify-content: center;
+    width: 30px;
+  }
+
+  .studio__steps strong,
+  .studio__steps small {
+    display: block;
+    line-height: 1.25;
+  }
+
+  .studio__steps button > span:last-child {
+    min-width: 0;
+  }
+
+  .studio__steps small {
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .studio__step-status {
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    width: 1px;
+  }
+
+  .studio__task {
+    background: var(--s1);
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .studio__task-meta {
+    align-items: center;
+    background: var(--s2);
+    border-bottom: 1px solid var(--b1);
+    display: flex;
+    font-size: 0.8rem;
+    font-weight: 800;
+    justify-content: space-between;
+    padding: 10px 16px;
+  }
+
+  .studio__task-meta span:last-child {
+    color: var(--t2);
+    font-weight: 700;
+  }
+
+  .studio__task-status {
+    align-items: center;
+    background: var(--ok2);
+    border-bottom: 1px solid color-mix(in srgb, var(--ok), transparent 78%);
+    border-left: 3px solid var(--ok);
+    display: grid;
+    gap: 5px 10px;
+    grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+    padding: 10px 16px;
+  }
+
+  .studio__task-status[data-tone="running"] {
+    background: var(--ac2);
+    border-bottom-color: color-mix(in srgb, var(--ac), transparent 72%);
+    border-left-color: var(--studio-accent-bg);
+  }
+
+  .studio__task-status[data-tone="warning"] {
+    background: var(--warn2);
+    border-bottom-color: color-mix(in srgb, var(--warn), transparent 70%);
+    border-left-color: var(--warn);
+  }
+
+  .studio__task-status[data-tone="error"] {
+    background: var(--err2);
+    border-bottom-color: color-mix(in srgb, var(--err), transparent 70%);
+    border-left-color: var(--err);
+  }
+
+  .studio__task-status > span {
+    color: var(--t3);
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .studio__task-status strong {
+    color: var(--t1);
+    font-size: 0.88rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .studio__task-status small {
+    color: var(--t2);
+    font-size: 0.82rem;
+    line-height: 1.3;
+    min-width: 0;
+  }
+
+  .studio__step-help {
+    background: var(--s2);
+    border-bottom: 1px solid var(--b1);
+    color: var(--t2);
+    font-size: 0.84rem;
+    line-height: 1.38;
+    padding: 0 16px;
+  }
+
+  .studio__step-help[open] {
+    padding-bottom: 12px;
+  }
+
+  .studio__step-help summary {
+    align-items: center;
+    color: var(--t1);
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 10px 0;
+  }
+
+  .studio__step-help summary span {
+    color: var(--t2);
+    font-size: 0.78rem;
     font-weight: 800;
   }
 
-  .studio__section legend small,
-  .studio__field small {
-    color: var(--t2);
-    font-size: 0.82rem;
-    line-height: 1.45;
+  .studio__step-help summary strong {
+    font-size: 0.88rem;
+    line-height: 1.2;
+    text-align: right;
   }
 
-  .studio__fields {
+  .studio__step-help p {
+    font-size: 0.84rem;
+    line-height: 1.38;
+    margin: 0 0 8px;
+  }
+
+  .studio__screen {
+    min-height: auto;
+    padding: 24px 28px 28px;
+  }
+
+  .studio__screen-head {
+    max-width: 760px;
+  }
+
+  .studio__screen-head h2 {
+    font-size: clamp(1.32rem, 1.55vw, 1.72rem);
+    line-height: 1.12;
+    margin-bottom: 8px;
+  }
+
+  .studio__screen-head h2:focus {
+    outline: none;
+  }
+
+  .studio__screen-head p {
+    font-size: 0.94rem;
+    line-height: 1.42;
+    margin: 0;
+  }
+
+  .studio__provider-grid,
+  .studio__field-grid,
+  .studio__choice-grid,
+  .studio__sheet-grid {
     display: grid;
-    gap: 12px;
+    gap: 14px;
+    margin-top: 22px;
+  }
+
+  .studio__provider-grid,
+  .studio__choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .studio__field-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .studio__recommended-path {
+    display: grid;
+    gap: 14px;
+    margin-top: 22px;
   }
 
   .studio__field {
     display: grid;
-    gap: 7px;
+    gap: 8px;
+    grid-column: span 3;
   }
 
-  .studio__label-row {
+  .studio__field--wide {
+    grid-column: 1 / -1;
+  }
+
+  .studio__field > span,
+  .studio__confirm {
     align-items: center;
     display: flex;
     font-size: 0.9rem;
-    font-weight: 700;
-    justify-content: space-between;
+    font-weight: 900;
+    gap: 7px;
   }
 
-  .studio__required {
-    color: var(--t3);
-    font-family: var(--mono);
-    font-size: 0.64rem;
-    font-weight: 600;
-    text-transform: uppercase;
+  .studio__field-help {
+    color: var(--t2);
+    font-size: 0.8rem;
+    line-height: 1.35;
   }
 
   .studio input[type="text"],
+  .studio input[type="number"],
+  .studio input[type="password"],
   .studio select,
   .studio textarea {
     background: var(--s2);
@@ -854,205 +2347,613 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     border-radius: var(--r);
     color: var(--t1);
     font: inherit;
-    min-height: 42px;
-    padding: 9px 11px;
+    min-height: 46px;
+    padding: 10px 12px;
     width: 100%;
+  }
+
+  .studio input:focus-visible,
+  .studio select:focus-visible,
+  .studio textarea:focus-visible,
+  .studio button:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--studio-focus), transparent 64%);
+    outline-offset: 2px;
   }
 
   .studio textarea {
     font-family: var(--mono);
-    min-height: 150px;
+    min-height: 128px;
     resize: vertical;
   }
 
-  .studio__switch {
-    align-items: center;
-    display: flex;
-    min-height: 42px;
-  }
-
-  .studio__switch input {
-    height: 1px;
-    opacity: 0;
-    position: absolute;
-    width: 1px;
-  }
-
-  .studio__switch span {
-    background: var(--s3);
-    border: 1px solid var(--b2);
-    border-radius: 999px;
-    cursor: pointer;
-    height: 28px;
-    position: relative;
-    transition: background 0.12s;
-    width: 52px;
-  }
-
-  .studio__switch span::after {
-    background: var(--s1);
-    border-radius: 50%;
-    box-shadow: var(--shadow-sm);
-    content: "";
-    height: 22px;
-    left: 2px;
-    position: absolute;
-    top: 2px;
-    transition: transform 0.12s;
-    width: 22px;
-  }
-
-  .studio__switch input:checked + span {
-    background: var(--ac);
-    border-color: var(--ac);
-  }
-
-  .studio__switch input:checked + span::after {
-    transform: translateX(24px);
-  }
-
-  .studio__side {
-    display: grid;
-    gap: 18px;
-  }
-
-  .studio__icon-button,
-  .studio__primary,
-  .studio__segmented button,
-  .studio__command {
-    align-items: center;
+  .studio__detail-tile,
+  .studio__choice-card,
+  .studio__split-action,
+  .studio__faq,
+  .studio__manual-entry,
+  .studio__recommended-path,
+  .studio__notice,
+  .studio__mode-gate,
+  .studio__saved-start,
+  .studio__action-status,
+  .studio__facts,
+  .studio__review,
+  .studio__result,
+  .studio__context-block {
     background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+  }
+
+  .studio__recommended-path {
+    padding: 16px;
+  }
+
+  .studio__manual-entry {
+    margin-top: 14px;
+    padding: 14px 16px;
+  }
+
+  .studio__manual-entry summary {
+    cursor: pointer;
+    font-weight: 900;
+  }
+
+  .studio__manual-entry p {
+    color: var(--t2);
+    font-size: 0.86rem;
+    line-height: 1.42;
+    margin: 8px 0 0;
+  }
+
+  .studio__detail-tile {
+    display: grid;
+    gap: 5px;
+    min-height: 132px;
+    padding: 16px;
+  }
+
+  .studio__mode-gate {
+    align-items: center;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr auto;
+    margin-top: 22px;
+    padding: 16px;
+  }
+
+  .studio__mode-gate[data-mode="static"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+  }
+
+  .studio__mode-gate p {
+    margin: 5px 0 0;
+  }
+
+  .studio__mode-gate code {
+    background: color-mix(in srgb, var(--warn), transparent 86%);
+    border-radius: 5px;
+    color: var(--t1);
+    font-family: var(--mono);
+    padding: 2px 5px;
+  }
+
+  .studio__parse-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    grid-column: 1 / -1;
+    margin-top: -8px;
+  }
+
+  .studio__parse-chips[hidden] {
+    display: none;
+  }
+
+  .studio__parse-chips span {
+    background: var(--ok2);
+    border: 1px solid color-mix(in srgb, var(--ok), transparent 72%);
+    border-radius: 999px;
+    color: var(--t1);
+    font-size: 0.8rem;
+    font-weight: 800;
+    padding: 5px 9px;
+  }
+
+  .studio__parse-chips span[data-tone="warning"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+  }
+
+  .studio__saved-start {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 16px;
+  }
+
+  .studio__saved-start[hidden] {
+    display: none;
+  }
+
+  .studio__saved-start > div:last-child {
+    display: grid;
+    gap: 8px;
+  }
+
+  .studio__saved-choice {
+    background: var(--s1);
     border: 1px solid var(--b1);
     border-radius: var(--r);
     color: var(--t1);
     cursor: pointer;
+    display: grid;
+    font: inherit;
+    gap: 4px;
+    padding: 11px 12px;
+    text-align: left;
+  }
+
+  .studio__saved-choice span {
+    color: var(--t2);
+    font-size: 0.84rem;
+  }
+
+  .studio__detail-tile span {
+    color: var(--t2);
+    font-size: 0.8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .studio__detail-tile strong {
+    font-size: 1.1rem;
+  }
+
+  .studio__choice-card {
+    align-items: start;
+    cursor: pointer;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: auto 1fr;
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .studio__choice-card input {
+    height: 20px;
+    margin-top: 2px;
+    width: 20px;
+  }
+
+  .studio__choice-card strong,
+  .studio__choice-card small {
+    display: block;
+  }
+
+  .studio__choice-card small {
+    line-height: 1.45;
+    margin-top: 4px;
+  }
+
+  .studio__split-action {
+    align-items: center;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr auto;
+    margin-top: 14px;
+    padding: 16px;
+  }
+
+  .studio__split-action p {
+    margin: 4px 0 0;
+  }
+
+  .studio__action-status {
+    display: grid;
+    gap: 4px;
+    margin-top: 16px;
+    padding: 13px 14px;
+  }
+
+  .studio__action-status[hidden],
+  .studio__facts[hidden] {
+    display: none;
+  }
+
+  .studio__action-status[data-tone="ok"] {
+    background: var(--ok2);
+    border-color: color-mix(in srgb, var(--ok), transparent 72%);
+  }
+
+  .studio__action-status[data-tone="warning"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+  }
+
+  .studio__action-status[data-tone="error"] {
+    background: var(--err2);
+    border-color: color-mix(in srgb, var(--err), transparent 70%);
+  }
+
+  .studio__facts {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 16px;
+    padding: 12px;
+  }
+
+  .studio__fact {
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .studio__fact--ok {
+    background: var(--ok2);
+    border-color: color-mix(in srgb, var(--ok), transparent 74%);
+  }
+
+  .studio__fact--warn {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 70%);
+  }
+
+  .studio__key-diagram {
+    align-items: center;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    margin-top: 22px;
+  }
+
+  .studio__key-diagram > div:not(.studio__key-arrow) {
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    display: grid;
+    gap: 5px;
+    min-height: 120px;
+    padding: 16px;
+  }
+
+  .studio__key-diagram span {
+    color: var(--t2);
+    font-size: 0.8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .studio__key-arrow {
+    color: var(--t3);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .studio__faq {
+    display: grid;
+    gap: 8px;
+    margin-top: 22px;
+    padding: 14px;
+  }
+
+  .studio__faq details {
+    border-top: 1px solid var(--b1);
+    padding-top: 8px;
+  }
+
+  .studio__faq details:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .studio__faq summary,
+  .studio__advanced summary {
+    cursor: pointer;
+    font-weight: 900;
+  }
+
+  .studio__advanced {
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    margin-top: 18px;
+    padding: 14px;
+  }
+
+  .studio__actionbar {
+    align-items: center;
+    border-top: 1px solid var(--b1);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    margin: 28px 0 0;
+    padding: 16px 0 0;
+  }
+
+  .studio__primary,
+  .studio__secondary,
+  .studio__ghost,
+  .studio__command {
+    align-items: center;
+    border: 1px solid var(--b1);
+    border-radius: var(--r);
+    cursor: pointer;
     display: inline-flex;
     font: inherit;
-    font-weight: 700;
+    font-weight: 900;
     gap: 8px;
-    min-height: 38px;
-    padding: 8px 11px;
-  }
-
-  .studio__icon-button {
-    justify-content: center;
-    padding: 8px;
-    width: 38px;
-  }
-
-  .studio svg {
-    fill: none;
-    height: 16px;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 2;
-    width: 16px;
+    min-height: 40px;
+    padding: 9px 12px;
   }
 
   .studio__primary {
-    background: var(--ac);
-    border-color: var(--ac);
-    color: #fff;
+    background: var(--studio-accent-bg);
+    border-color: var(--studio-accent-bg);
+    color: var(--studio-accent-ink);
   }
 
-  .studio__command-list {
+  .studio__secondary {
+    background: var(--s1);
+    color: var(--t1);
+  }
+
+  .studio__secondary--small {
+    font-size: 0.8rem;
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .studio__ghost {
+    background: transparent;
+    color: var(--t1);
+  }
+
+  .studio__ghost--small {
+    font-size: 0.82rem;
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .studio__primary:disabled,
+  .studio__secondary:disabled,
+  .studio__ghost:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
+  .studio__context {
     display: grid;
     gap: 10px;
   }
 
-  .studio__engine-actions {
+  .studio__context-block {
+    line-height: 1.35;
+    padding: 12px;
+  }
+
+  .studio__context .studio__kicker {
+    font-size: 0.62rem;
+    margin-bottom: 4px;
+  }
+
+  .studio__context-block h2 {
+    font-size: 0.98rem;
+    line-height: 1.18;
+    margin-bottom: 6px;
+  }
+
+  .studio__context-block p {
+    font-size: 0.86rem;
+    line-height: 1.38;
+    margin: 0;
+  }
+
+  .studio__context-list {
     display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    font-size: 0.82rem;
+    gap: 5px;
+    line-height: 1.32;
+    margin: 8px 0 0;
+    padding-left: 16px;
   }
 
-  .studio__engine-actions[hidden] {
-    display: none;
+  .studio__context-row {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 8px;
   }
 
-  .studio__engine-password,
-  .studio__engine-server-select {
-    grid-column: 1 / -1;
+  .studio__context-row h2 {
+    margin: 0;
   }
 
-  .studio__command {
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    justify-content: flex-start;
-    text-align: left;
-    width: 100%;
+  .studio__context-block--live {
+    background: var(--ok2);
+    border-color: color-mix(in srgb, var(--ok), transparent 72%);
+    border-left: 3px solid var(--ok);
   }
 
-  .studio__primary:disabled,
-  .studio__command:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
+  .studio__context-block--live[data-tone="running"] {
+    background: var(--ac2);
+    border-color: color-mix(in srgb, var(--ac), transparent 68%);
+    border-left-color: var(--studio-accent-bg);
   }
 
-  .studio__copy-status,
-  .studio__parse-status {
-    color: var(--t2);
-    font-size: 0.85rem;
-    min-height: 1.4em;
-    padding-top: 8px;
+  .studio__context-block--live[data-tone="warning"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+    border-left-color: var(--warn);
+  }
+
+  .studio__context-block--live[data-tone="error"] {
+    background: var(--err2);
+    border-color: color-mix(in srgb, var(--err), transparent 70%);
+    border-left-color: var(--err);
+  }
+
+  .studio__context-block--quiet {
+    background: var(--s1);
   }
 
   .studio__errors {
     background: var(--err2);
-    border: 1px solid color-mix(in srgb, var(--err), transparent 72%);
+    border: 1px solid color-mix(in srgb, var(--err), transparent 70%);
     border-radius: var(--r);
     color: var(--err);
     display: grid;
-    font-size: 0.88rem;
     gap: 5px;
-    margin-bottom: 12px;
-    padding: 10px 12px;
+    margin-top: 16px;
+    padding: 11px 12px;
   }
 
   .studio__errors[hidden] {
     display: none;
   }
 
-  .studio__code {
-    background: var(--code-bg);
-    border: 1px solid var(--code-br);
-    border-radius: var(--r);
-    color: var(--t1);
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    line-height: 1.55;
-    max-height: 420px;
-    overflow: auto;
-    padding: 12px;
-    white-space: pre-wrap;
+  .studio__review {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 22px;
+    padding: 16px;
   }
 
-  .studio__code--short {
-    max-height: 260px;
-  }
-
-  .studio__segmented {
-    display: flex;
-    gap: 6px;
-  }
-
-  .studio__segmented button {
-    font-size: 0.82rem;
-    min-height: 34px;
-    padding: 6px 10px;
-  }
-
-  .studio__result {
-    align-items: center;
-    background: var(--s2);
+  .studio__impact-card {
+    background: var(--s1);
     border: 1px solid var(--b1);
     border-radius: var(--r);
     display: grid;
-    gap: 2px;
-    margin-bottom: 12px;
-    min-height: 82px;
+    gap: 10px;
+    min-height: 128px;
     padding: 14px;
+  }
+
+  .studio__impact-card[data-tone="ok"] {
+    background: var(--ok2);
+    border-color: color-mix(in srgb, var(--ok), transparent 72%);
+  }
+
+  .studio__impact-card[data-tone="warning"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+  }
+
+  .studio__impact-card[data-tone="change"] {
+    background: var(--studio-accent-soft);
+    border-color: color-mix(in srgb, var(--studio-accent-bg), transparent 68%);
+  }
+
+  .studio__impact-card > div {
+    align-items: start;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .studio__impact-card strong {
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .studio__impact-card span {
+    background: var(--s2);
+    border: 1px solid var(--b1);
+    border-radius: 999px;
+    color: var(--t1);
+    flex: 0 0 auto;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 900;
+    padding: 3px 7px;
+    text-transform: uppercase;
+  }
+
+  .studio__impact-card p {
+    color: var(--t2);
+    overflow-wrap: anywhere;
+    margin: 0;
+  }
+
+  .studio__confirm {
+    background: var(--warn2);
+    border: 1px solid color-mix(in srgb, var(--warn), transparent 68%);
+    border-radius: var(--r);
+    gap: 10px;
+    margin-top: 16px;
+    padding: 13px 14px;
+  }
+
+  .studio__result {
+    display: grid;
+    gap: 4px;
+    margin-top: 18px;
+    min-height: 96px;
+    padding: 16px;
+  }
+
+  .studio__progress-card,
+  .studio__action-center,
+  .studio__recovery-card {
+    display: grid;
+    gap: 12px;
+    margin-top: 18px;
+    padding: 16px;
+  }
+
+  .studio__progress-card[hidden],
+  .studio__action-center[hidden],
+  .studio__recovery-card[hidden] {
+    display: none;
+  }
+
+  .studio__progress-card {
+    background: var(--ac2);
+    border: 1px solid color-mix(in srgb, var(--ac), transparent 68%);
+  }
+
+  .studio__progress-card[data-status="failed"],
+  .studio__recovery-card {
+    background: var(--err2);
+    border-color: color-mix(in srgb, var(--err), transparent 70%);
+  }
+
+  .studio__progress-card[data-status="cancel_requested"],
+  .studio__progress-card[data-status="completed_after_cancel"] {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+  }
+
+  .studio__action-center {
+    background: var(--ok2);
+    border: 1px solid color-mix(in srgb, var(--ok), transparent 72%);
+  }
+
+  .studio__action-center p,
+  .studio__recovery-card p {
+    margin: 4px 0 0;
+  }
+
+  .studio__action-center-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .studio__post-deploy-list {
+    display: grid;
+    gap: 7px;
+    margin: 0;
+    padding-left: 18px;
   }
 
   .studio__result strong {
@@ -1066,27 +2967,25 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     color: var(--err);
   }
 
-  .studio__result span {
-    font-weight: 800;
-  }
-
-  .studio__result small {
-    color: var(--t2);
+  .studio__result[data-status="warning"] strong {
+    color: var(--warn);
   }
 
   .studio__timeline {
     display: grid;
     gap: 10px;
     list-style: none;
-    max-height: 448px;
+    margin: 18px 0 0;
+    max-height: 340px;
     overflow: auto;
+    padding: 0;
   }
 
   .studio__timeline-item {
     align-items: start;
     display: grid;
     gap: 10px;
-    grid-template-columns: 30px 1fr;
+    grid-template-columns: 34px 1fr;
   }
 
   .studio__timeline-item > span {
@@ -1103,49 +3002,238 @@ const serverFieldsById = new Map(serverFields.map((field) => [field.id, field]))
     width: 30px;
   }
 
-  .studio__timeline-item strong {
-    display: block;
-    line-height: 1.35;
-  }
-
   .studio__timeline-item small {
     color: var(--t2);
+    display: block;
     font-family: var(--mono);
     font-size: 0.72rem;
+    margin-top: 2px;
   }
 
-  .studio__paste {
-    padding: 18px 0 0;
+  .studio__timeline-item--warning > span {
+    background: var(--warn2);
+    border-color: color-mix(in srgb, var(--warn), transparent 68%);
+    color: var(--warn);
+  }
+
+  .studio__timeline-item--error > span {
+    background: var(--err2);
+    border-color: color-mix(in srgb, var(--err), transparent 70%);
+    color: var(--err);
+  }
+
+  .studio__timeline-item details {
+    margin-top: 6px;
+  }
+
+  .studio__timeline-item summary {
+    color: var(--t2);
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 900;
+  }
+
+  .studio__timeline-item pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-br);
+    border-radius: var(--r);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    margin: 6px 0 0;
+    max-height: 160px;
+    overflow: auto;
+    padding: 8px;
+    white-space: pre-wrap;
+  }
+
+  .studio__sheet {
+    background: var(--s1);
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-lg);
+    color: var(--t1);
+    max-height: min(82vh, 840px);
+    max-width: min(1040px, calc(100vw - 28px));
+    overflow: auto;
+    padding: 0;
+    width: 100%;
+  }
+
+  .studio__sheet::backdrop {
+    background: rgba(26, 29, 46, 0.36);
+  }
+
+  .studio__sheet-head {
+    align-items: center;
+    background: var(--s2);
+    border-bottom: 1px solid var(--b1);
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 18px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .studio__sheet-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    padding: 18px;
+  }
+
+  .studio__sheet-grid section {
+    min-width: 0;
+  }
+
+  .studio__sheet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .studio__panel-head {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .studio__command-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .studio__command {
+    background: var(--code-bg);
+    color: var(--t1);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    justify-content: flex-start;
+    overflow-wrap: anywhere;
+    text-align: left;
+    width: 100%;
+  }
+
+  .studio__code {
+    background: var(--code-bg);
+    border: 1px solid var(--code-br);
+    border-radius: var(--r);
+    color: var(--t1);
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    line-height: 1.55;
+    max-height: 280px;
+    overflow: auto;
+    padding: 12px;
+    white-space: pre-wrap;
+  }
+
+  .studio__copy-status {
+    min-height: 1.4em;
   }
 
   @media (max-width: 1040px) {
-    .studio__workspace,
-    .studio__workspace--lower {
+    .studio__cockpit {
       grid-template-columns: 1fr;
+      justify-content: stretch;
+    }
+
+    .studio__journey {
+      overflow-x: auto;
+      position: static;
+    }
+
+    .studio__steps {
+      display: flex;
+      min-width: max-content;
+    }
+
+    .studio__steps button {
+      min-width: 132px;
     }
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 820px) {
     .studio {
-      width: min(100% - 20px, 1440px);
+      width: min(100% - 20px, 1520px);
     }
 
-    .studio__header,
-    .studio__panel-head {
+    .studio__topbar,
+    .studio__cockpit,
+    .studio__trust-strip,
+    .studio__key-diagram,
+    .studio__mode-gate,
+    .studio__split-action,
+    .studio__review div,
+    .studio__sheet-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .studio__topbar {
       align-items: stretch;
-      flex-direction: column;
+      display: grid;
+      position: static;
     }
 
-    .studio__fields {
+    .studio__top-status {
+      justify-content: flex-start;
+    }
+
+    .studio__journey {
+      overflow-x: auto;
+      position: static;
+    }
+
+    .studio__steps {
+      display: flex;
+      min-width: max-content;
+    }
+
+    .studio__steps button {
+      min-width: 170px;
+    }
+
+    .studio__screen {
+      min-height: auto;
+      padding: 18px;
+    }
+
+    .studio__provider-grid,
+    .studio__choice-grid,
+    .studio__field-grid,
+    .studio__facts,
+    .studio__review,
+    .studio__context {
       grid-template-columns: 1fr;
     }
 
-    .studio__segmented {
-      flex-wrap: wrap;
+    .studio__field,
+    .studio__field--wide {
+      grid-column: auto;
     }
 
-    .studio__engine-actions {
-      grid-template-columns: 1fr;
+    .studio__actionbar {
+      justify-content: stretch;
+      margin: 22px 0 0;
+      padding: 12px 0 0;
+      position: static;
+    }
+
+    .studio__actionbar button,
+    .studio__split-action button {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio *,
+    .studio *::before,
+    .studio *::after {
+      scroll-behavior: auto;
+      transition-duration: 0.01ms;
     }
   }
 </style>

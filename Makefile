@@ -92,7 +92,12 @@ ai-docs: ## Generate AI reference from human docs (strip frontmatter)
 		echo ""; \
 	done > src/meridian/data/ai-reference.md
 
-build: ai-docs ## Build wheel and sdist
+studio-assets: ## Build website assets bundled into `meridian studio`
+	cd website && pnpm run contracts:check && pnpm run build
+	cp VERSION website/dist/version
+	find website/dist -name .DS_Store -delete
+
+build: ai-docs studio-assets ## Build wheel and sdist
 	uv build
 
 publish: build ## Publish to PyPI (requires trusted publisher or token)

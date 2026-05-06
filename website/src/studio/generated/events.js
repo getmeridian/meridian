@@ -21,4 +21,4 @@ export const eventTypeCatalog = {
     "warning",
     "error"
   ]
-} as const;
+};

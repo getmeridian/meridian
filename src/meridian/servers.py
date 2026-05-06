@@ -29,6 +29,7 @@ class ServerEntry:
     name: str = ""
     role: str = SERVER_ROLE_EXIT
     port: int = 22
+    key_path: str = ""
 
     def __str__(self) -> str:
         parts = [self.host, self.user]
@@ -113,9 +114,19 @@ class ServerRegistry:
         return len(self.list())
 
     def find(self, query: str) -> ServerEntry | None:
-        """Find a server by IP or name (first match)."""
+        """Find a server by IP, name, or v2 profile ID (first match)."""
+        needle = query.strip()
+        for profile in _read_profiles_file(self.path.with_suffix(".json")):
+            if profile.id == needle or profile.title == needle or profile.host == needle:
+                return ServerEntry(
+                    host=profile.host,
+                    user=profile.ssh_user,
+                    name=profile.title,
+                    port=profile.ssh_port,
+                    key_path=profile.key_path,
+                )
         for entry in self.list():
-            if entry.host == query or entry.name == query:
+            if entry.host == needle or entry.name == needle:
                 return entry
         return None
 
@@ -134,13 +145,28 @@ class ServerRegistry:
         if entry.role != SERVER_ROLE_EXIT:
             return
         profile_store = ServerProfileStore(self.path.with_suffix(".json"), legacy_path=self.path)
+        existing_profile = profile_store.find(entry.host) or (profile_store.find(entry.name) if entry.name else None)
         draft = ServerConnectionDraft(
             title=entry.name or entry.host,
             host=entry.host,
             ssh_user=entry.user,
             ssh_port=entry.port,
         )
-        profile_store.upsert(profile_from_draft(draft))
+        profile = profile_from_draft(draft)
+        preserved_key_path = entry.key_path or (existing_profile.key_path if existing_profile else "")
+        if preserved_key_path:
+            profile = profile.model_copy(
+                update={
+                    "auth_state": existing_profile.auth_state if existing_profile else profile.auth_state,
+                    "key_path": preserved_key_path,
+                    "last_error": existing_profile.last_error if existing_profile else profile.last_error,
+                    "last_validated_at": existing_profile.last_validated_at
+                    if existing_profile
+                    else profile.last_validated_at,
+                    "source": existing_profile.source if existing_profile else profile.source,
+                }
+            )
+        profile_store.upsert(profile)
 
     def remove(self, query: str) -> bool:
         """Remove a server by IP or name. Returns True if found and removed."""
@@ -266,7 +292,13 @@ def _read_profiles_file(path: Path) -> builtins.list[ServerProfile]:
 
 def _profile_entries(profiles: list[ServerProfile]) -> list[ServerEntry]:
     return [
-        ServerEntry(host=profile.host, user=profile.ssh_user, name=profile.title, port=profile.ssh_port)
+        ServerEntry(
+            host=profile.host,
+            user=profile.ssh_user,
+            name=profile.title,
+            port=profile.ssh_port,
+            key_path=profile.key_path,
+        )
         for profile in profiles
     ]
 

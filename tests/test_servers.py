@@ -129,6 +129,35 @@ class TestServerRegistry:
         assert entry.user == "ubuntu"
         assert entry.port == 2222
 
+    def test_find_reads_v2_profile_ids_for_cli_compat(self, servers_file: Path) -> None:
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        ).model_copy(update={"key_path": "/tmp/meridian_ed25519"})
+        ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
+
+        entry = ServerRegistry(servers_file).find(profile.id)
+
+        assert entry is not None
+        assert entry.host == "198.51.100.10"
+        assert entry.user == "ubuntu"
+        assert entry.name == "Family VPN"
+        assert entry.port == 2222
+        assert entry.key_path == "/tmp/meridian_ed25519"
+
+    def test_registry_add_preserves_v2_profile_key_path(self, servers_file: Path) -> None:
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        ).model_copy(update={"auth_state": "key_ready", "key_path": "/tmp/meridian_ed25519"})
+        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+        store.upsert(profile)
+
+        ServerRegistry(servers_file).add(ServerEntry("198.51.100.10", "ubuntu", "Family VPN", port=2222))
+
+        saved = store.find(profile.id)
+        assert saved is not None
+        assert saved.key_path == "/tmp/meridian_ed25519"
+        assert saved.auth_state == "key_ready"
+
     def test_remove_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("1.2.3.4", "root", "s1"))

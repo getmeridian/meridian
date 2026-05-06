@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "RegionalTrafficDecision": {
+      "additionalProperties": false,
+      "description": "UX-shaped decision for a country or region before it becomes route rules.",
+      "properties": {
+        "country_codes": {
+          "items": {
+            "maxLength": 2,
+            "minLength": 2,
+            "pattern": "^[A-Za-z]{2}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Country Codes",
+          "type": "array"
+        },
+        "entry_server_ref": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "title": "Entry Server Ref",
+          "type": "string"
+        },
+        "exit_server_ref": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "title": "Exit Server Ref",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "default": "block",
+          "enum": [
+            "block",
+            "regional_exit",
+            "default_exit"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "country_codes"
+      ],
+      "title": "RegionalTrafficDecision",
+      "type": "object"
+    },
+    "TopologyServerCapabilities": {
+      "additionalProperties": false,
+      "description": "Capabilities a saved server can provide to topology and routing plans.",
+      "properties": {
+        "capabilities": {
+          "items": {
+            "enum": [
+              "panel",
+              "exit",
+              "relay"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "region": {
+          "default": "",
+          "maxLength": 2,
+          "pattern": "^$|^[A-Za-z]{2}$",
+          "title": "Region",
+          "type": "string"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_ref",
+        "capabilities"
+      ],
+      "title": "TopologyServerCapabilities",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Beginner topology draft made of saved server cards and plain decisions.",
+  "properties": {
+    "regional_traffic": {
+      "items": {
+        "$ref": "#/$defs/RegionalTrafficDecision"
+      },
+      "title": "Regional Traffic",
+      "type": "array"
+    },
+    "servers": {
+      "items": {
+        "$ref": "#/$defs/TopologyServerCapabilities"
+      },
+      "title": "Servers",
+      "type": "array"
+    }
+  },
+  "title": "TopologyBuilderDraft",
+  "type": "object"
+}

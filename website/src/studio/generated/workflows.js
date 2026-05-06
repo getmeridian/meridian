@@ -18,4 +18,4 @@ export const workflowCatalog = {
       "title": "Deploy Meridian server"
     }
   ]
-} as const;
+};

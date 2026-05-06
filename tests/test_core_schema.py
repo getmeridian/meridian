@@ -41,6 +41,7 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "deploy-envelope" in names
     assert "deploy-request" in names
     assert "deploy-result" in names
+    assert "deploy-operation-result" in names
     assert "deploy-workflow-answers" in names
     assert "server-add-request" in names
     assert "server-bootstrap-key-request" in names
@@ -48,6 +49,10 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "server-connection-draft" in names
     assert "server-profile" in names
     assert "routing-policy-draft" in names
+    assert "regional-traffic-decision" in names
+    assert "route-card" in names
+    assert "topology-builder-draft" in names
+    assert "topology-server-shelf-item" in names
     assert "node-add-request" in names
     assert "server-validate-request" in names
     assert "server-validate-result" in names
@@ -66,6 +71,15 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "fleet-status-envelope" in names
     assert "fleet-inventory-envelope" in names
     assert "event" in names
+    assert "operation" in names
+    assert "operation-cancel" in names
+    assert "operation-diagnostics" in names
+    assert "operation-error" in names
+    assert "operation-events" in names
+    assert "operation-list" in names
+    assert "operation-result" in names
+    assert "operation-snapshot" in names
+    assert "operation-start" in names
     assert "schema-catalog-entry" in names
     assert "command-contract" in names
     assert "command-catalog-entry" in names
@@ -119,12 +133,15 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
 def test_topology_schemas_model_capabilities_and_country_routes() -> None:
     server_capabilities = schema_for("topology-server-capabilities")["properties"]
     route_rule = schema_for("traffic-route-rule")["properties"]
+    route_card = schema_for("route-card")["properties"]
 
     assert server_capabilities["capabilities"]["items"]["enum"] == ["panel", "exit", "relay"]
     assert server_capabilities["region"]["pattern"] == r"^$|^[A-Za-z]{2}$"
+    assert route_rule["action"]["enum"] == ["route", "block"]
     assert route_rule["country_codes"]["items"]["pattern"] == r"^[A-Za-z]{2}$"
     assert route_rule["entry_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
-    assert route_rule["exit_server_ref"]["minLength"] == 1
+    assert route_rule["exit_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
+    assert route_card["sentence"]["type"] == "string"
 
 
 def test_server_onboarding_schemas_expose_cross_field_constraints() -> None:
@@ -182,6 +199,27 @@ def test_schema_catalog_entries_are_typed() -> None:
     assert entry.commands == ["plan"]
     assert entry.json_schema is not None
     assert next(item for item in catalog if item["name"] == "plan-envelope")["schema"] == entry.json_schema
+
+
+def test_operation_schemas_are_exported_for_studio_engine_contracts() -> None:
+    snapshot = schema_for("operation-snapshot")["properties"]
+    events = schema_for("operation-events")["properties"]
+    result = schema_for("operation-result")["properties"]
+
+    assert snapshot["state"]["enum"] == [
+        "queued",
+        "running",
+        "succeeded",
+        "failed",
+        "cancel_requested",
+        "cancelled",
+        "completed_after_cancel",
+    ]
+    assert snapshot["latest_event"]["anyOf"][0]["$ref"].endswith("/Event")
+    assert events["schema"]["const"] == "meridian.operation-events/v1"
+    assert events["events"]["items"]["$ref"].endswith("/Event")
+    assert result["error"]["anyOf"][0]["$ref"].endswith("/OperationError")
+    assert schema_for("deploy-operation-result")["properties"]["result"]["$ref"].endswith("/DeployResult")
 
 
 def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:

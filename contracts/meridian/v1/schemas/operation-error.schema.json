@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "Terminal operation error safe for Studio and diagnostics.",
+  "properties": {
+    "category": {
+      "default": "system",
+      "enum": [
+        "user",
+        "system",
+        "bug",
+        "cancelled"
+      ],
+      "title": "Category",
+      "type": "string"
+    },
+    "code": {
+      "default": "",
+      "title": "Code",
+      "type": "string"
+    },
+    "details": {
+      "additionalProperties": true,
+      "title": "Details",
+      "type": "object"
+    },
+    "exit_code": {
+      "default": 1,
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "hint": {
+      "default": "",
+      "title": "Hint",
+      "type": "string"
+    },
+    "last_seq": {
+      "default": 0,
+      "title": "Last Seq",
+      "type": "integer"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "retryable": {
+      "default": false,
+      "title": "Retryable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "message"
+  ],
+  "title": "OperationError",
+  "type": "object"
+}

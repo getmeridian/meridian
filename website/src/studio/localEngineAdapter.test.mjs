@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { connectLocalEngine, enginePost } from "./localEngineAdapter.js";
+import { connectLocalEngine, enginePost, EngineRequestError } from "./localEngineAdapter.js";
 
 function jsonResponse(payload, ok = true) {
   return {
@@ -48,11 +48,38 @@ test("enginePost sends JSON with the Engine CSRF token", async () => {
   assert.equal(calls[0][1].body, JSON.stringify({ title: "Edge" }));
 });
 
-test("enginePost raises readable Engine errors", async () => {
+test("enginePost raises readable typed Engine errors", async () => {
   await assert.rejects(
     enginePost({ csrfToken: "csrf" }, "/api/v1/servers", {}, async () =>
-      jsonResponse({ detail: { message: "Invalid request body", hint: "- host: Enter a valid IP address." } }, false),
+      jsonResponse(
+        { detail: { category: "user", message: "Invalid request body", hint: "- host: Enter a valid IP address." } },
+        false,
+      ),
     ),
-    /host: Enter a valid IP address/,
+    (error) =>
+      error instanceof EngineRequestError &&
+      error.category === "user" &&
+      /host: Enter a valid IP address/.test(error.message),
+  );
+});
+
+test("enginePost preserves active operation details from Engine errors", async () => {
+  await assert.rejects(
+    enginePost({ csrfToken: "csrf" }, "/api/v1/deploy/start", {}, async () =>
+      jsonResponse(
+        {
+          detail: {
+            category: "user",
+            message: "Deploy already running for this target.",
+            operation: { id: "op-active", state: "running" },
+          },
+        },
+        false,
+      ),
+    ),
+    (error) =>
+      error instanceof EngineRequestError &&
+      error.operation?.id === "op-active" &&
+      error.retryable === true,
   );
 });

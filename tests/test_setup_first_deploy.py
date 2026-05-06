@@ -102,7 +102,7 @@ def _base_patches():  # noqa: ANN202
             }
         ),
         "meridian.commands.setup._get_docker_gateway": MagicMock(return_value=_GATEWAY),
-        "meridian.commands.setup._deploy_node_container": MagicMock(),
+        "meridian.commands.setup._deploy_node_container": MagicMock(return_value=True),
         "meridian.commands.setup._create_hosts_for_node": MagicMock(),
         "meridian.commands.setup.secrets.token_hex": MagicMock(side_effect=lambda n: "a" * (n * 2)),
     }
@@ -532,6 +532,59 @@ class TestSetupFirstDeployPanelWait:
                 geo_block=True,
                 version=_VERSION,
             )
+
+
+# ---------------------------------------------------------------------------
+# Node evidence
+# ---------------------------------------------------------------------------
+
+
+class TestSetupFirstDeployNodeEvidence:
+    def test_node_container_failure_stops_deploy(self) -> None:
+        from meridian.commands.setup import _setup_first_deploy
+
+        cluster = ClusterConfig()
+        panel = _make_panel_mock()
+
+        with (
+            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
+            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch(
+                "meridian.commands.setup._build_xray_config",
+                return_value={
+                    "config": {},
+                    "reality_public_key": "PUB",
+                    "reality_short_id": "abcd1234",
+                    "reality_private_key": "PRIV",
+                },
+            ),
+            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.commands.setup._deploy_node_container", return_value=False),
+            patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
+            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
+            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch.object(cluster, "save"),
+            patch.object(cluster, "backup"),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            _setup_first_deploy(
+                resolved=_make_resolved(),
+                cluster=cluster,
+                domain="",
+                sni=_SNI,
+                client_name=_CLIENT,
+                secret_path=_SECRET_PATH,
+                reality_port=_REALITY_PORT,
+                xhttp_port=_XHTTP_PORT,
+                wss_port=_WSS_PORT,
+                pq=False,
+                geo_block=True,
+                version=_VERSION,
+            )
+
+        assert exc_info.value.exit_code == 3
+        mock_hosts.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

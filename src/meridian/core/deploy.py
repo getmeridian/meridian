@@ -71,6 +71,9 @@ class DeployResult(CoreModel):
     panel_url: str
     panel_secret_path: str
     connection_page_path: str
+    connection_page_url: str = ""
+    subscription_url: str = ""
+    test_command: str = ""
     node_count: int
     relay_count: int
     summary: str
@@ -208,10 +211,10 @@ def _deploy_input_fields(request: DeployRequest) -> list[InputField]:
         ),
         InputField(
             id="geo_block",
-            label="Geo-block Russian traffic",
+            label="Block RU traffic",
             kind="boolean",
             default=request.geo_block,
-            help_text="Recommended to reduce server-IP exposure to Russian services.",
+            help_text="Blocks RU destinations on this server. Regional exit routing is configured separately.",
         ),
         InputField(
             id="confirm",

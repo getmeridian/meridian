@@ -224,6 +224,22 @@ class TestComputePlanRelays:
         assert len(plan.actions) == 1
         assert plan.actions[0].kind == PlanActionKind.UPDATE_RELAY
 
+    def test_relay_exit_node_name_resolves_to_actual_ip_without_diff(self) -> None:
+        desired = DesiredState(
+            nodes=[DesiredNodeState(host="198.51.100.1", name="de-exit")],
+            relays=[DesiredRelayState(host="198.51.100.10", exit_node="de-exit")],
+            manage_nodes=True,
+            manage_relays=True,
+        )
+        actual = ActualState(
+            nodes=[ActualNodeState(host="198.51.100.1", name="de-exit")],
+            relays=[ActualRelayState(host="198.51.100.10", exit_node_ip="198.51.100.1")],
+        )
+
+        plan = compute_plan(desired, actual)
+
+        assert plan.is_empty
+
 
 class TestComputePlanSubscriptionPage:
     def test_add_subscription_page(self) -> None:

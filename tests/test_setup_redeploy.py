@@ -134,7 +134,7 @@ def _run_redeploy(
     with (
         patch("meridian.commands.setup.MeridianPanel", return_value=panel_mock),
         patch("meridian.commands.setup._build_xray_config", return_value=xray_result) as mock_build,
-        patch("meridian.commands.setup._deploy_node_container") as mock_deploy,
+        patch("meridian.commands.setup._deploy_node_container", return_value=True) as mock_deploy,
         patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
         patch("meridian.commands.setup._cache_inbounds") as mock_cache,
         patch.object(cluster, "save") as mock_save,
@@ -329,6 +329,37 @@ class TestSetupRedeployFailures:
         panel.ping.return_value = False
         with pytest.raises(typer.Exit):
             _run_redeploy(panel_mock=panel)
+
+    def test_node_container_failure_stops_redeploy_before_metadata_save(self) -> None:
+        cluster = _configured_cluster()
+
+        with (
+            patch("meridian.commands.setup.MeridianPanel", return_value=_make_panel_mock()),
+            patch("meridian.commands.setup._build_xray_config", return_value=dict(_XRAY_RESULT)),
+            patch("meridian.commands.setup._deploy_node_container", return_value=False),
+            patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
+            patch("meridian.commands.setup._cache_inbounds"),
+            patch.object(cluster, "save") as mock_save,
+            patch.object(cluster, "backup") as mock_backup,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            from meridian.commands.setup import _setup_redeploy
+
+            _setup_redeploy(
+                resolved=_make_resolved(),
+                cluster=cluster,
+                domain="",
+                sni=_SNI,
+                reality_port=_REALITY_PORT,
+                xhttp_port=_XHTTP_PORT,
+                wss_port=_WSS_PORT,
+                version=_VERSION,
+            )
+
+        assert exc_info.value.exit_code == 3
+        mock_hosts.assert_not_called()
+        mock_backup.assert_not_called()
+        mock_save.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

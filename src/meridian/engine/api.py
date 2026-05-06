@@ -5,18 +5,21 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, NoReturn, Self
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from meridian.adapters.deploy_process import run_deploy_process
 from meridian.adapters.server_engine import default_server_connection_factory
 from meridian.cluster import ClusterConfig
 from meridian.config import SERVER_PROFILES_FILE, SERVERS_FILE
 from meridian.core.deploy import DeployRequest
+from meridian.core.inputs import ServerReferenceValue
+from meridian.core.redaction import redact
 from meridian.core.schema import schema_catalog
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -26,8 +29,9 @@ from meridian.core.servers import (
 )
 from meridian.core.services import collect_workflow, workflow_catalog
 from meridian.core.validation import validation_errors_hint
-from meridian.engine.deploy import dry_run_deploy_request
+from meridian.engine.deploy import dry_run_deploy_request, resolve_deploy_target
 from meridian.engine.errors import EngineError
+from meridian.engine.operations import ActiveDeployOperationError, OperationManager, OperationRunner
 from meridian.engine.servers import (
     KeyProvider,
     ServerConnectionFactory,
@@ -58,11 +62,17 @@ class EngineBootstrapKeyRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    server_ref: str
+    server_ref: ServerReferenceValue
     key_policy: ServerKeyPolicy = "generate_meridian"
     public_key: str = ""
     disable_password_auth: bool = False
     password: str = Field(default="", max_length=4096)
+
+    @model_validator(mode="after")
+    def require_public_key_when_reusing_key(self) -> Self:
+        if self.key_policy == "use_existing" and not self.public_key.strip():
+            raise ValueError("Paste a public key when reusing an existing SSH key.")
+        return self
 
     def contract(self) -> ServerBootstrapKeyRequest:
         return ServerBootstrapKeyRequest(
@@ -137,6 +147,8 @@ def create_engine_app(
     server_store_factory: Callable[[], ServerProfileStoreLike] | None = None,
     server_connection_factory: ServerConnectionFactory = default_server_connection_factory,
     server_key_provider: KeyProvider = ensure_meridian_keypair,
+    operation_manager: OperationManager | None = None,
+    deploy_runner: OperationRunner = run_deploy_process,
 ) -> FastAPI:
     """Create the localhost Engine app without starting a network listener."""
     token = csrf_token or secrets.token_urlsafe(32)
@@ -145,6 +157,7 @@ def create_engine_app(
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.state.csrf_token = token
     app.state.assets_dir = str(assets_dir) if assets_dir else ""
+    app.state.operation_manager = operation_manager or OperationManager()
     app.add_middleware(
         LocalEngineSecurity,
         allowed_hosts=allowed_hosts,
@@ -185,7 +198,7 @@ def create_engine_app(
             "schema": "meridian.engine-health/v1",
             "status": "ok",
             "csrf_token": token,
-            "assets": {"available": assets_dir is not None, "path": str(assets_dir or "")},
+            "assets": {"available": assets_dir is not None},
         }
 
     @app.get("/api/v1/schemas")
@@ -257,6 +270,98 @@ def create_engine_app(
             _raise_engine_error(exc)
         return {"schema": "meridian.deploy-dry-run/v1", "plan": plan.model_dump(mode="json")}
 
+    @app.post("/api/v1/deploy/start")
+    def deploy_start(request: DeployRequest, x_meridian_csrf: str = Header(default="")) -> Any:
+        _require_csrf(x_meridian_csrf, token)
+        if not request.yes:
+            _raise_engine_error(
+                EngineError(
+                    "Deploy needs confirmation.",
+                    hint="Review the plan in Studio, then press Start deploy.",
+                    category="user",
+                )
+            )
+        manager: OperationManager = app.state.operation_manager
+        try:
+            target = resolve_deploy_target(request, server_store())
+        except EngineError as exc:
+            _raise_engine_error(exc)
+        request_target = f"direct:{target.server_ip}:{target.ssh_user}:{target.ssh_port}"
+        active = manager.active_deploy_for_target(request_target)
+        if active is not None:
+            return _active_operation_response(active)
+        try:
+            operation = manager.start_deploy(request, deploy_runner, request_target=request_target)
+        except ActiveDeployOperationError as exc:
+            return _active_operation_response(exc.operation)
+        except EngineError as exc:
+            _raise_engine_error(exc)
+        return {"schema": "meridian.operation-start/v1", "operation": operation.snapshot()}
+
+    @app.get("/api/v1/operations")
+    def operations() -> dict[str, Any]:
+        manager: OperationManager = app.state.operation_manager
+        return {
+            "schema": "meridian.operations/v1",
+            "operations": [operation.snapshot() for operation in manager.list()],
+        }
+
+    @app.get("/api/v1/operations/{operation_id}")
+    def operation_status(operation_id: str) -> dict[str, Any]:
+        operation = _get_operation(app.state.operation_manager, operation_id)
+        return {"schema": "meridian.operation/v1", "operation": operation.snapshot()}
+
+    @app.get("/api/v1/operations/{operation_id}/events")
+    def operation_events(operation_id: str, after_seq: int = 0) -> dict[str, Any]:
+        operation = _get_operation(app.state.operation_manager, operation_id)
+        snapshot = operation.snapshot()
+        return {
+            "schema": "meridian.operation-events/v1",
+            "operation_id": operation.id,
+            "after_seq": after_seq,
+            "latest_seq": snapshot["last_seq"],
+            "events": operation.event_payloads(after_seq=max(after_seq, 0)),
+        }
+
+    @app.get("/api/v1/operations/{operation_id}/result")
+    def operation_result(operation_id: str) -> dict[str, Any]:
+        operation = _get_operation(app.state.operation_manager, operation_id)
+        return {
+            "schema": "meridian.operation-result/v1",
+            "operation": operation.snapshot(),
+            "result": operation.result,
+            "error": operation.error,
+        }
+
+    @app.get("/api/v1/operations/{operation_id}/diagnostics")
+    def operation_diagnostics(operation_id: str) -> dict[str, Any]:
+        operation = _get_operation(app.state.operation_manager, operation_id)
+        snapshot = operation.snapshot()
+        events = operation.event_payloads()
+        payload = redact(
+            {
+                "schema": "meridian.operation-diagnostics/v1",
+                "operation": snapshot,
+                "events": events,
+                "result": operation.result,
+                "error": operation.error,
+                "request": operation.request.model_dump(mode="json"),
+            }
+        )
+        return {
+            **payload,
+            "markdown": _diagnostics_markdown(payload),
+        }
+
+    @app.post("/api/v1/operations/{operation_id}/cancel")
+    def operation_cancel(operation_id: str, x_meridian_csrf: str = Header(default="")) -> dict[str, Any]:
+        _require_csrf(x_meridian_csrf, token)
+        state = app.state.operation_manager.cancel(operation_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="Operation not found.")
+        operation = _get_operation(app.state.operation_manager, operation_id)
+        return {"schema": "meridian.operation-cancel/v1", "operation": operation.snapshot()}
+
     if assets_dir is not None:
         app.mount("/", StaticFiles(directory=assets_dir, html=True), name="studio")
     else:
@@ -283,6 +388,20 @@ def _raise_engine_error(exc: EngineError) -> NoReturn:
     )
 
 
+def _active_operation_response(operation: Any) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": {
+                "message": "Deploy already running for this target.",
+                "hint": "Resume the active operation instead of starting another deploy.",
+                "category": "user",
+                "operation": operation.snapshot(),
+            }
+        },
+    )
+
+
 def _dump_profile(profile: Any) -> dict[str, Any]:
     return profile.model_dump(mode="json", exclude={"key_path"})
 
@@ -291,6 +410,13 @@ def _dump_server_result(result: Any) -> dict[str, Any]:
     payload = result.model_dump(mode="json")
     payload["server"].pop("key_path", None)
     return payload
+
+
+def _get_operation(manager: OperationManager, operation_id: str) -> Any:
+    operation = manager.get(operation_id)
+    if operation is None:
+        raise HTTPException(status_code=404, detail="Operation not found.")
+    return operation
 
 
 def _missing_assets_page() -> HTMLResponse:
@@ -307,3 +433,31 @@ def _missing_assets_page() -> HTMLResponse:
 </html>
 """
     )
+
+
+def _diagnostics_markdown(payload: dict[str, Any]) -> str:
+    operation = payload.get("operation", {}) if isinstance(payload.get("operation"), dict) else {}
+    error = payload.get("error", {}) if isinstance(payload.get("error"), dict) else {}
+    lines = [
+        "# Meridian Studio Operation Diagnostics",
+        "",
+        f"- Operation: `{operation.get('id', '')}`",
+        f"- Kind: `{operation.get('kind', '')}`",
+        f"- State: `{operation.get('state', '')}`",
+        f"- Target: `{operation.get('request_target', '')}`",
+        f"- Events: `{operation.get('event_count', 0)}`",
+        f"- Warnings: `{operation.get('warning_count', 0)}`",
+        f"- Errors: `{operation.get('error_count', 0)}`",
+    ]
+    if error:
+        lines.extend(
+            [
+                "",
+                "## Error",
+                "",
+                f"- Message: {error.get('message', '')}",
+                f"- Hint: {error.get('hint', '')}",
+                f"- Category: `{error.get('category', '')}`",
+            ]
+        )
+    return "\n".join(lines) + "\n"

@@ -56,6 +56,9 @@ pattern = "(?P<version>.+)"
 [tool.hatch.build.targets.wheel]
 packages = ["src/meridian"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"website/dist" = "meridian/studio_assets"
+
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/.github",
@@ -75,6 +78,9 @@ exclude = [
     "/uv.lock",
     "CLAUDE.md",
 ]
+
+[tool.hatch.build.targets.sdist.force-include]
+"website/dist" = "src/meridian/studio_assets"
 
 [tool.ruff]
 target-version = "py311"

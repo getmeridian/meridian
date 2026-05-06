@@ -32,6 +32,18 @@ from meridian.core.models import (
     OutputStatus,
     Summary,
 )
+from meridian.core.operations import (
+    DeployOperationResult,
+    OperationCancel,
+    OperationDiagnostics,
+    OperationEnvelope,
+    OperationError,
+    OperationEvents,
+    OperationList,
+    OperationResultEnvelope,
+    OperationSnapshot,
+    OperationStart,
+)
 from meridian.core.plan import PlanActionResult, PlanCounts, PlanResult
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -41,7 +53,15 @@ from meridian.core.servers import (
     ServerValidateRequest,
     ServerValidateResult,
 )
-from meridian.core.topology import RoutingPolicyDraft, TopologyServerCapabilities, TrafficRouteRule
+from meridian.core.topology import (
+    RegionalTrafficDecision,
+    RouteCard,
+    RoutingPolicyDraft,
+    TopologyBuilderDraft,
+    TopologyServerCapabilities,
+    TopologyServerShelfItem,
+    TrafficRouteRule,
+)
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 
@@ -459,6 +479,16 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "event": Event,
     "error": MeridianError,
+    "operation": OperationEnvelope,
+    "deploy-operation-result": DeployOperationResult,
+    "operation-cancel": OperationCancel,
+    "operation-diagnostics": OperationDiagnostics,
+    "operation-error": OperationError,
+    "operation-events": OperationEvents,
+    "operation-list": OperationList,
+    "operation-result": OperationResultEnvelope,
+    "operation-snapshot": OperationSnapshot,
+    "operation-start": OperationStart,
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
@@ -472,6 +502,10 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "server-validate-request": ServerValidateRequest,
     "server-validate-result": ServerValidateResult,
     "routing-policy-draft": RoutingPolicyDraft,
+    "regional-traffic-decision": RegionalTrafficDecision,
+    "route-card": RouteCard,
+    "topology-builder-draft": TopologyBuilderDraft,
+    "topology-server-shelf-item": TopologyServerShelfItem,
     "topology-server-capabilities": TopologyServerCapabilities,
     "traffic-route-rule": TrafficRouteRule,
     "node-add-request": NodeAddRequest,
