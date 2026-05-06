@@ -226,6 +226,9 @@ def build_contract_files() -> dict[Path, str]:
     files[Path("workflows") / "index.json"] = _plain_json(
         {"schema": "meridian.workflow-catalog/v1", "workflows": [item.model_dump(mode="json") for item in workflows]}
     )
+    files[Path("workflows") / "server-onboarding.json"] = _plain_json(
+        collect_workflow("server-onboarding").model_dump(mode="json")
+    )
     files[Path("workflows") / "deploy.json"] = _plain_json(collect_workflow("deploy").model_dump(mode="json"))
 
     files[Path("fixtures") / "deploy-dry-run-envelope.json"] = _redacted_json(_deploy_dry_run_fixture())

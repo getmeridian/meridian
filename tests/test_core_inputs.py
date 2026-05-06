@@ -12,6 +12,12 @@ from meridian.core.command_inputs import (
     ServerAddRequest,
 )
 from meridian.core.inputs import is_ip_deploy_target
+from meridian.core.servers import (
+    ServerBootstrapKeyRequest,
+    ServerConnectionDraft,
+    ServerValidateRequest,
+    profile_from_draft,
+)
 from meridian.core.validation import validation_error_hint, wrap_validation_error
 
 
@@ -51,6 +57,54 @@ def test_node_add_request_validates_user_and_port() -> None:
     hint = validation_error_hint(exc_info.value)
     assert "user: Use letters, numbers, dots, hyphens, and underscores." in hint
     assert "ssh_port" in hint
+
+
+def test_server_connection_draft_accepts_ip_title_and_port() -> None:
+    draft = ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+    profile = profile_from_draft(draft)
+
+    assert draft.title == "Family VPN"
+    assert draft.host == "198.51.100.10"
+    assert profile.id.startswith("srv-")
+    assert profile.title == "Family VPN"
+    assert profile.ssh_port == 2222
+
+
+def test_server_connection_draft_rejects_common_typos_readably() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        ServerConnectionDraft(title=" \t ", host="vpn.example", ssh_user="bad user", ssh_port=70000)
+
+    hint = validation_error_hint(exc_info.value)
+    assert "title: Server title is required." in hint
+    assert "host: Enter a valid IP address." in hint
+    assert "ssh_user: Use letters, numbers, dots, hyphens, and underscores." in hint
+    assert "ssh_port:" in hint
+    assert "ValidationError" not in hint
+
+
+def test_server_validate_request_requires_saved_ref_or_draft() -> None:
+    draft = ServerConnectionDraft(title="Demo server", host="198.51.100.10")
+
+    assert ServerValidateRequest(draft=draft).draft == draft
+    assert ServerValidateRequest(server_ref="Demo server").server_ref == "Demo server"
+
+    with pytest.raises(ValidationError) as missing:
+        ServerValidateRequest()
+    with pytest.raises(ValidationError) as both:
+        ServerValidateRequest(server_ref="Demo server", draft=draft)
+
+    assert "Choose either a saved server or new server details." in validation_error_hint(missing.value)
+    assert "Choose either a saved server or new server details." in validation_error_hint(both.value)
+
+
+def test_server_bootstrap_key_request_keeps_password_out_of_public_contract() -> None:
+    request = ServerBootstrapKeyRequest(server_ref="Demo server")
+    assert request.key_policy == "generate_meridian"
+
+    with pytest.raises(ValidationError) as exc_info:
+        ServerBootstrapKeyRequest(server_ref="Demo server", key_policy="use_existing")
+
+    assert "Paste a public key when reusing an existing SSH key." in validation_error_hint(exc_info.value)
 
 
 def test_relay_deploy_request_validates_names_ports_and_exit_selector() -> None:

@@ -1,8 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
-import { deployWorkflow } from '../studio/generated';
+import { deployWorkflow, serverOnboardingWorkflow } from '../studio/generated';
 
-const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field]));
+const deployFieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field]));
+const serverFieldsById = new Map(serverOnboardingWorkflow.fields.map((field) => [field.id, field]));
 ---
 
 <Base
@@ -20,6 +21,107 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
         <span class="studio__status-dot" aria-hidden="true"></span>
         <span>Contract mode</span>
       </div>
+    </section>
+
+    <section class="studio__workspace" aria-label="Server onboarding">
+      <form class="studio__form" id="studio-server-form">
+        <div class="studio__panel-head">
+          <div>
+            <p class="studio__panel-kicker">Server setup</p>
+            <h2>{serverOnboardingWorkflow.title}</h2>
+          </div>
+          <output class="studio__validation-pill" id="studio-server-validation-pill">Ready</output>
+        </div>
+
+        {serverOnboardingWorkflow.sections.map((section) => (
+          <fieldset class="studio__section">
+            <legend>
+              <span>{section.title}</span>
+              {section.description && <small>{section.description}</small>}
+            </legend>
+            <div class="studio__fields">
+              {section.field_ids.map((fieldId) => {
+                const field = serverFieldsById.get(fieldId);
+                if (!field) return null;
+                const inputId = `studio-server-field-${field.id}`;
+                return (
+                  <label class={`studio__field studio__field--${field.kind}`} for={inputId}>
+                    <span class="studio__label-row">
+                      <span>{field.label}</span>
+                      {field.required && <span class="studio__required">Required</span>}
+                    </span>
+                    {field.kind === 'choice' ? (
+                      <select id={inputId} data-server-field={field.id} data-studio-kind={field.kind}>
+                        {field.options.map((option) => (
+                          <option value={option.value} selected={option.value === field.default}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={inputId}
+                        type="text"
+                        data-server-field={field.id}
+                        data-studio-kind={field.kind}
+                        value={String(field.default ?? '')}
+                      />
+                    )}
+                    {field.help_text && <small>{field.help_text}</small>}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ))}
+      </form>
+
+      <aside class="studio__side" aria-label="Server draft and setup commands">
+        <div class="studio__panel">
+          <div class="studio__panel-head">
+            <div>
+              <p class="studio__panel-kicker">Draft</p>
+              <h2>server.json</h2>
+            </div>
+          </div>
+          <div class="studio__errors" id="studio-server-errors" hidden></div>
+          <pre class="studio__code" id="studio-server-json"></pre>
+        </div>
+
+        <div class="studio__panel">
+          <div class="studio__panel-head">
+            <div>
+              <p class="studio__panel-kicker">Static setup</p>
+              <h2>Commands</h2>
+            </div>
+          </div>
+          <div class="studio__command-list">
+            <button class="studio__command" type="button" id="studio-copy-server-connect">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 17l6-6-6-6"></path>
+                <path d="M12 19h8"></path>
+              </svg>
+              <span id="studio-server-connect-command"></span>
+            </button>
+            <button class="studio__command" type="button" id="studio-copy-server-key">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 7a4 4 0 1 0 2 3.46L22 5l-3-3-5.5 5.5"></path>
+                <path d="M9 15l-2 2"></path>
+              </svg>
+              <span id="studio-server-key-command"></span>
+            </button>
+            <button class="studio__command" type="button" id="studio-copy-server-save">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path>
+                <path d="M17 21v-8H7v8"></path>
+                <path d="M7 3v5h8"></path>
+              </svg>
+              <span id="studio-server-save-command"></span>
+            </button>
+          </div>
+          <p class="studio__copy-status" id="studio-server-copy-status" aria-live="polite"></p>
+        </div>
+      </aside>
     </section>
 
     <section class="studio__workspace" aria-label="Deploy workflow">
@@ -40,7 +142,7 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
             </legend>
             <div class="studio__fields">
               {section.field_ids.map((fieldId) => {
-                const field = fieldsById.get(fieldId);
+                const field = deployFieldsById.get(fieldId);
                 if (!field) return null;
                 const inputId = `studio-field-${field.id}`;
                 return (
@@ -178,15 +280,35 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
   import {
     buildCliCommands,
     buildDeployRequest,
+    buildServerCliCommands,
+    buildServerConnectionDraft,
     formatJson,
     parseEnvelope,
     parseEventStream,
     summarizeEnvelope,
     timelineFromEvents,
     validateDeployRequest,
+    validateServerConnectionDraft,
   } from '../studio/staticAdapter.js';
-  import { deployRequestSchema, deployWorkflow, studioFixtures } from '../studio/generated';
+  import {
+    deployRequestSchema,
+    deployWorkflow,
+    serverConnectionDraftSchema,
+    serverOnboardingWorkflow,
+    studioFixtures,
+  } from '../studio/generated';
 
+  const serverForm = document.getElementById('studio-server-form') as HTMLFormElement;
+  const serverJson = document.getElementById('studio-server-json') as HTMLElement;
+  const serverErrorsEl = document.getElementById('studio-server-errors') as HTMLElement;
+  const serverValidationPill = document.getElementById('studio-server-validation-pill') as HTMLElement;
+  const serverConnectCommand = document.getElementById('studio-server-connect-command') as HTMLElement;
+  const serverKeyCommand = document.getElementById('studio-server-key-command') as HTMLElement;
+  const serverSaveCommand = document.getElementById('studio-server-save-command') as HTMLElement;
+  const copyServerConnect = document.getElementById('studio-copy-server-connect') as HTMLButtonElement;
+  const copyServerKey = document.getElementById('studio-copy-server-key') as HTMLButtonElement;
+  const copyServerSave = document.getElementById('studio-copy-server-save') as HTMLButtonElement;
+  const serverCopyStatus = document.getElementById('studio-server-copy-status') as HTMLElement;
   const form = document.getElementById('studio-form') as HTMLFormElement;
   const requestJson = document.getElementById('studio-request-json') as HTMLElement;
   const errorsEl = document.getElementById('studio-errors') as HTMLElement;
@@ -205,6 +327,15 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
   const parseStatus = document.getElementById('studio-parse-status') as HTMLElement;
   const commands = buildCliCommands();
 
+  function collectServerState() {
+    const state: Record<string, string | boolean> = {};
+    serverForm.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-server-field]').forEach((input) => {
+      const field = input.dataset.serverField!;
+      state[field] = input instanceof HTMLInputElement && input.type === 'checkbox' ? input.checked : input.value;
+    });
+    return state;
+  }
+
   function collectState() {
     const state: Record<string, string | boolean> = {};
     form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-studio-field]').forEach((input) => {
@@ -212,6 +343,25 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
       state[field] = input instanceof HTMLInputElement && input.type === 'checkbox' ? input.checked : input.value;
     });
     return state;
+  }
+
+  function updateServerDraft() {
+    const draft = buildServerConnectionDraft(collectServerState());
+    const errors = validateServerConnectionDraft(draft, serverConnectionDraftSchema, serverOnboardingWorkflow);
+    const ready = errors.length === 0;
+    const serverCommands = buildServerCliCommands(draft);
+
+    serverJson.textContent = formatJson(draft);
+    serverConnectCommand.textContent = serverCommands.connect;
+    serverKeyCommand.textContent = serverCommands.copyKey;
+    serverSaveCommand.textContent = serverCommands.save;
+    copyServerConnect.disabled = !ready;
+    copyServerKey.disabled = !ready;
+    copyServerSave.disabled = !ready;
+    serverValidationPill.textContent = ready ? 'Ready to test' : `${errors.length} issue${errors.length === 1 ? '' : 's'}`;
+    serverValidationPill.dataset.state = ready ? 'ok' : 'error';
+    renderServerErrors(errors);
+    return serverCommands;
   }
 
   function updateRequest() {
@@ -229,6 +379,17 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
     return request;
   }
 
+  function renderServerErrors(errors: { field: string; message: string }[]) {
+    serverErrorsEl.hidden = errors.length === 0;
+    serverErrorsEl.replaceChildren(
+      ...errors.map((error) => {
+        const item = document.createElement('p');
+        item.textContent = `${error.field}: ${error.message}`;
+        return item;
+      }),
+    );
+  }
+
   function renderErrors(errors: { field: string; message: string }[]) {
     errorsEl.hidden = errors.length === 0;
     errorsEl.replaceChildren(
@@ -243,11 +404,13 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
   function renderEnvelope(envelope: Record<string, any>) {
     const summary = summarizeEnvelope(envelope);
     result.dataset.status = summary.status;
-    result.innerHTML = `
-      <strong>${summary.status}</strong>
-      <span>${summary.text}</span>
-      <small>${summary.changed ? 'Changes expected' : 'No immediate changes'}</small>
-    `;
+    const status = document.createElement('strong');
+    status.textContent = summary.status;
+    const text = document.createElement('span');
+    text.textContent = summary.text;
+    const changed = document.createElement('small');
+    changed.textContent = summary.changed ? 'Changes expected' : 'No immediate changes';
+    result.replaceChildren(status, text, changed);
     resultJson.textContent = formatJson(envelope);
   }
 
@@ -261,13 +424,15 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
     }>).map((event) => {
       const item = document.createElement('li');
       item.className = `studio__timeline-item studio__timeline-item--${event.level}`;
-      item.innerHTML = `
-        <span>${event.seq}</span>
-        <div>
-          <strong>${event.message}</strong>
-          <small>${event.phase} · ${event.type}</small>
-        </div>
-      `;
+      const seq = document.createElement('span');
+      seq.textContent = String(event.seq);
+      const body = document.createElement('div');
+      const message = document.createElement('strong');
+      message.textContent = event.message;
+      const meta = document.createElement('small');
+      meta.textContent = `${event.phase} · ${event.type}`;
+      body.replaceChildren(message, meta);
+      item.replaceChildren(seq, body);
       return item;
     });
     timeline.replaceChildren(...items);
@@ -281,7 +446,19 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
     }, 1500);
   }
 
+  async function copyServerText(text: string, label: string) {
+    await navigator.clipboard.writeText(text);
+    serverCopyStatus.textContent = `${label} copied`;
+    window.setTimeout(() => {
+      serverCopyStatus.textContent = '';
+    }, 1500);
+  }
+
+  serverForm.addEventListener('input', updateServerDraft);
   form.addEventListener('input', updateRequest);
+  copyServerConnect.addEventListener('click', () => copyServerText(updateServerDraft().connect, 'SSH command'));
+  copyServerKey.addEventListener('click', () => copyServerText(updateServerDraft().copyKey, 'Key command'));
+  copyServerSave.addEventListener('click', () => copyServerText(updateServerDraft().save, 'Save command'));
   copyDryRun.addEventListener('click', () => copyText(commands.dryRun, 'Dry-run command'));
   copyDeploy.addEventListener('click', () => copyText(commands.deploy, 'Deploy command'));
   downloadRequest.addEventListener('click', () => {
@@ -330,6 +507,7 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
     }
   });
 
+  updateServerDraft();
   updateRequest();
   renderEnvelope(studioFixtures.deployDryRunEnvelope);
   renderTimeline(studioFixtures.deployDryRunEvents);
@@ -412,6 +590,10 @@ const fieldsById = new Map(deployWorkflow.fields.map((field) => [field.id, field
     display: grid;
     gap: 18px;
     grid-template-columns: minmax(0, 1.25fr) minmax(380px, 0.75fr);
+  }
+
+  .studio__workspace + .studio__workspace {
+    margin-top: 18px;
   }
 
   .studio__workspace--lower {

@@ -10,7 +10,8 @@ import typer
 
 from meridian.commands.server import run_add
 from meridian.console import set_json_mode, set_quiet_mode
-from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
+from meridian.core.servers import ServerConnectionDraft, profile_from_draft
+from meridian.servers import SERVER_REGISTRY_SCHEMA, SERVER_ROLE_RELAY, ServerEntry, ServerProfileStore, ServerRegistry
 
 
 class TestServerEntry:
@@ -86,6 +87,13 @@ class TestServerRegistry:
         assert entries[0].user == "ubuntu"
         assert entries[0].name == "new-name"
 
+    def test_add_persists_custom_ssh_port(self, servers_file: Path) -> None:
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry("198.51.100.10", "ubuntu", "edge", port=2222))
+
+        assert servers_file.read_text() == "198.51.100.10 ubuntu edge port=2222\n"
+        assert reg.find("edge").port == 2222
+
     def test_find_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("1.2.3.4", "root", "myserver"))
@@ -154,3 +162,76 @@ def test_server_add_invalid_input_prints_readable_validation_error(capsys: pytes
     assert "ValidationError" not in captured.err
     assert "pydantic" not in captured.err.lower()
     mock_connection.assert_not_called()
+
+
+def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest.CaptureFixture[str]) -> None:
+    set_json_mode(False)
+    set_quiet_mode(False)
+
+    with (
+        patch("meridian.commands.server.ServerConnection") as mock_connection,
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_add("198.51.100.10", ssh_port=70000)
+
+    captured = capsys.readouterr()
+    assert exc_info.value.exit_code == 2
+    assert "Invalid server add request" in captured.err
+    assert "ssh_port:" in captured.err
+    assert "ValidationError" not in captured.err
+    mock_connection.assert_not_called()
+
+
+def test_server_add_persists_role_and_port(servers_file: Path, tmp_path: Path) -> None:
+    with (
+        patch("meridian.commands.server.SERVERS_FILE", servers_file),
+        patch("meridian.commands.server.CREDS_BASE", tmp_path / "credentials"),
+        patch("meridian.commands.server.ServerConnection") as mock_connection,
+    ):
+        conn = mock_connection.return_value
+        conn.fetch_credentials.return_value = False
+
+        run_add("198.51.100.10", name="relay-a", user="ubuntu", ssh_port=2222, role="relay")
+
+    mock_connection.assert_called_once_with(ip="198.51.100.10", user="ubuntu", local_mode=False, port=2222)
+    entry = ServerRegistry(servers_file).find("relay-a")
+    assert entry is not None
+    assert entry.role == SERVER_ROLE_RELAY
+    assert entry.port == 2222
+
+
+class TestServerProfileStore:
+    def test_upsert_find_and_remove_profiles_by_human_refs(self, tmp_path: Path) -> None:
+        store = ServerProfileStore(tmp_path / "servers.json")
+        profile = profile_from_draft(
+            ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
+        )
+
+        store.upsert(profile)
+
+        assert store.find(profile.id) == profile
+        assert store.find("Family VPN") == profile
+        assert store.find("198.51.100.10") == profile
+        assert store.remove("Family VPN") is True
+        assert store.list() == []
+
+    def test_json_store_uses_v2_schema(self, tmp_path: Path) -> None:
+        path = tmp_path / "servers.json"
+        store = ServerProfileStore(path)
+        store.upsert(profile_from_draft(ServerConnectionDraft(title="Edge", host="198.51.100.10")))
+
+        assert f'"schema": "{SERVER_REGISTRY_SCHEMA}"' in path.read_text()
+
+    def test_store_reads_legacy_servers_as_profiles_without_rewriting(self, servers_file: Path) -> None:
+        servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
+        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+
+        profiles = store.list()
+
+        assert len(profiles) == 1
+        assert profiles[0].title == "edge"
+        assert profiles[0].host == "198.51.100.10"
+        assert profiles[0].ssh_user == "ubuntu"
+        assert profiles[0].ssh_port == 2222
+        assert profiles[0].source == "legacy"
+        assert not store.path.exists()

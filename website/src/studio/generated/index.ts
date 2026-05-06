@@ -5,4 +5,6 @@ export * from "./deployRequestSchema";
 export * from "./deployWorkflow";
 export * from "./events";
 export * from "./fixtures";
+export * from "./serverConnectionDraftSchema";
+export * from "./serverOnboardingWorkflow";
 export * from "./workflows";

@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from meridian.config import DEFAULT_SNI
-from meridian.core.inputs import DeployIpValue, NameValue, OptionalSelectorValue, SshUserValue
+from meridian.core.inputs import DeployIpValue, NameValue, OptionalServerReferenceValue, SshUserValue
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
@@ -25,7 +25,7 @@ class DeployRequest(CoreModel):
     user: SshUserValue = "root"
     yes: bool = False
     harden: bool = True
-    requested_server: OptionalSelectorValue = ""
+    requested_server: OptionalServerReferenceValue = ""
     server_name: str = ""
     icon: str = ""
     color: str = ""

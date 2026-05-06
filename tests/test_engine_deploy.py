@@ -6,6 +6,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, NodeEntry, PanelConfig, RelayEntry
 from meridian.core.deploy import DeployRequest
+from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
 from meridian.engine.deploy import (
     EngineError,
     dry_run_deploy_request,
@@ -19,12 +20,14 @@ _IP_B = "198.51.100.20"
 
 
 class FakeRegistry:
-    def __init__(self, entries: list[ServerEntry] | None = None) -> None:
+    def __init__(self, entries: list[ServerEntry | ServerProfile] | None = None) -> None:
         self.entries = entries or []
 
-    def find(self, query: str) -> ServerEntry | None:
+    def find(self, query: str) -> ServerEntry | ServerProfile | None:
         for entry in self.entries:
-            if entry.host == query or entry.name == query:
+            name = getattr(entry, "name", getattr(entry, "title", ""))
+            server_id = getattr(entry, "id", "")
+            if entry.host == query or name == query or server_id == query:
                 return entry
         return None
 
@@ -70,6 +73,20 @@ def test_resolve_registered_server_uses_registry_user_when_request_user_is_root(
 
     assert target.server_ip == _IP_B
     assert target.ssh_user == "admin"
+    assert target.ssh_port == 22
+
+
+def test_resolve_server_profile_uses_stable_id_title_and_port() -> None:
+    profile = profile_from_draft(ServerConnectionDraft(title="Family VPN", host=_IP_B, ssh_user="admin", ssh_port=2222))
+    registry = FakeRegistry([profile])
+
+    by_id = resolve_deploy_target(DeployRequest(requested_server=profile.id), registry)
+    by_title = resolve_deploy_target(DeployRequest(requested_server="Family VPN"), registry)
+
+    assert by_id.server_ip == _IP_B
+    assert by_id.ssh_user == "admin"
+    assert by_id.ssh_port == 2222
+    assert by_title == by_id
 
 
 def test_resolve_registered_server_preserves_explicit_user() -> None:

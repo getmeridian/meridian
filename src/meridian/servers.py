@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import builtins
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from pydantic import ValidationError
+
+from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
 
 SERVER_ROLE_EXIT = "exit"
 SERVER_ROLE_RELAY = "relay"
 _SERVER_ROLES = {SERVER_ROLE_EXIT, SERVER_ROLE_RELAY}
+SERVER_REGISTRY_SCHEMA = "meridian.servers/v2"
 
 
 @dataclass
@@ -132,3 +140,84 @@ class ServerRegistry:
         if removed:
             self._write_lines(new_lines)
         return removed
+
+
+class ServerProfileStore:
+    """JSON server profile registry for Studio and future Engine flows."""
+
+    def __init__(self, path: Path, *, legacy_path: Path | None = None) -> None:
+        self.path = path
+        self.legacy_path = legacy_path
+
+    def list(self) -> list[ServerProfile]:
+        """Return saved server profiles, migrating readable legacy entries in memory."""
+        if self.path.exists():
+            return self._read_profiles()
+        if self.legacy_path and self.legacy_path.exists():
+            return self._legacy_profiles()
+        return []
+
+    def find(self, query: str) -> ServerProfile | None:
+        """Find a server by stable ID, title, or host."""
+        needle = query.strip()
+        for profile in self.list():
+            if profile.id == needle or profile.title == needle or profile.host == needle:
+                return profile
+        return None
+
+    def upsert(self, profile: ServerProfile) -> None:
+        """Insert or replace a profile by stable ID, title, or host."""
+        profiles = [
+            existing
+            for existing in self.list()
+            if existing.id != profile.id and existing.title != profile.title and existing.host != profile.host
+        ]
+        profiles.append(profile)
+        self._write_profiles(profiles)
+
+    def remove(self, query: str) -> bool:
+        """Remove a profile by stable ID, title, or host."""
+        needle = query.strip()
+        profiles = self.list()
+        remaining = [
+            profile
+            for profile in profiles
+            if profile.id != needle and profile.title != needle and profile.host != needle
+        ]
+        if len(remaining) == len(profiles):
+            return False
+        self._write_profiles(remaining)
+        return True
+
+    def _read_profiles(self) -> builtins.list[ServerProfile]:
+        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        raw_profiles = payload.get("servers", []) if isinstance(payload, dict) else []
+        profiles: builtins.list[ServerProfile] = []
+        for raw in raw_profiles:
+            try:
+                profiles.append(ServerProfile.model_validate(raw))
+            except ValidationError:
+                continue
+        return profiles
+
+    def _write_profiles(self, profiles: builtins.list[ServerProfile]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, Any] = {
+            "schema": SERVER_REGISTRY_SCHEMA,
+            "servers": [profile.model_dump(mode="json") for profile in profiles],
+        }
+        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    def _legacy_profiles(self) -> builtins.list[ServerProfile]:
+        assert self.legacy_path is not None
+        profiles: builtins.list[ServerProfile] = []
+        for entry in ServerRegistry(self.legacy_path).list():
+            draft = ServerConnectionDraft(
+                title=entry.name or entry.host,
+                host=entry.host,
+                ssh_user=entry.user,
+                ssh_port=entry.port,
+                role_intent="relay" if entry.role == SERVER_ROLE_RELAY else "exit",
+            )
+            profiles.append(profile_from_draft(draft, source="legacy"))
+        return profiles

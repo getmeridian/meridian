@@ -10,6 +10,7 @@
 - **Pydantic at API boundaries** - public request/result/event/error/service contracts validate, serialize, and export JSON Schema from Pydantic v2 models.
 - **Deploy planning is pure** - mode, ports, reusable paths, and request validation are computed before adapters perform SSH or panel I/O.
 - **Input models fail early** - CLI and Engine adapters should validate typed core request models at the boundary, then pass trusted objects inward.
+- **Server onboarding is UX-shaped** - collect titles, server IPs, SSH user/port, role intent, and stable references before mapping into storage or deploy requests.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
 
@@ -27,3 +28,4 @@
 - Wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for non-expert operators.
 - Use `WithJsonSchema` for custom validators that need public schema constraints without replacing readable runtime errors.
 - Generated JSON Schemas are public data; redact values without destroying schema `properties`.
+- Do not put SSH passwords or private keys into public server contracts; Engine must handle them through short-lived secret channels.

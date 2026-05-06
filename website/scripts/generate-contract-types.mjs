@@ -75,9 +75,21 @@ async function generate(outputDir) {
   await writeManifest(outputDir, "deployWorkflow.ts", "deployWorkflow", deployWorkflow);
   await writeManifest(
     outputDir,
+    "serverOnboardingWorkflow.ts",
+    "serverOnboardingWorkflow",
+    await readJson("workflows/server-onboarding.json"),
+  );
+  await writeManifest(
+    outputDir,
     "deployRequestSchema.ts",
     "deployRequestSchema",
     await readJson("schemas/deploy-request.schema.json"),
+  );
+  await writeManifest(
+    outputDir,
+    "serverConnectionDraftSchema.ts",
+    "serverConnectionDraftSchema",
+    await readJson("schemas/server-connection-draft.schema.json"),
   );
   await writeManifest(outputDir, "fixtures.ts", "studioFixtures", {
     deployDryRunEnvelope: await readJson("fixtures/deploy-dry-run-envelope.json"),
@@ -88,7 +100,7 @@ async function generate(outputDir) {
   });
   await writeFile(
     path.join(outputDir, "index.ts"),
-    `${header}export * from "./commands";\nexport * from "./deployRequestSchema";\nexport * from "./deployWorkflow";\nexport * from "./events";\nexport * from "./fixtures";\nexport * from "./workflows";\n`,
+    `${header}export * from "./commands";\nexport * from "./deployRequestSchema";\nexport * from "./deployWorkflow";\nexport * from "./events";\nexport * from "./fixtures";\nexport * from "./serverConnectionDraftSchema";\nexport * from "./serverOnboardingWorkflow";\nexport * from "./workflows";\n`,
     "utf8",
   );
 }

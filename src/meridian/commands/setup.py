@@ -325,7 +325,6 @@ def _execute_deploy_request(
     pq = request.pq
     warp = request.warp
     geo_block = request.geo_block
-    ssh_port = request.ssh_port
 
     # request.decoy is deprecated (403/404 is now always the default).
     # Accept silently for backwards compatibility but don't use it.
@@ -341,7 +340,7 @@ def _execute_deploy_request(
         registry,
         explicit_ip=target.server_ip,
         user=target.ssh_user,
-        port=ssh_port,
+        port=target.ssh_port,
     )
     resolved = ensure_server_connection(resolved)
     _check_ports(resolved.conn, resolved.ip, yes)
@@ -480,7 +479,7 @@ def _execute_deploy_request(
         mode="first_deploy" if is_first_deploy else "redeploy",
         server_ip=resolved.ip,
         ssh_user=resolved.user,
-        ssh_port=getattr(resolved.conn, "port", ssh_port),
+        ssh_port=getattr(resolved.conn, "port", target.ssh_port),
         domain=domain,
         sni=sni or DEFAULT_SNI,
         client_name=client_name,

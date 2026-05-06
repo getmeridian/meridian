@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "ServerProfile": {
+      "additionalProperties": false,
+      "description": "Saved server profile referenced by deploy, relay, verify, and recovery flows.",
+      "properties": {
+        "auth_state": {
+          "default": "unknown",
+          "enum": [
+            "unknown",
+            "validated",
+            "key_ready",
+            "failed"
+          ],
+          "title": "Auth State",
+          "type": "string"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "format": "ipv6",
+              "type": "string"
+            }
+          ],
+          "title": "Host"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_path": {
+          "default": "",
+          "title": "Key Path",
+          "type": "string"
+        },
+        "last_error": {
+          "default": "",
+          "title": "Last Error",
+          "type": "string"
+        },
+        "last_validated_at": {
+          "default": "",
+          "title": "Last Validated At",
+          "type": "string"
+        },
+        "role": {
+          "default": "exit",
+          "enum": [
+            "exit",
+            "relay"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "source": {
+          "default": "manual",
+          "enum": [
+            "manual",
+            "legacy",
+            "engine",
+            "imported"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "ssh_port": {
+          "default": 22,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "default": "root",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9._-]+$",
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "host"
+      ],
+      "title": "ServerProfile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result from validating SSH reachability and operator permissions.",
+  "properties": {
+    "auth_ok": {
+      "title": "Auth Ok",
+      "type": "boolean"
+    },
+    "detected_os": {
+      "default": "",
+      "title": "Detected Os",
+      "type": "string"
+    },
+    "hints": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Hints",
+      "type": "array"
+    },
+    "reachable": {
+      "title": "Reachable",
+      "type": "boolean"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerProfile"
+    },
+    "sudo_ok": {
+      "default": false,
+      "title": "Sudo Ok",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "server",
+    "reachable",
+    "auth_ok"
+  ],
+  "title": "ServerValidateResult",
+  "type": "object"
+}

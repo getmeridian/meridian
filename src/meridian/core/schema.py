@@ -33,6 +33,14 @@ from meridian.core.models import (
     Summary,
 )
 from meridian.core.plan import PlanActionResult, PlanCounts, PlanResult
+from meridian.core.servers import (
+    ServerBootstrapKeyRequest,
+    ServerBootstrapKeyResult,
+    ServerConnectionDraft,
+    ServerProfile,
+    ServerValidateRequest,
+    ServerValidateResult,
+)
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 
@@ -455,7 +463,13 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-show": ClientShowResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
+    "server-bootstrap-key-request": ServerBootstrapKeyRequest,
+    "server-bootstrap-key-result": ServerBootstrapKeyResult,
+    "server-connection-draft": ServerConnectionDraft,
+    "server-profile": ServerProfile,
     "server-remove-request": ServerRemoveRequest,
+    "server-validate-request": ServerValidateRequest,
+    "server-validate-result": ServerValidateResult,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
     "relay-deploy-request": RelayDeployRequest,

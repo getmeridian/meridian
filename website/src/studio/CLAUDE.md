@@ -12,6 +12,7 @@
 
 - Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
 - Static adapter logic is pure browser-safe JavaScript with Node tests; it does not store operator input.
+- Server setup stays static-safe by rendering drafts and commands only; password/key bootstrap waits for Engine.
 
 ## Pitfalls
 

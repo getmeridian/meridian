@@ -350,6 +350,33 @@ class TestRunCoreBoundary:
         assert payload["data"]["server_ip"] == _IP_B
         mock_resolve.assert_not_called()
 
+    def test_run_uses_registered_server_ssh_port_for_execution(self) -> None:
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin", port=2222)
+        resolved = _make_resolved(_IP_B)
+        resolved.user = "admin"
+        resolved.conn.user = "admin"
+        resolved.conn.port = 2222
+
+        with (
+            patch("meridian.commands.setup.ServerRegistry", return_value=registry),
+            patch("meridian.commands.setup.resolve_server", return_value=resolved) as mock_resolve,
+            patch("meridian.commands.setup.ensure_server_connection", side_effect=lambda r: r),
+            patch("meridian.commands.setup._check_ports"),
+            patch("meridian.commands.setup.ClusterConfig.load", return_value=_empty_cluster()),
+            patch("meridian.commands.setup._run_provisioner"),
+            patch("meridian.commands.setup._configure_panel_and_node"),
+            patch("meridian.commands.setup.ClusterConfig.save"),
+            patch("meridian.commands.setup._print_success"),
+            patch("meridian.commands.setup._offer_relay"),
+            patch("meridian.commands.setup._build_redeploy_command", return_value=""),
+        ):
+            run(requested_server="edge", yes=True)
+
+        assert mock_resolve.call_args.kwargs["explicit_ip"] == _IP_B
+        assert mock_resolve.call_args.kwargs["user"] == "admin"
+        assert mock_resolve.call_args.kwargs["port"] == 2222
+
     def test_run_machine_mode_requires_confirmation(self) -> None:
         with (
             patch("meridian.commands.setup.deploy_server") as mock_deploy,

@@ -7,6 +7,8 @@
 
 export type Ip = string;
 export type Name = string;
+export type Role = "exit" | "relay";
+export type SshPort = number;
 export type User = string;
 
 /**
@@ -15,5 +17,7 @@ export type User = string;
 export interface ServerAddRequest {
   ip: Ip;
   name?: Name;
+  role?: Role;
+  ssh_port?: SshPort;
   user?: User;
 }

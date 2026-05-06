@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from meridian.core.inputs import (
     IPAddressValue,
     NameValue,
@@ -27,6 +29,8 @@ class ServerAddRequest(CoreModel):
     ip: IPAddressValue
     name: NameValue = ""
     user: SshUserValue = "root"
+    ssh_port: PortValue = 22
+    role: Literal["exit", "relay"] = "exit"
 
 
 class ServerRemoveRequest(CoreModel):

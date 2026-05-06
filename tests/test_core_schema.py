@@ -43,7 +43,13 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "deploy-result" in names
     assert "deploy-workflow-answers" in names
     assert "server-add-request" in names
+    assert "server-bootstrap-key-request" in names
+    assert "server-bootstrap-key-result" in names
+    assert "server-connection-draft" in names
+    assert "server-profile" in names
     assert "node-add-request" in names
+    assert "server-validate-request" in names
+    assert "server-validate-result" in names
     assert "relay-deploy-request" in names
     assert "deploy-plan" in names
     assert "deploy-ports" in names
@@ -76,6 +82,8 @@ def test_schema_for_output_envelope_uses_wire_aliases() -> None:
 
 def test_request_schemas_expose_model_validation_constraints() -> None:
     server_add = schema_for("server-add-request")["properties"]
+    server_draft = schema_for("server-connection-draft")["properties"]
+    server_profile = schema_for("server-profile")["properties"]
     deploy = schema_for("deploy-request")["properties"]
     workflow_answers = schema_for("deploy-workflow-answers")["properties"]
 
@@ -86,14 +94,42 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     assert server_add["user"]["pattern"] == r"^[a-zA-Z0-9._-]+$"
     assert server_add["user"]["minLength"] == 1
     assert server_add["name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+    assert server_add["ssh_port"]["minimum"] == 1
+    assert server_add["ssh_port"]["maximum"] == 65535
+    assert server_draft["host"]["anyOf"] == [
+        {"format": "ipv4", "type": "string"},
+        {"format": "ipv6", "type": "string"},
+    ]
+    assert server_draft["title"]["maxLength"] == 80
+    assert server_profile["id"]["pattern"] == r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
     assert deploy["ip"]["anyOf"] == [
         {"format": "ipv4", "type": "string"},
         {"format": "ipv6", "type": "string"},
         {"pattern": r"^$|^[Ll][Oo][Cc][Aa][Ll](?:[Ll][Yy])?$", "type": "string"},
     ]
     assert deploy["client_name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+    assert deploy["requested_server"]["pattern"] == r"^$|^[^\r\n\t]+$"
     assert workflow_answers["ip"]["anyOf"] == deploy["ip"]["anyOf"]
     assert workflow_answers["user"]["pattern"] == deploy["user"]["pattern"]
+
+
+def test_server_onboarding_schemas_expose_cross_field_constraints() -> None:
+    validate_request = schema_for("server-validate-request")
+    bootstrap_request = schema_for("server-bootstrap-key-request")
+
+    assert validate_request["oneOf"] == [
+        {
+            "required": ["server_ref"],
+            "properties": {"server_ref": {"minLength": 1}, "draft": {"type": "null"}},
+        },
+        {"required": ["draft"], "properties": {"server_ref": {"const": ""}}},
+    ]
+    assert bootstrap_request["allOf"] == [
+        {
+            "if": {"properties": {"key_policy": {"const": "use_existing"}}, "required": ["key_policy"]},
+            "then": {"required": ["public_key"], "properties": {"public_key": {"minLength": 1}}},
+        }
+    ]
 
 
 def test_command_envelope_schema_binds_command_to_typed_data() -> None:

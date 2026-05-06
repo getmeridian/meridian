@@ -2,8 +2,13 @@ const IPV4_RE = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\
 
 const FIELD_LABELS = {
   client_name: "First client",
+  host: "Server IP address",
   ip: "Server IP address",
+  role_intent: "Server role",
   sni: "Camouflage target",
+  ssh_port: "SSH port",
+  ssh_user: "SSH user",
+  title: "Server title",
   user: "SSH user",
 };
 
@@ -34,7 +39,27 @@ export function buildDeployRequest(formState) {
   return request;
 }
 
+export function buildServerConnectionDraft(formState) {
+  const rawPort = String(formState.ssh_port ?? "").trim();
+  const parsedPort = Number.parseInt(rawPort, 10);
+  return {
+    title: String(formState.title ?? "").trim(),
+    host: String(formState.host ?? "").trim(),
+    ssh_user: String(formState.ssh_user ?? "root").trim(),
+    ssh_port: Number.isNaN(parsedPort) ? rawPort : parsedPort,
+    role_intent: String(formState.role_intent ?? "exit").trim() || "exit",
+  };
+}
+
 export function validateDeployRequest(request, schema, workflow) {
+  return validateRequest(request, schema, workflow);
+}
+
+export function validateServerConnectionDraft(request, schema, workflow) {
+  return validateRequest(request, schema, workflow);
+}
+
+function validateRequest(request, schema, workflow) {
   const errors = [];
   const requiredFields = workflow.fields.filter((field) => field.required && field.id !== "confirm");
 
@@ -50,7 +75,7 @@ export function validateDeployRequest(request, schema, workflow) {
     if (value === undefined || value === null || value === "") {
       continue;
     }
-    const message = validateSchemaProperty(String(value), propertySchema, field);
+    const message = validateSchemaProperty(value, propertySchema, field);
     if (message) {
       errors.push({ field, message });
     }
@@ -63,6 +88,21 @@ export function buildCliCommands() {
   return {
     deploy: "meridian deploy --request deploy.json --json --events=jsonl",
     dryRun: "meridian deploy --request deploy.json --dry-run --json",
+  };
+}
+
+export function buildServerCliCommands(draft) {
+  const target = `${draft.ssh_user}@${draft.host}`;
+  const port = Number(draft.ssh_port);
+  const customPort = Number.isInteger(port) && port !== 22;
+  const sshPort = customPort ? ` -p ${port}` : "";
+  const addPort = customPort ? ` --ssh-port ${port}` : "";
+  const role = draft.role_intent === "relay" ? " --role relay" : "";
+  const cliName = slugifyTitle(draft.title);
+  return {
+    connect: `ssh${sshPort} ${shellQuote(target)}`,
+    copyKey: `ssh-copy-id${sshPort} ${shellQuote(target)}`,
+    save: `meridian server add ${shellQuote(draft.host)} --name ${shellQuote(cliName)} --user ${shellQuote(draft.ssh_user)}${addPort}${role}`,
   };
 }
 
@@ -113,14 +153,36 @@ export function timelineFromEvents(events) {
 }
 
 function validateSchemaProperty(value, schema, field) {
-  if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
+  if (schema.type === "integer") {
+    return validateIntegerProperty(value, schema, field);
+  }
+
+  const text = String(value);
+  if (schema.pattern && !new RegExp(schema.pattern).test(text)) {
     return patternMessage(field);
   }
-  if (Number.isInteger(schema.minLength) && value.length < schema.minLength) {
+  if (Number.isInteger(schema.minLength) && text.length < schema.minLength) {
     return `${labelFor(field)} is required.`;
   }
-  if (Array.isArray(schema.anyOf) && !schema.anyOf.some((candidate) => matchesSchemaCandidate(value, candidate))) {
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return `${labelFor(field)} has an invalid option.`;
+  }
+  if (Array.isArray(schema.anyOf) && !schema.anyOf.some((candidate) => matchesSchemaCandidate(text, candidate))) {
     return patternMessage(field);
+  }
+  return "";
+}
+
+function validateIntegerProperty(value, schema, field) {
+  const number = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(number)) {
+    return `${labelFor(field)} must be a whole number.`;
+  }
+  if (Number.isInteger(schema.minimum) && number < schema.minimum) {
+    return `${labelFor(field)} must be at least ${schema.minimum}.`;
+  }
+  if (Number.isInteger(schema.maximum) && number > schema.maximum) {
+    return `${labelFor(field)} must be ${schema.maximum} or lower.`;
   }
   return "";
 }
@@ -150,16 +212,36 @@ function isLikelyIpv6(value) {
 }
 
 function patternMessage(field) {
+  if (field === "host") {
+    return "Enter a valid IP address.";
+  }
   if (field === "ip") {
     return "Enter a valid IP address, or use local when running Meridian on the target server.";
   }
-  if (field === "user") {
+  if (field === "ssh_user" || field === "user") {
     return "Use letters, numbers, dots, hyphens, and underscores.";
   }
   if (field === "client_name") {
     return "Use letters, numbers, hyphens, and underscores.";
   }
   return `${labelFor(field)} has an invalid format.`;
+}
+
+function shellQuote(value) {
+  const text = String(value);
+  if (/^[a-zA-Z0-9_./:@%+=,-]+$/.test(text)) {
+    return text;
+  }
+  return `'${text.replaceAll("'", "'\"'\"'")}'`;
+}
+
+function slugifyTitle(title) {
+  const slug = String(title)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "server";
 }
 
 function labelFor(field) {

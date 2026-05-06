@@ -12,12 +12,20 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 
 
-def run_add(ip: str, name: str = "", user: str = "root") -> None:
+def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22, role: str = "exit") -> None:
     """Register a server, verify SSH, and fetch credentials."""
-    request = validate_command_input(ServerAddRequest, "Invalid server add request", ip=ip, name=name, user=user)
+    request = validate_command_input(
+        ServerAddRequest,
+        "Invalid server add request",
+        ip=ip,
+        name=name,
+        user=user,
+        ssh_port=ssh_port,
+        role=role,
+    )
 
     registry = ServerRegistry(SERVERS_FILE)
-    conn = ServerConnection(ip=request.ip, user=request.user, local_mode=False)
+    conn = ServerConnection(ip=request.ip, user=request.user, local_mode=False, port=request.ssh_port)
 
     info(f"Connecting to {request.ip}...")
     try:
@@ -33,7 +41,9 @@ def run_add(ip: str, name: str = "", user: str = "root") -> None:
     else:
         warn("No credentials found on server (run meridian deploy first)")
 
-    registry.add(ServerEntry(host=request.ip, user=request.user, name=request.name))
+    registry.add(
+        ServerEntry(host=request.ip, user=request.user, name=request.name, role=request.role, port=request.ssh_port)
+    )
     ok(f"Server added: {request.name or request.ip}")
 
 
@@ -47,11 +57,11 @@ def run_list() -> None:
         return
 
     err_console.print()
-    err_console.print(f"  [bold]{'NAME':<15s}  {'IP':<39s}  {'USER':<8s}[/bold]")
+    err_console.print(f"  [bold]{'NAME':<15s}  {'IP':<39s}  {'USER':<8s}  {'PORT':<5s}  {'ROLE':<5s}[/bold]")
     line()
     for entry in entries:
         label = entry.name if entry.name else "--"
-        err_console.print(f"  {label:<15s}  {entry.host:<39s}  {entry.user:<8s}")
+        err_console.print(f"  {label:<15s}  {entry.host:<39s}  {entry.user:<8s}  {entry.port:<5d}  {entry.role:<5s}")
     err_console.print()
 
 

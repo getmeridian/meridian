@@ -27,6 +27,9 @@ _OPTIONAL_SELECTOR_PATTERN = r"^\S*$"
 _NAME_RE = re.compile(_NAME_PATTERN)
 _SSH_USER_RE = re.compile(_SSH_USER_PATTERN)
 _LOCAL_TARGETS = {"local", "locally"}
+_SERVER_TITLE_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 80, "pattern": r"^[^\r\n\t]+$"}
+_SERVER_REF_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 120, "pattern": r"^[^\r\n\t]+$"}
+_OPTIONAL_SERVER_REF_SCHEMA = {"type": "string", "maxLength": 120, "pattern": r"^$|^[^\r\n\t]+$"}
 
 
 def is_local_deploy_target(value: str) -> bool:
@@ -111,6 +114,35 @@ def validate_required_name_value(value: str) -> str:
     return validate_name_value(value)
 
 
+def validate_server_title_value(value: str) -> str:
+    """Validate a human display title without forcing storage-shaped slugs."""
+    value = value.strip()
+    if not value:
+        raise ValueError("Server title is required.")
+    if len(value) > 80:
+        raise ValueError("Server title must be 80 characters or fewer.")
+    if any(char in value for char in "\r\n\t"):
+        raise ValueError("Server title cannot contain tabs or line breaks.")
+    return value
+
+
+def validate_server_reference_value(value: str) -> str:
+    """Validate a title/IP/ID reference entered by a human."""
+    value = value.strip()
+    if not value:
+        raise ValueError("Choose a saved server or enter a server reference.")
+    if len(value) > 120 or any(char in value for char in "\r\n\t"):
+        raise ValueError("Server references cannot contain tabs or line breaks.")
+    return value
+
+
+def validate_optional_server_reference_value(value: str) -> str:
+    """Validate an optional human server reference."""
+    if not value:
+        return value
+    return validate_server_reference_value(value)
+
+
 IPAddressValue = Annotated[
     str,
     WithJsonSchema(_IP_ADDRESS_SCHEMA),
@@ -150,5 +182,20 @@ RequiredNameValue = Annotated[
     str,
     WithJsonSchema({"type": "string", "pattern": _NAME_PATTERN, "minLength": 1}),
     AfterValidator(validate_required_name_value),
+]
+ServerTitleValue = Annotated[
+    str,
+    WithJsonSchema(_SERVER_TITLE_SCHEMA),
+    AfterValidator(validate_server_title_value),
+]
+ServerReferenceValue = Annotated[
+    str,
+    WithJsonSchema(_SERVER_REF_SCHEMA),
+    AfterValidator(validate_server_reference_value),
+]
+OptionalServerReferenceValue = Annotated[
+    str,
+    WithJsonSchema(_OPTIONAL_SERVER_REF_SCHEMA),
+    AfterValidator(validate_optional_server_reference_value),
 ]
 PortValue = Annotated[int, Field(ge=1, le=65535)]

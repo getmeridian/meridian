@@ -43,6 +43,13 @@ panel and not a remote daemon.
   boundaries.
 - Exposed validation constraints in generated JSON Schemas without changing
   runtime error text.
+- Added server onboarding contracts for title, server IP, SSH user, SSH port,
+  role intent, validation results, key-bootstrap metadata, and saved profiles.
+- Added a static Studio server setup step with draft JSON, SSH test,
+  `ssh-copy-id`, and legacy `meridian server add` commands without password or
+  key material in the browser.
+- Added a v2 server-profile store foundation and let deploy target resolution
+  use saved profile titles/IDs/IPs with SSH port metadata.
 - Verified backend tests, ruff, mypy, contract checks, Astro check, and website
   build after the contract/Pydantic slice.
 

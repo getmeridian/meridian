@@ -56,15 +56,18 @@ def test_command_catalog_schema_references_are_exported() -> None:
 def test_workflow_catalog_exports_deploy_workflow() -> None:
     catalog = workflow_catalog()
     deploy = collect_workflow("deploy")
+    server = collect_workflow("server-onboarding")
 
-    assert [item.id for item in catalog] == ["deploy"]
-    assert catalog[0].ready_request_schema == "deploy-request"
-    assert catalog[0].title == deploy.title
-    assert catalog[0].summary == deploy.summary
+    assert [item.id for item in catalog] == ["server-onboarding", "deploy"]
+    assert catalog[0].ready_request_schema == "server-connection-draft"
+    assert catalog[0].title == server.title
+    assert catalog[1].ready_request_schema == "deploy-request"
+    assert catalog[1].title == deploy.title
+    assert catalog[1].summary == deploy.summary
 
     exported = json.loads((CONTRACTS / "workflows" / "index.json").read_text(encoding="utf-8"))
     assert exported["schema"] == "meridian.workflow-catalog/v1"
-    assert exported["workflows"][0]["id"] == "deploy"
+    assert [workflow["id"] for workflow in exported["workflows"]] == ["server-onboarding", "deploy"]
 
 
 def test_event_schema_uses_public_literal_event_types() -> None:

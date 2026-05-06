@@ -23,6 +23,7 @@ from meridian.core.deploy_validation import (
 )
 from meridian.core.inputs import is_ip_deploy_target, is_local_deploy_target
 from meridian.core.models import ErrorCategory
+from meridian.core.servers import ServerProfile
 from meridian.servers import ServerEntry
 
 
@@ -41,12 +42,13 @@ class ResolvedDeployTarget:
 
     server_ip: str
     ssh_user: str
+    ssh_port: int = 22
 
 
 class ServerLookup(Protocol):
     """Minimal registry surface needed for deploy planning."""
 
-    def find(self, query: str) -> ServerEntry | None:
+    def find(self, query: str) -> ServerEntry | ServerProfile | None:
         """Return a registered server by host/name, if known."""
 
 
@@ -60,6 +62,7 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
         request = normalize_deploy_request(request)
         server_ip = request.ip
         ssh_user = request.user
+        ssh_port = request.ssh_port
         if request.requested_server:
             if is_local_deploy_target(request.requested_server):
                 server_ip = request.requested_server
@@ -75,14 +78,25 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
                         )
                 else:
                     server_ip = entry.host
-                    if request.user == "root" and entry.user:
-                        ssh_user = entry.user
+                    entry_user = _entry_user(entry)
+                    if request.user == "root" and entry_user:
+                        ssh_user = entry_user
+                    if request.ssh_port == 22:
+                        ssh_port = _entry_port(entry)
 
         validate_deploy_target(server_ip)
     except DeployValidationError as exc:
         raise _user_error(exc) from exc
 
-    return ResolvedDeployTarget(server_ip=server_ip, ssh_user=ssh_user)
+    return ResolvedDeployTarget(server_ip=server_ip, ssh_user=ssh_user, ssh_port=ssh_port)
+
+
+def _entry_user(entry: ServerEntry | ServerProfile) -> str:
+    return getattr(entry, "user", getattr(entry, "ssh_user", "root"))
+
+
+def _entry_port(entry: ServerEntry | ServerProfile) -> int:
+    return getattr(entry, "port", getattr(entry, "ssh_port", 22))
 
 
 def project_deploy_cluster_state(cluster: ClusterConfig, server_ip: str) -> DeployClusterState:

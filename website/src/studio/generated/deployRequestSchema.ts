@@ -65,7 +65,8 @@ export const deployRequestSchema = {
     },
     "requested_server": {
       "default": "",
-      "pattern": "^\\S*$",
+      "maxLength": 120,
+      "pattern": "^$|^[^\\r\\n\\t]+$",
       "title": "Requested Server",
       "type": "string"
     },
