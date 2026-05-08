@@ -79,13 +79,13 @@ Add that public key to your VPS provider or to the server user's `~/.ssh/authori
 Test SSH before running Meridian:
 
 ```bash
-ssh root@YOUR_SERVER_IP
+ssh root@198.51.100.10
 ```
 
 If your VPS uses a non-root user, test that user instead and pass it to deploy:
 
 ```bash
-meridian deploy YOUR_SERVER_IP --user ubuntu
+meridian deploy 198.51.100.10 --user ubuntu
 ```
 
 ## Use an SSH agent
@@ -112,7 +112,7 @@ meridian deploy
 Or provide the server IP directly:
 
 ```bash
-meridian deploy YOUR_SERVER_IP
+meridian deploy 198.51.100.10
 ```
 
 Meridian stores credentials under `~/.meridian/` inside WSL. Run follow-up commands from the same WSL distribution so it can find the cached server credentials:
@@ -120,7 +120,7 @@ Meridian stores credentials under `~/.meridian/` inside WSL. Run follow-up comma
 ```bash
 meridian client add alice
 meridian client list
-meridian test YOUR_SERVER_IP
+meridian test 198.51.100.10
 ```
 
 ## VS Code Remote WSL
@@ -140,13 +140,13 @@ Files edited through Remote WSL live in the Linux filesystem, which avoids path 
 Some interactive terminal prompts can behave differently under WSL. If the deploy wizard does not accept input as expected, provide values explicitly:
 
 ```bash
-meridian deploy YOUR_SERVER_IP --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.microsoft.com
 ```
 
 You can also run a preflight check first:
 
 ```bash
-meridian preflight YOUR_SERVER_IP
+meridian preflight 198.51.100.10
 ```
 
 ### Permission denied over SSH
@@ -155,7 +155,7 @@ Confirm the key exists in WSL, not only in Windows:
 
 ```bash
 ls -la ~/.ssh
-ssh -v root@YOUR_SERVER_IP
+ssh -v root@198.51.100.10
 ```
 
 The private key should be readable only by your WSL user:

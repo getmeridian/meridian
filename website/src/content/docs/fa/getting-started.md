@@ -9,7 +9,7 @@ section: guides
 
 شما نیاز دارید:
 - یک **VPS** که بر روی Debian یا Ubuntu اجرا می‌شود (دسترسی کلید SSH به صورت root)
-- یک **ترمینال** در کامپیوتر محلی خود (macOS، Linux یا WSL)
+- یک **ترمینال** در کامپیوتر محلی خود (macOS، Linux یا [WSL در Windows](/docs/fa/wsl/))
 
 ## نصب CLI
 
