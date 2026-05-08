@@ -11,7 +11,7 @@ One command sets up an undetectable proxy server with hardened defaults. This gu
 
 You need:
 - A **VPS** running Debian or Ubuntu (root SSH key access)
-- A **terminal** on your local machine (macOS, Linux, or WSL)
+- A **terminal** on your local machine (macOS, Linux, or [WSL on Windows](/docs/en/wsl/))
 
 ## Install the CLI
 

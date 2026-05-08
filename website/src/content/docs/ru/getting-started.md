@@ -9,7 +9,7 @@ section: guides
 
 Вам понадобятся:
 - **VPS** на Debian или Ubuntu (с доступом по SSH ключу под root)
-- **Терминал** на вашем локальном компьютере (macOS, Linux или WSL)
+- **Терминал** на вашем локальном компьютере (macOS, Linux или [WSL в Windows](/docs/ru/wsl/))
 
 ## Установить CLI
 

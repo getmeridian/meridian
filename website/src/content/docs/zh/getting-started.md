@@ -9,7 +9,7 @@ section: guides
 
 您需要：
 - 一台运行 Debian 或 Ubuntu 的 **VPS**（具有 root SSH 密钥访问权限）
-- 您本地计算机上的 **终端**（macOS、Linux 或 WSL）
+- 您本地计算机上的 **终端**（macOS、Linux 或 [Windows 上的 WSL](/docs/zh/wsl/)）
 
 ## 安装 CLI
 
