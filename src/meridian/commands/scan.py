@@ -16,6 +16,33 @@ from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 
 
+def _is_valid_hostname(value: str) -> bool:
+    """Return True if value is a plausible DNS hostname.
+
+    Rejects anything with whitespace or characters outside the RFC 1123 label
+    alphabet, and labels that don't start/end with an alphanumeric. Stricter
+    than necessary by design — the cost of letting garbage through is a broken
+    Reality inbound on a live server.
+    """
+    if not value or len(value) > 253:
+        return False
+    labels = value.split(".")
+    if len(labels) < 2:
+        return False
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if not (label[0].isalnum() and label[-1].isalnum()):
+            return False
+        if any(not (ch.isalnum() or ch == "-") for ch in label):
+            return False
+    # Reject IPv4 literals — Reality serverNames must be DNS hostnames.
+    # An all-numeric TLD is the cheap discriminator.
+    if labels[-1].isdigit():
+        return False
+    return True
+
+
 def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     """Run RealiTLScanner on the server and return list of discovered SNI targets.
 
@@ -108,22 +135,37 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
         return []
     csv_output = csv_result.stdout.strip()
 
-    if not csv_output or csv_output == "IP,ORIGIN,CERT_DOMAIN,CERT_ISSUER,GEO_CODE":
+    lines = csv_output.splitlines()
+    if not lines:
         return []
 
-    # Parse CSV: extract cert_domain (column 3), skip header, deduplicate, filter bad targets
+    # RealiTLScanner CSV header has shifted over time (5 columns → 11 columns
+    # with TLS/ALPN/CURVE/CERT_* details). Resolve CERT_DOMAIN by header name
+    # instead of a fixed index, so a future format change doesn't silently
+    # smuggle e.g. "TLS 1.3" into Xray's Reality serverNames.
+    header = [h.strip() for h in lines[0].split(",")]
+    try:
+        domain_idx = header.index("CERT_DOMAIN")
+        ip_idx = header.index("IP")
+    except ValueError:
+        return []
+
     domains: list[str] = []
-    for csv_line in csv_output.splitlines():
+    for csv_line in lines[1:]:
         parts = csv_line.split(",")
-        if len(parts) < 3:
+        if len(parts) <= max(domain_idx, ip_idx):
             continue
-        csv_ip, _origin, cert_domain = parts[0], parts[1], parts[2]
-        if csv_ip == "IP":
-            continue  # header
-        if not cert_domain:
+        csv_ip = parts[ip_idx].strip()
+        cert_domain = parts[domain_idx].strip()
+        if csv_ip == "IP" or not cert_domain:
             continue
         if cert_domain.startswith("*"):
             continue  # wildcard certs
+        # Defensive hostname validation — RFC 1123 letters/digits/hyphens/dots
+        # only. Rejects pre-parsed garbage like "TLS 1.3" before it can land
+        # in Reality settings.
+        if not _is_valid_hostname(cert_domain):
+            continue
         # Filter known-bad targets
         if any(
             bad in cert_domain.lower()

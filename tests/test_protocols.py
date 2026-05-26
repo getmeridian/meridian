@@ -546,13 +546,25 @@ class TestBuildRelayUrl:
         url = XHTTPProtocol().build_relay_url("r-uuid", "", creds, "bob", "198.51.100.50")
         assert url == ""
 
-    def test_xhttp_relay_with_relay_sni(self) -> None:
+    def test_xhttp_relay_ignores_relay_sni(self) -> None:
+        # XHTTP TLS is terminated by nginx on the exit using its server_name
+        # cert (domain or exit IP). The relay's Reality SNI must NOT be used
+        # — it would route XHTTP traffic to the per-relay Reality inbound,
+        # whose dest fallback would return 404 for the XHTTP path.
         creds = _make_test_creds(domain="example.com", xhttp_path="xp123")
         url = XHTTPProtocol().build_relay_url(
             "r-uuid", "", creds, "bob", "198.51.100.50", relay_sni="yandex.ru", relay_name="moscow"
         )
-        assert "sni=yandex.ru" in url
-        assert "sni=example.com" not in url
+        assert "sni=example.com" in url
+        assert "sni=yandex.ru" not in url
+
+    def test_xhttp_relay_ip_mode_ignores_relay_sni(self) -> None:
+        creds = _make_test_creds(xhttp_path="xp123")
+        url = XHTTPProtocol().build_relay_url(
+            "r-uuid", "", creds, "bob", "198.51.100.50", relay_sni="yandex.ru", relay_name="moscow"
+        )
+        assert "sni=198.51.100.1" in url  # exit IP, not relay's Reality SNI
+        assert "sni=yandex.ru" not in url
 
     def test_wss_relay_url(self) -> None:
         creds = _make_test_creds(domain="example.com", ws_path="ws789")
