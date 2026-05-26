@@ -511,12 +511,13 @@ def _regenerate_client_pages(
 def run_deploy(
     relay_ip: str,
     exit_arg: str,
-    user: str = "root",
+    user: str = "",
     relay_name: str = "",
     listen_port: int = 443,
     yes: bool = False,
     sni: str = "",
     ssh_port: int = 22,
+    exit_user: str = "",
 ) -> None:
     """Deploy a relay node that forwards traffic to an exit server."""
     # Validate relay IP
@@ -527,6 +528,7 @@ def run_deploy(
         fail(f"Invalid relay name: {relay_name}", hint="Use letters, numbers, hyphens, underscores", hint_type="user")
 
     registry = ServerRegistry(SERVERS_FILE)
+    relay_user = _relay_registry_user(registry, relay_ip, user)
 
     # --- Explain what a relay does ---
     err_console.print()
@@ -539,7 +541,7 @@ def run_deploy(
 
     # Resolve exit server
     info(f"Resolving exit server: {exit_arg}")
-    resolved_exit = _resolve_exit(registry, exit_arg, user, force_refresh=True)
+    resolved_exit = _resolve_exit(registry, exit_arg, exit_user, force_refresh=True)
     exit_creds = ServerCredentials.load(resolved_exit.creds_dir / "proxy.yml")
 
     # Check if relay already registered
@@ -569,8 +571,8 @@ def run_deploy(
     ok(f"Exit server verified: {resolved_exit.ip}")
 
     # Connect to relay server
-    info(f"Connecting to relay server: {relay_ip}")
-    relay_conn = ServerConnection(ip=relay_ip, user=user, port=ssh_port)
+    info(f"Connecting to relay server: {relay_user}@{relay_ip}")
+    relay_conn = ServerConnection(ip=relay_ip, user=relay_user, port=ssh_port)
     try:
         relay_conn.check_ssh()
     except SSHError as exc:
@@ -669,7 +671,7 @@ def run_deploy(
     from meridian.config import REALM_VERSION
 
     summary = (
-        f"Relay:    {user}@{relay_ip}:{listen_port}\n"
+        f"Relay:    {relay_user}@{relay_ip}:{listen_port}\n"
         f"Exit:     {resolved_exit.ip}:443\n"
         f"Engine:   Realm v{REALM_VERSION} (zero-copy TCP forwarder)\n"
         f"Name:     {relay_name or '(auto)'}\n"
@@ -686,7 +688,7 @@ def run_deploy(
     err_console.print()
 
     if not yes:
-        confirm(f"Deploy relay to {user}@{relay_ip}?")
+        confirm(f"Deploy relay to {relay_user}@{relay_ip}?")
     err_console.print()
 
     # Run relay provisioner
@@ -698,7 +700,7 @@ def run_deploy(
         exit_ip=resolved_exit.ip,
         exit_port=443,
         listen_port=listen_port,
-        user=user,
+        user=relay_user,
     )
 
     info(f"Configuring relay at {relay_ip}...")
@@ -774,7 +776,9 @@ def run_deploy(
 
     # Register relay in server registry
     if relay_ip != resolved_exit.ip:
-        registry.add(ServerEntry(host=relay_ip, user=user, name=relay_name, role=SERVER_ROLE_RELAY, port=ssh_port))
+        registry.add(
+            ServerEntry(host=relay_ip, user=relay_user, name=relay_name, role=SERVER_ROLE_RELAY, port=ssh_port)
+        )
 
     # Regenerate connection pages for all existing clients
     if exit_creds.clients:
@@ -909,6 +913,7 @@ def run_remove(
     exit_arg: str = "",
     user: str = "",
     yes: bool = False,
+    exit_user: str = "",
 ) -> None:
     """Remove a relay node."""
     if not is_ip(relay_ip):
@@ -918,7 +923,7 @@ def run_remove(
 
     # Find the exit server for this relay
     if exit_arg:
-        resolved_exit = _resolve_exit(registry, exit_arg, user, force_refresh=True)
+        resolved_exit = _resolve_exit(registry, exit_arg, exit_user, force_refresh=True)
     else:
         result = _find_exit_for_relay(relay_ip, force_refresh=True)
         if result is None:
@@ -1029,6 +1034,7 @@ def run_check(
     relay_ip: str,
     exit_arg: str = "",
     user: str = "",
+    exit_user: str = "",
 ) -> None:
     """Check health of a relay node."""
     if not is_ip(relay_ip):
@@ -1038,7 +1044,7 @@ def run_check(
 
     # Find exit server
     if exit_arg:
-        resolved_exit = _resolve_exit(registry, exit_arg, user)
+        resolved_exit = _resolve_exit(registry, exit_arg, exit_user)
     else:
         result = _find_exit_for_relay(relay_ip)
         if result is None:
