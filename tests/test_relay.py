@@ -204,10 +204,13 @@ class TestBuildRelayUrls:
         assert "sni=yandex.ru" in reality_url.url
         assert "sni=www.microsoft.com" not in reality_url.url
 
-        # XHTTP should also use relay SNI
+        # XHTTP must NOT use relay's Reality SNI — that SNI routes to a
+        # Reality-only Xray inbound on the exit. XHTTP terminates at nginx
+        # via the exit's server_name (domain or exit IP).
         xhttp_urls = [u for u in result.urls if u.key == "xhttp"]
         if xhttp_urls:
-            assert "sni=yandex.ru" in xhttp_urls[0].url
+            assert "sni=5.6.7.8" in xhttp_urls[0].url  # exit IP
+            assert "sni=yandex.ru" not in xhttp_urls[0].url
 
     def test_build_all_relay_urls_uses_relay_sni(self, sample_proxy_with_relays: Path) -> None:
         """build_all_relay_urls passes relay.sni from each RelayEntry."""
