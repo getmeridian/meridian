@@ -828,6 +828,7 @@ def run_deploy(
 def run_list(
     exit_arg: str = "",
     user: str = "",
+    exit_user: str = "",
 ) -> None:
     """List relay nodes attached to exit server(s)."""
     from rich.box import ROUNDED
@@ -837,7 +838,7 @@ def run_list(
 
     if exit_arg:
         # List relays for a specific exit
-        resolved = _resolve_exit(registry, exit_arg, user)
+        resolved = _resolve_exit(registry, exit_arg, exit_user)
         creds = ServerCredentials.load(resolved.creds_dir / "proxy.yml")
 
         if not creds.relays:

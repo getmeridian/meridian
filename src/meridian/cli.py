@@ -387,12 +387,15 @@ def relay_deploy_cmd(
 @relay_app.command("list")
 def relay_list_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Filter by exit server (IP or name)"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: str = typer.Option("", "--user", "-u", help="SSH user for the relay (defaults to registry entry or 'root')"),
+    exit_user: str = typer.Option(
+        "", "--exit-user", help="SSH user for the exit (defaults to registry entry or 'root')"
+    ),
 ) -> None:
     """List relay nodes."""
     from meridian.commands.relay import run_list
 
-    run_list(exit, user)
+    run_list(exit, user, exit_user=exit_user)
 
 
 @relay_app.command("remove")
