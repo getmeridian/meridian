@@ -30,10 +30,9 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     raw_arch = arch_result.stdout.strip()
     match raw_arch:
         case "x86_64":
-            arch = "64"
+            arch = "amd64"
         case "aarch64":
-            warn("RealiTLScanner has no arm64 build.")
-            return []
+            arch = "arm64"
         case _:
             warn(f"Unsupported architecture for scanner: {raw_arch}")
             return []
