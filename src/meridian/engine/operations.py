@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from meridian.core.deploy import DeployRequest
 from meridian.core.models import Event, EventLevel
-from meridian.core.operations import DeployOperationResult, OperationKind, OperationState
+from meridian.core.operations import DeployOperationResult, OperationKind, OperationSnapshot, OperationState
 from meridian.core.output import now_iso
 from meridian.core.redaction import redact
 from meridian.engine.errors import EngineError
@@ -55,28 +55,28 @@ class EngineOperation:
         self.error: dict[str, Any] | None = None
         self._lock = threading.Lock()
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self) -> OperationSnapshot:
         with self._lock:
             warning_count = sum(1 for event in self.events if event.get("level") == "warning")
             error_count = sum(1 for event in self.events if event.get("level") == "error")
             latest_event = dict(self.events[-1]) if self.events else None
-            return {
-                "id": self.id,
-                "kind": self.kind,
-                "state": self.state,
-                "request_target": self.request_target,
-                "created_at": self.created_at,
-                "updated_at": self.updated_at,
-                "event_count": len(self.events),
-                "warning_count": warning_count,
-                "error_count": error_count,
-                "last_seq": len(self.events),
-                "current_phase": str(latest_event.get("phase") or "") if latest_event else "",
-                "latest_event": latest_event,
-                "cancelable": self.state in {"queued", "running"},
-                "has_result": self.result is not None,
-                "has_error": self.error is not None,
-            }
+            return OperationSnapshot(
+                id=self.id,
+                kind=self.kind,
+                state=self.state,
+                request_target=self.request_target,
+                created_at=self.created_at,
+                updated_at=self.updated_at,
+                event_count=len(self.events),
+                warning_count=warning_count,
+                error_count=error_count,
+                last_seq=len(self.events),
+                current_phase=str(latest_event.get("phase") or "") if latest_event else "",
+                latest_event=latest_event,
+                cancelable=self.state in {"queued", "running"},
+                has_result=self.result is not None,
+                has_error=self.error is not None,
+            )
 
     def event_payloads(self, *, after_seq: int = 0) -> list[dict[str, Any]]:
         with self._lock:
@@ -250,7 +250,7 @@ class OperationManager:
                     "hint": exc.hint,
                     "category": exc.category,
                     "retryable": exc.category != "bug",
-                    "last_seq": operation.snapshot()["last_seq"],
+                    "last_seq": operation.snapshot().last_seq,
                 }
             )
             return
@@ -262,7 +262,7 @@ class OperationManager:
                     "hint": str(exc),
                     "category": "bug",
                     "retryable": False,
-                    "last_seq": operation.snapshot()["last_seq"],
+                    "last_seq": operation.snapshot().last_seq,
                 }
             )
             return

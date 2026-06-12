@@ -319,7 +319,7 @@ def create_engine_app(
             "schema": "meridian.operation-events/v1",
             "operation_id": operation.id,
             "after_seq": after_seq,
-            "latest_seq": snapshot["last_seq"],
+            "latest_seq": snapshot.last_seq,
             "events": operation.event_payloads(after_seq=max(after_seq, 0)),
         }
 
@@ -396,7 +396,7 @@ def _active_operation_response(operation: Any) -> JSONResponse:
                 "message": "Deploy already running for this target.",
                 "hint": "Resume the active operation instead of starting another deploy.",
                 "category": "user",
-                "operation": operation.snapshot(),
+                "operation": operation.snapshot().model_dump(mode="json"),
             }
         },
     )
