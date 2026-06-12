@@ -8,12 +8,12 @@ The reconciler executor calls them directly.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import secrets
 from typing import Any
 
 from meridian.cluster import ClusterConfig, DesiredNode, DesiredRelay, NodeEntry, RelayEntry
+from meridian.core.deploy_planning import compute_deploy_ports
 from meridian.remnawave import MeridianPanel, RemnawaveError
 
 logger = logging.getLogger("meridian.operations")
@@ -239,10 +239,10 @@ def add_node(
     ensure_server_connection(resolved)
 
     # Compute deterministic port layout
-    ip_hash = int(hashlib.sha256(ip.encode()).hexdigest()[:8], 16)
-    xhttp_port = 30000 + (ip_hash % 10000)
-    reality_port = 10000 + ip_hash % 1000
-    wss_port = 20000 + (ip_hash % 10000)
+    ports = compute_deploy_ports(ip)
+    xhttp_port = ports.xhttp_port
+    reality_port = ports.reality_port
+    wss_port = ports.wss_port
     xhttp_path = secrets.token_hex(8)
     ws_path = secrets.token_hex(8)
 
@@ -336,10 +336,10 @@ def update_node(
     )
 
     # Compute port layout (same scheme as deploy)
-    ip_hash = int(hashlib.sha256(ip.encode()).hexdigest()[:8], 16)
-    xhttp_port = 30000 + (ip_hash % 10000)
-    reality_port = 10000 + ip_hash % 1000
-    wss_port = 20000 + (ip_hash % 10000)
+    ports = compute_deploy_ports(ip)
+    xhttp_port = ports.xhttp_port
+    reality_port = ports.reality_port
+    wss_port = ports.wss_port
 
     # Save old values for rollback if redeploy fails
     old_name, old_sni, old_domain, old_warp = node.name, node.sni, node.domain, node.warp

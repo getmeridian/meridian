@@ -7,7 +7,6 @@ is persisted in cluster.yml.
 
 from __future__ import annotations
 
-import hashlib
 import re
 import shlex
 
@@ -37,8 +36,9 @@ def _relay_label(relay: RelayEntry) -> str:
 
 def _relay_xray_port(relay_ip: str) -> int:
     """Deterministic Xray port for a relay inbound (range 40000-49999)."""
-    ip_hash = int(hashlib.sha256(relay_ip.encode()).hexdigest()[:8], 16)
-    return 40000 + (ip_hash % 10000)
+    from meridian.core.deploy_planning import compute_relay_port
+
+    return compute_relay_port(relay_ip)
 
 
 def _relay_registry_user(registry: ServerRegistry, relay_ip: str, explicit_user: str) -> str:

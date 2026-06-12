@@ -59,14 +59,24 @@ class DeployPlan(CoreModel):
     relay_count: int
 
 
+def _ip_hash(ip: str) -> int:
+    """Deterministic 32-bit hash of an IP string for port arithmetic."""
+    return int(hashlib.sha256(ip.encode()).hexdigest()[:8], 16)
+
+
 def compute_deploy_ports(server_ip: str) -> DeployPorts:
     """Return Meridian's deterministic port layout for a server IP."""
-    ip_hash = int(hashlib.sha256(server_ip.encode()).hexdigest()[:8], 16)
+    h = _ip_hash(server_ip)
     return DeployPorts(
-        xhttp_port=30000 + (ip_hash % 10000),
-        reality_port=10000 + ip_hash % 1000,
-        wss_port=20000 + (ip_hash % 10000),
+        xhttp_port=30000 + (h % 10000),
+        reality_port=10000 + h % 1000,
+        wss_port=20000 + (h % 10000),
     )
+
+
+def compute_relay_port(relay_ip: str) -> int:
+    """Return the deterministic Xray port for a relay inbound (range 40000-49999)."""
+    return 40000 + (_ip_hash(relay_ip) % 10000)
 
 
 def build_deploy_plan(
