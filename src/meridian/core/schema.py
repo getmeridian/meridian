@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, RootModel, create_model
 
 from meridian.core.apply import ApplyActionResult, ApplyCounts, ApplyResult
 from meridian.core.clients import ClientListResult, ClientShowResult
@@ -134,44 +134,81 @@ class _ContractEnvelope(CoreModel):
     errors: list[MeridianError]
 
 
-class _PlanSuccessEnvelope(_ContractEnvelope):
-    command: Literal["plan"]
-    status: Literal["changed", "no_changes"]
-    data: PlanResult
-    errors: list[MeridianError] = Field(max_length=0)
+# ---------------------------------------------------------------------------
+# Envelope factory — replaces per-command copy-pasted envelope classes
+# ---------------------------------------------------------------------------
 
 
-class _PlanTerminalEnvelope(_ContractEnvelope):
-    command: Literal["plan"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
+def _make_command_envelope(
+    prefix: str,
+    command: str,
+    data_type: type,
+    *,
+    success_statuses: Any = None,
+    failure_data_type: type = EmptyData,
+    doc: str = "",
+) -> tuple[type[_ContractEnvelope], type[_ContractEnvelope], type[RootModel]]:  # type: ignore[type-arg]
+    """Build (SuccessEnvelope, TerminalEnvelope, OutputEnvelope) for a command.
+
+    The generated models produce identical JSON Schemas to the hand-written
+    classes they replace — same ``$defs`` keys, same discriminator mapping.
+
+    Args:
+        prefix: PascalCase prefix for class names (e.g. ``"FleetStatus"``).
+        command: Literal command string (e.g. ``"fleet.status"``).
+        data_type: Pydantic model for the success ``data`` field.
+        success_statuses: Literal type for success status values.
+            Defaults to ``Literal["ok"]``.
+        failure_data_type: Pydantic model for the terminal ``data`` field.
+            Defaults to :class:`EmptyData`.
+        doc: Docstring for the root envelope model.
+    """
+    cmd_literal = Literal[command]  # type: ignore[valid-type]
+    if success_statuses is None:
+        success_statuses = Literal["ok"]
+
+    success_cls = create_model(
+        f"_{prefix}SuccessEnvelope",
+        __base__=_ContractEnvelope,
+        command=(cmd_literal, ...),
+        status=(success_statuses, ...),
+        data=(data_type, ...),
+        errors=(list[MeridianError], Field(max_length=0)),
+    )
+
+    terminal_cls = create_model(
+        f"_{prefix}TerminalEnvelope",
+        __base__=_ContractEnvelope,
+        command=(cmd_literal, ...),
+        status=(Literal["failed", "cancelled"], ...),
+        data=(failure_data_type, ...),
+        errors=(list[MeridianError], Field(min_length=1)),
+    )
+
+    union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]
+    root_cls = type(f"{prefix}OutputEnvelope", (RootModel[union_type],), {"__doc__": doc})
+
+    return success_cls, terminal_cls, root_cls
 
 
-class PlanOutputEnvelope(
-    RootModel[Annotated[_PlanSuccessEnvelope | _PlanTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian plan --json`."""
+# --- Plan ---
+_PlanSuccessEnvelope, _PlanTerminalEnvelope, PlanOutputEnvelope = _make_command_envelope(
+    "Plan",
+    "plan",
+    PlanResult,
+    success_statuses=Literal["changed", "no_changes"],
+    doc="Envelope schema for `meridian plan --json`.",
+)
 
-
-class _ApplySuccessEnvelope(_ContractEnvelope):
-    command: Literal["apply"]
-    status: Literal["changed", "no_changes"]
-    data: ApplyResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ApplyTerminalEnvelope(_ContractEnvelope):
-    command: Literal["apply"]
-    status: Literal["failed", "cancelled"]
-    data: ApplyResult | EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ApplyOutputEnvelope(
-    RootModel[Annotated[_ApplySuccessEnvelope | _ApplyTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian apply --json`."""
+# --- Apply ---
+_ApplySuccessEnvelope, _ApplyTerminalEnvelope, ApplyOutputEnvelope = _make_command_envelope(
+    "Apply",
+    "apply",
+    ApplyResult,
+    success_statuses=Literal["changed", "no_changes"],
+    failure_data_type=ApplyResult | EmptyData,
+    doc="Envelope schema for `meridian apply --json`.",
+)
 
 
 class ApplyFailureData(RootModel[ApplyResult | EmptyData]):
@@ -183,6 +220,9 @@ class DeployCommandData(RootModel[DeployResult | DeployPlan]):
 
     Normal execution returns DeployResult. Dry-run returns DeployPlan.
     """
+
+
+# --- Deploy (three-way discriminated union — kept manual) ---
 
 
 class _DeployChangedEnvelope(_ContractEnvelope):
@@ -214,166 +254,62 @@ class DeployOutputEnvelope(
     """Envelope schema for `meridian deploy --json`."""
 
 
-class _FleetStatusSuccessEnvelope(_ContractEnvelope):
-    command: Literal["fleet.status"]
-    status: Literal["ok"]
-    data: FleetStatus
-    errors: list[MeridianError] = Field(max_length=0)
+# --- Standard ok/fail envelopes ---
+_, _, FleetStatusOutputEnvelope = _make_command_envelope(
+    "FleetStatus",
+    "fleet.status",
+    FleetStatus,
+    doc="Envelope schema for `meridian fleet status --json`.",
+)
 
+_, _, FleetInventoryOutputEnvelope = _make_command_envelope(
+    "FleetInventory",
+    "fleet.inventory",
+    FleetInventory,
+    doc="Envelope schema for `meridian fleet inventory --json`.",
+)
 
-class _FleetStatusTerminalEnvelope(_ContractEnvelope):
-    command: Literal["fleet.status"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
+_, _, ClientListOutputEnvelope = _make_command_envelope(
+    "ClientList",
+    "client.list",
+    ClientListResult,
+    doc="Envelope schema for `meridian client list --json`.",
+)
 
+_, _, ClientShowOutputEnvelope = _make_command_envelope(
+    "ClientShow",
+    "client.show",
+    ClientShowResult,
+    doc="Envelope schema for `meridian client show --json`.",
+)
 
-class FleetStatusOutputEnvelope(
-    RootModel[Annotated[_FleetStatusSuccessEnvelope | _FleetStatusTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian fleet status --json`."""
+_, _, ApiSchemasOutputEnvelope = _make_command_envelope(
+    "ApiSchemas",
+    "api.schemas",
+    ApiSchemasResult,
+    doc="Envelope schema for `meridian api schemas --json`.",
+)
 
+_, _, ApiCommandsOutputEnvelope = _make_command_envelope(
+    "ApiCommands",
+    "api.commands",
+    ApiCommandsResult,
+    doc="Envelope schema for `meridian api commands --json`.",
+)
 
-class _FleetInventorySuccessEnvelope(_ContractEnvelope):
-    command: Literal["fleet.inventory"]
-    status: Literal["ok"]
-    data: FleetInventory
-    errors: list[MeridianError] = Field(max_length=0)
+_, _, ApiSchemaOutputEnvelope = _make_command_envelope(
+    "ApiSchema",
+    "api.schema",
+    ApiSchemaResult,
+    doc="Envelope schema for `meridian api schema NAME --envelope`.",
+)
 
-
-class _FleetInventoryTerminalEnvelope(_ContractEnvelope):
-    command: Literal["fleet.inventory"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class FleetInventoryOutputEnvelope(
-    RootModel[
-        Annotated[_FleetInventorySuccessEnvelope | _FleetInventoryTerminalEnvelope, Field(discriminator="status")]
-    ]
-):
-    """Envelope schema for `meridian fleet inventory --json`."""
-
-
-class _ClientListSuccessEnvelope(_ContractEnvelope):
-    command: Literal["client.list"]
-    status: Literal["ok"]
-    data: ClientListResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ClientListTerminalEnvelope(_ContractEnvelope):
-    command: Literal["client.list"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ClientListOutputEnvelope(
-    RootModel[Annotated[_ClientListSuccessEnvelope | _ClientListTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian client list --json`."""
-
-
-class _ClientShowSuccessEnvelope(_ContractEnvelope):
-    command: Literal["client.show"]
-    status: Literal["ok"]
-    data: ClientShowResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ClientShowTerminalEnvelope(_ContractEnvelope):
-    command: Literal["client.show"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ClientShowOutputEnvelope(
-    RootModel[Annotated[_ClientShowSuccessEnvelope | _ClientShowTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian client show --json`."""
-
-
-class _ApiSchemasSuccessEnvelope(_ContractEnvelope):
-    command: Literal["api.schemas"]
-    status: Literal["ok"]
-    data: ApiSchemasResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ApiSchemasTerminalEnvelope(_ContractEnvelope):
-    command: Literal["api.schemas"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ApiSchemasOutputEnvelope(
-    RootModel[Annotated[_ApiSchemasSuccessEnvelope | _ApiSchemasTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian api schemas --json`."""
-
-
-class _ApiCommandsSuccessEnvelope(_ContractEnvelope):
-    command: Literal["api.commands"]
-    status: Literal["ok"]
-    data: ApiCommandsResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ApiCommandsTerminalEnvelope(_ContractEnvelope):
-    command: Literal["api.commands"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ApiCommandsOutputEnvelope(
-    RootModel[Annotated[_ApiCommandsSuccessEnvelope | _ApiCommandsTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian api commands --json`."""
-
-
-class _ApiSchemaSuccessEnvelope(_ContractEnvelope):
-    command: Literal["api.schema"]
-    status: Literal["ok"]
-    data: ApiSchemaResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ApiSchemaTerminalEnvelope(_ContractEnvelope):
-    command: Literal["api.schema"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ApiSchemaOutputEnvelope(
-    RootModel[Annotated[_ApiSchemaSuccessEnvelope | _ApiSchemaTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian api schema NAME --envelope`."""
-
-
-class _ApiWorkflowSuccessEnvelope(_ContractEnvelope):
-    command: Literal["api.workflow"]
-    status: Literal["ok"]
-    data: ApiWorkflowResult
-    errors: list[MeridianError] = Field(max_length=0)
-
-
-class _ApiWorkflowTerminalEnvelope(_ContractEnvelope):
-    command: Literal["api.workflow"]
-    status: Literal["failed", "cancelled"]
-    data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
-
-
-class ApiWorkflowOutputEnvelope(
-    RootModel[Annotated[_ApiWorkflowSuccessEnvelope | _ApiWorkflowTerminalEnvelope, Field(discriminator="status")]]
-):
-    """Envelope schema for `meridian api workflow NAME --json`."""
+_, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
+    "ApiWorkflow",
+    "api.workflow",
+    ApiWorkflowResult,
+    doc="Envelope schema for `meridian api workflow NAME --json`.",
+)
 
 
 OutcomeCategory = ErrorCategory | Literal["none"]
