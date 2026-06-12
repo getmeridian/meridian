@@ -122,7 +122,7 @@ def run_add(
         if request.name and new_node.name != request.name:
             new_node.name = request.name
             cluster.save()
-        from meridian.operations import hybrid_sync_desired_nodes_add
+        from meridian.reconciler.snapshots import hybrid_sync_desired_nodes_add
 
         hybrid_sync_desired_nodes_add(cluster, new_node, ssh_user=request.user, ssh_port=request.ssh_port)
 
@@ -413,7 +413,7 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
     cluster.save()
 
     # Hybrid sync — drop from desired_nodes (only if managed declaratively).
-    from meridian.operations import hybrid_sync_desired_nodes_remove
+    from meridian.reconciler.snapshots import hybrid_sync_desired_nodes_remove
 
     hybrid_sync_desired_nodes_remove(cluster, node.ip)
 

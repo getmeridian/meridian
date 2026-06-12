@@ -12,203 +12,41 @@ import logging
 import secrets
 from typing import Any
 
-from meridian.cluster import ClusterConfig, DesiredNode, DesiredRelay, NodeEntry, RelayEntry
+from meridian.cluster import ClusterConfig, NodeEntry, RelayEntry
 from meridian.core.deploy_planning import compute_deploy_ports
+from meridian.reconciler.snapshots import (
+    hybrid_sync_desired_clients_add,
+    hybrid_sync_desired_clients_remove,
+    hybrid_sync_desired_nodes_add,
+    hybrid_sync_desired_nodes_remove,
+    hybrid_sync_desired_nodes_update,
+    hybrid_sync_desired_relays_add,
+    hybrid_sync_desired_relays_remove,
+    load_applied_snapshot,
+)
 from meridian.remnawave import MeridianPanel, RemnawaveError
 
 logger = logging.getLogger("meridian.operations")
 
-
-# ---------------------------------------------------------------------------
-# Hybrid declarative ↔ imperative sync
-# ---------------------------------------------------------------------------
-#
-# Discussion uburuntu/meridian#27 proposed three CLI entry points: pure
-# imperative, pure declarative, and a hybrid where imperative commands also
-# update the desired_* lists in cluster.yml so the next `meridian apply` does
-# not see the freshly-added resource as drift and remove it. The helpers
-# below implement the hybrid sync. The contract: only sync when the user has
-# already opted into declarative for the relevant resource type (the matching
-# desired_* attribute is not None). A None value means "this category is
-# unmanaged declaratively" — leaving it alone preserves backwards compatible
-# imperative behaviour for users who never wrote desired_* into cluster.yml.
-
-
-def load_applied_snapshot(cluster: ClusterConfig, key: str) -> set[str] | None:
-    """Read a reconciler applied-state snapshot from ``cluster.applied_state``.
-
-    Returns a set of strings or None. None means "no history" -- the caller
-    treats this as the conservative drift classification (safest default).
-
-    An empty list in applied_state means "managed and converged to zero"
-    which is semantically distinct from None (no history). Empty lists
-    return an empty set so compute_plan can distinguish them.
-    """
-    # Map legacy _extra key names to AppliedState field names
-    _KEY_MAP = {
-        "desired_clients_applied": "clients",
-        "desired_nodes_applied": "nodes",
-        "desired_relays_applied": "relays",
-    }
-    field_name = _KEY_MAP.get(key, key)
-    snap = getattr(cluster.applied_state, field_name, None)
-    if snap is None:
-        return None
-    if not isinstance(snap, list):
-        return None
-    clean: set[str] = set()
-    for item in snap:
-        if isinstance(item, str):
-            clean.add(item)
-    # Empty list -> empty set (not None). This preserves the "managed,
-    # converged to zero" semantics -- compute_plan needs this to distinguish
-    # from "no history" (None).
-    return clean
-
-
-def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -> None:
-    """Mirror a successful imperative add into the applied snapshot.
-
-    Without this, compute_plan classifies the imperative addition as drift
-    (``from_extras=True``) on the NEXT plan after the user deletes the resource
-    from desired_*, and ``apply --yes`` silently skips the deliberate removal.
-    The applied snapshot must reflect "panel state after the last reconciled
-    add/remove operation we executed" — and `meridian client add` IS such an op.
-    """
-    _KEY_MAP = {
-        "desired_clients_applied": "clients",
-        "desired_nodes_applied": "nodes",
-        "desired_relays_applied": "relays",
-    }
-    field_name = _KEY_MAP.get(key, key)
-    snap = getattr(cluster.applied_state, field_name, None)
-    if not isinstance(snap, list):
-        snap = []
-    if entry not in snap:
-        snap.append(entry)
-    setattr(cluster.applied_state, field_name, snap)
-
-
-def _applied_snapshot_mirror_remove(cluster: ClusterConfig, key: str, entry: Any) -> None:
-    _KEY_MAP = {
-        "desired_clients_applied": "clients",
-        "desired_nodes_applied": "nodes",
-        "desired_relays_applied": "relays",
-    }
-    field_name = _KEY_MAP.get(key, key)
-    snap = getattr(cluster.applied_state, field_name, None)
-    if not isinstance(snap, list):
-        return
-    setattr(cluster.applied_state, field_name, [e for e in snap if e != entry])
-
-
-def hybrid_sync_desired_clients_add(cluster: ClusterConfig, name: str) -> None:
-    if cluster.desired_clients is None:
-        return
-    if name in cluster.desired_clients:
-        return
-    cluster.desired_clients.append(name)
-    _applied_snapshot_mirror_add(cluster, "desired_clients_applied", name)
-    cluster.save()
-
-
-def hybrid_sync_desired_clients_remove(cluster: ClusterConfig, name: str) -> None:
-    if cluster.desired_clients is None:
-        return
-    if name not in cluster.desired_clients:
-        return
-    cluster.desired_clients = [c for c in cluster.desired_clients if c != name]
-    _applied_snapshot_mirror_remove(cluster, "desired_clients_applied", name)
-    cluster.save()
-
-
-def hybrid_sync_desired_nodes_add(cluster: ClusterConfig, node: NodeEntry, ssh_user: str, ssh_port: int) -> None:
-    if cluster.desired_nodes is None:
-        return
-    if any(d.host == node.ip for d in cluster.desired_nodes):
-        return
-    cluster.desired_nodes.append(
-        DesiredNode(
-            host=node.ip,
-            name=node.name,
-            ssh_user=ssh_user,
-            ssh_port=ssh_port,
-            domain=node.domain,
-            sni=node.sni,
-            warp=node.warp,
-        )
-    )
-    _applied_snapshot_mirror_add(cluster, "desired_nodes_applied", node.ip)
-    cluster.save()
-
-
-def hybrid_sync_desired_nodes_update(cluster: ClusterConfig, node: NodeEntry, old_name: str = "") -> None:
-    """Mirror an in-place node metadata change into desired_nodes (if managed).
-
-    If ``old_name`` is provided and the node was renamed, also rewrite any
-    matching ``desired_relays[].exit_node`` references that pointed at the
-    old name. Without this fix-up an imperative node rename would leave
-    stale references that later resolve to nothing (apply.py refuses to
-    delete an old relay when the new exit_node cannot be resolved).
-    """
-    saved = False
-    if cluster.desired_nodes is not None:
-        for d in cluster.desired_nodes:
-            if d.host == node.ip:
-                d.name = node.name
-                d.sni = node.sni
-                d.domain = node.domain
-                d.warp = node.warp
-                saved = True
-                break
-
-    if old_name and old_name != node.name and cluster.desired_relays is not None:
-        for r in cluster.desired_relays:
-            if r.exit_node == old_name:
-                r.exit_node = node.name
-                saved = True
-
-    if saved:
-        cluster.save()
-
-
-def hybrid_sync_desired_nodes_remove(cluster: ClusterConfig, node_ip: str) -> None:
-    if cluster.desired_nodes is None:
-        return
-    if not any(d.host == node_ip for d in cluster.desired_nodes):
-        return
-    cluster.desired_nodes = [d for d in cluster.desired_nodes if d.host != node_ip]
-    _applied_snapshot_mirror_remove(cluster, "desired_nodes_applied", node_ip)
-    cluster.save()
-
-
-def hybrid_sync_desired_relays_add(cluster: ClusterConfig, relay: RelayEntry, exit_node_ref: str) -> None:
-    if cluster.desired_relays is None:
-        return
-    if any(d.host == relay.ip for d in cluster.desired_relays):
-        return
-    cluster.desired_relays.append(
-        DesiredRelay(
-            host=relay.ip,
-            name=relay.name,
-            exit_node=exit_node_ref,
-            sni=relay.sni,
-            ssh_user=relay.ssh_user,
-            ssh_port=relay.ssh_port,
-        )
-    )
-    _applied_snapshot_mirror_add(cluster, "desired_relays_applied", relay.ip)
-    cluster.save()
-
-
-def hybrid_sync_desired_relays_remove(cluster: ClusterConfig, relay_ip: str) -> None:
-    if cluster.desired_relays is None:
-        return
-    if not any(d.host == relay_ip for d in cluster.desired_relays):
-        return
-    cluster.desired_relays = [d for d in cluster.desired_relays if d.host != relay_ip]
-    _applied_snapshot_mirror_remove(cluster, "desired_relays_applied", relay_ip)
-    cluster.save()
+# Re-export snapshot/hybrid-sync API so existing callers that import from
+# meridian.operations keep working without changes.
+__all__ = [
+    "add_client",
+    "add_node",
+    "add_relay",
+    "hybrid_sync_desired_clients_add",
+    "hybrid_sync_desired_clients_remove",
+    "hybrid_sync_desired_nodes_add",
+    "hybrid_sync_desired_nodes_remove",
+    "hybrid_sync_desired_nodes_update",
+    "hybrid_sync_desired_relays_add",
+    "hybrid_sync_desired_relays_remove",
+    "load_applied_snapshot",
+    "remove_client",
+    "remove_node",
+    "remove_relay",
+    "update_node",
+]
 
 
 # ---------------------------------------------------------------------------

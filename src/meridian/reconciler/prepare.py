@@ -61,7 +61,7 @@ def compute_reconciliation_plan(
     Returns:
         A ``Plan`` with typed actions ready for display or execution.
     """
-    from meridian.operations import load_applied_snapshot
+    from meridian.reconciler.snapshots import load_applied_snapshot
 
     desired = build_desired_state(cluster)
     actual = build_actual_state(cluster, panel, panel_conn=panel_conn)

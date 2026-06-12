@@ -125,7 +125,7 @@ def run_add(
         # (cluster.yml has desired_clients), mirror the imperative add into
         # that list so the next `meridian apply` does not see drift and
         # remove the freshly-added user. No-op when desired_clients is None.
-        from meridian.operations import hybrid_sync_desired_clients_add
+        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_add
 
         hybrid_sync_desired_clients_add(cluster, name)
 
@@ -349,7 +349,7 @@ def run_remove(
 
         # Hybrid sync — drop from desired_clients (if managed declaratively)
         # so the next `meridian apply` does not re-create the just-removed user.
-        from meridian.operations import hybrid_sync_desired_clients_remove
+        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_remove
 
         hybrid_sync_desired_clients_remove(cluster, name)
 

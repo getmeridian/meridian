@@ -22,7 +22,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 ## Pitfalls
 
 - **`from_extras=True` is drift, False is intentional.** Classification relies on the applied-state snapshot; don't skip it (`apply.py` must record after every success).
-- **Hybrid imperative commands (`client add`, `node add`) must mirror into the applied snapshot** — otherwise the next plan re-classifies the fresh-imperative resource as drift. See `operations.py::_applied_snapshot_mirror_add`.
+- **Hybrid imperative commands (`client add`, `node add`) must mirror into the applied snapshot** — otherwise the next plan re-classifies the fresh-imperative resource as drift. See `reconciler/snapshots.py`.
 - **`compute_plan` takes `applied_*` as `set[str] | None`** — `None` means "no history, treat every actual-not-desired as drift". Preserve the None vs empty-set distinction.
 - **Duplicate node names silently misroute** relay `exit_node` — the validator in `cluster.py` rejects duplicates at load time.
 
@@ -30,6 +30,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 
 - Pure diff: `diff.py::compute_plan`
 - Shared entry point: `prepare.py::compute_reconciliation_plan`
+- Applied-state snapshots + hybrid sync: `snapshots.py`
 - Executor: `executor.py`
 - Dataclasses: `state.py` / `diff.py`
 - Display: `display.py::print_plan`

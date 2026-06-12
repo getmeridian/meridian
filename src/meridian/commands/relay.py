@@ -266,7 +266,7 @@ def run_deploy(
     # Hybrid sync — mirror the relay into desired_relays when the user manages
     # relays declaratively. Use the exit node's name when available so the
     # desired entry stays human-readable; fall back to the IP otherwise.
-    from meridian.operations import hybrid_sync_desired_relays_add
+    from meridian.reconciler.snapshots import hybrid_sync_desired_relays_add
 
     exit_node_for_sync = cluster.find_node(exit_ip)
     exit_ref = exit_node_for_sync.name if exit_node_for_sync and exit_node_for_sync.name else exit_ip
@@ -452,7 +452,7 @@ def run_remove(
     cluster.save()
 
     # Hybrid sync — drop from desired_relays (only if managed declaratively).
-    from meridian.operations import hybrid_sync_desired_relays_remove
+    from meridian.reconciler.snapshots import hybrid_sync_desired_relays_remove
 
     hybrid_sync_desired_relays_remove(cluster, request.relay_ip)
 
