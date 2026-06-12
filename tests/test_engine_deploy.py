@@ -25,9 +25,7 @@ class FakeRegistry:
 
     def find(self, query: str) -> ServerEntry | ServerProfile | None:
         for entry in self.entries:
-            name = getattr(entry, "name", getattr(entry, "title", ""))
-            server_id = getattr(entry, "id", "")
-            if entry.host == query or name == query or server_id == query:
+            if entry.host == query or entry.title == query or getattr(entry, "id", "") == query:
                 return entry
         return None
 

@@ -340,7 +340,7 @@ class TestRunCoreBoundary:
 
     def test_run_dry_run_resolves_registered_server_without_ssh(self, capsys: pytest.CaptureFixture[str]) -> None:
         registry = MagicMock()
-        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin")
+        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin", ssh_user="admin", ssh_port=22)
         with (
             patch("meridian.commands.setup.ServerRegistry", return_value=registry),
             patch("meridian.commands.setup.ClusterConfig.load", return_value=_empty_cluster()),
@@ -354,7 +354,7 @@ class TestRunCoreBoundary:
 
     def test_run_uses_registered_server_ssh_port_for_execution(self) -> None:
         registry = MagicMock()
-        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin", port=2222)
+        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin", port=2222, ssh_user="admin", ssh_port=2222)
         resolved = _make_resolved(_IP_B)
         resolved.user = "admin"
         resolved.conn.user = "admin"

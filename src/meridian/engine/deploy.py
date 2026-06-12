@@ -69,25 +69,16 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
                         )
                 else:
                     server_ip = entry.host
-                    entry_user = _entry_user(entry)
-                    if request.user == "root" and entry_user:
-                        ssh_user = entry_user
+                    if request.user == "root" and entry.ssh_user:
+                        ssh_user = entry.ssh_user
                     if request.ssh_port == 22:
-                        ssh_port = _entry_port(entry)
+                        ssh_port = entry.ssh_port
 
         validate_deploy_target(server_ip)
     except DeployValidationError as exc:
         raise _user_error(exc) from exc
 
     return ResolvedDeployTarget(server_ip=server_ip, ssh_user=ssh_user, ssh_port=ssh_port)
-
-
-def _entry_user(entry: ServerEntry | ServerProfile) -> str:
-    return getattr(entry, "user", getattr(entry, "ssh_user", "root"))
-
-
-def _entry_port(entry: ServerEntry | ServerProfile) -> int:
-    return getattr(entry, "port", getattr(entry, "ssh_port", 22))
 
 
 def project_deploy_cluster_state(cluster: ClusterConfig, server_ip: str) -> DeployClusterState:

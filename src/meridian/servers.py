@@ -31,6 +31,26 @@ class ServerEntry:
     port: int = 22
     key_path: str = ""
 
+    # --- Aliases for ServerProfile field-name compatibility ---
+    # These properties let code that works with both ServerEntry and
+    # ServerProfile use a single set of field names (ssh_user, ssh_port,
+    # title) without getattr shims.
+
+    @property
+    def ssh_user(self) -> str:
+        """Alias for ``user`` — matches ``ServerProfile.ssh_user``."""
+        return self.user
+
+    @property
+    def ssh_port(self) -> int:
+        """Alias for ``port`` — matches ``ServerProfile.ssh_port``."""
+        return self.port
+
+    @property
+    def title(self) -> str:
+        """Alias for ``name`` — matches ``ServerProfile.title``."""
+        return self.name
+
     def __str__(self) -> str:
         parts = [self.host, self.user]
         if self.role == SERVER_ROLE_EXIT:
