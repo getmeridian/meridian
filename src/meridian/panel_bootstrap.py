@@ -973,72 +973,13 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     after the panel API has registered the node and returned the mTLS secret.
     """
     from meridian.config import REMNAWAVE_NODE_API_PORT, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+    from meridian.provision.containers import EnvFile, deploy_compose_stack
     from meridian.provision.remnawave_node import _render_node_compose, _render_node_env
 
     node_dir = REMNAWAVE_NODE_DIR
-    q_dir = shlex.quote(node_dir)
 
-    # Create directory
-    result = conn.run(f"mkdir -p {q_dir} && chmod 700 {q_dir}", timeout=15)
-    if result.returncode != 0:
-        logger.warning("Could not create %s: %s", node_dir, result.stderr.strip()[:200])
-        return False
-
-    # Write .env
     env_content = _render_node_env(REMNAWAVE_NODE_API_PORT, secret_key)
-    env_path = f"{node_dir}/.env"
-    result = conn.put_text(
-        env_path,
-        env_content,
-        mode="600",
-        sensitive=True,
-        timeout=15,
-        operation_name="write remnawave node env",
-    )
-    if result.returncode != 0:
-        logger.warning("Could not write %s: %s", env_path, result.stderr.strip()[:200])
-        return False
-
-    # Write docker-compose.yml
     compose_content = _render_node_compose(REMNAWAVE_NODE_IMAGE, REMNAWAVE_NODE_API_PORT)
-    compose_path = f"{node_dir}/docker-compose.yml"
-    result = conn.put_text(
-        compose_path,
-        compose_content,
-        mode="644",
-        timeout=15,
-        operation_name="write remnawave node compose",
-    )
-    if result.returncode != 0:
-        logger.warning("Could not write %s: %s", compose_path, result.stderr.strip()[:200])
-        return False
-
-    # Pull image
-    logger.info("Pulling Remnawave node image...")
-    result = conn.run(
-        "docker compose pull",
-        cwd=node_dir,
-        timeout=300,
-        retries=3,
-        retry_delay=10,
-        operation_name="pull remnawave node image",
-    )
-    if result.returncode != 0:
-        logger.warning("Could not pull node image — node may not start")
-        return False
-
-    # Start container
-    result = conn.run("docker compose up -d", cwd=node_dir, timeout=120)
-    if result.returncode != 0:
-        logger.warning("Node container failed to start: %s", result.stderr.strip()[:200])
-        return False
-
-    logger.info("Remnawave node deployed")
-
-    # Health gate: verify the node container started
-    logger.info("Verifying node container health...")
-
-    from meridian.health import ReadinessTimeout, poll_until_ready
 
     def _node_running() -> bool:
         check = conn.run(
@@ -1047,37 +988,38 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         )
         return check.returncode == 0 and "true" in check.stdout.strip().lower()
 
-    try:
-        poll_until_ready(
-            _node_running,
-            timeout=30,
-            interval=3.0,
-            description="Remnawave node container",
-        )
+    logger.info("Pulling Remnawave node image...")
+    deploy_result = deploy_compose_stack(
+        conn,
+        node_dir,
+        compose_content,
+        env_files=[EnvFile(filename=".env", content=env_content, sensitive=True)],
+        health_check=_node_running,
+        health_timeout=30,
+        health_interval=3.0,
+        service_name="Remnawave node",
+    )
+
+    if deploy_result.changed:
+        logger.info("Remnawave node deployed")
         node_healthy = True
-        logger.info("Node container verified healthy")
-    except ReadinessTimeout:
+    else:
+        logger.warning("Node container issue: %s", deploy_result.detail)
+        # Health timeout means the container might still be running
+        # (deploy_result.logs is non-empty if we got past docker compose up)
         node_healthy = False
-        logs = conn.run("docker logs remnawave-node --tail 20 2>&1", timeout=15)
-        log_tail = logs.stdout.strip()[:500] if logs.returncode == 0 else "(no logs available)"
-        logger.warning(
-            "Node container may not be healthy after 30s\n"
-            "  Recent logs:\n%s\n"
-            "  Check: ssh %s@%s docker logs remnawave-node",
-            log_tail,
-            shlex.quote(conn.user),
-            conn.ip,
-        )
 
     # Allow Docker internal traffic to reach the node API port
     # (panel in bridge network → node on host via gateway IP)
-    from meridian.config import REMNAWAVE_NODE_API_PORT
-
-    conn.run(
-        f"ufw allow from 172.16.0.0/12 to any port {REMNAWAVE_NODE_API_PORT} proto tcp"
-        f" comment 'Meridian node API (Docker internal)' 2>/dev/null; true",
-        timeout=15,
-    )
+    # Open UFW even on health timeout (container may still come up);
+    # skip only on total deploy failure (mkdir/pull/compose-up).
+    deploy_reached_containers = deploy_result.changed or "healthy" in deploy_result.detail
+    if deploy_reached_containers:
+        conn.run(
+            f"ufw allow from 172.16.0.0/12 to any port {REMNAWAVE_NODE_API_PORT} proto tcp"
+            f" comment 'Meridian node API (Docker internal)' 2>/dev/null; true",
+            timeout=15,
+        )
 
     return node_healthy
 

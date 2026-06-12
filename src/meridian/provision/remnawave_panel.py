@@ -383,24 +383,12 @@ class DeployRemnawavePanel:
                 detail="added subscription page to existing panel",
             )
 
-        # -- Create directory structure --
-        for d in (panel_dir, f"{panel_dir}/data"):
-            qd = shlex.quote(d)
-            result = conn.run(f"mkdir -p {qd} && chmod 700 {qd}", timeout=15)
-            if result.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to create {d}: {result.stderr.strip()[:200]}",
-                )
-
-        # -- Generate secrets --
+        # -- Fresh deploy via deploy_compose_stack --
         db_password = secrets.token_hex(16)
         jwt_auth_secret = secrets.token_hex(32)
         jwt_api_secret = secrets.token_hex(32)
         metrics_password = secrets.token_hex(8)
 
-        # -- Write .env file --
         env_content = _render_panel_env(
             panel_port=panel_port,
             db_password=db_password,
@@ -410,122 +398,48 @@ class DeployRemnawavePanel:
             sub_public_domain=sub_public_domain,
             metrics_password=metrics_password,
         )
-        env_path = f"{panel_dir}/.env"
-        result = conn.put_text(
-            env_path,
-            env_content,
-            mode="600",
-            sensitive=True,
-            timeout=15,
-            operation_name="write remnawave panel env",
-        )
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write .env: {result.stderr.strip()[:200]}",
-            )
-
-        # -- Write .env.subscription placeholder (real token written by setup.py) --
         sub_env_content = _render_subscription_env()
-        sub_env_path = f"{panel_dir}/.env.subscription"
-        result = conn.put_text(
-            sub_env_path,
-            sub_env_content,
-            mode="600",
-            sensitive=True,
-            timeout=15,
-            operation_name="write subscription page env",
-        )
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write .env.subscription: {result.stderr.strip()[:200]}",
-            )
-
-        # -- Write docker-compose.yml --
         compose_content = _render_panel_compose(
             image=image,
             panel_port=panel_port,
             subscription_page_image=sub_page_image,
             subscription_page_host_port=sub_page_host_port,
         )
-        compose_path = f"{panel_dir}/docker-compose.yml"
-        result = conn.put_text(
-            compose_path,
+
+        from meridian.provision.containers import EnvFile, deploy_compose_stack
+
+        _health_url = f"http://127.0.0.1:{_METRICS_PORT}/health"
+        _q_health_url = shlex.quote(_health_url)
+
+        def _panel_healthy() -> bool:
+            r = conn.run(
+                f"curl -sf -o /dev/null -w '%{{http_code}}' {_q_health_url}",
+                timeout=15,
+            )
+            code = r.stdout.strip()
+            return r.returncode == 0 and code in ("200", "204")
+
+        deploy_result = deploy_compose_stack(
+            conn,
+            panel_dir,
             compose_content,
-            mode="644",
-            timeout=15,
-            operation_name="write remnawave panel compose",
+            env_files=[
+                EnvFile(filename=".env", content=env_content, sensitive=True),
+                EnvFile(filename=".env.subscription", content=sub_env_content, sensitive=True),
+            ],
+            dirs=[f"{panel_dir}/data"],
+            health_check=_panel_healthy,
+            health_timeout=120,
+            health_interval=3.0,
+            service_name="Remnawave panel",
+            stop_first=True,
         )
-        if result.returncode != 0:
+
+        if not deploy_result.changed:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"failed to write docker-compose.yml: {result.stderr.strip()[:200]}",
-            )
-
-        # -- Stop old containers if partially deployed --
-        conn.run("docker compose down 2>/dev/null", cwd=panel_dir, timeout=60)
-
-        # -- Pull images (with retries) --
-        pull_result = conn.run(
-            "docker compose pull",
-            cwd=panel_dir,
-            timeout=300,
-            retries=3,
-            retry_delay=10,
-            operation_name="pull remnawave panel images",
-        )
-        if pull_result.returncode != 0:
-            stderr = pull_result.stderr.strip()[:200] or "unknown"
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"docker compose pull failed after 3 attempts: {stderr}",
-            )
-
-        # -- Start containers --
-        result = conn.run("docker compose up -d", cwd=panel_dir, timeout=120)
-        if result.returncode != 0:
-            logs = conn.run("docker compose logs --tail 50", cwd=panel_dir, timeout=15)
-            log_out = logs.stdout.strip()[:500] if logs.returncode == 0 else "no logs available"
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=(f"docker compose up failed: {result.stderr.strip()[:200]}\nContainer logs:\n{log_out}"),
-            )
-
-        # -- Wait for panel to become healthy --
-        try:
-            from meridian.health import ReadinessTimeout, poll_until_ready
-
-            _health_url = f"http://127.0.0.1:{_METRICS_PORT}/health"
-            _q_health_url = shlex.quote(_health_url)
-
-            def _panel_healthy() -> bool:
-                r = conn.run(
-                    f"curl -sf -o /dev/null -w '%{{http_code}}' {_q_health_url}",
-                    timeout=15,
-                )
-                code = r.stdout.strip()
-                return r.returncode == 0 and code in ("200", "204")
-
-            poll_until_ready(
-                _panel_healthy,
-                timeout=120,
-                interval=3.0,
-                description="Remnawave panel",
-            )
-        except ReadinessTimeout:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=(
-                    f"Remnawave panel did not become healthy after 120s. "
-                    f"Check: docker logs {_PANEL_CONTAINER} --tail 30"
-                ),
+                detail=deploy_result.detail,
             )
 
         # -- Store secrets in context --

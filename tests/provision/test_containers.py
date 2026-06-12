@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from meridian.provision.containers import ComposeDeployResult, deploy_compose_stack
+from meridian.provision.containers import ComposeDeployResult, EnvFile, deploy_compose_stack
 
 from .conftest import MockConnection
 
@@ -18,11 +18,13 @@ class TestDeployComposeStack:
     """Tests for deploy_compose_stack()."""
 
     def test_success_full_sequence(self) -> None:
-        """Happy path: mkdir -> compose.yml -> pull -> up succeeds."""
+        """Happy path: mkdir -> put_text env/compose -> pull -> up succeeds."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
-        conn.when("cat >", rc=0)
+        conn.when("cat >", rc=0)  # put_text dispatches through run("cat > ...")
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
@@ -51,19 +53,21 @@ class TestDeployComposeStack:
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
-        conn.when("cat >", rc=1, stderr="No space left")
+        conn.when("docker-compose.yml", rc=1, stderr="No space left")
 
         result = deploy_compose_stack(conn, "/opt/test", SAMPLE_COMPOSE)
 
         assert result.changed is False
         assert "docker-compose.yml" in result.detail
 
-    def test_pull_retries_on_failure(self) -> None:
-        """Pull retries the configured number of times before failing."""
+    def test_pull_failure_returns_unchanged(self) -> None:
+        """Pull failure returns changed=False with error detail."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=1, stderr="network error")
 
         result = deploy_compose_stack(
@@ -75,10 +79,9 @@ class TestDeployComposeStack:
         )
 
         assert result.changed is False
-        assert "docker compose pull failed after 2 attempts" in result.detail
-        # Should have called pull twice
-        pull_calls = [c for c in conn.calls if "docker compose pull" in c]
-        assert len(pull_calls) == 2
+        assert "docker compose pull failed" in result.detail
+        # Pull retries happen inside conn.run() — MockConnection sees one call
+        conn.assert_called_with_pattern("docker compose pull")
 
     def test_compose_up_failure_collects_logs(self) -> None:
         """If docker compose up fails, logs are collected."""
@@ -86,6 +89,8 @@ class TestDeployComposeStack:
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=1, stderr="port conflict")
         conn.when("docker compose logs", stdout="ERROR: something broke")
@@ -104,6 +109,8 @@ class TestDeployComposeStack:
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
@@ -124,6 +131,8 @@ class TestDeployComposeStack:
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
         conn.when("docker compose logs", stdout="timeout logs")
@@ -144,11 +153,13 @@ class TestDeployComposeStack:
         assert "test-svc" in result.detail
 
     def test_env_content_written_when_provided(self) -> None:
-        """When env_content is provided, .env is written with mode 600."""
+        """When env_content is provided, .env is written via put_text."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
@@ -161,9 +172,35 @@ class TestDeployComposeStack:
         )
 
         assert result.changed is True
-        # Should have written .env
+        # put_text writes .env via "cat > /opt/test/.env" in MockConnection
         env_calls = [c for c in conn.calls if ".env" in c]
         assert len(env_calls) > 0
+
+    def test_env_files_written(self) -> None:
+        """EnvFile objects are written via put_text."""
+        conn = MockConnection()
+        conn.when("mkdir", rc=0)
+        conn.when("chmod", rc=0)
+        conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
+        conn.when("docker compose pull", rc=0)
+        conn.when("docker compose up", rc=0)
+
+        result = deploy_compose_stack(
+            conn,
+            "/opt/test",
+            SAMPLE_COMPOSE,
+            env_files=[
+                EnvFile(filename=".env", content="KEY=val\n"),
+                EnvFile(filename=".env.sub", content="SUB=1\n"),
+            ],
+            pull_retries=1,
+        )
+
+        assert result.changed is True
+        env_calls = [c for c in conn.calls if ".env" in c]
+        assert len(env_calls) >= 2
 
     def test_extra_dirs_created(self) -> None:
         """Extra directories are created alongside work_dir."""
@@ -171,6 +208,8 @@ class TestDeployComposeStack:
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
@@ -188,11 +227,13 @@ class TestDeployComposeStack:
         assert len(mkdir_calls) == 3
 
     def test_no_env_file_when_empty(self) -> None:
-        """When env_content is empty, .env is not written."""
+        """When env_content is empty and no env_files, .env is not written."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
         conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
@@ -202,6 +243,27 @@ class TestDeployComposeStack:
 
         env_calls = [c for c in conn.calls if ".env" in c]
         assert len(env_calls) == 0
+
+    def test_stop_first_runs_down(self) -> None:
+        """When stop_first=True, docker compose down is called before pull."""
+        conn = MockConnection()
+        conn.when("mkdir", rc=0)
+        conn.when("chmod", rc=0)
+        conn.when("cat >", rc=0)
+        conn.when("install", rc=0)
+        conn.when("mv ", rc=0)
+        conn.when("docker compose", rc=0)
+
+        result = deploy_compose_stack(
+            conn,
+            "/opt/test",
+            SAMPLE_COMPOSE,
+            pull_retries=1,
+            stop_first=True,
+        )
+
+        assert result.changed is True
+        conn.assert_called_with_pattern("docker compose down")
 
 
 class TestComposeDeployResult:

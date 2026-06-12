@@ -178,7 +178,7 @@ class TestDeployNodeContainerDockerPullRetry:
             _deploy_node_container(conn, _SECRET_KEY)
         assert not caplog.records
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
-        assert pull_call.kwargs["operation_name"] == "pull remnawave node image"
+        assert pull_call.kwargs["operation_name"] == "pull Remnawave node images"
 
     @patch("meridian.health.time.sleep")
     def test_pull_fails_all_three_attempts_warns_and_returns(
@@ -252,7 +252,7 @@ class TestDeployNodeContainerHealthGate:
 
     @patch("meridian.health.time.sleep")
     @patch("meridian.health.time.monotonic")
-    def test_health_timeout_warns_with_docker_logs(
+    def test_health_timeout_warns_with_detail(
         self, mock_mono: MagicMock, mock_sleep: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
@@ -272,7 +272,6 @@ class TestDeployNodeContainerHealthGate:
         assert len(warning_records) == 1
         warning_text = warning_records[0].message
         assert "healthy" in warning_text.lower() or "health" in warning_text.lower()
-        assert "could not connect" in warning_text
 
     @patch("meridian.health.time.sleep")
     @patch("meridian.health.time.monotonic")
@@ -358,7 +357,7 @@ class TestDeployNodeContainerFailures:
         with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
             _deploy_node_container(conn, _SECRET_KEY)
         assert len(caplog.records) == 1
-        assert "failed to start" in caplog.records[0].message.lower()
+        assert "failed to start" in caplog.records[0].message.lower() or "compose up failed" in caplog.records[0].message.lower()
         # No health check or UFW after compose up failure
         commands = [c[0][0] for c in conn.run.call_args_list]
         assert not any("docker inspect" in c for c in commands)
