@@ -6,6 +6,7 @@ No CLI interaction (prompts, Rich tables) — those stay in commands/relay.py.
 
 from __future__ import annotations
 
+import logging
 import re
 import shlex
 
@@ -16,10 +17,11 @@ from meridian.config import (
     CREDS_BASE,
     sanitize_ip_for_path,
 )
-from meridian.console import info, ok, warn
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Relay label / port helpers
@@ -125,7 +127,7 @@ def deploy_relay_nginx(
     )
     mkdir = exit_conn.run("mkdir -p /etc/nginx/stream.d/relay-maps", timeout=15)
     if mkdir.returncode != 0:
-        warn(f"could not create relay nginx map directory: {mkdir.stderr.strip() or mkdir.stdout.strip()}")
+        logger.warning("could not create relay nginx map directory: %s", mkdir.stderr.strip() or mkdir.stdout.strip())
         return False
     map_write = exit_conn.put_text(
         f"/etc/nginx/stream.d/relay-maps/{label}.conf",
@@ -135,7 +137,7 @@ def deploy_relay_nginx(
         operation_name="write relay nginx map",
     )
     if map_write.returncode != 0:
-        warn(f"could not write relay nginx map: {map_write.stderr.strip() or map_write.stdout.strip()}")
+        logger.warning("could not write relay nginx map: %s", map_write.stderr.strip() or map_write.stdout.strip())
         return False
     upstream_block = f"upstream {upstream} {{\n    server 127.0.0.1:{port};\n}}\n"
     upstream_write = exit_conn.put_text(
@@ -146,17 +148,19 @@ def deploy_relay_nginx(
         operation_name="write relay nginx upstream",
     )
     if upstream_write.returncode != 0:
-        warn(f"could not write relay nginx upstream: {upstream_write.stderr.strip() or upstream_write.stdout.strip()}")
+        logger.warning(
+            "could not write relay nginx upstream: %s", upstream_write.stderr.strip() or upstream_write.stdout.strip()
+        )
         return False
     result = exit_conn.run("nginx -t 2>&1", timeout=15)
     if result.returncode != 0:
-        warn(f"nginx config validation failed: {result.stderr.strip() or result.stdout.strip()}")
+        logger.warning("nginx config validation failed: %s", result.stderr.strip() or result.stdout.strip())
         return False
     reload_result = exit_conn.run("systemctl reload nginx", timeout=15)
     if reload_result.returncode != 0:
-        warn(f"nginx reload failed: {reload_result.stderr.strip() or reload_result.stdout.strip()}")
+        logger.warning("nginx reload failed: %s", reload_result.stderr.strip() or reload_result.stdout.strip())
         return False
-    ok(f"nginx updated: SNI={relay_sni} -> port {port}")
+    logger.info("nginx updated: SNI=%s -> port %d", relay_sni, port)
     return True
 
 
@@ -168,10 +172,10 @@ def remove_relay_nginx(exit_conn: ServerConnection, relay: RelayEntry) -> bool:
         timeout=15,
     )
     if exit_conn.run("nginx -t 2>&1", timeout=15).returncode != 0:
-        warn("nginx config validation failed after relay removal")
+        logger.warning("nginx config validation failed after relay removal")
         return False
     if exit_conn.run("systemctl reload nginx", timeout=15).returncode != 0:
-        warn("nginx reload failed after relay removal")
+        logger.warning("nginx reload failed after relay removal")
         return False
     return True
 
@@ -207,7 +211,7 @@ def create_relay_hosts(
         existing = panel.find_host_by_remark(remark)
         if existing:
             host_uuids[str(proto_key)] = existing.uuid
-            info(f"Host '{remark}' already exists, reusing")
+            logger.info("Host '%s' already exists, reusing", remark)
             continue
         try:
             host = panel.create_host(
@@ -221,9 +225,9 @@ def create_relay_hosts(
                 security_layer=security,
             )
             host_uuids[str(proto_key)] = host.uuid
-            ok(f"Host created: {remark}")
+            logger.info("Host created: %s", remark)
         except RemnawaveError as e:
-            warn(f"Could not create {proto_key} host: {e}")
+            logger.warning("Could not create %s host: %s", proto_key, e)
     return host_uuids
 
 
@@ -234,6 +238,6 @@ def delete_relay_hosts(panel: MeridianPanel, relay: RelayEntry) -> None:
             continue
         try:
             panel.delete_host(host_uuid)
-            ok(f"Host deleted: {proto_key} ({host_uuid[:8]}...)")
+            logger.info("Host deleted: %s (%s...)", proto_key, host_uuid[:8])
         except RemnawaveError as e:
-            warn(f"Could not delete {proto_key} host {host_uuid[:8]}...: {e}")
+            logger.warning("Could not delete %s host %s...: %s", proto_key, host_uuid[:8], e)

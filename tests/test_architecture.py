@@ -344,7 +344,6 @@ class TestStructuralHealth:
         # after each is migrated to raise MeridianError subclasses instead.
         allowlist = {
             "panel_bootstrap.py",
-            "relay_ops.py",
             "resolve.py",
             "xray_config.py",
         }
