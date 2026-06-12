@@ -14,9 +14,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from meridian.config import SERVER_CREDS_DIR, creds_dir_for, is_ip
-from meridian.console import fail
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
-from meridian.ssh import SSHUI, ServerConnection, SSHError
+from meridian.ssh import SSHUI, ServerConnection
 
 if TYPE_CHECKING:
     from meridian.credentials import ServerCredentials
@@ -213,8 +212,5 @@ def ensure_server_connection(
                 creds_dir=creds_dir_for(resolved.ip, local_mode=True),
                 conn=resolved.conn,
             )
-    try:
-        resolved.conn.check_ssh(ui=ui)
-    except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
+    resolved.conn.check_ssh(ui=ui)
     return resolved

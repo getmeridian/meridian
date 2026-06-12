@@ -64,7 +64,10 @@ def run_deploy(
 
     cluster = load_cluster()
     registry = ServerRegistry(SERVERS_FILE)
-    exit_ip = find_exit_node(cluster, request.exit_arg)
+    try:
+        exit_ip = find_exit_node(cluster, request.exit_arg)
+    except ValueError as exc:
+        fail(str(exc), hint="List nodes: meridian node list", hint_type="user")
     exit_node = cluster.find_node(exit_ip)
     if exit_node is None:
         fail(f"Exit node {exit_ip} not found in cluster", hint_type="bug")
@@ -301,7 +304,10 @@ def run_list(
 
     relays = cluster.relays
     if exit_arg:
-        exit_ip = find_exit_node(cluster, exit_arg)
+        try:
+            exit_ip = find_exit_node(cluster, exit_arg)
+        except ValueError as exc:
+            fail(str(exc), hint="List nodes: meridian node list", hint_type="user")
         relays = [r for r in relays if r.exit_node_ip == exit_ip]
 
     if not relays:
@@ -405,7 +411,11 @@ def run_remove(
 
     # Verify exit_arg matches if specified
     if request.exit_arg:
-        if relay_entry.exit_node_ip != find_exit_node(cluster, request.exit_arg):
+        try:
+            resolved_exit = find_exit_node(cluster, request.exit_arg)
+        except ValueError as exc:
+            fail(str(exc), hint="List nodes: meridian node list", hint_type="user")
+        if relay_entry.exit_node_ip != resolved_exit:
             fail(
                 f"Relay {request.relay_ip} is attached to exit {relay_entry.exit_node_ip}, not {request.exit_arg}",
                 hint_type="user",

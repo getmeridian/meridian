@@ -189,8 +189,17 @@ def try_resolve_server(
 
 
 def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
-    """CLI wrapper — delegates to ``meridian.resolve`` with Rich SSH UI."""
-    return _ensure_server_connection(resolved, ui=RichSSHUI())
+    """CLI wrapper — delegates to ``meridian.resolve`` with Rich SSH UI.
+
+    Catches ``SSHError`` from the library layer and converts it to a
+    ``fail()`` exit with the appropriate hint.
+    """
+    from meridian.ssh import SSHError
+
+    try:
+        return _ensure_server_connection(resolved, ui=RichSSHUI())
+    except SSHError as exc:
+        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
 
 
 def fetch_credentials(resolved: ResolvedServer, *, force: bool = False) -> bool:

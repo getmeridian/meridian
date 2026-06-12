@@ -86,25 +86,18 @@ def save_relay_local(relay_ip: str, exit_ip: str, exit_port: int, listen_port: i
 
 
 def find_exit_node(cluster: ClusterConfig, exit_arg: str) -> str:
-    """Resolve --exit flag to a node IP. Accepts IP or node name."""
-    from meridian.console import fail
+    """Resolve --exit flag to a node IP. Accepts IP or node name.
 
+    Raises ``ValueError`` when the exit node cannot be resolved.
+    """
     node = cluster.find_node(exit_arg)
     if node is not None:
         return node.ip
     if not exit_arg and len(cluster.nodes) == 1:
         return cluster.nodes[0].ip
     if not exit_arg:
-        fail(
-            "Multiple nodes in cluster -- specify which one with --exit",
-            hint="List nodes: meridian node list",
-            hint_type="user",
-        )
-    fail(
-        f"Exit node '{exit_arg}' not found in cluster",
-        hint="List nodes: meridian node list",
-        hint_type="user",
-    )
+        raise ValueError("Multiple nodes in cluster -- specify which one with --exit")
+    raise ValueError(f"Exit node '{exit_arg}' not found in cluster")
 
 
 # ---------------------------------------------------------------------------

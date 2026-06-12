@@ -7,12 +7,14 @@ x25519 keypairs for the Reality protocol.
 
 from __future__ import annotations
 
+import logging
 import secrets
 from dataclasses import dataclass
 from typing import Any
 
-from meridian.console import fail, info
 from meridian.ssh import ServerConnection
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -55,7 +57,7 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
             return private_key, public_key
 
     # Last resort: download a temporary Xray binary
-    info("Downloading Xray binary for key generation...")
+    logger.info("Downloading Xray binary for key generation...")
     dl_result = conn.run(
         "ARCH=$(uname -m); "
         'case "$ARCH" in '
@@ -79,12 +81,9 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
         if private_key and public_key:
             return private_key, public_key
 
-    fail(
-        "Could not generate Reality x25519 keypair",
-        hint="Install xray on the server or ensure Docker is running",
-        hint_type="system",
+    raise RuntimeError(
+        "Could not generate Reality x25519 keypair — install xray on the server or ensure Docker is running"
     )
-    return "", ""  # unreachable
 
 
 def build_xray_config(
@@ -165,7 +164,7 @@ def build_xray_config(
         short_id = existing_short_id
     else:
         if conn is None:
-            fail("Cannot generate Reality keys without SSH connection", hint_type="bug")
+            raise ValueError("Cannot generate Reality keys without SSH connection")
         private_key, public_key = generate_reality_keypair(conn)
         short_id = secrets.token_hex(4)  # 8-char hex
 
