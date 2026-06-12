@@ -479,13 +479,13 @@ def add_relay(
     """Provision a relay and register host entries in the panel.
 
     Reuses the same functions as the imperative ``meridian relay deploy``:
-    Realm provisioner, ``_create_relay_hosts()``, ``_deploy_relay_nginx()``,
-    and ``_save_relay_local()``.
+    Realm provisioner, ``create_relay_hosts()``, ``deploy_relay_nginx()``,
+    and ``save_relay_local()``.
     """
-    from meridian.commands.relay import (
-        _create_relay_hosts,
-        _deploy_relay_nginx,
-        _save_relay_local,
+    from meridian.relay_ops import (
+        create_relay_hosts,
+        deploy_relay_nginx,
+        save_relay_local,
     )
     from meridian.commands.resolve import ResolvedServer, ensure_server_connection
     from meridian.config import DEFAULT_SNI
@@ -532,7 +532,7 @@ def add_relay(
 
     # Create host entries — uses the same function as imperative relay deploy
     # (creates REALITY + XHTTP hosts with correct security_layer/fingerprint)
-    host_uuids = _create_relay_hosts(panel, cluster, relay_ip, port, effective_sni, relay_name)
+    host_uuids = create_relay_hosts(panel, cluster, relay_ip, port, effective_sni, relay_name)
     if not host_uuids:
         raise RuntimeError(f"Relay {relay_ip}: no panel hosts created")
 
@@ -540,11 +540,11 @@ def add_relay(
     # exit node's own SNI (same guard as imperative relay deploy).
     # Deploying nginx with the same SNI would hijack the exit node's Reality routing.
     if effective_sni and effective_sni != (exit_node.sni or ""):
-        if not _deploy_relay_nginx(exit_conn, effective_sni, relay_ip, relay_name):
+        if not deploy_relay_nginx(exit_conn, effective_sni, relay_ip, relay_name):
             raise RuntimeError(f"Relay {relay_ip}: nginx configuration failed on exit node")
 
     # Save local relay metadata (same as imperative path)
-    _save_relay_local(relay_ip, exit_node.ip, port, port)
+    save_relay_local(relay_ip, exit_node.ip, port, port)
 
     # Save relay to cluster
     relay = RelayEntry(
@@ -579,7 +579,7 @@ def remove_relay(
 
     Reuses the same functions as the imperative ``meridian relay remove``.
     """
-    from meridian.commands.relay import _delete_relay_hosts, _remove_relay_nginx
+    from meridian.relay_ops import delete_relay_hosts, remove_relay_nginx
     from meridian.config import RELAY_SERVICE_NAME, sanitize_ip_for_path
     from meridian.ssh import ServerConnection
 
@@ -588,14 +588,14 @@ def remove_relay(
         raise ValueError(f"Relay {relay_ip} not found in cluster")
 
     # Delete host entries from panel (same function as imperative path)
-    _delete_relay_hosts(panel, relay)
+    delete_relay_hosts(panel, relay)
 
     # Clean up nginx on exit node (best-effort)
     exit_node = cluster.find_node(relay.exit_node_ip)
     if exit_node:
         try:
             exit_conn = ServerConnection(exit_node.ip, exit_node.ssh_user, port=exit_node.ssh_port)
-            _remove_relay_nginx(exit_conn, relay)
+            remove_relay_nginx(exit_conn, relay)
         except Exception as e:
             logger.warning("Could not clean up nginx for relay %s: %s", relay_ip, e)
 

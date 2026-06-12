@@ -597,28 +597,28 @@ class TestNginxStreamRelay:
 
 class TestRelayHelpers:
     def test_relay_label_from_name(self) -> None:
-        from meridian.commands.relay import _relay_label
+        from meridian.relay_ops import relay_label
 
         entry = RelayEntry(ip="1.2.3.4", name="ru-moscow")
-        assert _relay_label(entry) == "ru-moscow"
+        assert relay_label(entry) == "ru-moscow"
 
     def test_relay_label_from_ip(self) -> None:
-        from meridian.commands.relay import _relay_label
+        from meridian.relay_ops import relay_label
 
         entry = RelayEntry(ip="1.2.3.4")
-        assert _relay_label(entry) == "1-2-3-4"
+        assert relay_label(entry) == "1-2-3-4"
 
     def test_relay_xray_port_deterministic(self) -> None:
-        from meridian.commands.relay import _relay_xray_port
+        from meridian.relay_ops import relay_xray_port
 
-        port = _relay_xray_port("1.2.3.4")
+        port = relay_xray_port("1.2.3.4")
         assert 40000 <= port <= 49999
-        assert _relay_xray_port("1.2.3.4") == port  # same input → same output
+        assert relay_xray_port("1.2.3.4") == port  # same input → same output
 
     def test_relay_xray_port_differs_per_ip(self) -> None:
-        from meridian.commands.relay import _relay_xray_port
+        from meridian.relay_ops import relay_xray_port
 
-        assert _relay_xray_port("1.2.3.4") != _relay_xray_port("5.6.7.8")
+        assert relay_xray_port("1.2.3.4") != relay_xray_port("5.6.7.8")
 
 
 # ---------------------------------------------------------------------------

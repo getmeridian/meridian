@@ -393,8 +393,8 @@ class TestHybridDesiredRelaysSync:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.relay._delete_relay_hosts"),
-            patch("meridian.commands.relay._remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts"),
+            patch("meridian.relay_ops.remove_relay_nginx"),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):
@@ -411,8 +411,8 @@ class TestHybridDesiredRelaysSync:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.relay._delete_relay_hosts"),
-            patch("meridian.commands.relay._remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts"),
+            patch("meridian.relay_ops.remove_relay_nginx"),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):
@@ -521,8 +521,8 @@ class TestHybridSyncAppliedSnapshot:
         cluster.applied_state.relays = ["198.51.100.20"]
         panel = _mock_panel()
         with (
-            patch("meridian.commands.relay._delete_relay_hosts"),
-            patch("meridian.commands.relay._remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts"),
+            patch("meridian.relay_ops.remove_relay_nginx"),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):

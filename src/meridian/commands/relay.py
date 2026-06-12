@@ -11,9 +11,8 @@ import re
 import shlex
 
 import typer
-import yaml
 
-from meridian.cluster import ClusterConfig, ProtocolKey, RelayEntry
+from meridian.cluster import RelayEntry
 from meridian.commands._helpers import load_cluster, make_panel
 from meridian.commands._validation import validate_command_input
 from meridian.config import (
@@ -24,207 +23,18 @@ from meridian.config import (
 )
 from meridian.console import confirm, err_console, fail, info, line, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.relay_ops import (
+    create_relay_hosts,
+    delete_relay_hosts,
+    deploy_relay_nginx,
+    find_exit_node,
+    relay_registry_user,
+    remove_relay_nginx,
+    save_relay_local,
+)
+from meridian.remnawave import RemnawaveError
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
-
-
-def _relay_label(relay: RelayEntry) -> str:
-    """Derive a filesystem/remark-safe label from a relay entry."""
-    return re.sub(r"[^a-zA-Z0-9_-]", "-", relay.name or relay.ip)
-
-
-def _relay_xray_port(relay_ip: str) -> int:
-    """Deterministic Xray port for a relay inbound (range 40000-49999)."""
-    from meridian.core.deploy_planning import compute_relay_port
-
-    return compute_relay_port(relay_ip)
-
-
-def _relay_registry_user(registry: ServerRegistry, relay_ip: str, explicit_user: str) -> str:
-    """Pick the relay SSH user from explicit flag or the stored registry entry."""
-    if explicit_user:
-        return explicit_user
-    entry = registry.find(relay_ip)
-    return entry.user if entry and entry.user else "root"
-
-
-def _save_relay_local(relay_ip: str, exit_ip: str, exit_port: int, listen_port: int) -> None:
-    """Save relay metadata to ~/.meridian/credentials/<relay-ip>/relay.yml (atomic)."""
-    import os
-    import tempfile
-
-    relay_creds_dir = CREDS_BASE / sanitize_ip_for_path(relay_ip)
-    relay_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    relay_meta = {
-        "role": "relay",
-        "exit_ip": exit_ip,
-        "exit_port": exit_port,
-        "listen_port": listen_port,
-    }
-    relay_file = relay_creds_dir / "relay.yml"
-    fd, tmp = tempfile.mkstemp(dir=str(relay_creds_dir), suffix=".tmp")
-    try:
-        os.write(fd, yaml.dump(relay_meta, default_flow_style=False, sort_keys=False).encode())
-        os.close(fd)
-        fd = -1
-        os.chmod(tmp, 0o600)
-        os.rename(tmp, str(relay_file))
-    except BaseException:
-        if fd >= 0:
-            os.close(fd)
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
-
-
-def _find_exit_node(cluster: ClusterConfig, exit_arg: str) -> str:
-    """Resolve --exit flag to a node IP. Accepts IP or node name."""
-    node = cluster.find_node(exit_arg)
-    if node is not None:
-        return node.ip
-    if not exit_arg and len(cluster.nodes) == 1:
-        return cluster.nodes[0].ip
-    if not exit_arg:
-        fail(
-            "Multiple nodes in cluster -- specify which one with --exit",
-            hint="List nodes: meridian node list",
-            hint_type="user",
-        )
-    fail(
-        f"Exit node '{exit_arg}' not found in cluster",
-        hint="List nodes: meridian node list",
-        hint_type="user",
-    )
-
-
-def _deploy_relay_nginx(
-    exit_conn: ServerConnection,
-    relay_sni: str,
-    relay_ip: str,
-    relay_name: str = "",
-) -> bool:
-    """Create per-relay nginx SNI map + upstream on exit server and reload."""
-    label = _relay_label(RelayEntry(ip=relay_ip, name=relay_name))
-    port = _relay_xray_port(relay_ip)
-    upstream = f"xray_relay_{label}"
-
-    # Ensure main stream config includes relay-maps
-    exit_conn.run(
-        "grep -q 'relay-maps' /etc/nginx/stream.d/meridian.conf 2>/dev/null || "
-        r"sed -i '/map \$ssl_preread_server_name/a\\    include /etc/nginx/stream.d/relay-maps/*.conf;' "
-        "/etc/nginx/stream.d/meridian.conf",
-        timeout=15,
-    )
-    mkdir = exit_conn.run("mkdir -p /etc/nginx/stream.d/relay-maps", timeout=15)
-    if mkdir.returncode != 0:
-        warn(f"could not create relay nginx map directory: {mkdir.stderr.strip() or mkdir.stdout.strip()}")
-        return False
-    map_write = exit_conn.put_text(
-        f"/etc/nginx/stream.d/relay-maps/{label}.conf",
-        f"    {relay_sni}  {upstream};\n",
-        mode="644",
-        timeout=15,
-        operation_name="write relay nginx map",
-    )
-    if map_write.returncode != 0:
-        warn(f"could not write relay nginx map: {map_write.stderr.strip() or map_write.stdout.strip()}")
-        return False
-    upstream_block = f"upstream {upstream} {{\n    server 127.0.0.1:{port};\n}}\n"
-    upstream_write = exit_conn.put_text(
-        f"/etc/nginx/stream.d/meridian-relay-{label}.conf",
-        upstream_block,
-        mode="644",
-        timeout=15,
-        operation_name="write relay nginx upstream",
-    )
-    if upstream_write.returncode != 0:
-        warn(f"could not write relay nginx upstream: {upstream_write.stderr.strip() or upstream_write.stdout.strip()}")
-        return False
-    result = exit_conn.run("nginx -t 2>&1", timeout=15)
-    if result.returncode != 0:
-        warn(f"nginx config validation failed: {result.stderr.strip() or result.stdout.strip()}")
-        return False
-    reload_result = exit_conn.run("systemctl reload nginx", timeout=15)
-    if reload_result.returncode != 0:
-        warn(f"nginx reload failed: {reload_result.stderr.strip() or reload_result.stdout.strip()}")
-        return False
-    ok(f"nginx updated: SNI={relay_sni} -> port {port}")
-    return True
-
-
-def _remove_relay_nginx(exit_conn: ServerConnection, relay: RelayEntry) -> bool:
-    """Remove per-relay nginx config files from the exit server and reload."""
-    q = shlex.quote(_relay_label(relay))
-    exit_conn.run(
-        f"rm -f /etc/nginx/stream.d/relay-maps/{q}.conf /etc/nginx/stream.d/meridian-relay-{q}.conf",
-        timeout=15,
-    )
-    if exit_conn.run("nginx -t 2>&1", timeout=15).returncode != 0:
-        warn("nginx config validation failed after relay removal")
-        return False
-    if exit_conn.run("systemctl reload nginx", timeout=15).returncode != 0:
-        warn("nginx reload failed after relay removal")
-        return False
-    return True
-
-
-def _create_relay_hosts(
-    panel: MeridianPanel,
-    cluster: ClusterConfig,
-    relay_ip: str,
-    relay_port: int,
-    relay_sni: str,
-    relay_name: str,
-) -> dict[str, str]:
-    """Create Remnawave Host entries for a relay. Returns {protocol_key: host_uuid}."""
-    host_uuids: dict[str, str] = {}
-    label = _relay_label(RelayEntry(ip=relay_ip, name=relay_name))
-
-    # Panel v2.7+ only accepts DEFAULT/TLS/NONE for securityLayer.
-    # Reality hosts use "DEFAULT" (panel infers reality from inbound type).
-    _PROTO_CONFIG: list[tuple[ProtocolKey, str]] = [
-        (ProtocolKey.REALITY, "DEFAULT"),
-        (ProtocolKey.XHTTP, "TLS"),
-    ]
-    for proto_key, security in _PROTO_CONFIG:
-        ref = cluster.get_inbound(proto_key)
-        if not ref or not ref.uuid:
-            continue
-        remark = f"Relay-{label}-{proto_key}"
-        existing = panel.find_host_by_remark(remark)
-        if existing:
-            host_uuids[str(proto_key)] = existing.uuid
-            info(f"Host '{remark}' already exists, reusing")
-            continue
-        try:
-            host = panel.create_host(
-                remark=remark,
-                address=relay_ip,
-                port=relay_port,
-                config_profile_uuid=cluster.config_profile_uuid,
-                inbound_uuid=ref.uuid,
-                sni=relay_sni,
-                fingerprint="chrome",
-                security_layer=security,
-            )
-            host_uuids[str(proto_key)] = host.uuid
-            ok(f"Host created: {remark}")
-        except RemnawaveError as e:
-            warn(f"Could not create {proto_key} host: {e}")
-    return host_uuids
-
-
-def _delete_relay_hosts(panel: MeridianPanel, relay: RelayEntry) -> None:
-    """Delete all Remnawave Host entries for a relay."""
-    for proto_key, host_uuid in relay.host_uuids.items():
-        if not host_uuid:
-            continue
-        try:
-            panel.delete_host(host_uuid)
-            ok(f"Host deleted: {proto_key} ({host_uuid[:8]}...)")
-        except RemnawaveError as e:
-            warn(f"Could not delete {proto_key} host {host_uuid[:8]}...: {e}")
 
 
 def run_deploy(
@@ -253,7 +63,7 @@ def run_deploy(
 
     cluster = load_cluster()
     registry = ServerRegistry(SERVERS_FILE)
-    exit_ip = _find_exit_node(cluster, request.exit_arg)
+    exit_ip = find_exit_node(cluster, request.exit_arg)
     exit_node = cluster.find_node(exit_ip)
     if exit_node is None:
         fail(f"Exit node {exit_ip} not found in cluster", hint_type="bug")
@@ -396,7 +206,7 @@ def run_deploy(
     panel = make_panel(cluster)
     with panel:
         info("Creating relay host entries in panel...")
-        host_uuids = _create_relay_hosts(
+        host_uuids = create_relay_hosts(
             panel,
             cluster,
             request.relay_ip,
@@ -419,7 +229,7 @@ def run_deploy(
             exit_conn.check_ssh()
         except SSHError as exc:
             fail(f"Cannot SSH to exit node {exit_ip}: {exc}", hint="Check exit node SSH access", hint_type="system")
-        if not _deploy_relay_nginx(exit_conn, relay_sni, request.relay_ip, request.relay_name):
+        if not deploy_relay_nginx(exit_conn, relay_sni, request.relay_ip, request.relay_name):
             fail(
                 "Relay nginx routing update failed on the exit server",
                 hint="Fix nginx on the exit and retry.",
@@ -440,7 +250,7 @@ def run_deploy(
     cluster.backup()
     cluster.relays.append(relay_entry)
     cluster.save()
-    _save_relay_local(request.relay_ip, exit_ip, 443, request.listen_port)
+    save_relay_local(request.relay_ip, exit_ip, 443, request.listen_port)
     if request.relay_ip != exit_ip:
         registry.add(
             ServerEntry(
@@ -490,7 +300,7 @@ def run_list(
 
     relays = cluster.relays
     if exit_arg:
-        exit_ip = _find_exit_node(cluster, exit_arg)
+        exit_ip = find_exit_node(cluster, exit_arg)
         relays = [r for r in relays if r.exit_node_ip == exit_ip]
 
     if not relays:
@@ -594,7 +404,7 @@ def run_remove(
 
     # Verify exit_arg matches if specified
     if request.exit_arg:
-        if relay_entry.exit_node_ip != _find_exit_node(cluster, request.exit_arg):
+        if relay_entry.exit_node_ip != find_exit_node(cluster, request.exit_arg):
             fail(
                 f"Relay {request.relay_ip} is attached to exit {relay_entry.exit_node_ip}, not {request.exit_arg}",
                 hint_type="user",
@@ -605,12 +415,12 @@ def run_remove(
         if not confirm(f"Remove relay {relay_label} from exit {relay_entry.exit_node_ip}?"):
             raise typer.Exit(1)
 
-    relay_user = _relay_registry_user(registry, request.relay_ip, request.user)
+    relay_user = relay_registry_user(registry, request.relay_ip, request.user)
 
     # Delete Remnawave hosts
     with make_panel(cluster) as panel:
         info("Removing relay host entries from panel...")
-        _delete_relay_hosts(panel, relay_entry)
+        delete_relay_hosts(panel, relay_entry)
 
     # Remove nginx config from exit server
     exit_node = cluster.find_node(relay_entry.exit_node_ip)
@@ -619,7 +429,7 @@ def run_remove(
         try:
             exit_conn = ServerConnection(ip=exit_node.ip, user=exit_node.ssh_user, port=exit_node.ssh_port)
             exit_conn.check_ssh()
-            if not _remove_relay_nginx(exit_conn, relay_entry):
+            if not remove_relay_nginx(exit_conn, relay_entry):
                 warn("Relay nginx cleanup failed -- manual cleanup may be needed")
         except SSHError:
             warn(f"Could not connect to exit node {exit_node.ip} -- nginx not cleaned up")
@@ -678,7 +488,7 @@ def run_check(
     info(f"Checking relay: {relay_entry.name or request.relay_ip} -> exit: {relay_entry.exit_node_ip}")
     err_console.print()
     all_ok = True
-    relay_user = _relay_registry_user(registry, request.relay_ip, request.user)
+    relay_user = relay_registry_user(registry, request.relay_ip, request.user)
 
     # 1. SSH connectivity to relay
     try:
