@@ -1,25 +1,18 @@
 """Server resolution logic for CLI commands.
 
 Data structures and pure helpers live in ``meridian.resolve``; this module
-re-exports them for backward compatibility and adds CLI-specific resolution
-(interactive prompts, Rich output, version-mismatch warnings).
+contains only CLI-specific resolution functions that depend on Rich, Typer,
+prompts, or ``console.fail()``.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from meridian import resolve as _resolve_lib
 from meridian.config import creds_dir_for, is_ip
 from meridian.console import err_console, fail, info, warn
-from meridian.resolve import (
-    LOCAL_KEYWORDS,
-    VALID_SSH_USER,
-    ResolvedServer,
-    auto_selectable_entries,
-    detect_local_mode_from_creds,
-    detect_public_ip,
-    is_local_keyword,
-)
+from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
 )
@@ -27,14 +20,9 @@ from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 from meridian.ssh_ui import RichSSHUI
 
-# Re-export for backward compatibility
 __all__ = [
-    "LOCAL_KEYWORDS",
-    "ResolvedServer",
-    "detect_public_ip",
     "ensure_server_connection",
     "fetch_credentials",
-    "is_local_keyword",
     "resolve_server",
     "try_resolve_server",
 ]
@@ -69,8 +57,8 @@ def resolve_server(
 
     # 1. Explicit IP argument or 'local' keyword takes highest priority
     if explicit_ip:
-        if is_local_keyword(explicit_ip):
-            detected_ip = detect_public_ip()
+        if _resolve_lib.is_local_keyword(explicit_ip):
+            detected_ip = _resolve_lib.detect_public_ip()
             if not detected_ip:
                 fail(
                     "Could not detect this server's public IP",
@@ -91,8 +79,8 @@ def resolve_server(
 
     # 2. --server flag (resolve via registry, or 'local' keyword)
     elif requested_server:
-        if is_local_keyword(requested_server):
-            detected_ip = detect_public_ip()
+        if _resolve_lib.is_local_keyword(requested_server):
+            detected_ip = _resolve_lib.detect_public_ip()
             if not detected_ip:
                 fail(
                     "Could not detect this server's public IP",
@@ -120,14 +108,14 @@ def resolve_server(
 
     # 3. Running on the server itself as root — /etc/meridian/ readable
     else:
-        local_ip = detect_local_mode_from_creds()
+        local_ip = _resolve_lib.detect_local_mode_from_creds()
         if local_ip:
             ip = local_ip
             local_mode = True
 
         # 4. Single server auto-select
         else:
-            selectable_entries = auto_selectable_entries(registry)
+            selectable_entries = _resolve_lib.auto_selectable_entries(registry)
             if len(selectable_entries) == 1:
                 entry = selectable_entries[0]
                 ip = entry.host
@@ -155,7 +143,7 @@ def resolve_server(
     # Resolve user: explicit flag > registry > default root
     resolved_user = user or registry_user or "root"
 
-    if not VALID_SSH_USER.match(resolved_user):
+    if not _resolve_lib.VALID_SSH_USER.match(resolved_user):
         fail(
             f"SSH user '{resolved_user}' is invalid",
             hint="Use letters, numbers, dots, hyphens, and underscores.",

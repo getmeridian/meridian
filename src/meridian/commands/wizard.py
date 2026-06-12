@@ -11,9 +11,9 @@ from dataclasses import dataclass
 
 import typer
 
-from meridian.commands.resolve import detect_public_ip, is_local_keyword
 from meridian.config import DEFAULT_SNI, is_ip
 from meridian.console import choose, confirm, err_console, info, prompt, warn
+from meridian.resolve import detect_public_ip, is_local_keyword
 from meridian.ssh import ServerConnection
 from meridian.ssh_ui import RichSSHUI
 

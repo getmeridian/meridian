@@ -24,7 +24,6 @@ from meridian.cluster import (
     ClusterConfig,
 )
 from meridian.commands.resolve import (
-    ResolvedServer,
     ensure_server_connection,
     resolve_server,
 )
@@ -68,6 +67,7 @@ from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_dep
 from meridian.panel_bootstrap import configure_panel_and_node, run_provisioner
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.renderers import emit_json
+from meridian.resolve import ResolvedServer
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection
 

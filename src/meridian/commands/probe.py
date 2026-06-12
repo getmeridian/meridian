@@ -10,9 +10,10 @@ import ssl
 import subprocess
 from dataclasses import dataclass, field
 
-from meridian.commands.resolve import is_local_keyword, resolve_server
+from meridian.commands.resolve import resolve_server
 from meridian.config import SERVERS_FILE, is_ip
 from meridian.console import err_console, info, line, ok, warn
+from meridian.resolve import is_local_keyword
 from meridian.servers import ServerRegistry
 from meridian.ssh import tcp_connect
 
