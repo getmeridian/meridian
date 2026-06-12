@@ -61,6 +61,7 @@ class SSHUI(Protocol):
         Raises ``SSHError`` if no interactive terminal is available.
         """
         ...
+
     def ssh_failed(self, ip: str, user: str, stderr: str) -> None: ...
     def host_key_changed(self, ip: str) -> None: ...
 
@@ -580,10 +581,7 @@ class ServerConnection:
         if ui is None:
             ui = _DEFAULT_UI
 
-        ui.info(
-            f"Checking SSH connectivity to {self.user}@{self.ip}"
-            + (f":{self.port}" if self.port != 22 else "")
-        )
+        ui.info(f"Checking SSH connectivity to {self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else ""))
 
         # Verify host key on first connection
         if not _host_key_known(self.ip, self.port):
