@@ -17,7 +17,7 @@ from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
 )
 from meridian.servers import ServerRegistry
-from meridian.ssh import ServerConnection
+from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
 
 __all__ = [
