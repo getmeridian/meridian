@@ -45,12 +45,8 @@ def run_add(
         yes=yes,
     )
     from meridian.commands.resolve import ensure_server_connection, resolve_server
-    from meridian.commands.setup import (
-        DEFAULT_SNI,
-        _run_provisioner,
-        _setup_new_node,
-    )
-    from meridian.config import SERVERS_FILE
+    from meridian.config import DEFAULT_SNI, SERVERS_FILE
+    from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.servers import ServerRegistry
 
     cluster = load_cluster()
@@ -85,7 +81,7 @@ def run_add(
     ws_path = secrets.token_hex(8)
 
     # Run SSH provisioner pipeline (OS hardening, Docker, nginx, TLS)
-    _run_provisioner(
+    run_provisioner(
         resolved=resolved,
         cluster=cluster,
         domain=request.domain,
@@ -103,7 +99,7 @@ def run_add(
     # Configure via panel API (register node, deploy container, create hosts)
     from meridian import __version__
 
-    _setup_new_node(
+    setup_new_node(
         resolved=resolved,
         cluster=cluster,
         domain=request.domain,

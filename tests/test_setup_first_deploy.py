@@ -90,10 +90,10 @@ def _make_panel_mock() -> MagicMock:
 def _base_patches():  # noqa: ANN202
     """Return dict of common patches for _setup_first_deploy tests."""
     return {
-        "meridian.commands.setup._wait_for_panel_api": MagicMock(return_value=True),
-        "meridian.commands.setup.MeridianPanel.register_admin": MagicMock(return_value=_AUTH_TOKEN),
-        "meridian.commands.setup._create_api_token": MagicMock(return_value=_API_TOKEN),
-        "meridian.commands.setup._build_xray_config": MagicMock(
+        "meridian.panel_bootstrap.wait_for_panel_api": MagicMock(return_value=True),
+        "meridian.panel_bootstrap.MeridianPanel.register_admin": MagicMock(return_value=_AUTH_TOKEN),
+        "meridian.panel_bootstrap.create_api_token": MagicMock(return_value=_API_TOKEN),
+        "meridian.panel_bootstrap.build_xray_config": MagicMock(
             return_value={
                 "config": {"inbounds": [], "outbounds": []},
                 "reality_public_key": "PUB_KEY",
@@ -101,10 +101,10 @@ def _base_patches():  # noqa: ANN202
                 "reality_private_key": "PRIV_KEY",
             }
         ),
-        "meridian.commands.setup._get_docker_gateway": MagicMock(return_value=_GATEWAY),
-        "meridian.commands.setup._deploy_node_container": MagicMock(return_value=True),
-        "meridian.commands.setup._create_hosts_for_node": MagicMock(),
-        "meridian.commands.setup.secrets.token_hex": MagicMock(side_effect=lambda n: "a" * (n * 2)),
+        "meridian.panel_bootstrap.get_docker_gateway": MagicMock(return_value=_GATEWAY),
+        "meridian.panel_bootstrap.deploy_node_container": MagicMock(return_value=True),
+        "meridian.panel_bootstrap.create_hosts_for_node": MagicMock(),
+        "meridian.panel_bootstrap.secrets.token_hex": MagicMock(side_effect=lambda n: "a" * (n * 2)),
     }
 
 
@@ -121,11 +121,11 @@ class TestSetupFirstDeployHappyPath:
         save_calls: list[str] = []
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "PUB",
@@ -133,11 +133,11 @@ class TestSetupFirstDeployHappyPath:
                     "reality_private_key": "PRIV",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save", side_effect=lambda: save_calls.append("save")),
             patch.object(cluster, "backup", side_effect=lambda: save_calls.append("backup")),
         ):
@@ -169,11 +169,11 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "MY_PUB",
@@ -181,11 +181,11 @@ class TestSetupFirstDeployHappyPath:
                     "reality_private_key": "MY_PRIV",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -217,11 +217,11 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -229,11 +229,11 @@ class TestSetupFirstDeployHappyPath:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -261,11 +261,11 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -273,11 +273,11 @@ class TestSetupFirstDeployHappyPath:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -307,11 +307,11 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -319,11 +319,11 @@ class TestSetupFirstDeployHappyPath:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -360,11 +360,11 @@ class TestSetupFirstDeployAdminRegistration:
         panel = _make_panel_mock()
 
         patches = [
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", side_effect=register_effect),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", side_effect=register_effect),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -372,16 +372,16 @@ class TestSetupFirstDeployAdminRegistration:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ]
         if login_effect is not None:
-            patches.append(patch("meridian.commands.setup.MeridianPanel.login", side_effect=login_effect))
+            patches.append(patch("meridian.panel_bootstrap.MeridianPanel.login", side_effect=login_effect))
 
         import contextlib
 
@@ -421,10 +421,10 @@ class TestSetupFirstDeployAdminRegistration:
         cluster = ClusterConfig()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", side_effect=RemnawaveError("fail")),
-            patch("meridian.commands.setup.MeridianPanel.login", side_effect=RemnawaveError("fail")),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", side_effect=RemnawaveError("fail")),
+            patch("meridian.panel_bootstrap.MeridianPanel.login", side_effect=RemnawaveError("fail")),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
@@ -462,10 +462,10 @@ class TestSetupFirstDeployAdminRegistration:
         mock_cls.register_admin.return_value = _AUTH_TOKEN
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -473,11 +473,11 @@ class TestSetupFirstDeployAdminRegistration:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", mock_cls),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", mock_cls),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -514,8 +514,8 @@ class TestSetupFirstDeployPanelWait:
         cluster = ClusterConfig()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=False),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=False),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             pytest.raises(typer.Exit),
         ):
             _setup_first_deploy(
@@ -547,11 +547,11 @@ class TestSetupFirstDeployNodeEvidence:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "PUB",
@@ -559,11 +559,11 @@ class TestSetupFirstDeployNodeEvidence:
                     "reality_private_key": "PRIV",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container", return_value=False),
-            patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container", return_value=False),
+            patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit) as exc_info,
@@ -604,11 +604,11 @@ class TestSetupFirstDeployConfigProfile:
         panel.find_config_profile_by_name.return_value = existing
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -616,11 +616,11 @@ class TestSetupFirstDeployConfigProfile:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -651,11 +651,11 @@ class TestSetupFirstDeployConfigProfile:
         panel.find_config_profile_by_name.side_effect = RemnawaveError("500 Server Error")
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -663,9 +663,9 @@ class TestSetupFirstDeployConfigProfile:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
@@ -703,11 +703,11 @@ class TestSetupFirstDeployNodeRegistration:
         panel.get_node_secret_key.return_value = "existing-secret"
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -715,11 +715,11 @@ class TestSetupFirstDeployNodeRegistration:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -750,11 +750,11 @@ class TestSetupFirstDeployNodeRegistration:
         panel.create_node.side_effect = RemnawaveError("500")
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -762,9 +762,9 @@ class TestSetupFirstDeployNodeRegistration:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
@@ -799,11 +799,11 @@ class TestSetupFirstDeployClientCreation:
         panel.get_user.return_value = MagicMock(username=_CLIENT)  # already exists
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -811,11 +811,11 @@ class TestSetupFirstDeployClientCreation:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -845,11 +845,11 @@ class TestSetupFirstDeployClientCreation:
         panel.create_user.side_effect = RemnawaveError("500")
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value=_API_TOKEN),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -857,11 +857,11 @@ class TestSetupFirstDeployClientCreation:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
@@ -898,11 +898,11 @@ class TestSetupFirstDeployApiToken:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.commands.setup._wait_for_panel_api", return_value=True),
-            patch("meridian.commands.setup.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
-            patch("meridian.commands.setup._create_api_token", return_value="my-api-token-123"),
+            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value="my-api-token-123"),
             patch(
-                "meridian.commands.setup._build_xray_config",
+                "meridian.panel_bootstrap.build_xray_config",
                 return_value={
                     "config": {},
                     "reality_public_key": "P",
@@ -910,11 +910,11 @@ class TestSetupFirstDeployApiToken:
                     "reality_private_key": "K",
                 },
             ),
-            patch("meridian.commands.setup._get_docker_gateway", return_value=_GATEWAY),
-            patch("meridian.commands.setup._deploy_node_container"),
-            patch("meridian.commands.setup._create_hosts_for_node"),
-            patch("meridian.commands.setup.MeridianPanel", return_value=panel),
-            patch("meridian.commands.setup.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container"),
+            patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):

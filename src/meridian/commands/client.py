@@ -140,7 +140,7 @@ def run_add(
             panel_node = cluster.panel_node
             if panel_node:
                 try:
-                    from meridian.commands.setup import _deploy_client_page
+                    from meridian.panel_bootstrap import deploy_client_page
                     from meridian.ssh import ServerConnection
 
                     sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
@@ -149,7 +149,7 @@ def run_add(
                         user=cluster.panel.ssh_user or "root",
                         port=getattr(cluster.panel, "ssh_port", 22) or 22,
                     ) as conn:
-                        _deploy_client_page(conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
+                        deploy_client_page(conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
                 except Exception:
                     pass  # Non-fatal — subscription URL still works
 

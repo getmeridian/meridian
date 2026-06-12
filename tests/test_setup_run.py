@@ -725,7 +725,7 @@ class TestSubscriptionPagePathPersistence:
         subscription_page section, cluster.subscription_page must be a
         non-None SubscriptionPageConfig with a non-empty path."""
         from meridian.cluster import ClusterConfig
-        from meridian.commands.setup import _run_provisioner
+        from meridian.panel_bootstrap import run_provisioner
 
         cluster = ClusterConfig()
         assert cluster.subscription_page is None
@@ -733,11 +733,11 @@ class TestSubscriptionPagePathPersistence:
 
         with (
             patch("meridian.provision.Provisioner.run", return_value=[]) as mock_run,
-            patch("meridian.commands.setup.ok"),
-            patch("meridian.commands.setup.info"),
-            patch("meridian.commands.setup.fail"),
+            patch("meridian.panel_bootstrap.ok"),
+            patch("meridian.panel_bootstrap.info"),
+            patch("meridian.panel_bootstrap.fail"),
         ):
-            _run_provisioner(
+            run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]
                 cluster=cluster,
                 domain="",
@@ -768,18 +768,18 @@ class TestSubscriptionPagePathPersistence:
         _run_provisioner must NOT rotate it — otherwise nginx would end up
         with both the old and new paths until the old one is cleaned up."""
         from meridian.cluster import ClusterConfig, SubscriptionPageConfig
-        from meridian.commands.setup import _run_provisioner
+        from meridian.panel_bootstrap import run_provisioner
 
         cluster = ClusterConfig(subscription_page=SubscriptionPageConfig(path="stable_path_abc"))
         resolved = _make_resolved()
 
         with (
             patch("meridian.provision.Provisioner.run", return_value=[]),
-            patch("meridian.commands.setup.ok"),
-            patch("meridian.commands.setup.info"),
-            patch("meridian.commands.setup.fail"),
+            patch("meridian.panel_bootstrap.ok"),
+            patch("meridian.panel_bootstrap.info"),
+            patch("meridian.panel_bootstrap.fail"),
         ):
-            _run_provisioner(
+            run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]
                 cluster=cluster,
                 domain="",

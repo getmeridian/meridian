@@ -132,11 +132,11 @@ def _run_redeploy(
     mocks: dict[str, MagicMock] = {}
 
     with (
-        patch("meridian.commands.setup.MeridianPanel", return_value=panel_mock),
-        patch("meridian.commands.setup._build_xray_config", return_value=xray_result) as mock_build,
-        patch("meridian.commands.setup._deploy_node_container", return_value=True) as mock_deploy,
-        patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
-        patch("meridian.commands.setup._cache_inbounds") as mock_cache,
+        patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel_mock),
+        patch("meridian.panel_bootstrap.build_xray_config", return_value=xray_result) as mock_build,
+        patch("meridian.panel_bootstrap.deploy_node_container", return_value=True) as mock_deploy,
+        patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
+        patch("meridian.panel_bootstrap.cache_inbounds") as mock_cache,
         patch.object(cluster, "save") as mock_save,
         patch.object(cluster, "backup") as mock_backup,
     ):
@@ -334,11 +334,11 @@ class TestSetupRedeployFailures:
         cluster = _configured_cluster()
 
         with (
-            patch("meridian.commands.setup.MeridianPanel", return_value=_make_panel_mock()),
-            patch("meridian.commands.setup._build_xray_config", return_value=dict(_XRAY_RESULT)),
-            patch("meridian.commands.setup._deploy_node_container", return_value=False),
-            patch("meridian.commands.setup._create_hosts_for_node") as mock_hosts,
-            patch("meridian.commands.setup._cache_inbounds"),
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=_make_panel_mock()),
+            patch("meridian.panel_bootstrap.build_xray_config", return_value=dict(_XRAY_RESULT)),
+            patch("meridian.panel_bootstrap.deploy_node_container", return_value=False),
+            patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
+            patch("meridian.panel_bootstrap.cache_inbounds"),
             patch.object(cluster, "save") as mock_save,
             patch.object(cluster, "backup") as mock_backup,
             pytest.raises(typer.Exit) as exc_info,

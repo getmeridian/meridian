@@ -1,4 +1,4 @@
-"""Tests for host creation and inbound caching in setup — _create_hosts_for_node, _cache_inbounds.
+"""Tests for host creation and inbound caching in setup — create_hosts_for_node, cache_inbounds.
 
 Verifies idempotency (skip by remark), partial failure (warn and continue),
 missing inbounds, and the tag → ProtocolKey mapping.
@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
-from meridian.commands.setup import _cache_inbounds, _create_hosts_for_node
+from meridian.panel_bootstrap import cache_inbounds, create_hosts_for_node
 from meridian.remnawave import MeridianPanel, RemnawaveError
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def _find_create_call(panel: MeridianPanel, remark: str) -> dict | None:
 
 
 # ===========================================================================
-# _create_hosts_for_node — happy path
+# create_hosts_for_node — happy path
 # ===========================================================================
 
 
@@ -85,7 +85,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_creates_reality_host(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"reality-{_IP}")
         assert kw is not None
@@ -97,7 +97,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_creates_xhttp_host(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"xhttp-{_DOMAIN}")
         assert kw is not None
@@ -108,7 +108,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_creates_wss_host_only_with_domain(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"wss-{_DOMAIN}")
         assert kw is not None
@@ -119,7 +119,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_no_wss_host_without_domain(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, "", _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, "", _SNI, _REALITY_PORT)
 
         assert _find_create_call(panel, f"wss-{_DOMAIN}") is None
         # No WSS call at all
@@ -129,7 +129,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_xhttp_address_uses_domain_when_available(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"xhttp-{_DOMAIN}")
         assert kw is not None
@@ -138,7 +138,7 @@ class TestCreateHostsForNodeHappyPath:
     def test_xhttp_address_falls_back_to_ip(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, "", _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, "", _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"xhttp-{_IP}")
         assert kw is not None
@@ -148,7 +148,7 @@ class TestCreateHostsForNodeHappyPath:
         panel = _make_panel()
         cluster = _configured_cluster()
         other_ip = "198.51.100.99"
-        _create_hosts_for_node(panel, cluster, other_ip, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, other_ip, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"reality-{other_ip}")
         assert kw is not None
@@ -158,7 +158,7 @@ class TestCreateHostsForNodeHappyPath:
         panel = _make_panel()
         cluster = _configured_cluster()
         custom_port = 22345
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, custom_port)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, custom_port)
 
         kw = _find_create_call(panel, f"reality-{_IP}")
         assert kw is not None
@@ -166,7 +166,7 @@ class TestCreateHostsForNodeHappyPath:
 
 
 # ===========================================================================
-# _create_hosts_for_node — idempotency
+# create_hosts_for_node — idempotency
 # ===========================================================================
 
 
@@ -177,7 +177,7 @@ class TestCreateHostsForNodeIdempotency:
         panel = _make_panel()
         panel.list_hosts.return_value = [_host_with_remark(f"reality-{_IP}")]
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         assert _find_create_call(panel, f"reality-{_IP}") is None
         # XHTTP and WSS should still be created
@@ -188,7 +188,7 @@ class TestCreateHostsForNodeIdempotency:
         panel = _make_panel()
         panel.list_hosts.return_value = [_host_with_remark(f"xhttp-{_DOMAIN}")]
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         assert _find_create_call(panel, f"xhttp-{_DOMAIN}") is None
         assert _find_create_call(panel, f"reality-{_IP}") is not None
@@ -197,7 +197,7 @@ class TestCreateHostsForNodeIdempotency:
         panel = _make_panel()
         panel.list_hosts.return_value = [_host_with_remark(f"wss-{_DOMAIN}")]
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         assert _find_create_call(panel, f"wss-{_DOMAIN}") is None
         assert _find_create_call(panel, f"reality-{_IP}") is not None
@@ -209,7 +209,7 @@ class TestCreateHostsForNodeIdempotency:
             _host_with_remark(f"wss-{_DOMAIN}"),
         ]
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         # Only XHTTP should be created
         assert panel.create_host.call_count == 1
@@ -223,20 +223,20 @@ class TestCreateHostsForNodeIdempotency:
             _host_with_remark(f"wss-{_DOMAIN}"),
         ]
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         panel.create_host.assert_not_called()
 
 
 # ===========================================================================
-# _create_hosts_for_node — partial failure
+# create_hosts_for_node — partial failure
 # ===========================================================================
 
 
 class TestCreateHostsForNodePartialFailure:
     """Individual host creation failures warn but don't abort."""
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_reality_host_creation_fails_warns_continues(self, mock_warn: MagicMock) -> None:
         panel = _make_panel()
 
@@ -247,14 +247,14 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_reality
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         mock_warn.assert_called()
         # XHTTP and WSS should still be attempted
         assert _find_create_call(panel, f"xhttp-{_DOMAIN}") is not None
         assert _find_create_call(panel, f"wss-{_DOMAIN}") is not None
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_one_of_three_hosts_fail_creates_other_two(self, mock_warn: MagicMock) -> None:
         panel = _make_panel()
 
@@ -265,7 +265,7 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_xhttp
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         # 3 attempts total (reality, xhttp, wss)
         assert panel.create_host.call_count == 3
@@ -275,14 +275,14 @@ class TestCreateHostsForNodePartialFailure:
         panel = _make_panel()
         panel.list_hosts.side_effect = RemnawaveError("api down")
         cluster = _configured_cluster()
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         # Should fall back to empty set and attempt all creations
         assert panel.create_host.call_count == 3
 
 
 # ===========================================================================
-# _create_hosts_for_node — missing inbounds
+# create_hosts_for_node — missing inbounds
 # ===========================================================================
 
 
@@ -293,7 +293,7 @@ class TestCreateHostsForNodeMissingInbounds:
         panel = _make_panel()
         cluster = _configured_cluster()
         del cluster.inbounds[ProtocolKey.REALITY]
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         assert _find_create_call(panel, f"reality-{_IP}") is None
         # XHTTP and WSS should still be created
@@ -307,13 +307,13 @@ class TestCreateHostsForNodeMissingInbounds:
             nodes=[NodeEntry(ip=_IP)],
             inbounds={},
         )
-        _create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         panel.create_host.assert_not_called()
 
 
 # ===========================================================================
-# _cache_inbounds
+# cache_inbounds
 # ===========================================================================
 
 
@@ -324,7 +324,7 @@ class TestCacheInbounds:
         panel = _make_panel()
         panel.list_inbounds.return_value = [_inbound("uuid-r", "vless-reality")]
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         assert ProtocolKey.REALITY in cluster.inbounds
         assert cluster.inbounds[ProtocolKey.REALITY].uuid == "uuid-r"
@@ -334,7 +334,7 @@ class TestCacheInbounds:
         panel = _make_panel()
         panel.list_inbounds.return_value = [_inbound("uuid-x", "vless-xhttp")]
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         assert ProtocolKey.XHTTP in cluster.inbounds
         assert cluster.inbounds[ProtocolKey.XHTTP].uuid == "uuid-x"
@@ -344,7 +344,7 @@ class TestCacheInbounds:
         panel = _make_panel()
         panel.list_inbounds.return_value = [_inbound("uuid-w", "vless-wss")]
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         assert ProtocolKey.WSS in cluster.inbounds
         assert cluster.inbounds[ProtocolKey.WSS].uuid == "uuid-w"
@@ -358,7 +358,7 @@ class TestCacheInbounds:
             _inbound("uuid-w", "vless-wss"),
         ]
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         assert len(cluster.inbounds) == 3
         assert cluster.inbounds[ProtocolKey.REALITY].uuid == "uuid-r"
@@ -373,17 +373,17 @@ class TestCacheInbounds:
             _inbound("uuid-mystery", "shadowsocks"),
         ]
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         assert len(cluster.inbounds) == 1
         assert ProtocolKey.REALITY in cluster.inbounds
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_handles_api_error_gracefully(self, mock_warn: MagicMock) -> None:
         panel = _make_panel()
         panel.list_inbounds.side_effect = RemnawaveError("unreachable")
         cluster = ClusterConfig()
-        _cache_inbounds(panel, cluster)
+        cache_inbounds(panel, cluster)
 
         mock_warn.assert_called()
         assert len(cluster.inbounds) == 0

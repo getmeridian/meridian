@@ -15,11 +15,8 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import typer
 
-from meridian.commands.setup import (
-    _check_ports,
-    _deploy_node_container,
-    _wait_for_panel_api,
-)
+from meridian.commands.setup import _check_ports
+from meridian.panel_bootstrap import deploy_node_container as _deploy_node_container, wait_for_panel_api as _wait_for_panel_api
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -78,10 +75,10 @@ class TestDeployNodeContainerHappyPath:
         conn.run.side_effect = _run_side_effect
         return conn
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_creates_node_directory(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -92,10 +89,10 @@ class TestDeployNodeContainerHappyPath:
         assert _NODE_DIR in first_call[0][0]
         assert "chmod 700" in first_call[0][0]
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_writes_env_file(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -106,10 +103,10 @@ class TestDeployNodeContainerHappyPath:
         assert env_writes[0].kwargs["mode"] == "600"
         assert env_writes[0].kwargs["sensitive"] is True
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_writes_compose_file(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -119,10 +116,10 @@ class TestDeployNodeContainerHappyPath:
         assert len(compose_writes) == 1
         assert compose_writes[0].kwargs["mode"] == "644"
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_pulls_docker_image(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -134,10 +131,10 @@ class TestDeployNodeContainerHappyPath:
         assert pull_calls[0].kwargs["retries"] == 3
         assert pull_calls[0].kwargs["retry_delay"] == 10
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_starts_container(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -147,10 +144,10 @@ class TestDeployNodeContainerHappyPath:
         up_cmds = [c for c in commands if "docker compose up -d" in c]
         assert len(up_cmds) == 1
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_opens_ufw_port_on_healthy_container(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -161,10 +158,10 @@ class TestDeployNodeContainerHappyPath:
         assert len(ufw_cmds) == 1
         assert "172.16.0.0/12" in ufw_cmds[0]
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_no_warnings_on_happy_path(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -181,10 +178,10 @@ class TestDeployNodeContainerHappyPath:
 class TestDeployNodeContainerDockerPullRetry:
     """Pull retry logic: 3 attempts, 10s delay between."""
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_pull_succeeds_on_second_attempt(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -203,10 +200,10 @@ class TestDeployNodeContainerDockerPullRetry:
         assert pull_call.kwargs["retry_delay"] == 10
         mock_time.sleep.assert_not_called()
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_pull_succeeds_on_third_attempt(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -223,10 +220,10 @@ class TestDeployNodeContainerDockerPullRetry:
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
         assert pull_call.kwargs["operation_name"] == "pull remnawave node image"
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_pull_fails_all_three_attempts_warns_and_returns(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -242,10 +239,10 @@ class TestDeployNodeContainerDockerPullRetry:
         mock_warn.assert_called_once()
         assert "pull" in mock_warn.call_args[0][0].lower()
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_pull_failure_does_not_start_container(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -270,10 +267,10 @@ class TestDeployNodeContainerDockerPullRetry:
 class TestDeployNodeContainerHealthGate:
     """Health polling: 10 attempts, 3s delay, docker inspect check."""
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_health_succeeds_on_third_attempt(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -291,10 +288,10 @@ class TestDeployNodeContainerHealthGate:
         # sleep(3) called between health check attempts
         assert call(3) in mock_time.sleep.call_args_list
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_health_timeout_warns_with_docker_logs(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -314,10 +311,10 @@ class TestDeployNodeContainerHealthGate:
         assert "healthy" in warning_text.lower() or "health" in warning_text.lower()
         assert "could not connect" in warning_text
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_health_timeout_still_opens_ufw(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -337,10 +334,10 @@ class TestDeployNodeContainerHealthGate:
         ufw_cmds = [c for c in commands if "ufw allow" in c]
         assert len(ufw_cmds) == 1
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_health_gate_polls_up_to_ten_times(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -368,10 +365,10 @@ class TestDeployNodeContainerHealthGate:
 class TestDeployNodeContainerFailures:
     """Non-fatal failures: mkdir, compose up."""
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_mkdir_failure_warns_and_returns_early(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -389,10 +386,10 @@ class TestDeployNodeContainerFailures:
         # Only mkdir was called — no further commands
         assert conn.run.call_count == 1
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_compose_up_failure_warns_and_returns_early(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -412,10 +409,10 @@ class TestDeployNodeContainerFailures:
         assert not any("docker inspect" in c for c in commands)
         assert not any("ufw allow" in c for c in commands)
 
-    @patch("meridian.commands.setup.time")
-    @patch("meridian.commands.setup.ok")
-    @patch("meridian.commands.setup.info")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.panel_bootstrap.ok")
+    @patch("meridian.panel_bootstrap.info")
+    @patch("meridian.panel_bootstrap.warn")
     def test_compose_up_failure_includes_stderr_in_warning(
         self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
     ) -> None:
@@ -439,7 +436,7 @@ class TestDeployNodeContainerFailures:
 class TestCheckPortsHappyPath:
     """Both ports free or held by allowed Meridian processes."""
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_ports_free(self, mock_warn: MagicMock) -> None:
         """Empty ss output means port is free."""
         conn = MagicMock()
@@ -447,28 +444,28 @@ class TestCheckPortsHappyPath:
         _check_ports(conn, _IP, yes=True)
         mock_warn.assert_not_called()
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_port_held_by_nginx_is_allowed(self, mock_warn: MagicMock) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("nginx",pid=1234,fd=6))\n')
         _check_ports(conn, _IP, yes=True)
         mock_warn.assert_not_called()
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_port_held_by_xray_is_allowed(self, mock_warn: MagicMock) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("xray",pid=5678,fd=7))\n')
         _check_ports(conn, _IP, yes=True)
         mock_warn.assert_not_called()
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_port_held_by_docker_proxy_is_allowed(self, mock_warn: MagicMock) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("docker-proxy",pid=999,fd=4))\n')
         _check_ports(conn, _IP, yes=True)
         mock_warn.assert_not_called()
 
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_port_held_by_remnawave_node_is_allowed(self, mock_warn: MagicMock) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:80 *:* users:(("remnawave-node",pid=444,fd=3))\n')
@@ -486,7 +483,7 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_in_yes_mode_calls_fail(
         self, mock_warn: MagicMock, mock_fail: MagicMock, mock_err_console: MagicMock
     ) -> None:
@@ -502,7 +499,7 @@ class TestCheckPortsConflict:
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.choose", return_value=2)
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_interactive_abort(
         self,
         mock_warn: MagicMock,
@@ -520,7 +517,7 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.choose", return_value=1)
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_interactive_retry_then_free(
         self,
         mock_warn: MagicMock,
@@ -540,7 +537,7 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.commands.setup.warn")
+    @patch("meridian.panel_bootstrap.warn")
     def test_unknown_process_treated_as_conflict(
         self, mock_warn: MagicMock, mock_fail: MagicMock, mock_err_console: MagicMock
     ) -> None:
@@ -562,7 +559,7 @@ class TestCheckPortsConflict:
 class TestWaitForPanelApi:
     """Polling httpx.get for panel readiness."""
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_immediate_success(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """Status < 500 on first try returns True immediately."""
@@ -573,7 +570,7 @@ class TestWaitForPanelApi:
         mock_get.assert_called_once()
         mock_time.sleep.assert_not_called()
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_status_405_is_success(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """405 Method Not Allowed still means the API is up."""
@@ -582,7 +579,7 @@ class TestWaitForPanelApi:
         mock_get.return_value = resp
         assert _wait_for_panel_api("https://198.51.100.2") is True
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_status_500_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """500 is not considered success — should retry."""
@@ -594,7 +591,7 @@ class TestWaitForPanelApi:
         assert _wait_for_panel_api("https://198.51.100.2", retries=3) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_all_retries_exhausted_returns_false(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """After all retries with 500s, returns False."""
@@ -604,7 +601,7 @@ class TestWaitForPanelApi:
         assert _wait_for_panel_api("https://198.51.100.2", retries=3) is False
         assert mock_get.call_count == 3
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_connect_error_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """ConnectError is caught and retried."""
@@ -616,7 +613,7 @@ class TestWaitForPanelApi:
         assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_timeout_exception_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """TimeoutException is caught and retried."""
@@ -628,7 +625,7 @@ class TestWaitForPanelApi:
         assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_sleeps_between_retries_with_correct_delay(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """Verify sleep(delay) is called between retries, not after last."""
@@ -645,7 +642,7 @@ class TestWaitForPanelApi:
         assert mock_time.sleep.call_count == 2
         mock_time.sleep.assert_called_with(5.0)
 
-    @patch("meridian.commands.setup.time")
+    @patch("meridian.panel_bootstrap.time")
     @patch("httpx.get")
     def test_passes_verify_false_and_timeout(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
         """Ensure httpx.get is called with verify=False and timeout=10."""

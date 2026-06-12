@@ -150,8 +150,8 @@ class TestNodeAdd:
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
-            patch("meridian.commands.setup._run_provisioner") as mock_prov,
-            patch("meridian.commands.setup._setup_new_node"),
+            patch("meridian.panel_bootstrap.run_provisioner") as mock_prov,
+            patch("meridian.panel_bootstrap.setup_new_node"),
         ):
             mock_load.return_value = cluster
             run_add(ip="198.51.100.5", yes=True)
@@ -171,8 +171,8 @@ class TestNodeAdd:
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
-            patch("meridian.commands.setup._run_provisioner"),
-            patch("meridian.commands.setup._setup_new_node") as mock_setup,
+            patch("meridian.panel_bootstrap.run_provisioner"),
+            patch("meridian.panel_bootstrap.setup_new_node") as mock_setup,
         ):
             mock_load.return_value = cluster
             run_add(ip="198.51.100.5", name="new-node", yes=True)

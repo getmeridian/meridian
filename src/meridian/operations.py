@@ -235,7 +235,7 @@ def add_node(
     the panel REST API. Returns the new NodeEntry added to cluster.yml.
     """
     from meridian.commands.resolve import ResolvedServer, ensure_server_connection
-    from meridian.commands.setup import _run_provisioner, _setup_new_node
+    from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.config import DEFAULT_SNI
     from meridian.ssh import ServerConnection
 
@@ -265,7 +265,7 @@ def add_node(
     ws_path = secrets.token_hex(8)
 
     # SSH provisioner pipeline (OS hardening, Docker, nginx, TLS)
-    _run_provisioner(
+    run_provisioner(
         resolved=resolved,
         cluster=cluster,
         domain=domain,
@@ -283,7 +283,7 @@ def add_node(
     # Panel API: register node, deploy container, create hosts
     from meridian import __version__
 
-    _setup_new_node(
+    setup_new_node(
         resolved=resolved,
         cluster=cluster,
         domain=domain,
@@ -301,7 +301,7 @@ def add_node(
     if node is None:
         raise RuntimeError(f"Node {ip} was provisioned but not found in cluster config")
 
-    # _setup_new_node uses "domain or ip" as name. Override with desired name.
+    # setup_new_node uses "domain or ip" as name. Override with desired name.
     if name and name != node.name:
         node.name = name
         if node.uuid:
@@ -330,12 +330,12 @@ def update_node(
 ) -> None:
     """Redeploy an existing node with updated configuration.
 
-    Calls the existing _setup_redeploy() flow from setup.py.
+    Calls the existing setup_redeploy() flow from panel_bootstrap.
     Uses None as sentinel for "not specified" (keep current).
     Empty string means "clear to default/empty".
     """
     from meridian.commands.resolve import ResolvedServer
-    from meridian.commands.setup import _setup_redeploy
+    from meridian.panel_bootstrap import setup_redeploy
     from meridian.ssh import ServerConnection
 
     node = cluster.find_node(ip)
@@ -362,7 +362,7 @@ def update_node(
     # Save old values for rollback if redeploy fails
     old_name, old_sni, old_domain, old_warp = node.name, node.sni, node.domain, node.warp
 
-    # Update metadata before redeploy so _setup_redeploy reads new values.
+    # Update metadata before redeploy so setup_redeploy reads new values.
     # None = keep current, "" = clear to empty/default.
     if name is not None:
         node.name = name
@@ -376,7 +376,7 @@ def update_node(
     from meridian import __version__
 
     try:
-        _setup_redeploy(
+        setup_redeploy(
             resolved=resolved,
             cluster=cluster,
             domain=node.domain,

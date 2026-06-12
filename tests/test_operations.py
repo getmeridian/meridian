@@ -117,7 +117,7 @@ class TestUpdateNode:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.setup._setup_redeploy", side_effect=RuntimeError("SSH failed")),
+            patch("meridian.panel_bootstrap.setup_redeploy", side_effect=RuntimeError("SSH failed")),
             patch("meridian.ssh.ServerConnection"),
             patch("meridian.commands.resolve.ResolvedServer"),
         ):
@@ -134,7 +134,7 @@ class TestUpdateNode:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.setup._setup_redeploy"),
+            patch("meridian.panel_bootstrap.setup_redeploy"),
             patch("meridian.ssh.ServerConnection"),
             patch("meridian.commands.resolve.ResolvedServer"),
         ):
@@ -203,7 +203,7 @@ class TestUpdateNodeMetadataConsistency:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.setup._setup_redeploy", side_effect=RuntimeError("provisioner died")),
+            patch("meridian.panel_bootstrap.setup_redeploy", side_effect=RuntimeError("provisioner died")),
             patch("meridian.ssh.ServerConnection"),
             patch("meridian.commands.resolve.ResolvedServer"),
         ):
@@ -235,7 +235,7 @@ class TestUpdateNodeMetadataConsistency:
         panel.update_node_name.side_effect = RemnawaveError("panel down")
 
         with (
-            patch("meridian.commands.setup._setup_redeploy"),  # provisioner OK
+            patch("meridian.panel_bootstrap.setup_redeploy"),  # provisioner OK
             patch("meridian.ssh.ServerConnection"),
             patch("meridian.commands.resolve.ResolvedServer"),
         ):
@@ -369,7 +369,7 @@ class TestHybridDesiredNodesSync:
         panel = _mock_panel()
 
         with (
-            patch("meridian.commands.setup._setup_redeploy"),
+            patch("meridian.panel_bootstrap.setup_redeploy"),
             patch("meridian.ssh.ServerConnection"),
             patch("meridian.commands.resolve.ResolvedServer"),
             patch.object(ClusterConfig, "save"),
