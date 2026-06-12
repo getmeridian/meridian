@@ -320,6 +320,18 @@ class MeridianPanel:
     Uses the official ``remnawave`` SDK for panel operations and falls
     back to raw httpx only for auth helpers and generic low-level access.
 
+    Domain groups (natural extraction boundaries):
+      - Auth (login, register_admin) — classmethods, no SDK instance
+      - Users — CRUD for Meridian clients (= Remnawave users)
+      - Nodes — register, list, enable/disable, delete proxy nodes
+      - Hosts — direct addresses and relay entries in subscriptions
+      - Config Profiles — Xray configuration templates
+      - Inbounds — protocol definitions within config profiles
+      - Internal Squads — user-to-inbound access control groups
+      - Keygen — node mTLS secret bundles
+      - Subscriptions — subscription URL building
+      - Xray Config — global DNS/routing configuration
+
     Usage:
         panel = MeridianPanel("https://panel.example.com", "jwt-token")
         user = panel.create_user("alice")
@@ -675,7 +687,6 @@ class MeridianPanel:
         """Delete a host entry."""
         _sdk_call(self._sdk.hosts.delete_host(uuid))
 
-    # --- Config Profiles (not in SDK — raw httpx) ---
     # --- Config Profiles ---
 
     def create_config_profile(self, name: str, config: dict[str, Any]) -> ConfigProfile:
