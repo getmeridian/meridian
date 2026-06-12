@@ -12,6 +12,8 @@ import secrets
 from dataclasses import dataclass
 from typing import Any
 
+from meridian.core.errors import MeridianError
+>>>>>>> 3ca67ab (Remove fail() from xray_config.py: raise exceptions instead)
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -81,8 +83,10 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
         if private_key and public_key:
             return private_key, public_key
 
-    raise RuntimeError(
-        "Could not generate Reality x25519 keypair — install xray on the server or ensure Docker is running"
+    raise MeridianError(
+        "Could not generate Reality x25519 keypair",
+        hint="Install xray on the server or ensure Docker is running",
+        category="system",
     )
 
 
@@ -164,7 +168,10 @@ def build_xray_config(
         short_id = existing_short_id
     else:
         if conn is None:
-            raise ValueError("Cannot generate Reality keys without SSH connection")
+            raise MeridianError(
+                "Cannot generate Reality keys without SSH connection",
+                category="bug",
+            )
         private_key, public_key = generate_reality_keypair(conn)
         short_id = secrets.token_hex(4)  # 8-char hex
 

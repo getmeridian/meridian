@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from meridian.core.errors import MeridianError
 from meridian.xray_config import XrayConfigResult, build_xray_config
 
 # ---------------------------------------------------------------------------
@@ -263,7 +264,7 @@ class TestBuildXrayConfigKeyReuse:
         assert len(result.reality_short_id) == 8  # secrets.token_hex(4)
 
     def test_fails_without_conn_when_keys_missing(self) -> None:
-        with pytest.raises(ValueError, match="SSH connection"):
+        with pytest.raises(MeridianError, match="without SSH connection"):
             build_xray_config(
                 conn=None,
                 sni=_SNI,
