@@ -16,6 +16,7 @@
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
 
 ## What's done well
+- No barrel re-exports in `__init__.py` — all consumers import from specific submodules, keeping the dependency graph explicit.
 - Shared serializers keep JSON output stable and recursively handle core Pydantic models.
 - Redaction is centralized so expanding JSON/API surfaces does not multiply secret-leak risk.
 - Fleet inventory is built as a redacted result object before any CLI rendering happens.
@@ -23,7 +24,7 @@
 - Reporter primitives let provision/apply/deploy flows emit typed events without choosing a renderer.
 
 ## Pitfalls
-- Do not import command modules, `meridian.console`, Typer, or Rich here.
+- Do not import command modules, `meridian.console`, `meridian.config`, Typer, or Rich here. Core constants live in `core/defaults.py`.
 - Do not emit raw SSH commands, panel tokens, private keys, JWTs, database URLs, or subscription secrets.
 - Keep human wording in adapters; core summaries are short API metadata, not terminal copy.
 - Wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for non-expert operators.

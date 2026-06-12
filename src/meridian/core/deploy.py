@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from meridian.config import DEFAULT_SNI
+from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.inputs import DeployIpValue, NameValue, OptionalServerReferenceValue, SshUserValue
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
