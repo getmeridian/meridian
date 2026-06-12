@@ -16,11 +16,11 @@ from meridian.console import confirm, err_console, error_context, fail, info, ok
 from meridian.core.apply import build_apply_result
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.reconciler import PlanActionKind, compute_plan
+from meridian.reconciler import PlanActionKind
 from meridian.reconciler.diff import PlanAction
 from meridian.reconciler.display import print_plan
 from meridian.reconciler.executor import ExecutionResult, execute_plan
-from meridian.reconciler.state import build_actual_state, build_desired_state
+from meridian.reconciler.prepare import compute_reconciliation_plan, validate_cluster_for_reconciliation
 from meridian.renderers import emit_json
 
 
@@ -575,25 +575,7 @@ def _run(
     - ``"no"``: skip extras (filtered out of the plan before execute).
     """
     cluster = ClusterConfig.load()
-
-    has_desired = (
-        cluster.desired_nodes is not None or cluster.desired_clients is not None or cluster.desired_relays is not None
-    )
-    has_sub_page = cluster.subscription_page and (
-        cluster.subscription_page.enabled or cluster.subscription_page._extra.get("deployed", False)
-    )
-    if not has_desired and not has_sub_page:
-        fail(
-            "No desired state defined in cluster.yml",
-            hint=("Add desired_nodes, desired_clients, or desired_relays to cluster.yml,\nthen run: meridian apply"),
-            hint_type="user",
-        )
-
-    if not cluster.is_configured:
-        fail(
-            "No panel configured — deploy first with: meridian deploy <IP>",
-            hint_type="user",
-        )
+    validate_cluster_for_reconciliation(cluster, "apply")
 
     info("Fetching actual state from panel...")
     from meridian.remnawave import MeridianPanel, RemnawaveError
@@ -606,18 +588,7 @@ def _run(
             panel_conn = ServerConnection(cluster.panel.server_ip, cluster.panel.ssh_user, port=cluster.panel.ssh_port)
 
         with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
-            desired = build_desired_state(cluster)
-            actual = build_actual_state(cluster, panel, panel_conn=panel_conn)
-
-            from meridian.operations import load_applied_snapshot
-
-            plan = compute_plan(
-                desired,
-                actual,
-                applied_clients=load_applied_snapshot(cluster, "desired_clients_applied"),
-                applied_node_hosts=load_applied_snapshot(cluster, "desired_nodes_applied"),
-                applied_relay_hosts=load_applied_snapshot(cluster, "desired_relays_applied"),
-            )
+            plan = compute_reconciliation_plan(cluster, panel, panel_conn=panel_conn)
 
             if plan.is_empty:
                 if json_output:

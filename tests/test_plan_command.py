@@ -43,9 +43,7 @@ def _capture_plan_json(plan: Plan) -> tuple[dict, int]:
         patch.object(ClusterConfig, "load", return_value=cluster),
         patch("meridian.remnawave.MeridianPanel"),
         patch("meridian.ssh.ServerConnection"),
-        patch("meridian.commands.plan.build_desired_state"),
-        patch("meridian.commands.plan.build_actual_state"),
-        patch("meridian.commands.plan.compute_plan", return_value=plan),
+        patch("meridian.commands.plan.compute_reconciliation_plan", return_value=plan),
         redirect_stdout(buf),
     ):
         with pytest.raises(typer.Exit) as exc_info:
@@ -143,9 +141,7 @@ class TestPlanJsonOutput:
             patch.object(ClusterConfig, "load", return_value=cluster),
             patch("meridian.remnawave.MeridianPanel"),
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.plan.build_desired_state"),
-            patch("meridian.commands.plan.build_actual_state"),
-            patch("meridian.commands.plan.compute_plan", return_value=plan),
+            patch("meridian.commands.plan.compute_reconciliation_plan", return_value=plan),
             redirect_stdout(buf),
         ):
             with pytest.raises(typer.Exit):
