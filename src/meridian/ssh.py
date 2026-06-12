@@ -1058,6 +1058,7 @@ class ServerConnection(_FileTransferMixin):
 
         return False
 
+
 def tcp_connect(host: str, port: int, timeout: int = 5) -> bool:
     """Test TCP connectivity to host:port using a Python socket."""
     import socket as _socket
