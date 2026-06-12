@@ -20,6 +20,8 @@
 
 **Pinned version tuple** — `config.py` pins Remnawave images/SDK plus external binaries. Move the tuple together and update the CHANGELOG compatibility matrix; mismatched Remnawave backend/node/SDK versions silently lose data.
 
+**Errors over exits** — library modules raise typed exceptions (`MeridianError` hierarchy in `core/errors.py`). Only CLI command entry points call `console.fail()`. This keeps library code reusable from Engine, Studio, and tests.
+
 ## What's done well
 
 - **Forward-compatible YAML** — `_extra` dict in ClusterConfig preserves unknown YAML keys for forward-compat only. Reconciler state lives in the typed `applied_state: AppliedState` field; subscription page deployment status in `subscription_page.deployed`. Never store load-bearing runtime state in `_extra`.
@@ -35,3 +37,4 @@
 - **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.
 - **Local mode**: detection is file-based only — `/etc/meridian/node.yml` or dir existence.
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
+- **Do not call `console.fail()` from library modules** (operations, relay_ops, resolve, xray_config, provision/, panel_bootstrap). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.

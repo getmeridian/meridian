@@ -42,8 +42,12 @@ SECURITY.md / CONTRIBUTING.md           — public policies
 scripts/CLAUDE.md                       — repository automation and contract export
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
+├── operations.py                       — client/node/relay CRUD orchestration
 ├── panel_bootstrap.py                  — panel setup, node deploy, xray config
 ├── relay_ops.py                        — relay infrastructure operations
+├── resolve.py                          — ResolvedServer, ensure_server_connection
+├── xray_config.py                      — Xray inbound/outbound config generation
+├── cluster_persistence.py              — cluster.yml serialization/deserialization
 ├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
 ├── core/defaults.py                    — core-owned constants (DEFAULT_SNI)
 ├── core/errors.py                      — shared error base types
@@ -54,7 +58,8 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
 ├── reconciler/CLAUDE.md                — compute_plan purity + executor ordering
-│   └── prepare.py                      — shared plan computation entry point
+│   ├── prepare.py                      — shared plan computation entry point
+│   └── snapshots.py                    — applied-state snapshots + hybrid sync
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
 tests/CLAUDE.md                         — testing philosophy, MockConnection
