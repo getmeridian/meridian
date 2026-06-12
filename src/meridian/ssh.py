@@ -19,23 +19,27 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Protocol
 
+from meridian.core.errors import MeridianError
 from meridian.ssh_keys import host_key_known
 
 logger = logging.getLogger("meridian.ssh")
 
 
-class SSHError(Exception):
+class SSHError(MeridianError):
     """Raised when an SSH operation fails.
 
     Attributes:
         hint: Optional recovery suggestion for the user.
-        hint_type: Error category --- "user", "system", or "bug".
+        hint_type: Backward-compatible alias for ``category``.
     """
 
     def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system") -> None:
-        super().__init__(msg)
-        self.hint = hint
-        self.hint_type = hint_type
+        super().__init__(msg, hint=hint, category=hint_type)  # type: ignore[arg-type]
+
+    @property
+    def hint_type(self) -> str:
+        """Backward-compatible alias for ``self.category``."""
+        return self.category
 
 
 # ---------------------------------------------------------------------------

@@ -90,11 +90,19 @@ def warn(msg: str) -> None:
 _EXIT_CODES = {"user": 2, "system": 3, "bug": 1, "cancelled": 130}
 
 
-def fail(msg: str, *, hint: str = "", hint_type: str = "bug", exit_code: int | None = None) -> NoReturn:
+def fail(
+    msg: str | Exception,
+    *,
+    hint: str = "",
+    hint_type: str = "bug",
+    exit_code: int | None = None,
+) -> NoReturn:
     """Print an error message and exit.
 
     Args:
-        msg: The error message to display.
+        msg: The error message to display, or a ``MeridianError`` instance
+            whose fields are used directly (hint/hint_type/exit_code kwargs
+            are ignored when a ``MeridianError`` is passed).
         hint: Optional hint shown below the error.
         hint_type: Controls the footer line shown:
             "user"   -- input validation errors; no GitHub link shown.
@@ -103,6 +111,13 @@ def fail(msg: str, *, hint: str = "", hint_type: str = "bug", exit_code: int | N
         exit_code: Explicit exit code. If None, derived from hint_type
             (user=2, system=3, bug=1).
     """
+    from meridian.core.errors import MeridianError as _MeridianError
+
+    if isinstance(msg, _MeridianError):
+        hint = msg.hint
+        hint_type = msg.category
+        exit_code = msg.exit_code
+        msg = str(msg)
     code = exit_code if exit_code is not None else _EXIT_CODES.get(hint_type, 1)
     if _output_json:
         from meridian.core.models import ErrorCategory, MeridianError

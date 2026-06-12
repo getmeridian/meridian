@@ -26,16 +26,21 @@ from remnawave.models.internal_squads import UpdateInternalSquadRequestDto
 from remnawave.models.nodes import CreateNodeRequestDto, NodeConfigProfileRequestDto
 from remnawave.models.users import CreateUserRequestDto
 
+from meridian.core.errors import MeridianError
+
 logger = logging.getLogger("meridian.api")
 
 
-class RemnawaveError(Exception):
+class RemnawaveError(MeridianError):
     """Raised when a Remnawave API call fails."""
 
     def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system"):
-        super().__init__(msg)
-        self.hint = hint
-        self.hint_type = hint_type
+        super().__init__(msg, hint=hint, category=hint_type)  # type: ignore[arg-type]
+
+    @property
+    def hint_type(self) -> str:
+        """Backward-compatible alias for ``self.category``."""
+        return self.category
 
 
 class RemnawaveNotFoundError(RemnawaveError):
