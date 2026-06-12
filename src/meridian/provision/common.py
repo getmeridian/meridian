@@ -157,6 +157,7 @@ class HardenSSH:
     name = "Harden SSH configuration"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        commands: list = []
         changed = False
         ensure = ensure_file_content(
             conn,
@@ -170,12 +171,14 @@ class HardenSSH:
                 name=self.name,
                 status="failed",
                 detail=f"failed to write sshd hardening drop-in: {ensure.detail}",
+                commands=commands,
             )
         if ensure.changed:
-            conn.run(f"rm -f {_SSH_HARDENING_DROPIN_OLD_PATH}", timeout=15)
+            rm_result = conn.run(f"rm -f {_SSH_HARDENING_DROPIN_OLD_PATH}", timeout=15)
+            commands.append(rm_result)
             # Neutralize conflicting settings in other drop-ins (e.g., cloud-init)
             # so our values are authoritative regardless of load order.
-            conn.run(
+            neutralize = conn.run(
                 "for f in /etc/ssh/sshd_config.d/*.conf; do "
                 f'[ "$f" = "{_SSH_HARDENING_DROPIN_PATH}" ] && continue; '
                 "sed -i -E "
@@ -186,15 +189,18 @@ class HardenSSH:
                 '"$f" 2>/dev/null; done',
                 timeout=15,
             )
+            commands.append(neutralize)
             changed = True
 
         # Validate config before restarting
         validate = conn.run("sshd -t", timeout=15)
+        commands.append(validate)
         if validate.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"sshd config validation failed: {validate.stderr.strip()[:200]}",
+                commands=commands,
             )
 
         # Validate effective settings too — cloud-init drop-ins can override the main file.
@@ -206,39 +212,46 @@ class HardenSSH:
 
         for setting in _required:
             effective = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
+            commands.append(effective)
             if effective.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail=f"effective sshd setting mismatch: expected '{setting}'",
+                    commands=commands,
                 )
 
         for setting in _optional:
             effective = conn.run(f"sshd -T | grep -qi '^{setting.split()[0]}'", timeout=15)
+            commands.append(effective)
             if effective.returncode != 0:
                 # sshd doesn't recognize this directive — skip verification
                 continue
             check = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
+            commands.append(check)
             if check.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail=f"effective sshd setting mismatch: expected '{setting}'",
+                    commands=commands,
                 )
 
         if not changed:
-            return StepResult(name=self.name, status="ok", detail="already hardened")
+            return StepResult(name=self.name, status="ok", detail="already hardened", commands=commands)
 
         # Restart sshd (service is named "sshd" on some distros, "ssh" on others)
         restart = conn.run("systemctl restart sshd 2>/dev/null || systemctl restart ssh", timeout=15)
+        commands.append(restart)
         if restart.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"sshd restart failed: {restart.stderr.strip()[:200]}",
+                commands=commands,
             )
 
-        return StepResult(name=self.name, status="changed")
+        return StepResult(name=self.name, status="changed", commands=commands)
 
 
 class ConfigureFail2ban:
@@ -350,6 +363,7 @@ class ConfigureFirewall:
     name = "Configure firewall"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        commands: list = []
         facts = ServerFacts(conn)
         ufw = facts.ufw_state()
         ufw_active = ufw.active
@@ -360,15 +374,19 @@ class ConfigureFirewall:
                     name=self.name,
                     status="failed",
                     detail="ufw not available — install it manually: apt-get install ufw",
+                    commands=commands,
                 )
             recheck = conn.run("which ufw", timeout=15)
+            commands.append(recheck)
             if recheck.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail="ufw not available — install it manually: apt-get install ufw",
+                    commands=commands,
                 )
             status = conn.run("ufw status", timeout=15)
+            commands.append(status)
             ufw_active = status.returncode == 0 and "Status: active" in status.stdout
 
         changed = False
@@ -381,6 +399,7 @@ class ConfigureFirewall:
                     name=self.name,
                     status="failed",
                     detail=f"failed to allow SSH port {ssh_port}: {result.detail}",
+                    commands=commands,
                 )
             if result.changed:
                 changed = True
@@ -392,6 +411,7 @@ class ConfigureFirewall:
                 name=self.name,
                 status="failed",
                 detail=f"failed to allow HTTPS: {result.detail}",
+                commands=commands,
             )
         if result.changed:
             changed = True
@@ -404,6 +424,7 @@ class ConfigureFirewall:
                     name=self.name,
                     status="failed",
                     detail=f"failed to allow HTTP: {result.detail}",
+                    commands=commands,
                 )
             if result.changed:
                 changed = True
@@ -419,35 +440,43 @@ class ConfigureFirewall:
 
         # Set default policies and enable
         default_incoming = conn.run("ufw default deny incoming", timeout=15)
+        commands.append(default_incoming)
         if default_incoming.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"ufw default deny incoming failed: {default_incoming.stderr.strip()[:200]}",
+                commands=commands,
             )
         default_outgoing = conn.run("ufw default allow outgoing", timeout=15)
+        commands.append(default_outgoing)
         if default_outgoing.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"ufw default allow outgoing failed: {default_outgoing.stderr.strip()[:200]}",
+                commands=commands,
             )
 
         # Enable ufw (non-interactive) -- only counts as changed if it wasn't active
         if not ufw_active:
             enable = conn.run("ufw --force enable", timeout=30)
+            commands.append(enable)
             if enable.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail=f"ufw enable failed: {enable.stderr.strip()[:200]}",
+                    commands=commands,
                 )
             changed = True
         else:
             # Reload to apply any rule changes
-            conn.run("ufw reload", timeout=30)
+            reload_result = conn.run("ufw reload", timeout=30)
+            commands.append(reload_result)
 
         return StepResult(
             name=self.name,
             status="changed" if changed else "ok",
+            commands=commands,
         )

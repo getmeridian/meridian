@@ -32,6 +32,7 @@ class StepResult:
     status: StepStatus
     detail: str = ""  # Human-readable detail for tracing
     duration_ms: int = 0
+    commands: list = field(default_factory=list)  # CommandResult traces for drill-down
 
 
 @dataclass

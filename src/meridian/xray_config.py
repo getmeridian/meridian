@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from meridian.core.errors import MeridianError
->>>>>>> 3ca67ab (Remove fail() from xray_config.py: raise exceptions instead)
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
