@@ -244,7 +244,6 @@ FILE_SIZE_BUDGET = 800
 
 FILE_SIZE_ALLOWLIST: dict[str, str] = {
     "panel_bootstrap.py": "extracted from setup.py; further split planned",
-    "cluster.py": "data model + persistence + validation — split would scatter a cohesive concern",
     "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
     "provision/nginx.py": "nginx config generation is one cohesive template concern",
     "cli.py": "Typer registration for all subcommands — structural, not complex",
@@ -333,8 +332,8 @@ class TestStructuralHealth:
         APPLIED_KEYS = {"desired_clients_applied", "desired_nodes_applied", "desired_relay_hosts_applied"}
         violations = []
         for path in sorted(SRC.rglob("*.py")):
-            if path.name == "cluster.py":
-                continue  # cluster.py handles migration from _extra → applied_state
+            if path.name in ("cluster.py", "cluster_persistence.py"):
+                continue  # cluster persistence handles migration from _extra → applied_state
             text = path.read_text()
             for key in APPLIED_KEYS:
                 if f'_extra["{key}"]' in text or f"_extra['{key}']" in text or f'_extra.get("{key}")' in text:
