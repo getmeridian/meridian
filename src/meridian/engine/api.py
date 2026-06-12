@@ -5,13 +5,13 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, NoReturn, Self
+from typing import Any, NoReturn
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from meridian.adapters.deploy_process import run_deploy_process
 from meridian.adapters.server_engine import default_server_connection_factory
@@ -58,7 +58,12 @@ LOCAL_ENGINE_CSP = (
 
 
 class EngineBootstrapKeyRequest(BaseModel):
-    """Engine-only key bootstrap body with a short-lived password secret."""
+    """Engine-only key bootstrap body with a short-lived password secret.
+
+    Field-level validation (key_policy vs public_key) is delegated to the core
+    ServerBootstrapKeyRequest contract via .contract() so the rule lives in one
+    place.
+    """
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -67,12 +72,6 @@ class EngineBootstrapKeyRequest(BaseModel):
     public_key: str = ""
     disable_password_auth: bool = False
     password: str = Field(default="", max_length=4096)
-
-    @model_validator(mode="after")
-    def require_public_key_when_reusing_key(self) -> Self:
-        if self.key_policy == "use_existing" and not self.public_key.strip():
-            raise ValueError("Paste a public key when reusing an existing SSH key.")
-        return self
 
     def contract(self) -> ServerBootstrapKeyRequest:
         return ServerBootstrapKeyRequest(
@@ -248,8 +247,12 @@ def create_engine_app(
     ) -> dict[str, Any]:
         _require_csrf(x_meridian_csrf, token)
         try:
+            contract = request.contract()
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
+        try:
             result = bootstrap_server_key(
-                request.contract(),
+                contract,
                 server_store(),
                 connection_factory=server_connection_factory,
                 key_provider=server_key_provider,
