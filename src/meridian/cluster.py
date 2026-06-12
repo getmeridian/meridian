@@ -12,7 +12,7 @@ import os
 import re
 import shutil
 import tempfile
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -567,56 +567,20 @@ def _is_valid_port(port: int) -> bool:
 # Serialization helpers
 # ---------------------------------------------------------------------------
 
-_PANEL_FIELDS = {
-    "url",
-    "api_token",
-    "admin_user",
-    "admin_pass",
-    "server_ip",
-    "ssh_user",
-    "ssh_port",
-    "secret_path",
-    "sub_path",
-    "deployed_with",
-}
-_NODE_FIELDS = {
-    "ip",
-    "uuid",
-    "name",
-    "ssh_user",
-    "ssh_port",
-    "sni",
-    "domain",
-    "is_panel_host",
-    "deployed_with",
-    "xhttp_path",
-    "ws_path",
-    "reality_public_key",
-    "reality_short_id",
-    "reality_private_key",
-    "warp",
-}
-_RELAY_FIELDS = {"ip", "name", "port", "exit_node_ip", "host_uuids", "sni", "ssh_user", "ssh_port"}
-_BRANDING_FIELDS = {"server_name", "icon", "color"}
-_INBOUND_REF_FIELDS = {"uuid", "tag"}
-_SUBSCRIPTION_PAGE_FIELDS = {"enabled", "path"}
-_DESIRED_NODE_FIELDS = {"host", "name", "ssh_user", "ssh_port", "domain", "sni", "warp"}
-_DESIRED_RELAY_FIELDS = {"host", "name", "exit_node", "sni", "ssh_user", "ssh_port"}
-_KNOWN_TOP = {
-    "version",
-    "panel",
-    "config_profile_uuid",
-    "config_profile_name",
-    "squad_uuid",
-    "nodes",
-    "relays",
-    "branding",
-    "inbounds",
-    "subscription_page",
-    "desired_nodes",
-    "desired_clients",
-    "desired_relays",
-}
+def _public_fields(cls: type) -> set[str]:
+    """Return the set of non-underscored field names from a dataclass."""
+    return {f.name for f in fields(cls) if not f.name.startswith("_")}
+
+
+_PANEL_FIELDS = _public_fields(PanelConfig)
+_NODE_FIELDS = _public_fields(NodeEntry)
+_RELAY_FIELDS = _public_fields(RelayEntry)
+_BRANDING_FIELDS = _public_fields(BrandingConfig)
+_INBOUND_REF_FIELDS = _public_fields(InboundRef)
+_SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
+_DESIRED_NODE_FIELDS = _public_fields(DesiredNode)
+_DESIRED_RELAY_FIELDS = _public_fields(DesiredRelay)
+_KNOWN_TOP = _public_fields(ClusterConfig)
 
 
 def _strip_none(d: dict[str, Any]) -> dict[str, Any]:
@@ -795,7 +759,6 @@ def _load_dataclass(
     downstream code never sees ``None`` on a ``str``/``int``/``bool`` field.
     """
     from dataclasses import MISSING
-    from dataclasses import fields as dataclass_fields
 
     if not isinstance(raw, dict):
         raw = {}
@@ -804,7 +767,7 @@ def _load_dataclass(
 
     # Build a map of field name → default value for None coercion
     field_defaults: dict[str, Any] = {}
-    for f in dataclass_fields(cls):
+    for f in fields(cls):
         if f.name.startswith("_"):
             continue
         if f.default is not MISSING:
