@@ -194,7 +194,6 @@ def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
     Catches ``SSHError`` from the library layer and converts it to a
     ``fail()`` exit with the appropriate hint.
     """
-    from meridian.ssh import SSHError
 
     try:
         return _ensure_server_connection(resolved, ui=RichSSHUI())
