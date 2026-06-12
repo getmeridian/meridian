@@ -91,7 +91,7 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 
 ## Module discipline
 
-Rules enforced by `tests/test_architecture.py` (CI) and ruff TID251 (lint). Violations fail the build.
+Rules enforced by `tests/test_architecture.py` — violations fail CI.
 
 - **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
 - **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
