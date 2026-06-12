@@ -166,22 +166,24 @@ class TestRunCoreBoundary:
         assert mock_deploy.call_args.kwargs["executor"].__name__ == "_execute_deploy_request"
 
     def test_run_collects_wizard_input_before_core_service(self) -> None:
-        wizard_result = (
-            _IP_A,
-            "admin",
-            "www.microsoft.com",
-            "vpn.example",
-            False,
-            "alice",
-            "Family VPN",
-            "shield",
-            "ocean",
-            True,
-            True,
-            False,
+        from meridian.commands.wizard import WizardResult
+
+        wizard_result = WizardResult(
+            ip=_IP_A,
+            user="admin",
+            sni="www.microsoft.com",
+            domain="vpn.example",
+            harden=False,
+            client_name="alice",
+            server_name="Family VPN",
+            icon="shield",
+            color="ocean",
+            pq=True,
+            warp=True,
+            geo_block=False,
         )
         with (
-            patch("meridian.commands.setup._interactive_wizard", return_value=wizard_result) as mock_wizard,
+            patch("meridian.commands.wizard.interactive_wizard", return_value=wizard_result) as mock_wizard,
             patch("meridian.commands.setup.deploy_server") as mock_deploy,
         ):
             run(yes=True)
