@@ -19,8 +19,9 @@ from meridian.core.output import OperationContext, command_envelope
 from meridian.reconciler import PlanActionKind
 from meridian.reconciler.diff import PlanAction
 from meridian.reconciler.display import print_plan
-from meridian.reconciler.executor import ExecutionResult, execute_plan
+from meridian.reconciler.executor import ActionHandler, ExecutionResult, execute_plan
 from meridian.reconciler.prepare import compute_reconciliation_plan, validate_cluster_for_reconciliation
+from meridian.remnawave import MeridianPanel
 from meridian.renderers import emit_json
 
 
@@ -39,14 +40,9 @@ def _looks_like_ip(s: str) -> bool:
         return False
 
 
-def _handle_add_node(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_add_node(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Provision and register a new node."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import add_node
-    from meridian.remnawave import MeridianPanel
-
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
 
     # Find the desired node spec to get SSH/domain/sni params
     desired = next((n for n in (cluster.desired_nodes or []) if n.host == action.target), None)
@@ -63,14 +59,9 @@ def _handle_add_node(action: PlanAction, panel: object, cluster: object) -> None
     )
 
 
-def _handle_update_node(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_update_node(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Redeploy a node with updated configuration."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import update_node
-    from meridian.remnawave import MeridianPanel
-
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
 
     desired = next((n for n in (cluster.desired_nodes or []) if n.host == action.target), None)
     update_node(
@@ -84,25 +75,16 @@ def _handle_update_node(action: PlanAction, panel: object, cluster: object) -> N
     )
 
 
-def _handle_remove_node(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_remove_node(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Deregister and remove a node."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import remove_node
-    from meridian.remnawave import MeridianPanel
 
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
     remove_node(cluster, panel, node_ip=action.target)
 
 
-def _handle_add_relay(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_add_relay(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Provision and register a new relay."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import add_relay
-    from meridian.remnawave import MeridianPanel
-
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
 
     desired = next((r for r in (cluster.desired_relays or []) if r.host == action.target), None)
     # Resolve exit_node name → IP (desired.exit_node can be a name or IP)
@@ -123,7 +105,7 @@ def _handle_add_relay(action: PlanAction, panel: object, cluster: object) -> Non
     )
 
 
-def _handle_update_relay(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_update_relay(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Update a relay by removing the old config and re-provisioning with the new one.
 
     Failure semantics: this action is destructive — once the old relay is
@@ -138,13 +120,8 @@ def _handle_update_relay(action: PlanAction, panel: object, cluster: object) -> 
     the common cases (panel cannot reach new exit node, SSH cannot reach new
     relay host) before we do any irreversible work.
     """
-    from meridian.cluster import ClusterConfig
     from meridian.operations import add_relay, remove_relay
-    from meridian.remnawave import MeridianPanel
     from meridian.ssh import ServerConnection
-
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
 
     desired = next(
         (r for r in (cluster.desired_relays or []) if r.host == action.target),
@@ -204,47 +181,34 @@ def _handle_update_relay(action: PlanAction, panel: object, cluster: object) -> 
     )
 
 
-def _handle_remove_relay(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_remove_relay(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Remove a relay."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import remove_relay
-    from meridian.remnawave import MeridianPanel
 
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
     remove_relay(cluster, panel, relay_ip=action.target)
 
 
-def _handle_add_client(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_add_client(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Create a client via the panel API."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import add_client
-    from meridian.remnawave import MeridianPanel
 
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
     add_client(cluster, panel, name=action.target)
 
 
-def _handle_remove_client(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_remove_client(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Delete a client via the panel API."""
-    from meridian.cluster import ClusterConfig
     from meridian.operations import remove_client
-    from meridian.remnawave import MeridianPanel
 
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
     remove_client(cluster, panel, name=action.target)
 
 
-def _handle_add_subscription_page(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_add_subscription_page(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Deploy the subscription page container.
 
     Handles both fresh deploys (container not in compose) and restarts
     (container exists but stopped). Regenerates docker-compose.yml if the
     subscription page service is missing, then configures with API token.
     """
-    from meridian.cluster import ClusterConfig
     from meridian.config import (
         REMNAWAVE_BACKEND_IMAGE,
         REMNAWAVE_PANEL_DIR,
@@ -256,11 +220,7 @@ def _handle_add_subscription_page(action: PlanAction, panel: object, cluster: ob
         _render_panel_compose,
         configure_subscription_page,
     )
-    from meridian.remnawave import MeridianPanel
     from meridian.ssh import ServerConnection
-
-    assert isinstance(panel, MeridianPanel)
-    assert isinstance(cluster, ClusterConfig)
 
     if not cluster.panel.server_ip:
         raise RuntimeError("Panel server IP not set in cluster config")
@@ -397,13 +357,10 @@ def _handle_add_subscription_page(action: PlanAction, panel: object, cluster: ob
     cluster.save()
 
 
-def _handle_remove_subscription_page(action: PlanAction, panel: object, cluster: object) -> None:
+def _handle_remove_subscription_page(action: PlanAction, panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Stop the subscription page container."""
-    from meridian.cluster import ClusterConfig
     from meridian.config import REMNAWAVE_PANEL_DIR
     from meridian.ssh import ServerConnection
-
-    assert isinstance(cluster, ClusterConfig)
 
     if not cluster.panel.server_ip:
         raise RuntimeError("Panel server IP not set in cluster config")
@@ -526,9 +483,9 @@ def _emit_apply_drift_decision_required(*, plan: Any, operation: OperationContex
 def _execute_plan_quietly_for_json(
     plan: Any,
     *,
-    panel: Any,
-    cluster: Any,
-    callbacks: dict[PlanActionKind, Any],
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
+    callbacks: dict[PlanActionKind, ActionHandler],
     max_parallel: int,
 ) -> ExecutionResult:
     """Run CLI-backed callbacks without letting nested fail() write JSON fragments."""
@@ -662,7 +619,7 @@ def _run(
                     raise typer.Exit(1)
 
             info("Applying plan...")
-            callbacks = {
+            callbacks: dict[PlanActionKind, ActionHandler] = {
                 PlanActionKind.ADD_NODE: _handle_add_node,
                 PlanActionKind.UPDATE_NODE: _handle_update_node,
                 PlanActionKind.REMOVE_NODE: _handle_remove_node,

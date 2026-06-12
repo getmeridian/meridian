@@ -10,11 +10,21 @@ Node provisioning is parallelized when multiple nodes are independent.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING
 
 from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind
+
+if TYPE_CHECKING:
+    from meridian.cluster import ClusterConfig
+    from meridian.remnawave import MeridianPanel
+
+#: Callback signature for plan action handlers.
+#: Each handler receives the action to execute, a panel client for API
+#: calls, and the cluster config for state management.
+ActionHandler = Callable[["PlanAction", "MeridianPanel", "ClusterConfig"], None]
 
 logger = logging.getLogger("meridian.reconciler")
 
@@ -52,9 +62,9 @@ class ExecutionResult:
 
 def _run_action(
     action: PlanAction,
-    handler: Any,
-    panel: Any,
-    cluster: Any,
+    handler: ActionHandler,
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
 ) -> ActionResult:
     """Execute a single action and return the result."""
     try:
@@ -68,10 +78,10 @@ def _run_action(
 
 def execute_plan(
     plan: Plan,
-    panel: Any,
-    cluster: Any,
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
     *,
-    callbacks: dict[PlanActionKind, Any] | None = None,
+    callbacks: dict[PlanActionKind, ActionHandler] | None = None,
     max_parallel: int = 4,
 ) -> ExecutionResult:
     """Execute a reconciliation plan.
@@ -175,7 +185,7 @@ def execute_plan(
         if kind in parallel_kinds and len(actions) > 1 and max_parallel > 1:
             from meridian.remnawave import MeridianPanel
 
-            def _make_worker_panel(p: Any) -> Any:
+            def _make_worker_panel(p: MeridianPanel) -> MeridianPanel:
                 """Clone a MeridianPanel for a worker thread."""
                 if isinstance(p, MeridianPanel):
                     return MeridianPanel(p._base, p._token, timeout=p._timeout, max_retries=p._max_retries)

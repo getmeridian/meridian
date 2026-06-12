@@ -11,9 +11,11 @@ existing provisioning code.
 """
 
 from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind, compute_plan
+from meridian.reconciler.executor import ActionHandler
 from meridian.reconciler.state import ActualState, DesiredState
 
 __all__ = [
+    "ActionHandler",
     "ActualState",
     "DesiredState",
     "Plan",
