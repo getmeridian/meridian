@@ -592,6 +592,7 @@ def _is_valid_port(port: int) -> bool:
 # Serialization helpers
 # ---------------------------------------------------------------------------
 
+
 def _public_fields(cls: type) -> set[str]:
     """Return the set of non-underscored field names from a dataclass."""
     return {f.name for f in fields(cls) if not f.name.startswith("_")}

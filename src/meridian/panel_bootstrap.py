@@ -39,7 +39,6 @@ from meridian.core.reporters import Reporter
 from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.ssh import ServerConnection
 
-
 # ---------------------------------------------------------------------------
 # Provisioner pipeline
 # ---------------------------------------------------------------------------

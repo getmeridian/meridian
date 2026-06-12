@@ -32,7 +32,6 @@ class DeployEventSink(Protocol):
         """Record a typed deploy event."""
 
 
-
 class OperationSnapshot(CoreModel):
     """Public state summary for a long-running local Engine operation."""
 

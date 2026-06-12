@@ -836,16 +836,26 @@ class MeridianPanel:
     def login(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
         """Authenticate and return an auth token."""
         return cls._auth_request(
-            base_url, "/api/auth/login", username, password,
-            accepted_codes=(200,), error_label="login", timeout=timeout,
+            base_url,
+            "/api/auth/login",
+            username,
+            password,
+            accepted_codes=(200,),
+            error_label="login",
+            timeout=timeout,
         )
 
     @classmethod
     def register_admin(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
         """Register the initial admin user during setup."""
         return cls._auth_request(
-            base_url, "/api/auth/register", username, password,
-            accepted_codes=(200, 201), error_label="registration", timeout=timeout,
+            base_url,
+            "/api/auth/register",
+            username,
+            password,
+            accepted_codes=(200, 201),
+            error_label="registration",
+            timeout=timeout,
         )
 
 

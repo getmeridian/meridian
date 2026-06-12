@@ -235,8 +235,8 @@ def add_node(
     the panel REST API. Returns the new NodeEntry added to cluster.yml.
     """
     from meridian.commands.resolve import ResolvedServer, ensure_server_connection
-    from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.config import DEFAULT_SNI
+    from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.ssh import ServerConnection
 
     effective_sni = sni or DEFAULT_SNI
@@ -481,13 +481,13 @@ def add_relay(
     Realm provisioner, ``create_relay_hosts()``, ``deploy_relay_nginx()``,
     and ``save_relay_local()``.
     """
+    from meridian.commands.resolve import ResolvedServer, ensure_server_connection
+    from meridian.config import DEFAULT_SNI
     from meridian.relay_ops import (
         create_relay_hosts,
         deploy_relay_nginx,
         save_relay_local,
     )
-    from meridian.commands.resolve import ResolvedServer, ensure_server_connection
-    from meridian.config import DEFAULT_SNI
     from meridian.ssh import ServerConnection
 
     effective_sni = sni or DEFAULT_SNI
@@ -578,8 +578,8 @@ def remove_relay(
 
     Reuses the same functions as the imperative ``meridian relay remove``.
     """
-    from meridian.relay_ops import delete_relay_hosts, remove_relay_nginx
     from meridian.config import RELAY_SERVICE_NAME, sanitize_ip_for_path
+    from meridian.relay_ops import delete_relay_hosts, remove_relay_nginx
     from meridian.ssh import ServerConnection
 
     relay = cluster.find_relay(relay_ip)

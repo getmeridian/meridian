@@ -21,7 +21,6 @@ from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 
-
 # ---------------------------------------------------------------------------
 # Relay label / port helpers
 # ---------------------------------------------------------------------------

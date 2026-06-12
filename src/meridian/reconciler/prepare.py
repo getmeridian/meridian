@@ -23,20 +23,16 @@ def validate_cluster_for_reconciliation(cluster: ClusterConfig, command: str) ->
     Calls ``fail()`` (which raises ``typer.Exit``) on validation errors.
     """
     has_desired = (
-        cluster.desired_nodes is not None
-        or cluster.desired_clients is not None
-        or cluster.desired_relays is not None
+        cluster.desired_nodes is not None or cluster.desired_clients is not None or cluster.desired_relays is not None
     )
     has_sub_page = cluster.subscription_page and (
-        cluster.subscription_page.enabled
-        or cluster.subscription_page.deployed
+        cluster.subscription_page.enabled or cluster.subscription_page.deployed
     )
     if not has_desired and not has_sub_page:
         fail(
             "No desired state defined in cluster.yml",
             hint=(
-                "Add desired_nodes, desired_clients, or desired_relays "
-                f"to cluster.yml,\nthen run: meridian {command}"
+                f"Add desired_nodes, desired_clients, or desired_relays to cluster.yml,\nthen run: meridian {command}"
             ),
             hint_type="user",
         )

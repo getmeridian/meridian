@@ -14,7 +14,6 @@ from typing import TypeVar
 from meridian.facts import ServerFacts
 from meridian.ssh import CommandResult, ServerConnection
 
-
 _T = TypeVar("_T")
 
 

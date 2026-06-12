@@ -400,7 +400,6 @@ def _ssh_copy_id_command(profile: ServerProfile) -> str:
     return f"ssh-copy-id{port} {shlex.quote(target)}"
 
 
-
 def _ssh_target(profile: ServerProfile) -> str:
     host = f"[{profile.host}]" if ":" in profile.host and not profile.host.startswith("[") else profile.host
     return f"{profile.ssh_user}@{host}"
