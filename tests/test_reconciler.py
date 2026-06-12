@@ -868,7 +868,7 @@ class TestBuildActualState:
         from meridian.ssh import ServerConnection
 
         cluster = _make_cluster(
-            subscription_page=SubscriptionPageConfig(enabled=True, _extra={"deployed": True}),
+            subscription_page=SubscriptionPageConfig(enabled=True, deployed=True),
         )
         panel = _mock_panel()
         conn = MagicMock(spec=ServerConnection)

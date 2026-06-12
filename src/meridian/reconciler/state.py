@@ -258,7 +258,7 @@ def build_actual_state(
     if not ssh_checked:
         # Fallback: trust the deployment flag from cluster.yml
         sub_page = cluster.subscription_page
-        sub_running = bool(sub_page._extra.get("deployed", False)) if sub_page else False
+        sub_running = bool(sub_page.deployed) if sub_page else False
 
     return ActualState(
         nodes=actual_nodes,

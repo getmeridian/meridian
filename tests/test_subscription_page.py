@@ -89,7 +89,7 @@ class TestHandleAddSubscriptionPage:
 
         assert cluster.subscription_page.enabled is True
         assert cluster.subscription_page.path == "aaa111"
-        assert cluster.subscription_page._extra.get("deployed") is True
+        assert cluster.subscription_page.deployed is True
 
     def test_regenerates_compose_and_writes_env_when_service_missing(self) -> None:
         cluster = _make_cluster()
@@ -144,7 +144,7 @@ class TestHandleAddSubscriptionPage:
         # Path got auto-generated (we left it empty in the cluster fixture)
         assert cluster.subscription_page.path
         assert cluster.subscription_page.enabled is True
-        assert cluster.subscription_page._extra.get("deployed") is True
+        assert cluster.subscription_page.deployed is True
 
     def test_failed_compose_write_raises_and_does_not_persist_state(self) -> None:
         cluster = _make_cluster()
@@ -170,7 +170,7 @@ class TestHandleAddSubscriptionPage:
 
         # cluster.save must NOT be called when we never got to the success path
         save.assert_not_called()
-        assert cluster.subscription_page._extra.get("deployed") is not True
+        assert cluster.subscription_page.deployed is not True
 
     def test_nginx_validation_failure_raises(self) -> None:
         cluster = _make_cluster(SubscriptionPageConfig(enabled=True, path="newpath"))
@@ -224,7 +224,7 @@ class TestHandleRemoveSubscriptionPage:
 
         # State updated — disabled, deployed=False
         assert cluster.subscription_page.enabled is False
-        assert cluster.subscription_page._extra.get("deployed") is False
+        assert cluster.subscription_page.deployed is False
 
     def test_raises_when_panel_server_ip_missing(self) -> None:
         cluster = _make_cluster()

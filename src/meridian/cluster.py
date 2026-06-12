@@ -146,6 +146,7 @@ class SubscriptionPageConfig:
 
     enabled: bool = True
     path: str = ""  # nginx proxy path (random hex, generated on first deploy)
+    deployed: bool = False  # whether the container has been deployed
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -183,6 +184,28 @@ class DesiredRelay:
 
 
 @dataclass
+class AppliedState:
+    """Reconciler snapshot of the last successfully applied desired state.
+
+    Tracks which resources were present in the desired declaration at the
+    time of the last successful ``meridian apply``. This lets ``compute_plan``
+    distinguish intentional removal (resource was in applied, user removed
+    it from desired) from drift (resource exists in panel but was never in
+    desired).
+
+    Semantics of None vs empty list:
+    - ``None``  = no history (first apply, or category unmanaged). compute_plan
+      treats every actual-not-desired resource as drift (conservative).
+    - ``[]``    = managed and converged to zero. compute_plan treats
+      actual-not-desired resources as intentional removals.
+    """
+
+    nodes: list[str] | None = None  # applied node host IPs
+    clients: list[str] | None = None  # applied client usernames
+    relays: list[str] | None = None  # applied relay host IPs
+
+
+@dataclass
 class ClusterConfig:
     """Fleet-wide configuration — the sole local state for Meridian 4.0.
 
@@ -206,6 +229,8 @@ class ClusterConfig:
     desired_nodes: list[DesiredNode] | None = None
     desired_clients: list[str] | None = None
     desired_relays: list[DesiredRelay] | None = None
+    # v2: reconciler applied-state snapshot (last successful apply)
+    applied_state: AppliedState = field(default_factory=AppliedState)
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
     _readonly: bool = field(default=False, repr=False)
     _lock: Any = field(default=None, repr=False)  # threading.RLock for parallel save safety
@@ -580,7 +605,12 @@ _INBOUND_REF_FIELDS = _public_fields(InboundRef)
 _SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
 _DESIRED_NODE_FIELDS = _public_fields(DesiredNode)
 _DESIRED_RELAY_FIELDS = _public_fields(DesiredRelay)
-_KNOWN_TOP = _public_fields(ClusterConfig)
+_KNOWN_TOP = _public_fields(ClusterConfig) | {
+    # Legacy keys (migrated into applied_state on load)
+    "desired_clients_applied",
+    "desired_nodes_applied",
+    "desired_relays_applied",
+}
 
 
 _SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
@@ -705,6 +735,9 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     # Subscription page (v2 — only serialize if explicitly declared)
     if cfg.subscription_page is not None:
         sub_page_dict = _serialize_dataclass(cfg.subscription_page)
+        # Only include deployed if True (keep YAML clean)
+        if not sub_page_dict.get("deployed"):
+            sub_page_dict.pop("deployed", None)
         if sub_page_dict:
             out["subscription_page"] = sub_page_dict
 
@@ -731,6 +764,17 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
             _strip_ssh_defaults(d)
             desired_relays_out.append(d)
         out["desired_relays"] = desired_relays_out
+
+    # Applied state (v2 — reconciler snapshot, only serialize non-None fields)
+    applied_dict: dict[str, Any] = {}
+    if cfg.applied_state.nodes is not None:
+        applied_dict["nodes"] = list(cfg.applied_state.nodes)
+    if cfg.applied_state.clients is not None:
+        applied_dict["clients"] = list(cfg.applied_state.clients)
+    if cfg.applied_state.relays is not None:
+        applied_dict["relays"] = list(cfg.applied_state.relays)
+    if applied_dict:
+        out["applied_state"] = applied_dict
 
     # Extra fields (forward-compat)
     for k, v in cfg._extra.items():
@@ -789,6 +833,40 @@ def _load_dataclass(
         values[field_name] = value
     extra = {k: v for k, v in raw.items() if k not in known_fields}
     return cls(**values, _extra=extra)
+
+
+def _load_applied_list(raw: Any) -> list[str] | None:
+    """Parse an applied-state list from YAML, coercing to list[str] | None.
+
+    Returns None for absent/non-list values (no history).
+    Empty list is preserved (managed, converged to zero).
+    Filters non-string items defensively.
+    """
+    if not isinstance(raw, list):
+        return None
+    clean = [item for item in raw if isinstance(item, str)]
+    return clean if clean else None
+
+
+def _load_applied_state(raw: dict[str, Any]) -> AppliedState:
+    """Load AppliedState from a parsed YAML mapping."""
+    return AppliedState(
+        nodes=_load_applied_list(raw.get("nodes")),
+        clients=_load_applied_list(raw.get("clients")),
+        relays=_load_applied_list(raw.get("relays")),
+    )
+
+
+def _migrate_legacy_applied_state(data: dict[str, Any]) -> AppliedState:
+    """Migrate legacy desired_*_applied top-level keys into AppliedState.
+
+    Pre-v4.1 stored these as top-level YAML keys via cluster._extra.
+    """
+    return AppliedState(
+        nodes=_load_applied_list(data.get("desired_nodes_applied")),
+        clients=_load_applied_list(data.get("desired_clients_applied")),
+        relays=_load_applied_list(data.get("desired_relays_applied")),
+    )
 
 
 def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
@@ -895,6 +973,22 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                 )
             )
 
+    # Applied state (v2) — load from typed key, or migrate from legacy _extra keys
+    applied_state = AppliedState()
+    _applied_raw = data.get("applied_state")
+    if isinstance(_applied_raw, dict):
+        # New format: typed applied_state key
+        applied_state = _load_applied_state(_applied_raw)
+    else:
+        # Backward compat: migrate from legacy top-level _extra keys
+        applied_state = _migrate_legacy_applied_state(data)
+
+    # Migrate subscription_page._extra["deployed"] → subscription_page.deployed
+    if subscription_page is not None:
+        legacy_deployed = subscription_page._extra.pop("deployed", None)
+        if legacy_deployed is not None and not subscription_page.deployed:
+            subscription_page.deployed = bool(legacy_deployed)
+
     # Extra fields
     extra = {k: v for k, v in data.items() if k not in _KNOWN_TOP}
 
@@ -912,5 +1006,6 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         desired_nodes=desired_nodes,
         desired_clients=desired_clients,
         desired_relays=desired_relays,
+        applied_state=applied_state,
         _extra=extra,
     )

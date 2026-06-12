@@ -933,7 +933,7 @@ def _setup_first_deploy(
 
         if cluster.subscription_page is None:
             cluster.subscription_page = SubscriptionPageConfig()
-        cluster.subscription_page._extra["deployed"] = True
+        cluster.subscription_page.deployed = True
         cluster.save()
     ok("Subscription page configured")
 
@@ -1283,7 +1283,7 @@ def _setup_redeploy(
 
                     if cluster.subscription_page is None:
                         cluster.subscription_page = SubscriptionPageConfig()
-                    cluster.subscription_page._extra["deployed"] = True
+                    cluster.subscription_page.deployed = True
                     cluster.save()
 
     except RemnawaveError as e:

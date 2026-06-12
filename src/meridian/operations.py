@@ -35,29 +35,35 @@ logger = logging.getLogger("meridian.operations")
 
 
 def load_applied_snapshot(cluster: ClusterConfig, key: str) -> set[str] | None:
-    """Read a ``desired_*_applied`` snapshot safely from ``cluster._extra``.
+    """Read a reconciler applied-state snapshot from ``cluster.applied_state``.
 
-    Returns a set of strings or None. Rejects malformed data (strings,
-    dicts, wrong element types) defensively by returning None — the
-    caller then treats this as "no history" which falls back to the
-    conservative drift classification (safest default).
+    Returns a set of strings or None. None means "no history" -- the caller
+    treats this as the conservative drift classification (safest default).
 
-    None is also returned for an absent OR empty snapshot: compute_plan
-    uses None as a sentinel for "first apply / no history, so every
-    actual-not-desired resource is drift". An empty list means "this
-    category was managed and converged to zero" which is semantically
-    the same for drift classification.
+    An empty list in applied_state means "managed and converged to zero"
+    which is semantically distinct from None (no history). Empty lists
+    return an empty set so compute_plan can distinguish them.
     """
-    snap = cluster._extra.get(key)
+    # Map legacy _extra key names to AppliedState field names
+    _KEY_MAP = {
+        "desired_clients_applied": "clients",
+        "desired_nodes_applied": "nodes",
+        "desired_relays_applied": "relays",
+    }
+    field_name = _KEY_MAP.get(key, key)
+    snap = getattr(cluster.applied_state, field_name, None)
+    if snap is None:
+        return None
     if not isinstance(snap, list):
         return None
     clean: set[str] = set()
     for item in snap:
         if isinstance(item, str):
             clean.add(item)
-        # Silently skip malformed items; the snapshot will be rewritten
-        # with clean data on the next successful apply.
-    return clean or None
+    # Empty list -> empty set (not None). This preserves the "managed,
+    # converged to zero" semantics -- compute_plan needs this to distinguish
+    # from "no history" (None).
+    return clean
 
 
 def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -> None:
@@ -69,19 +75,31 @@ def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -
     The applied snapshot must reflect "panel state after the last reconciled
     add/remove operation we executed" — and `meridian client add` IS such an op.
     """
-    snap = cluster._extra.get(key)
+    _KEY_MAP = {
+        "desired_clients_applied": "clients",
+        "desired_nodes_applied": "nodes",
+        "desired_relays_applied": "relays",
+    }
+    field_name = _KEY_MAP.get(key, key)
+    snap = getattr(cluster.applied_state, field_name, None)
     if not isinstance(snap, list):
         snap = []
     if entry not in snap:
         snap.append(entry)
-    cluster._extra[key] = snap
+    setattr(cluster.applied_state, field_name, snap)
 
 
 def _applied_snapshot_mirror_remove(cluster: ClusterConfig, key: str, entry: Any) -> None:
-    snap = cluster._extra.get(key)
+    _KEY_MAP = {
+        "desired_clients_applied": "clients",
+        "desired_nodes_applied": "nodes",
+        "desired_relays_applied": "relays",
+    }
+    field_name = _KEY_MAP.get(key, key)
+    snap = getattr(cluster.applied_state, field_name, None)
     if not isinstance(snap, list):
         return
-    cluster._extra[key] = [e for e in snap if e != entry]
+    setattr(cluster.applied_state, field_name, [e for e in snap if e != entry])
 
 
 def hybrid_sync_desired_clients_add(cluster: ClusterConfig, name: str) -> None:

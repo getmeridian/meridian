@@ -7,7 +7,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 
 - **`compute_plan` is a pure function** — no I/O, no network, no side effects. Takes `(desired, actual, applied_*)` dataclasses, returns `Plan[PlanAction]`. Fully unit-testable; covers every diff case.
 - **Typed `PlanAction.kind`** — `ADD_NODE / UPDATE_NODE / REMOVE_NODE / ADD_RELAY / UPDATE_RELAY / REMOVE_RELAY / ADD_CLIENT / REMOVE_CLIENT / ADD_SUBSCRIPTION_PAGE / REMOVE_SUBSCRIPTION_PAGE`. Executor dispatches by kind.
-- **Applied-state snapshot** — `cluster._extra["desired_*_applied"]` recorded after every successful apply. Distinguishes intentional removal (in applied → from_extras=False → executes under `--yes`) from drift (not in applied → from_extras=True → requires `--prune-extras=yes`).
+- **Applied-state snapshot** — `cluster.applied_state` (typed `AppliedState` dataclass) recorded after every successful apply. Distinguishes intentional removal (in applied -> from_extras=False -> executes under `--yes`) from drift (not in applied -> from_extras=True -> requires `--prune-extras=yes`).
 - **Parallel executor** — `ADD_NODE` actions run via `ThreadPoolExecutor`. Per-worker `MeridianPanel` clone (`_make_worker_panel`); `threading.local()` event loop keeps async SDK calls isolated. Destructive kinds stay serial.
 - **Display order is not execution order** — `plan --json` exposes both `plan_index` and `execution_order`. Relay/client removals run before some adds for host-remark safety; node removals still run last. `UPDATE_RELAY` is a destructive replacement.
 

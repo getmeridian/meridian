@@ -29,7 +29,7 @@ def validate_cluster_for_reconciliation(cluster: ClusterConfig, command: str) ->
     )
     has_sub_page = cluster.subscription_page and (
         cluster.subscription_page.enabled
-        or cluster.subscription_page._extra.get("deployed", False)
+        or cluster.subscription_page.deployed
     )
     if not has_desired and not has_sub_page:
         fail(

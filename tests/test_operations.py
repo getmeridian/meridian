@@ -433,7 +433,7 @@ class TestHybridDesiredRelaysSync:
 #   3. `meridian apply --yes`         (expected: remove bob)
 # produces DRIFT classification for bob (bob was never in the last applied
 # snapshot), so --yes silently skips the removal. The fix: imperative
-# add/remove must also mirror into cluster._extra["desired_*_applied"], so
+# add/remove must also mirror into cluster.applied_state, so
 # compute_plan classifies the later removal as intentional (from_extras=False).
 
 
@@ -444,17 +444,17 @@ class TestHybridSyncAppliedSnapshot:
         panel.create_user.return_value = SimpleNamespace(uuid="u-1", username="bob")
         with patch.object(ClusterConfig, "save"):
             add_client(cluster, panel, name="bob")
-        assert cluster._extra.get("desired_clients_applied") == ["bob"]
+        assert cluster.applied_state.clients == ["bob"]
 
     def test_client_remove_mirrors_into_applied_snapshot(self) -> None:
         cluster = _make_cluster(desired_clients=["default", "bob"])
-        cluster._extra["desired_clients_applied"] = ["default", "bob"]
+        cluster.applied_state.clients = ["default", "bob"]
         panel = _mock_panel()
         panel.get_user.return_value = SimpleNamespace(uuid="u-bob", username="bob")
         panel.delete_user.return_value = True
         with patch.object(ClusterConfig, "save"):
             remove_client(cluster, panel, name="bob")
-        assert cluster._extra.get("desired_clients_applied") == ["default"]
+        assert cluster.applied_state.clients == ["default"]
 
     def test_client_add_noop_when_desired_is_none(self) -> None:
         """Unmanaged clients: applied snapshot must NOT appear from nowhere."""
@@ -463,46 +463,53 @@ class TestHybridSyncAppliedSnapshot:
         panel.create_user.return_value = SimpleNamespace(uuid="u-1", username="bob")
         with patch.object(ClusterConfig, "save"):
             add_client(cluster, panel, name="bob")
-        assert "desired_clients_applied" not in cluster._extra
+        assert cluster.applied_state.clients is None
 
     def test_client_add_tolerates_malformed_snapshot(self) -> None:
-        """If _extra has junk where applied snapshot should be, mirror resets it."""
+        """If applied_state has junk where applied snapshot should be, mirror resets it."""
         cluster = _make_cluster(desired_clients=["default"])
-        cluster._extra["desired_clients_applied"] = "corrupt-string"  # wrong type
+        cluster.applied_state.clients = "corrupt-string"  # type: ignore[assignment]  # wrong type
         panel = _mock_panel()
         panel.create_user.return_value = SimpleNamespace(uuid="u-1", username="bob")
         with patch.object(ClusterConfig, "save"):
             add_client(cluster, panel, name="bob")
-        assert cluster._extra.get("desired_clients_applied") == ["bob"]
+        assert cluster.applied_state.clients == ["bob"]
 
     def test_load_snapshot_rejects_string(self) -> None:
         """A bare string must NOT explode into a set of chars (Codex finding #3)."""
         cluster = _make_cluster()
-        cluster._extra["desired_clients_applied"] = "alice"
+        cluster.applied_state.clients = "alice"  # type: ignore[assignment]
         assert load_applied_snapshot(cluster, "desired_clients_applied") is None
 
     def test_load_snapshot_rejects_dict(self) -> None:
         cluster = _make_cluster()
-        cluster._extra["desired_clients_applied"] = {"not": "a list"}
+        cluster.applied_state.clients = {"not": "a list"}  # type: ignore[assignment]
         assert load_applied_snapshot(cluster, "desired_clients_applied") is None
 
     def test_load_snapshot_filters_non_string_items(self) -> None:
         """Garbage entries are skipped; clean entries still load."""
         cluster = _make_cluster()
-        cluster._extra["desired_clients_applied"] = ["alice", 42, None, "bob"]
+        cluster.applied_state.clients = ["alice", 42, None, "bob"]  # type: ignore[list-item]
         result = load_applied_snapshot(cluster, "desired_clients_applied")
         assert result == {"alice", "bob"}
 
-    def test_load_snapshot_empty_list_returns_none(self) -> None:
-        """Empty snapshot collapses to None — treated as 'no history' by plan
-        (conservative: actual-not-desired → drift, needs --prune-extras=yes)."""
+    def test_load_snapshot_empty_list_returns_empty_set(self) -> None:
+        """Empty snapshot returns empty set -- 'managed, converged to zero'.
+        This is semantically distinct from None ('no history')."""
         cluster = _make_cluster()
-        cluster._extra["desired_clients_applied"] = []
+        cluster.applied_state.clients = []
+        result = load_applied_snapshot(cluster, "desired_clients_applied")
+        assert result == set()
+
+    def test_load_snapshot_none_returns_none(self) -> None:
+        """None snapshot means 'no history' -- conservative drift classification."""
+        cluster = _make_cluster()
+        cluster.applied_state.clients = None
         assert load_applied_snapshot(cluster, "desired_clients_applied") is None
 
     def test_load_snapshot_returns_set_when_populated(self) -> None:
         cluster = _make_cluster()
-        cluster._extra["desired_clients_applied"] = ["alice", "bob"]
+        cluster.applied_state.clients = ["alice", "bob"]
         assert load_applied_snapshot(cluster, "desired_clients_applied") == {"alice", "bob"}
 
     def test_relay_remove_mirrors_into_applied_snapshot(self) -> None:
@@ -511,7 +518,7 @@ class TestHybridSyncAppliedSnapshot:
         relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="r1")
         desired = [DesiredRelay(host="198.51.100.20", name="r1", exit_node="198.51.100.1")]
         cluster = _make_cluster(relays=[relay], desired_relays=desired)
-        cluster._extra["desired_relays_applied"] = ["198.51.100.20"]
+        cluster.applied_state.relays = ["198.51.100.20"]
         panel = _mock_panel()
         with (
             patch("meridian.commands.relay._delete_relay_hosts"),
@@ -522,4 +529,4 @@ class TestHybridSyncAppliedSnapshot:
             from meridian.operations import remove_relay
 
             remove_relay(cluster, panel, relay_ip="198.51.100.20")
-        assert cluster._extra.get("desired_relays_applied") == []
+        assert cluster.applied_state.relays == []

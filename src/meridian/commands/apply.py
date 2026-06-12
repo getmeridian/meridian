@@ -393,7 +393,7 @@ def _handle_add_subscription_page(action: PlanAction, panel: object, cluster: ob
         cluster.subscription_page = SubscriptionPageConfig()
     cluster.subscription_page.enabled = True
     cluster.subscription_page.path = sub_path
-    cluster.subscription_page._extra["deployed"] = True
+    cluster.subscription_page.deployed = True
     cluster.save()
 
 
@@ -433,7 +433,7 @@ def _handle_remove_subscription_page(action: PlanAction, panel: object, cluster:
 
     if cluster.subscription_page is not None:
         cluster.subscription_page.enabled = False
-        cluster.subscription_page._extra["deployed"] = False
+        cluster.subscription_page.deployed = False
     cluster.save()
 
 
@@ -693,11 +693,11 @@ def _run(
             # avoid erasing history when a category is temporarily unmanaged.
             if result.all_succeeded:
                 if cluster.desired_clients is not None:
-                    cluster._extra["desired_clients_applied"] = list(cluster.desired_clients)
+                    cluster.applied_state.clients = list(cluster.desired_clients)
                 if cluster.desired_nodes is not None:
-                    cluster._extra["desired_nodes_applied"] = [n.host for n in cluster.desired_nodes]
+                    cluster.applied_state.nodes = [n.host for n in cluster.desired_nodes]
                 if cluster.desired_relays is not None:
-                    cluster._extra["desired_relays_applied"] = [r.host for r in cluster.desired_relays]
+                    cluster.applied_state.relays = [r.host for r in cluster.desired_relays]
 
             try:
                 cluster.save()

@@ -268,9 +268,8 @@ class TestApplyRunFailureSafety:
         ):
             apply_run(yes=True, parallel=1, prune_extras="yes")
 
-        # Snapshot must be in _extra after apply
-        assert "desired_clients_applied" in cluster._extra
-        assert cluster._extra["desired_clients_applied"] == ["alice", "bob"]
+        # Snapshot must be in applied_state after apply
+        assert cluster.applied_state.clients == ["alice", "bob"]
 
     def test_apply_json_success_outputs_typed_result(self) -> None:
         cluster = self._build_cluster_with_desired_clients()
