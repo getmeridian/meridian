@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from meridian.console import err_console, info, ok, warn
-from meridian.ssh_keys import host_key_known, host_key_lookup
+from meridian.ssh_keys import host_key_known
 
 logger = logging.getLogger("meridian.ssh")
 

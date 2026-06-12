@@ -8,10 +8,13 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from meridian.models import ProtocolURL, RelayURLSet, derive_client_name
 from meridian.urls import generate_qr_base64
+
+if TYPE_CHECKING:
+    import jinja2
 
 logger = logging.getLogger(__name__)
 
@@ -447,7 +450,7 @@ def _render_pwa_template(
 # ---------------------------------------------------------------------------
 
 
-def _create_jinja_env(*, autoescape: bool = True) -> "Environment":
+def _create_jinja_env(*, autoescape: bool = True) -> "jinja2.Environment":
     """Create a Jinja2 Environment with common filters.
 
     Both ``_render_template`` (connection-info) and ``_render_pwa_template``
