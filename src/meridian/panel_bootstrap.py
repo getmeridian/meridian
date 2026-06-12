@@ -8,6 +8,7 @@ No CLI interaction (prompts, Rich tables) — those stay in commands/.
 
 from __future__ import annotations
 
+import logging
 import secrets
 import shlex
 import time
@@ -25,13 +26,6 @@ from meridian.config import (
     DEFAULT_SNI,
     REMNAWAVE_NODE_API_PORT,
 )
-from meridian.console import (
-    err_console,
-    info,
-    is_quiet_mode,
-    ok,
-    warn,
-)
 from meridian.core.errors import PanelSetupError, ProvisioningError
 from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
@@ -40,6 +34,8 @@ from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.resolve import ResolvedServer
 from meridian.ssh import ServerConnection
 from meridian.xray_config import build_xray_config
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Provisioner pipeline
@@ -67,6 +63,7 @@ def run_provisioner(
     reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
     remote_executor: RemoteExecutor | None = None,
+    render: bool = True,
 ) -> None:
     """Run the SSH-based provisioner pipeline (OS, Docker, containers)."""
     from meridian.provision import ProvisionContext, Provisioner, build_node_steps, build_setup_steps
@@ -114,21 +111,17 @@ def run_provisioner(
     else:
         cluster.subscription_page.path = sub_page_path
 
-    if not is_quiet_mode():
-        err_console.print()
-    info(f"Configuring server at {ctx.ip}...")
+    logger.info("Configuring server at %s...", ctx.ip)
     if domain:
-        info(f"Domain: {domain}")
+        logger.info("Domain: %s", domain)
     if sni and sni != DEFAULT_SNI:
-        info(f"SNI: {sni}")
+        logger.info("SNI: %s", sni)
     if pq:
-        info("Post-quantum encryption: enabled (experimental)")
+        logger.info("Post-quantum encryption: enabled (experimental)")
     if warp:
-        info("Cloudflare WARP: enabled")
+        logger.info("Cloudflare WARP: enabled")
     if not geo_block:
-        info("Geo-blocking: disabled (Russian sites accessible)")
-    if not is_quiet_mode():
-        err_console.print()
+        logger.info("Geo-blocking: disabled (Russian sites accessible)")
 
     # Choose pipeline: full setup (panel + node) or node-only
     if is_panel_host:
@@ -143,7 +136,7 @@ def run_provisioner(
     remote_executor = remote_executor or SSHRemoteExecutor(resolved.conn)
     conn = RemoteExecutorConnection(remote_executor)
 
-    results = provisioner.run(conn, ctx, reporter=reporter, operation=operation, render=not is_quiet_mode())
+    results = provisioner.run(conn, ctx, reporter=reporter, operation=operation, render=render)
 
     # Check for failures
     failed = [r for r in results if r.status == "failed"]
@@ -153,9 +146,7 @@ def run_provisioner(
             hint=f"Step '{failed[0].name}' failed: {failed[0].detail}\nRun: meridian preflight {ctx.ip}",
         )
 
-    if not is_quiet_mode():
-        err_console.print()
-    ok("All provisioning steps completed")
+    logger.info("All provisioning steps completed")
 
 
 # ---------------------------------------------------------------------------
@@ -282,9 +273,7 @@ def configure_panel_and_node(
     """
     from meridian import __version__
 
-    if not is_quiet_mode():
-        err_console.print()
-    info("Configuring panel via API...")
+    logger.info("Configuring panel via API...")
 
     if is_first_deploy:
         setup_first_deploy(
@@ -348,7 +337,7 @@ def setup_first_deploy(
     base_url = panel_base_url(resolved.ip, domain, secret_path)
 
     # Wait for panel API to become accessible
-    info("Waiting for panel API...")
+    logger.info("Waiting for panel API...")
     if not wait_for_panel_api(base_url):
         raise PanelSetupError(
             "Panel API is not reachable",
@@ -378,7 +367,7 @@ def setup_first_deploy(
                 f"Panel admin registration failed ({e}), login also failed ({login_err})",
                 hint="Panel may need a fresh start: meridian teardown, then redeploy",
             )
-    ok("Panel admin registered")
+    logger.info("Panel admin registered")
 
     # Save admin credentials BEFORE API token step (lockout prevention:
     # if API token creation fails, we can still login with these creds)
@@ -400,7 +389,7 @@ def setup_first_deploy(
     cluster.backup()
     cluster.save()  # Create a long-lived API token (auth token is browser-session only)
     api_token = create_api_token(base_url, auth_token)
-    ok("API token created")
+    logger.info("API token created")
 
     # Update cluster with the API token
     cluster.panel.api_token = api_token
@@ -416,7 +405,7 @@ def setup_first_deploy(
             cluster.subscription_page = SubscriptionPageConfig()
         cluster.subscription_page.deployed = True
         cluster.save()
-    ok("Subscription page configured")
+    logger.info("Subscription page configured")
 
     with MeridianPanel(base_url, api_token) as panel:
         # Create config profile (Xray inbound definitions)
@@ -443,10 +432,10 @@ def setup_first_deploy(
             existing_profile = panel.find_config_profile_by_name(profile_name)
             if existing_profile:
                 profile = existing_profile
-                info(f"Config profile '{profile_name}' already exists, reusing")
+                logger.info("Config profile '%s' already exists, reusing", profile_name)
             else:
                 profile = panel.create_config_profile(profile_name, xray_config)
-                ok("Config profile created")
+                logger.info("Config profile created")
             cluster.config_profile_uuid = profile.uuid
             cluster.config_profile_name = profile.name
         except RemnawaveError as e:
@@ -466,12 +455,12 @@ def setup_first_deploy(
                 ]
                 if inbound_uuids_all:
                     panel.assign_inbounds_to_squad(squad_uuid, inbound_uuids_all)
-                    ok("Inbounds linked to Default-Squad")
+                    logger.info("Inbounds linked to Default-Squad")
                 cluster.squad_uuid = squad_uuid
             else:
-                warn("Default-Squad not found — users may not get access to inbounds")
+                logger.warning("Default-Squad not found — users may not get access to inbounds")
         except RemnawaveError as e:
-            warn(f"Could not configure squad: {e}")
+            logger.warning("Could not configure squad: %s", e)
 
         # Register this server as a node
         # For same-server deployments (panel + node co-located), the panel runs
@@ -483,7 +472,7 @@ def setup_first_deploy(
             inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
             existing_api_node = panel.find_node_by_address(node_address)
             if existing_api_node:
-                info(f"Node at {node_address} already registered, reusing")
+                logger.info("Node at %s already registered, reusing", node_address)
                 # Re-fetch keygen for secret key (needed for container .env)
                 secret_key = panel.get_node_secret_key()
                 node_creds = NodeCredentials(uuid=existing_api_node.uuid, secret_key=secret_key)
@@ -495,7 +484,7 @@ def setup_first_deploy(
                     config_profile_uuid=cluster.config_profile_uuid,
                     inbound_uuids=inbound_uuids,
                 )
-                ok(f"Node registered: {node_name}")
+                logger.info("Node registered: %s", node_name)
         except RemnawaveError as e:
             raise PanelSetupError(f"Failed to register node: {e}")
 
@@ -536,12 +525,12 @@ def setup_first_deploy(
         try:
             existing_user = panel.get_user(client_name)
             if existing_user:
-                info(f"Client '{client_name}' already exists")
+                logger.info("Client '%s' already exists", client_name)
                 user = existing_user
             else:
                 squad_uuids = [cluster.squad_uuid] if cluster.squad_uuid else None
                 user = panel.create_user(client_name, squad_uuids=squad_uuids)
-                ok(f"Client '{client_name}' created")
+                logger.info("Client '%s' created", client_name)
 
             # Deploy connection page for this client
             if user and isinstance(getattr(user, "vless_uuid", None), str) and user.vless_uuid:
@@ -551,16 +540,16 @@ def setup_first_deploy(
                         resolved.conn, cluster, node_entry, user.vless_uuid, client_name, sub_url
                     )
                     if page_url:
-                        ok("Connection page deployed")
+                        logger.info("Connection page deployed")
                         cluster._extra["_page_url"] = page_url
                     if sub_url:
                         cluster._extra["_subscription_url"] = sub_url
                 except (OSError, RuntimeError):
                     pass  # Non-fatal — subscription URL still works
         except RemnawaveError as e:
-            warn(f"Could not create client '{client_name}': {e}")
+            logger.warning("Could not create client '%s': %s", client_name, e)
 
-    ok("Panel configuration complete")
+    logger.info("Panel configuration complete")
 
 
 def setup_redeploy(
@@ -602,12 +591,12 @@ def setup_redeploy(
                     "Cannot reach panel API",
                     hint=f"Panel URL: {cluster.panel.url}\nCheck panel logs on {cluster.panel.server_ip}",
                 )
-            ok("Panel API accessible")
+            logger.info("Panel API accessible")
 
             # Build Xray config reusing existing Reality keys
             # If we have saved keys, skip keygen (preserves client configs)
             if node.reality_private_key and node.reality_public_key and node.reality_short_id:
-                info("Reusing existing Reality keys (client configs preserved)")
+                logger.info("Reusing existing Reality keys (client configs preserved)")
                 xray_result = build_xray_config(
                     None,  # no SSH needed when reusing keys
                     sni=sni or node.sni,
@@ -626,7 +615,7 @@ def setup_redeploy(
                 )
             else:
                 # No saved keys — must regenerate (breaks existing client configs)
-                warn("No saved Reality keys — regenerating (clients will need new configs)")
+                logger.warning("No saved Reality keys — regenerating (clients will need new configs)")
                 xray_result = build_xray_config(
                     resolved.conn,
                     sni=sni or node.sni,
@@ -652,14 +641,14 @@ def setup_redeploy(
                 existing_profile = panel.find_config_profile_by_name(profile_name)
                 if existing_profile:
                     profile = existing_profile
-                    info(f"Config profile '{profile_name}' already exists, reusing")
+                    logger.info("Config profile '%s' already exists, reusing", profile_name)
                 else:
                     profile = panel.create_config_profile(profile_name, xray_config)
-                    ok("Config profile created")
+                    logger.info("Config profile created")
                 cluster.config_profile_uuid = profile.uuid
                 cluster.config_profile_name = profile.name
             except RemnawaveError as e:
-                warn(f"Could not update config profile: {e}")
+                logger.warning("Could not update config profile: %s", e)
 
             # Re-cache inbounds
             cache_inbounds(panel, cluster)
@@ -681,9 +670,9 @@ def setup_redeploy(
             if node.uuid:
                 api_node = panel.get_node(node.uuid)
                 if api_node:
-                    ok(f"Node {resolved.ip} still registered")
+                    logger.info("Node %s still registered", resolved.ip)
                 else:
-                    warn(f"Node {resolved.ip} not found in panel — re-registering")
+                    logger.warning("Node %s not found in panel — re-registering", resolved.ip)
                     inbound_uuids = [
                         ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid
                     ]
@@ -710,7 +699,7 @@ def setup_redeploy(
                             ),
                         )
             else:
-                warn("Node has no UUID — skipping panel verification")
+                logger.warning("Node has no UUID — skipping panel verification")
 
             # Redeploy node container (refresh secret key + image)
             if node.uuid:
@@ -748,7 +737,7 @@ def setup_redeploy(
             node.ws_path = ws_path or node.ws_path
             cluster.backup()
             cluster.save()
-            ok("Node configuration updated")
+            logger.info("Node configuration updated")
 
             # Ensure subscription page has a valid token (upgrade from pre-subscription deploys)
             if node.is_panel_host:
@@ -798,7 +787,7 @@ def setup_new_node(
             inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
             existing_api_node = panel.find_node_by_address(resolved.ip)
             if existing_api_node:
-                info(f"Node at {resolved.ip} already registered, reusing")
+                logger.info("Node at %s already registered, reusing", resolved.ip)
                 secret_key = panel.get_node_secret_key()
                 node_creds = NodeCredentials(uuid=existing_api_node.uuid, secret_key=secret_key)
             else:
@@ -809,7 +798,7 @@ def setup_new_node(
                     config_profile_uuid=cluster.config_profile_uuid,
                     inbound_uuids=inbound_uuids,
                 )
-                ok(f"Node registered: {node_name}")
+                logger.info("Node registered: %s", node_name)
 
             # Deploy the node container with the secret key
             deploy_node_container(resolved.conn, node_creds.secret_key)
@@ -843,7 +832,7 @@ def setup_new_node(
     except RemnawaveError as e:
         raise PanelSetupError(f"Panel API error: {e}") from e
 
-    ok("New node configured")
+    logger.info("New node configured")
 
 
 # ---------------------------------------------------------------------------
@@ -878,9 +867,9 @@ def cache_inbounds(panel: MeridianPanel, cluster: ClusterConfig) -> None:
             key = tag_map.get(ib.tag)
             if key:
                 cluster.inbounds[str(key)] = InboundRef(uuid=ib.uuid, tag=ib.tag)
-        ok(f"Cached {len(cluster.inbounds)} inbound references")
+        logger.info("Cached %d inbound references", len(cluster.inbounds))
     except RemnawaveError as e:
-        warn(f"Could not cache inbound references: {e}")
+        logger.warning("Could not cache inbound references: %s", e)
 
 
 def create_hosts_for_node(
@@ -905,7 +894,7 @@ def create_hosts_for_node(
     if reality_ref and reality_ref.uuid:
         remark = f"reality-{node_ip}"
         if remark in existing_remarks:
-            info(f"Host '{remark}' already exists, skipping")
+            logger.info("Host '%s' already exists, skipping", remark)
         else:
             try:
                 panel.create_host(
@@ -918,16 +907,16 @@ def create_hosts_for_node(
                     fingerprint="chrome",
                     security_layer="DEFAULT",
                 )
-                ok(f"Host created: Reality via {node_ip}:{reality_port}")
+                logger.info("Host created: Reality via %s:%s", node_ip, reality_port)
             except RemnawaveError as e:
-                warn(f"Could not create Reality host: {e}")
+                logger.warning("Could not create Reality host: %s", e)
 
     # XHTTP host (via domain or IP, port 443 through nginx)
     xhttp_ref = cluster.get_inbound(ProtocolKey.XHTTP)
     if xhttp_ref and xhttp_ref.uuid:
         remark = f"xhttp-{host_address}"
         if remark in existing_remarks:
-            info(f"Host '{remark}' already exists, skipping")
+            logger.info("Host '%s' already exists, skipping", remark)
         else:
             try:
                 panel.create_host(
@@ -938,9 +927,9 @@ def create_hosts_for_node(
                     inbound_uuid=xhttp_ref.uuid,
                     security_layer="TLS",
                 )
-                ok(f"Host created: XHTTP via {host_address}:443")
+                logger.info("Host created: XHTTP via %s:443", host_address)
             except RemnawaveError as e:
-                warn(f"Could not create XHTTP host: {e}")
+                logger.warning("Could not create XHTTP host: %s", e)
 
     # WSS host (domain mode only, port 443 through CDN)
     if domain:
@@ -948,7 +937,7 @@ def create_hosts_for_node(
         if wss_ref and wss_ref.uuid:
             remark = f"wss-{domain}"
             if remark in existing_remarks:
-                info(f"Host '{remark}' already exists, skipping")
+                logger.info("Host '%s' already exists, skipping", remark)
             else:
                 try:
                     panel.create_host(
@@ -959,9 +948,9 @@ def create_hosts_for_node(
                         inbound_uuid=wss_ref.uuid,
                         security_layer="TLS",
                     )
-                    ok(f"Host created: WSS via {domain}:443")
+                    logger.info("Host created: WSS via %s:443", domain)
                 except RemnawaveError as e:
-                    warn(f"Could not create WSS host: {e}")
+                    logger.warning("Could not create WSS host: %s", e)
 
 
 def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
@@ -980,7 +969,7 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     # Create directory
     result = conn.run(f"mkdir -p {q_dir} && chmod 700 {q_dir}", timeout=15)
     if result.returncode != 0:
-        warn(f"Could not create {node_dir}: {result.stderr.strip()[:200]}")
+        logger.warning("Could not create %s: %s", node_dir, result.stderr.strip()[:200])
         return False
 
     # Write .env
@@ -995,7 +984,7 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         operation_name="write remnawave node env",
     )
     if result.returncode != 0:
-        warn(f"Could not write {env_path}: {result.stderr.strip()[:200]}")
+        logger.warning("Could not write %s: %s", env_path, result.stderr.strip()[:200])
         return False
 
     # Write docker-compose.yml
@@ -1009,11 +998,11 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         operation_name="write remnawave node compose",
     )
     if result.returncode != 0:
-        warn(f"Could not write {compose_path}: {result.stderr.strip()[:200]}")
+        logger.warning("Could not write %s: %s", compose_path, result.stderr.strip()[:200])
         return False
 
     # Pull image
-    info("Pulling Remnawave node image...")
+    logger.info("Pulling Remnawave node image...")
     result = conn.run(
         "docker compose pull",
         cwd=node_dir,
@@ -1023,19 +1012,19 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         operation_name="pull remnawave node image",
     )
     if result.returncode != 0:
-        warn("Could not pull node image — node may not start")
+        logger.warning("Could not pull node image — node may not start")
         return False
 
     # Start container
     result = conn.run("docker compose up -d", cwd=node_dir, timeout=120)
     if result.returncode != 0:
-        warn(f"Node container failed to start: {result.stderr.strip()[:200]}")
+        logger.warning("Node container failed to start: %s", result.stderr.strip()[:200])
         return False
 
-    ok("Remnawave node deployed")
+    logger.info("Remnawave node deployed")
 
     # Health gate: verify the node container started
-    info("Verifying node container health...")
+    logger.info("Verifying node container health...")
     node_healthy = False
     for _attempt in range(10):
         check = conn.run(
@@ -1048,14 +1037,17 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         time.sleep(3)
 
     if node_healthy:
-        ok("Node container verified healthy")
+        logger.info("Node container verified healthy")
     else:
         logs = conn.run("docker logs remnawave-node --tail 20 2>&1", timeout=15)
         log_tail = logs.stdout.strip()[:500] if logs.returncode == 0 else "(no logs available)"
-        warn(
-            f"Node container may not be healthy after 30s\n"
-            f"  Recent logs:\n{log_tail}\n"
-            f"  Check: ssh {shlex.quote(conn.user)}@{conn.ip} docker logs remnawave-node"
+        logger.warning(
+            "Node container may not be healthy after 30s\n"
+            "  Recent logs:\n%s\n"
+            "  Check: ssh %s@%s docker logs remnawave-node",
+            log_tail,
+            shlex.quote(conn.user),
+            conn.ip,
         )
 
     # Allow Docker internal traffic to reach the node API port
@@ -1167,7 +1159,7 @@ def deploy_client_page(
 
     error = upload_client_files(conn, user_uuid, files)
     if error:
-        warn(f"Could not deploy connection page: {error}")
+        logger.warning("Could not deploy connection page: %s", error)
         return ""
 
     return page_url

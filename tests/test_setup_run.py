@@ -738,8 +738,6 @@ class TestSubscriptionPagePathPersistence:
 
         with (
             patch("meridian.provision.Provisioner.run", return_value=[]) as mock_run,
-            patch("meridian.panel_bootstrap.ok"),
-            patch("meridian.panel_bootstrap.info"),
         ):
             run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]
@@ -756,7 +754,7 @@ class TestSubscriptionPagePathPersistence:
 
         assert cluster.subscription_page is not None, (
             "subscription_page must be created during first deploy — "
-            "otherwise a later REMOVE_SUBSCRIPTION_PAGE would skip nginx "
+            "otherwise a later REMOVE_SUBSCRIPTION_PAGE would skip nginx"
             "cleanup and re-enable would create duplicate routes"
         )
         assert cluster.subscription_page.path, (
@@ -779,8 +777,6 @@ class TestSubscriptionPagePathPersistence:
 
         with (
             patch("meridian.provision.Provisioner.run", return_value=[]),
-            patch("meridian.panel_bootstrap.ok"),
-            patch("meridian.panel_bootstrap.info"),
         ):
             run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]

@@ -400,6 +400,7 @@ def _execute_deploy_request(
             info_page_path=info_page_path,
             reporter=reporter,
             operation=operation,
+            render=not is_quiet_mode(),
         )
 
         # Post-provisioner: configure panel via REST API

@@ -9,6 +9,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
 from meridian.panel_bootstrap import cache_inbounds, create_hosts_for_node
 from meridian.remnawave import MeridianPanel, RemnawaveError
@@ -236,8 +238,7 @@ class TestCreateHostsForNodeIdempotency:
 class TestCreateHostsForNodePartialFailure:
     """Individual host creation failures warn but don't abort."""
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_reality_host_creation_fails_warns_continues(self, mock_warn: MagicMock) -> None:
+    def test_reality_host_creation_fails_warns_continues(self, caplog: pytest.LogCaptureFixture) -> None:
         panel = _make_panel()
 
         def _fail_on_reality(**kwargs: object) -> MagicMock:
@@ -247,15 +248,17 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_reality
         cluster = _configured_cluster()
-        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        import logging
 
-        mock_warn.assert_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+
+        assert caplog.records
         # XHTTP and WSS should still be attempted
         assert _find_create_call(panel, f"xhttp-{_DOMAIN}") is not None
         assert _find_create_call(panel, f"wss-{_DOMAIN}") is not None
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_one_of_three_hosts_fail_creates_other_two(self, mock_warn: MagicMock) -> None:
+    def test_one_of_three_hosts_fail_creates_other_two(self, caplog: pytest.LogCaptureFixture) -> None:
         panel = _make_panel()
 
         def _fail_on_xhttp(**kwargs: object) -> MagicMock:
@@ -265,11 +268,14 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_xhttp
         cluster = _configured_cluster()
-        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         # 3 attempts total (reality, xhttp, wss)
         assert panel.create_host.call_count == 3
-        mock_warn.assert_called()
+        assert caplog.records  # warning for xhttp failure
 
     def test_list_hosts_fails_still_attempts_creation(self) -> None:
         panel = _make_panel()
@@ -378,12 +384,14 @@ class TestCacheInbounds:
         assert len(cluster.inbounds) == 1
         assert ProtocolKey.REALITY in cluster.inbounds
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_handles_api_error_gracefully(self, mock_warn: MagicMock) -> None:
+    def test_handles_api_error_gracefully(self, caplog: pytest.LogCaptureFixture) -> None:
         panel = _make_panel()
         panel.list_inbounds.side_effect = RemnawaveError("unreachable")
         cluster = ClusterConfig()
-        cache_inbounds(panel, cluster)
+        import logging
 
-        mock_warn.assert_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            cache_inbounds(panel, cluster)
+
+        assert caplog.records
         assert len(cluster.inbounds) == 0

@@ -9,6 +9,7 @@ Covers:
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
@@ -16,7 +17,8 @@ import pytest
 import typer
 
 from meridian.commands.setup import _check_ports
-from meridian.panel_bootstrap import deploy_node_container as _deploy_node_container, wait_for_panel_api as _wait_for_panel_api
+from meridian.panel_bootstrap import deploy_node_container as _deploy_node_container
+from meridian.panel_bootstrap import wait_for_panel_api as _wait_for_panel_api
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -76,12 +78,7 @@ class TestDeployNodeContainerHappyPath:
         return conn
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_creates_node_directory(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_creates_node_directory(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         first_call = conn.run.call_args_list[0]
@@ -90,12 +87,7 @@ class TestDeployNodeContainerHappyPath:
         assert "chmod 700" in first_call[0][0]
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_writes_env_file(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_writes_env_file(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         env_writes = [c for c in conn.put_text.call_args_list if c[0][0].endswith("/.env")]
@@ -104,12 +96,7 @@ class TestDeployNodeContainerHappyPath:
         assert env_writes[0].kwargs["sensitive"] is True
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_writes_compose_file(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_writes_compose_file(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         compose_writes = [c for c in conn.put_text.call_args_list if c[0][0].endswith("/docker-compose.yml")]
@@ -117,12 +104,7 @@ class TestDeployNodeContainerHappyPath:
         assert compose_writes[0].kwargs["mode"] == "644"
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_pulls_docker_image(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_pulls_docker_image(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         pull_calls = [c for c in conn.run.call_args_list if c[0][0] == "docker compose pull"]
@@ -132,12 +114,7 @@ class TestDeployNodeContainerHappyPath:
         assert pull_calls[0].kwargs["retry_delay"] == 10
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_starts_container(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_starts_container(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         commands = [c[0][0] for c in conn.run.call_args_list]
@@ -145,12 +122,7 @@ class TestDeployNodeContainerHappyPath:
         assert len(up_cmds) == 1
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_opens_ufw_port_on_healthy_container(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_opens_ufw_port_on_healthy_container(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
         commands = [c[0][0] for c in conn.run.call_args_list]
@@ -159,15 +131,11 @@ class TestDeployNodeContainerHappyPath:
         assert "172.16.0.0/12" in ufw_cmds[0]
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_no_warnings_on_happy_path(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_no_warnings_on_happy_path(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = self._make_healthy_conn()
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_not_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert not caplog.records
 
 
 # ---------------------------------------------------------------------------
@@ -179,12 +147,7 @@ class TestDeployNodeContainerDockerPullRetry:
     """Pull retry logic: 3 attempts, 10s delay between."""
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_pull_succeeds_on_second_attempt(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_pull_succeeds_on_second_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = _conn_mock()
 
         def _run(cmd: str, **kwargs: object) -> SimpleNamespace:
@@ -193,20 +156,16 @@ class TestDeployNodeContainerDockerPullRetry:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_not_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert not caplog.records
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
         assert pull_call.kwargs["retries"] == 3
         assert pull_call.kwargs["retry_delay"] == 10
         mock_time.sleep.assert_not_called()
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_pull_succeeds_on_third_attempt(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_pull_succeeds_on_third_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = _conn_mock()
 
         def _run(cmd: str, **kwargs: object) -> SimpleNamespace:
@@ -215,17 +174,15 @@ class TestDeployNodeContainerDockerPullRetry:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_not_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert not caplog.records
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
         assert pull_call.kwargs["operation_name"] == "pull remnawave node image"
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
     def test_pull_fails_all_three_attempts_warns_and_returns(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
+        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -235,17 +192,13 @@ class TestDeployNodeContainerDockerPullRetry:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_called_once()
-        assert "pull" in mock_warn.call_args[0][0].lower()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert len(caplog.records) == 1
+        assert "pull" in caplog.records[0].message.lower()
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_pull_failure_does_not_start_container(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_pull_failure_does_not_start_container(self, mock_time: MagicMock) -> None:
         conn = _conn_mock()
 
         def _run(cmd: str, **kwargs: object) -> SimpleNamespace:
@@ -268,12 +221,7 @@ class TestDeployNodeContainerHealthGate:
     """Health polling: 10 attempts, 3s delay, docker inspect check."""
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_health_succeeds_on_third_attempt(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_health_succeeds_on_third_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = _conn_mock()
         health_results = iter([_fail_result(), _fail_result(), _ok_result(stdout="true\n")])
 
@@ -283,17 +231,15 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_not_called()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert not caplog.records
         # sleep(3) called between health check attempts
         assert call(3) in mock_time.sleep.call_args_list
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
     def test_health_timeout_warns_with_docker_logs(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
+        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -305,19 +251,16 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_called_once()
-        warning_text = mock_warn.call_args[0][0]
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        warning_records = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warning_records) == 1
+        warning_text = warning_records[0].message
         assert "healthy" in warning_text.lower() or "health" in warning_text.lower()
         assert "could not connect" in warning_text
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_health_timeout_still_opens_ufw(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_health_timeout_still_opens_ufw(self, mock_time: MagicMock) -> None:
         """UFW rule is opened regardless of health outcome."""
         conn = _conn_mock()
 
@@ -335,12 +278,7 @@ class TestDeployNodeContainerHealthGate:
         assert len(ufw_cmds) == 1
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_health_gate_polls_up_to_ten_times(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
-    ) -> None:
+    def test_health_gate_polls_up_to_ten_times(self, mock_time: MagicMock) -> None:
         conn = _conn_mock()
 
         def _run(cmd: str, **kwargs: object) -> SimpleNamespace:
@@ -366,11 +304,8 @@ class TestDeployNodeContainerFailures:
     """Non-fatal failures: mkdir, compose up."""
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
     def test_mkdir_failure_warns_and_returns_early(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
+        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -380,18 +315,16 @@ class TestDeployNodeContainerFailures:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_called_once()
-        assert _NODE_DIR in mock_warn.call_args[0][0]
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert len(caplog.records) == 1
+        assert _NODE_DIR in caplog.records[0].message
         # Only mkdir was called — no further commands
         assert conn.run.call_count == 1
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
     def test_compose_up_failure_warns_and_returns_early(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
+        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -401,20 +334,18 @@ class TestDeployNodeContainerFailures:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        mock_warn.assert_called_once()
-        assert "failed to start" in mock_warn.call_args[0][0].lower()
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert len(caplog.records) == 1
+        assert "failed to start" in caplog.records[0].message.lower()
         # No health check or UFW after compose up failure
         commands = [c[0][0] for c in conn.run.call_args_list]
         assert not any("docker inspect" in c for c in commands)
         assert not any("ufw allow" in c for c in commands)
 
     @patch("meridian.panel_bootstrap.time")
-    @patch("meridian.panel_bootstrap.ok")
-    @patch("meridian.panel_bootstrap.info")
-    @patch("meridian.panel_bootstrap.warn")
     def test_compose_up_failure_includes_stderr_in_warning(
-        self, mock_warn: MagicMock, mock_info: MagicMock, mock_ok: MagicMock, mock_time: MagicMock
+        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -424,8 +355,9 @@ class TestDeployNodeContainerFailures:
             return _ok_result()
 
         conn.run.side_effect = _run
-        _deploy_node_container(conn, _SECRET_KEY)
-        assert "port already allocated" in mock_warn.call_args[0][0]
+        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+            _deploy_node_container(conn, _SECRET_KEY)
+        assert "port already allocated" in caplog.records[0].message
 
 
 # ---------------------------------------------------------------------------
@@ -436,41 +368,31 @@ class TestDeployNodeContainerFailures:
 class TestCheckPortsHappyPath:
     """Both ports free or held by allowed Meridian processes."""
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_ports_free(self, mock_warn: MagicMock) -> None:
+    def test_ports_free(self) -> None:
         """Empty ss output means port is free."""
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout="")
         _check_ports(conn, _IP, yes=True)
-        mock_warn.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_port_held_by_nginx_is_allowed(self, mock_warn: MagicMock) -> None:
+    def test_port_held_by_nginx_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("nginx",pid=1234,fd=6))\n')
         _check_ports(conn, _IP, yes=True)
-        mock_warn.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_port_held_by_xray_is_allowed(self, mock_warn: MagicMock) -> None:
+    def test_port_held_by_xray_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("xray",pid=5678,fd=7))\n')
         _check_ports(conn, _IP, yes=True)
-        mock_warn.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_port_held_by_docker_proxy_is_allowed(self, mock_warn: MagicMock) -> None:
+    def test_port_held_by_docker_proxy_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("docker-proxy",pid=999,fd=4))\n')
         _check_ports(conn, _IP, yes=True)
-        mock_warn.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.warn")
-    def test_port_held_by_remnawave_node_is_allowed(self, mock_warn: MagicMock) -> None:
+    def test_port_held_by_remnawave_node_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:80 *:* users:(("remnawave-node",pid=444,fd=3))\n')
         _check_ports(conn, _IP, yes=True)
-        mock_warn.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -483,9 +405,8 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_in_yes_mode_calls_fail(
-        self, mock_warn: MagicMock, mock_fail: MagicMock, mock_err_console: MagicMock
+        self, mock_fail: MagicMock, mock_err_console: MagicMock
     ) -> None:
         """With --yes, a conflicting process triggers fail() which raises Exit."""
         mock_fail.side_effect = typer.Exit(2)
@@ -499,10 +420,8 @@ class TestCheckPortsConflict:
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.choose", return_value=2)
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_interactive_abort(
         self,
-        mock_warn: MagicMock,
         mock_fail: MagicMock,
         mock_choose: MagicMock,
         mock_err_console: MagicMock,
@@ -517,10 +436,8 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.choose", return_value=1)
-    @patch("meridian.panel_bootstrap.warn")
     def test_non_meridian_process_interactive_retry_then_free(
         self,
-        mock_warn: MagicMock,
         mock_choose: MagicMock,
         mock_err_console: MagicMock,
     ) -> None:
@@ -537,10 +454,7 @@ class TestCheckPortsConflict:
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.fail")
-    @patch("meridian.panel_bootstrap.warn")
-    def test_unknown_process_treated_as_conflict(
-        self, mock_warn: MagicMock, mock_fail: MagicMock, mock_err_console: MagicMock
-    ) -> None:
+    def test_unknown_process_treated_as_conflict(self, mock_fail: MagicMock, mock_err_console: MagicMock) -> None:
         """When regex can't extract process name, 'unknown' is not in allowed set."""
         mock_fail.side_effect = typer.Exit(2)
         conn = MagicMock()

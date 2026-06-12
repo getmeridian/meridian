@@ -343,7 +343,6 @@ class TestStructuralHealth:
         # TODO: these modules still import fail — remove from allowlist
         # after each is migrated to raise MeridianError subclasses instead.
         allowlist = {
-            "panel_bootstrap.py",
             "resolve.py",
             "xray_config.py",
         }
