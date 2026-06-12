@@ -1,4 +1,10 @@
-"""SSH connection helpers."""
+"""SSH connection helpers.
+
+This module is a pure transport layer with no Rich/console dependency.
+All user-facing output goes through an optional ``SSHUI`` callback
+protocol so that CLI callers get Rich output while Engine/headless
+callers stay dependency-free.
+"""
 
 from __future__ import annotations
 
@@ -11,12 +17,104 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
-from meridian.console import err_console, info, ok, warn
 from meridian.ssh_keys import host_key_known
 
 logger = logging.getLogger("meridian.ssh")
+
+
+class SSHError(Exception):
+    """Raised when an SSH operation fails.
+
+    Attributes:
+        hint: Optional recovery suggestion for the user.
+        hint_type: Error category --- "user", "system", or "bug".
+    """
+
+    def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system") -> None:
+        super().__init__(msg)
+        self.hint = hint
+        self.hint_type = hint_type
+
+
+# ---------------------------------------------------------------------------
+# UI callback protocol --- decouples transport from presentation
+# ---------------------------------------------------------------------------
+
+
+class SSHUI(Protocol):
+    """Callback interface for SSH user-facing output.
+
+    The default implementation logs via the ``meridian.ssh`` logger.
+    Pass a Rich-based implementation from the CLI layer to get
+    coloured terminal output identical to the previous behaviour.
+    """
+
+    def info(self, msg: str) -> None: ...
+    def ok(self, msg: str) -> None: ...
+    def warn(self, msg: str) -> None: ...
+    def host_key_prompt(self, ip: str, fingerprint: str, algo: str) -> bool:
+        """Display host-key fingerprint and ask the user to accept.
+
+        Returns ``True`` if the user accepts the key, ``False`` otherwise.
+        Raises ``SSHError`` if no interactive terminal is available.
+        """
+        ...
+    def ssh_failed(self, ip: str, user: str, stderr: str) -> None: ...
+    def host_key_changed(self, ip: str) -> None: ...
+
+
+class _LogUI:
+    """Default SSHUI that writes to the ``meridian.ssh`` logger."""
+
+    def info(self, msg: str) -> None:
+        logger.info(msg)
+
+    def ok(self, msg: str) -> None:
+        logger.info(msg)
+
+    def warn(self, msg: str) -> None:
+        logger.warning(msg)
+
+    def host_key_prompt(self, ip: str, fingerprint: str, algo: str) -> bool:
+        """Prompt via /dev/tty (OS-level, no Rich dependency)."""
+        lines = [f"First connection to {ip}"]
+        if fingerprint:
+            lines.append(f"Host key fingerprint: {fingerprint}")
+        else:
+            lines.append(f"Host key type: {algo}")
+        lines.append("Verify this matches your VPS provider's console.")
+        lines.append("A mismatch may indicate a network attack.")
+        for ln in lines:
+            logger.info(ln)
+
+        try:
+            with open("/dev/tty") as tty:
+                print("\n  -> Trust this host key? [Y/n] ", end="", flush=True)  # noqa: T201
+                answer = tty.readline().strip().lower()
+        except OSError:
+            raise SSHError(
+                f"Cannot verify host key for {ip} (no terminal available)",
+                hint="Run interactively, or pre-add the key: ssh-keyscan IP >> ~/.ssh/known_hosts",
+                hint_type="user",
+            )
+        return answer in ("", "y", "yes")
+
+    def ssh_failed(self, ip: str, user: str, stderr: str) -> None:
+        logger.error("SSH connection failed: %s", stderr)
+        logger.info("1. Copy your SSH key:  ssh-copy-id %s@%s", user, ip)
+        logger.info("2. Test manually:      ssh %s@%s", user, ip)
+        logger.info("3. Different user:     meridian deploy IP --user ubuntu")
+
+    def host_key_changed(self, ip: str) -> None:
+        logger.error("Host key for %s has CHANGED!", ip)
+        logger.warning("This could indicate a network attack (MitM).")
+        logger.info("If you recently rebuilt this server, remove the old key:")
+        logger.info("  ssh-keygen -R %s", ip)
+
+
+_DEFAULT_UI = _LogUI()
 
 # Patterns to redact from debug log output (env var assignments with secrets)
 _SECRET_PATTERNS = re.compile(
@@ -77,20 +175,6 @@ def _stringify_output(value: str | bytes | None) -> str:
     return value
 
 
-class SSHError(Exception):
-    """Raised when an SSH operation fails.
-
-    Attributes:
-        hint: Optional recovery suggestion for the user.
-        hint_type: Error category — "user", "system", or "bug".
-    """
-
-    def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system") -> None:
-        super().__init__(msg)
-        self.hint = hint
-        self.hint_type = hint_type
-
-
 SSH_OPTS: list[str] = [
     "-o",
     "BatchMode=yes",
@@ -141,12 +225,15 @@ def _host_key_known(ip: str, port: int = 22) -> bool:
     return host_key_known(ip, port)
 
 
-def _verify_host_key(ip: str, port: int = 22) -> bool:
+def _verify_host_key(ip: str, port: int = 22, *, ui: SSHUI | None = None) -> bool:
     """Scan, display, and prompt user to verify the SSH host key.
 
     Returns True if the user accepts (key added to known_hosts), False otherwise.
     Uses ssh-keyscan to fetch the key and ssh-keygen to compute the fingerprint.
     """
+    if ui is None:
+        ui = _DEFAULT_UI
+
     # Scan the host key
     keyscan_cmd = ["ssh-keyscan", "-T", "5"]
     if port != 22:
@@ -161,15 +248,15 @@ def _verify_host_key(ip: str, port: int = 22) -> bool:
             stdin=subprocess.DEVNULL,
         )
         if result.returncode != 0 or not result.stdout.strip():
-            warn(f"Could not scan host key for {ip}")
+            ui.warn(f"Could not scan host key for {ip}")
             return False
     except (subprocess.TimeoutExpired, FileNotFoundError):
-        warn(f"Could not scan host key for {ip}")
+        ui.warn(f"Could not scan host key for {ip}")
         return False
 
     key_lines = [line for line in result.stdout.strip().splitlines() if line and not line.startswith("#")]
     if not key_lines:
-        warn(f"No host keys found for {ip}")
+        ui.warn(f"No host keys found for {ip}")
         return False
 
     # Prefer ed25519 > ecdsa > rsa
@@ -197,37 +284,14 @@ def _verify_host_key(ip: str, port: int = 22) -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         fingerprint = ""
 
-    # Display to user
+    # Extract algorithm for display
     key_type = preferred.split()[1] if len(preferred.split()) >= 2 else "unknown"
-    # key_type is the full key data, extract algorithm from the 3rd field
     parts = preferred.split()
     algo = parts[1] if len(parts) >= 3 else key_type
 
-    err_console.print()
-    err_console.print(f"  [warn]![/warn] First connection to {ip}")
-    if fingerprint:
-        err_console.print("  [dim]Host key fingerprint:[/dim]")
-        err_console.print(f"  [bold]{fingerprint}[/bold]")
-    else:
-        err_console.print(f"  [dim]Host key type: {algo}[/dim]")
-    err_console.print()
-    err_console.print("  [dim]Verify this matches your VPS provider's console.[/dim]")
-    err_console.print("  [dim]A mismatch may indicate a network attack.[/dim]")
-
-    # Prompt user
-    try:
-        with open("/dev/tty") as tty:
-            err_console.print("\n  [info]\u2192[/info] Trust this host key? [dim][Y/n][/dim] ", end="")
-            answer = tty.readline().strip().lower()
-    except OSError:
-        # No TTY — refuse to accept host key silently (MitM risk)
-        raise SSHError(
-            f"Cannot verify host key for {ip} (no terminal available)",
-            hint="Run interactively, or pre-add the key: ssh-keyscan IP >> ~/.ssh/known_hosts",
-            hint_type="user",
-        )
-
-    if answer not in ("", "y", "yes"):
+    # Prompt user via UI callback (handles display + TTY interaction)
+    accepted = ui.host_key_prompt(ip, fingerprint, algo)
+    if not accepted:
         return False
 
     # Add only the verified key to known_hosts (user only saw this fingerprint)
@@ -236,7 +300,7 @@ def _verify_host_key(ip: str, port: int = 22) -> bool:
     with open(known_hosts, "a") as f:
         f.write(preferred + "\n")
 
-    ok("Host key saved")
+    ui.ok("Host key saved")
     return True
 
 
@@ -501,19 +565,29 @@ class ServerConnection:
         assert last is not None
         return last
 
-    def check_ssh(self) -> None:
-        """Verify SSH connectivity. Exits on failure.
+    def check_ssh(self, *, ui: SSHUI | None = None) -> None:
+        """Verify SSH connectivity. Raises SSHError on failure.
 
         On first connection to an unknown host, scans the host key,
         displays the fingerprint, and prompts the user to verify it.
+
+        Args:
+            ui: Optional UI callback for progress/error output.
+                Defaults to logger-based output.
         """
         if self.local_mode:
             return
-        info(f"Checking SSH connectivity to {self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else ""))
+        if ui is None:
+            ui = _DEFAULT_UI
+
+        ui.info(
+            f"Checking SSH connectivity to {self.user}@{self.ip}"
+            + (f":{self.port}" if self.port != 22 else "")
+        )
 
         # Verify host key on first connection
         if not _host_key_known(self.ip, self.port):
-            if not _verify_host_key(self.ip, self.port):
+            if not _verify_host_key(self.ip, self.port, ui=ui):
                 raise SSHError(
                     f"Host key for {self.ip} not accepted",
                     hint="Verify the fingerprint matches your VPS provider's console.",
@@ -530,26 +604,20 @@ class ServerConnection:
             # run() converts TimeoutExpired to returncode=124
             if result.returncode == 124:
                 raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", hint_type="system")
-            # Host key changed — warn clearly
+            # Host key changed
             if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
-                err_console.print(f"\n  [error]Host key for {self.ip} has CHANGED![/error]")
-                err_console.print("  [warn]This could indicate a network attack (MitM).[/warn]")
-                err_console.print("  [dim]If you recently rebuilt this server, remove the old key:[/dim]")
-                err_console.print(f"  [dim]  ssh-keygen -R {self.ip}[/dim]")
+                ui.host_key_changed(self.ip)
                 raise SSHError(f"Host key verification failed for {self.ip}", hint_type="system")
-            # sudo not found — non-root user on a system without sudo
+            # sudo not found
             if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
                 raise SSHError(
                     f"sudo is not installed on {self.ip}",
                     hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
                     hint_type="system",
                 )
-            err_console.print(f"\n  [error]SSH connection failed:[/error] {stderr}")
-            err_console.print(f"  [dim]1. Copy your SSH key:  ssh-copy-id {self.user}@{self.ip}[/dim]")
-            err_console.print(f"  [dim]2. Test manually:      ssh {self.user}@{self.ip}[/dim]")
-            err_console.print("  [dim]3. Different user:     meridian deploy IP --user ubuntu[/dim]")
+            ui.ssh_failed(self.ip, self.user, stderr)
             raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", hint_type="system")
-        ok("SSH connection successful")
+        ui.ok("SSH connection successful")
 
     def detect_local_mode(self) -> bool:
         """Check if we're running on the target server itself.
@@ -587,7 +655,7 @@ class ServerConnection:
         if file_check_failed:
             try:
                 if SERVER_CREDS_DIR.is_dir():
-                    warn("Running as non-root on the server. Using sudo for commands.")
+                    logger.warning("Running as non-root on the server. Using sudo for commands.")
                     self.local_mode = True
                     self.needs_sudo = True
                     return True

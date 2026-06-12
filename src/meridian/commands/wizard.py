@@ -15,6 +15,7 @@ from meridian.commands.resolve import detect_public_ip, is_local_keyword
 from meridian.config import DEFAULT_SNI, is_ip
 from meridian.console import choose, confirm, err_console, info, prompt, warn
 from meridian.ssh import ServerConnection
+from meridian.ssh_ui import RichSSHUI
 
 
 @dataclass
@@ -153,7 +154,7 @@ def interactive_wizard(
                     if not is_local:
                         conn.detect_local_mode()
                         if not conn.local_mode:
-                            conn.check_ssh()
+                            conn.check_ssh(ui=RichSSHUI())
 
                     from meridian.commands.scan import scan_for_sni
 

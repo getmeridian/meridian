@@ -10,6 +10,7 @@ from meridian.console import err_console, fail, info, line, ok, warn
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh_ui import RichSSHUI
 
 
 def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22) -> None:
@@ -28,7 +29,7 @@ def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22) -> 
 
     info(f"Connecting to {request.ip}...")
     try:
-        conn.check_ssh()
+        conn.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
 

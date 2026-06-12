@@ -141,6 +141,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
     import shlex
 
     from meridian.ssh import ServerConnection, SSHError
+    from meridian.ssh_ui import RichSSHUI
 
     request = validate_command_input(NodeTargetRequest, "Invalid node check request", ip_or_name=ip_or_name, user=user)
     cluster = load_cluster()
@@ -175,7 +176,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
     ssh_user = request.user or node.ssh_user or "root"
     try:
         conn = ServerConnection(ip=node.ip, user=ssh_user, port=node.ssh_port)
-        conn.check_ssh()
+        conn.check_ssh(ui=RichSSHUI())
         ok("SSH: connected")
     except SSHError:
         err_console.print("  [red]✗[/red] SSH: cannot connect")

@@ -16,6 +16,7 @@ from meridian.config import CREDS_BASE, RELAY_SERVICE_NAME, SERVERS_FILE, saniti
 from meridian.console import err_console, fail, info, ok, prompt, warn
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
+from meridian.ssh_ui import RichSSHUI
 
 
 def run(
@@ -67,7 +68,7 @@ def run(
         for relay in relays_for_node:
             try:
                 relay_conn = ServerConnection(ip=relay.ip, user=user)
-                relay_conn.check_ssh()
+                relay_conn.check_ssh(ui=RichSSHUI())
                 relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
                 relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
                 ok(f"Relay {relay.ip} stopped")

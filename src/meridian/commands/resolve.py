@@ -12,6 +12,7 @@ from meridian.config import SERVER_CREDS_DIR, creds_dir_for, is_ip
 from meridian.console import err_console, fail, info, warn
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh_ui import RichSSHUI
 
 if TYPE_CHECKING:
     from meridian.credentials import ServerCredentials
@@ -365,7 +366,7 @@ def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
                 conn=resolved.conn,
             )
     try:
-        resolved.conn.check_ssh()
+        resolved.conn.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
     return resolved

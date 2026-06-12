@@ -35,6 +35,7 @@ from meridian.relay_ops import (
 from meridian.remnawave import RemnawaveError
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh_ui import RichSSHUI
 
 
 def run_deploy(
@@ -97,7 +98,7 @@ def run_deploy(
     info(f"Connecting to relay server: {request.relay_ip}")
     relay_conn = ServerConnection(ip=request.relay_ip, user=request.user, port=request.ssh_port)
     try:
-        relay_conn.check_ssh()
+        relay_conn.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
 
@@ -226,7 +227,7 @@ def run_deploy(
         info("Configuring nginx SNI routing on exit server...")
         exit_conn = ServerConnection(ip=exit_ip, user=exit_node.ssh_user, port=exit_node.ssh_port)
         try:
-            exit_conn.check_ssh()
+            exit_conn.check_ssh(ui=RichSSHUI())
         except SSHError as exc:
             fail(f"Cannot SSH to exit node {exit_ip}: {exc}", hint="Check exit node SSH access", hint_type="system")
         if not deploy_relay_nginx(exit_conn, relay_sni, request.relay_ip, request.relay_name):
@@ -428,7 +429,7 @@ def run_remove(
         info("Removing relay nginx config from exit server...")
         try:
             exit_conn = ServerConnection(ip=exit_node.ip, user=exit_node.ssh_user, port=exit_node.ssh_port)
-            exit_conn.check_ssh()
+            exit_conn.check_ssh(ui=RichSSHUI())
             if not remove_relay_nginx(exit_conn, relay_entry):
                 warn("Relay nginx cleanup failed -- manual cleanup may be needed")
         except SSHError:
@@ -438,7 +439,7 @@ def run_remove(
     info(f"Stopping relay service on {request.relay_ip}...")
     try:
         relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
-        relay_conn.check_ssh()
+        relay_conn.check_ssh(ui=RichSSHUI())
         relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
         relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
         ok("Relay service stopped")
@@ -493,7 +494,7 @@ def run_check(
     # 1. SSH connectivity to relay
     try:
         relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
-        relay_conn.check_ssh()
+        relay_conn.check_ssh(ui=RichSSHUI())
         ok("SSH to relay: connected")
     except (SSHError, OSError):
         err_console.print(f"  [red bold]x[/red bold] SSH to relay: failed ({request.relay_ip})")
