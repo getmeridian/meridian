@@ -6,27 +6,17 @@ import secrets
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
 from meridian.core.deploy import DeployRequest
 from meridian.core.models import Event, EventLevel
-from meridian.core.operations import DeployOperationResult
+from meridian.core.operations import DeployOperationResult, OperationKind, OperationState
+from meridian.core.output import now_iso
 from meridian.core.redaction import redact
 from meridian.engine.errors import EngineError
 
-OperationState = Literal[
-    "queued",
-    "running",
-    "succeeded",
-    "failed",
-    "cancel_requested",
-    "cancelled",
-    "completed_after_cancel",
-]
-OperationKind = Literal["deploy"]
 OperationRunner = Callable[[DeployRequest, "EngineOperation"], dict[str, Any]]
 
 
@@ -58,7 +48,7 @@ class EngineOperation:
         self.request = request
         self.request_target = request_target or _deploy_target_key(request)
         self.state: OperationState = "queued"
-        self.created_at = _now()
+        self.created_at = now_iso()
         self.updated_at = self.created_at
         self.events: list[dict[str, Any]] = []
         self.result: dict[str, Any] | None = None
@@ -103,7 +93,7 @@ class EngineOperation:
                     "schema": "meridian.event/v1",
                     "operation_id": self.id,
                     "seq": 0,
-                    "time": _now(),
+                    "time": now_iso(),
                     "level": "warning",
                     "type": "warning",
                     "phase": "engine",
@@ -114,7 +104,7 @@ class EngineOperation:
         with self._lock:
             payload["seq"] = len(self.events) + 1
             self.events.append(payload)
-            self.updated_at = _now()
+            self.updated_at = now_iso()
 
     def emit_status(
         self,
@@ -132,7 +122,7 @@ class EngineOperation:
                 "schema": "meridian.event/v1",
                 "operation_id": self.id,
                 "seq": 0,
-                "time": _now(),
+                "time": now_iso(),
                 "level": level,
                 "type": status_type,
                 "phase": phase,
@@ -146,7 +136,7 @@ class EngineOperation:
             if self.state == "cancelled":
                 return False
             self.state = "running"
-            self.updated_at = _now()
+            self.updated_at = now_iso()
             return True
 
     def mark_succeeded(self, result: dict[str, Any]) -> None:
@@ -154,17 +144,17 @@ class EngineOperation:
             if self.state == "cancel_requested":
                 self.result = redact(result)
                 self.state = "completed_after_cancel"
-                self.updated_at = _now()
+                self.updated_at = now_iso()
                 return
             self.result = redact(result)
             self.state = "succeeded"
-            self.updated_at = _now()
+            self.updated_at = now_iso()
 
     def mark_failed(self, error: dict[str, Any]) -> None:
         with self._lock:
             self.error = redact(error)
             self.state = "failed"
-            self.updated_at = _now()
+            self.updated_at = now_iso()
 
     def cancel(self) -> OperationState:
         with self._lock:
@@ -172,7 +162,7 @@ class EngineOperation:
                 self.state = "cancelled"
             elif self.state == "running":
                 self.state = "cancel_requested"
-            self.updated_at = _now()
+            self.updated_at = now_iso()
             return self.state
 
     def cancel_requested(self) -> bool:
@@ -310,10 +300,6 @@ class OperationManager:
             ):
                 return operation
         return None
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _deploy_target_key(request: DeployRequest) -> str:
