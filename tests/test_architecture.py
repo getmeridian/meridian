@@ -116,12 +116,20 @@ class TestLayerBoundaries:
             tree = ast.parse(path.read_text(), filename=str(path))
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("meridian.commands"):
-                    for alias in node.names:
-                        if alias.name.startswith("_"):
-                            violations.append(
-                                f"{path.name} imports private {alias.name} from {node.module}"
-                            )
-        assert violations == [], "Library modules import private command symbols:\n" + "\n".join(violations)
+                    # Reject any import from meridian.commands.resolve — those
+                    # symbols now live in meridian.resolve.
+                    if node.module == "meridian.commands.resolve" or node.module.startswith("meridian.commands.resolve."):
+                        imported = ", ".join(a.name for a in node.names)
+                        violations.append(
+                            f"{path.name} imports {imported} from {node.module} — use meridian.resolve"
+                        )
+                    else:
+                        for alias in node.names:
+                            if alias.name.startswith("_"):
+                                violations.append(
+                                    f"{path.name} imports private {alias.name} from {node.module}"
+                                )
+        assert violations == [], "Library modules import command-layer symbols:\n" + "\n".join(violations)
 
 
 # ---------------------------------------------------------------------------
