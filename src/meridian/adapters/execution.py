@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, RemoteCommandResult, RemoteExecutor
 from meridian.ssh import CommandResult
@@ -111,7 +110,14 @@ class RemoteExecutorConnection:
         text: str,
         *,
         encoding: str = "utf-8",
-        **kwargs: Any,
+        mode: str | int | None = None,
+        owner: str | None = None,
+        sudo: bool | None = None,
+        atomic: bool = True,
+        create_parent: bool = False,
+        sensitive: bool = False,
+        timeout: int = 30,
+        operation_name: str = "write file",
     ) -> CommandResult:
         return legacy_command_result(
             self.executor.put_text(
@@ -119,14 +125,14 @@ class RemoteExecutorConnection:
                     remote_path=remote_path,
                     text=text,
                     encoding=encoding,
-                    mode=kwargs.get("mode"),
-                    owner=kwargs.get("owner"),
-                    sudo=kwargs.get("sudo"),
-                    atomic=kwargs.get("atomic", True),
-                    create_parent=kwargs.get("create_parent", False),
-                    sensitive=kwargs.get("sensitive", False),
-                    timeout=kwargs.get("timeout", 30),
-                    operation_name=kwargs.get("operation_name", "write file"),
+                    mode=mode,
+                    owner=owner,
+                    sudo=sudo,
+                    atomic=atomic,
+                    create_parent=create_parent,
+                    sensitive=sensitive,
+                    timeout=timeout,
+                    operation_name=operation_name,
                 )
             )
         )
