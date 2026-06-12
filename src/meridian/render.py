@@ -426,18 +426,11 @@ def _render_pwa_template(
         logger.warning("Failed to load PWA template %s: %s", filename, exc)
         return ""
 
-    from jinja2 import BaseLoader, Environment, TemplateError
+    from jinja2 import TemplateError
 
     # HTML templates get autoescape; JSON manifests do not
     use_autoescape = filename.endswith(".html.j2")
-    env = Environment(loader=BaseLoader(), autoescape=use_autoescape)
-
-    def default_filter(value: object, default_value: object = "") -> object:
-        if value is None or value == "":
-            return default_value
-        return value
-
-    env.filters["default"] = default_filter
+    env = _create_jinja_env(autoescape=use_autoescape)
     env.filters["capitalize"] = lambda v: str(v).capitalize()
     env.filters["tojson"] = lambda v: json.dumps(str(v), ensure_ascii=False)[1:-1]
 
@@ -452,6 +445,26 @@ def _render_pwa_template(
 # ---------------------------------------------------------------------------
 # Shared internal helpers
 # ---------------------------------------------------------------------------
+
+
+def _create_jinja_env(*, autoescape: bool = True) -> "Environment":
+    """Create a Jinja2 Environment with common filters.
+
+    Both ``_render_template`` (connection-info) and ``_render_pwa_template``
+    (PWA shell/manifest) share the ``default`` filter and BaseLoader.
+    Callers add template-specific filters after creation.
+    """
+    from jinja2 import BaseLoader, Environment
+
+    env = Environment(loader=BaseLoader(), autoescape=autoescape)
+
+    def default_filter(value: object, default_value: object = "") -> object:
+        if value is None or value == "":
+            return default_value
+        return value
+
+    env.filters["default"] = default_filter
+    return env
 
 
 def _load_template_text() -> str | None:
@@ -581,16 +594,7 @@ def _render_template(
             TemplateError = Exception  # type: ignore[assignment,misc]
 
         try:
-            from jinja2 import BaseLoader, Environment
-
-            env = Environment(loader=BaseLoader(), autoescape=True)
-
-            def default_filter(value: object, default_value: object = "") -> object:
-                if value is None or value == "":
-                    return default_value
-                return value
-
-            env.filters["default"] = default_filter
+            env = _create_jinja_env(autoescape=True)
             env.filters["bool"] = lambda v: str(v).lower() in ("true", "1", "yes")
 
             tmpl = env.from_string(template_text)
