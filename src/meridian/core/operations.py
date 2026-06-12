@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import Field
 
@@ -19,6 +19,18 @@ OperationState = Literal[
     "completed_after_cancel",
 ]
 OperationKind = Literal["deploy"]
+
+
+class DeployEventSink(Protocol):
+    """Narrow event-sink protocol for deploy process adapters.
+
+    Adapters push JSONL events into the running operation without
+    depending on the full ``EngineOperation`` class.
+    """
+
+    def add_event(self, event: dict[str, Any]) -> None:
+        """Record a typed deploy event."""
+
 
 
 class OperationSnapshot(CoreModel):

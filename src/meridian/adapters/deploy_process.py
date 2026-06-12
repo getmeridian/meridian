@@ -12,12 +12,12 @@ from typing import Any, cast
 from pydantic import ValidationError
 
 from meridian.core.deploy import DeployRequest, DeployResult
+from meridian.core.errors import EngineError
 from meridian.core.models import ErrorCategory
-from meridian.engine.errors import EngineError
-from meridian.engine.operations import EngineOperation
+from meridian.core.operations import DeployEventSink
 
 
-def run_deploy_process(request: DeployRequest, operation: EngineOperation) -> dict[str, Any]:
+def run_deploy_process(request: DeployRequest, operation: DeployEventSink) -> dict[str, Any]:
     """Run the stable CLI process API and stream JSONL events into Engine state."""
     with tempfile.TemporaryDirectory(prefix="meridian-engine-") as tmp:
         request_path = Path(tmp) / "deploy.json"
@@ -68,7 +68,7 @@ def run_deploy_process(request: DeployRequest, operation: EngineOperation) -> di
     }
 
 
-def _capture_event(text: str, operation: EngineOperation, stderr_tail: list[str]) -> None:
+def _capture_event(text: str, operation: DeployEventSink, stderr_tail: list[str]) -> None:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:

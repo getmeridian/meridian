@@ -7,6 +7,7 @@ from pathlib import Path
 
 CORE_DIR = Path(__file__).resolve().parents[1] / "src" / "meridian" / "core"
 ENGINE_DIR = Path(__file__).resolve().parents[1] / "src" / "meridian" / "engine"
+ADAPTERS_DIR = Path(__file__).resolve().parents[1] / "src" / "meridian" / "adapters"
 FORBIDDEN_IMPORTS = (
     "meridian.commands",
     "meridian.console",
@@ -18,6 +19,9 @@ ENGINE_FORBIDDEN_IMPORTS = FORBIDDEN_IMPORTS + (
     "meridian.remnawave",
     "meridian.renderers",
     "meridian.ssh",
+)
+ADAPTER_FORBIDDEN_IMPORTS = (
+    "meridian.engine",
 )
 
 
@@ -48,5 +52,15 @@ def test_engine_does_not_import_commands_or_runtime_adapters() -> None:
         for module in _imported_module_names(path):
             if any(module == forbidden or module.startswith(f"{forbidden}.") for forbidden in ENGINE_FORBIDDEN_IMPORTS):
                 violations.append(f"{path.relative_to(ENGINE_DIR)} imports {module}")
+
+    assert violations == []
+
+
+def test_adapters_do_not_import_engine_modules() -> None:
+    violations: list[str] = []
+    for path in sorted(ADAPTERS_DIR.rglob("*.py")):
+        for module in _imported_module_names(path):
+            if any(module == forbidden or module.startswith(f"{forbidden}.") for forbidden in ADAPTER_FORBIDDEN_IMPORTS):
+                violations.append(f"{path.relative_to(ADAPTERS_DIR)} imports {module}")
 
     assert violations == []
