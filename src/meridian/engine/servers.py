@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Protocol
 
 from meridian.config import MERIDIAN_SSH_KEY_FILE
+from meridian.core.execution import ServerCommandResult, ServerConnection
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
     ServerBootstrapKeyResult,
@@ -36,26 +37,9 @@ class ServerProfileStoreLike(Protocol):
         """Insert or replace a server profile."""
 
 
-class CommandResultLike(Protocol):
-    """Small command-result surface used by Engine server operations."""
-
-    returncode: int
-    stdout: str
-    stderr: str
-
-
-class ServerConnectionLike(Protocol):
-    """Small subset of ServerConnection used by onboarding operations."""
-
-    def run(
-        self,
-        command: str,
-        timeout: int = 30,
-        *,
-        sudo: bool | None = None,
-        sensitive: bool = False,
-    ) -> CommandResultLike:
-        """Run a command on the server."""
+# Re-export core protocols under their legacy engine names.
+CommandResultLike = ServerCommandResult
+ServerConnectionLike = ServerConnection
 
 
 class ServerConnectionFactory(Protocol):

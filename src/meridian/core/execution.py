@@ -101,3 +101,29 @@ class RemoteExecutor(Protocol):
     def get_text(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> RemoteCommandResult: ...
 
     def close(self) -> None: ...
+
+
+class ServerCommandResult(Protocol):
+    """Lightweight command-result surface for server onboarding probes."""
+
+    returncode: int
+    stdout: str
+    stderr: str
+
+
+class ServerConnection(Protocol):
+    """Lightweight SSH connection surface for server onboarding probes.
+
+    Smaller than ``RemoteExecutor``; covers only the ``conn.run()`` subset
+    needed by server validation, key bootstrap, and OS detection.
+    """
+
+    def run(
+        self,
+        command: str,
+        timeout: int = 30,
+        *,
+        sudo: bool | None = None,
+        sensitive: bool = False,
+    ) -> ServerCommandResult:
+        """Run a command on the server."""

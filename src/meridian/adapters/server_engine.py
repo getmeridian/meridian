@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from meridian.core.execution import ServerConnection
 from meridian.core.servers import ServerProfile
-from meridian.engine.servers import ServerConnectionLike
-from meridian.ssh import ServerConnection
+from meridian.ssh import ServerConnection as SSHServerConnection
 
 
 def default_server_connection_factory(
@@ -12,9 +12,9 @@ def default_server_connection_factory(
     *,
     identity_file: str = "",
     password: str = "",
-) -> ServerConnectionLike:
+) -> ServerConnection:
     """Create a non-interactive SSH connection for local Engine operations."""
-    return ServerConnection(
+    return SSHServerConnection(
         profile.host,
         profile.ssh_user,
         port=profile.ssh_port,
