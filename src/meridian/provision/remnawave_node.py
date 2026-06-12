@@ -2,13 +2,10 @@
 
 Deploys the Remnawave node container on a proxy server. The node uses
 host networking so Xray can bind to specific localhost ports. The node
-API port is used for panel→node communication (mTLS, token-authenticated).
+API port is used for panel->node communication (mTLS, token-authenticated).
 """
 
 from __future__ import annotations
-
-import shlex
-import time
 
 from meridian.config import (
     REMNAWAVE_NODE_API_PORT,
@@ -16,6 +13,7 @@ from meridian.config import (
     REMNAWAVE_NODE_IMAGE,
 )
 from meridian.facts import ServerFacts
+from meridian.provision.containers import deploy_compose_stack
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -69,29 +67,6 @@ SECRET_KEY={secret_key}
 """
 
 
-def _wait_for_remnawave_node(
-    conn: ServerConnection,
-    node_api_port: int,
-    retries: int = 20,
-    delay: float = 3.0,
-) -> None:
-    """Poll the node port until responsive or retries exhausted."""
-    for _ in range(retries):
-        result = conn.run(
-            f"ss -tlnp 'sport = :{node_api_port}' | grep -q ':{node_api_port}'",
-            timeout=15,
-        )
-        if result.returncode == 0:
-            return
-        time.sleep(delay)
-
-    raise RuntimeError(
-        f"Remnawave node did not become responsive on port {node_api_port} "
-        f"after {retries * delay:.0f}s. "
-        f"Check: docker logs {_NODE_CONTAINER} --tail 30"
-    )
-
-
 class DeployRemnawaveNode:
     """Deploy Remnawave node container on a proxy server.
 
@@ -131,93 +106,39 @@ class DeployRemnawaveNode:
                 detail="container already running",
             )
 
-        # -- Create directory structure --
-        for d in (node_dir, f"{node_dir}/logs"):
-            qd = shlex.quote(d)
-            result = conn.run(f"mkdir -p {qd} && chmod 700 {qd}", timeout=15)
-            if result.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to create {d}: {result.stderr.strip()[:200]}",
-                )
-
-        # -- Write .env file --
-        env_content = _render_node_env(node_api_port=node_api_port, secret_key=secret_key)
-        env_path = f"{node_dir}/.env"
-        result = conn.put_text(
-            env_path,
-            env_content,
-            mode="600",
-            sensitive=True,
-            timeout=15,
-            operation_name="write remnawave node env",
-        )
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write .env: {result.stderr.strip()[:200]}",
-            )
-
-        # -- Write docker-compose.yml --
+        # -- Build compose and env content --
         compose_content = _render_node_compose(image=image, node_api_port=node_api_port)
-        compose_path = f"{node_dir}/docker-compose.yml"
-        result = conn.put_text(
-            compose_path,
+        env_content = _render_node_env(node_api_port=node_api_port, secret_key=secret_key)
+
+        # -- Health check: poll the node API port --
+        def _health_check() -> bool:
+            result = conn.run(
+                f"ss -tlnp 'sport = :{node_api_port}' | grep -q ':{node_api_port}'",
+                timeout=15,
+            )
+            return result.returncode == 0
+
+        # -- Deploy via shared compose lifecycle --
+        deploy_result = deploy_compose_stack(
+            conn,
+            node_dir,
             compose_content,
-            mode="644",
-            timeout=15,
-            operation_name="write remnawave node compose",
+            env_content=env_content,
+            dirs=[f"{node_dir}/logs"],
+            health_check=_health_check,
+            health_timeout=60,
+            health_interval=3,
+            pull_retries=3,
+            pull_retry_delay=10,
+            pull_timeout=300,
+            service_name="remnawave-node",
         )
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write docker-compose.yml: {result.stderr.strip()[:200]}",
-            )
 
-        # -- Pull image (with retries) --
-        pull_result = conn.run(
-            "docker compose pull",
-            cwd=node_dir,
-            timeout=300,
-            retries=3,
-            retry_delay=10,
-            operation_name="pull remnawave node image",
-        )
-        if pull_result.returncode != 0:
-            stderr = pull_result.stderr.strip()[:200] or "unknown"
+        if not deploy_result.changed:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"docker compose pull failed after 3 attempts: {stderr}",
-            )
-
-        # -- Start container --
-        result = conn.run("docker compose up -d", cwd=node_dir, timeout=120)
-        if result.returncode != 0:
-            logs = conn.run("docker compose logs --tail 50", cwd=node_dir, timeout=15)
-            log_output = logs.stdout.strip()[:500] if logs.returncode == 0 else "no logs available"
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=(
-                    f"docker compose up failed: {result.stderr.strip()[:200]}\n"
-                    f"Container logs:\n{log_output}\n"
-                    f"Common fixes: check disk space (df -h), "
-                    f"Docker status (systemctl status docker)"
-                ),
-            )
-
-        # -- Wait for node to become responsive --
-        try:
-            _wait_for_remnawave_node(conn, node_api_port)
-        except RuntimeError as e:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=str(e),
+                detail=deploy_result.detail,
             )
 
         return StepResult(name=self.name, status="changed")
