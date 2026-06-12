@@ -11,7 +11,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.remnawave import RemnawaveError
@@ -417,6 +416,7 @@ class TestSetupFirstDeployAdminRegistration:
         assert cluster.panel.api_token == _API_TOKEN
 
     def test_register_and_login_both_fail_exits(self) -> None:
+        from meridian.core.errors import PanelSetupError
         from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
@@ -428,7 +428,7 @@ class TestSetupFirstDeployAdminRegistration:
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
-            pytest.raises(typer.Exit),
+            pytest.raises(PanelSetupError, match="Panel admin registration failed"),
         ):
             setup_first_deploy(
                 resolved=_make_resolved(),
@@ -510,6 +510,7 @@ class TestSetupFirstDeployAdminRegistration:
 
 class TestSetupFirstDeployPanelWait:
     def test_panel_unreachable_fails(self) -> None:
+        from meridian.core.errors import PanelSetupError
         from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
@@ -517,7 +518,7 @@ class TestSetupFirstDeployPanelWait:
         with (
             patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=False),
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
-            pytest.raises(typer.Exit),
+            pytest.raises(PanelSetupError, match="Panel API is not reachable"),
         ):
             setup_first_deploy(
                 resolved=_make_resolved(),
@@ -542,6 +543,7 @@ class TestSetupFirstDeployPanelWait:
 
 class TestSetupFirstDeployNodeEvidence:
     def test_node_container_failure_stops_deploy(self) -> None:
+        from meridian.core.errors import ProvisioningError
         from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
@@ -567,7 +569,7 @@ class TestSetupFirstDeployNodeEvidence:
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
-            pytest.raises(typer.Exit) as exc_info,
+            pytest.raises(ProvisioningError, match="Node container did not become healthy"),
         ):
             setup_first_deploy(
                 resolved=_make_resolved(),
@@ -584,7 +586,6 @@ class TestSetupFirstDeployNodeEvidence:
                 version=_VERSION,
             )
 
-        assert exc_info.value.exit_code == 3
         mock_hosts.assert_not_called()
 
 
@@ -645,6 +646,7 @@ class TestSetupFirstDeployConfigProfile:
         assert cluster.config_profile_uuid == "existing-profile-uuid"
 
     def test_profile_creation_failure_exits(self) -> None:
+        from meridian.core.errors import PanelSetupError
         from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
@@ -669,7 +671,7 @@ class TestSetupFirstDeployConfigProfile:
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
-            pytest.raises(typer.Exit),
+            pytest.raises(PanelSetupError, match="Failed to create config profile"),
         ):
             setup_first_deploy(
                 resolved=_make_resolved(),
@@ -743,6 +745,7 @@ class TestSetupFirstDeployNodeRegistration:
         assert cluster.nodes[0].uuid == "existing-node-uuid"
 
     def test_node_registration_failure_exits(self) -> None:
+        from meridian.core.errors import PanelSetupError
         from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
@@ -768,7 +771,7 @@ class TestSetupFirstDeployNodeRegistration:
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
-            pytest.raises(typer.Exit),
+            pytest.raises(PanelSetupError, match="Failed to register node"),
         ):
             setup_first_deploy(
                 resolved=_make_resolved(),

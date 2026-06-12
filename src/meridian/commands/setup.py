@@ -57,6 +57,7 @@ from meridian.core.deploy_planning import (
     DeployPlan,
 )
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
+from meridian.core.errors import MeridianError
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -378,48 +379,51 @@ def _execute_deploy_request(
     ws_path = deploy_plan.ws_path
     info_page_path = deploy_plan.info_page_path
 
-    # Build and run provisioner pipeline
-    run_provisioner(
-        resolved=resolved,
-        cluster=cluster,
-        domain=domain,
-        sni=sni,
-        harden=harden,
-        is_panel_host=is_first_deploy,
-        secret_path=secret_path,
-        xhttp_port=xhttp_port,
-        reality_port=reality_port,
-        wss_port=wss_port,
-        pq=pq,
-        warp=warp,
-        geo_block=geo_block,
-        xhttp_path=xhttp_path,
-        ws_path=ws_path,
-        info_page_path=info_page_path,
-        reporter=reporter,
-        operation=operation,
-    )
+    # Build and run provisioner pipeline + configure panel via REST API
+    try:
+        run_provisioner(
+            resolved=resolved,
+            cluster=cluster,
+            domain=domain,
+            sni=sni,
+            harden=harden,
+            is_panel_host=is_first_deploy,
+            secret_path=secret_path,
+            xhttp_port=xhttp_port,
+            reality_port=reality_port,
+            wss_port=wss_port,
+            pq=pq,
+            warp=warp,
+            geo_block=geo_block,
+            xhttp_path=xhttp_path,
+            ws_path=ws_path,
+            info_page_path=info_page_path,
+            reporter=reporter,
+            operation=operation,
+        )
 
-    # Post-provisioner: configure panel via REST API
-    configure_panel_and_node(
-        resolved=resolved,
-        cluster=cluster,
-        domain=domain,
-        sni=sni or DEFAULT_SNI,
-        client_name=client_name,
-        is_first_deploy=is_first_deploy,
-        is_redeploy=is_redeploy,
-        secret_path=secret_path,
-        reality_port=reality_port,
-        xhttp_port=xhttp_port,
-        wss_port=wss_port,
-        pq=pq,
-        warp=warp,
-        geo_block=geo_block,
-        xhttp_path=xhttp_path,
-        ws_path=ws_path,
-        info_page_path=info_page_path,
-    )
+        # Post-provisioner: configure panel via REST API
+        configure_panel_and_node(
+            resolved=resolved,
+            cluster=cluster,
+            domain=domain,
+            sni=sni or DEFAULT_SNI,
+            client_name=client_name,
+            is_first_deploy=is_first_deploy,
+            is_redeploy=is_redeploy,
+            secret_path=secret_path,
+            reality_port=reality_port,
+            xhttp_port=xhttp_port,
+            wss_port=wss_port,
+            pq=pq,
+            warp=warp,
+            geo_block=geo_block,
+            xhttp_path=xhttp_path,
+            ws_path=ws_path,
+            info_page_path=info_page_path,
+        )
+    except MeridianError as exc:
+        fail(exc)
 
     # Save branding
     if server_name or icon or color:

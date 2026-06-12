@@ -27,12 +27,12 @@ from meridian.config import (
 )
 from meridian.console import (
     err_console,
-    fail,
     info,
     is_quiet_mode,
     ok,
     warn,
 )
+from meridian.core.errors import PanelSetupError, ProvisioningError
 from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
@@ -139,7 +139,7 @@ def run_provisioner(
     provisioner = Provisioner(steps)
 
     if remote_executor is None and not isinstance(resolved.conn, ServerConnection):
-        fail("No SSH connection available", hint_type="bug")
+        raise ProvisioningError("No SSH connection available", category="bug")
     remote_executor = remote_executor or SSHRemoteExecutor(resolved.conn)
     conn = RemoteExecutorConnection(remote_executor)
 
@@ -148,10 +148,9 @@ def run_provisioner(
     # Check for failures
     failed = [r for r in results if r.status == "failed"]
     if failed:
-        fail(
+        raise ProvisioningError(
             "Setup failed",
             hint=f"Step '{failed[0].name}' failed: {failed[0].detail}\nRun: meridian preflight {ctx.ip}",
-            hint_type="system",
         )
 
     if not is_quiet_mode():
@@ -197,17 +196,16 @@ def create_api_token(base_url: str, auth_token: str) -> str:
         verify=False,
     )
     if resp.status_code not in (200, 201):
-        fail(
+        raise PanelSetupError(
             f"Could not create API token ({resp.status_code}): {resp.text[:200]}",
             hint="The panel may need a fresh start",
-            hint_type="system",
         )
     data = resp.json()
     if isinstance(data, dict) and "response" in data:
         data = data["response"]
     token = data.get("token", "")
     if not token:
-        fail("API token creation succeeded but no token returned", hint_type="bug")
+        raise PanelSetupError("API token creation succeeded but no token returned", category="bug")
     return token
 
 
@@ -352,13 +350,12 @@ def setup_first_deploy(
     # Wait for panel API to become accessible
     info("Waiting for panel API...")
     if not wait_for_panel_api(base_url):
-        fail(
+        raise PanelSetupError(
             "Panel API is not reachable",
             hint=(
                 f"Panel should be at {base_url}\n"
                 f"Check: ssh {resolved.user}@{resolved.ip} docker logs remnawave --tail 30"
             ),
-            hint_type="system",
         )
 
     # Register admin user (reuse saved credentials on re-run after partial failure)
@@ -377,10 +374,9 @@ def setup_first_deploy(
         try:
             auth_token = MeridianPanel.login(base_url, admin_user, admin_pass)
         except RemnawaveError as login_err:
-            fail(
+            raise PanelSetupError(
                 f"Panel admin registration failed ({e}), login also failed ({login_err})",
                 hint="Panel may need a fresh start: meridian teardown, then redeploy",
-                hint_type="system",
             )
     ok("Panel admin registered")
 
@@ -454,7 +450,7 @@ def setup_first_deploy(
             cluster.config_profile_uuid = profile.uuid
             cluster.config_profile_name = profile.name
         except RemnawaveError as e:
-            fail(f"Failed to create config profile: {e}", hint_type="system")
+            raise PanelSetupError(f"Failed to create config profile: {e}")
 
         # Cache inbound references from the profile
         cache_inbounds(panel, cluster)
@@ -501,13 +497,12 @@ def setup_first_deploy(
                 )
                 ok(f"Node registered: {node_name}")
         except RemnawaveError as e:
-            fail(f"Failed to register node: {e}", hint_type="system")
+            raise PanelSetupError(f"Failed to register node: {e}")
 
         if not deploy_node_container(resolved.conn, node_creds.secret_key):
-            fail(
+            raise ProvisioningError(
                 "Node container did not become healthy",
                 hint=(f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} docker logs remnawave-node --tail 50"),
-                hint_type="system",
             )
 
         # Save node entry to cluster
@@ -591,23 +586,21 @@ def setup_redeploy(
     changes to SNI, domain, protocol options, etc.
     """
     if not cluster.panel.api_token:
-        fail(
+        raise PanelSetupError(
             "Cluster config exists but has no API token",
             hint="Run: meridian teardown, then redeploy from scratch",
-            hint_type="system",
         )
 
     node = cluster.find_node(resolved.ip)
     if not node:
-        fail(f"Node {resolved.ip} not found in cluster config", hint_type="system")
+        raise PanelSetupError(f"Node {resolved.ip} not found in cluster config")
 
     try:
         with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
             if not panel.ping():
-                fail(
+                raise PanelSetupError(
                     "Cannot reach panel API",
                     hint=f"Panel URL: {cluster.panel.url}\nCheck panel logs on {cluster.panel.server_ip}",
-                    hint_type="system",
                 )
             ok("Panel API accessible")
 
@@ -709,13 +702,12 @@ def setup_redeploy(
                     )
                     node.uuid = node_creds.uuid
                     if not deploy_node_container(resolved.conn, node_creds.secret_key):
-                        fail(
+                        raise ProvisioningError(
                             "Node container did not become healthy",
                             hint=(
                                 f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
                                 "docker logs remnawave-node --tail 50"
                             ),
-                            hint_type="system",
                         )
             else:
                 warn("Node has no UUID — skipping panel verification")
@@ -725,13 +717,12 @@ def setup_redeploy(
                 secret_key = panel.get_node_secret_key()
                 if secret_key:
                     if not deploy_node_container(resolved.conn, secret_key):
-                        fail(
+                        raise ProvisioningError(
                             "Node container did not become healthy",
                             hint=(
                                 f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
                                 "docker logs remnawave-node --tail 50"
                             ),
-                            hint_type="system",
                         )
 
             # Recreate hosts (idempotent)
@@ -772,7 +763,7 @@ def setup_redeploy(
                     cluster.save()
 
     except RemnawaveError as e:
-        fail(f"Panel API error: {e}", hint_type="system")
+        raise PanelSetupError(f"Panel API error: {e}") from e
 
 
 def setup_new_node(
@@ -790,18 +781,17 @@ def setup_new_node(
 ) -> None:
     """Add a new node to an existing cluster."""
     if not cluster.panel.api_token:
-        fail(
+        raise PanelSetupError(
             "No panel configured -- deploy a panel first with: meridian deploy <IP>",
-            hint_type="user",
+            category="user",
         )
 
     try:
         with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
             if not panel.ping():
-                fail(
+                raise PanelSetupError(
                     "Cannot reach panel API",
                     hint=f"Panel URL: {cluster.panel.url}\nCheck panel logs on {cluster.panel.server_ip}",
-                    hint_type="system",
                 )
 
             node_name = domain or resolved.ip
@@ -851,7 +841,7 @@ def setup_new_node(
             create_hosts_for_node(panel, cluster, resolved.ip, domain, sni, reality_port)
 
     except RemnawaveError as e:
-        fail(f"Panel API error: {e}", hint_type="system")
+        raise PanelSetupError(f"Panel API error: {e}") from e
 
     ok("New node configured")
 

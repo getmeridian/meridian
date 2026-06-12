@@ -71,7 +71,9 @@ def _configured_cluster(ip: str = _IP_A) -> ClusterConfig:
 
 
 def _make_resolved(ip: str = _IP_A) -> SimpleNamespace:
-    conn = MagicMock()
+    from meridian.ssh import ServerConnection
+
+    conn = MagicMock(spec=ServerConnection)
     conn.ip = ip
     conn.user = "root"
     conn.port = 22
@@ -738,7 +740,6 @@ class TestSubscriptionPagePathPersistence:
             patch("meridian.provision.Provisioner.run", return_value=[]) as mock_run,
             patch("meridian.panel_bootstrap.ok"),
             patch("meridian.panel_bootstrap.info"),
-            patch("meridian.panel_bootstrap.fail"),
         ):
             run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]
@@ -780,7 +781,6 @@ class TestSubscriptionPagePathPersistence:
             patch("meridian.provision.Provisioner.run", return_value=[]),
             patch("meridian.panel_bootstrap.ok"),
             patch("meridian.panel_bootstrap.info"),
-            patch("meridian.panel_bootstrap.fail"),
         ):
             run_provisioner(
                 resolved=resolved,  # type: ignore[arg-type]

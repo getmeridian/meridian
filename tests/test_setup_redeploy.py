@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-import typer
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
@@ -314,24 +313,32 @@ class TestSetupRedeployKeyPreservation:
 
 class TestSetupRedeployFailures:
     def test_fails_when_no_api_token(self) -> None:
+        from meridian.core.errors import PanelSetupError
+
         cluster = _configured_cluster()
         cluster.panel.api_token = ""
-        with pytest.raises(typer.Exit):
+        with pytest.raises(PanelSetupError, match="no API token"):
             _run_redeploy(cluster=cluster)
 
     def test_fails_when_node_not_in_cluster(self) -> None:
+        from meridian.core.errors import PanelSetupError
+
         cluster = _configured_cluster()
         resolved = _make_resolved(ip="198.51.100.99")
-        with pytest.raises(typer.Exit):
+        with pytest.raises(PanelSetupError, match="not found in cluster config"):
             _run_redeploy(cluster=cluster, resolved=resolved)
 
     def test_fails_when_panel_unreachable(self) -> None:
+        from meridian.core.errors import PanelSetupError
+
         panel = _make_panel_mock()
         panel.ping.return_value = False
-        with pytest.raises(typer.Exit):
+        with pytest.raises(PanelSetupError, match="Cannot reach panel API"):
             _run_redeploy(panel_mock=panel)
 
     def test_node_container_failure_stops_redeploy_before_metadata_save(self) -> None:
+        from meridian.core.errors import ProvisioningError
+
         cluster = _configured_cluster()
 
         with (
@@ -342,7 +349,7 @@ class TestSetupRedeployFailures:
             patch("meridian.panel_bootstrap.cache_inbounds"),
             patch.object(cluster, "save") as mock_save,
             patch.object(cluster, "backup") as mock_backup,
-            pytest.raises(typer.Exit) as exc_info,
+            pytest.raises(ProvisioningError, match="Node container did not become healthy"),
         ):
             from meridian.panel_bootstrap import setup_redeploy
 
@@ -357,7 +364,6 @@ class TestSetupRedeployFailures:
                 version=_VERSION,
             )
 
-        assert exc_info.value.exit_code == 3
         mock_hosts.assert_not_called()
         mock_backup.assert_not_called()
         mock_save.assert_not_called()
@@ -465,16 +471,20 @@ class TestSetupRedeployNodeVerification:
 class TestSetupRedeployAuth:
     def test_auth_error_fails_with_panel_api_error(self) -> None:
         """RemnawaveAuthError on ping is caught by outer except RemnawaveError."""
+        from meridian.core.errors import PanelSetupError
+
         panel = _make_panel_mock()
         panel.ping.side_effect = RemnawaveAuthError("401 Unauthorized")
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(PanelSetupError, match="Panel API error"):
             _run_redeploy(panel_mock=panel)
 
     def test_remnawave_error_during_workflow_exits(self) -> None:
         """Any RemnawaveError that escapes the inner try/except fails the function."""
+        from meridian.core.errors import PanelSetupError
+
         panel = _make_panel_mock()
         panel.get_node_secret_key.side_effect = RemnawaveError("keygen endpoint unreachable")
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(PanelSetupError, match="Panel API error"):
             _run_redeploy(panel_mock=panel)

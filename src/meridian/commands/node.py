@@ -46,6 +46,7 @@ def run_add(
     )
     from meridian.commands.resolve import ensure_server_connection, resolve_server
     from meridian.config import DEFAULT_SNI, SERVERS_FILE
+    from meridian.core.errors import MeridianError
     from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.servers import ServerRegistry
 
@@ -81,36 +82,39 @@ def run_add(
     ws_path = secrets.token_hex(8)
 
     # Run SSH provisioner pipeline (OS hardening, Docker, nginx, TLS)
-    run_provisioner(
-        resolved=resolved,
-        cluster=cluster,
-        domain=request.domain,
-        sni=effective_sni,
-        harden=request.harden,
-        is_panel_host=False,
-        secret_path=cluster.panel.secret_path,
-        xhttp_port=ports.xhttp_port,
-        reality_port=ports.reality_port,
-        wss_port=ports.wss_port,
-        xhttp_path=xhttp_path,
-        ws_path=ws_path,
-    )
+    try:
+        run_provisioner(
+            resolved=resolved,
+            cluster=cluster,
+            domain=request.domain,
+            sni=effective_sni,
+            harden=request.harden,
+            is_panel_host=False,
+            secret_path=cluster.panel.secret_path,
+            xhttp_port=ports.xhttp_port,
+            reality_port=ports.reality_port,
+            wss_port=ports.wss_port,
+            xhttp_path=xhttp_path,
+            ws_path=ws_path,
+        )
 
-    # Configure via panel API (register node, deploy container, create hosts)
-    from meridian import __version__
+        # Configure via panel API (register node, deploy container, create hosts)
+        from meridian import __version__
 
-    setup_new_node(
-        resolved=resolved,
-        cluster=cluster,
-        domain=request.domain,
-        sni=effective_sni,
-        reality_port=ports.reality_port,
-        xhttp_port=ports.xhttp_port,
-        wss_port=ports.wss_port,
-        version=__version__,
-        xhttp_path=xhttp_path,
-        ws_path=ws_path,
-    )
+        setup_new_node(
+            resolved=resolved,
+            cluster=cluster,
+            domain=request.domain,
+            sni=effective_sni,
+            reality_port=ports.reality_port,
+            xhttp_port=ports.xhttp_port,
+            wss_port=ports.wss_port,
+            version=__version__,
+            xhttp_path=xhttp_path,
+            ws_path=ws_path,
+        )
+    except MeridianError as exc:
+        fail(exc)
 
     # Hybrid sync — when desired_nodes is non-None, mirror this imperative
     # add into the desired list so a subsequent `meridian apply` does not
