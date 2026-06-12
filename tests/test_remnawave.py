@@ -767,21 +767,21 @@ class TestInternalSquads:
         assert str(body.uuid) == "00000000-0000-0000-0000-0000000000f0"
         assert [str(uuid) for uuid in body.inbounds] == ["00000000-0000-0000-0000-0000000000f1"]
 
-    def test_get_default_squad_uuid(self) -> None:
-        panel = _make_panel()
-        panel.list_internal_squads = MagicMock(return_value=[{"uuid": "sq-1", "name": "Default-Squad"}])
-        assert panel.get_default_squad_uuid() == "sq-1"
+    def test_select_default_squad_uuid(self) -> None:
+        from meridian.commands.setup import _select_default_squad_uuid
 
-    def test_get_default_squad_uuid_falls_back_to_first(self) -> None:
+        assert _select_default_squad_uuid([{"uuid": "sq-1", "name": "Default-Squad"}]) == "sq-1"
+
+    def test_select_default_squad_uuid_falls_back_to_first(self) -> None:
         """Panel v2.7+ may not have Default-Squad — fall back to first available."""
-        panel = _make_panel()
-        panel.list_internal_squads = MagicMock(return_value=[{"uuid": "sq-1", "name": "Other"}])
-        assert panel.get_default_squad_uuid() == "sq-1"
+        from meridian.commands.setup import _select_default_squad_uuid
 
-    def test_get_default_squad_uuid_empty_list(self) -> None:
-        panel = _make_panel()
-        panel.list_internal_squads = MagicMock(return_value=[])
-        assert panel.get_default_squad_uuid() == ""
+        assert _select_default_squad_uuid([{"uuid": "sq-1", "name": "Other"}]) == "sq-1"
+
+    def test_select_default_squad_uuid_empty_list(self) -> None:
+        from meridian.commands.setup import _select_default_squad_uuid
+
+        assert _select_default_squad_uuid([]) == ""
 
 
 # ---------------------------------------------------------------------------

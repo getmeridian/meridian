@@ -724,21 +724,6 @@ class MeridianPanel:
         squads = getattr(resp, "internal_squads", None) or getattr(resp, "internalSquads", None) or []
         return [_sdk_to_dict(squad) for squad in squads]
 
-    def get_default_squad_uuid(self) -> str:
-        """Get the UUID of the Default-Squad, or the first squad if none named that.
-
-        Panel v2.7+ may not auto-create "Default-Squad" — fall back to any
-        existing squad so users get access to inbounds.
-        """
-        squads = self.list_internal_squads()
-        for s in squads:
-            if isinstance(s, dict) and s.get("name") == "Default-Squad":
-                return str(s.get("uuid", ""))
-        # Fallback: first available squad
-        if squads and isinstance(squads[0], dict):
-            return str(squads[0].get("uuid", ""))
-        return ""
-
     def assign_inbounds_to_squad(self, squad_uuid: str, inbound_uuids: list[str]) -> None:
         """Assign inbounds to an internal squad (PATCH)."""
         body = UpdateInternalSquadRequestDto(uuid=UUID(squad_uuid), inbounds=[UUID(uuid) for uuid in inbound_uuids])

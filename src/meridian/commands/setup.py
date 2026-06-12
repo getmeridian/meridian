@@ -978,7 +978,7 @@ def _setup_first_deploy(
         # Remnawave requires users and inbounds to share an "internal squad"
         # for the user to appear in the node's Xray config.
         try:
-            squad_uuid = panel.get_default_squad_uuid()
+            squad_uuid = _select_default_squad_uuid(panel.list_internal_squads())
             if squad_uuid:
                 inbound_uuids_all = [
                     ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid
@@ -1188,7 +1188,7 @@ def _setup_redeploy(
 
             # Refresh squad-inbound linkage
             try:
-                squad_uuid = cluster.squad_uuid or panel.get_default_squad_uuid()
+                squad_uuid = cluster.squad_uuid or _select_default_squad_uuid(panel.list_internal_squads())
                 if squad_uuid:
                     inbound_uuids_all = [
                         ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid
@@ -1539,6 +1539,20 @@ def _build_xray_config(
         "reality_short_id": short_id,
         "reality_private_key": private_key,
     }
+
+
+def _select_default_squad_uuid(squads: list[dict[str, Any]]) -> str:
+    """Select the Default-Squad UUID from a list of squads.
+
+    Policy: prefer the squad named "Default-Squad"; fall back to the first
+    available squad. Panel v2.7+ may not auto-create "Default-Squad".
+    """
+    for s in squads:
+        if isinstance(s, dict) and s.get("name") == "Default-Squad":
+            return str(s.get("uuid", ""))
+    if squads and isinstance(squads[0], dict):
+        return str(squads[0].get("uuid", ""))
+    return ""
 
 
 def _cache_inbounds(panel: MeridianPanel, cluster: ClusterConfig) -> None:
