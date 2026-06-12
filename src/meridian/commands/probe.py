@@ -81,7 +81,7 @@ def _https_get(
         status = resp.status
         conn.close()
         return status, resp_headers, body
-    except Exception:
+    except (OSError, http.client.HTTPException):  # Socket, SSL, and HTTP protocol errors
         return 0, {}, b""
 
 
@@ -96,7 +96,7 @@ def _get_cert_der(ip: str, sni: str, timeout: int = 5) -> bytes:
             with ctx.wrap_socket(sock, server_hostname=sni) as ssock:
                 der = ssock.getpeercert(binary_form=True)
                 return der or b""
-    except Exception:
+    except (OSError, ssl.SSLError):  # Socket and TLS handshake errors
         return b""
 
 
@@ -457,7 +457,7 @@ def check_http2_support(ip: str) -> CheckResult:
         ssock = ctx.wrap_socket(sock, server_hostname=ip)
         alpn = ssock.selected_alpn_protocol()
         ssock.close()
-    except Exception:
+    except (OSError, ssl.SSLError):  # Socket and TLS handshake errors
         result.findings.append((True, "Could not check ALPN (connection failed)"))
         return result
 
@@ -513,7 +513,7 @@ def _tls_version_accepted(ip: str, version: ssl.TLSVersion) -> bool:
         ssock = ctx.wrap_socket(sock, server_hostname=ip)
         ssock.close()
         return True
-    except Exception:
+    except (OSError, ssl.SSLError):  # Socket and TLS errors (expected when version rejected)
         return False
 
 

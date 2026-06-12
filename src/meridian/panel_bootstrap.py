@@ -621,7 +621,7 @@ def setup_first_deploy(
                         cluster._extra["_page_url"] = page_url
                     if sub_url:
                         cluster._extra["_subscription_url"] = sub_url
-                except Exception:
+                except (OSError, RuntimeError):
                     pass  # Non-fatal — subscription URL still works
         except RemnawaveError as e:
             warn(f"Could not create client '{client_name}': {e}")

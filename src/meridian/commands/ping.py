@@ -228,7 +228,7 @@ def _run_connection_tests(cluster: ClusterConfig, server_ip: str) -> None:
                 users = panel.list_users()
                 if users:
                     test_uuid = users[0].vless_uuid or users[0].uuid
-        except Exception:
+        except (OSError, RuntimeError):
             pass  # Fall back to dummy UUID (will test reachability only)
     if not test_uuid:
         warn("No client UUID available — connection tests may fail auth")

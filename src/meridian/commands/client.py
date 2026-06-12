@@ -150,7 +150,7 @@ def run_add(
                         port=getattr(cluster.panel, "ssh_port", 22) or 22,
                     ) as conn:
                         deploy_client_page(conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
-                except Exception:
+                except (OSError, RuntimeError):
                     pass  # Non-fatal — subscription URL still works
 
     err_console.print()
@@ -371,7 +371,7 @@ def run_remove(
                         f"rm -rf /var/www/private/{shlex.quote(client.vless_uuid)}",
                         timeout=15,
                     )
-            except Exception:
+            except (OSError, RuntimeError):
                 pass  # Non-fatal
 
     err_console.print()

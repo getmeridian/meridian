@@ -164,7 +164,7 @@ def _handle_update_relay(action: PlanAction, panel: MeridianPanel, cluster: Clus
                 f"SSH preflight to {desired.ssh_user}@{action.target}:{desired.ssh_port} "
                 f"returned exit {result.returncode} — refusing to remove the running relay"
             )
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         raise RuntimeError(f"UPDATE_RELAY preflight failed for {action.target}: {e}. Old relay left intact.") from e
 
     # Preflight passed — proceed with the destructive swap.
@@ -658,7 +658,7 @@ def _run(
 
             try:
                 cluster.save()
-            except Exception as exc:
+            except OSError as exc:
                 error = MeridianError(
                     code="MERIDIAN_STATE_SAVE_FAILED",
                     category="system",

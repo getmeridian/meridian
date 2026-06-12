@@ -36,7 +36,7 @@ def deploy_server(
     )
     try:
         result = executor(request, reporter, operation)
-    except Exception as exc:
+    except Exception as exc:  # Executor is protocol-typed; re-raises after event emission
         emit_event(
             reporter,
             operation,

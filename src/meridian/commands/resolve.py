@@ -415,8 +415,8 @@ def _check_version_mismatch(server_ip: str, proxy_file: Path) -> None:
 
         deployed = Version(deployed_with)
         current = Version(__version__)
-    except Exception:
-        return  # Unparseable version — skip silently
+    except (ImportError, ValueError):
+        return  # Unparseable version or missing packaging — skip silently
 
     if deployed.major == current.major and deployed.minor == current.minor:
         return  # Patch differences are fine

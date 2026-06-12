@@ -71,7 +71,7 @@ def _run_action(
         handler(action, panel, cluster)
         logger.info("Action succeeded: %s %s", action.kind.value, action.target)
         return ActionResult(action=action, success=True)
-    except Exception as e:
+    except Exception as e:  # Executor must catch all to report failures, not crash threads
         logger.error("Action failed: %s %s — %s", action.kind.value, action.target, e)
         return ActionResult(action=action, success=False, error=str(e))
 

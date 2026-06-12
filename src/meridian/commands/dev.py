@@ -314,5 +314,5 @@ def _regen(
             (client_dir / name).write_text(content)
 
         info("Regenerated preview files")
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         warn(f"Regeneration failed: {exc}")

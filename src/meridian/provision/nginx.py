@@ -915,7 +915,7 @@ class DeployPWAAssets:
 
         try:
             error = upload_pwa_assets(conn)
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             return StepResult(
                 name=self.name,
                 status="failed",

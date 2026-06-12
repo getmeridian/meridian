@@ -19,6 +19,16 @@ from typing import Any
 
 from meridian.infra.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
 
+# Deferred hcloud imports — the SDK is optional. These are imported at class
+# level only for type annotations in except clauses; actual constructors
+# remain inside methods (see __init__ for the ImportError gate).
+try:
+    from hcloud import APIException as _APIException
+    from hcloud.actions.domain import ActionException as _ActionException
+except ImportError:  # SDK not installed — methods will never be called
+    _APIException = Exception  # type: ignore[assignment,misc]
+    _ActionException = Exception  # type: ignore[assignment,misc]
+
 logger = logging.getLogger("meridian.infra.hetzner")
 
 # Hourly rates in EUR, used by estimate_cost(). Source: Hetzner Cloud pricing page.
@@ -104,7 +114,7 @@ class HetznerProvider(CloudProvider):
 
         try:
             response = self._client.servers.create(**create_kwargs)
-        except Exception as e:
+        except _APIException as e:
             raise ProviderError(
                 f"Hetzner server create failed: {e}",
                 provider=self.name,
@@ -116,12 +126,12 @@ class HetznerProvider(CloudProvider):
         action = response.action
         try:
             action.wait_until_finished(max_retries=120)  # ~2 min cap
-        except Exception as e:
+        except _ActionException as e:
             # Don't leave an orphan if create-action never resolves.
             try:
                 server.delete()
-            except Exception:
-                logger.warning("Could not cleanup orphan server %s", server.id)
+            except _APIException as cleanup_err:  # Best-effort orphan cleanup
+                logger.warning("Could not cleanup orphan server %s: %s", server.id, cleanup_err)
             raise ProviderError(
                 f"Hetzner server create action did not finish: {e}",
                 provider=self.name,
@@ -136,14 +146,14 @@ class HetznerProvider(CloudProvider):
     def destroy_vm(self, vm_id: str) -> None:
         try:
             server = self._client.servers.get_by_id(int(vm_id))
-        except Exception:
-            # Already gone; idempotent success.
+        except (ValueError, _APIException):
+            # Already gone or invalid ID; idempotent success.
             return
         if server is None:
             return
         try:
             server.delete()
-        except Exception as e:
+        except _APIException as e:
             raise ProviderError(
                 f"Hetzner server delete failed: {e}",
                 provider=self.name,
@@ -153,7 +163,7 @@ class HetznerProvider(CloudProvider):
     def get_vm(self, vm_id: str) -> VMInstance | None:
         try:
             server = self._client.servers.get_by_id(int(vm_id))
-        except Exception:
+        except (ValueError, _APIException):
             return None
         if server is None:
             return None
@@ -166,7 +176,7 @@ class HetznerProvider(CloudProvider):
             label_selector = ",".join(f"{k}={v}" for k, v in labels.items())
         try:
             servers = self._client.servers.get_all(label_selector=label_selector)
-        except Exception as e:
+        except _APIException as e:
             raise ProviderError(
                 f"Hetzner server list failed: {e}",
                 provider=self.name,
@@ -193,7 +203,7 @@ class HetznerProvider(CloudProvider):
             )
         try:
             key = self._client.ssh_keys.create(name=name, public_key=public_key)
-        except Exception as e:
+        except _APIException as e:
             raise ProviderError(
                 f"Hetzner SSH key upload failed: {e}",
                 provider=self.name,
@@ -204,13 +214,13 @@ class HetznerProvider(CloudProvider):
     def delete_ssh_key(self, key_id: str) -> None:
         try:
             key = self._client.ssh_keys.get_by_id(int(key_id))
-        except Exception:
+        except (ValueError, _APIException):
             return
         if key is None:
             return
         try:
             key.delete()
-        except Exception as e:
+        except _APIException as e:
             raise ProviderError(
                 f"Hetzner SSH key delete failed: {e}",
                 provider=self.name,

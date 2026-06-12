@@ -204,7 +204,7 @@ def run_recover(panel_url: str, api_token: str) -> None:
                 result = conn.run("cat /etc/meridian/sub_path 2>/dev/null", timeout=10)
                 if result.returncode == 0 and result.stdout.strip():
                     panel_config.sub_path = result.stdout.strip()
-        except Exception:
+        except (OSError, RuntimeError):
             pass  # Non-fatal — sub_path can be re-generated on next deploy
 
     cluster = ClusterConfig(

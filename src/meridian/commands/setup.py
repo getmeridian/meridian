@@ -446,7 +446,7 @@ def _execute_deploy_request(
                 sensitive=True,
                 timeout=10,
             )
-        except Exception:
+        except (OSError, RuntimeError):
             pass  # Non-fatal
 
     # Register server in legacy registry (for --server flag resolution)
@@ -593,7 +593,7 @@ def _check_legacy_panel(conn: ServerConnection, server_ip: str, yes: bool) -> No
         try:
             creds = ServerCredentials.load(proxy_path)
             client_names = [c.name for c in creds.clients if c.name]
-        except Exception:
+        except (OSError, ValueError, KeyError):
             pass
 
     lines = [

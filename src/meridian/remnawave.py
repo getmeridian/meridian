@@ -295,7 +295,7 @@ def _sdk_call(coro: Any) -> Any:
         raise RemnawaveError(f"Panel API error: {e}", hint_type="system") from e
     except httpx.RequestError as e:
         raise RemnawaveNetworkError(f"Panel network error: {e}", hint_type="system") from e
-    except Exception as e:
+    except ApiError as e:
         if isinstance(e, NotFoundError):
             raise RemnawaveNotFoundError(f"Resource not found: {e}", hint_type="system") from e
         if isinstance(e, (UnauthorizedError, ForbiddenError)):
@@ -406,7 +406,7 @@ class MeridianPanel:
                 resp.raise_for_status()
                 try:
                     data = resp.json()
-                except Exception as e:
+                except (ValueError, UnicodeDecodeError) as e:
                     raise RemnawaveError(
                         f"Panel returned invalid JSON ({len(resp.content)} bytes)",
                         hint=f"Response may be truncated by firewall or DPI: {e}",
@@ -461,7 +461,7 @@ class MeridianPanel:
             return True
         except RemnawaveAuthError:
             raise
-        except Exception:
+        except (RemnawaveError, httpx.HTTPError, OSError):
             return False
 
     # --- Users (= Meridian clients) ---

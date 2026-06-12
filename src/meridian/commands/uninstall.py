@@ -71,7 +71,7 @@ def run(
                 relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
                 relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
                 ok(f"Relay {relay.ip} stopped")
-            except Exception:
+            except (OSError, RuntimeError):
                 warn(f"Could not reach relay {relay.ip} — service may still be running")
             # Clean up local relay metadata
             relay_creds_dir = CREDS_BASE / sanitize_ip_for_path(relay.ip)

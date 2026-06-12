@@ -389,8 +389,7 @@ def update_node(
             xhttp_path=node.xhttp_path,
             ws_path=node.ws_path,
         )
-    except Exception:
-        # Rollback metadata on failure so cluster.yml stays accurate
+    except Exception:  # Rollback metadata on failure so cluster.yml stays accurate
         node.name, node.sni, node.domain, node.warp = old_name, old_sni, old_domain, old_warp
         raise
 
@@ -596,7 +595,7 @@ def remove_relay(
         try:
             exit_conn = ServerConnection(exit_node.ip, exit_node.ssh_user, port=exit_node.ssh_port)
             remove_relay_nginx(exit_conn, relay)
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             logger.warning("Could not clean up nginx for relay %s: %s", relay_ip, e)
 
     # Stop Realm service on relay host (same as imperative path)
@@ -604,7 +603,7 @@ def remove_relay(
         relay_conn = ServerConnection(relay_ip, relay.ssh_user, port=relay.ssh_port)
         relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
         relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         logger.warning("Could not stop relay service on %s: %s", relay_ip, e)
 
     # Remove from cluster.yml

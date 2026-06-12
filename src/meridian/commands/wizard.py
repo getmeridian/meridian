@@ -168,7 +168,7 @@ def interactive_wizard(
                             sni = top[pick - 1]
                     else:
                         warn("No targets found on the same network")
-                except Exception:
+                except (OSError, RuntimeError, ValueError):
                     warn("Could not connect to scan. You can run 'meridian scan' later.")
 
         if not sni:

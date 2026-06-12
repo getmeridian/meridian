@@ -252,7 +252,7 @@ def build_actual_state(
                 )
                 sub_running = result.returncode == 0 and result.stdout.strip() == "true"
                 ssh_checked = True
-            except Exception:
+            except (OSError, RuntimeError):
                 # SSH failure (auth, connectivity, timeout) — fall back to flag
                 pass
     if not ssh_checked:

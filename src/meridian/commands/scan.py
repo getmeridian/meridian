@@ -13,7 +13,7 @@ from meridian.commands.resolve import (
 from meridian.config import SERVERS_FILE
 from meridian.console import err_console, info, line, ok, prompt, warn
 from meridian.servers import ServerRegistry
-from meridian.ssh import ServerConnection
+from meridian.ssh import ServerConnection, SSHError
 
 
 def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
@@ -25,7 +25,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     # Detect server architecture
     try:
         arch_result = conn.run("uname -m", timeout=10)
-    except Exception:
+    except (OSError, SSHError):
         return []
     raw_arch = arch_result.stdout.strip()
     match raw_arch:
@@ -49,7 +49,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
                 f"curl -sSfL --max-time 30 -o /tmp/realitlscanner {q_url} </dev/null && chmod +x /tmp/realitlscanner",
                 timeout=40,
             )
-        except Exception:
+        except (OSError, SSHError):
             pass
             dl_result = None
     if not dl_result or dl_result.returncode != 0:
@@ -67,7 +67,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
             warn("Downloaded scanner binary failed integrity check")
             conn.run("rm -f /tmp/realitlscanner", timeout=5)
             return []
-    except Exception:
+    except (OSError, SSHError):
         pass  # verification is best-effort
 
     # Get server's subnet CIDR for scanning
@@ -79,7 +79,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
             timeout=10,
         )
         server_cidr = cidr_result.stdout.strip()
-    except Exception:
+    except (OSError, SSHError):
         server_cidr = ""
     if not server_cidr:
         server_cidr = f"{ip}/24"
@@ -93,7 +93,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
                 " -out /tmp/meridian-scan.csv -thread 4 -timeout 5 >/dev/null 2>&1",
                 timeout=100,
             )
-        except Exception:
+        except (OSError, SSHError):
             warn("Scan timed out")
             conn.run("rm -f /tmp/realitlscanner /tmp/meridian-scan.csv", timeout=5)
             return []
@@ -104,7 +104,7 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
             "cat /tmp/meridian-scan.csv 2>/dev/null; rm -f /tmp/realitlscanner /tmp/meridian-scan.csv",
             timeout=10,
         )
-    except Exception:
+    except (OSError, SSHError):
         return []
     csv_output = csv_result.stdout.strip()
 

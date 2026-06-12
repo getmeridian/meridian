@@ -107,7 +107,7 @@ def collect_fleet_inventory(
                 try:
                     api_nodes = panel.list_nodes()
                     sources = sources.model_copy(update={"nodes": "available"})
-                except Exception as exc:
+                except Exception as exc:  # Protocol adapter — concrete exception type unknown
                     _handle_error(exc, classify_error)
                     sources = sources.model_copy(update={"nodes": "unavailable"})
                     warnings.append(
@@ -118,7 +118,7 @@ def collect_fleet_inventory(
                             details={"cause": type(exc).__name__},
                         )
                     )
-    except Exception as exc:
+    except Exception as exc:  # Protocol adapter — concrete exception type unknown
         _handle_error(exc, classify_error)
         panel_ok = False
         sources = sources.model_copy(update={"panel": "unavailable", "nodes": "unavailable"})
@@ -169,7 +169,7 @@ def collect_fleet_status(
                 try:
                     api_nodes = panel.list_nodes()
                     sources = sources.model_copy(update={"nodes": "available"})
-                except Exception as exc:
+                except Exception as exc:  # Protocol adapter — concrete exception type unknown
                     _handle_error(exc, classify_error)
                     sources = sources.model_copy(update={"nodes": "unavailable"})
                     warnings.append(
@@ -183,7 +183,7 @@ def collect_fleet_status(
                 try:
                     api_users = panel.list_users()
                     sources = sources.model_copy(update={"users": "available"})
-                except Exception as exc:
+                except Exception as exc:  # Protocol adapter — concrete exception type unknown
                     _handle_error(exc, classify_error)
                     sources = sources.model_copy(update={"users": "unavailable"})
                     warnings.append(
@@ -194,7 +194,7 @@ def collect_fleet_status(
                             details={"cause": type(exc).__name__},
                         )
                     )
-    except Exception as exc:
+    except Exception as exc:  # Protocol adapter — concrete exception type unknown
         _handle_error(exc, classify_error)
         panel_ok = False
         sources = sources.model_copy(update={"panel": "unavailable", "nodes": "unavailable", "users": "unavailable"})
@@ -209,7 +209,7 @@ def collect_fleet_status(
 
     try:
         relay_health = check_relays(topology.relays)
-    except Exception as exc:
+    except Exception as exc:  # Protocol adapter — concrete exception type unknown
         relay_health = {}
         sources = sources.model_copy(update={"relays": "unavailable"})
         warnings.append(
