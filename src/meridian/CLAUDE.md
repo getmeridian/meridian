@@ -22,9 +22,11 @@
 
 ## What's done well
 
-- **Forward-compatible YAML** — `_extra` dict in ClusterConfig means newer versions don't corrupt older CLI reads.
+- **Forward-compatible YAML** — `_extra` dict in ClusterConfig preserves unknown YAML keys for forward-compat only. Reconciler state lives in the typed `applied_state: AppliedState` field; subscription page deployment status in `subscription_page.deployed`. Never store load-bearing runtime state in `_extra`.
 - **Single source of state** — No split-brain. Remnawave DB is authoritative for users. cluster.yml is authoritative for deployment topology. No sync needed.
 - **Relay = Host** — Relays map to Remnawave Host entries. Enable/disable host → subscriptions auto-adapt.
+- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup and node deploy (was setup.py). `relay_ops.py` owns relay infrastructure (was commands/relay.py). Both are library modules, not CLI-specific. `operations.py` imports from them, never from `commands/`.
+- **Architecture tests** — `tests/test_architecture.py` enforces layer boundaries, file size budget, private import bans, and contract drift checks at CI time.
 
 ## Pitfalls
 

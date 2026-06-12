@@ -16,6 +16,8 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 - **Drift-aware apply** — panel-side edits (admin adds a user in the UI) surface as plan actions on next `meridian plan`. Users see diffs; `--prune-extras` controls whether drift is pruned.
 - **Failure-safety gate** — after any failure in a phase, later destructive phases are skipped. This does not make early destructive phases atomic; future work needs preflight/journal/switch phases.
 - **Rich terraform-style display** — `+` adds, `-` removes, `~` updates; `[drift]` marker on `from_extras=True`.
+- **Typed handlers** — `ActionHandler = Callable[[PlanAction, MeridianPanel, ClusterConfig], None]` enforces handler signatures at compile time.
+- **Shared plan computation** — `prepare.py::compute_reconciliation_plan()` is the single entry point for both `plan` and `apply` commands.
 
 ## Pitfalls
 
@@ -27,6 +29,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 ## Links
 
 - Pure diff: `diff.py::compute_plan`
+- Shared entry point: `prepare.py::compute_reconciliation_plan`
 - Executor: `executor.py`
 - Dataclasses: `state.py` / `diff.py`
 - Display: `display.py::print_plan`
