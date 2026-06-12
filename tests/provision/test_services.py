@@ -5,15 +5,15 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from meridian.provision.services import (
+from meridian.provision.nginx import (
     ConfigureNginx,
     DeployPWAAssets,
     InstallNginx,
-    IssueTLSCert,
     _render_nginx_http_config,
     _render_nginx_ip_config,
     _render_nginx_stream_config,
 )
+from meridian.provision.tls import IssueTLSCert
 from meridian.provision.steps import ProvisionContext
 from tests.provision.conftest import MockConnection
 
@@ -556,7 +556,7 @@ class TestNginxFingerprinting:
             panel_internal_port=2053,
             info_page_path="connect",
         )
-        assert "http2 on;" in cfg
+        assert "ssl http2" in cfg
 
     def test_domain_http2_enabled(self):
         cfg = _render_nginx_http_config(
@@ -568,7 +568,7 @@ class TestNginxFingerprinting:
             panel_internal_port=2053,
             info_page_path="connect",
         )
-        assert "http2 on;" in cfg
+        assert "ssl http2" in cfg
 
     def test_tls_modern_protocols_only(self):
         """Only TLSv1.2 and TLSv1.3 — no older protocols."""
@@ -584,8 +584,8 @@ class TestNginxFingerprinting:
         assert "TLSv1.1" not in cfg
         assert "SSLv" not in cfg
 
-    def test_stream_ipv4_listening(self):
-        """Stream server listens on IPv4 (IPv6 omitted for host compatibility)."""
+    def test_stream_ipv4_and_ipv6_listening(self):
+        """Stream server listens on both IPv4 and IPv6."""
         cfg = _render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
@@ -593,7 +593,7 @@ class TestNginxFingerprinting:
             server_ip="198.51.100.1",
         )
         assert "listen 443;" in cfg
-        assert "[::]:443" not in cfg
+        assert "listen [::]:443;" in cfg
 
     def test_stream_proxy_connect_timeout(self):
         """Stream proxy should have a short connect timeout (good practice)."""
@@ -963,7 +963,7 @@ class TestIssueTLSCert:
         assert "--days" not in acme_calls[0]
 
     def test_uses_configured_acme_server(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setattr("meridian.provision.services.ACME_SERVER", "https://acme.test/directory")
+        monkeypatch.setattr("meridian.provision.tls.ACME_SERVER", "https://acme.test/directory")
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=2)

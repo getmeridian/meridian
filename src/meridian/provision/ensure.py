@@ -9,9 +9,22 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass
+from typing import TypeVar
 
 from meridian.facts import ServerFacts
 from meridian.ssh import CommandResult, ServerConnection
+
+
+_T = TypeVar("_T")
+
+
+def resolve_ctx(val: _T | None, fallback: _T) -> _T:
+    """Resolve a constructor value with context fallback.
+
+    None = "not provided by caller, use context". Explicit values
+    (including falsy ones like 0 or "") are respected as-is.
+    """
+    return val if val is not None else fallback
 
 
 @dataclass(frozen=True)

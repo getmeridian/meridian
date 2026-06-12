@@ -579,7 +579,7 @@ class TestRenderingWithRelays:
 class TestNginxStreamRelay:
     def test_stream_config_includes_relay_maps(self) -> None:
         """Main stream config should include relay-maps directory."""
-        from meridian.provision.services import _render_nginx_stream_config
+        from meridian.provision.nginx import _render_nginx_stream_config
 
         config = _render_nginx_stream_config(
             reality_sni="www.microsoft.com",

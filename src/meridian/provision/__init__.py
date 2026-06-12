@@ -191,7 +191,7 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Operation]:
     )
 
     # PWA assets (connection pages deployed via post-provisioner API setup)
-    from meridian.provision.services import DeployPWAAssets
+    from meridian.provision.nginx import DeployPWAAssets
 
     operations.append(
         op(

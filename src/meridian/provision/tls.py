@@ -12,6 +12,7 @@ import shlex
 import time
 
 from meridian.config import ACME_SERVER
+from meridian.provision.ensure import resolve_ctx
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -54,15 +55,6 @@ def _stale_shortlived_policy(domain_info: str) -> bool:
     return next_renew_time > int(time.time()) + _SHORTLIVED_IP_CERT_MAX_NEXT_RENEW_SECONDS
 
 
-def _resolve_ctx(val, fallback):
-    """Resolve a constructor value with context fallback.
-
-    None = "not provided by caller, use context". Explicit values
-    (including falsy ones like 0 or "") are respected as-is.
-    """
-    return val if val is not None else fallback
-
-
 # ---------------------------------------------------------------------------
 # IssueTLSCert — issue real TLS certificate via acme.sh
 # ---------------------------------------------------------------------------
@@ -89,7 +81,7 @@ class IssueTLSCert:
         self.server_ip = server_ip
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        server_ip = _resolve_ctx(self.server_ip, ctx.ip)
+        server_ip = resolve_ctx(self.server_ip, ctx.ip)
         cert_host = server_ip if self.ip_mode else self.domain
         q_cert_host = shlex.quote(cert_host)
         profile_flag = " --certificate-profile shortlived" if self.ip_mode else ""
