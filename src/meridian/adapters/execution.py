@@ -10,18 +10,7 @@ from meridian.ssh import CommandResult
 
 def legacy_command_result(result: RemoteCommandResult) -> CommandResult:
     """Convert a core command result into the legacy connection result."""
-    return CommandResult(
-        args=result.args,
-        returncode=result.returncode,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        duration_ms=result.duration_ms,
-        attempts=result.attempts,
-        timed_out=result.timed_out,
-        sudo=result.sudo,
-        redacted_command=result.redacted_command,
-        operation_name=result.operation_name,
-    )
+    return CommandResult(**result.model_dump())
 
 
 class RemoteExecutorConnection:

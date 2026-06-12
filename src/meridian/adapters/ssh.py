@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from meridian.core.execution import (
@@ -16,18 +17,7 @@ from meridian.ssh import CommandResult, ServerConnection
 
 def remote_command_result(result: CommandResult) -> RemoteCommandResult:
     """Convert the current SSH command result into a core result."""
-    return RemoteCommandResult(
-        args=result.args,
-        returncode=result.returncode,
-        stdout=result.stdout,
-        stderr=result.stderr,
-        duration_ms=result.duration_ms,
-        attempts=result.attempts,
-        timed_out=result.timed_out,
-        sudo=result.sudo,
-        redacted_command=result.redacted_command,
-        operation_name=result.operation_name,
-    )
+    return RemoteCommandResult(**dataclasses.asdict(result))
 
 
 class SSHRemoteExecutor:

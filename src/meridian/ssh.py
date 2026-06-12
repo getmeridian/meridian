@@ -54,6 +54,11 @@ class CommandResult:
     redacted_command: str = ""
     operation_name: str = ""
 
+    @property
+    def ok(self) -> bool:
+        """Whether the command exited successfully."""
+        return self.returncode == 0
+
     def check_returncode(self) -> None:
         if self.returncode != 0:
             raise subprocess.CalledProcessError(
