@@ -532,7 +532,7 @@ class MeridianPanel:
         address: str,
         port: int,
         *,
-        config_profile_uuid: str = "",
+        config_profile_uuid: str,
         inbound_uuids: list[str] | None = None,
         country_code: str = "XX",
     ) -> NodeCredentials:
@@ -540,35 +540,19 @@ class MeridianPanel:
 
         Returns credentials including the SECRET_KEY for the node container.
         """
-        if config_profile_uuid:
-            body = CreateNodeRequestDto(
-                name=name,
-                address=address,
-                port=port,
-                country_code=country_code,
-                config_profile=NodeConfigProfileRequestDto(
-                    activeConfigProfileUuid=config_profile_uuid,
-                    activeInbounds=inbound_uuids or [],
-                ),
-            )
-            resp = _sdk_call(self._sdk.nodes.create_node(body))
-            data = _sdk_to_dict(resp)
-            node_uuid = str(getattr(resp, "uuid", ""))
-        else:
-            # Keep a raw fallback for compatibility with callers that do not
-            # yet provide a config profile binding.
-            body = {
-                "name": name,
-                "address": address,
-                "port": port,
-                "countryCode": country_code,
-                "configProfile": {
-                    "activeConfigProfileUuid": config_profile_uuid,
-                    "activeInbounds": inbound_uuids or [],
-                },
-            }
-            data = self._post("/api/nodes", json=body)
-            node_uuid = data.get("uuid", "")
+        body = CreateNodeRequestDto(
+            name=name,
+            address=address,
+            port=port,
+            country_code=country_code,
+            config_profile=NodeConfigProfileRequestDto(
+                activeConfigProfileUuid=config_profile_uuid,
+                activeInbounds=inbound_uuids or [],
+            ),
+        )
+        resp = _sdk_call(self._sdk.nodes.create_node(body))
+        data = _sdk_to_dict(resp)
+        node_uuid = str(getattr(resp, "uuid", ""))
 
         return NodeCredentials(uuid=node_uuid, secret_key=self.get_node_secret_key(), _raw=data)
 
@@ -795,13 +779,27 @@ class MeridianPanel:
     # --- Auth (for initial setup — raw httpx, no SDK instance yet) ---
 
     @classmethod
-    def login(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
-        """Authenticate and return an auth token."""
+    def _auth_request(
+        cls,
+        base_url: str,
+        path: str,
+        username: str,
+        password: str,
+        *,
+        accepted_codes: tuple[int, ...] = (200,),
+        error_label: str = "auth",
+        timeout: int = 30,
+    ) -> str:
+        """Shared auth helper — POST credentials, extract token.
+
+        Both ``login`` and ``register_admin`` are thin wrappers around this.
+        """
         import httpx
 
+        url = f"{base_url.rstrip('/')}{path}"
         try:
             resp = httpx.post(
-                f"{base_url.rstrip('/')}/api/auth/login",
+                url,
                 json={"username": username, "password": password},
                 timeout=timeout,
                 verify=False,
@@ -814,87 +812,50 @@ class MeridianPanel:
             ) from e
         except httpx.TimeoutException:
             raise RemnawaveNetworkError(
-                f"Panel login timed out after {timeout}s",
+                f"Panel {error_label} timed out after {timeout}s",
                 hint_type="system",
             )
-        if resp.status_code != 200:
+        if resp.status_code not in accepted_codes:
+            detail = resp.text[:200] if resp.status_code >= 400 else ""
+            msg = f"Panel {error_label} failed ({resp.status_code})"
+            if detail:
+                msg = f"{msg}: {detail}"
             raise RemnawaveError(
-                f"Panel login failed ({resp.status_code})",
-                hint="Check panel credentials",
-                hint_type="user",
+                msg,
+                hint="Check panel credentials" if resp.status_code in (401, 403) else "",
+                hint_type="user" if resp.status_code in (401, 403) else "system",
             )
         try:
             data = resp.json()
         except (ValueError, TypeError) as e:
-            raise RemnawaveError("Panel returned invalid JSON during login", hint_type="system") from e
+            raise RemnawaveError(f"Panel returned invalid JSON during {error_label}", hint_type="system") from e
         if isinstance(data, dict) and "response" in data:
             data = data["response"]
         token = data.get("accessToken", "") or data.get("token", "")
         if not token:
-            raise RemnawaveError("Login succeeded but no token returned", hint_type="bug")
+            raise RemnawaveError(f"{error_label.capitalize()} succeeded but no token returned", hint_type="bug")
         return token
+
+    @classmethod
+    def login(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
+        """Authenticate and return an auth token."""
+        return cls._auth_request(
+            base_url, "/api/auth/login", username, password,
+            accepted_codes=(200,), error_label="login", timeout=timeout,
+        )
 
     @classmethod
     def register_admin(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
         """Register the initial admin user during setup."""
-        import httpx
-
-        try:
-            resp = httpx.post(
-                f"{base_url.rstrip('/')}/api/auth/register",
-                json={"username": username, "password": password},
-                timeout=timeout,
-                verify=False,
-            )
-        except httpx.ConnectError as e:
-            raise RemnawaveNetworkError(
-                f"Cannot connect to panel at {base_url}",
-                hint=f"Is the panel running? {e}",
-                hint_type="system",
-            ) from e
-        except httpx.TimeoutException:
-            raise RemnawaveNetworkError(
-                f"Panel registration timed out after {timeout}s",
-                hint_type="system",
-            )
-        if resp.status_code not in (200, 201):
-            raise RemnawaveError(
-                f"Admin registration failed ({resp.status_code}): {resp.text[:200]}",
-                hint_type="system",
-            )
-        try:
-            data = resp.json()
-        except (ValueError, TypeError) as e:
-            raise RemnawaveError("Panel returned invalid JSON during registration", hint_type="system") from e
-        if isinstance(data, dict) and "response" in data:
-            data = data["response"]
-        token = data.get("accessToken", "") or data.get("token", "")
-        if not token:
-            raise RemnawaveError("Registration succeeded but no token returned", hint_type="bug")
-        return token
+        return cls._auth_request(
+            base_url, "/api/auth/register", username, password,
+            accepted_codes=(200, 201), error_label="registration", timeout=timeout,
+        )
 
 
 # ---------------------------------------------------------------------------
 # Raw JSON → dataclass parsers (for endpoints using raw httpx)
 # ---------------------------------------------------------------------------
-
-
-def _parse_user(data: Any) -> User:
-    if not isinstance(data, dict):
-        return User()
-    return User(
-        uuid=data.get("uuid", ""),
-        short_uuid=data.get("shortUuid", "") or data.get("short_uuid", ""),
-        username=data.get("username", ""),
-        vless_uuid=data.get("vlessUuid", "") or data.get("vless_uuid", ""),
-        status=data.get("status", ""),
-        used_traffic_bytes=data.get("usedTrafficBytes", 0) or 0,
-        traffic_limit_bytes=data.get("trafficLimitBytes", 0) or 0,
-        created_at=data.get("createdAt", ""),
-        online_at=data.get("onlineAt", "") or data.get("lastOnline", ""),
-        sub_revoked_at=data.get("subRevokedAt", ""),
-        _raw=data,
-    )
 
 
 def _parse_host(data: Any) -> Host:
