@@ -583,6 +583,21 @@ _DESIRED_RELAY_FIELDS = _public_fields(DesiredRelay)
 _KNOWN_TOP = _public_fields(ClusterConfig)
 
 
+_SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
+"""Default SSH credentials — shared by panel, node, relay, and desired-state entries."""
+
+
+def _strip_ssh_defaults(d: dict[str, Any]) -> None:
+    """Remove ssh_user/ssh_port from *d* when they match the defaults.
+
+    Keeps YAML output clean — readers re-apply the same defaults on load.
+    """
+    if d.get("ssh_user") == "root":
+        d.pop("ssh_user", None)
+    if d.get("ssh_port") == 22:
+        d.pop("ssh_port", None)
+
+
 def _strip_none(d: dict[str, Any]) -> dict[str, Any]:
     """Remove keys with None values."""
     return {k: v for k, v in d.items() if v is not None}
@@ -621,10 +636,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     # Panel
     panel_dict = _serialize_dataclass(cfg.panel)
     # Remove default values to keep YAML clean
-    if panel_dict.get("ssh_user") == "root":
-        panel_dict.pop("ssh_user", None)
-    if panel_dict.get("ssh_port") == 22:
-        panel_dict.pop("ssh_port", None)
+    _strip_ssh_defaults(panel_dict)
     if panel_dict:
         out["panel"] = panel_dict
 
@@ -641,10 +653,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         nodes_out = []
         for node in cfg.nodes:
             d = _serialize_dataclass(node)
-            if d.get("ssh_user") == "root":
-                d.pop("ssh_user", None)
-            if d.get("ssh_port") == 22:
-                d.pop("ssh_port", None)
+            _strip_ssh_defaults(d)
             if not d.get("is_panel_host"):
                 d.pop("is_panel_host", None)
             if not d.get("xhttp_path"):
@@ -667,10 +676,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         relays_out = []
         for relay in cfg.relays:
             d = _serialize_dataclass(relay)
-            if d.get("ssh_user") == "root":
-                d.pop("ssh_user", None)
-            if d.get("ssh_port") == 22:
-                d.pop("ssh_port", None)
+            _strip_ssh_defaults(d)
             relays_out.append(d)
         out["relays"] = relays_out
 
@@ -708,10 +714,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         desired_nodes_out = []
         for dn in cfg.desired_nodes:
             d = _serialize_dataclass(dn)
-            if d.get("ssh_user") == "root":
-                d.pop("ssh_user", None)
-            if d.get("ssh_port") == 22:
-                d.pop("ssh_port", None)
+            _strip_ssh_defaults(d)
             # Preserve warp: None → YAML null, False, True are all meaningful.
             # _serialize_dataclass strips None via _strip_none, so re-add it.
             d["warp"] = dn.warp
@@ -725,10 +728,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         desired_relays_out = []
         for dr in cfg.desired_relays:
             d = _serialize_dataclass(dr)
-            if d.get("ssh_user") == "root":
-                d.pop("ssh_user", None)
-            if d.get("ssh_port") == 22:
-                d.pop("ssh_port", None)
+            _strip_ssh_defaults(d)
             desired_relays_out.append(d)
         out["desired_relays"] = desired_relays_out
 
@@ -798,7 +798,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         data.get("panel", {}),
         PanelConfig,
         _PANEL_FIELDS,
-        defaults={"ssh_user": "root", "ssh_port": 22},
+        defaults={**_SSH_DEFAULTS},
     )
 
     # Nodes
@@ -809,7 +809,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                 n,
                 NodeEntry,
                 _NODE_FIELDS,
-                defaults={"ssh_user": "root", "ssh_port": 22, "is_panel_host": False, "warp": False},
+                defaults={**_SSH_DEFAULTS, "is_panel_host": False, "warp": False},
                 transforms={"is_panel_host": bool, "warp": bool},
             )
         )
@@ -822,7 +822,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                 r,
                 RelayEntry,
                 _RELAY_FIELDS,
-                defaults={"ssh_user": "root", "ssh_port": 22, "port": 443},
+                defaults={**_SSH_DEFAULTS, "port": 443},
             )
         )
 
@@ -868,7 +868,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                     dn,
                     DesiredNode,
                     _DESIRED_NODE_FIELDS,
-                    defaults={"ssh_user": "root", "ssh_port": 22, "warp": None},
+                    defaults={**_SSH_DEFAULTS, "warp": None},
                 )
             )
 
@@ -891,7 +891,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                     dr,
                     DesiredRelay,
                     _DESIRED_RELAY_FIELDS,
-                    defaults={"ssh_user": "root", "ssh_port": 22},
+                    defaults={**_SSH_DEFAULTS},
                 )
             )
 
