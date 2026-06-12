@@ -7,7 +7,12 @@ adapters catch it to build typed JSON error responses via ``to_error_model()``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from meridian.core.models import ErrorCategory
+
+if TYPE_CHECKING:
+    from meridian.core.models import MeridianError as MeridianErrorModel
 
 _EXIT_CODES: dict[str, int] = {"user": 2, "system": 3, "bug": 1, "cancelled": 130}
 
@@ -49,14 +54,6 @@ class MeridianError(Exception):
             retryable=self.retryable,
             exit_code=self.exit_code,
         )
-
-
-# Pydantic model type alias — resolved lazily in to_error_model() to
-# avoid circular imports.  This annotation is for type checkers only.
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from meridian.core.models import MeridianError as MeridianErrorModel
 
 
 class EngineError(MeridianError):
