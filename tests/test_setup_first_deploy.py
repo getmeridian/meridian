@@ -15,6 +15,7 @@ import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.remnawave import RemnawaveError
+from meridian.xray_config import XrayConfigResult
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -94,12 +95,12 @@ def _base_patches():  # noqa: ANN202
         "meridian.panel_bootstrap.MeridianPanel.register_admin": MagicMock(return_value=_AUTH_TOKEN),
         "meridian.panel_bootstrap.create_api_token": MagicMock(return_value=_API_TOKEN),
         "meridian.panel_bootstrap.build_xray_config": MagicMock(
-            return_value={
-                "config": {"inbounds": [], "outbounds": []},
-                "reality_public_key": "PUB_KEY",
-                "reality_short_id": "abcd1234",
-                "reality_private_key": "PRIV_KEY",
-            }
+            return_value=XrayConfigResult(
+                config={"inbounds": [], "outbounds": []},
+                reality_public_key="PUB_KEY",
+                reality_short_id="abcd1234",
+                reality_private_key="PRIV_KEY",
+            )
         ),
         "meridian.panel_bootstrap.get_docker_gateway": MagicMock(return_value=_GATEWAY),
         "meridian.panel_bootstrap.deploy_node_container": MagicMock(return_value=True),
@@ -126,12 +127,12 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "PUB",
-                    "reality_short_id": "ab",
-                    "reality_private_key": "PRIV",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="PUB",
+                    reality_short_id="ab",
+                    reality_private_key="PRIV",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -174,12 +175,12 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "MY_PUB",
-                    "reality_short_id": "abcd1234",
-                    "reality_private_key": "MY_PRIV",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="MY_PUB",
+                    reality_short_id="abcd1234",
+                    reality_private_key="MY_PRIV",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -222,12 +223,12 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -266,12 +267,12 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -312,12 +313,12 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -365,12 +366,12 @@ class TestSetupFirstDeployAdminRegistration:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -466,12 +467,12 @@ class TestSetupFirstDeployAdminRegistration:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -552,12 +553,12 @@ class TestSetupFirstDeployNodeEvidence:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "PUB",
-                    "reality_short_id": "abcd1234",
-                    "reality_private_key": "PRIV",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="PUB",
+                    reality_short_id="abcd1234",
+                    reality_private_key="PRIV",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container", return_value=False),
@@ -609,12 +610,12 @@ class TestSetupFirstDeployConfigProfile:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -656,12 +657,12 @@ class TestSetupFirstDeployConfigProfile:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
@@ -708,12 +709,12 @@ class TestSetupFirstDeployNodeRegistration:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -755,12 +756,12 @@ class TestSetupFirstDeployNodeRegistration:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
@@ -804,12 +805,12 @@ class TestSetupFirstDeployClientCreation:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -850,12 +851,12 @@ class TestSetupFirstDeployClientCreation:
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
@@ -903,12 +904,12 @@ class TestSetupFirstDeployApiToken:
             patch("meridian.panel_bootstrap.create_api_token", return_value="my-api-token-123"),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
-                return_value={
-                    "config": {},
-                    "reality_public_key": "P",
-                    "reality_short_id": "a",
-                    "reality_private_key": "K",
-                },
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="P",
+                    reality_short_id="a",
+                    reality_private_key="K",
+                ),
             ),
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),

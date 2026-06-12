@@ -16,6 +16,7 @@ import typer
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
+from meridian.xray_config import XrayConfigResult
 
 # ---------------------------------------------------------------------------
 # Constants (RFC 5737 IPs)
@@ -98,18 +99,18 @@ def _make_panel_mock() -> MagicMock:
     return panel
 
 
-_XRAY_RESULT = {
-    "config": {"inbounds": [], "outbounds": []},
-    "reality_public_key": "NEW_PUB",
-    "reality_short_id": "aabb1122",
-    "reality_private_key": "NEW_PRIV",
-}
+_XRAY_RESULT = XrayConfigResult(
+    config={"inbounds": [], "outbounds": []},
+    reality_public_key="NEW_PUB",
+    reality_short_id="aabb1122",
+    reality_private_key="NEW_PRIV",
+)
 
 
 def _run_redeploy(
     cluster: ClusterConfig | None = None,
     panel_mock: MagicMock | None = None,
-    xray_result: dict | None = None,
+    xray_result: XrayConfigResult | None = None,
     resolved: SimpleNamespace | None = None,
     *,
     sni: str = _SNI,
@@ -127,7 +128,7 @@ def _run_redeploy(
     if resolved is None:
         resolved = _make_resolved()
     if xray_result is None:
-        xray_result = dict(_XRAY_RESULT)
+        xray_result = _XRAY_RESULT
 
     mocks: dict[str, MagicMock] = {}
 
@@ -335,7 +336,7 @@ class TestSetupRedeployFailures:
 
         with (
             patch("meridian.panel_bootstrap.MeridianPanel", return_value=_make_panel_mock()),
-            patch("meridian.panel_bootstrap.build_xray_config", return_value=dict(_XRAY_RESULT)),
+            patch("meridian.panel_bootstrap.build_xray_config", return_value=_XRAY_RESULT),
             patch("meridian.panel_bootstrap.deploy_node_container", return_value=False),
             patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
             patch("meridian.panel_bootstrap.cache_inbounds"),

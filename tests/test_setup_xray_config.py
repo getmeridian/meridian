@@ -1,4 +1,4 @@
-"""Tests for _build_xray_config — Xray inbound generation.
+"""Tests for build_xray_config — Xray inbound generation.
 
 Covers protocol selection (Reality/XHTTP/WSS), key reuse vs generation,
 geo-blocking rules, PQ fingerprint, and return value structure.
@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 import typer
 
-from meridian.panel_bootstrap import build_xray_config
+from meridian.xray_config import XrayConfigResult, build_xray_config
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -33,8 +33,8 @@ _EXISTING_SHORT_ID = "deadbeef"
 # ---------------------------------------------------------------------------
 
 
-def _call_with_existing_keys(**overrides: object) -> dict:
-    """Call _build_xray_config with pre-existing Reality keys (no SSH needed)."""
+def _call_with_existing_keys(**overrides: object) -> XrayConfigResult:
+    """Call build_xray_config with pre-existing Reality keys (no SSH needed)."""
     defaults: dict = dict(
         conn=None,
         sni=_SNI,
@@ -62,9 +62,9 @@ def _make_keygen_conn() -> MagicMock:
     return conn
 
 
-def _inbound_tags(result: dict) -> list[str]:
+def _inbound_tags(result: XrayConfigResult) -> list[str]:
     """Extract inbound tags from config result."""
-    return [ib["tag"] for ib in result["config"]["inbounds"]]
+    return [ib["tag"] for ib in result.config["inbounds"]]
 
 
 # ---------------------------------------------------------------------------
@@ -91,11 +91,11 @@ class TestBuildXrayConfigInboundSelection:
 
     def test_inbound_count_no_domain_is_two(self) -> None:
         result = _call_with_existing_keys(domain="")
-        assert len(result["config"]["inbounds"]) == 2
+        assert len(result.config["inbounds"]) == 2
 
     def test_inbound_count_with_domain_is_three(self) -> None:
         result = _call_with_existing_keys(domain=_DOMAIN)
-        assert len(result["config"]["inbounds"]) == 3
+        assert len(result.config["inbounds"]) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ class TestBuildXrayConfigInboundSelection:
 class TestBuildXrayConfigRealityInbound:
     def _reality(self, **kw: object) -> dict:
         result = _call_with_existing_keys(**kw)
-        return next(ib for ib in result["config"]["inbounds"] if ib["tag"] == "vless-reality")
+        return next(ib for ib in result.config["inbounds"] if ib["tag"] == "vless-reality")
 
     def test_reality_uses_provided_sni(self) -> None:
         ib = self._reality(sni="cdn.example.net")
@@ -154,7 +154,7 @@ class TestBuildXrayConfigRealityInbound:
 class TestBuildXrayConfigXhttpInbound:
     def _xhttp(self, **kw: object) -> dict:
         result = _call_with_existing_keys(**kw)
-        return next(ib for ib in result["config"]["inbounds"] if ib["tag"] == "vless-xhttp")
+        return next(ib for ib in result.config["inbounds"] if ib["tag"] == "vless-xhttp")
 
     def test_xhttp_uses_provided_port(self) -> None:
         ib = self._xhttp(xhttp_port=44444)
@@ -191,7 +191,7 @@ class TestBuildXrayConfigWssInbound:
         defaults = dict(domain=_DOMAIN)
         defaults.update(kw)
         result = _call_with_existing_keys(**defaults)
-        return next(ib for ib in result["config"]["inbounds"] if ib["tag"] == "vless-wss")
+        return next(ib for ib in result.config["inbounds"] if ib["tag"] == "vless-wss")
 
     def test_wss_uses_provided_port(self) -> None:
         ib = self._wss(wss_port=55555)
@@ -222,30 +222,30 @@ class TestBuildXrayConfigWssInbound:
 class TestBuildXrayConfigKeyReuse:
     def test_reuses_existing_private_key(self) -> None:
         result = _call_with_existing_keys()
-        reality = next(ib for ib in result["config"]["inbounds"] if ib["tag"] == "vless-reality")
+        reality = next(ib for ib in result.config["inbounds"] if ib["tag"] == "vless-reality")
         assert reality["streamSettings"]["realitySettings"]["privateKey"] == _EXISTING_PRIVATE
 
     def test_reuses_existing_short_id(self) -> None:
         result = _call_with_existing_keys()
-        reality = next(ib for ib in result["config"]["inbounds"] if ib["tag"] == "vless-reality")
+        reality = next(ib for ib in result.config["inbounds"] if ib["tag"] == "vless-reality")
         assert reality["streamSettings"]["realitySettings"]["shortIds"] == [_EXISTING_SHORT_ID]
 
     def test_returns_existing_public_key(self) -> None:
         result = _call_with_existing_keys()
-        assert result["reality_public_key"] == _EXISTING_PUBLIC
+        assert result.reality_public_key == _EXISTING_PUBLIC
 
     def test_returns_existing_private_key(self) -> None:
         result = _call_with_existing_keys()
-        assert result["reality_private_key"] == _EXISTING_PRIVATE
+        assert result.reality_private_key == _EXISTING_PRIVATE
 
     def test_returns_existing_short_id(self) -> None:
         result = _call_with_existing_keys()
-        assert result["reality_short_id"] == _EXISTING_SHORT_ID
+        assert result.reality_short_id == _EXISTING_SHORT_ID
 
     def test_conn_not_needed_when_keys_provided(self) -> None:
         """conn=None is valid when all existing keys are provided."""
         result = _call_with_existing_keys(conn=None)
-        assert result["reality_public_key"] == _EXISTING_PUBLIC
+        assert result.reality_public_key == _EXISTING_PUBLIC
 
     def test_generates_new_keys_when_none_provided(self) -> None:
         conn = _make_keygen_conn()
@@ -259,9 +259,9 @@ class TestBuildXrayConfigKeyReuse:
             pq=False,
             geo_block=False,
         )
-        assert result["reality_public_key"] == "GENERATED_PUB"
-        assert result["reality_private_key"] == "GENERATED_PRIV"
-        assert len(result["reality_short_id"]) == 8  # secrets.token_hex(4)
+        assert result.reality_public_key == "GENERATED_PUB"
+        assert result.reality_private_key == "GENERATED_PRIV"
+        assert len(result.reality_short_id) == 8  # secrets.token_hex(4)
 
     def test_fails_without_conn_when_keys_missing(self) -> None:
         with pytest.raises(typer.Exit):
@@ -293,7 +293,7 @@ class TestBuildXrayConfigKeyReuse:
             existing_short_id=_EXISTING_SHORT_ID,
         )
         # Should generate because not all three present
-        assert result["reality_public_key"] == "GENERATED_PUB"
+        assert result.reality_public_key == "GENERATED_PUB"
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ class TestBuildXrayConfigKeyReuse:
 class TestBuildXrayConfigGeoBlocking:
     def _routing_rules(self, **kw: object) -> list[dict]:
         result = _call_with_existing_keys(**kw)
-        return result["config"]["routing"]["rules"]
+        return result.config["routing"]["rules"]
 
     def test_geo_block_enabled_includes_ru_domain_rule(self) -> None:
         rules = self._routing_rules(geo_block=True)
@@ -345,26 +345,26 @@ class TestBuildXrayConfigGeoBlocking:
 class TestBuildXrayConfigBaseConfig:
     def test_has_direct_outbound(self) -> None:
         result = _call_with_existing_keys()
-        tags = [o["tag"] for o in result["config"]["outbounds"]]
+        tags = [o["tag"] for o in result.config["outbounds"]]
         assert "direct" in tags
 
     def test_has_block_outbound(self) -> None:
         result = _call_with_existing_keys()
-        tags = [o["tag"] for o in result["config"]["outbounds"]]
+        tags = [o["tag"] for o in result.config["outbounds"]]
         assert "block" in tags
 
     def test_has_dns_config(self) -> None:
         result = _call_with_existing_keys()
-        assert "dns" in result["config"]
-        assert "servers" in result["config"]["dns"]
+        assert "dns" in result.config
+        assert "servers" in result.config["dns"]
 
     def test_log_level_is_warning(self) -> None:
         result = _call_with_existing_keys()
-        assert result["config"]["log"]["loglevel"] == "warning"
+        assert result.config["log"]["loglevel"] == "warning"
 
     def test_routing_strategy(self) -> None:
         result = _call_with_existing_keys()
-        assert result["config"]["routing"]["domainStrategy"] == "IPIfNonMatch"
+        assert result.config["routing"]["domainStrategy"] == "IPIfNonMatch"
 
 
 # ---------------------------------------------------------------------------
@@ -373,23 +373,26 @@ class TestBuildXrayConfigBaseConfig:
 
 
 class TestBuildXrayConfigReturnValue:
-    def test_returns_config_key(self) -> None:
+    def test_returns_config(self) -> None:
         result = _call_with_existing_keys()
-        assert "config" in result
-        assert isinstance(result["config"], dict)
+        assert isinstance(result.config, dict)
 
     def test_returns_reality_public_key(self) -> None:
         result = _call_with_existing_keys()
-        assert "reality_public_key" in result
+        assert result.reality_public_key
 
     def test_returns_reality_short_id(self) -> None:
         result = _call_with_existing_keys()
-        assert "reality_short_id" in result
+        assert result.reality_short_id
 
     def test_returns_reality_private_key(self) -> None:
         result = _call_with_existing_keys()
-        assert "reality_private_key" in result
+        assert result.reality_private_key
 
-    def test_return_value_has_exactly_four_keys(self) -> None:
+    def test_return_value_is_xray_config_result(self) -> None:
         result = _call_with_existing_keys()
-        assert set(result.keys()) == {"config", "reality_public_key", "reality_short_id", "reality_private_key"}
+        assert isinstance(result, XrayConfigResult)
+        assert isinstance(result.config, dict)
+        assert isinstance(result.reality_public_key, str)
+        assert isinstance(result.reality_short_id, str)
+        assert isinstance(result.reality_private_key, str)
