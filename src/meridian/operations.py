@@ -234,9 +234,9 @@ def add_node(
     Runs the full SSH provisioner pipeline, then configures the node via
     the panel REST API. Returns the new NodeEntry added to cluster.yml.
     """
-    from meridian.commands.resolve import ResolvedServer, ensure_server_connection
     from meridian.config import DEFAULT_SNI
     from meridian.panel_bootstrap import run_provisioner, setup_new_node
+    from meridian.resolve import ResolvedServer, ensure_server_connection
     from meridian.ssh import ServerConnection
 
     effective_sni = sni or DEFAULT_SNI
@@ -334,8 +334,8 @@ def update_node(
     Uses None as sentinel for "not specified" (keep current).
     Empty string means "clear to default/empty".
     """
-    from meridian.commands.resolve import ResolvedServer
     from meridian.panel_bootstrap import setup_redeploy
+    from meridian.resolve import ResolvedServer
     from meridian.ssh import ServerConnection
 
     node = cluster.find_node(ip)
@@ -481,13 +481,13 @@ def add_relay(
     Realm provisioner, ``create_relay_hosts()``, ``deploy_relay_nginx()``,
     and ``save_relay_local()``.
     """
-    from meridian.commands.resolve import ResolvedServer, ensure_server_connection
     from meridian.config import DEFAULT_SNI
     from meridian.relay_ops import (
         create_relay_hosts,
         deploy_relay_nginx,
         save_relay_local,
     )
+    from meridian.resolve import ResolvedServer, ensure_server_connection
     from meridian.ssh import ServerConnection
 
     effective_sni = sni or DEFAULT_SNI

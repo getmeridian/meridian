@@ -44,9 +44,10 @@ def run_add(
         harden=harden,
         yes=yes,
     )
-    from meridian.commands.resolve import ensure_server_connection, resolve_server
+    from meridian.commands.resolve import resolve_server
     from meridian.config import DEFAULT_SNI, SERVERS_FILE
     from meridian.panel_bootstrap import run_provisioner, setup_new_node
+    from meridian.resolve import ensure_server_connection
     from meridian.servers import ServerRegistry
 
     cluster = load_cluster()

@@ -122,7 +122,7 @@ class TestSingleServerAutoSelect:
     def test_single_server_auto_select(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Patch _detect_local_mode_from_creds to return None (not on server)
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -135,7 +135,7 @@ class TestSingleServerAutoSelect:
         self, tmp_home: Path, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -159,7 +159,7 @@ class TestSingleServerAutoSelect:
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -177,7 +177,7 @@ class TestMultipleServers:
 
     def test_multiple_servers_fail(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -191,7 +191,7 @@ class TestMultipleServers:
         self, tmp_home: Path, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -213,7 +213,7 @@ class TestNoServers:
 
     def test_no_servers_fail(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: None,
         )
         reg = ServerRegistry(servers_file)
@@ -227,7 +227,7 @@ class TestLocalMode:
 
     def test_local_mode_detection(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: "10.0.0.1",
         )
         monkeypatch.setattr("meridian.config.os.geteuid", lambda: 0)
@@ -239,7 +239,7 @@ class TestLocalMode:
 
     def test_local_mode_non_root_uses_user_creds_dir(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "meridian.commands.resolve._detect_local_mode_from_creds",
+            "meridian.commands.resolve.detect_local_mode_from_creds",
             lambda: "10.0.0.1",
         )
         monkeypatch.setattr("meridian.config.os.geteuid", lambda: 1000)

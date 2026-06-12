@@ -119,7 +119,7 @@ class TestUpdateNode:
         with (
             patch("meridian.panel_bootstrap.setup_redeploy", side_effect=RuntimeError("SSH failed")),
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.resolve.ResolvedServer"),
+            patch("meridian.resolve.ResolvedServer"),
         ):
             with pytest.raises(RuntimeError, match="SSH failed"):
                 update_node(cluster, panel, ip="198.51.100.2", name="new", sni="new.sni")
@@ -136,7 +136,7 @@ class TestUpdateNode:
         with (
             patch("meridian.panel_bootstrap.setup_redeploy"),
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.resolve.ResolvedServer"),
+            patch("meridian.resolve.ResolvedServer"),
         ):
             update_node(cluster, panel, ip="198.51.100.2", name="new-name")
 
@@ -205,7 +205,7 @@ class TestUpdateNodeMetadataConsistency:
         with (
             patch("meridian.panel_bootstrap.setup_redeploy", side_effect=RuntimeError("provisioner died")),
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.resolve.ResolvedServer"),
+            patch("meridian.resolve.ResolvedServer"),
         ):
             with pytest.raises(RuntimeError):
                 update_node(
@@ -237,7 +237,7 @@ class TestUpdateNodeMetadataConsistency:
         with (
             patch("meridian.panel_bootstrap.setup_redeploy"),  # provisioner OK
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.resolve.ResolvedServer"),
+            patch("meridian.resolve.ResolvedServer"),
         ):
             update_node(cluster, panel, ip="198.51.100.2", name="new-name")
 
@@ -371,7 +371,7 @@ class TestHybridDesiredNodesSync:
         with (
             patch("meridian.panel_bootstrap.setup_redeploy"),
             patch("meridian.ssh.ServerConnection"),
-            patch("meridian.commands.resolve.ResolvedServer"),
+            patch("meridian.resolve.ResolvedServer"),
             patch.object(ClusterConfig, "save"),
         ):
             update_node(cluster, panel, ip="198.51.100.6", name="new", sni="new.sni")

@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from meridian.commands.resolve import detect_public_ip
+from meridian.resolve import detect_public_ip
 from meridian.commands.setup import (
     _build_redeploy_command,
     run,
@@ -24,14 +24,14 @@ from meridian.config import is_ipv4
 class TestDetectPublicIP:
     def test_returns_valid_ip(self) -> None:
         mock_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="93.184.216.34\n", stderr="")
-        with patch("meridian.commands.resolve.subprocess.run", return_value=mock_result):
+        with patch("meridian.resolve.subprocess.run", return_value=mock_result):
             ip = detect_public_ip()
         assert ip == "93.184.216.34"
         assert is_ipv4(ip)
 
     def test_returns_empty_on_timeout(self) -> None:
         with patch(
-            "meridian.commands.resolve.subprocess.run",
+            "meridian.resolve.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="curl", timeout=5),
         ):
             ip = detect_public_ip()
@@ -39,7 +39,7 @@ class TestDetectPublicIP:
 
     def test_returns_empty_on_not_found(self) -> None:
         with patch(
-            "meridian.commands.resolve.subprocess.run",
+            "meridian.resolve.subprocess.run",
             side_effect=FileNotFoundError,
         ):
             ip = detect_public_ip()
@@ -47,13 +47,13 @@ class TestDetectPublicIP:
 
     def test_returns_empty_on_invalid_output(self) -> None:
         mock_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="not-an-ip\n", stderr="")
-        with patch("meridian.commands.resolve.subprocess.run", return_value=mock_result):
+        with patch("meridian.resolve.subprocess.run", return_value=mock_result):
             ip = detect_public_ip()
         assert ip == ""
 
     def test_returns_empty_on_curl_failure(self) -> None:
         mock_result = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="error")
-        with patch("meridian.commands.resolve.subprocess.run", return_value=mock_result):
+        with patch("meridian.resolve.subprocess.run", return_value=mock_result):
             ip = detect_public_ip()
         assert ip == ""
 
@@ -67,7 +67,7 @@ class TestDetectPublicIP:
                 return subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="")
             return subprocess.CompletedProcess(args=[], returncode=0, stdout="10.0.0.1\n", stderr="")
 
-        with patch("meridian.commands.resolve.subprocess.run", side_effect=side_effect):
+        with patch("meridian.resolve.subprocess.run", side_effect=side_effect):
             ip = detect_public_ip()
         assert ip == "10.0.0.1"
         assert len(calls) == 2

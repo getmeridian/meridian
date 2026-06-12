@@ -20,7 +20,6 @@ from meridian.cluster import (
     PanelConfig,
     ProtocolKey,
 )
-from meridian.commands.resolve import ResolvedServer
 from meridian.config import (
     DEFAULT_SNI,
     REMNAWAVE_NODE_API_PORT,
@@ -37,6 +36,7 @@ from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
 from meridian.core.reporters import Reporter
 from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
+from meridian.resolve import ResolvedServer
 from meridian.ssh import ServerConnection
 
 # ---------------------------------------------------------------------------
