@@ -12,13 +12,13 @@ from rich.console import Console
 from rich.status import Status
 
 from meridian.config import DEFAULT_SNI
+from meridian.core.reporters import NoopReporter, Reporter
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
     from meridian.core.events import CoreEventType
     from meridian.core.models import EventLevel
     from meridian.core.output import OperationContext
-    from meridian.core.reporters import Reporter
     from meridian.remnawave import MeridianPanel
 
 StepStatus = Literal["ok", "changed", "skipped", "failed"]
@@ -166,7 +166,7 @@ class Provisioner:
         conn: Any,
         ctx: Any,
         *,
-        reporter: Reporter | None = None,
+        reporter: Reporter = NoopReporter(),
         operation: OperationContext | None = None,
         render: bool = True,
     ) -> list[StepResult]:
@@ -251,7 +251,7 @@ class Provisioner:
 
 
 def _report_step_event(
-    reporter: Reporter | None,
+    reporter: Reporter,
     operation: OperationContext | None,
     event_type: CoreEventType,
     step_name: str,
@@ -262,7 +262,7 @@ def _report_step_event(
     result: StepResult | None = None,
 ) -> None:
     """Emit a provisioning event when a reporter is attached."""
-    if reporter is None or operation is None:
+    if operation is None:
         return
     from meridian.core.reporters import emit_event
 

@@ -35,7 +35,7 @@ from meridian.console import (
 )
 from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
-from meridian.core.reporters import Reporter
+from meridian.core.reporters import NoopReporter, Reporter
 from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.resolve import ResolvedServer
 from meridian.ssh import ServerConnection
@@ -64,7 +64,7 @@ def run_provisioner(
     xhttp_path: str = "",
     ws_path: str = "",
     info_page_path: str = "",
-    reporter: Reporter | None = None,
+    reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
     remote_executor: RemoteExecutor | None = None,
 ) -> None:

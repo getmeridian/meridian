@@ -60,7 +60,7 @@ from meridian.core.deploy_validation import DeployValidationError, normalize_dep
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.reporters import Reporter, emit_event
+from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.services.deploy import deploy_server
 from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
@@ -102,7 +102,7 @@ def run(
     """Deploy a VLESS+Reality proxy server (Remnawave architecture)."""
     operation = OperationContext()
     final_json = json_output or events == "jsonl"
-    reporter: Reporter | None = JsonlReporter() if events == "jsonl" else None
+    reporter: Reporter = JsonlReporter() if events == "jsonl" else NoopReporter()
 
     with error_context("deploy", timer=operation.timer), _quiet_machine_output(final_json):
         if events and events != "jsonl":
@@ -277,9 +277,7 @@ def _emit_deploy_json(result: DeployResult | DeployPlan, *, operation: Operation
     )
 
 
-def _emit_deploy_started_event(reporter: Reporter | None, operation: OperationContext, *, dry_run: bool) -> None:
-    if reporter is None:
-        return
+def _emit_deploy_started_event(reporter: Reporter, operation: OperationContext, *, dry_run: bool) -> None:
     emit_event(
         reporter,
         operation,
@@ -291,14 +289,12 @@ def _emit_deploy_started_event(reporter: Reporter | None, operation: OperationCo
 
 
 def _emit_deploy_completed_event(
-    reporter: Reporter | None,
+    reporter: Reporter,
     operation: OperationContext,
     plan: DeployPlan,
     *,
     dry_run: bool,
 ) -> None:
-    if reporter is None:
-        return
     emit_event(
         reporter,
         operation,
@@ -311,7 +307,7 @@ def _emit_deploy_completed_event(
 
 def _execute_deploy_request(
     request: DeployRequest,
-    reporter: Reporter | None = None,
+    reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
 ) -> DeployResult:
     """Execute deploy request using the current SSH/panel implementation."""

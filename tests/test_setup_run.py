@@ -26,6 +26,7 @@ from meridian.cluster import (
 from meridian.commands.setup import run
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.deploy_planning import DeployClusterState, build_deploy_plan
+from meridian.core.reporters import NoopReporter
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -209,7 +210,7 @@ class TestRunCoreBoundary:
         assert payload["status"] == "changed"
         assert payload["summary"]["changed"] is True
         assert payload["data"]["server_ip"] == _IP_A
-        assert mock_deploy.call_args.kwargs["reporter"] is None
+        assert isinstance(mock_deploy.call_args.kwargs["reporter"], NoopReporter)
 
     def test_run_loads_deploy_request_file(self, tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
         request_path = tmp_path / "deploy.json"

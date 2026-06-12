@@ -16,7 +16,7 @@ def deploy_server(
     request: DeployRequest,
     *,
     executor: DeployExecutor,
-    reporter: Reporter | None = None,
+    reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
 ) -> DeployResult:
     """Run a deploy through the core service boundary.
@@ -25,7 +25,6 @@ def deploy_server(
     incrementally without letting core import command modules.
     """
     operation = operation or OperationContext()
-    reporter = reporter or NoopReporter()
     emit_event(
         reporter,
         operation,
