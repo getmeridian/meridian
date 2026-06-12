@@ -65,6 +65,7 @@ from meridian.core.reporters import Reporter, emit_event
 from meridian.core.services.deploy import deploy_server
 from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
+from meridian.panel_bootstrap import configure_panel_and_node, run_provisioner
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.renderers import emit_json
 from meridian.servers import ServerEntry, ServerRegistry
@@ -382,7 +383,7 @@ def _execute_deploy_request(
     info_page_path = deploy_plan.info_page_path
 
     # Build and run provisioner pipeline
-    _run_provisioner(
+    run_provisioner(
         resolved=resolved,
         cluster=cluster,
         domain=domain,
@@ -404,7 +405,7 @@ def _execute_deploy_request(
     )
 
     # Post-provisioner: configure panel via REST API
-    _configure_panel_and_node(
+    configure_panel_and_node(
         resolved=resolved,
         cluster=cluster,
         domain=domain,
@@ -499,32 +500,6 @@ def _execute_deploy_request(
         relay_count=len(cluster.relays),
         summary=f"Deploy completed for {resolved.ip}",
     )
-
-
-# ---------------------------------------------------------------------------
-# Provisioner pipeline + panel bootstrap — extracted to panel_bootstrap.py
-# ---------------------------------------------------------------------------
-# Backward-compatible aliases so tests that patch "meridian.commands.setup._X"
-# continue to work. New code should import from meridian.panel_bootstrap.
-
-from meridian.panel_bootstrap import (  # noqa: F401 — backward-compat aliases for test patches
-    build_xray_config as _build_xray_config,
-    cache_inbounds as _cache_inbounds,
-    configure_panel_and_node as _configure_panel_and_node,
-    create_api_token as _create_api_token,
-    create_hosts_for_node as _create_hosts_for_node,
-    deploy_client_page as _deploy_client_page,
-    deploy_node_container as _deploy_node_container,
-    generate_reality_keypair as _generate_reality_keypair,
-    get_docker_gateway as _get_docker_gateway,
-    panel_base_url as _panel_base_url,
-    run_provisioner as _run_provisioner,
-    select_default_squad_uuid as _select_default_squad_uuid,
-    setup_first_deploy as _setup_first_deploy,
-    setup_new_node as _setup_new_node,
-    setup_redeploy as _setup_redeploy,
-    wait_for_panel_api as _wait_for_panel_api,
-)
 
 
 # ---------------------------------------------------------------------------

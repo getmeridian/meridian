@@ -141,9 +141,9 @@ class TestSetupFirstDeployHappyPath:
             patch.object(cluster, "save", side_effect=lambda: save_calls.append("save")),
             patch.object(cluster, "backup", side_effect=lambda: save_calls.append("backup")),
         ):
-            from meridian.commands.setup import _setup_first_deploy
+            from meridian.panel_bootstrap import setup_first_deploy
 
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -189,9 +189,9 @@ class TestSetupFirstDeployHappyPath:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            from meridian.commands.setup import _setup_first_deploy
+            from meridian.panel_bootstrap import setup_first_deploy
 
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -237,9 +237,9 @@ class TestSetupFirstDeployHappyPath:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            from meridian.commands.setup import _setup_first_deploy
+            from meridian.panel_bootstrap import setup_first_deploy
 
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -281,9 +281,9 @@ class TestSetupFirstDeployHappyPath:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            from meridian.commands.setup import _setup_first_deploy
+            from meridian.panel_bootstrap import setup_first_deploy
 
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -327,9 +327,9 @@ class TestSetupFirstDeployHappyPath:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            from meridian.commands.setup import _setup_first_deploy
+            from meridian.panel_bootstrap import setup_first_deploy
 
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -354,7 +354,7 @@ class TestSetupFirstDeployHappyPath:
 
 class TestSetupFirstDeployAdminRegistration:
     def _run_with_register_result(self, register_effect, login_effect=None) -> ClusterConfig:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -388,7 +388,7 @@ class TestSetupFirstDeployAdminRegistration:
         with contextlib.ExitStack() as stack:
             for p in patches:
                 stack.enter_context(p)
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -416,7 +416,7 @@ class TestSetupFirstDeployAdminRegistration:
         assert cluster.panel.api_token == _API_TOKEN
 
     def test_register_and_login_both_fail_exits(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
 
@@ -429,7 +429,7 @@ class TestSetupFirstDeployAdminRegistration:
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -446,7 +446,7 @@ class TestSetupFirstDeployAdminRegistration:
 
     def test_reuses_existing_admin_creds_on_rerun(self) -> None:
         """If cluster already has admin creds (from partial failure), reuse them."""
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         cluster.panel = PanelConfig(
@@ -481,7 +481,7 @@ class TestSetupFirstDeployAdminRegistration:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -509,7 +509,7 @@ class TestSetupFirstDeployAdminRegistration:
 
 class TestSetupFirstDeployPanelWait:
     def test_panel_unreachable_fails(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
 
@@ -518,7 +518,7 @@ class TestSetupFirstDeployPanelWait:
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             pytest.raises(typer.Exit),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -541,7 +541,7 @@ class TestSetupFirstDeployPanelWait:
 
 class TestSetupFirstDeployNodeEvidence:
     def test_node_container_failure_stops_deploy(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -568,7 +568,7 @@ class TestSetupFirstDeployNodeEvidence:
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -594,7 +594,7 @@ class TestSetupFirstDeployNodeEvidence:
 
 class TestSetupFirstDeployConfigProfile:
     def test_reuses_existing_profile_by_name(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -624,7 +624,7 @@ class TestSetupFirstDeployConfigProfile:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -644,7 +644,7 @@ class TestSetupFirstDeployConfigProfile:
         assert cluster.config_profile_uuid == "existing-profile-uuid"
 
     def test_profile_creation_failure_exits(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -670,7 +670,7 @@ class TestSetupFirstDeployConfigProfile:
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -693,7 +693,7 @@ class TestSetupFirstDeployConfigProfile:
 
 class TestSetupFirstDeployNodeRegistration:
     def test_existing_node_reused(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -723,7 +723,7 @@ class TestSetupFirstDeployNodeRegistration:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -742,7 +742,7 @@ class TestSetupFirstDeployNodeRegistration:
         assert cluster.nodes[0].uuid == "existing-node-uuid"
 
     def test_node_registration_failure_exits(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -769,7 +769,7 @@ class TestSetupFirstDeployNodeRegistration:
             patch.object(cluster, "backup"),
             pytest.raises(typer.Exit),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -792,7 +792,7 @@ class TestSetupFirstDeployNodeRegistration:
 
 class TestSetupFirstDeployClientCreation:
     def test_existing_client_skipped(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -819,7 +819,7 @@ class TestSetupFirstDeployClientCreation:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -837,7 +837,7 @@ class TestSetupFirstDeployClientCreation:
         panel.create_user.assert_not_called()
 
     def test_client_creation_failure_warns_not_fails(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -866,7 +866,7 @@ class TestSetupFirstDeployClientCreation:
             patch.object(cluster, "backup"),
         ):
             # Should NOT raise — client creation failure is non-fatal
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -892,7 +892,7 @@ class TestSetupFirstDeployClientCreation:
 
 class TestSetupFirstDeployApiToken:
     def test_api_token_saved_to_cluster(self) -> None:
-        from meridian.commands.setup import _setup_first_deploy
+        from meridian.panel_bootstrap import setup_first_deploy
 
         cluster = ClusterConfig()
         panel = _make_panel_mock()
@@ -918,7 +918,7 @@ class TestSetupFirstDeployApiToken:
             patch.object(cluster, "save"),
             patch.object(cluster, "backup"),
         ):
-            _setup_first_deploy(
+            setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",

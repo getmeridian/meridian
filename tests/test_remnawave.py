@@ -768,18 +768,18 @@ class TestInternalSquads:
         assert [str(uuid) for uuid in body.inbounds] == ["00000000-0000-0000-0000-0000000000f1"]
 
     def test_select_default_squad_uuid(self) -> None:
-        from meridian.commands.setup import _select_default_squad_uuid
+        from meridian.panel_bootstrap import select_default_squad_uuid as _select_default_squad_uuid
 
         assert _select_default_squad_uuid([{"uuid": "sq-1", "name": "Default-Squad"}]) == "sq-1"
 
     def test_select_default_squad_uuid_falls_back_to_first(self) -> None:
         """Panel v2.7+ may not have Default-Squad — fall back to first available."""
-        from meridian.commands.setup import _select_default_squad_uuid
+        from meridian.panel_bootstrap import select_default_squad_uuid as _select_default_squad_uuid
 
         assert _select_default_squad_uuid([{"uuid": "sq-1", "name": "Other"}]) == "sq-1"
 
     def test_select_default_squad_uuid_empty_list(self) -> None:
-        from meridian.commands.setup import _select_default_squad_uuid
+        from meridian.panel_bootstrap import select_default_squad_uuid as _select_default_squad_uuid
 
         assert _select_default_squad_uuid([]) == ""
 

@@ -118,7 +118,7 @@ def _run_redeploy(
     ws_path: str = "",
 ) -> dict:
     """Run _setup_redeploy with standard mocks. Returns dict of mocks + cluster."""
-    from meridian.commands.setup import _setup_redeploy
+    from meridian.panel_bootstrap import setup_redeploy
 
     if cluster is None:
         cluster = _configured_cluster()
@@ -147,7 +147,7 @@ def _run_redeploy(
         mocks["save"] = mock_save
         mocks["backup"] = mock_backup
 
-        _setup_redeploy(
+        setup_redeploy(
             resolved=resolved,
             cluster=cluster,
             domain=domain,
@@ -343,9 +343,9 @@ class TestSetupRedeployFailures:
             patch.object(cluster, "backup") as mock_backup,
             pytest.raises(typer.Exit) as exc_info,
         ):
-            from meridian.commands.setup import _setup_redeploy
+            from meridian.panel_bootstrap import setup_redeploy
 
-            _setup_redeploy(
+            setup_redeploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",

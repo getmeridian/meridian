@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 import typer
 
-from meridian.commands.setup import _build_xray_config
+from meridian.panel_bootstrap import build_xray_config
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -49,7 +49,7 @@ def _call_with_existing_keys(**overrides: object) -> dict:
         existing_short_id=_EXISTING_SHORT_ID,
     )
     defaults.update(overrides)
-    return _build_xray_config(**defaults)
+    return build_xray_config(**defaults)
 
 
 def _make_keygen_conn() -> MagicMock:
@@ -249,7 +249,7 @@ class TestBuildXrayConfigKeyReuse:
 
     def test_generates_new_keys_when_none_provided(self) -> None:
         conn = _make_keygen_conn()
-        result = _build_xray_config(
+        result = build_xray_config(
             conn=conn,
             sni=_SNI,
             reality_port=_REALITY_PORT,
@@ -265,7 +265,7 @@ class TestBuildXrayConfigKeyReuse:
 
     def test_fails_without_conn_when_keys_missing(self) -> None:
         with pytest.raises(typer.Exit):
-            _build_xray_config(
+            build_xray_config(
                 conn=None,
                 sni=_SNI,
                 reality_port=_REALITY_PORT,
@@ -279,7 +279,7 @@ class TestBuildXrayConfigKeyReuse:
     def test_partial_keys_trigger_generation(self) -> None:
         """If only some keys are provided, generates fresh set."""
         conn = _make_keygen_conn()
-        result = _build_xray_config(
+        result = build_xray_config(
             conn=conn,
             sni=_SNI,
             reality_port=_REALITY_PORT,
