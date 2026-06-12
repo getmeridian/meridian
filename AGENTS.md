@@ -19,11 +19,19 @@ contracts/CLAUDE.md                     — generated meridian-core contracts
 scripts/CLAUDE.md                       — repository automation
 
 src/meridian/CLAUDE.md                  — Python CLI architecture
+  panel_bootstrap.py                    — panel setup, node deploy, xray config
+  relay_ops.py                          — relay infrastructure operations
+  ssh_keys.py                           — host key utilities (shared by ssh.py + engine)
+  core/defaults.py                      — core-owned constants (DEFAULT_SNI)
+  core/errors.py                        — shared error base types
   commands/CLAUDE.md                    — per-subcommand pattern
+    wizard.py                           — interactive deploy wizard
   engine/CLAUDE.md                      — local Engine use-case boundary
+    routes.py                           — FastAPI route handlers
   provision/CLAUDE.md                   — step pipeline + idempotency
   infra/CLAUDE.md                       — CloudProvider abstract + per-cloud impls
   reconciler/CLAUDE.md                  — plan / apply purity + executor
+    prepare.py                          — shared plan computation entry point
   templates/pwa/CLAUDE.md               — PWA security model
 
 tests/CLAUDE.md                         — testing philosophy
