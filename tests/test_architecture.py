@@ -323,6 +323,56 @@ class TestStructuralHealth:
             + "\nDrop the underscore prefix or stop importing it externally."
         )
 
+    def test_library_modules_do_not_import_console_fail(self) -> None:
+        """Library modules must raise exceptions, not call console.fail().
+
+        fail() exits the process — it belongs in CLI command entry points only.
+        Library modules (operations, relay_ops, resolve, panel_bootstrap,
+        xray_config, provision/) should raise typed exceptions that command
+        callers convert to fail() calls.
+        """
+        # Modules that must not import fail from meridian.console
+        library_files = [
+            SRC / "operations.py",
+            SRC / "relay_ops.py",
+            SRC / "resolve.py",
+            SRC / "xray_config.py",
+        ]
+        library_files.extend(sorted((SRC / "provision").rglob("*.py")))
+
+        # TODO: these modules still import fail — remove from allowlist
+        # after each is migrated to raise MeridianError subclasses instead.
+        allowlist = {
+            "panel_bootstrap.py",
+            "relay_ops.py",
+            "resolve.py",
+            "xray_config.py",
+        }
+
+        violations = []
+        for path in library_files:
+            if not path.exists():
+                continue
+            if path.name in allowlist:
+                continue
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module == "meridian.console"
+                ):
+                    imported_names = [a.name for a in node.names]
+                    if "fail" in imported_names:
+                        violations.append(
+                            f"{path.relative_to(SRC)} imports fail from meridian.console"
+                        )
+
+        assert violations == [], (
+            "Library modules must not import console.fail() — raise exceptions instead:\n"
+            + "\n".join(violations)
+            + "\nSee core/errors.py for MeridianError hierarchy."
+        )
+
     def test_applied_state_not_in_extra(self) -> None:
         """Reconciler state must use typed AppliedState, not cluster._extra.
 
