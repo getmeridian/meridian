@@ -291,8 +291,12 @@ class TestCheckSSH:
     @patch("meridian.ssh._host_key_known", return_value=True)
     def test_ssh_timeout_exits(self, _mock_hk: Any) -> None:
         conn = ServerConnection(ip="1.2.3.4")
-        with patch.object(conn, "run", side_effect=subprocess.TimeoutExpired(cmd="ssh", timeout=10)):
-            with pytest.raises(SSHError):
+        with patch.object(conn, "run") as mock_run:
+            # run() converts TimeoutExpired to returncode=124 internally
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=124, stdout="", stderr="Command timed out after 10s"
+            )
+            with pytest.raises(SSHError, match="timed out"):
                 conn.check_ssh()
 
     @patch("meridian.ssh._host_key_known", return_value=True)

@@ -538,32 +538,34 @@ class ServerConnection:
 
         try:
             result = self.run("echo ok", timeout=10)
-            if result.returncode != 0:
-                stderr = result.stderr.strip()
-                # Host key changed — warn clearly
-                if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
-                    err_console.print(f"\n  [error]Host key for {self.ip} has CHANGED![/error]")
-                    err_console.print("  [warn]This could indicate a network attack (MitM).[/warn]")
-                    err_console.print("  [dim]If you recently rebuilt this server, remove the old key:[/dim]")
-                    err_console.print(f"  [dim]  ssh-keygen -R {self.ip}[/dim]")
-                    raise SSHError(f"Host key verification failed for {self.ip}", hint_type="system")
-                # sudo not found — non-root user on a system without sudo
-                if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
-                    raise SSHError(
-                        f"sudo is not installed on {self.ip}",
-                        hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
-                        hint_type="system",
-                    )
-                err_console.print(f"\n  [error]SSH connection failed:[/error] {stderr}")
-                err_console.print(f"  [dim]1. Copy your SSH key:  ssh-copy-id {self.user}@{self.ip}[/dim]")
-                err_console.print(f"  [dim]2. Test manually:      ssh {self.user}@{self.ip}[/dim]")
-                err_console.print("  [dim]3. Different user:     meridian deploy IP --user ubuntu[/dim]")
-                raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", hint_type="system")
-            ok("SSH connection successful")
-        except subprocess.TimeoutExpired:
-            raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", hint_type="system")
         except FileNotFoundError:
             raise SSHError("ssh command not found. Please install OpenSSH client.", hint_type="system")
+
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            # run() converts TimeoutExpired to returncode=124
+            if result.returncode == 124:
+                raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", hint_type="system")
+            # Host key changed — warn clearly
+            if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
+                err_console.print(f"\n  [error]Host key for {self.ip} has CHANGED![/error]")
+                err_console.print("  [warn]This could indicate a network attack (MitM).[/warn]")
+                err_console.print("  [dim]If you recently rebuilt this server, remove the old key:[/dim]")
+                err_console.print(f"  [dim]  ssh-keygen -R {self.ip}[/dim]")
+                raise SSHError(f"Host key verification failed for {self.ip}", hint_type="system")
+            # sudo not found — non-root user on a system without sudo
+            if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
+                raise SSHError(
+                    f"sudo is not installed on {self.ip}",
+                    hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
+                    hint_type="system",
+                )
+            err_console.print(f"\n  [error]SSH connection failed:[/error] {stderr}")
+            err_console.print(f"  [dim]1. Copy your SSH key:  ssh-copy-id {self.user}@{self.ip}[/dim]")
+            err_console.print(f"  [dim]2. Test manually:      ssh {self.user}@{self.ip}[/dim]")
+            err_console.print("  [dim]3. Different user:     meridian deploy IP --user ubuntu[/dim]")
+            raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", hint_type="system")
+        ok("SSH connection successful")
 
     def detect_local_mode(self) -> bool:
         """Check if we're running on the target server itself.
