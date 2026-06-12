@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from meridian.console import err_console, info, ok, warn
+from meridian.ssh_keys import host_key_known, host_key_lookup
 
 logger = logging.getLogger("meridian.ssh")
 
@@ -131,30 +132,8 @@ def scp_host(ip: str) -> str:
 
 
 def _host_key_known(ip: str, port: int = 22) -> bool:
-    """Check if the host key for this IP is already in known_hosts."""
-    # ssh-keygen -F uses [host]:port notation for non-default ports
-    lookup = host_key_lookup(ip, port)
-    try:
-        result = subprocess.run(
-            ["ssh-keygen", "-F", lookup],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            stdin=subprocess.DEVNULL,
-        )
-        return result.returncode == 0 and bool(result.stdout.strip())
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def host_key_known(ip: str, port: int = 22) -> bool:
-    """Public wrapper for checking known_hosts without prompting."""
-    return _host_key_known(ip, port)
-
-
-def host_key_lookup(ip: str, port: int = 22) -> str:
-    """Return the OpenSSH known_hosts lookup string for a host/port."""
-    return f"[{ip}]:{port}" if port != 22 else ip
+    """Thin wrapper so test patches on ``meridian.ssh._host_key_known`` keep working."""
+    return host_key_known(ip, port)
 
 
 def _verify_host_key(ip: str, port: int = 22) -> bool:

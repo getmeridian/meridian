@@ -20,6 +20,7 @@ from meridian.core.servers import (
     profile_from_draft,
 )
 from meridian.engine.errors import EngineError
+from meridian.ssh_keys import host_key_known, host_key_lookup
 
 
 class ServerProfileStoreLike(Protocol):
@@ -414,26 +415,6 @@ def _ssh_copy_id_command(profile: ServerProfile) -> str:
     port = f" -p {profile.ssh_port}" if profile.ssh_port != 22 else ""
     return f"ssh-copy-id{port} {shlex.quote(target)}"
 
-
-def host_key_known(host: str, port: int = 22) -> bool:
-    """Check OpenSSH known_hosts without importing the SSH runtime adapter."""
-    lookup = host_key_lookup(host, port)
-    try:
-        result = subprocess.run(
-            ["ssh-keygen", "-F", lookup],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            stdin=subprocess.DEVNULL,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0 and bool(result.stdout.strip())
-
-
-def host_key_lookup(host: str, port: int = 22) -> str:
-    """Return the OpenSSH known_hosts lookup string for a host/port."""
-    return f"[{host}]:{port}" if port != 22 else host
 
 
 def _ssh_target(profile: ServerProfile) -> str:
