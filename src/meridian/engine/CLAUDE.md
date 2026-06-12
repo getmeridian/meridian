@@ -7,6 +7,7 @@
 - **Adapters stay explicit** - Filesystem state, server registries, SSH, panel clients, and future HTTP handlers are passed in or isolated behind small runtime helpers.
 - **Only for execution** - Static Studio can use generated contracts without Engine. Engine is for local executable UI mode: SSH, files, secrets, operation state, events, and cancellation.
 - **Localhost API first** - `meridian studio` serves a FastAPI app on `127.0.0.1` with contract/workflow discovery, server onboarding actions, deploy dry-run, and process-local deploy operations.
+- **Routes are module-level** - `routes.py` has standalone handler functions on an APIRouter; `api.py` wires app.state and includes the router. No closures capture injected services.
 
 ## Pitfalls
 
@@ -15,3 +16,4 @@
 - Keep human wording and terminal rendering in CLI adapters.
 - Keep localhost security hostile-by-default: Host/Origin checks, CSRF, no permissive CORS.
 - Keep password bootstrap one-time only: no generated contracts, logs, events, browser storage, or profile persistence.
+- `EngineBootstrapKeyRequest` lives in `routes.py`, not `api.py` -- it is only used by route handlers.
