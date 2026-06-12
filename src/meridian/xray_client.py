@@ -312,7 +312,16 @@ def test_connection(
         )
 
         # Wait for SOCKS5 to be ready
-        _wait_for_port(socks_port, timeout=5)
+        def _socks_ready() -> bool:
+            with socket.create_connection(("127.0.0.1", socks_port), timeout=0.5):
+                return True
+
+        poll_until_ready(
+            _socks_ready,
+            timeout=5,
+            interval=0.2,
+            description=f"localhost:{socks_port}",
+        )
 
         # Test connectivity
         start = time.monotonic()
@@ -360,21 +369,6 @@ def test_connection(
                 proc.kill()
         if config_file:
             Path(config_file).unlink(missing_ok=True)
-
-
-def _wait_for_port(port: int, timeout: float = 5) -> None:
-    """Wait until a TCP port is accepting connections on localhost."""
-
-    def _check() -> bool:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-            return True
-
-    poll_until_ready(
-        _check,
-        timeout=timeout,
-        interval=0.2,
-        description=f"localhost:{port}",
-    )
 
 
 def build_test_configs(creds: ServerCredentials) -> list[tuple[str, dict, bool]]:

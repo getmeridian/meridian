@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import secrets
 import shlex
-import time
 from typing import Any
 
 from meridian.adapters import RemoteExecutorConnection, SSHRemoteExecutor
@@ -218,25 +217,38 @@ def get_docker_gateway(conn: ServerConnection) -> str:
     return gateway or "172.17.0.1"
 
 
-def wait_for_panel_api(base_url: str, retries: int = 20, delay: float = 3.0) -> bool:
-    """Wait for the panel REST API to become reachable from the deployer."""
+def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) -> bool:
+    """Wait for the panel REST API to become reachable from the deployer.
+
+    Uses poll_until_ready for centralized health polling.
+    """
     import httpx
 
-    for attempt in range(retries):
-        try:
-            resp = httpx.get(
-                f"{base_url.rstrip('/')}/api/auth/login",
-                timeout=10,
-                verify=False,  # Self-signed cert during bootstrap
-            )
-            # Any response (even 405 Method Not Allowed) means the API is up
-            if resp.status_code < 500:
-                return True
-        except (httpx.ConnectError, httpx.TimeoutException):
-            pass
-        if attempt < retries - 1:
-            time.sleep(delay)
-    return False
+    from meridian.health import ReadinessTimeout, poll_until_ready
+
+    def _check() -> bool:
+        resp = httpx.get(
+            f"{base_url.rstrip('/')}/api/auth/login",
+            timeout=10,
+            verify=False,  # Self-signed cert during bootstrap
+        )
+        # Any response (even 405 Method Not Allowed) means the API is up
+        return resp.status_code < 500
+
+    try:
+        poll_until_ready(
+            _check,
+            timeout=retries * delay,
+            interval=delay,
+            description="panel API",
+        )
+        return True
+    except ReadinessTimeout:
+        return False
+
+
+# Backward-compatible alias for tests
+wait_for_panel_api = check_panel_api_ready
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +350,7 @@ def setup_first_deploy(
 
     # Wait for panel API to become accessible
     logger.info("Waiting for panel API...")
-    if not wait_for_panel_api(base_url):
+    if not check_panel_api_ready(base_url):
         raise PanelSetupError(
             "Panel API is not reachable",
             hint=(
@@ -1025,20 +1037,27 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
 
     # Health gate: verify the node container started
     logger.info("Verifying node container health...")
-    node_healthy = False
-    for _attempt in range(10):
+
+    from meridian.health import ReadinessTimeout, poll_until_ready
+
+    def _node_running() -> bool:
         check = conn.run(
             "docker inspect remnawave-node --format '{{.State.Running}}' 2>/dev/null",
             timeout=10,
         )
-        if check.returncode == 0 and "true" in check.stdout.strip().lower():
-            node_healthy = True
-            break
-        time.sleep(3)
+        return check.returncode == 0 and "true" in check.stdout.strip().lower()
 
-    if node_healthy:
+    try:
+        poll_until_ready(
+            _node_running,
+            timeout=30,
+            interval=3.0,
+            description="Remnawave node container",
+        )
+        node_healthy = True
         logger.info("Node container verified healthy")
-    else:
+    except ReadinessTimeout:
+        node_healthy = False
         logs = conn.run("docker logs remnawave-node --tail 20 2>&1", timeout=15)
         log_tail = logs.stdout.strip()[:500] if logs.returncode == 0 else "(no logs available)"
         logger.warning(

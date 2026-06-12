@@ -90,7 +90,7 @@ def _make_panel_mock() -> MagicMock:
 def _base_patches():  # noqa: ANN202
     """Return dict of common patches for _setup_first_deploy tests."""
     return {
-        "meridian.panel_bootstrap.wait_for_panel_api": MagicMock(return_value=True),
+        "meridian.panel_bootstrap.check_panel_api_ready": MagicMock(return_value=True),
         "meridian.panel_bootstrap.MeridianPanel.register_admin": MagicMock(return_value=_AUTH_TOKEN),
         "meridian.panel_bootstrap.create_api_token": MagicMock(return_value=_API_TOKEN),
         "meridian.panel_bootstrap.build_xray_config": MagicMock(
@@ -121,7 +121,7 @@ class TestSetupFirstDeployHappyPath:
         save_calls: list[str] = []
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -169,7 +169,7 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -217,7 +217,7 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -261,7 +261,7 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -307,7 +307,7 @@ class TestSetupFirstDeployHappyPath:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -360,7 +360,7 @@ class TestSetupFirstDeployAdminRegistration:
         panel = _make_panel_mock()
 
         patches = [
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", side_effect=register_effect),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -422,7 +422,7 @@ class TestSetupFirstDeployAdminRegistration:
         cluster = ClusterConfig()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", side_effect=RemnawaveError("fail")),
             patch("meridian.panel_bootstrap.MeridianPanel.login", side_effect=RemnawaveError("fail")),
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
@@ -463,7 +463,7 @@ class TestSetupFirstDeployAdminRegistration:
         mock_cls.register_admin.return_value = _AUTH_TOKEN
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
                 "meridian.panel_bootstrap.build_xray_config",
@@ -516,7 +516,7 @@ class TestSetupFirstDeployPanelWait:
         cluster = ClusterConfig()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=False),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=False),
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             pytest.raises(PanelSetupError, match="Panel API is not reachable"),
         ):
@@ -550,7 +550,7 @@ class TestSetupFirstDeployNodeEvidence:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -606,7 +606,7 @@ class TestSetupFirstDeployConfigProfile:
         panel.find_config_profile_by_name.return_value = existing
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -654,7 +654,7 @@ class TestSetupFirstDeployConfigProfile:
         panel.find_config_profile_by_name.side_effect = RemnawaveError("500 Server Error")
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -706,7 +706,7 @@ class TestSetupFirstDeployNodeRegistration:
         panel.get_node_secret_key.return_value = "existing-secret"
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -754,7 +754,7 @@ class TestSetupFirstDeployNodeRegistration:
         panel.create_node.side_effect = RemnawaveError("500")
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -803,7 +803,7 @@ class TestSetupFirstDeployClientCreation:
         panel.get_user.return_value = MagicMock(username=_CLIENT)  # already exists
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -849,7 +849,7 @@ class TestSetupFirstDeployClientCreation:
         panel.create_user.side_effect = RemnawaveError("500")
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
             patch(
@@ -902,7 +902,7 @@ class TestSetupFirstDeployApiToken:
         panel = _make_panel_mock()
 
         with (
-            patch("meridian.panel_bootstrap.wait_for_panel_api", return_value=True),
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
             patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
             patch("meridian.panel_bootstrap.create_api_token", return_value="my-api-token-123"),
             patch(

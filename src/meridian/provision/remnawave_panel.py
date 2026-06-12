@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import secrets
 import shlex
-import time
 
 from meridian.config import (
     REMNAWAVE_BACKEND_IMAGE,
@@ -267,31 +266,6 @@ def configure_subscription_page(
     return True
 
 
-def _wait_for_remnawave_panel(
-    conn: ServerConnection,
-    retries: int = 40,
-    delay: float = 3.0,
-) -> None:
-    """Poll the Remnawave health endpoint until responsive or retries exhausted."""
-    url = f"http://127.0.0.1:{_METRICS_PORT}/health"
-    q_url = shlex.quote(url)
-
-    for _ in range(retries):
-        result = conn.run(
-            f"curl -sf -o /dev/null -w '%{{http_code}}' {q_url}",
-            timeout=15,
-        )
-        code = result.stdout.strip()
-        if result.returncode == 0 and code in ("200", "204"):
-            return
-        time.sleep(delay)
-
-    raise RuntimeError(
-        f"Remnawave panel did not become healthy after {retries * delay:.0f}s. "
-        f"Check: docker logs {_PANEL_CONTAINER} --tail 30"
-    )
-
-
 class DeployRemnawavePanel:
     """Deploy Remnawave panel stack as Docker containers.
 
@@ -525,12 +499,33 @@ class DeployRemnawavePanel:
 
         # -- Wait for panel to become healthy --
         try:
-            _wait_for_remnawave_panel(conn)
-        except RuntimeError as e:
+            from meridian.health import ReadinessTimeout, poll_until_ready
+
+            _health_url = f"http://127.0.0.1:{_METRICS_PORT}/health"
+            _q_health_url = shlex.quote(_health_url)
+
+            def _panel_healthy() -> bool:
+                r = conn.run(
+                    f"curl -sf -o /dev/null -w '%{{http_code}}' {_q_health_url}",
+                    timeout=15,
+                )
+                code = r.stdout.strip()
+                return r.returncode == 0 and code in ("200", "204")
+
+            poll_until_ready(
+                _panel_healthy,
+                timeout=120,
+                interval=3.0,
+                description="Remnawave panel",
+            )
+        except ReadinessTimeout:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=str(e),
+                detail=(
+                    f"Remnawave panel did not become healthy after 120s. "
+                    f"Check: docker logs {_PANEL_CONTAINER} --tail 30"
+                ),
             )
 
         # -- Store secrets in context --

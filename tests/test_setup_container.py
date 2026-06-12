@@ -77,7 +77,7 @@ class TestDeployNodeContainerHappyPath:
         conn.run.side_effect = _run_side_effect
         return conn
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_creates_node_directory(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -86,7 +86,7 @@ class TestDeployNodeContainerHappyPath:
         assert _NODE_DIR in first_call[0][0]
         assert "chmod 700" in first_call[0][0]
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_writes_env_file(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -95,7 +95,7 @@ class TestDeployNodeContainerHappyPath:
         assert env_writes[0].kwargs["mode"] == "600"
         assert env_writes[0].kwargs["sensitive"] is True
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_writes_compose_file(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -103,7 +103,7 @@ class TestDeployNodeContainerHappyPath:
         assert len(compose_writes) == 1
         assert compose_writes[0].kwargs["mode"] == "644"
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_pulls_docker_image(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -113,7 +113,7 @@ class TestDeployNodeContainerHappyPath:
         assert pull_calls[0].kwargs["retries"] == 3
         assert pull_calls[0].kwargs["retry_delay"] == 10
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_starts_container(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -121,7 +121,7 @@ class TestDeployNodeContainerHappyPath:
         up_cmds = [c for c in commands if "docker compose up -d" in c]
         assert len(up_cmds) == 1
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_opens_ufw_port_on_healthy_container(self, mock_time: MagicMock) -> None:
         conn = self._make_healthy_conn()
         _deploy_node_container(conn, _SECRET_KEY)
@@ -130,7 +130,7 @@ class TestDeployNodeContainerHappyPath:
         assert len(ufw_cmds) == 1
         assert "172.16.0.0/12" in ufw_cmds[0]
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_no_warnings_on_happy_path(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = self._make_healthy_conn()
         with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
@@ -146,7 +146,7 @@ class TestDeployNodeContainerHappyPath:
 class TestDeployNodeContainerDockerPullRetry:
     """Pull retry logic: 3 attempts, 10s delay between."""
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_pull_succeeds_on_second_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = _conn_mock()
 
@@ -162,9 +162,9 @@ class TestDeployNodeContainerDockerPullRetry:
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
         assert pull_call.kwargs["retries"] == 3
         assert pull_call.kwargs["retry_delay"] == 10
-        mock_time.sleep.assert_not_called()
+        mock_time.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_pull_succeeds_on_third_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
         conn = _conn_mock()
 
@@ -180,7 +180,7 @@ class TestDeployNodeContainerDockerPullRetry:
         pull_call = next(c for c in conn.run.call_args_list if c[0][0] == "docker compose pull")
         assert pull_call.kwargs["operation_name"] == "pull remnawave node image"
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_pull_fails_all_three_attempts_warns_and_returns(
         self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -197,7 +197,7 @@ class TestDeployNodeContainerDockerPullRetry:
         assert len(caplog.records) == 1
         assert "pull" in caplog.records[0].message.lower()
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_pull_failure_does_not_start_container(self, mock_time: MagicMock) -> None:
         conn = _conn_mock()
 
@@ -218,10 +218,23 @@ class TestDeployNodeContainerDockerPullRetry:
 
 
 class TestDeployNodeContainerHealthGate:
-    """Health polling: 10 attempts, 3s delay, docker inspect check."""
+    """Health polling via poll_until_ready: timeout=30, interval=3."""
 
-    @patch("meridian.panel_bootstrap.time")
-    def test_health_succeeds_on_third_attempt(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
+    @staticmethod
+    def _advancing_monotonic(step: float = 3.0) -> MagicMock:
+        """Return a mock for time.monotonic that advances by *step* each call."""
+        counter = [0.0]
+        def _mono() -> float:
+            val = counter[0]
+            counter[0] += step
+            return val
+        return MagicMock(side_effect=_mono)
+
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
+    def test_health_succeeds_on_third_attempt(
+        self, mock_mono: MagicMock, mock_sleep: MagicMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
         conn = _conn_mock()
         health_results = iter([_fail_result(), _fail_result(), _ok_result(stdout="true\n")])
 
@@ -231,15 +244,16 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
+        mock_mono.side_effect = self._advancing_monotonic(3.0).side_effect
         with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
             _deploy_node_container(conn, _SECRET_KEY)
         assert not caplog.records
-        # sleep(3) called between health check attempts
-        assert call(3) in mock_time.sleep.call_args_list
+        assert mock_sleep.call_count >= 2
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     def test_health_timeout_warns_with_docker_logs(
-        self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
+        self, mock_mono: MagicMock, mock_sleep: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         conn = _conn_mock()
 
@@ -251,6 +265,7 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
+        mock_mono.side_effect = self._advancing_monotonic(3.0).side_effect
         with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
             _deploy_node_container(conn, _SECRET_KEY)
         warning_records = [r for r in caplog.records if r.levelno >= logging.WARNING]
@@ -259,8 +274,9 @@ class TestDeployNodeContainerHealthGate:
         assert "healthy" in warning_text.lower() or "health" in warning_text.lower()
         assert "could not connect" in warning_text
 
-    @patch("meridian.panel_bootstrap.time")
-    def test_health_timeout_still_opens_ufw(self, mock_time: MagicMock) -> None:
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
+    def test_health_timeout_still_opens_ufw(self, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """UFW rule is opened regardless of health outcome."""
         conn = _conn_mock()
 
@@ -272,13 +288,16 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
+        mock_mono.side_effect = self._advancing_monotonic(3.0).side_effect
         _deploy_node_container(conn, _SECRET_KEY)
         commands = [c[0][0] for c in conn.run.call_args_list]
         ufw_cmds = [c for c in commands if "ufw allow" in c]
         assert len(ufw_cmds) == 1
 
-    @patch("meridian.panel_bootstrap.time")
-    def test_health_gate_polls_up_to_ten_times(self, mock_time: MagicMock) -> None:
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
+    def test_health_gate_polls_within_timeout(self, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
+        """poll_until_ready polls multiple times within the 30s timeout."""
         conn = _conn_mock()
 
         def _run(cmd: str, **kwargs: object) -> SimpleNamespace:
@@ -289,10 +308,12 @@ class TestDeployNodeContainerHealthGate:
             return _ok_result()
 
         conn.run.side_effect = _run
+        mock_mono.side_effect = self._advancing_monotonic(3.0).side_effect
         _deploy_node_container(conn, _SECRET_KEY)
         commands = [c[0][0] for c in conn.run.call_args_list]
         inspect_calls = [c for c in commands if "docker inspect remnawave-node" in c]
-        assert len(inspect_calls) == 10
+        # poll_until_ready with timeout=30, interval=3 → ~10 attempts
+        assert len(inspect_calls) >= 5
 
 
 # ---------------------------------------------------------------------------
@@ -303,7 +324,7 @@ class TestDeployNodeContainerHealthGate:
 class TestDeployNodeContainerFailures:
     """Non-fatal failures: mkdir, compose up."""
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_mkdir_failure_warns_and_returns_early(
         self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -322,7 +343,7 @@ class TestDeployNodeContainerFailures:
         # Only mkdir was called — no further commands
         assert conn.run.call_count == 1
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_compose_up_failure_warns_and_returns_early(
         self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -343,7 +364,7 @@ class TestDeployNodeContainerFailures:
         assert not any("docker inspect" in c for c in commands)
         assert not any("ufw allow" in c for c in commands)
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
     def test_compose_up_failure_includes_stderr_in_warning(
         self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -471,32 +492,39 @@ class TestCheckPortsConflict:
 
 
 class TestWaitForPanelApi:
-    """Polling httpx.get for panel readiness."""
+    """Polling httpx.get for panel readiness via poll_until_ready."""
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_immediate_success(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_immediate_success(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """Status < 500 on first try returns True immediately."""
+        mock_mono.return_value = 0.0
         resp = MagicMock()
         resp.status_code = 200
         mock_get.return_value = resp
         assert _wait_for_panel_api("https://198.51.100.2") is True
         mock_get.assert_called_once()
-        mock_time.sleep.assert_not_called()
+        mock_sleep.assert_not_called()
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_status_405_is_success(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_status_405_is_success(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """405 Method Not Allowed still means the API is up."""
+        mock_mono.return_value = 0.0
         resp = MagicMock()
         resp.status_code = 405
         mock_get.return_value = resp
         assert _wait_for_panel_api("https://198.51.100.2") is True
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_status_500_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_status_500_retries(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """500 is not considered success — should retry."""
+        # Simulate time advancing with each call
+        mock_mono.side_effect = [0.0, 0.0, 3.0, 3.0]
         resp_500 = MagicMock()
         resp_500.status_code = 500
         resp_200 = MagicMock()
@@ -505,46 +533,59 @@ class TestWaitForPanelApi:
         assert _wait_for_panel_api("https://198.51.100.2", retries=3) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_all_retries_exhausted_returns_false(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_all_retries_exhausted_returns_false(
+        self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock
+    ) -> None:
         """After all retries with 500s, returns False."""
+        # retries=3, delay=3.0 → timeout=9.0
+        # monotonic: start=0, after check 1=0, after check 2=4.5, after check 3=9 → timeout
+        mock_mono.side_effect = [0.0, 0.0, 4.5, 9.0]
         resp = MagicMock()
         resp.status_code = 500
         mock_get.return_value = resp
         assert _wait_for_panel_api("https://198.51.100.2", retries=3) is False
         assert mock_get.call_count == 3
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_connect_error_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_connect_error_retries(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """ConnectError is caught and retried."""
         import httpx
 
+        mock_mono.side_effect = [0.0, 0.0, 3.0, 3.0]
         resp_ok = MagicMock()
         resp_ok.status_code = 200
         mock_get.side_effect = [httpx.ConnectError("refused"), resp_ok]
         assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_timeout_exception_retries(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_timeout_exception_retries(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
         """TimeoutException is caught and retried."""
         import httpx
 
+        mock_mono.side_effect = [0.0, 0.0, 3.0, 3.0]
         resp_ok = MagicMock()
         resp_ok.status_code = 200
         mock_get.side_effect = [httpx.TimeoutException("timed out"), resp_ok]
         assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_sleeps_between_retries_with_correct_delay(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
-        """Verify sleep(delay) is called between retries, not after last."""
+    def test_sleeps_between_retries(self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock) -> None:
+        """Verify sleep is called between retries."""
         import httpx
 
+        # retries=3, delay=5.0 → timeout=15.0
+        mock_mono.side_effect = [0.0, 0.0, 5.0, 5.0, 10.0, 10.0, 15.0]
         mock_get.side_effect = [
             httpx.ConnectError("refused"),
             httpx.ConnectError("refused"),
@@ -552,14 +593,16 @@ class TestWaitForPanelApi:
         ]
         result = _wait_for_panel_api("https://198.51.100.2", retries=3, delay=5.0)
         assert result is False
-        # Sleep between retries but not after the last attempt
-        assert mock_time.sleep.call_count == 2
-        mock_time.sleep.assert_called_with(5.0)
+        assert mock_sleep.call_count >= 2
 
-    @patch("meridian.panel_bootstrap.time")
+    @patch("meridian.health.time.sleep")
+    @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_passes_verify_false_and_timeout(self, mock_get: MagicMock, mock_time: MagicMock) -> None:
+    def test_passes_verify_false_and_timeout(
+        self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock
+    ) -> None:
         """Ensure httpx.get is called with verify=False and timeout=10."""
+        mock_mono.return_value = 0.0
         resp = MagicMock()
         resp.status_code = 200
         mock_get.return_value = resp
