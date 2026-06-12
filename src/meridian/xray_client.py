@@ -26,6 +26,7 @@ from meridian.config import (
     XRAY_GITHUB_URL,
     XRAY_VERSION,
 )
+from meridian.health import poll_until_ready
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
@@ -363,13 +364,17 @@ def test_connection(
 
 def _wait_for_port(port: int, timeout: float = 5) -> None:
     """Wait until a TCP port is accepting connections on localhost."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-                return
-        except OSError:
-            time.sleep(0.2)
+
+    def _check() -> bool:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+
+    poll_until_ready(
+        _check,
+        timeout=timeout,
+        interval=0.2,
+        description=f"localhost:{port}",
+    )
 
 
 def build_test_configs(creds: ServerCredentials) -> list[tuple[str, dict, bool]]:
