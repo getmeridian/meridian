@@ -302,7 +302,7 @@ def _with_validation_state(
 
 def _detect_os(conn: ServerConnectionLike) -> str:
     result = conn.run(
-        ". /etc/os-release 2>/dev/null && printf '%s %s\\n' \"$ID\" \"$VERSION_ID\" || uname -s",
+        '. /etc/os-release 2>/dev/null && printf \'%s %s\\n\' "$ID" "$VERSION_ID" || uname -s',
         timeout=10,
         sudo=False,
     )

@@ -1021,10 +1021,7 @@ def _setup_first_deploy(
         if not _deploy_node_container(resolved.conn, node_creds.secret_key):
             fail(
                 "Node container did not become healthy",
-                hint=(
-                    f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} "
-                    "docker logs remnawave-node --tail 50"
-                ),
+                hint=(f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} docker logs remnawave-node --tail 50"),
                 hint_type="system",
             )
 

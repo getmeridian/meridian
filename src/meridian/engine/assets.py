@@ -10,6 +10,7 @@ from typing import Any
 _PACKAGED_ASSETS: Path | None = None
 _PACKAGED_ASSETS_CONTEXT: Any = None
 
+
 def resolve_studio_assets(explicit: str = "") -> Path | None:
     """Return a directory containing built Studio assets, if one is available."""
     candidates = []

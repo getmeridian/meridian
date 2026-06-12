@@ -6,10 +6,12 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from meridian.core.models import CoreModel, Event
 from meridian.core.deploy import DeployResult
+from meridian.core.models import CoreModel, Event
 
-OperationState = Literal["queued", "running", "succeeded", "failed", "cancel_requested", "cancelled", "completed_after_cancel"]
+OperationState = Literal[
+    "queued", "running", "succeeded", "failed", "cancel_requested", "cancelled", "completed_after_cancel"
+]
 OperationKind = Literal["deploy"]
 
 
@@ -63,7 +65,9 @@ class OperationEnvelope(CoreModel):
 class OperationStart(CoreModel):
     """Operation start response."""
 
-    schema_version: Literal["meridian.operation-start/v1"] = Field(default="meridian.operation-start/v1", alias="schema")
+    schema_version: Literal["meridian.operation-start/v1"] = Field(
+        default="meridian.operation-start/v1", alias="schema"
+    )
     operation: OperationSnapshot
 
 
