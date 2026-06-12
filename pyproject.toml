@@ -87,7 +87,34 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
+select = ["E", "F", "I", "W", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# Layer boundaries enforced at lint time — complement tests/test_architecture.py.
+# core/ must never depend on CLI, console, or Rich.
+"meridian.console".msg = "core/ and engine/ must not import meridian.console — keep UI in adapters"
+"meridian.commands".msg = "Do not import from commands/ in library modules — extract shared logic instead"
+"rich".msg = "Do not import Rich in core/ or engine/ — keep rendering in CLI adapters"
+
+[tool.ruff.lint.per-file-ignores]
+# Only core/ and engine/ are banned from console/Rich — command modules need them.
+"src/meridian/commands/*" = ["TID251"]
+"src/meridian/panel_bootstrap.py" = ["TID251"]
+"src/meridian/relay_ops.py" = ["TID251"]
+"src/meridian/ssh.py" = ["TID251"]
+"src/meridian/provision/*" = ["TID251"]
+"src/meridian/operations.py" = ["TID251"]
+"src/meridian/console.py" = ["TID251"]
+"src/meridian/cli.py" = ["TID251"]
+"src/meridian/render.py" = ["TID251"]
+"src/meridian/display.py" = ["TID251"]
+"src/meridian/pwa.py" = ["TID251"]
+"src/meridian/branding.py" = ["TID251"]
+"src/meridian/update.py" = ["TID251"]
+"src/meridian/ai.py" = ["TID251"]
+"src/meridian/reconciler/display.py" = ["TID251"]
+"src/meridian/reconciler/prepare.py" = ["TID251"]
+"tests/*" = ["TID251"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

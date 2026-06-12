@@ -89,6 +89,16 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 - **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
 - **ctx7 CLI**: check library docs before writing code that depends on external packages
 
+## Module discipline
+
+Rules enforced by `tests/test_architecture.py` (CI) and ruff TID251 (lint). Violations fail the build.
+
+- **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
+- **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
+- **Layer boundaries** — `core/` never imports console, config, commands, or Rich. `engine/` never imports commands, provision, ssh, or remnawave. `adapters/` never imports engine. Enforced by both ruff (`TID251`) and pytest.
+- **One concept, one place** — before adding a new type, helper, or constant, search for an existing one. Duplicate port computations, result types, error hierarchies, and field sets were the top source of drift.
+- **Typed contracts at boundaries** — new result types must reference or compose existing core types. Don't reinvent `returncode, stdout, stderr`; use `CommandResult`. Don't hand-build dicts that match a Pydantic model; construct the model.
+
 ## Community & public communication
 
 **Always ask before posting.** Show the exact text to the user and get approval before any `gh issue`, `gh pr create`, or GitHub comment. This covers issue bodies, PR descriptions, discussion replies, and any `gh` command that creates or modifies public content.
