@@ -248,7 +248,7 @@ FILE_SIZE_ALLOWLIST: dict[str, str] = {
     "provision/nginx.py": "nginx config generation is one cohesive template concern",
     "cli.py": "Typer registration for all subcommands — structural, not complex",
     "commands/setup.py": "deploy orchestrator — further extraction tracked",
-    "ssh.py": "transport layer — Rich decoupled via SSHUI protocol; put_bytes/run complexity is structural",
+    "ssh.py": "transport layer — file transfer extracted to _FileTransferMixin; remaining size is structural",
 }
 
 
