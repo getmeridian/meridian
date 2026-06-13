@@ -121,7 +121,7 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 
 **Standalone mode** — nginx on port 443 routes Reality traffic to Xray via SNI inspection. nginx also provides TLS (Let's Encrypt IP certificate via acme.sh) for hosted connection pages, panel access, and XHTTP transport. No domain needed.
 
-**Domain mode** — Same architecture, plus nginx handles VLESS+WSS through Cloudflare CDN as a fallback when the server IP is blocked.
+**Domain mode** — Same architecture, plus nginx handles VLESS+WSS through Cloudflare CDN as a fallback when the server IP is blocked. XHTTP also benefits from the domain certificate for enhanced stealth.
 
 **Relay mode** — A lightweight TCP forwarder (Realm) on a domestic server forwards port 443 to the exit server abroad. All protocols work through the relay with end-to-end encryption.
 
@@ -181,7 +181,7 @@ After setup, connect with any of these apps:
 
 ## Common scenarios
 
-**My IP got blocked** — The most common scenario in censored regions. Get a new VPS, run `meridian deploy NEW_IP`, then re-add clients with `meridian client add`. If you're in domain mode, update the DNS A record to point at the new IP and re-run deploy. If you're not using domain mode yet, consider switching (`--domain`) to get a CDN fallback through Cloudflare — when the IP is blocked, the WSS/CDN link still works.
+**My IP got blocked** — The most common scenario in censored regions. Try the XHTTP fallback first — it uses a different TLS path that may still work. If not, get a new VPS, run `meridian deploy NEW_IP`, then re-add clients with `meridian client add`. If you're in domain mode, update the DNS A record to point at the new IP and re-run deploy. If you're not using domain mode yet, consider switching (`--domain`) to get a CDN fallback through Cloudflare — when the IP is blocked, the WSS/CDN path still works.
 
 **Sharing with family** — After `meridian client add alice`, you get a shareable URL hosted on the server. Send the link by email, iMessage, or any messenger. They open it on their phone, install the app (one tap), scan the QR code, and connect. No file transfer needed.
 

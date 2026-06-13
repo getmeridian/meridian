@@ -199,6 +199,9 @@ def create_relay_hosts(
 
     # Panel v2.7+ only accepts DEFAULT/TLS/NONE for securityLayer.
     # Reality hosts use "DEFAULT" (panel infers reality from inbound type).
+    # WSS is excluded: CDN routing (Cloudflare) already provides geographic
+    # flexibility and L4 TCP relaying does not help traffic that routes
+    # through the CDN anyway.
     _PROTO_CONFIG: list[tuple[ProtocolKey, str]] = [
         (ProtocolKey.REALITY, "DEFAULT"),
         (ProtocolKey.XHTTP, "TLS"),

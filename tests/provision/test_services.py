@@ -558,7 +558,8 @@ class TestNginxFingerprinting:
             panel_internal_port=2053,
             info_page_path="connect",
         )
-        assert "ssl http2" in cfg
+        assert "ssl;" in cfg
+        assert "http2 on;" in cfg
 
     def test_domain_http2_enabled(self):
         cfg = render_nginx_http_config(
@@ -570,7 +571,8 @@ class TestNginxFingerprinting:
             panel_internal_port=2053,
             info_page_path="connect",
         )
-        assert "ssl http2" in cfg
+        assert "ssl;" in cfg
+        assert "http2 on;" in cfg
 
     def test_tls_modern_protocols_only(self):
         """Only TLSv1.2 and TLSv1.3 — no older protocols."""
