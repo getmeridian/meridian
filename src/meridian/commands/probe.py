@@ -614,6 +614,53 @@ def check_domain_root(ip: str, domain: str) -> CheckResult:
 
 
 # ---------------------------------------------------------------------------
+# Tier 3: Cluster-aware checks (secret path isolation, SNI camouflage)
+# ---------------------------------------------------------------------------
+
+_PANEL_PATHS = ["/admin", "/panel", "/dashboard", "/login", "/api"]
+
+
+def check_secret_paths(ip: str, panel_path: str) -> CheckResult:
+    """Verify secret panel path is not discoverable via differential probing."""
+    result = CheckResult(name="Secret path isolation", passed=True)
+    for probe_path in _PANEL_PATHS:
+        status, _, _ = _https_get(ip, probe_path)
+        if status not in (0, 403, 404):
+            result.passed = False
+            result.findings.append((False, f"GET {probe_path} → {status} (expected 403/404)"))
+    status, _, _ = _https_get(ip, f"/{panel_path}/")
+    if status == 0:
+        result.findings.append((True, "Could not connect (skipped)"))
+    elif status in (200, 301, 302):
+        result.findings.append((True, "Panel accessible via secret path"))
+    else:
+        result.passed = False
+        result.findings.append((False, f"Panel secret path → {status} (expected 200/301/302)"))
+    if not result.findings:
+        result.findings.append((True, "All paths behave correctly"))
+    return result
+
+
+def check_sni_camouflage(ip: str, expected_sni: str) -> CheckResult:
+    """Verify configured SNI returns the camouflage target's certificate."""
+    result = CheckResult(name="SNI camouflage", passed=True)
+    server_cert = _get_cert_der(ip, expected_sni)
+    if not server_cert:
+        result.findings.append((True, f"Could not connect with SNI={expected_sni} (skipped)"))
+        return result
+    direct_cert = _get_cert_der(expected_sni, expected_sni)
+    if not direct_cert:
+        result.findings.append((True, f"Could not connect to {expected_sni} directly (skipped)"))
+        return result
+    if _cert_identity(server_cert) == _cert_identity(direct_cert):
+        result.findings.append((True, f"SNI={expected_sni} returns matching certificate"))
+    else:
+        result.passed = False
+        result.findings.append((False, f"SNI={expected_sni} cert does NOT match direct connection"))
+    return result
+
+
+# ---------------------------------------------------------------------------
 # run()
 # ---------------------------------------------------------------------------
 
@@ -768,6 +815,34 @@ def run(
             _print_result(domain_result)
             if not domain_result.passed:
                 issues += 1
+
+    # -- Tier 3: Cluster-aware checks (secret path, SNI camouflage) --
+    try:
+        from meridian.cluster import ClusterConfig
+
+        cluster = ClusterConfig.load()
+        node = next((n for n in cluster.nodes if n.ip == resolved.ip), None)
+        if node and cluster.panel.secret_path:
+            err_console.print()
+            err_console.print("  [bold]Cluster-aware checks[/bold]")
+            err_console.print()
+
+            info("Checking secret path isolation...")
+            sp_result = check_secret_paths(resolved.ip, cluster.panel.secret_path)
+            checks_run += 1
+            _print_result(sp_result)
+            if not sp_result.passed:
+                issues += 1
+
+            if node.sni:
+                info("Checking SNI camouflage...")
+                sc_result = check_sni_camouflage(resolved.ip, node.sni)
+                checks_run += 1
+                _print_result(sc_result)
+                if not sc_result.passed:
+                    issues += 1
+    except Exception:
+        pass  # cluster not configured — skip tier 3
 
     # -- Verdict --
     err_console.print()
