@@ -88,7 +88,8 @@
   {
     "name": "v2rayN",
     "platform": "Windows",
-    "url": "https://github.com/2dust/v2rayN/releases/latest"
+    "url": "https://github.com/2dust/v2rayN/releases/latest",
+    "deeplink": "v2rayng://install-sub?url={url}&name={name}"
   },
   {
     "name": "Clash Verge Rev",

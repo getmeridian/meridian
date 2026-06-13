@@ -219,7 +219,7 @@ _PWA_APPS: list[dict[str, Any]] = [
         },
         "deeplink": "happ://add/{url_raw}",
     },
-    {"name": "v2rayN", "platform": "Windows", "url": "https://github.com/2dust/v2rayN/releases/latest"},
+    {"name": "v2rayN", "platform": "Windows", "url": "https://github.com/2dust/v2rayN/releases/latest", "deeplink": "v2rayng://install-sub?url={url}&name={name}"},
     {
         "name": "Clash Verge Rev",
         "platform": "Windows",
