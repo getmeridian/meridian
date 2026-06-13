@@ -316,7 +316,7 @@ def interactive_wizard(
     # --- Summary panel ---
     from rich.panel import Panel
 
-    protocol_line = "VLESS + Reality (TCP)\n           + XHTTP fallback (same port)"
+    protocol_line = "VLESS + Reality (TCP)\n           + XHTTP fallback (TLS, same port)"
     if domain:
         protocol_line += f"\n           + CDN fallback ({domain})"
 

@@ -26,6 +26,9 @@ _SUSPICIOUS_PORTS: dict[int, str] = {
     2087: "often used by VPN panels",
     2096: "often used by VPN panels",
     10000: "often used by Webmin / proxy management",
+    3000: "Remnawave panel (should be localhost-only)",
+    3010: "Remnawave node API (should be localhost-only)",
+    3020: "Remnawave subscription page (should be localhost-only)",
 }
 
 # Paths commonly used by V2Ray/Xray/Trojan proxy transports

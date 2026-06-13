@@ -72,7 +72,8 @@ class Protocol(ABC):
     def shares_uuid_with(self) -> str | None:
         """Key of another protocol this one shares a UUID with.
 
-        For example, XHTTP shares the Reality UUID.
+        XHTTP shares the Reality UUID for Xray inbound routing, but uses
+        standard TLS (nginx-terminated), not Reality security.
         None means this protocol uses its own UUID.
         """
         return None
