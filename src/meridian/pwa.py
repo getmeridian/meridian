@@ -24,6 +24,7 @@ from meridian.render import (
 )
 
 if TYPE_CHECKING:
+    from meridian.cluster import ClusterConfig, NodeEntry
     from meridian.models import ProtocolURL, RelayURLSet
     from meridian.ssh import ServerConnection
 
@@ -159,3 +160,100 @@ def upload_pwa_assets(conn: ServerConnection) -> str:
         if result.returncode != 0:
             return f"Failed to upload pwa/{filename}: {result.stderr.strip()[:200]}"
     return ""
+
+
+def deploy_client_page(
+    conn: ServerConnection,
+    cluster: ClusterConfig,
+    node: NodeEntry,
+    user_uuid: str,
+    client_name: str,
+    sub_url: str = "",
+) -> str:
+    """Generate and upload a PWA connection page for a client.
+
+    Builds VLESS protocol URLs from cluster.yml node data + client UUID,
+    generates QR codes and PWA files, uploads to the server.
+
+    Returns the page URL on success, empty string on failure.
+    """
+    import logging
+
+    from meridian.models import ProtocolURL
+    from meridian.protocols import PROTOCOLS
+    from meridian.urls import generate_qr_base64
+
+    logger = logging.getLogger("meridian.pwa")
+
+    host = node.domain or node.ip
+    info_page_path = cluster.panel.sub_path or ""
+    if not info_page_path:
+        return ""
+
+    page_url = f"https://{host}/{info_page_path}/{user_uuid}/"
+
+    # Build protocol URLs using the protocol registry's build_url() methods
+    protocol_urls: list[ProtocolURL] = []
+
+    if node.reality_public_key:
+        reality = PROTOCOLS.get("reality")
+        if reality:
+            url = reality.build_url(
+                user_uuid,
+                client_name,
+                ip=node.ip,
+                sni=node.sni,
+                public_key=node.reality_public_key,
+                short_id=node.reality_short_id or "",
+                server_name=cluster.branding.server_name,
+            )
+            qr = generate_qr_base64(url)
+            protocol_urls.append(ProtocolURL(key="reality", label=reality.display_label, url=url, qr_b64=qr))
+
+    if node.xhttp_path:
+        xhttp = PROTOCOLS.get("xhttp")
+        if xhttp:
+            url = xhttp.build_url(
+                user_uuid,
+                client_name,
+                ip=node.ip,
+                xhttp_path=node.xhttp_path,
+                domain=node.domain or "",
+                server_name=cluster.branding.server_name,
+            )
+            qr = generate_qr_base64(url)
+            protocol_urls.append(ProtocolURL(key="xhttp", label=xhttp.display_label, url=url, qr_b64=qr))
+
+    if node.domain and node.ws_path:
+        wss = PROTOCOLS.get("wss")
+        if wss:
+            url = wss.build_url(
+                user_uuid,
+                client_name,
+                domain=node.domain,
+                ws_path=node.ws_path,
+                server_name=cluster.branding.server_name,
+            )
+            qr = generate_qr_base64(url)
+            protocol_urls.append(ProtocolURL(key="wss", label=wss.display_label, url=url, qr_b64=qr))
+
+    if not protocol_urls:
+        return ""
+
+    files = generate_client_files(
+        protocol_urls,
+        server_ip=node.ip,
+        domain=node.domain or "",
+        client_name=client_name,
+        server_name=cluster.branding.server_name,
+        server_icon=cluster.branding.icon,
+        color=cluster.branding.color,
+        page_url=page_url,
+    )
+
+    error = upload_client_files(conn, user_uuid, files)
+    if error:
+        logger.warning("Could not deploy connection page: %s", error)
+        return ""
+
+    return page_url

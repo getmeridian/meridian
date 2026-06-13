@@ -36,11 +36,8 @@ from meridian.xray_config import build_xray_config
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
+
 # Provisioner pipeline
-# ---------------------------------------------------------------------------
-
-
 def run_provisioner(
     resolved: ResolvedServer,
     cluster: ClusterConfig,
@@ -148,11 +145,7 @@ def run_provisioner(
     logger.info("All provisioning steps completed")
 
 
-# ---------------------------------------------------------------------------
 # Post-provisioner: Remnawave API configuration
-# ---------------------------------------------------------------------------
-
-
 def panel_base_url(ip: str, domain: str, secret_path: str) -> str:
     """Build the panel base URL for API calls.
 
@@ -251,11 +244,99 @@ def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) 
 wait_for_panel_api = check_panel_api_ready
 
 
-# ---------------------------------------------------------------------------
+# Shared setup helpers — deduplicated from setup_first_deploy / setup_redeploy
+def _update_subscription_page(
+    conn: ServerConnection,
+    cluster: ClusterConfig,
+    api_token: str,
+) -> None:
+    """Write subscription page env with real API token and mark deployed."""
+    from meridian.cluster import SubscriptionPageConfig
+    from meridian.provision.remnawave_panel import configure_subscription_page
+
+    if configure_subscription_page(conn, api_token):
+        if cluster.subscription_page is None:
+            cluster.subscription_page = SubscriptionPageConfig()
+        cluster.subscription_page.deployed = True
+        cluster.save()
+
+
+def _ensure_config_profile(
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
+    profile_name: str,
+    xray_config: dict,
+    *,
+    raise_on_error: bool = True,
+) -> None:
+    """Find or create the Xray config profile, cache inbounds."""
+    try:
+        existing = panel.find_config_profile_by_name(profile_name)
+        if existing:
+            logger.info("Config profile '%s' already exists, reusing", profile_name)
+            cluster.config_profile_uuid = existing.uuid
+            cluster.config_profile_name = existing.name
+        else:
+            profile = panel.create_config_profile(profile_name, xray_config)
+            logger.info("Config profile created")
+            cluster.config_profile_uuid = profile.uuid
+            cluster.config_profile_name = profile.name
+    except RemnawaveError as e:
+        if raise_on_error:
+            raise PanelSetupError(f"Failed to create config profile: {e}")
+        logger.warning("Could not update config profile: %s", e)
+
+    cache_inbounds(panel, cluster)
+
+
+def _ensure_squad_linkage(
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
+    *,
+    reuse_uuid: bool = False,
+) -> None:
+    """Link all cached inbounds to the Default-Squad."""
+    try:
+        squad_uuid = (cluster.squad_uuid if reuse_uuid else "") or select_default_squad_uuid(
+            panel.list_internal_squads()
+        )
+        if squad_uuid:
+            uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
+            if uuids:
+                panel.assign_inbounds_to_squad(squad_uuid, uuids)
+                logger.info("Inbounds linked to Default-Squad")
+            cluster.squad_uuid = squad_uuid
+        elif not reuse_uuid:
+            logger.warning("Default-Squad not found — users may not get access to inbounds")
+    except RemnawaveError as e:
+        logger.warning("Could not configure squad: %s", e)
+
+
+def _register_or_reuse_node(
+    panel: MeridianPanel,
+    cluster: ClusterConfig,
+    node_address: str,
+    node_name: str,
+) -> NodeCredentials:
+    """Register a node or reuse an existing registration."""
+    inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
+    existing = panel.find_node_by_address(node_address)
+    if existing:
+        logger.info("Node at %s already registered, reusing", node_address)
+        secret_key = panel.get_node_secret_key()
+        return NodeCredentials(uuid=existing.uuid, secret_key=secret_key)
+    creds = panel.create_node(
+        name=node_name,
+        address=node_address,
+        port=REMNAWAVE_NODE_API_PORT,
+        config_profile_uuid=cluster.config_profile_uuid,
+        inbound_uuids=inbound_uuids,
+    )
+    logger.info("Node registered: %s", node_name)
+    return creds
+
+
 # Panel configuration workflows
-# ---------------------------------------------------------------------------
-
-
 def configure_panel_and_node(
     resolved: ResolvedServer,
     cluster: ClusterConfig,
@@ -408,20 +489,11 @@ def setup_first_deploy(
     cluster.save()
 
     # Configure subscription page with the real API token
-    from meridian.provision.remnawave_panel import configure_subscription_page
-
-    if configure_subscription_page(resolved.conn, api_token):
-        from meridian.cluster import SubscriptionPageConfig
-
-        if cluster.subscription_page is None:
-            cluster.subscription_page = SubscriptionPageConfig()
-        cluster.subscription_page.deployed = True
-        cluster.save()
+    _update_subscription_page(resolved.conn, cluster, api_token)
     logger.info("Subscription page configured")
 
     with MeridianPanel(base_url, api_token) as panel:
         # Create config profile (Xray inbound definitions)
-        profile_name = "meridian-default"
         xray_result = build_xray_config(
             resolved.conn,
             sni=sni,
@@ -435,68 +507,18 @@ def setup_first_deploy(
             xhttp_path=xhttp_path,
             ws_path=ws_path,
         )
-        xray_config = xray_result.config
         reality_public_key = xray_result.reality_public_key
         reality_short_id = xray_result.reality_short_id
         reality_private_key = xray_result.reality_private_key
 
-        try:
-            existing_profile = panel.find_config_profile_by_name(profile_name)
-            if existing_profile:
-                profile = existing_profile
-                logger.info("Config profile '%s' already exists, reusing", profile_name)
-            else:
-                profile = panel.create_config_profile(profile_name, xray_config)
-                logger.info("Config profile created")
-            cluster.config_profile_uuid = profile.uuid
-            cluster.config_profile_name = profile.name
-        except RemnawaveError as e:
-            raise PanelSetupError(f"Failed to create config profile: {e}")
-
-        # Cache inbound references from the profile
-        cache_inbounds(panel, cluster)
-
-        # Assign inbounds to Default-Squad so users can access them.
-        # Remnawave requires users and inbounds to share an "internal squad"
-        # for the user to appear in the node's Xray config.
-        try:
-            squad_uuid = select_default_squad_uuid(panel.list_internal_squads())
-            if squad_uuid:
-                inbound_uuids_all = [
-                    ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid
-                ]
-                if inbound_uuids_all:
-                    panel.assign_inbounds_to_squad(squad_uuid, inbound_uuids_all)
-                    logger.info("Inbounds linked to Default-Squad")
-                cluster.squad_uuid = squad_uuid
-            else:
-                logger.warning("Default-Squad not found — users may not get access to inbounds")
-        except RemnawaveError as e:
-            logger.warning("Could not configure squad: %s", e)
+        _ensure_config_profile(panel, cluster, "meridian-default", xray_result.config)
+        _ensure_squad_linkage(panel, cluster)
 
         # Register this server as a node
-        # For same-server deployments (panel + node co-located), the panel runs
-        # in a Docker bridge network and cannot reach the node on 127.0.0.1.
-        # Use the Docker bridge gateway IP so the panel can reach the node.
         node_address = get_docker_gateway(resolved.conn)
         node_name = domain or resolved.ip
         try:
-            inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
-            existing_api_node = panel.find_node_by_address(node_address)
-            if existing_api_node:
-                logger.info("Node at %s already registered, reusing", node_address)
-                # Re-fetch keygen for secret key (needed for container .env)
-                secret_key = panel.get_node_secret_key()
-                node_creds = NodeCredentials(uuid=existing_api_node.uuid, secret_key=secret_key)
-            else:
-                node_creds = panel.create_node(
-                    name=node_name,
-                    address=node_address,
-                    port=REMNAWAVE_NODE_API_PORT,
-                    config_profile_uuid=cluster.config_profile_uuid,
-                    inbound_uuids=inbound_uuids,
-                )
-                logger.info("Node registered: %s", node_name)
+            node_creds = _register_or_reuse_node(panel, cluster, node_address, node_name)
         except RemnawaveError as e:
             raise PanelSetupError(f"Failed to register node: {e}")
 
@@ -647,36 +669,9 @@ def setup_redeploy(
             reality_short_id = xray_result.reality_short_id
             reality_private_key = xray_result.reality_private_key
 
-            # Update or create config profile
             profile_name = cluster.config_profile_name or "meridian-default"
-            try:
-                existing_profile = panel.find_config_profile_by_name(profile_name)
-                if existing_profile:
-                    profile = existing_profile
-                    logger.info("Config profile '%s' already exists, reusing", profile_name)
-                else:
-                    profile = panel.create_config_profile(profile_name, xray_config)
-                    logger.info("Config profile created")
-                cluster.config_profile_uuid = profile.uuid
-                cluster.config_profile_name = profile.name
-            except RemnawaveError as e:
-                logger.warning("Could not update config profile: %s", e)
-
-            # Re-cache inbounds
-            cache_inbounds(panel, cluster)
-
-            # Refresh squad-inbound linkage
-            try:
-                squad_uuid = cluster.squad_uuid or select_default_squad_uuid(panel.list_internal_squads())
-                if squad_uuid:
-                    inbound_uuids_all = [
-                        ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid
-                    ]
-                    if inbound_uuids_all:
-                        panel.assign_inbounds_to_squad(squad_uuid, inbound_uuids_all)
-                    cluster.squad_uuid = squad_uuid
-            except RemnawaveError:
-                pass  # Non-fatal on redeploy
+            _ensure_config_profile(panel, cluster, profile_name, xray_config, raise_on_error=False)
+            _ensure_squad_linkage(panel, cluster, reuse_uuid=True)
 
             # Verify node registration
             if node.uuid:
@@ -753,15 +748,7 @@ def setup_redeploy(
 
             # Ensure subscription page has a valid token (upgrade from pre-subscription deploys)
             if node.is_panel_host:
-                from meridian.provision.remnawave_panel import configure_subscription_page
-
-                if configure_subscription_page(resolved.conn, cluster.panel.api_token):
-                    from meridian.cluster import SubscriptionPageConfig
-
-                    if cluster.subscription_page is None:
-                        cluster.subscription_page = SubscriptionPageConfig()
-                    cluster.subscription_page.deployed = True
-                    cluster.save()
+                _update_subscription_page(resolved.conn, cluster, cluster.panel.api_token)
 
     except RemnawaveError as e:
         raise PanelSetupError(f"Panel API error: {e}") from e
@@ -796,21 +783,7 @@ def setup_new_node(
                 )
 
             node_name = domain or resolved.ip
-            inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
-            existing_api_node = panel.find_node_by_address(resolved.ip)
-            if existing_api_node:
-                logger.info("Node at %s already registered, reusing", resolved.ip)
-                secret_key = panel.get_node_secret_key()
-                node_creds = NodeCredentials(uuid=existing_api_node.uuid, secret_key=secret_key)
-            else:
-                node_creds = panel.create_node(
-                    name=node_name,
-                    address=resolved.ip,
-                    port=REMNAWAVE_NODE_API_PORT,
-                    config_profile_uuid=cluster.config_profile_uuid,
-                    inbound_uuids=inbound_uuids,
-                )
-                logger.info("Node registered: %s", node_name)
+            node_creds = _register_or_reuse_node(panel, cluster, resolved.ip, node_name)
 
             # Deploy the node container with the secret key
             deploy_node_container(resolved.conn, node_creds.secret_key)
@@ -847,11 +820,7 @@ def setup_new_node(
     logger.info("New node configured")
 
 
-# ---------------------------------------------------------------------------
 # Panel API helpers
-# ---------------------------------------------------------------------------
-
-
 def select_default_squad_uuid(squads: list[dict[str, Any]]) -> str:
     """Select the Default-Squad UUID from a list of squads.
 
@@ -1024,103 +993,5 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     return node_healthy
 
 
-# ---------------------------------------------------------------------------
-# Connection page deployment
-# ---------------------------------------------------------------------------
-
-
-def deploy_client_page(
-    conn: ServerConnection,
-    cluster: ClusterConfig,
-    node: NodeEntry,
-    user_uuid: str,
-    client_name: str,
-    sub_url: str = "",
-) -> str:
-    """Generate and upload a PWA connection page for a client.
-
-    Builds VLESS protocol URLs from cluster.yml node data + client UUID,
-    generates QR codes and PWA files, uploads to the server.
-
-    Returns the page URL on success, empty string on failure.
-    """
-    from meridian.models import ProtocolURL
-    from meridian.protocols import PROTOCOLS
-    from meridian.pwa import generate_client_files, upload_client_files
-    from meridian.urls import generate_qr_base64
-
-    host = node.domain or node.ip
-    info_page_path = cluster.panel.sub_path or ""
-    if not info_page_path:
-        return ""
-
-    page_url = f"https://{host}/{info_page_path}/{user_uuid}/"
-
-    # Build protocol URLs using the protocol registry's build_url() methods
-    protocol_urls: list[ProtocolURL] = []
-
-    # Reality (always)
-    if node.reality_public_key:
-        reality = PROTOCOLS.get("reality")
-        if reality:
-            url = reality.build_url(
-                user_uuid,
-                client_name,
-                ip=node.ip,
-                sni=node.sni,
-                public_key=node.reality_public_key,
-                short_id=node.reality_short_id or "",
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="reality", label=reality.display_label, url=url, qr_b64=qr))
-
-    # XHTTP (if path configured)
-    if node.xhttp_path:
-        xhttp = PROTOCOLS.get("xhttp")
-        if xhttp:
-            url = xhttp.build_url(
-                user_uuid,
-                client_name,
-                ip=node.ip,
-                xhttp_path=node.xhttp_path,
-                domain=node.domain or "",
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="xhttp", label=xhttp.display_label, url=url, qr_b64=qr))
-
-    # WSS (only in domain mode)
-    if node.domain and node.ws_path:
-        wss = PROTOCOLS.get("wss")
-        if wss:
-            url = wss.build_url(
-                user_uuid,
-                client_name,
-                domain=node.domain,
-                ws_path=node.ws_path,
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="wss", label=wss.display_label, url=url, qr_b64=qr))
-
-    if not protocol_urls:
-        return ""
-
-    files = generate_client_files(
-        protocol_urls,
-        server_ip=node.ip,
-        domain=node.domain or "",
-        client_name=client_name,
-        server_name=cluster.branding.server_name,
-        server_icon=cluster.branding.icon,
-        color=cluster.branding.color,
-        page_url=page_url,
-    )
-
-    error = upload_client_files(conn, user_uuid, files)
-    if error:
-        logger.warning("Could not deploy connection page: %s", error)
-        return ""
-
-    return page_url
+# Re-export deploy_client_page for backward compatibility (moved to pwa.py)
+from meridian.pwa import deploy_client_page  # noqa: F401, E402
