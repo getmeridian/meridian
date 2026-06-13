@@ -42,3 +42,6 @@ tests/systemlab/fixtures/pebble-ca.pem
 # Real-VM harness local artifacts — see tests/realvm/README.md
 tests/realvm/.local/
 /tmp/realvm_*
+
+# Remnawave reference repos (cloned for deep referencing)
+.remnawave-ref/
