@@ -197,12 +197,17 @@ def build_xray_config(
     config["inbounds"].append(reality_inbound)
 
     # XHTTP inbound (enhanced stealth -- behind nginx reverse proxy)
+    # mode=packet-up: nginx proxy_pass cannot transport stream-up/stream-one
+    # gRPC framing. Explicit packet-up prevents clients from attempting and
+    # failing stream-up, which would silently degrade performance.
     xhttp_stream: dict[str, Any] = {
         "network": "xhttp",
         "security": "none",
     }
+    xhttp_settings: dict[str, Any] = {"mode": "packet-up"}
     if xhttp_path:
-        xhttp_stream["xhttpSettings"] = {"path": f"/{xhttp_path}"}
+        xhttp_settings["path"] = f"/{xhttp_path}"
+    xhttp_stream["xhttpSettings"] = xhttp_settings
     xhttp_inbound = {
         "tag": "vless-xhttp",
         "protocol": "vless",

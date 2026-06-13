@@ -132,10 +132,6 @@
           "title": "Panel Url",
           "type": "string"
         },
-        "pq": {
-          "title": "Pq",
-          "type": "boolean"
-        },
         "relay_count": {
           "title": "Relay Count",
           "type": "integer"
@@ -184,7 +180,6 @@
         "sni",
         "client_name",
         "harden",
-        "pq",
         "warp",
         "geo_block",
         "panel_url",

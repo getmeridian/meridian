@@ -56,11 +56,6 @@
       "default": "",
       "title": "Ip"
     },
-    "pq": {
-      "default": false,
-      "title": "Pq",
-      "type": "boolean"
-    },
     "server_name": {
       "default": "",
       "title": "Server Name",

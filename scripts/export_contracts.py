@@ -99,7 +99,6 @@ def _deploy_success_fixture(operation_id: str = "op-fixture-deploy-success") -> 
         sni="www.microsoft.com",
         client_name="default",
         harden=True,
-        pq=False,
         warp=False,
         geo_block=True,
         panel_url="https://vpn.example/panel-secret/",

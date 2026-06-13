@@ -56,11 +56,6 @@
       "default": "",
       "title": "Ip"
     },
-    "pq": {
-      "default": false,
-      "title": "Pq",
-      "type": "boolean"
-    },
     "requested_server": {
       "default": "",
       "maxLength": 120,

@@ -167,9 +167,17 @@ class TestBuildXrayConfigXhttpInbound:
         ib = self._xhttp(xhttp_path="my_xhttp_path")
         assert ib["streamSettings"]["xhttpSettings"]["path"] == "/my_xhttp_path"
 
-    def test_xhttp_no_path_settings_when_empty(self) -> None:
+    def test_xhttp_no_path_when_empty(self) -> None:
         ib = self._xhttp(xhttp_path="")
-        assert "xhttpSettings" not in ib["streamSettings"]
+        assert "path" not in ib["streamSettings"]["xhttpSettings"]
+
+    def test_xhttp_mode_is_packet_up(self) -> None:
+        ib = self._xhttp()
+        assert ib["streamSettings"]["xhttpSettings"]["mode"] == "packet-up"
+
+    def test_xhttp_mode_present_with_path(self) -> None:
+        ib = self._xhttp(xhttp_path="my_xhttp_path")
+        assert ib["streamSettings"]["xhttpSettings"]["mode"] == "packet-up"
 
     def test_xhttp_network_is_xhttp(self) -> None:
         ib = self._xhttp()

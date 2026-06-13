@@ -129,8 +129,8 @@ def render_xhttp_location(xhttp_path: str) -> str:
             proxy_request_buffering off;
         }}
 
-        # Long timeouts: XHTTP mode=auto lets clients negotiate streaming
-        # modes (stream-one/stream-up) with long-lived connections.
+        # Long timeouts: XHTTP packet-up mode uses individual POST requests
+        # that can be long-lived for large uploads.
         location /{xhttp_path}/ {{
             proxy_pass http://meridian_xhttp;
             proxy_http_version 1.1;
