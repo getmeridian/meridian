@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from meridian.provision.containers import ComposeDeployResult, EnvFile, deploy_compose_stack
-
-from .conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 SAMPLE_COMPOSE = """\
 services:
@@ -28,9 +27,7 @@ class TestDeployComposeStack:
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
-        result = deploy_compose_stack(
-            conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1
-        )
+        result = deploy_compose_stack(conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1)
 
         assert result.changed is True
         assert result.detail == ""
@@ -95,9 +92,7 @@ class TestDeployComposeStack:
         conn.when("docker compose up", rc=1, stderr="port conflict")
         conn.when("docker compose logs", stdout="ERROR: something broke")
 
-        result = deploy_compose_stack(
-            conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1
-        )
+        result = deploy_compose_stack(conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1)
 
         assert result.changed is False
         assert "docker compose up failed" in result.detail
@@ -237,9 +232,7 @@ class TestDeployComposeStack:
         conn.when("docker compose pull", rc=0)
         conn.when("docker compose up", rc=0)
 
-        deploy_compose_stack(
-            conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1
-        )
+        deploy_compose_stack(conn, "/opt/test", SAMPLE_COMPOSE, pull_retries=1)
 
         env_calls = [c for c in conn.calls if ".env" in c]
         assert len(env_calls) == 0

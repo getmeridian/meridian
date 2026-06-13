@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 from meridian.core.output import OperationContext
 from meridian.core.reporters import CaptureReporter
 from meridian.provision.steps import ProvisionContext, Provisioner, StepResult
-
-from .conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
 # Mock step helpers
@@ -146,7 +145,7 @@ class TestProvisioner:
         operation = OperationContext(operation_id="op-provision", started_at="2026-05-04T21:00:00Z")
         provisioner = Provisioner(steps=steps)
 
-        provisioner.run(conn, ctx, reporter=reporter, operation=operation, render=False)
+        provisioner.run(conn, ctx, reporter=reporter, operation=operation)
 
         assert [event.type for event in reporter.events] == [
             "provision.step.started",
@@ -167,7 +166,7 @@ class TestProvisioner:
         operation = OperationContext(operation_id="op-provision", started_at="2026-05-04T21:00:00Z")
         provisioner = Provisioner(steps=steps)
 
-        provisioner.run(conn, ctx, reporter=reporter, operation=operation, render=False)
+        provisioner.run(conn, ctx, reporter=reporter, operation=operation)
 
         assert [event.type for event in reporter.events] == [
             "provision.step.started",

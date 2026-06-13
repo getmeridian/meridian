@@ -83,6 +83,7 @@ def run(
         err_console.print()
 
     # Run uninstall via provisioner
+    from meridian.provision.progress import RichStepRenderer
     from meridian.provision.steps import ProvisionContext, Provisioner
     from meridian.provision.uninstall import Uninstall
 
@@ -93,7 +94,7 @@ def run(
     )
 
     provisioner = Provisioner([Uninstall()])
-    results = provisioner.run(resolved.conn, ctx)
+    results = provisioner.run(resolved.conn, ctx, renderer=RichStepRenderer())
 
     failed = [r for r in results if r.status == "failed"]
     if failed:

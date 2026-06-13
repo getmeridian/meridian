@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from meridian.provision.ensure import ensure_service_running
-
-from .conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 
 def test_ensure_service_running_enables_active_but_disabled_service() -> None:

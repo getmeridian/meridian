@@ -43,7 +43,8 @@ scripts/CLAUDE.md                       — repository automation and contract e
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── operations.py                       — client/node/relay CRUD orchestration
-├── panel_bootstrap.py                  — panel setup, node deploy, xray config
+├── panel_bootstrap.py                  — panel setup orchestration (first deploy, redeploy)
+├── node_deploy.py                      — node container deployment, host creation, panel API helpers
 ├── relay_ops.py                        — relay infrastructure operations
 ├── resolve.py                          — ResolvedServer, ensure_server_connection
 ├── xray_config.py                      — Xray inbound/outbound config generation
@@ -53,6 +54,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── core/errors.py                      — shared error base types
 ├── commands/CLAUDE.md                  — per-subcommand pattern
 │   └── wizard.py                       — interactive deploy wizard
+├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 │   └── routes.py                       — FastAPI route handlers
 ├── provision/CLAUDE.md                 — step pipeline + idempotency

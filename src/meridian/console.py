@@ -22,35 +22,47 @@ _theme = Theme(
     }
 )
 
-console = Console(theme=_theme, highlight=False)
-err_console = Console(theme=_theme, stderr=True, highlight=False)
 
-_output_json = False
-_quiet_mode = False
+class ConsoleState:
+    """Encapsulates mutable console globals for testability."""
+
+    __slots__ = ("console", "err_console", "json_mode", "quiet_mode")
+
+    def __init__(self) -> None:
+        self.console = Console(theme=_theme, highlight=False)
+        self.err_console = Console(theme=_theme, stderr=True, highlight=False)
+        self.json_mode: bool = False
+        self.quiet_mode: bool = False
+
+
+_state = ConsoleState()
+
+# Module-level aliases for backward compatibility.
+console = _state.console
+err_console = _state.err_console
+
 _error_command: ContextVar[str] = ContextVar("meridian_error_command", default="cli.error")
 _error_timer: ContextVar[Any | None] = ContextVar("meridian_error_timer", default=None)
 
 
 def set_json_mode(enabled: bool) -> None:
     """Set JSON output mode."""
-    global _output_json
-    _output_json = enabled
+    _state.json_mode = enabled
 
 
 def is_json_mode() -> bool:
     """Check if JSON output mode is active."""
-    return _output_json
+    return _state.json_mode
 
 
 def set_quiet_mode(enabled: bool) -> None:
     """Set quiet mode — suppresses info/ok/warn/banner output."""
-    global _quiet_mode
-    _quiet_mode = enabled
+    _state.quiet_mode = enabled
 
 
 def is_quiet_mode() -> bool:
     """Check if quiet mode is active."""
-    return _quiet_mode
+    return _state.quiet_mode
 
 
 @contextmanager
@@ -73,17 +85,17 @@ def json_output(data: Any) -> None:
 
 
 def info(msg: str) -> None:
-    if not _quiet_mode:
+    if not _state.quiet_mode:
         err_console.print(f"  [info]\u2192[/info] {msg}")
 
 
 def ok(msg: str) -> None:
-    if not _quiet_mode:
+    if not _state.quiet_mode:
         err_console.print(f"  [ok]\u2713[/ok] {msg}")
 
 
 def warn(msg: str) -> None:
-    if not _quiet_mode:
+    if not _state.quiet_mode:
         err_console.print(f"  [warn]![/warn] {msg}")
 
 
@@ -119,7 +131,7 @@ def fail(
         exit_code = msg.exit_code
         msg = str(msg)
     code = exit_code if exit_code is not None else _EXIT_CODES.get(hint_type, 1)
-    if _output_json:
+    if _state.json_mode:
         from meridian.core.models import ErrorCategory, MeridianError
         from meridian.core.output import command_envelope
         from meridian.renderers import emit_json
@@ -164,7 +176,7 @@ def line() -> None:
 
 
 def banner(version: str) -> None:
-    if not _quiet_mode:
+    if not _state.quiet_mode:
         err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
 
 

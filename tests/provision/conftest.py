@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import pytest
 
@@ -17,92 +16,7 @@ from meridian.credentials import (
     XHTTPConfig,
 )
 from meridian.provision.steps import ProvisionContext
-
-
-class MockConnection:
-    """Mock ServerConnection with pattern-matching command dispatch.
-
-    Returns different results based on command substring matching.
-    First matching pattern wins. Unmatched commands return the default
-    (rc=0, stdout="", stderr="").
-
-    Usage::
-
-        conn = MockConnection()
-        conn.when("dpkg-query", stdout="curl\\tok\\n")
-        conn.when("apt-get install", rc=1, stderr="broken")
-        result = step.run(conn, ctx)
-    """
-
-    def __init__(self) -> None:
-        self._rules: list[tuple[str, subprocess.CompletedProcess[str]]] = []
-        self._calls: list[str] = []
-        self._default = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-        self.ip = "198.51.100.1"
-        self.user = "root"
-        self.local_mode = False
-        self.needs_sudo = False
-
-    def when(
-        self,
-        pattern: str,
-        *,
-        stdout: str = "",
-        stderr: str = "",
-        rc: int = 0,
-    ) -> MockConnection:
-        """Register a response for commands matching pattern (substring)."""
-        self._rules.append(
-            (
-                pattern,
-                subprocess.CompletedProcess(args=[], returncode=rc, stdout=stdout, stderr=stderr),
-            )
-        )
-        return self
-
-    def run(self, command: str, timeout: int = 30, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        """Dispatch command to first matching pattern."""
-        self._calls.append(command)
-        for pattern, response in self._rules:
-            if pattern in command:
-                return response
-        return self._default
-
-    def get_text(self, path: str, timeout: int = 30, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        """Mock ServerConnection.get_text."""
-        return self.run(f"cat {path} 2>/dev/null", timeout=timeout, **kwargs)
-
-    def put_text(self, path: str, text: str, timeout: int = 30, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        """Mock ServerConnection.put_text."""
-        if kwargs.get("create_parent"):
-            parent = str(PurePosixPath(path).parent)
-            if parent and parent != ".":
-                mkdir = self.run(f"mkdir -p {parent}", timeout=timeout)
-                if mkdir.returncode != 0:
-                    return mkdir
-        return self.run(f"cat > {path}\n{text}", timeout=timeout)
-
-    def put_bytes(
-        self, path: str, data: bytes, timeout: int = 30, **kwargs: object
-    ) -> subprocess.CompletedProcess[str]:
-        """Mock ServerConnection.put_bytes."""
-        return self.put_text(path, data.decode(errors="replace"), timeout=timeout, **kwargs)
-
-    @property
-    def call_count(self) -> int:
-        return len(self._calls)
-
-    @property
-    def calls(self) -> list[str]:
-        return list(self._calls)
-
-    def assert_called_with_pattern(self, pattern: str) -> None:
-        """Assert at least one call contained the given pattern."""
-        assert any(pattern in c for c in self._calls), f"No call matching '{pattern}'. Calls: {self._calls}"
-
-    def assert_not_called_with_pattern(self, pattern: str) -> None:
-        """Assert no call contained the given pattern."""
-        assert not any(pattern in c for c in self._calls), f"Unexpected call matching '{pattern}'. Calls: {self._calls}"
+from tests.support.mock_connection import MockConnection
 
 
 @pytest.fixture

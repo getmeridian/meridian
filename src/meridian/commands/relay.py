@@ -185,6 +185,7 @@ def run_deploy(
             raise typer.Exit(1)
 
     # Run relay provisioner (Realm install -- panel-agnostic)
+    from meridian.provision.progress import RichStepRenderer
     from meridian.provision.relay import RelayContext, build_relay_steps
     from meridian.provision.steps import Provisioner
 
@@ -198,7 +199,7 @@ def run_deploy(
     info(f"Configuring relay at {request.relay_ip}...")
     err_console.print()
 
-    results = Provisioner(build_relay_steps(ctx)).run(relay_conn, ctx)
+    results = Provisioner(build_relay_steps(ctx)).run(relay_conn, ctx, renderer=RichStepRenderer())
     failed = [r for r in results if r.status == "failed"]
     if failed:
         fail("Relay deployment failed", hint=f"Step '{failed[0].name}' failed: {failed[0].detail}", hint_type="system")

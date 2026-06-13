@@ -21,7 +21,7 @@ from meridian.ssh import ServerConnection
 _NODE_CONTAINER = "remnawave-node"
 
 
-def _render_node_compose(image: str, node_api_port: int) -> str:
+def render_node_compose(image: str, node_api_port: int) -> str:
     """Render the docker-compose.yml for the Remnawave node."""
     return f"""\
 # Remnawave Node - Xray Proxy Node
@@ -56,7 +56,7 @@ services:
 """
 
 
-def _render_node_env(node_api_port: int, secret_key: str) -> str:
+def render_node_env(node_api_port: int, secret_key: str) -> str:
     """Render the .env file for the Remnawave node."""
     return f"""\
 # Remnawave Node environment
@@ -107,8 +107,8 @@ class DeployRemnawaveNode:
             )
 
         # -- Build compose and env content --
-        compose_content = _render_node_compose(image=image, node_api_port=node_api_port)
-        env_content = _render_node_env(node_api_port=node_api_port, secret_key=secret_key)
+        compose_content = render_node_compose(image=image, node_api_port=node_api_port)
+        env_content = render_node_env(node_api_port=node_api_port, secret_key=secret_key)
 
         # -- Health check: poll the node API port --
         def _health_check() -> bool:

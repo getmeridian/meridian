@@ -224,10 +224,12 @@ class TestDeployNodeContainerHealthGate:
     def _advancing_monotonic(step: float = 3.0) -> MagicMock:
         """Return a mock for time.monotonic that advances by *step* each call."""
         counter = [0.0]
+
         def _mono() -> float:
             val = counter[0]
             counter[0] += step
             return val
+
         return MagicMock(side_effect=_mono)
 
     @patch("meridian.health.time.sleep")
@@ -357,7 +359,10 @@ class TestDeployNodeContainerFailures:
         with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
             _deploy_node_container(conn, _SECRET_KEY)
         assert len(caplog.records) == 1
-        assert "failed to start" in caplog.records[0].message.lower() or "compose up failed" in caplog.records[0].message.lower()
+        assert (
+            "failed to start" in caplog.records[0].message.lower()
+            or "compose up failed" in caplog.records[0].message.lower()
+        )
         # No health check or UFW after compose up failure
         commands = [c[0][0] for c in conn.run.call_args_list]
         assert not any("docker inspect" in c for c in commands)
@@ -634,9 +639,9 @@ class TestRenderNodeCompose:
         NET_ADMIN those syscalls fail with EPERM and the panel UI silently
         reports nothing.
         """
-        from meridian.provision.remnawave_node import _render_node_compose
+        from meridian.provision.remnawave_node import render_node_compose
 
-        content = _render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
 
         assert "cap_add:" in content, "cap_add key missing — node will not accept elevated capabilities"
         assert "NET_ADMIN" in content, "NET_ADMIN capability missing — panel plugins + IP Control will silently fail"
@@ -645,13 +650,13 @@ class TestRenderNodeCompose:
         """`network_mode: host` is required so Xray can bind to arbitrary
         ports on the server (Reality, XHTTP, WSS). Losing it regresses core
         proxying."""
-        from meridian.provision.remnawave_node import _render_node_compose
+        from meridian.provision.remnawave_node import render_node_compose
 
-        content = _render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
         assert "network_mode: host" in content
 
     def test_interpolates_image_tag(self) -> None:
-        from meridian.provision.remnawave_node import _render_node_compose
+        from meridian.provision.remnawave_node import render_node_compose
 
-        content = _render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
         assert "image: remnawave/node:2.7.0" in content

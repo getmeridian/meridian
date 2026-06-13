@@ -10,11 +10,11 @@
 
 **SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. The `SSHUI` callback protocol in `ssh_auth.py` decouples transport from presentation; CLI callers pass `RichSSHUI` from `ssh_ui.py`, Engine/headless callers get logger-only output by default. File transfer methods (`put_bytes`, `put_text`, `get_text`, `get_bytes`, `write_file`, `fetch_credentials`) live in `_FileTransferMixin`; `ServerConnection` inherits from it.
 
-**Remote execution primitives** — `conn.run()` returns `CommandResult` metadata and supports `cwd`, `env`, retries, ok codes, sensitive commands, and operation labels. File writes use `put_text`/`put_bytes`; never embed generated file content in shell heredocs.
+**Remote execution primitives** — `conn.run()` returns `CommandResult` metadata and supports `cwd`, `env`, retries, ok codes, sensitive commands, and operation labels. File writes use `put_text`/`put_bytes`; never embed generated file content in shell heredocs. `CommandResult` and `RemoteCommandResult` have explicit `to_remote()`/`from_remote()` conversion methods. Adapters delegate to these methods, not dict unpacking.
 
 **Server facts** — `facts.py` is the typed cache for OS, Docker, UFW, containers, sshd ports, disk, and sysctl data. Use it before adding one-off probe parsing in provisioners or diagnostics.
 
-**Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer. Every error must be actionable.
+**Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer. Every error must be actionable. `ConsoleState` class wraps globals; module-level functions delegate to singleton instance.
 
 **Engine boundary** — `meridian.engine` owns command-free runtime use cases only when a local executable surface needs them. Static Studio does not need Engine; executable Studio will need it for SSH, files, secrets, events, and cancellation.
 
@@ -27,7 +27,7 @@
 - **Forward-compatible YAML** — `_extra` dict in ClusterConfig preserves unknown YAML keys for forward-compat only. Reconciler state lives in the typed `applied_state: AppliedState` field; subscription page deployment status in `subscription_page.deployed`. Never store load-bearing runtime state in `_extra`.
 - **Single source of state** — No split-brain. Remnawave DB is authoritative for users. cluster.yml is authoritative for deployment topology. No sync needed.
 - **Relay = Host** — Relays map to Remnawave Host entries. Enable/disable host → subscriptions auto-adapt.
-- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup and node deploy (was setup.py). `relay_ops.py` owns relay infrastructure (was commands/relay.py). `resolve.py` owns `ResolvedServer`, `ensure_server_connection`, and pure resolution helpers; `commands/resolve.py` re-exports them and adds CLI-specific logic (prompts, Rich output). Library modules import from `meridian.resolve`, never from `commands/`. Applied-state snapshots and hybrid imperative-declarative sync live in `reconciler/snapshots.py`. `cluster_persistence.py` owns YAML serialization/deserialization; `cluster.py` keeps the data model, validation, and query methods.
+- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup orchestration (first deploy, redeploy, new node workflows). `node_deploy.py` owns node container deployment, host creation, panel API helpers, and inbound caching (extracted from panel_bootstrap.py). `relay_ops.py` owns relay infrastructure (was commands/relay.py). `resolve.py` owns `ResolvedServer`, `ensure_server_connection`, and pure resolution helpers; `commands/resolve.py` re-exports them and adds CLI-specific logic (prompts, Rich output). Library modules import from `meridian.resolve`, never from `commands/`. Applied-state snapshots and hybrid imperative-declarative sync live in `reconciler/snapshots.py`. `cluster_persistence.py` owns YAML serialization/deserialization; `cluster.py` keeps the data model, validation, and query methods. `diagnostics/` owns reusable server health checks (disk, container, port, TLS, firewall) returning `CheckResult`; commands own rendering.
 - **Architecture tests** — `tests/test_architecture.py` enforces layer boundaries, file size budget, private import bans, commands/resolve import ban for library modules, and contract drift checks at CI time.
 
 ## Pitfalls

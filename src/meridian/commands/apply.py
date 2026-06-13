@@ -217,8 +217,8 @@ def _handle_add_subscription_page(action: PlanAction, panel: MeridianPanel, clus
         REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
     )
     from meridian.provision.remnawave_panel import (
-        _render_panel_compose,
         configure_subscription_page,
+        render_panel_compose,
     )
     from meridian.ssh import ServerConnection
 
@@ -236,7 +236,7 @@ def _handle_add_subscription_page(action: PlanAction, panel: MeridianPanel, clus
     if check.returncode != 0:
         # Container not in compose — regenerate compose file, create placeholder
         # .env.subscription (required by compose), then bring up
-        compose = _render_panel_compose(
+        compose = render_panel_compose(
             image=REMNAWAVE_BACKEND_IMAGE,
             panel_port=REMNAWAVE_PANEL_PORT,
             subscription_page_image=REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
@@ -254,9 +254,9 @@ def _handle_add_subscription_page(action: PlanAction, panel: MeridianPanel, clus
             raise RuntimeError(f"Failed to write docker-compose.yml: {result.stderr.strip()[:200]}")
 
         # Create placeholder .env.subscription so docker compose up doesn't fail
-        from meridian.provision.remnawave_panel import _render_subscription_env
+        from meridian.provision.remnawave_panel import render_subscription_env
 
-        sub_env = _render_subscription_env()
+        sub_env = render_subscription_env()
         sub_env_path = f"{REMNAWAVE_PANEL_DIR}/.env.subscription"
         result = conn.put_text(
             sub_env_path,

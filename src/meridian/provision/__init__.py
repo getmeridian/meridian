@@ -8,18 +8,22 @@ The build_setup_steps() function assembles the full deployment pipeline:
 
 from __future__ import annotations
 
+from meridian.provision.progress import NoopStepRenderer, RichStepRenderer, StepRenderer
 from meridian.provision.recipe import Operation, Recipe, RecipeValidationError, Resource, op
 from meridian.provision.steps import ProvisionContext, Provisioner, Step, StepContext, StepResult
 
 __all__ = [
+    "NoopStepRenderer",
     "Operation",
     "Provisioner",
     "ProvisionContext",
     "Recipe",
     "RecipeValidationError",
     "Resource",
+    "RichStepRenderer",
     "Step",
     "StepContext",
+    "StepRenderer",
     "StepResult",
     "build_node_steps",
     "build_setup_steps",

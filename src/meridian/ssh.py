@@ -17,7 +17,10 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
+
+if TYPE_CHECKING:
+    from meridian.core.execution import RemoteCommandResult
 
 from meridian.core.errors import MeridianError
 from meridian.health import tcp_connect  # noqa: F401  # re-export for backward compat
@@ -91,6 +94,39 @@ class CommandResult:
     def ok(self) -> bool:
         """Whether the command exited successfully."""
         return self.returncode == 0
+
+    def to_remote(self) -> RemoteCommandResult:
+        """Convert to a core ``RemoteCommandResult`` with explicit field mapping."""
+        from meridian.core.execution import RemoteCommandResult
+
+        return RemoteCommandResult(
+            args=self.args,
+            returncode=self.returncode,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            duration_ms=self.duration_ms,
+            attempts=self.attempts,
+            timed_out=self.timed_out,
+            sudo=self.sudo,
+            redacted_command=self.redacted_command,
+            operation_name=self.operation_name,
+        )
+
+    @classmethod
+    def from_remote(cls, result: RemoteCommandResult) -> CommandResult:
+        """Create from a core ``RemoteCommandResult`` with explicit field mapping."""
+        return cls(
+            args=result.args,
+            returncode=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            duration_ms=result.duration_ms,
+            attempts=result.attempts,
+            timed_out=result.timed_out,
+            sudo=result.sudo,
+            redacted_command=result.redacted_command,
+            operation_name=result.operation_name,
+        )
 
     def check_returncode(self) -> None:
         if self.returncode != 0:

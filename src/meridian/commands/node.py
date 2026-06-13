@@ -8,6 +8,7 @@ reference and SSH access.
 from __future__ import annotations
 
 import secrets
+from typing import TYPE_CHECKING
 
 import typer
 
@@ -17,6 +18,9 @@ from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.deploy_planning import compute_deploy_ports
 from meridian.remnawave import RemnawaveError
+
+if TYPE_CHECKING:
+    from meridian.diagnostics import CheckResult
 
 # -- Node Add --
 
@@ -142,8 +146,12 @@ def run_add(
 
 def run_check(ip_or_name: str, user: str = "") -> None:
     """Check health of a node: panel status, SSH, containers, ports, TLS."""
-    import shlex
-
+    from meridian.diagnostics import (
+        check_container_running,
+        check_disk_space,
+        check_port_listening,
+        check_tls_certificate,
+    )
     from meridian.ssh import ServerConnection, SSHError
     from meridian.ssh_ui import RichSSHUI
 
@@ -159,7 +167,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
 
     all_ok = True
 
-    # 1. Panel heartbeat
+    # 1. Panel heartbeat (command-specific — requires panel client)
     try:
         panel = make_panel(cluster)
         with panel:
@@ -176,7 +184,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
         err_console.print("  [red]✗[/red] Panel: unreachable")
         all_ok = False
 
-    # 2. SSH connectivity
+    # 2. SSH connectivity (command-specific — requires SSH auth)
     ssh_user = request.user or node.ssh_user or "root"
     try:
         conn = ServerConnection(ip=node.ip, user=ssh_user, port=node.ssh_port)
@@ -188,55 +196,22 @@ def run_check(ip_or_name: str, user: str = "") -> None:
         err_console.print()
         return
 
-    # 3. Docker containers
-    result = conn.run("docker ps --format '{{.Names}}' 2>/dev/null", timeout=15)
-    containers = result.stdout.strip().splitlines() if result.returncode == 0 else []
-    if "remnawave-node" in containers:
-        ok("Container: remnawave-node running")
-    else:
-        err_console.print("  [red]✗[/red] Container: remnawave-node not found")
-        all_ok = False
-
+    # 3. Docker containers — via diagnostics
+    container_names = ["remnawave-node"]
     if node.is_panel_host:
-        for name in ("remnawave", "remnawave-db", "remnawave-redis"):
-            if name in containers:
-                ok(f"Container: {name} running")
-            else:
-                err_console.print(f"  [red]✗[/red] Container: {name} not found")
-                all_ok = False
+        container_names.extend(("remnawave", "remnawave-db", "remnawave-redis"))
+    for name in container_names:
+        all_ok = _render_check(check_container_running(conn, name), f"Container: {name}") and all_ok
 
-    # 4. Port 443
-    result = conn.run("ss -tlnp sport = :443 2>/dev/null | grep -c LISTEN", timeout=10)
-    if result.returncode == 0 and result.stdout.strip() != "0":
-        ok("Port 443: listening")
-    else:
-        err_console.print("  [red]✗[/red] Port 443: not listening")
-        all_ok = False
+    # 4. Port 443 — via diagnostics
+    all_ok = _render_check(check_port_listening(conn, 443), "Port 443") and all_ok
 
-    # 5. TLS cert validity
+    # 5. TLS cert validity — via diagnostics
     host = node.domain or node.sni or node.ip
-    result = conn.run(
-        f"echo | openssl s_client -connect 127.0.0.1:443 -servername {shlex.quote(host)} 2>/dev/null"
-        " | openssl x509 -noout -enddate 2>/dev/null",
-        timeout=15,
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        ok(f"TLS cert: {result.stdout.strip()}")
-    else:
-        warn("TLS cert: could not verify")
+    all_ok = _render_check(check_tls_certificate(conn, host), "TLS cert") and all_ok
 
-    # 6. Disk space
-    result = conn.run("df / --output=pcent 2>/dev/null | tail -1 | tr -d ' %'", timeout=10)
-    if result.returncode == 0 and result.stdout.strip():
-        try:
-            pct = int(result.stdout.strip())
-            if pct > 90:
-                warn(f"Disk: {pct}% used (low space)")
-                all_ok = False
-            else:
-                ok(f"Disk: {pct}% used")
-        except ValueError:
-            pass
+    # 6. Disk space — via diagnostics
+    all_ok = _render_check(check_disk_space(conn, min_free_mb=1024), "Disk") and all_ok
 
     err_console.print()
     if all_ok:
@@ -244,6 +219,22 @@ def run_check(ip_or_name: str, user: str = "") -> None:
     else:
         warn("Some checks failed — review above")
     err_console.print()
+
+
+def _render_check(result: CheckResult, label: str) -> bool:
+    """Render a CheckResult using console helpers. Returns True if ok."""
+    if result.status == "passed":
+        ok(f"{label}: {result.detail}")
+        return True
+    if result.status == "skipped":
+        ok(f"{label}: {result.detail}")
+        return True
+    if result.status == "warning":
+        warn(f"{label}: {result.detail}")
+        return True
+    # failed
+    err_console.print(f"  [red]✗[/red] {label}: {result.detail}")
+    return False
 
 
 # -- Node List --

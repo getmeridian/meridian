@@ -8,11 +8,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 from typing import Protocol as TypingProtocol
 
-from rich.console import Console
-from rich.status import Status
-
 from meridian.config import DEFAULT_SNI
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.provision.progress import NoopStepRenderer, StepRenderer
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
@@ -157,7 +155,7 @@ class Step(TypingProtocol):
 
 
 class Provisioner:
-    """Runs a list of steps with Rich progress output."""
+    """Runs a list of steps, delegating progress output to a StepRenderer."""
 
     def __init__(self, steps: Sequence[Step]) -> None:
         self.steps = list(steps)
@@ -169,21 +167,23 @@ class Provisioner:
         *,
         reporter: Reporter = NoopReporter(),
         operation: OperationContext | None = None,
-        render: bool = True,
+        renderer: StepRenderer | None = None,
     ) -> list[StepResult]:
-        """Execute all steps, collecting results. Shows Rich spinner per step.
+        """Execute all steps, collecting results.
+
+        Rendering is delegated to *renderer*. Pass ``RichStepRenderer()``
+        for interactive CLI output or omit for silent headless execution.
 
         Accepts any context type (ProvisionContext, RelayContext, etc.)
         as long as steps can consume it.  If ``ctx`` has a ``results``
         attribute, each result is appended there too.
         """
-        console = Console(stderr=True, highlight=False)
+        active_renderer: StepRenderer = renderer or NoopStepRenderer()
         results: list[StepResult] = []
 
         total = len(self.steps)
         for i, step in enumerate(self.steps):
             start = time.monotonic()
-            prefix = f"[{i + 1}/{total}]"
             _report_step_event(
                 reporter,
                 operation,
@@ -192,10 +192,7 @@ class Provisioner:
                 index=i + 1,
                 total=total,
             )
-            if render:
-                with Status(f"  [cyan]{prefix} {step.name}[/cyan]", console=console, spinner="dots"):
-                    result = step.run(conn, ctx)
-            else:
+            with active_renderer.step_starting(step.name, index=i + 1, total=total):
                 result = step.run(conn, ctx)
             elapsed_ms = int((time.monotonic() - start) * 1000)
             result.duration_ms = elapsed_ms
@@ -215,9 +212,7 @@ class Provisioner:
                     total=total,
                     result=result,
                 )
-                detail = f" ({result.detail})" if result.detail else ""
-                if render:
-                    console.print(f"  [red bold]\u2717[/red bold] {result.name}{detail}")
+                active_renderer.step_failed(result)
                 break
             elif result.status == "skipped":
                 _report_step_event(
@@ -229,9 +224,7 @@ class Provisioner:
                     total=total,
                     result=result,
                 )
-                detail = f" ({result.detail})" if result.detail else ""
-                if render:
-                    console.print(f"  [dim]\u2013 {result.name}{detail}[/dim]")
+                active_renderer.step_skipped(result)
             else:
                 _report_step_event(
                     reporter,
@@ -242,11 +235,7 @@ class Provisioner:
                     total=total,
                     result=result,
                 )
-                # ok or changed
-                marker = "\u2713"
-                detail = f" [dim]({result.detail})[/dim]" if result.detail else ""
-                if render:
-                    console.print(f"  [green]{marker}[/green] {result.name}{detail}")
+                active_renderer.step_completed(result)
 
         return results
 

@@ -118,17 +118,15 @@ class TestLayerBoundaries:
                 if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("meridian.commands"):
                     # Reject any import from meridian.commands.resolve — those
                     # symbols now live in meridian.resolve.
-                    if node.module == "meridian.commands.resolve" or node.module.startswith("meridian.commands.resolve."):
+                    if node.module == "meridian.commands.resolve" or node.module.startswith(
+                        "meridian.commands.resolve."
+                    ):
                         imported = ", ".join(a.name for a in node.names)
-                        violations.append(
-                            f"{path.name} imports {imported} from {node.module} — use meridian.resolve"
-                        )
+                        violations.append(f"{path.name} imports {imported} from {node.module} — use meridian.resolve")
                     else:
                         for alias in node.names:
                             if alias.name.startswith("_"):
-                                violations.append(
-                                    f"{path.name} imports private {alias.name} from {node.module}"
-                                )
+                                violations.append(f"{path.name} imports private {alias.name} from {node.module}")
         assert violations == [], "Library modules import command-layer symbols:\n" + "\n".join(violations)
 
 
@@ -159,7 +157,15 @@ class TestContractDrift:
         # Mapping of dataclass → known-fields set name in cluster.py
         # The sets are derived programmatically now, but this test ensures
         # the derivation stays correct.
-        for cls in (PanelConfig, NodeEntry, RelayEntry, DesiredNode, DesiredRelay, ClusterConfig, SubscriptionPageConfig):
+        for cls in (
+            PanelConfig,
+            NodeEntry,
+            RelayEntry,
+            DesiredNode,
+            DesiredRelay,
+            ClusterConfig,
+            SubscriptionPageConfig,
+        ):
             expected = {f.name for f in dataclasses.fields(cls) if not f.name.startswith("_")}
             # Just verify each class has typed public fields (the derivation test)
             assert len(expected) > 0, f"{cls.__name__} has no public fields"
@@ -177,9 +183,7 @@ class TestContractDrift:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id in ("OperationState", "OperationKind"):
-                        raise AssertionError(
-                            f"engine/operations.py redefines {target.id} — import from core instead"
-                        )
+                        raise AssertionError(f"engine/operations.py redefines {target.id} — import from core instead")
 
         # Verify the engine module actually uses the core types
         assert OperationState is not None
@@ -229,8 +233,7 @@ class TestContractDrift:
 
         unmapped = node_fields - topo_fields - EXCLUDED
         assert unmapped == set(), (
-            f"NodeEntry fields not in TopologyNode: {unmapped}. "
-            f"Add them to TopologyNode or to EXCLUDED in this test."
+            f"NodeEntry fields not in TopologyNode: {unmapped}. Add them to TopologyNode or to EXCLUDED in this test."
         )
 
 
@@ -243,7 +246,6 @@ class TestContractDrift:
 FILE_SIZE_BUDGET = 800
 
 FILE_SIZE_ALLOWLIST: dict[str, str] = {
-    "panel_bootstrap.py": "extracted from setup.py; further split planned",
     "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
     "provision/nginx.py": "nginx config generation is one cohesive template concern",
     "cli.py": "Typer registration for all subcommands — structural, not complex",
@@ -289,13 +291,7 @@ class TestStructuralHealth:
             # __version__ is a standard Python convention, not a private API
             "__version__",
         }
-        ALLOWED_PAIRS = {
-            # Provision internals used by apply handlers — tight coupling is intentional
-            ("commands/apply.py", "_render_panel_compose"),
-            ("commands/apply.py", "_render_subscription_env"),
-            ("panel_bootstrap.py", "_render_node_compose"),
-            ("panel_bootstrap.py", "_render_node_env"),
-        }
+        ALLOWED_PAIRS: set[tuple[str, str]] = set()
 
         violations = []
         for path in sorted(SRC.rglob("*.py")):
@@ -312,10 +308,12 @@ class TestStructuralHealth:
                         continue
 
                     for alias in node.names:
-                        if alias.name.startswith("_") and alias.name not in ALLOWED_NAMES and (source_file, alias.name) not in ALLOWED_PAIRS:
-                            violations.append(
-                                f"{source_file} imports private {alias.name} from {node.module}"
-                            )
+                        if (
+                            alias.name.startswith("_")
+                            and alias.name not in ALLOWED_NAMES
+                            and (source_file, alias.name) not in ALLOWED_PAIRS
+                        ):
+                            violations.append(f"{source_file} imports private {alias.name} from {node.module}")
 
         assert violations == [], (
             "Private symbols imported across module boundaries:\n"
@@ -355,15 +353,10 @@ class TestStructuralHealth:
                 continue
             tree = ast.parse(path.read_text(), filename=str(path))
             for node in ast.walk(tree):
-                if (
-                    isinstance(node, ast.ImportFrom)
-                    and node.module == "meridian.console"
-                ):
+                if isinstance(node, ast.ImportFrom) and node.module == "meridian.console":
                     imported_names = [a.name for a in node.names]
                     if "fail" in imported_names:
-                        violations.append(
-                            f"{path.relative_to(SRC)} imports fail from meridian.console"
-                        )
+                        violations.append(f"{path.relative_to(SRC)} imports fail from meridian.console")
 
         assert violations == [], (
             "Library modules must not import console.fail() — raise exceptions instead:\n"
@@ -387,7 +380,6 @@ class TestStructuralHealth:
                 if f'_extra["{key}"]' in text or f"_extra['{key}']" in text or f'_extra.get("{key}")' in text:
                     violations.append(f"{path.relative_to(SRC)} accesses _extra['{key}'] directly")
 
-        assert violations == [], (
-            "Applied-state accessed via _extra instead of cluster.applied_state:\n"
-            + "\n".join(violations)
+        assert violations == [], "Applied-state accessed via _extra instead of cluster.applied_state:\n" + "\n".join(
+            violations
         )

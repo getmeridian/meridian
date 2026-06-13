@@ -116,11 +116,11 @@ class TestHandleAddSubscriptionPage:
                 return_value=True,
             ),
             patch(
-                "meridian.provision.remnawave_panel._render_panel_compose",
+                "meridian.provision.remnawave_panel.render_panel_compose",
                 return_value="version: '3'\nservices: {}\n",
             ),
             patch(
-                "meridian.provision.remnawave_panel._render_subscription_env",
+                "meridian.provision.remnawave_panel.render_subscription_env",
                 return_value="API_TOKEN=fake\n",
             ),
             patch.object(ClusterConfig, "save"),
@@ -160,7 +160,7 @@ class TestHandleAddSubscriptionPage:
         with (
             patch("meridian.ssh.ServerConnection", return_value=conn),
             patch(
-                "meridian.provision.remnawave_panel._render_panel_compose",
+                "meridian.provision.remnawave_panel.render_panel_compose",
                 return_value="content",
             ),
             patch.object(ClusterConfig, "save", save),

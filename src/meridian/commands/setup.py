@@ -66,6 +66,7 @@ from meridian.core.services.deploy import deploy_server
 from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
 from meridian.panel_bootstrap import configure_panel_and_node, run_provisioner
+from meridian.provision.progress import RichStepRenderer
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.renderers import emit_json
 from meridian.resolve import ResolvedServer
@@ -400,7 +401,7 @@ def _execute_deploy_request(
             info_page_path=info_page_path,
             reporter=reporter,
             operation=operation,
-            render=not is_quiet_mode(),
+            renderer=RichStepRenderer() if not is_quiet_mode() else None,
         )
 
         # Post-provisioner: configure panel via REST API

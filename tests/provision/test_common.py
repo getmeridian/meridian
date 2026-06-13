@@ -18,7 +18,7 @@ from meridian.provision.common import (
     InstallPackages,
     SetTimezone,
 )
-from tests.provision.conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
 # InstallPackages

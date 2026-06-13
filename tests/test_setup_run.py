@@ -357,7 +357,9 @@ class TestRunCoreBoundary:
 
     def test_run_uses_registered_server_ssh_port_for_execution(self) -> None:
         registry = MagicMock()
-        registry.find.return_value = SimpleNamespace(host=_IP_B, user="admin", port=2222, ssh_user="admin", ssh_port=2222)
+        registry.find.return_value = SimpleNamespace(
+            host=_IP_B, user="admin", port=2222, ssh_user="admin", ssh_port=2222
+        )
         resolved = _make_resolved(_IP_B)
         resolved.user = "admin"
         resolved.conn.user = "admin"

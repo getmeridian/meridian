@@ -7,7 +7,7 @@ from pathlib import Path
 
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.warp import WARP_PROXY_PORT, InstallWarp
-from tests.provision.conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 
 class _WarpMockConnection(MockConnection):

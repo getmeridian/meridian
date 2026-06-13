@@ -15,7 +15,7 @@ from meridian.provision.relay import (
     VerifyRelay,
     build_relay_steps,
 )
-from tests.provision.conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
 # RelayContext validation

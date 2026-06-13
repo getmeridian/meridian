@@ -17,8 +17,7 @@ from pathlib import Path
 from meridian.provision import build_setup_steps
 from meridian.provision.relay import RelayContext, build_relay_steps
 from meridian.provision.steps import ProvisionContext
-
-from .conftest import MockConnection
+from tests.support.mock_connection import MockConnection
 
 
 def _make_pipeline_conn() -> MockConnection:

@@ -37,7 +37,7 @@ _METRICS_PORT = 3001
 _SUBSCRIPTION_PAGE_INTERNAL_PORT = 3010  # container-internal port
 
 
-def _render_panel_compose(
+def render_panel_compose(
     image: str,
     panel_port: int,
     subscription_page_image: str,
@@ -209,7 +209,7 @@ POSTGRES_DB=remnawave
 """
 
 
-def _render_subscription_env(
+def render_subscription_env(
     panel_url: str = "http://remnawave:3000",
     api_token: str = "",
 ) -> str:
@@ -241,7 +241,7 @@ def configure_subscription_page(
 
     logger = logging.getLogger("meridian.provision")
 
-    env_content = _render_subscription_env(api_token=api_token)
+    env_content = render_subscription_env(api_token=api_token)
     env_path = f"{panel_dir}/.env.subscription"
     result = conn.put_text(
         env_path,
@@ -335,7 +335,7 @@ class DeployRemnawavePanel:
 
             # Core containers running but subscription page missing — add it
             # without regenerating secrets (upgrade path).
-            compose_content = _render_panel_compose(
+            compose_content = render_panel_compose(
                 image=image,
                 panel_port=panel_port,
                 subscription_page_image=sub_page_image,
@@ -360,7 +360,7 @@ class DeployRemnawavePanel:
             sub_env_path = f"{panel_dir}/.env.subscription"
             sub_env_check = conn.run(f"test -f {shlex.quote(sub_env_path)}", timeout=15)
             if sub_env_check.returncode != 0:
-                sub_env_content = _render_subscription_env()
+                sub_env_content = render_subscription_env()
                 write_sub_env = conn.put_text(
                     sub_env_path,
                     sub_env_content,
@@ -398,8 +398,8 @@ class DeployRemnawavePanel:
             sub_public_domain=sub_public_domain,
             metrics_password=metrics_password,
         )
-        sub_env_content = _render_subscription_env()
-        compose_content = _render_panel_compose(
+        sub_env_content = render_subscription_env()
+        compose_content = render_panel_compose(
             image=image,
             panel_port=panel_port,
             subscription_page_image=sub_page_image,

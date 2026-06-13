@@ -13,9 +13,9 @@ from meridian.provision.nginx import (
     _render_nginx_ip_config,
     _render_nginx_stream_config,
 )
-from meridian.provision.tls import IssueTLSCert
 from meridian.provision.steps import ProvisionContext
-from tests.provision.conftest import MockConnection
+from meridian.provision.tls import IssueTLSCert
+from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
 # Config rendering: nginx stream (SNI routing)

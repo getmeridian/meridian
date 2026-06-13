@@ -29,6 +29,8 @@ Top-level `conftest.py` provides:
 - **`sample_proxy_yml`** / **`sample_v1_proxy_yml`** — legacy credential fixtures (kept for migration/credential tests).
 - **`servers_file`** / **`creds_dir`** — pre-built directory structures.
 
+**`tests/support/mock_connection.py`** — shared `MockConnection` class. Provision tests import via conftest fixtures; other layers import directly.
+
 ## Conventions
 
 - **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation.
