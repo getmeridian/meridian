@@ -174,7 +174,7 @@ def build_stream_block(
     """Build the SNI routing stream block from deploy parameters.
 
     This is the model-based replacement for the parameters that
-    ``_render_nginx_stream_config`` used to accept directly.
+    ``render_nginx_stream_config`` used to accept directly.
     """
     # --- SNI map entries ---
     maps: list[NginxStreamMap] = [

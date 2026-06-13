@@ -9,9 +9,11 @@ from meridian.provision.nginx import (
     ConfigureNginx,
     DeployPWAAssets,
     InstallNginx,
-    _render_nginx_http_config,
-    _render_nginx_ip_config,
-    _render_nginx_stream_config,
+)
+from meridian.provision.nginx_render import (
+    render_nginx_http_config,
+    render_nginx_ip_config,
+    render_nginx_stream_config,
 )
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert
@@ -24,7 +26,7 @@ from tests.support.mock_connection import MockConnection
 
 class TestRenderNginxStreamConfig:
     def test_contains_sni_routing(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -35,7 +37,7 @@ class TestRenderNginxStreamConfig:
         assert "proxy_pass $meridian_backend" in cfg
 
     def test_reality_sni_routes_to_xray(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -45,7 +47,7 @@ class TestRenderNginxStreamConfig:
         assert "127.0.0.1:10443" in cfg
 
     def test_server_ip_routes_to_nginx(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -54,7 +56,7 @@ class TestRenderNginxStreamConfig:
         assert "198.51.100.1  nginx_https" in cfg
 
     def test_domain_routes_to_nginx(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -66,7 +68,7 @@ class TestRenderNginxStreamConfig:
 
     def test_no_sni_routes_to_nginx(self):
         """Browsers connecting to bare IP send no SNI (RFC 6066)."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -76,7 +78,7 @@ class TestRenderNginxStreamConfig:
 
     def test_unknown_sni_routes_to_reality_dest(self):
         """Unknown SNI routes to reality dest — eliminates SNI differential."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -88,7 +90,7 @@ class TestRenderNginxStreamConfig:
 
     def test_no_domain_no_domain_rule(self):
         """Without domain, only server IP + no-SNI route to nginx. Default → reality_dest."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -112,7 +114,7 @@ class TestRenderNginxStreamConfig:
 
 class TestRenderNginxIpConfig:
     def test_has_ssl_certificate(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -123,7 +125,7 @@ class TestRenderNginxIpConfig:
         assert "/etc/ssl/meridian/fullchain.pem" in cfg
 
     def test_has_server_tokens_off(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -133,7 +135,7 @@ class TestRenderNginxIpConfig:
         assert "server_tokens off" in cfg
 
     def test_has_acme_challenge_location(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -150,7 +152,7 @@ class TestRenderNginxIpConfig:
 
 class TestNginxPWAHeaders:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -159,7 +161,7 @@ class TestNginxPWAHeaders:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -201,7 +203,7 @@ class TestNginxPWAHeaders:
 
 class TestNginxXHTTPBlock:
     def test_ip_config_xhttp_proxy_pass(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -215,7 +217,7 @@ class TestNginxXHTTPBlock:
         assert "xh-abc123" in cfg
 
     def test_domain_config_xhttp_proxy_pass(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -231,7 +233,7 @@ class TestNginxXHTTPBlock:
         assert "xh-def456" in cfg
 
     def test_xhttp_routes_exact_and_slash_paths(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -245,7 +247,7 @@ class TestNginxXHTTPBlock:
         assert cfg.count("proxy_pass http://meridian_xhttp;") == 2
 
     def test_xhttp_before_panel(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -259,7 +261,7 @@ class TestNginxXHTTPBlock:
         assert xhttp_pos < panel_pos
 
     def test_no_xhttp_without_params(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -270,7 +272,7 @@ class TestNginxXHTTPBlock:
         assert "meridian_xhttp" not in cfg
 
     def test_xhttp_has_streaming_timeouts(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -285,7 +287,7 @@ class TestNginxXHTTPBlock:
 
     def test_xhttp_upstream_keepalive(self):
         """XHTTP upstream block enables connection reuse to Xray."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -302,7 +304,7 @@ class TestNginxXHTTPBlock:
 
     def test_xhttp_upstream_keepalive_domain(self):
         """Domain mode also gets upstream keepalive."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -325,7 +327,7 @@ class TestNginxXHTTPBlock:
 
 class TestNginxPanelProxy:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -334,7 +336,7 @@ class TestNginxPanelProxy:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -376,7 +378,7 @@ class TestNginxPanelProxy:
 
 class TestNginxLocationStructure:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -385,7 +387,7 @@ class TestNginxLocationStructure:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -434,7 +436,7 @@ class TestNginxLocationStructure:
 
 class TestNginxWSS:
     def test_domain_config_has_websocket_upgrade(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -449,7 +451,7 @@ class TestNginxWSS:
 
     def test_ip_config_has_no_wss(self):
         """IP mode should not have WSS location block."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -473,7 +475,7 @@ class TestNginxDecoy:
         on all IPs.  nginx-generated error pages are identical across all
         nginx installations — no Meridian-specific content.
         """
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -489,7 +491,7 @@ class TestNginxDecoy:
 
     def test_domain_default_returns_nginx_403_404(self):
         """Domain mode also uses nginx-generated 403/404."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -505,7 +507,7 @@ class TestNginxDecoy:
         assert "return 200" not in https_block
 
     def test_default_has_security_headers(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -519,14 +521,14 @@ class TestNginxDecoy:
     def test_server_tokens_off(self):
         """Both modes should have server_tokens off."""
         for cfg in [
-            _render_nginx_ip_config(
+            render_nginx_ip_config(
                 server_ip="198.51.100.1",
                 nginx_internal_port=8443,
                 panel_web_base_path="secretpanel",
                 panel_internal_port=2053,
                 info_page_path="connect",
             ),
-            _render_nginx_http_config(
+            render_nginx_http_config(
                 domain="example.com",
                 nginx_internal_port=8443,
                 ws_path="wspath",
@@ -549,7 +551,7 @@ class TestNginxFingerprinting:
 
     def test_http2_enabled(self):
         """HTTP/2 must be enabled — missing h2 ALPN is a fingerprinting vector."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -559,7 +561,7 @@ class TestNginxFingerprinting:
         assert "ssl http2" in cfg
 
     def test_domain_http2_enabled(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -572,7 +574,7 @@ class TestNginxFingerprinting:
 
     def test_tls_modern_protocols_only(self):
         """Only TLSv1.2 and TLSv1.3 — no older protocols."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -586,7 +588,7 @@ class TestNginxFingerprinting:
 
     def test_stream_ipv4_and_ipv6_listening(self):
         """Stream server listens on both IPv4 and IPv6."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -597,7 +599,7 @@ class TestNginxFingerprinting:
 
     def test_stream_proxy_connect_timeout(self):
         """Stream proxy should have a short connect timeout (good practice)."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -607,7 +609,7 @@ class TestNginxFingerprinting:
 
     def test_stream_proxy_timeout(self):
         """Stream proxy needs a long idle timeout for VPN sessions."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -617,7 +619,7 @@ class TestNginxFingerprinting:
 
     def test_stream_socket_keepalive(self):
         """TCP keepalives keep relay→exit connections alive through NATs."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -627,7 +629,7 @@ class TestNginxFingerprinting:
 
     def test_ip_mode_no_http_redirect(self):
         """IP mode must NOT redirect HTTP→HTTPS (redirect to 403 is a contradiction)."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -643,7 +645,7 @@ class TestNginxFingerprinting:
 
     def test_domain_mode_keeps_http_redirect(self):
         """Domain mode SHOULD redirect HTTP→HTTPS (has real content)."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -657,7 +659,7 @@ class TestNginxFingerprinting:
 
     def test_port80_server_tokens_off(self):
         """Port 80 server must also have server_tokens off."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -670,14 +672,14 @@ class TestNginxFingerprinting:
     def test_no_444_in_https_server_block(self):
         """HTTPS block must never use 444 — silent close after TLS is the highest signal."""
         for cfg in [
-            _render_nginx_ip_config(
+            render_nginx_ip_config(
                 server_ip="198.51.100.1",
                 nginx_internal_port=8443,
                 panel_web_base_path="secretpanel",
                 panel_internal_port=2053,
                 info_page_path="connect",
             ),
-            _render_nginx_http_config(
+            render_nginx_http_config(
                 domain="example.com",
                 nginx_internal_port=8443,
                 ws_path="wspath",
@@ -695,7 +697,7 @@ class TestNginxFingerprinting:
 
     def test_no_custom_html_in_response(self):
         """HTTPS block must not serve custom HTML — it would be fingerprintable."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -708,7 +710,7 @@ class TestNginxFingerprinting:
 
     def test_csp_restricts_external_resources(self):
         """CSP must block external resource loading (self-hosted everything)."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -719,7 +721,7 @@ class TestNginxFingerprinting:
 
     def test_unknown_sni_proxied_to_dest(self):
         """Unknown SNIs must be TCP-proxied to Reality dest, not served by nginx."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -730,7 +732,7 @@ class TestNginxFingerprinting:
 
     def test_root_403_vs_default_404(self):
         """Root returns 403, other paths 404 — all nginx-generated, not Meridian."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",

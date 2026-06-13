@@ -14,7 +14,7 @@
 
 **Post-provisioner API setup** — Container deployment is SSH-based (provisioner steps). Panel/user/profile configuration happens via direct REST API calls AFTER containers are running. This separates infrastructure (SSH) from configuration (REST).
 
-**nginx + TLS extracted** — `services.py` split into `nginx.py` (SNI routing + HTTP config) and `tls.py` (acme.sh cert issuance). Connection page deployment stays in `services.py`.
+**nginx + TLS extracted** — `nginx_render.py` owns pure config string rendering (stream SNI, http server blocks). `nginx.py` owns step classes (InstallNginx, ConfigureNginx, DeployPWAAssets) that call `conn.run()`. `tls.py` owns acme.sh cert issuance. Connection page deployment stays in `services.py`.
 
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations. Prefer these helpers plus `ServerFacts` for idempotency checks instead of duplicating check/act shell snippets.
 

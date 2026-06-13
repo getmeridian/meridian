@@ -92,15 +92,15 @@ class TestLayerBoundaries:
 
     def test_core_never_imports_cli_layer(self) -> None:
         violations = _scan_violations(SRC / "core", CORE_FORBIDDEN)
-        assert violations == [], f"core/ has forbidden imports:\n" + "\n".join(violations)
+        assert violations == [], "core/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_engine_never_imports_commands_or_runtime(self) -> None:
         violations = _scan_violations(SRC / "engine", ENGINE_FORBIDDEN)
-        assert violations == [], f"engine/ has forbidden imports:\n" + "\n".join(violations)
+        assert violations == [], "engine/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_adapters_never_import_engine(self) -> None:
         violations = _scan_violations(SRC / "adapters", ADAPTER_FORBIDDEN)
-        assert violations == [], f"adapters/ has forbidden imports:\n" + "\n".join(violations)
+        assert violations == [], "adapters/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_library_modules_never_import_private_from_commands(self) -> None:
         """operations.py and friends must not import _foo from commands/.
@@ -172,11 +172,9 @@ class TestContractDrift:
 
     def test_operation_state_is_single_source(self) -> None:
         """OperationState must be defined once in core, not redefined in engine."""
-        from meridian.core.operations import OperationKind, OperationState
-        from meridian.engine.operations import EngineOperation
-
         # engine should import from core, not redefine
         import meridian.engine.operations as eng_mod
+        from meridian.core.operations import OperationKind, OperationState
 
         source = ast.parse(Path(eng_mod.__file__).read_text())
         for node in ast.walk(source):
@@ -247,10 +245,7 @@ FILE_SIZE_BUDGET = 800
 
 FILE_SIZE_ALLOWLIST: dict[str, str] = {
     "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
-    "provision/nginx.py": "nginx config generation is one cohesive template concern",
     "cli.py": "Typer registration for all subcommands — structural, not complex",
-    "commands/setup.py": "deploy orchestrator — further extraction tracked",
-    "ssh.py": "transport layer — file transfer extracted to _FileTransferMixin; remaining size is structural",
 }
 
 
@@ -338,18 +333,9 @@ class TestStructuralHealth:
         ]
         library_files.extend(sorted((SRC / "provision").rglob("*.py")))
 
-        # TODO: these modules still import fail — remove from allowlist
-        # after each is migrated to raise MeridianError subclasses instead.
-        allowlist = {
-            "resolve.py",
-            "xray_config.py",
-        }
-
         violations = []
         for path in library_files:
             if not path.exists():
-                continue
-            if path.name in allowlist:
                 continue
             tree = ast.parse(path.read_text(), filename=str(path))
             for node in ast.walk(tree):
