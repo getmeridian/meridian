@@ -120,6 +120,15 @@ def run(
         xray_status = "NOT RUNNING — proxy traffic is not flowing"
     sections.append(("Xray Process", xray_status))
 
+    # --- Node capabilities ---
+    from meridian.capabilities import detect_capabilities
+
+    caps = detect_capabilities(resolved.conn)
+    cap_lines = [f"Xray version: {caps.xray_version or 'unknown'}"]
+    enabled = [k for k in ("reality", "xhttp", "wss", "hysteria2", "finalmask", "vless_pq") if getattr(caps, k)]
+    cap_lines.append(f"Enabled: {', '.join(enabled) if enabled else 'none detected'}")
+    sections.append(("Node Capabilities", "\n".join(cap_lines)))
+
     # --- Remnawave Node Logs (redacted) ---
     log_cmd = "docker logs remnawave-node --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
     xray_logs = resolved.conn.run(log_cmd, timeout=15).stdout.strip() or "container not running"
