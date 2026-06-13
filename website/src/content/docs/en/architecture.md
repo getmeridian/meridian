@@ -11,7 +11,7 @@ section: reference
 - **Remnawave** — modern panel stack for Xray, deployed as separate `remnawave/backend`, `remnawave/node`, and `remnawave/subscription-page` Docker containers. Backend exposes a REST API (managed via the official `remnawave` Python SDK); node runs Xray in `network_mode: host`; subscription-page serves per-user config URLs.
 - **nginx** — single-process web server handling both SNI routing and TLS. The stream module listens on port 443 and routes traffic by SNI hostname without terminating TLS. The http module on port 8443 terminates TLS, serves connection pages, reverse-proxies the Remnawave admin UI + subscription page, and proxies XHTTP/WSS traffic to Xray. Certificates are managed by [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt).
 - **Docker** — runs Remnawave backend + PostgreSQL + Valkey (panel host only), Remnawave node (every exit node), and Remnawave subscription-page (panel host, optional).
-- **Pure-Python provisioner** — `src/meridian/provision/` executes deployment steps via SSH. Each step gets `(conn, ctx)` and returns a `StepResult`.
+- **Pure-Python provisioner** — `src/meridian/provision/` executes deployment steps via SSH. Each step gets `(conn, ctx)` and returns a `StepResult`. The `StepRenderer` protocol in `progress.py` decouples step execution from Rich rendering, keeping `steps.py` free of display imports.
 - **uTLS** — impersonates Chrome's TLS Client Hello fingerprint, making connections indistinguishable from real browser traffic.
 
 ## Service topology
@@ -131,7 +131,7 @@ Admin UI is reverse-proxied by nginx at `/<panel.secret_path>/` on port 443 in a
 
 Whenever an admin edits state directly in the Remnawave UI (e.g. adds a user, renames a host), the next `meridian plan` reads actual state from the panel, compares it against desired state (`cluster.yml`), and emits the diff as typed `PlanAction` objects. `meridian apply` executes them, calling the same SDK surfaces; `meridian apply --json` returns typed per-action execution results for process/UI clients.
 
-`meridian apply` snapshots desired state into `cluster._extra["desired_*_applied"]` after every successful run. The next plan uses that snapshot to distinguish intentional removals (was in last-applied) from drift (was never applied). This mirrors Terraform's state-tracking behaviour.
+`meridian apply` snapshots desired state into `cluster.applied_state` (a typed `AppliedState` dataclass) after every successful run. The next plan uses that snapshot to distinguish intentional removals (was in last-applied) from drift (was never applied). This mirrors Terraform's state-tracking behaviour.
 
 ## nginx configuration pattern
 
@@ -182,11 +182,11 @@ Steps execute sequentially via `build_setup_steps()` (panel host) or `build_node
 | 11 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
 | 12 | InstallWarp | `warp.py` | Cloudflare WARP (optional) |
 | 13 | InstallNginx | `nginx.py` | SNI routing + TLS + reverse proxy |
-| 14 | ConfigureNginx | `nginx.py` | nginx config for IP or domain mode |
+| 14 | ConfigureNginx | `nginx.py` + `nginx_render.py` | nginx config for IP or domain mode |
 | 15 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
 | 16 | DeployPWAAssets | `services.py` | PWA connection page assets |
 
-After the provisioner pipeline, `_configure_panel_and_node` in `setup.py` uses the Remnawave REST API to register inbounds, create the node container, assign hosts, and create the default client. The node container is NOT part of the SSH pipeline because it requires a panel-issued secret key.
+After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.py` uses the Remnawave REST API to register inbounds, create the node container, assign hosts, and create the default client. Node container deployment, host creation, and inbound caching helpers live in `node_deploy.py`. The node container is NOT part of the SSH pipeline because it requires a panel-issued secret key.
 
 ## Parallel provisioning
 

@@ -17,6 +17,14 @@ This creates a unique connection key for "alice" and displays:
 - A **shareable page URL** — hosted on your server, ready to send via any messenger
 - An **HTML file** saved locally — backup for offline sharing
 
+Pass multiple names to add several clients at once:
+
+```
+meridian client add alice bob charlie
+```
+
+Each client gets their own key and connection page. Failures are reported per-client — successfully created clients are kept even if some fail.
+
 ### What the recipient sees
 
 The shareable URL opens a connection page with:
@@ -56,32 +64,35 @@ meridian client remove alice
 
 Revokes access immediately. The client's UUID is removed from all inbounds on the server.
 
-## Multi-server
-
-Use `--server` to target a specific named server:
+## Suspend a client
 
 ```
-meridian client add alice --server finland
-meridian client show alice --server finland
-meridian client list --server finland
+meridian client disable alice
 ```
 
-If you have only one server, it's auto-selected.
+Temporarily blocks the client from connecting. Their configuration stays intact — no keys are deleted, and their subscription URL remains valid. Use this to pause access without losing the client's setup.
+
+To re-enable: `meridian client enable alice`
+
+## Re-enable a client
+
+```
+meridian client enable alice
+```
+
+Resumes a previously suspended client. They can connect again immediately using their existing keys and subscription URL.
 
 ## Where credentials are stored
 
-When you run `meridian deploy` from your laptop, Meridian saves server credentials locally:
+Meridian stores fleet topology locally in `~/.meridian/cluster.yml` — panel URL, API token, admin credentials, nodes, and relays. Client state (users, UUIDs, traffic) lives in the Remnawave panel's PostgreSQL database, which is the source of truth.
 
 ```
-~/.meridian/credentials/<IP>/proxy.yml   # keys, UUIDs, panel access
-~/.meridian/servers                      # server registry
+~/.meridian/cluster.yml                 # fleet topology + panel access
 ```
 
-On the server itself, the same data lives in `/etc/meridian/proxy.yml`. Meridian syncs between them automatically after `client add` and `client remove`.
+Client commands talk directly to the panel's REST API using the stored API token. No SSH is needed for client operations.
 
-This is why `meridian client add alice` works without specifying the server — Meridian looks it up in the local registry. If you have multiple servers, use `--server NAME`.
-
-If credentials get out of sync (e.g. you added a client from a different machine), `client show` will recover the data from the server panel automatically.
+If you need to recover after losing the local file, `meridian fleet recover` rebuilds `cluster.yml` from the live panel API.
 
 ## Web panel
 

@@ -17,6 +17,14 @@ meridian client add alice
 - **可共享的页面 URL** — 托管在您的服务器上，可通过任何信使发送
 - **本地保存的 HTML 文件** — 离线共享的备份
 
+一次传递多个名称以同时添加多个客户端：
+
+```
+meridian client add alice bob charlie
+```
+
+每个客户端获得自己的密钥和连接页面。失败按客户端报告 — 成功创建的客户端即使某些失败也会被保留。
+
 ### 收件人看到的内容
 
 可共享的 URL 打开一个连接页面，包括：
@@ -27,7 +35,7 @@ meridian client add alice
 
 通过电子邮件、iMessage、Telegram 或任何信使发送该 URL。收件人打开它、安装应用、扫描二维码并连接。无需任何技术知识。
 
-## 显示连接信息
+## 显示连接详情
 
 要在任何时候重新显示现有客户端的连接信息：
 
@@ -56,48 +64,75 @@ meridian client remove alice
 
 立即撤销访问权限。客户端的 UUID 将从服务器上的所有入站中删除。
 
-## 多服务器
-
-使用 `--server` 来针对特定的命名服务器：
+## 暂停客户端
 
 ```
-meridian client add alice --server finland
-meridian client show alice --server finland
-meridian client list --server finland
+meridian client disable alice
 ```
 
-如果您只有一个服务器，它会自动选择。
+临时阻止客户端连接。他们的配置保持完整 — 没有删除密钥，他们的订阅 URL 保持有效。使用此功能可以在不失去客户端设置的情况下暂停访问。
+
+要重新启用：`meridian client enable alice`
+
+## 重新启用客户端
+
+```
+meridian client enable alice
+```
+
+恢复之前暂停的客户端。他们可以使用现有密钥和订阅 URL 立即再次连接。
 
 ## 凭证存储位置
 
-当您从笔记本电脑运行 `meridian deploy` 时，Meridian 会在本地保存服务器凭证：
+Meridian 在本地将舰队拓扑存储在 `~/.meridian/cluster.yml` — 面板 URL、API 令牌、管理员凭证、节点和中继。客户端状态（用户、UUID、流量）位于 Remnawave 面板的 PostgreSQL 数据库中，这是事实的来源。
 
 ```
-~/.meridian/credentials/<IP>/proxy.yml   # 密钥、UUID、面板访问
-~/.meridian/servers                      # 服务器注册表
+~/.meridian/cluster.yml                 # 舰队拓扑 + 面板访问
 ```
 
-在服务器上，相同的数据存储在 `/etc/meridian/proxy.yml`。Meridian 在 `client add` 和 `client remove` 后自动同步。
+客户端命令直接使用存储的 API 令牌与面板的 REST API 对话。客户端操作无需 SSH。
 
-因此 `meridian client add alice` 不需要指定服务器 — Meridian 会在本地注册表中查找。如果有多个服务器，使用 `--server NAME`。
+如果您需要在丢失本地文件后恢复，`meridian fleet recover` 从实时面板 API 重建 `cluster.yml`。
 
-如果凭证不同步（例如从另一台机器添加了客户端），`client show` 会自动从服务器面板恢复数据。
+## Web 面板
 
-## Web 管理面板
-
-Meridian 部署 3x-ui 管理面板用于流量监控。通过凭证中显示的秘密 HTTPS 路径访问：
+Meridian 部署[Remnawave](https://remna.st/) 管理面板用于流量监控、用户管理和高级配置。它由 nginx 反向代理在随机化的 HTTPS 路径 — 不需要 SSH 隧道。在 `~/.meridian/cluster.yml` 中找到 URL 和管理员凭证：
 
 ```
-cat ~/.meridian/credentials/<IP>/proxy.yml | grep -A5 panel
+grep -A6 "^panel:" ~/.meridian/cluster.yml
 ```
 
-面板 URL、用户名和密码列在其中。不需要 SSH 隧道 — nginx 通过随机 HTTPS 路径反向代理面板。
+相关字段：
+
+```yaml
+panel:
+  url: https://<your-server-ip>/<secret_path>/
+  admin_user: admin
+  admin_pass: <generated>
+  api_token: <JWT used by Meridian CLI>
+  secret_path: <random>
+  sub_path: <random>   # subscription page path
+```
+
+在浏览器中打开 `url` 并使用 `admin_user` / `admin_pass` 登录。
+
+面板端编辑（例如重命名用户、禁用主机）会在 Meridian 中浮现为漂移 — 下次 `meridian plan` 显示面板实际状态与您的 `cluster.yml` 所需状态之间的差异。使用 `meridian apply` 以任何方式收敛。
 
 ## 工作原理
 
-客户端名称映射到带有协议前缀的 3x-ui `email` 字段：
-- `reality-alice` — Reality 入站
-- `xhttp-alice` — XHTTP 入站
-- `wss-alice` — WSS 入站（域名模式）
+每个 Meridian 客户端是一个单一的 Remnawave 用户（`users` 表中的一个 UUID）。该用户被分配给 Meridian 的默认内部小组，这授予对面板知道的每个入站的可见性（`vless-reality`、`vless-xhttp` 和域名模式下的 `vless-xhttp-ws`）。订阅 URL — `https://<ip>/<sub_path>/<short_uuid>` — 由 Remnawave 订阅页容器提供，包含客户端可以使用的所有入站端点。
 
-每个客户端在服务器上所有入站中获得唯一的 UUID。
+客户端应用（v2rayNG、Streisand、Hiddify、sing-box）将订阅 URL 视为单个事实来源：刷新它会在您部署新出口、添加中继或轮换 Reality 密钥时拉取新入站。
+
+## 声明性客户端列表
+
+对于舰队范围的设置，您可以以声明的方式而不是命令方式管理客户端。将 `desired_clients` 列表添加到 `~/.meridian/cluster.yml`：
+
+```yaml
+desired_clients:
+  - alice
+  - bob
+  - charlie
+```
+
+然后 `meridian plan` 显示与面板实际用户列表的差异，`meridian apply` 收敛 — 添加任何缺失的客户端，删除任何额外的。`meridian client add/remove` 仍然与此并排工作；两种方法共存。参见[声明性工作流](/docs/zh/getting-started/#declarative-workflow)了解完整故事。

@@ -44,20 +44,28 @@ meridian deploy [IP] [flags]
 Manage client access keys and connection details.
 
 ```
-meridian client add NAME [--server NAME]
-meridian client show NAME [--server NAME] [--json]
-meridian client list [--server NAME] [--json]
-meridian client remove NAME [--server NAME] [--yes]
+meridian client add NAME [NAME...]  [--json]
+meridian client show NAME [--json]
+meridian client list [--json]
+meridian client remove NAME [--yes] [--json]
+meridian client enable NAME [--json]
+meridian client disable NAME [--json]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--json` | | Emit `client show` / `client list` as a `meridian.output/v1` envelope |
+| `--json` | | Emit result as a `meridian.output/v1` envelope (all client commands) |
 | `--yes`, `-y` | | Skip removal confirmation (applies to `client remove`) |
+
+**`client add`** — pass multiple names to add several clients at once (e.g. `meridian client add alice bob charlie`). With `--json`, returns `data.clients[]` with username, UUID, and status for each created client.
 
 **`client list`** — with `--json`, returns `data.summary` status counts and `data.clients[]` records with username, UUID, status, traffic counters, creation time, and last seen time.
 
 **`client show`** — with `--json`, returns one `data.client` record plus `data.handoff.*` availability metadata. The human command still prints the usable subscription/share URLs.
+
+**`client enable`** — resumes a previously suspended client so they can connect again. With `--json`, returns `data.client` with username and status.
+
+**`client disable`** — temporarily suspends a client. Their configuration stays intact but they cannot connect until re-enabled. With `--json`, returns `data.client` with username and status.
 
 ### meridian server
 
@@ -79,7 +87,7 @@ Manage additional exit nodes in a multi-node fleet. The first server (panel host
 
 ```
 meridian node add IP [flags]
-meridian node list
+meridian node list [--json]
 meridian node remove IP [--yes] [--force]
 meridian node check IP
 ```
@@ -95,10 +103,15 @@ meridian node check IP
 | `--harden / --no-harden` | enabled | OS + SSH + firewall hardening for the node |
 | `--yes` | | Skip confirmation prompts (applies to `node remove`) |
 | `--force` | | On `node remove`, proceed even if relays reference this node as their exit |
+| `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
 
-**How it works**: `meridian node add` provisions the node host (OS packages, Docker, nginx, TLS, Remnawave node container), registers the node against the panel's REST API, and creates `reality` and `xhttp` host entries so clients automatically receive the new exit in their next subscription refresh. The new entry is added to `nodes[]` in `cluster.yml`; `desired_nodes[]` is also updated if that list is non-null (hybrid sync).
+**How it works**: `meridian node add` provisions the node host (OS packages, Docker, nginx, TLS, Remnawave node container), registers the node against the panel's REST API, and creates `reality` and `xhttp` host entries so clients automatically receive the new exit in their next subscription refresh. The new entry is added to `nodes[]` in `cluster.yml`; `desired_nodes[]` is also updated if that list is non-null (hybrid sync). Node deployment logic lives in `node_deploy.py`.
 
-**Removal guard**: `meridian node remove` refuses to delete a node that is still the `exit_node` of one or more relays; pass `--force` to override (and accept the consequence of orphaning relay configs until you either redeploy them or remove them).
+**Health checks**: `meridian node check` runs panel status, SSH, container, port, and TLS checks. When a check fails, it prints a remediation hint (e.g. `Run: docker compose up -d`).
+
+**Removal**: `meridian node remove` SSHs into the node to stop containers before removing the node from the cluster and panel. It refuses to delete a node that is still the `exit_node` of one or more relays; pass `--force` to override.
+
+**JSON output**: `node list --json` uses the `meridian.output/v1` envelope with `data.nodes[]` containing ip, name, uuid, status, xray_version, and traffic_bytes.
 
 ### meridian fleet
 
@@ -153,7 +166,7 @@ Manage relay nodes — lightweight TCP forwarders that route traffic through a d
 
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
-meridian relay list [--exit EXIT]
+meridian relay list [--exit EXIT] [--json]
 meridian relay remove RELAY_IP [--exit EXIT] [--yes]
 meridian relay check RELAY_IP [--exit EXIT]
 ```
@@ -166,8 +179,11 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--user/-u USER` | root | SSH user on relay |
 | `--ssh-port PORT` | 22 | SSH port on the relay server (if non-standard) |
 | `--yes/-y` | | Skip confirmation prompts |
+| `--json` | | Emit `relay list` as a `meridian.output/v1` envelope |
 
 **How relays work**: Client connects to the relay's domestic IP. Relay forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext. All protocols (Reality, XHTTP, WSS) work through the relay.
+
+**JSON output**: `relay list --json` uses the `meridian.output/v1` envelope with `data.relays[]`.
 
 ### meridian plan
 
@@ -327,7 +343,7 @@ meridian -v
 
 ## Global flags
 
-These flags are available on most commands that interact with a server:
+These flags are available on commands that interact with a server via SSH (deploy, node, relay, preflight, test, probe, doctor, teardown):
 
 | Flag | Description |
 |------|-------------|
@@ -335,6 +351,8 @@ These flags are available on most commands that interact with a server:
 | `--user/-u USER` | SSH user (default: root, non-root gets sudo automatically) |
 | `--sni HOST` | TLS camouflage target (used by deploy, preflight, test, doctor) |
 | `--domain DOMAIN` | Cloudflare CDN fallback domain (used by deploy, preflight, test) |
+
+Client commands (`client add/show/list/remove/enable/disable`) operate on the cluster's panel directly and do not accept `--server`.
 
 ## Server resolution
 

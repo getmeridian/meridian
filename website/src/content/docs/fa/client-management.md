@@ -12,10 +12,18 @@ meridian client add alice
 ```
 
 این یک کلید اتصال منحصر به فرد برای "alice" ایجاد می‌کند و نمایش می‌دهد:
-- یک **کد QR** در ترمینال — آن را با یک برنامه VPN اسکن کنید تا فوری متصل شوید
+- یک **کد QR** در ترمینال — آن را با برنامه VPN اسکن کنید تا فوری متصل شوید
 - **URL‌های اتصال** — پیوندهای VLESS برای هر پروتکل (Reality، XHTTP و WSS اگر حالت دامنه فعال باشد)
 - **URL صفحه قابل اشتراک** — میزبانی‌شده در سرور شما، آماده برای ارسال از طریق هر مسنجری
 - یک **فایل HTML** ذخیره‌شده به‌صورت محلی — نسخه پشتیبان برای اشتراک‌گذاری آفلاین
+
+چندین نام را ارسال کنید تا چندین کلاینت به‌طور همزمان اضافه شوند:
+
+```
+meridian client add alice bob charlie
+```
+
+هر کلاینت کلید اتصال و صفحه خود را می‌گیرد. خرابی‌ها به ازای هر کلاینت گزارش می‌شوند — کلاینت‌های ایجاد‌شده موفق نگه‌داشته می‌شوند حتی اگر برخی شکست بخورند.
 
 ### آنچه گیرنده می‌بیند
 
@@ -46,7 +54,7 @@ meridian client show alice
 meridian client list
 ```
 
-تمام کلاینت‌ها را با اتصالات پروتکل آن‌ها نشان می‌دهد (Reality، XHTTP، WSS).
+تمام کلاینت‌ها را با پروتکل اتصالات آن‌ها (Reality، XHTTP، WSS) نشان می‌دهد.
 
 ## حذف کلاینت
 
@@ -56,48 +64,75 @@ meridian client remove alice
 
 دسترسی را بلافاصله لغو می‌کند. UUID کلاینت از تمام inbound‌های سرور حذف می‌شود.
 
-## چند سرور
-
-برای هدف‌گذاری سرور نام‌گذاری شده خاص از `--server` استفاده کنید:
+## تعلیق کلاینت
 
 ```
-meridian client add alice --server finland
-meridian client show alice --server finland
-meridian client list --server finland
+meridian client disable alice
 ```
 
-اگر فقط یک سرور دارید، به‌طور خودکار انتخاب می‌شود.
+به‌صورت موقت کلاینت را از اتصال مسدود می‌کند. پیکربندی آن‌ها دست نخورده می‌ماند — کلیدی حذف نمی‌شود و URL اشتراک معتبر می‌ماند. از این برای توقف دسترسی بدون از دست دادن تنظیم کلاینت استفاده کنید.
+
+برای فعال‌سازی مجدد: `meridian client enable alice`
+
+## فعال‌سازی مجدد کلاینت
+
+```
+meridian client enable alice
+```
+
+یک کلاینت معلق پیشین را از سرکشی درمی‌آورد. آن‌ها می‌توانند بلافاصله با کلیدهای موجود و URL اشتراک خود متصل شوند.
 
 ## محل ذخیره اطلاعات اعتبار
 
-وقتی `meridian deploy` را از لپ‌تاپ خود اجرا می‌کنید، Meridian اطلاعات اعتبار سرور را به‌صورت محلی ذخیره می‌کند:
+Meridian توپولوژی فلیت را به‌صورت محلی در `~/.meridian/cluster.yml` ذخیره می‌کند — URL پنل، توکن API، اعتبارات مدیر، نودها و relay‌ها. وضعیت کلاینت (کاربران، UUID‌ها، ترافیق) در پایگاه داده PostgreSQL پنل Remnawave زندگی می‌کند، که منبع حقیقت است.
 
 ```
-~/.meridian/credentials/<IP>/proxy.yml   # کلیدها، UUID‌ها، دسترسی پنل
-~/.meridian/servers                      # رجیستری سرور
+~/.meridian/cluster.yml                 # توپولوژی فلیت + دسترسی پنل
 ```
 
-در خود سرور، همان داده‌ها در `/etc/meridian/proxy.yml` قرار دارد. Meridian پس از `client add` و `client remove` به‌طور خودکار آن‌ها را همگام‌سازی می‌کند.
+دستورات کلاینت مستقیماً با REST API پنل استفاده از توکن API ذخیره‌شده صحبت می‌کند. SSH برای عملیات کلاینت نیازی نیست.
 
-به همین دلیل `meridian client add alice` بدون تعیین سرور کار می‌کند — Meridian آن را در رجیستری محلی جستجو می‌کند. اگر چندین سرور دارید، از `--server NAME` استفاده کنید.
-
-اگر اطلاعات اعتبار ناهمگام شدند (مثلاً کلاینت از ماشین دیگری اضافه شده)، `client show` به‌طور خودکار داده‌ها را از پنل سرور بازیابی می‌کند.
+اگر بعد از از دست دادن فایل محلی نیاز به بازیابی دارید، `meridian fleet recover` `cluster.yml` را از API پنل زندگی بازسازی می‌کند.
 
 ## پنل وب
 
-Meridian پنل مدیریت 3x-ui را برای نظارت بر ترافیک مستقر می‌کند. از طریق مسیر مخفی HTTPS نشان‌داده‌شده در اطلاعات اعتبار دسترسی پیدا کنید:
+Meridian [Remnawave](https://remna.st/) پنل مدیریت را برای نظارت بر ترافیک، مدیریت کاربر و پیکربندی پیشرفته مستقر می‌کند. توسط nginx در یک مسیر HTTPS تصادفی پروکسی معکوس می‌شود — تونل SSH نیازی نیست. URL و اعتبارات مدیر را در `~/.meridian/cluster.yml` پیدا کنید:
 
 ```
-cat ~/.meridian/credentials/<IP>/proxy.yml | grep -A5 panel
+grep -A6 "^panel:" ~/.meridian/cluster.yml
 ```
 
-URL پنل، نام کاربری و رمز عبور در آنجا فهرست شده‌اند. تونل SSH نیاز نیست — nginx پنل را از طریق مسیر تصادفی HTTPS پراکسی معکوس می‌کند.
+فیلدهای مرتبط:
+
+```yaml
+panel:
+  url: https://<your-server-ip>/<secret_path>/
+  admin_user: admin
+  admin_pass: <generated>
+  api_token: <JWT used by Meridian CLI>
+  secret_path: <random>
+  sub_path: <random>   # subscription page path
+```
+
+`url` را در مرورگر باز کنید و با `admin_user` / `admin_pass` وارد شوید.
+
+ویرایش‌های سمت پنل (مثل تغییر نام کاربر، غیرفعال کردن میزبان) در Meridian به عنوان drift ظاهر می‌شود — بعدی `meridian plan` تفاوت بین وضعیت واقعی پنل و `cluster.yml` مطلوب را نشان می‌دهد. برای همگرایی هر طریق از `meridian apply` استفاده کنید.
 
 ## نحوه کار
 
-نام‌های کلاینت به فیلدهای 3x-ui `email` با پیشوندهای پروتکل نقشه‌برداری می‌شود:
-- `reality-alice` — Reality inbound
-- `xhttp-alice` — XHTTP inbound
-- `wss-alice` — WSS inbound (حالت دامنه)
+هر کلاینت Meridian یک کاربر Remnawave (یک UUID در جدول `users`) است. کاربر به Internal Squad پیش‌فرض Meridian اختصاص داده می‌شود، که دسترسی هر inbound پنل را می‌داند (`vless-reality`، `vless-xhttp` و `vless-xhttp-ws` در حالت دامنه). URL اشتراک — `https://<ip>/<sub_path>/<short_uuid>` — توسط کانتینر صفحه اشتراک Remnawave ارائه می‌شود و شامل تمام endpoints inbound است که کلاینت می‌تواند از آن استفاده کند.
 
-هر کلاینت UUID منحصر به فردی در تمام inbound‌های سرور دریافت می‌کند.
+برنامه‌های کلاینت (v2rayNG، Streisand، Hiddify، sing-box) URL اشتراک را به عنوان یک منبع حقیقت واحد بدون می‌کند: تازه‌سازی آن inbound‌های جدید را زمانی که نود خروجی جدید استقرار دهید، relay اضافه کنید یا کلیدهای Reality چرخش کنید کشید می‌کند.
+
+## فهرست کلاینت اعلانی
+
+برای تنظیمات فلیت وسیع شما می‌توانید کلاینت‌ها را به جای اعمالی مدیریت کنید. یک فهرست `desired_clients` را به `~/.meridian/cluster.yml` اضافه کنید:
+
+```yaml
+desired_clients:
+  - alice
+  - bob
+  - charlie
+```
+
+سپس `meridian plan` تفاوت را در برابر فهرست کاربر واقعی پنل نشان می‌دهد و `meridian apply` همگرا می‌کند — هر کلاینت گم شده را اضافه می‌کند، هر کلاینت اضافی را حذف می‌کند. `meridian client add/remove` هنوز هم کنار این کار می‌کند؛ دو رویکرد همزیستی می‌کند. جریان اعلانی کامل را برای [declarative workflow](/docs/en/getting-started/#declarative-workflow) ببینید.
