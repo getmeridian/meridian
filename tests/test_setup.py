@@ -135,7 +135,6 @@ class TestBuildRedeployCommand:
             server_name="",
             icon="",
             color="",
-            pq=False,
             warp=False,
             geo_block=True,
         )
@@ -152,7 +151,6 @@ class TestBuildRedeployCommand:
             server_name="My VPN",
             icon="",
             color="sunset",
-            pq=True,
             warp=True,
             geo_block=False,
         )
@@ -162,7 +160,6 @@ class TestBuildRedeployCommand:
         assert "--domain vpn.example.com" in cmd
         assert "--client-name ARMIK" in cmd
         assert "--no-harden" in cmd
-        assert "--pq" in cmd
         assert "--warp" in cmd
         assert "--no-geo-block" in cmd
         assert "--display-name 'My VPN'" in cmd
@@ -182,7 +179,6 @@ class TestBuildRedeployCommand:
             server_name="",
             icon="",
             color="ocean",
-            pq=False,
             warp=False,
             geo_block=True,
         )

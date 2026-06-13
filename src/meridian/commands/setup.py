@@ -92,7 +92,6 @@ def run(
     icon: str = "",
     color: str = "",
     decoy: str = "",
-    pq: bool = False,
     warp: bool = False,
     geo_block: bool = True,
     ssh_port: int = 22,
@@ -126,7 +125,6 @@ def run(
                 icon=icon,
                 color=color,
                 decoy=decoy,
-                pq=pq,
                 warp=warp,
                 geo_block=geo_block,
                 ssh_port=ssh_port,
@@ -151,7 +149,6 @@ def run(
                 server_name=server_name,
                 icon=icon,
                 color=color,
-                pq=pq,
                 warp=warp,
                 geo_block=geo_block,
             )
@@ -164,7 +161,6 @@ def run(
             server_name = wizard_result.server_name
             icon = wizard_result.icon
             color = wizard_result.color
-            pq = wizard_result.pq
             warp = wizard_result.warp
             geo_block = wizard_result.geo_block
             request = apply_deploy_workflow_answers(
@@ -179,7 +175,6 @@ def run(
                     server_name=server_name,
                     icon=icon,
                     color=color,
-                    pq=pq,
                     warp=warp,
                     geo_block=geo_block,
                     confirm=True,
@@ -323,7 +318,6 @@ def _execute_deploy_request(
     server_name = request.server_name
     icon = request.icon
     color = request.color
-    pq = request.pq
     warp = request.warp
     geo_block = request.geo_block
 
@@ -393,7 +387,6 @@ def _execute_deploy_request(
             xhttp_port=xhttp_port,
             reality_port=reality_port,
             wss_port=wss_port,
-            pq=pq,
             warp=warp,
             geo_block=geo_block,
             xhttp_path=xhttp_path,
@@ -417,7 +410,6 @@ def _execute_deploy_request(
             reality_port=reality_port,
             xhttp_port=xhttp_port,
             wss_port=wss_port,
-            pq=pq,
             warp=warp,
             geo_block=geo_block,
             xhttp_path=xhttp_path,
@@ -465,7 +457,6 @@ def _execute_deploy_request(
         server_name=server_name,
         icon=icon,
         color=color,
-        pq=pq,
         warp=warp,
         geo_block=geo_block,
     )
@@ -489,7 +480,6 @@ def _execute_deploy_request(
         sni=sni or DEFAULT_SNI,
         client_name=client_name,
         harden=harden,
-        pq=pq,
         warp=warp,
         geo_block=geo_block,
         panel_url=cluster.panel.url,
@@ -617,7 +607,6 @@ def _build_redeploy_command(
     server_name: str,
     icon: str,
     color: str,
-    pq: bool,
     warp: bool,
     geo_block: bool,
 ) -> str:
@@ -634,8 +623,6 @@ def _build_redeploy_command(
         parts.append(f"--client-name {shlex.quote(client_name)}")
     if not harden:
         parts.append("--no-harden")
-    if pq:
-        parts.append("--pq")
     if warp:
         parts.append("--warp")
     if not geo_block:

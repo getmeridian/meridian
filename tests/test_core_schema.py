@@ -377,7 +377,6 @@ def test_deploy_command_envelope_accepts_result_and_dry_run_plan() -> None:
         sni="www.microsoft.com",
         client_name="default",
         harden=True,
-        pq=False,
         warp=False,
         geo_block=True,
         panel_url="https://198.51.100.10/panel",

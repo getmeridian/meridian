@@ -38,3 +38,4 @@
 - **Local mode**: detection is file-based only — `/etc/meridian/node.yml` or dir existence.
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
 - **Do not call `console.fail()` from library modules** (operations, relay_ops, resolve, xray_config, provision/, panel_bootstrap). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.
+- **PQ encryption removed in v4** — Xray VLESS PQ requires per-user encryption fields on inbound clients plus Remnawave API support. Do not re-add the flag without both.

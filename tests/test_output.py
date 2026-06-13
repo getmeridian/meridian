@@ -163,22 +163,6 @@ class TestBuildProtocolURLs:
         assert reality.endswith("#alice")
         assert " @ " not in reality
 
-    def test_pq_encryption_in_reality_url(self) -> None:
-        """PQ encryption key appears in Reality URL encryption= param."""
-        creds = _make_creds()
-        creds.reality.encryption_key = "mlkem768x25519plus.native.0rtt.testkey123"
-        urls = build_protocol_urls("alice", "uuid-1", "", creds)
-        reality = _find_url(urls, "reality")
-        assert "encryption=mlkem768x25519plus.native.0rtt.testkey123" in reality
-        assert "encryption=none" not in reality
-
-    def test_no_pq_encryption_defaults_to_none(self) -> None:
-        """Without encryption key, URL has encryption=none."""
-        creds = _make_creds()
-        urls = build_protocol_urls("alice", "uuid-1", "", creds)
-        reality = _find_url(urls, "reality")
-        assert "encryption=none" in reality
-
 
 class TestBuildProtocolURLsEdgeCases:
     """Additional URL building edge case tests."""

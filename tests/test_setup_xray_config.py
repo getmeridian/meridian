@@ -1,7 +1,7 @@
 """Tests for build_xray_config — Xray inbound generation.
 
 Covers protocol selection (Reality/XHTTP/WSS), key reuse vs generation,
-geo-blocking rules, PQ fingerprint, and return value structure.
+geo-blocking rules, and return value structure.
 """
 
 from __future__ import annotations
@@ -42,7 +42,6 @@ def _call_with_existing_keys(**overrides: object) -> XrayConfigResult:
         xhttp_port=_XHTTP_PORT,
         wss_port=_WSS_PORT,
         domain="",
-        pq=False,
         geo_block=False,
         existing_private_key=_EXISTING_PRIVATE,
         existing_public_key=_EXISTING_PUBLIC,
@@ -256,7 +255,6 @@ class TestBuildXrayConfigKeyReuse:
             xhttp_port=_XHTTP_PORT,
             wss_port=_WSS_PORT,
             domain="",
-            pq=False,
             geo_block=False,
         )
         assert result.reality_public_key == "GENERATED_PUB"
@@ -272,7 +270,6 @@ class TestBuildXrayConfigKeyReuse:
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
                 domain="",
-                pq=False,
                 geo_block=False,
             )
 
@@ -286,7 +283,6 @@ class TestBuildXrayConfigKeyReuse:
             xhttp_port=_XHTTP_PORT,
             wss_port=_WSS_PORT,
             domain="",
-            pq=False,
             geo_block=False,
             existing_private_key=_EXISTING_PRIVATE,
             existing_public_key="",  # missing

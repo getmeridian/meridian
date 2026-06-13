@@ -97,7 +97,6 @@ def build_xray_config(
     wss_port: int,
     domain: str,
     *,
-    pq: bool,
     geo_block: bool,
     warp: bool = False,
     xhttp_path: str = "",
@@ -195,12 +194,6 @@ def build_xray_config(
             },
         },
     }
-    if pq:
-        rs = reality_inbound["streamSettings"]
-        if isinstance(rs, dict):
-            rs_inner = rs.get("realitySettings")
-            if isinstance(rs_inner, dict):
-                rs_inner["fingerprint"] = "chrome"
     config["inbounds"].append(reality_inbound)
 
     # XHTTP inbound (enhanced stealth -- behind nginx reverse proxy)

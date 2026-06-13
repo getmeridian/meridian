@@ -320,11 +320,6 @@ def deploy_cmd(
         "", "--color", help="Page color theme (ocean/sunset/forest/lavender/rose/slate)", rich_help_panel="Branding"
     ),
     decoy: str = typer.Option("", "--decoy", hidden=True, help="Deprecated: 403/404 is now always used"),
-    pq: bool = typer.Option(
-        False,
-        "--pq/--no-pq",
-        help="Post-quantum encryption via ML-KEM-768 hybrid (experimental)",
-    ),
     warp: bool = typer.Option(
         False,
         "--warp/--no-warp",
@@ -371,7 +366,6 @@ def deploy_cmd(
         icon=icon,
         color=color,
         decoy=decoy,
-        pq=pq,
         warp=warp,
         geo_block=geo_block,
         ssh_port=ssh_port,

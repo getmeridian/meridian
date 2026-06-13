@@ -91,7 +91,6 @@ def _deploy_result(ip: str = _IP_A) -> DeployResult:
         sni="www.microsoft.com",
         client_name="default",
         harden=True,
-        pq=False,
         warp=False,
         geo_block=True,
         panel_url=f"https://{ip}/panel",
@@ -148,7 +147,6 @@ class TestRunCoreBoundary:
                 server_name="Family VPN",
                 icon="shield",
                 color="ocean",
-                pq=True,
                 warp=True,
                 geo_block=False,
                 ssh_port=2222,
@@ -162,7 +160,6 @@ class TestRunCoreBoundary:
         assert request.yes is True
         assert request.harden is False
         assert request.server_name == "Family VPN"
-        assert request.pq is True
         assert request.warp is True
         assert request.geo_block is False
         assert request.ssh_port == 2222
@@ -181,7 +178,6 @@ class TestRunCoreBoundary:
             server_name="Family VPN",
             icon="shield",
             color="ocean",
-            pq=True,
             warp=True,
             geo_block=False,
         )
@@ -199,7 +195,6 @@ class TestRunCoreBoundary:
         assert request.harden is False
         assert request.client_name == "alice"
         assert request.server_name == "Family VPN"
-        assert request.pq is True
         assert request.warp is True
         assert request.geo_block is False
 

@@ -47,7 +47,6 @@ class ProvisionContext:
     domain: str = ""
     sni: str = DEFAULT_SNI
     xhttp_enabled: bool = True
-    pq_encryption: bool = False  # post-quantum VLESS encryption (experimental)
     warp: bool = False  # route egress through Cloudflare WARP (SOCKS5 proxy mode)
     geo_block: bool = True  # block Russian domains/IPs at Xray routing level
     hosted_page: bool = False  # serve connection pages via HTTPS on server

@@ -62,7 +62,6 @@ def run_provisioner(
     reality_port: int,
     wss_port: int,
     *,
-    pq: bool = False,
     warp: bool = False,
     geo_block: bool = True,
     xhttp_path: str = "",
@@ -82,7 +81,6 @@ def run_provisioner(
         domain=domain,
         sni=sni or DEFAULT_SNI,
         xhttp_enabled=True,
-        pq_encryption=pq,
         warp=warp,
         geo_block=geo_block,
         hosted_page=True,
@@ -124,8 +122,6 @@ def run_provisioner(
         logger.info("Domain: %s", domain)
     if sni and sni != DEFAULT_SNI:
         logger.info("SNI: %s", sni)
-    if pq:
-        logger.info("Post-quantum encryption: enabled (experimental)")
     if warp:
         logger.info("Cloudflare WARP: enabled")
     if not geo_block:
@@ -239,7 +235,6 @@ def configure_panel_and_node(
     xhttp_port: int,
     wss_port: int,
     *,
-    pq: bool = False,
     warp: bool = False,
     geo_block: bool = True,
     xhttp_path: str = "",
@@ -268,7 +263,6 @@ def configure_panel_and_node(
             reality_port=reality_port,
             xhttp_port=xhttp_port,
             wss_port=wss_port,
-            pq=pq,
             warp=warp,
             geo_block=geo_block,
             version=__version__,
@@ -286,7 +280,6 @@ def configure_panel_and_node(
             xhttp_port=xhttp_port,
             wss_port=wss_port,
             version=__version__,
-            pq=pq,
             warp=warp,
             geo_block=geo_block,
             xhttp_path=xhttp_path,
@@ -307,7 +300,6 @@ def setup_first_deploy(
     xhttp_port: int,
     wss_port: int,
     *,
-    pq: bool,
     warp: bool = False,
     geo_block: bool,
     version: str,
@@ -390,7 +382,6 @@ def setup_first_deploy(
             xhttp_port=xhttp_port,
             wss_port=wss_port,
             domain=domain,
-            pq=pq,
             geo_block=geo_block,
             warp=warp,
             xhttp_path=xhttp_path,
@@ -485,7 +476,6 @@ def setup_redeploy(
     wss_port: int,
     version: str,
     *,
-    pq: bool = False,
     warp: bool = False,
     geo_block: bool = True,
     xhttp_path: str = "",
@@ -527,7 +517,6 @@ def setup_redeploy(
                     xhttp_port=xhttp_port,
                     wss_port=wss_port,
                     domain=domain or node.domain,
-                    pq=pq,
                     geo_block=geo_block,
                     warp=warp,
                     xhttp_path=xhttp_path or node.xhttp_path,
@@ -546,7 +535,6 @@ def setup_redeploy(
                     xhttp_port=xhttp_port,
                     wss_port=wss_port,
                     domain=domain or node.domain,
-                    pq=pq,
                     geo_block=geo_block,
                     warp=warp,
                     xhttp_path=xhttp_path or node.xhttp_path,

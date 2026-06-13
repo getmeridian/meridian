@@ -302,7 +302,7 @@ class TestBuildUrlFromCreds:
         url = WSSProtocol().build_url_from_creds("", "", creds, "carol")
         assert url == ""
 
-    def test_pq_encryption_in_reality(self) -> None:
+    def test_encryption_key_in_reality(self) -> None:
         creds = _make_test_creds(encryption_key="pq-key-123")
         url = RealityProtocol().build_url_from_creds("r-uuid", "", creds, "alice")
         assert "encryption=pq-key-123" in url

@@ -87,19 +87,6 @@ class TestRealityConfig:
         assert stream["realitySettings"]["shortId"] == "abcd1234"
         assert stream["realitySettings"]["serverName"] == "www.microsoft.com"
 
-    def test_pq_encryption(self) -> None:
-        config = build_reality_config(
-            socks_port=10808,
-            server_ip="198.51.100.1",
-            uuid="test-uuid",
-            sni="www.microsoft.com",
-            public_key="testpbk",
-            short_id="abcd1234",
-            encryption="mlkem768x25519plus.native.0rtt.testkey",
-        )
-        user = config["outbounds"][0]["settings"]["vnext"][0]["users"][0]
-        assert user["encryption"] == "mlkem768x25519plus.native.0rtt.testkey"
-
     def test_is_valid_json(self) -> None:
         config = build_reality_config(10808, "198.51.100.1", "uuid", "sni", "pbk", "sid")
         # Roundtrip through JSON

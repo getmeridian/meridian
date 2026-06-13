@@ -30,7 +30,6 @@ class DeployRequest(CoreModel):
     icon: str = ""
     color: str = ""
     decoy: str = ""
-    pq: bool = False
     warp: bool = False
     geo_block: bool = True
     ssh_port: int = Field(default=22, ge=1, le=65535)
@@ -48,7 +47,6 @@ class DeployWorkflowAnswers(CoreModel):
     server_name: str = ""
     icon: str = ""
     color: str = ""
-    pq: bool = False
     warp: bool = False
     geo_block: bool = True
     confirm: bool = False
@@ -65,7 +63,6 @@ class DeployResult(CoreModel):
     sni: str
     client_name: str
     harden: bool
-    pq: bool
     warp: bool
     geo_block: bool
     panel_url: str
@@ -111,7 +108,6 @@ def apply_deploy_workflow_answers(request: DeployRequest, answers: DeployWorkflo
             "server_name": answers.server_name,
             "icon": answers.icon,
             "color": answers.color,
-            "pq": answers.pq,
             "warp": answers.warp,
             "geo_block": answers.geo_block,
             "yes": request.yes or answers.confirm,
@@ -196,13 +192,6 @@ def _deploy_input_fields(request: DeployRequest) -> list[InputField]:
             help_text="Initial connection profile name.",
         ),
         InputField(
-            id="pq",
-            label="Post-quantum encryption",
-            kind="boolean",
-            default=request.pq,
-            help_text="Experimental ML-KEM-768 hybrid encryption.",
-        ),
-        InputField(
             id="warp",
             label="Cloudflare WARP",
             kind="boolean",
@@ -254,6 +243,6 @@ def _deploy_input_sections(fields: list[InputField]) -> list[InputSection]:
         InputSection(
             id="advanced",
             title="Advanced options",
-            field_ids=keep(["pq", "warp", "geo_block", "confirm"]),
+            field_ids=keep(["warp", "geo_block", "confirm"]),
         ),
     ]

@@ -31,7 +31,6 @@ class WizardResult:
     server_name: str
     icon: str
     color: str
-    pq: bool
     warp: bool
     geo_block: bool
 
@@ -45,7 +44,6 @@ def interactive_wizard(
     server_name: str = "",
     icon: str = "",
     color: str = "",
-    pq: bool = False,
     warp: bool = False,
     geo_block: bool = True,
 ) -> WizardResult:
@@ -263,23 +261,6 @@ def interactive_wizard(
     if not client_name:
         client_name = "default"
 
-    # --- Post-quantum encryption ---
-    if not yes and not pq:
-        err_console.print()
-        err_console.print("  [bold]Post-quantum encryption[/bold] [dim](experimental)[/dim]")
-        err_console.print("  [dim]Adds ML-KEM-768 hybrid encryption on top of Reality.[/dim]")
-        err_console.print("  [dim]Only tested with Happ and v2RayTun. Some apps may not connect.[/dim]")
-        err_console.print()
-        choice = choose(
-            "Choose",
-            [
-                "No -- standard encryption [dim](all apps)[/dim]",
-                "Yes -- post-quantum [dim](tested: Happ, v2RayTun)[/dim]",
-            ],
-        )
-        if choice == 2:
-            pq = True
-
     # --- Cloudflare WARP ---
     if not yes and not warp:
         err_console.print()
@@ -339,10 +320,6 @@ def interactive_wizard(
     if domain:
         protocol_line += f"\n           + CDN fallback ({domain})"
 
-    encryption_line = ""
-    if pq:
-        encryption_line = "\nEncryption: Post-quantum (ML-KEM-768 hybrid) [dim]experimental[/dim]"
-
     warp_line = ""
     if warp:
         warp_line = "\nWARP:       Outgoing traffic via Cloudflare"
@@ -374,7 +351,6 @@ def interactive_wizard(
         f"Hardening:  {harden_label}\n"
         f"Client:     {client_name}\n"
         f"Mode:       {'Domain mode (best stealth + CDN fallback)' if domain else 'IP-only (works without a domain)'}"
-        f"{encryption_line}"
         f"{warp_line}"
         f"{geo_block_line}"
         f"{branding_line}"
@@ -404,7 +380,6 @@ def interactive_wizard(
         server_name=server_name,
         icon=icon,
         color=color,
-        pq=pq,
         warp=warp,
         geo_block=geo_block,
     )

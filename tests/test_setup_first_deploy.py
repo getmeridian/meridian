@@ -153,7 +153,6 @@ class TestSetupFirstDeployHappyPath:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -201,7 +200,6 @@ class TestSetupFirstDeployHappyPath:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -249,7 +247,6 @@ class TestSetupFirstDeployHappyPath:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -293,7 +290,6 @@ class TestSetupFirstDeployHappyPath:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -339,7 +335,6 @@ class TestSetupFirstDeployHappyPath:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -398,7 +393,6 @@ class TestSetupFirstDeployAdminRegistration:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -440,7 +434,6 @@ class TestSetupFirstDeployAdminRegistration:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -492,7 +485,6 @@ class TestSetupFirstDeployAdminRegistration:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -530,7 +522,6 @@ class TestSetupFirstDeployPanelWait:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -581,7 +572,6 @@ class TestSetupFirstDeployNodeEvidence:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -636,7 +626,6 @@ class TestSetupFirstDeployConfigProfile:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -683,7 +672,6 @@ class TestSetupFirstDeployConfigProfile:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -736,7 +724,6 @@ class TestSetupFirstDeployNodeRegistration:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -783,7 +770,6 @@ class TestSetupFirstDeployNodeRegistration:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -833,7 +819,6 @@ class TestSetupFirstDeployClientCreation:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -880,7 +865,6 @@ class TestSetupFirstDeployClientCreation:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )
@@ -932,7 +916,6 @@ class TestSetupFirstDeployApiToken:
                 reality_port=_REALITY_PORT,
                 xhttp_port=_XHTTP_PORT,
                 wss_port=_WSS_PORT,
-                pq=False,
                 geo_block=True,
                 version=_VERSION,
             )

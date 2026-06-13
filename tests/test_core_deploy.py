@@ -28,7 +28,6 @@ def _result() -> DeployResult:
         sni="www.microsoft.com",
         client_name="default",
         harden=True,
-        pq=False,
         warp=False,
         geo_block=True,
         panel_url="https://198.51.100.10/panel/",
@@ -92,7 +91,6 @@ def test_deploy_workflow_describes_wizard_inputs() -> None:
         "icon",
         "color",
         "client_name",
-        "pq",
         "warp",
         "geo_block",
         "confirm",
@@ -128,7 +126,6 @@ def test_apply_deploy_workflow_answers_updates_request() -> None:
             server_name="Family VPN",
             icon="shield",
             color="ocean",
-            pq=True,
             warp=True,
             geo_block=False,
             confirm=True,
@@ -140,7 +137,6 @@ def test_apply_deploy_workflow_answers_updates_request() -> None:
     assert updated.domain == "vpn.example"
     assert updated.harden is False
     assert updated.client_name == "alice"
-    assert updated.pq is True
     assert updated.warp is True
     assert updated.geo_block is False
     assert updated.yes is True
@@ -179,7 +175,6 @@ def test_apply_deploy_workflow_answers_revalidates_constructed_answers() -> None
         server_name="Family VPN",
         icon="",
         color="ocean",
-        pq=False,
         warp=False,
         geo_block=True,
         confirm=True,
