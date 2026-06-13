@@ -13,7 +13,7 @@ from meridian.commands.resolve import (
     try_resolve_server,
 )
 from meridian.config import CREDS_BASE, RELAY_SERVICE_NAME, SERVERS_FILE, sanitize_ip_for_path
-from meridian.console import err_console, fail, info, ok, prompt, warn
+from meridian.console import confirm, err_console, fail, info, ok, prompt, warn
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 from meridian.ssh_ui import RichSSHUI
@@ -43,13 +43,10 @@ def run(
     err_console.print()
     warn(f"This will remove Meridian from {resolved.ip}.")
     warn("Docker and system packages will NOT be touched.")
-    err_console.print()
 
-    if not yes:
-        answer = prompt("Continue? (y/N)")
-        if answer.lower() != "y":
-            info("Cancelled.")
-            raise typer.Exit()
+    if not yes and not confirm("Continue?"):
+        info("Cancelled.")
+        raise typer.Exit()
     err_console.print()
 
     resolved = ensure_server_connection(resolved)

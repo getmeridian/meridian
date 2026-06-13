@@ -89,72 +89,156 @@ def _print_handoff_links(subscription_url: str, *, page_url: str = "") -> None:
 
 
 def run_add(
-    name: str,
-    user: str = "",
-    requested_server: str = "",
+    names: list[str],
+    json_mode: bool = False,
 ) -> None:
-    """Add a new client to the proxy cluster."""
-    _validate_client_name(name)
+    """Add one or more clients to the proxy cluster."""
+    operation = OperationContext()
+    with error_context("client.add", timer=operation.timer):
+        _run_add(names=names, operation=operation, json_mode=json_mode)
+
+
+def _run_add(
+    *,
+    names: list[str],
+    operation: OperationContext,
+    json_mode: bool = False,
+) -> None:
+    """Implementation for client add with command metadata attached."""
+    # --- Validate ALL names first (fail early) ---
+    for name in names:
+        _validate_client_name(name)
+
+    # Reject duplicates within the batch
+    seen: set[str] = set()
+    for name in names:
+        lower = name.lower()
+        if lower in seen:
+            fail(
+                f"Duplicate client name in batch: '{name}'",
+                hint="Remove the duplicate and try again",
+                hint_type="user",
+            )
+        seen.add(lower)
+
     cluster = load_cluster()
     panel = make_panel(cluster)
 
-    info(f"Adding client '{name}'...")
-
     with panel:
-        # Check if user already exists
-        existing = panel.get_user(name)
-        if existing is not None:
+        # Check for conflicts with existing users
+        for name in names:
+            existing = panel.get_user(name)
+            if existing is not None:
+                fail(
+                    f"Client '{name}' already exists",
+                    hint="Use: meridian client show " + name,
+                    hint_type="user",
+                )
+
+        # --- Best-effort creation ---
+        succeeded: list[tuple[str, User]] = []
+        failed: list[tuple[str, str]] = []
+
+        squad_uuids = [cluster.squad_uuid] if cluster.squad_uuid else None
+        for name in names:
+            info(f"Adding client '{name}'...")
+            try:
+                new_user = panel.create_user(name, squad_uuids=squad_uuids)
+            except RemnawaveError as e:
+                failed.append((name, str(e)))
+                continue
+            succeeded.append((name, new_user))
+
+        # If everything failed, exit with the first error
+        if not succeeded:
+            first_name, first_err = failed[0]
             fail(
-                f"Client '{name}' already exists",
-                hint="Use: meridian client show " + name,
-                hint_type="user",
+                f"Could not create client '{first_name}': {first_err}",
+                hint="Check panel connectivity",
+                hint_type="system",
             )
 
-        # Create the user -- one API call
-        try:
-            squad_uuids = [cluster.squad_uuid] if cluster.squad_uuid else None
-            new_user = panel.create_user(name, squad_uuids=squad_uuids)
-        except RemnawaveError as e:
-            fail(
-                f"Could not create client: {e}",
-                hint=e.hint or "Check panel connectivity",
-                hint_type=e.hint_type,
-            )
-
-        # Hybrid sync — when the user is managing clients declaratively
-        # (cluster.yml has desired_clients), mirror the imperative add into
-        # that list so the next `meridian apply` does not see drift and
-        # remove the freshly-added user. No-op when desired_clients is None.
+        # Hybrid sync + page deploy for each successful client
         from meridian.reconciler.snapshots import hybrid_sync_desired_clients_add
 
-        hybrid_sync_desired_clients_add(cluster, name)
+        # Open one SSH connection for all page deployments
+        _conn = None
+        panel_node = cluster.panel_node
+        deploy_pages = bool(cluster.panel.server_ip and panel_node)
 
-        ok(f"Client '{name}' added")
+        if deploy_pages:
+            try:
+                from meridian.ssh import ServerConnection
 
-        # Build page URL (deterministic from cluster data)
-        page_url = _build_page_url(cluster, new_user.vless_uuid)
-        _print_subscription(panel, new_user, page_url=page_url)
+                _conn = ServerConnection(
+                    cluster.panel.server_ip,
+                    user=cluster.panel.ssh_user or "root",
+                    port=getattr(cluster.panel, "ssh_port", 22) or 22,
+                )
+                _conn.__enter__()
+            except (OSError, RuntimeError):
+                _conn = None  # Non-fatal
 
-        # Deploy connection page files on the panel host
-        if page_url and cluster.panel.server_ip:
-            panel_node = cluster.panel_node
-            if panel_node:
+        try:
+            for name, new_user in succeeded:
+                hybrid_sync_desired_clients_add(cluster, name)
+
+                page_url = _build_page_url(cluster, new_user.vless_uuid)
+
+                # Deploy connection page files
+                if deploy_pages and _conn is not None and page_url and panel_node:
+                    try:
+                        from meridian.panel_bootstrap import deploy_client_page
+
+                        sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
+                        deploy_client_page(_conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
+                    except (OSError, RuntimeError):
+                        pass  # Non-fatal
+        finally:
+            if _conn is not None:
                 try:
-                    from meridian.panel_bootstrap import deploy_client_page
-                    from meridian.ssh import ServerConnection
-
-                    sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
-                    with ServerConnection(
-                        cluster.panel.server_ip,
-                        user=cluster.panel.ssh_user or "root",
-                        port=getattr(cluster.panel, "ssh_port", 22) or 22,
-                    ) as conn:
-                        deploy_client_page(conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
+                    _conn.__exit__(None, None, None)
                 except (OSError, RuntimeError):
-                    pass  # Non-fatal — subscription URL still works
+                    pass
+
+        # --- JSON output ---
+        if is_json_mode():
+            clients_data = [
+                {"username": name, "uuid": new_user.uuid, "status": new_user.status.lower()}
+                for name, new_user in succeeded
+            ]
+            count = len(succeeded)
+            emit_json(
+                command_envelope(
+                    command="client.add",
+                    data={"clients": clients_data},
+                    summary=Summary(text=f"Added {count} client(s)", changed=True, counts={"added": count}),
+                    timer=operation.timer,
+                )
+            )
+            return
+
+        # --- Report results ---
+        succeeded_names = [n for n, _ in succeeded]
+        if failed:
+            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
+            for fail_name, fail_err in failed:
+                err_console.print(f"  [red]✗ Failed to add '{fail_name}': {fail_err}[/red]")
+        else:
+            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
+
+        # Show subscription info for each added client
+        for name, new_user in succeeded:
+            page_url = _build_page_url(cluster, new_user.vless_uuid)
+            if len(succeeded) > 1:
+                err_console.print()
+                err_console.print(f"  [bold]— {name} —[/bold]")
+            _print_subscription(panel, new_user, page_url=page_url)
 
     err_console.print()
-    err_console.print("  [dim]Show client:       meridian client show " + name + "[/dim]")
+    if len(succeeded) == 1:
+        only_name = succeeded[0][0]
+        err_console.print("  [dim]Show client:       meridian client show " + only_name + "[/dim]")
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()
 
@@ -164,20 +248,16 @@ def run_add(
 
 def run_show(
     name: str,
-    user: str = "",
-    requested_server: str = "",
 ) -> None:
     """Display connection info for an existing client."""
     operation = OperationContext()
     with error_context("client.show", timer=operation.timer):
-        _run_show(name=name, user=user, requested_server=requested_server, operation=operation)
+        _run_show(name=name, operation=operation)
 
 
 def _run_show(
     *,
     name: str,
-    user: str = "",
-    requested_server: str = "",
     operation: OperationContext,
 ) -> None:
     """Implementation for client show with command metadata attached."""
@@ -235,20 +315,15 @@ def _run_show(
     err_console.print()
 
 
-def run_list(
-    user: str = "",
-    requested_server: str = "",
-) -> None:
+def run_list() -> None:
     """List all clients from the Remnawave panel."""
     operation = OperationContext()
     with error_context("client.list", timer=operation.timer):
-        _run_list(user=user, requested_server=requested_server, operation=operation)
+        _run_list(operation=operation)
 
 
 def _run_list(
     *,
-    user: str = "",
-    requested_server: str = "",
     operation: OperationContext,
 ) -> None:
     """Implementation for client list with command metadata attached."""
@@ -318,11 +393,22 @@ def _run_list(
 
 def run_remove(
     name: str,
-    user: str = "",
-    requested_server: str = "",
     yes: bool = False,
+    json_mode: bool = False,
 ) -> None:
     """Remove a client from the proxy cluster."""
+    operation = OperationContext()
+    with error_context("client.remove", timer=operation.timer):
+        _run_remove(name=name, yes=yes, operation=operation)
+
+
+def _run_remove(
+    *,
+    name: str,
+    yes: bool = False,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client remove with command metadata attached."""
     _validate_client_name(name)
     cluster = load_cluster()
     panel = make_panel(cluster)
@@ -353,27 +439,165 @@ def run_remove(
 
         hybrid_sync_desired_clients_remove(cluster, name)
 
+        if is_json_mode():
+            emit_json(
+                command_envelope(
+                    command="client.remove",
+                    data={"client": {"username": name}},
+                    summary=Summary(text=f"Removed client '{name}'", changed=True),
+                    timer=operation.timer,
+                )
+            )
+            # Still clean up connection page files before returning
+            _cleanup_client_page(client, cluster)
+            return
+
         ok(f"Client '{name}' removed")
 
         # Clean up connection page files on server
-        if client.vless_uuid and cluster.panel.server_ip:
-            try:
-                import shlex
-
-                from meridian.ssh import ServerConnection
-
-                with ServerConnection(
-                    cluster.panel.server_ip,
-                    user=cluster.panel.ssh_user or "root",
-                    port=getattr(cluster.panel, "ssh_port", 22) or 22,
-                ) as conn:
-                    conn.run(
-                        f"rm -rf /var/www/private/{shlex.quote(client.vless_uuid)}",
-                        timeout=15,
-                    )
-            except (OSError, RuntimeError):
-                pass  # Non-fatal
+        _cleanup_client_page(client, cluster)
 
     err_console.print()
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+
+
+def _cleanup_client_page(client: User, cluster: ClusterConfig) -> None:
+    """Remove connection page files for a deleted client (non-fatal)."""
+    if client.vless_uuid and cluster.panel.server_ip:
+        try:
+            import shlex
+
+            from meridian.ssh import ServerConnection
+
+            with ServerConnection(
+                cluster.panel.server_ip,
+                user=cluster.panel.ssh_user or "root",
+                port=getattr(cluster.panel, "ssh_port", 22) or 22,
+            ) as conn:
+                conn.run(
+                    f"rm -rf /var/www/private/{shlex.quote(client.vless_uuid)}",
+                    timeout=15,
+                )
+        except (OSError, RuntimeError):
+            pass  # Non-fatal
+
+
+# -- Client Enable --
+
+
+def run_enable(
+    name: str,
+    json_mode: bool = False,
+) -> None:
+    """Re-enable a suspended client so they can connect again."""
+    operation = OperationContext()
+    with error_context("client.enable", timer=operation.timer):
+        _run_enable(name=name, operation=operation)
+
+
+def _run_enable(
+    *,
+    name: str,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client enable with command metadata attached."""
+    _validate_client_name(name)
+    cluster = load_cluster()
+    panel = make_panel(cluster)
+
+    with panel:
+        client = panel.get_user(name)
+        if client is None:
+            fail(
+                f"Client '{name}' not found",
+                hint="Check client name with: meridian client list",
+                hint_type="user",
+            )
+
+        try:
+            panel.enable_user(client.uuid)
+        except RemnawaveError as e:
+            fail(
+                f"Could not enable client '{name}': {e}",
+                hint=e.hint or "Check panel connectivity",
+                hint_type=e.hint_type,
+            )
+
+        if is_json_mode():
+            emit_json(
+                command_envelope(
+                    command="client.enable",
+                    data={"client": {"username": name, "status": "active"}},
+                    summary=Summary(text=f"Enabled client '{name}'", changed=True),
+                    timer=operation.timer,
+                )
+            )
+            return
+
+        ok(f"Client '{name}' enabled")
+
+    err_console.print()
+    err_console.print("  [dim]Show client:       meridian client show " + name + "[/dim]")
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+
+
+# -- Client Disable --
+
+
+def run_disable(
+    name: str,
+    json_mode: bool = False,
+) -> None:
+    """Temporarily suspend a client — they cannot connect until re-enabled."""
+    operation = OperationContext()
+    with error_context("client.disable", timer=operation.timer):
+        _run_disable(name=name, operation=operation)
+
+
+def _run_disable(
+    *,
+    name: str,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client disable with command metadata attached."""
+    _validate_client_name(name)
+    cluster = load_cluster()
+    panel = make_panel(cluster)
+
+    with panel:
+        client = panel.get_user(name)
+        if client is None:
+            fail(
+                f"Client '{name}' not found",
+                hint="Check client name with: meridian client list",
+                hint_type="user",
+            )
+
+        try:
+            panel.disable_user(client.uuid)
+        except RemnawaveError as e:
+            fail(
+                f"Could not disable client '{name}': {e}",
+                hint=e.hint or "Check panel connectivity",
+                hint_type=e.hint_type,
+            )
+
+        if is_json_mode():
+            emit_json(
+                command_envelope(
+                    command="client.disable",
+                    data={"client": {"username": name, "status": "disabled"}},
+                    summary=Summary(text=f"Disabled client '{name}'", changed=True),
+                    timer=operation.timer,
+                )
+            )
+            return
+
+        ok(f"Client '{name}' disabled")
+
+    err_console.print()
+    err_console.print("  [dim]Re-enable:         meridian client enable " + name + "[/dim]")
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()

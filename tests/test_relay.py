@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -651,3 +652,74 @@ relays:
 """)
         creds = ServerCredentials.load(path)
         assert creds.relays[0].sni == ""
+
+
+# ---------------------------------------------------------------------------
+# Relay list command JSON envelope test
+# ---------------------------------------------------------------------------
+
+
+class TestRelayListJsonEnvelope:
+    def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """relay list --json produces a meridian.output/v1 envelope."""
+        from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
+        from meridian.cluster import RelayEntry as ClusterRelayEntry
+        from meridian.commands.relay import run_list
+        from meridian.console import set_json_mode
+        from meridian.remnawave import RemnawaveError
+
+        cluster = ClusterConfig(
+            panel=PanelConfig(
+                url="https://198.51.100.1/panel",
+                api_token="tok",
+                server_ip="198.51.100.1",
+                secret_path="/secret",
+            ),
+            nodes=[
+                NodeEntry(
+                    ip="198.51.100.1",
+                    uuid="550e8400-e29b-41d4-a716-446655440001",
+                    is_panel_host=True,
+                    name="panel-node",
+                ),
+            ],
+            relays=[
+                ClusterRelayEntry(
+                    ip="198.51.100.3",
+                    name="relay-1",
+                    exit_node_ip="198.51.100.1",
+                    port=443,
+                    sni="example.com",
+                ),
+            ],
+            inbounds={
+                ProtocolKey.REALITY: InboundRef(
+                    uuid="550e8400-e29b-41d4-a716-446655440010",
+                    tag="vless-reality",
+                ),
+            },
+        )
+
+        panel = MagicMock()
+        panel.list_hosts.side_effect = RemnawaveError("Panel unreachable")
+
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            ):
+                mock_load.return_value = cluster
+                run_list()
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["schema"] == "meridian.output/v1"
+        assert payload["command"] == "relay.list"
+        assert payload["status"] == "ok"
+        assert payload["summary"]["counts"]["relays"] == 1
+        assert len(payload["data"]["relays"]) == 1
+        assert payload["data"]["relays"][0]["ip"] == "198.51.100.3"
+        assert payload["data"]["relays"][0]["name"] == "relay-1"
+        assert payload["data"]["relays"][0]["sni"] == "example.com"

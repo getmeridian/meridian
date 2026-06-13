@@ -8,6 +8,7 @@ reference and SSH access.
 from __future__ import annotations
 
 import secrets
+import shlex
 from typing import TYPE_CHECKING
 
 import typer
@@ -17,9 +18,13 @@ from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.deploy_planning import compute_deploy_ports
+from meridian.core.models import Summary
+from meridian.core.output import OperationContext, command_envelope
 from meridian.remnawave import RemnawaveError
+from meridian.renderers import emit_json
 
 if TYPE_CHECKING:
+    from meridian.cluster import NodeEntry
     from meridian.diagnostics import CheckResult
 
 # -- Node Add --
@@ -231,10 +236,41 @@ def _render_check(result: CheckResult, label: str) -> bool:
         return True
     if result.status == "warning":
         warn(f"{label}: {result.detail}")
+        if result.remediation:
+            err_console.print(f"    [dim]Run: {result.remediation}[/dim]")
         return True
     # failed
     err_console.print(f"  [red]✗[/red] {label}: {result.detail}")
+    if result.remediation:
+        err_console.print(f"    [dim]Run: {result.remediation}[/dim]")
     return False
+
+
+# -- Node Container Cleanup --
+
+
+def _stop_node_containers(node: NodeEntry) -> None:
+    """Best-effort SSH into node and stop containers before cluster removal."""
+    from meridian.ssh import ServerConnection, SSHError
+    from meridian.ssh_ui import RichSSHUI
+
+    info(f"Stopping containers on {node.ip}...")
+
+    try:
+        conn = ServerConnection(ip=node.ip, user=node.ssh_user, port=node.ssh_port)
+        conn.check_ssh(ui=RichSSHUI())
+    except SSHError:
+        warn(f"Could not stop containers on {node.ip} (SSH unreachable)")
+        return
+
+    node_compose = shlex.quote("/opt/remnawave-node/docker-compose.yml")
+    conn.run(f"docker compose -f {node_compose} down", timeout=60)
+
+    if node.is_panel_host:
+        panel_compose = shlex.quote("/opt/remnawave/docker-compose.yml")
+        conn.run(f"docker compose -f {panel_compose} down", timeout=60)
+
+    ok("Containers stopped")
 
 
 # -- Node List --
@@ -242,8 +278,19 @@ def _render_check(result: CheckResult, label: str) -> bool:
 
 def run_list() -> None:
     """List all nodes with health status from the panel."""
+    from meridian.console import error_context
+
+    operation = OperationContext()
+    with error_context("node.list", timer=operation.timer):
+        _run_list(operation=operation)
+
+
+def _run_list(*, operation: OperationContext) -> None:
+    """Implementation for node list with command metadata attached."""
     from rich.box import ROUNDED
     from rich.table import Table
+
+    from meridian.console import is_json_mode
 
     cluster = load_cluster()
     panel = make_panel(cluster)
@@ -260,8 +307,6 @@ def run_list() -> None:
 
     # Index API nodes by UUID for quick lookup
     api_by_uuid = {n.uuid: n for n in api_nodes}
-
-    from meridian.console import is_json_mode, json_output
 
     if is_json_mode():
         nodes_data = []
@@ -284,7 +329,19 @@ def run_list() -> None:
                     "traffic_bytes": api_node.traffic_used if api_node else 0,
                 }
             )
-        json_output({"nodes": nodes_data})
+        count = len(nodes_data)
+        emit_json(
+            command_envelope(
+                command="node.list",
+                data={"nodes": nodes_data},
+                summary=Summary(
+                    text=f"{count} node(s) in cluster",
+                    changed=False,
+                    counts={"nodes": count},
+                ),
+                timer=operation.timer,
+            )
+        )
         return
 
     table = Table(
@@ -399,9 +456,8 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
             except RemnawaveError as e:
                 warn(f"Could not delete node from panel: {e}")
 
-    # TODO: Optionally SSH in and teardown containers:
-    #   conn = ServerConnection(node.ip, user=node.ssh_user, port=node.ssh_port)
-    #   conn.run("docker compose down -v", ...)
+    # Best-effort SSH container cleanup before removing from cluster
+    _stop_node_containers(node)
 
     cluster.nodes = [n for n in cluster.nodes if n.ip != node.ip]
     cluster.save()

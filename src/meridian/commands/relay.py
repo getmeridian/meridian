@@ -23,6 +23,8 @@ from meridian.config import (
 )
 from meridian.console import confirm, err_console, fail, info, line, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
+from meridian.core.models import Summary
+from meridian.core.output import OperationContext, command_envelope
 from meridian.relay_ops import (
     create_relay_hosts,
     delete_relay_hosts,
@@ -298,6 +300,20 @@ def run_list(
     user: str = "",
 ) -> None:
     """List relay nodes from cluster configuration."""
+    from meridian.console import error_context
+
+    operation = OperationContext()
+    with error_context("relay.list", timer=operation.timer):
+        _run_list(exit_arg=exit_arg, user=user, operation=operation)
+
+
+def _run_list(
+    *,
+    exit_arg: str = "",
+    user: str = "",
+    operation: OperationContext,
+) -> None:
+    """Implementation for relay list with command metadata attached."""
     from rich.box import ROUNDED
     from rich.table import Table
 
@@ -333,7 +349,7 @@ def run_list(
     from meridian.console import is_json_mode
 
     if is_json_mode():
-        from meridian.console import json_output
+        from meridian.renderers import emit_json
 
         relays_data = []
         for relay in relays:
@@ -348,7 +364,19 @@ def run_list(
                     "enabled": enabled,
                 }
             )
-        json_output({"relays": relays_data})
+        count = len(relays_data)
+        emit_json(
+            command_envelope(
+                command="relay.list",
+                data={"relays": relays_data},
+                summary=Summary(
+                    text=f"{count} relay(s) configured",
+                    changed=False,
+                    counts={"relays": count},
+                ),
+                timer=operation.timer,
+            )
+        )
         return
 
     title = f"Relays for {exit_arg}" if exit_arg else "All Relay Nodes"

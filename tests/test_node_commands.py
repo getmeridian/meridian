@@ -6,6 +6,7 @@ Commands manage nodes via panel API and cluster.yml topology.
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -21,7 +22,9 @@ from meridian.cluster import (
     ProtocolKey,
     RelayEntry,
 )
-from meridian.commands.node import run_add, run_check, run_list, run_remove
+from meridian.commands.node import _render_check, run_add, run_check, run_list, run_remove
+from meridian.console import set_json_mode
+from meridian.diagnostics import CheckResult
 from meridian.remnawave import Node, RemnawaveError
 
 # ---------------------------------------------------------------------------
@@ -425,3 +428,179 @@ class TestNodeList:
         ):
             mock_load.return_value = cluster
             run_list()
+
+    def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """node list --json produces a meridian.output/v1 envelope."""
+        cluster = _configured_cluster()
+        panel = _make_panel_mock()
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            ):
+                mock_load.return_value = cluster
+                run_list()
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["schema"] == "meridian.output/v1"
+        assert payload["command"] == "node.list"
+        assert payload["status"] == "ok"
+        assert payload["summary"]["counts"]["nodes"] == 2
+        assert len(payload["data"]["nodes"]) == 2
+        assert payload["data"]["nodes"][0]["ip"] == "198.51.100.1"
+        assert payload["data"]["nodes"][0]["status"] == "connected"
+
+
+# ---------------------------------------------------------------------------
+# TestRenderCheck (remediation display)
+# ---------------------------------------------------------------------------
+
+
+class TestRenderCheck:
+    def test_render_check_failed_with_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Failed checks with remediation should print the hint below the result."""
+        result = CheckResult(
+            name="container:remnawave-node",
+            status="failed",
+            detail="remnawave-node exists but is not running",
+            remediation="docker start remnawave-node",
+        )
+        ok = _render_check(result, "Container: remnawave-node")
+
+        assert ok is False
+        captured = capsys.readouterr().err
+        assert "remnawave-node exists but is not running" in captured
+        assert "Run: docker start remnawave-node" in captured
+
+    def test_render_check_failed_without_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Failed checks without remediation should not print a hint line."""
+        result = CheckResult(
+            name="custom",
+            status="failed",
+            detail="something broke",
+            remediation="",
+        )
+        ok = _render_check(result, "Custom")
+
+        assert ok is False
+        captured = capsys.readouterr().err
+        assert "something broke" in captured
+        assert "Run:" not in captured
+
+    def test_render_check_warning_with_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Warning checks with remediation should print the hint below."""
+        result = CheckResult(
+            name="tls_certificate",
+            status="warning",
+            detail="Could not verify TLS certificate",
+            remediation="Check that nginx is running and serving TLS on port 443",
+        )
+        ok = _render_check(result, "TLS cert")
+
+        assert ok is True
+        captured = capsys.readouterr().err
+        assert "Could not verify TLS certificate" in captured
+        assert "Run: Check that nginx is running" in captured
+
+    def test_render_check_passed_ignores_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Passed checks should not print remediation even if set."""
+        result = CheckResult(
+            name="disk_space",
+            status="passed",
+            detail="42000 MB free",
+            remediation="should not appear",
+        )
+        ok = _render_check(result, "Disk")
+
+        assert ok is True
+        captured = capsys.readouterr().err
+        assert "42000 MB free" in captured
+        assert "should not appear" not in captured
+
+
+# ---------------------------------------------------------------------------
+# TestNodeRemoveContainerCleanup
+# ---------------------------------------------------------------------------
+
+
+class TestNodeRemoveContainerCleanup:
+    def test_remove_stops_containers_via_ssh(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
+        """Node remove should SSH into the node and stop containers."""
+        cluster = _configured_cluster()
+        panel = _make_panel_mock()
+
+        mock_conn = MagicMock()
+        mock_conn.check_ssh.return_value = None
+        mock_conn.run.return_value = _ssh_result()
+
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
+            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.commands.node.confirm", return_value=True),
+            patch("meridian.ssh.ServerConnection", return_value=mock_conn) as mock_sc,
+        ):
+            mock_load.return_value = cluster
+            run_remove(ip_or_name="198.51.100.2")
+
+        # SSH connection was created for the node
+        mock_sc.assert_called_once_with(ip="198.51.100.2", user="root", port=22)
+        mock_conn.check_ssh.assert_called_once()
+
+        # docker compose down was called for the node
+        run_calls = [str(c) for c in mock_conn.run.call_args_list]
+        assert any("docker compose" in c and "remnawave-node" in c and "down" in c for c in run_calls)
+
+    def test_remove_continues_if_ssh_fails(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
+        """If SSH is unreachable, node remove should warn and continue."""
+        from meridian.ssh import SSHError
+
+        cluster = _configured_cluster()
+        panel = _make_panel_mock()
+
+        mock_conn = MagicMock()
+        mock_conn.check_ssh.side_effect = SSHError("Connection refused")
+
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
+            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.commands.node.confirm", return_value=True),
+            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
+            patch("meridian.commands.node.warn") as mock_warn,
+        ):
+            mock_load.return_value = cluster
+            run_remove(ip_or_name="198.51.100.2")
+
+        # Warned about SSH failure
+        mock_warn.assert_any_call("Could not stop containers on 198.51.100.2 (SSH unreachable)")
+
+        # Node was still removed from cluster
+        assert len(cluster.nodes) == 1
+        assert cluster.nodes[0].ip == "198.51.100.1"
+
+    def test_remove_does_not_stop_panel_containers_for_non_panel_node(
+        self, tmp_home: Path, _patch_cluster_config: Path
+    ) -> None:
+        """Non-panel nodes should only stop the node container, not panel containers."""
+        cluster = _configured_cluster()
+        panel = _make_panel_mock()
+
+        mock_conn = MagicMock()
+        mock_conn.check_ssh.return_value = None
+        mock_conn.run.return_value = _ssh_result()
+
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
+            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.commands.node.confirm", return_value=True),
+            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
+        ):
+            mock_load.return_value = cluster
+            run_remove(ip_or_name="198.51.100.2")
+
+        # Only one docker compose down call (for the node)
+        run_calls = [str(c) for c in mock_conn.run.call_args_list]
+        assert any("remnawave-node" in c for c in run_calls)
+        assert not any("'/opt/remnawave/docker-compose.yml'" in c for c in run_calls)

@@ -13,7 +13,7 @@
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `deploy`, `migrate`, `test`, `probe`, `doctor`, `teardown`.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `deploy`, `migrate`, `test`, `probe`, `doctor`, `teardown`.
 
 ## What's done well
 

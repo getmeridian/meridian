@@ -13,12 +13,12 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from meridian.resolve import detect_public_ip
 from meridian.commands.setup import (
     _build_redeploy_command,
     run,
 )
 from meridian.config import is_ipv4
+from meridian.resolve import detect_public_ip
 
 
 class TestDetectPublicIP:

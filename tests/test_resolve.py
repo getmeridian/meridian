@@ -14,9 +14,9 @@ from meridian.commands.resolve import (
     fetch_credentials,
     resolve_server,
 )
-from meridian.resolve import is_local_keyword
 from meridian.config import SERVER_CREDS_DIR
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
+from meridian.resolve import is_local_keyword
 from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerProfileStore, ServerRegistry
 
 

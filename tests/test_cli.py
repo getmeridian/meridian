@@ -355,14 +355,14 @@ class TestCommandLocalJsonQuieting:
     def test_global_json_rejects_unmigrated_command(self, monkeypatch) -> None:
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "--json", "client", "add", "alice"])
+        monkeypatch.setattr(cli.sys, "argv", ["meridian", "--json", "node", "remove"])
 
-        result = runner.invoke(app, ["--json", "client", "add", "alice"])
+        result = runner.invoke(app, ["--json", "node", "remove"])
 
         _reset_output_modes()
         assert result.exit_code == 2
         payload = json.loads(result.output)
-        assert payload["command"] == "client.add"
+        assert payload["command"] == "node.remove"
         assert payload["status"] == "failed"
         assert payload["errors"][0]["category"] == "user"
         assert "Meridian v" not in result.output
