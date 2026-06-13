@@ -1,0 +1,64 @@
+{
+    "log": {
+        "loglevel": "warning"
+    },
+    "dns": {
+        "servers": [
+            {
+                "address": "https://dns.google/dns-query",
+                "domains": [
+                    "geosite:geolocation-!cn"
+                ]
+            },
+            "8.8.8.8",
+            {
+                "address": "localhost",
+                "domains": [
+                    "geosite:category-ru",
+                    "domain:.ru",
+                    "domain:.su",
+                    "domain:.рф"
+                ],
+                "expectIPs": [
+                    "geoip:ru"
+                ]
+            }
+        ]
+    },
+    "routing": {
+        "domainStrategy": "IPIfNonMatch",
+        "rules": [
+            {
+                "type": "field",
+                "domain": [
+                    "geosite:private"
+                ],
+                "outboundTag": "direct"
+            },
+            {
+                "type": "field",
+                "ip": [
+                    "geoip:private"
+                ],
+                "outboundTag": "direct"
+            },
+            {
+                "type": "field",
+                "domain": [
+                    "geosite:category-ru",
+                    "domain:.ru",
+                    "domain:.su",
+                    "domain:.рф"
+                ],
+                "outboundTag": "direct"
+            },
+            {
+                "type": "field",
+                "ip": [
+                    "geoip:ru"
+                ],
+                "outboundTag": "direct"
+            }
+        ]
+    }
+}
