@@ -8,7 +8,7 @@
 
 **Remnawave integration** — `remnawave.py` wraps the REST API with `httpx`. Direct HTTPS calls from deployer's machine (no SSH tunneling for API). JWT auth, retry with backoff, Meridian-specific error types.
 
-**SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. The `SSHUI` callback protocol in `ssh.py` decouples transport from presentation; CLI callers pass `RichSSHUI` from `ssh_ui.py`, Engine/headless callers get logger-only output by default. File transfer methods (`put_bytes`, `put_text`, `get_text`, `get_bytes`, `write_file`, `fetch_credentials`) live in `_FileTransferMixin`; `ServerConnection` inherits from it.
+**SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. The `SSHUI` callback protocol in `ssh_auth.py` decouples transport from presentation; CLI callers pass `RichSSHUI` from `ssh_ui.py`, Engine/headless callers get logger-only output by default. File transfer methods (`put_bytes`, `put_text`, `get_text`, `get_bytes`, `write_file`, `fetch_credentials`) live in `_FileTransferMixin`; `ServerConnection` inherits from it.
 
 **Remote execution primitives** — `conn.run()` returns `CommandResult` metadata and supports `cwd`, `env`, retries, ok codes, sensitive commands, and operation labels. File writes use `put_text`/`put_bytes`; never embed generated file content in shell heredocs.
 
