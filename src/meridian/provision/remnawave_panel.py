@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import secrets
 import shlex
+from typing import TYPE_CHECKING
 
 from meridian.config import (
     REMNAWAVE_BACKEND_IMAGE,
@@ -26,6 +27,9 @@ from meridian.config import (
 )
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
+
+if TYPE_CHECKING:
+    from meridian.cluster import TelegramConfig
 
 # Container names
 _PANEL_CONTAINER = "remnawave"
@@ -94,6 +98,12 @@ services:
       - remnawave-net
     volumes:
       - ./data:/var/lib/postgresql/data
+    environment:
+      - TZ=UTC
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     env_file:
       - .env
     healthcheck:
@@ -172,9 +182,13 @@ def _render_panel_env(
     front_end_domain: str,
     sub_public_domain: str,
     metrics_password: str,
+    telegram: TelegramConfig | None = None,
 ) -> str:
     """Render the .env file for the Remnawave panel."""
-    return f"""\
+    # Telegram: enabled when bot_token is configured
+    tg_enabled = bool(telegram and telegram.bot_token)
+
+    lines = f"""\
 # Remnawave Panel environment
 # Managed by Meridian. Manual edits will be overwritten on next run.
 
@@ -196,7 +210,7 @@ SUB_PUBLIC_DOMAIN={sub_public_domain}
 METRICS_USER=meridian
 METRICS_PASS={metrics_password}
 
-IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
+IS_TELEGRAM_NOTIFICATIONS_ENABLED={str(tg_enabled).lower()}
 IS_DOCS_ENABLED=false
 SWAGGER_PATH=/docs
 SCALAR_PATH=/scalar
@@ -207,6 +221,19 @@ POSTGRES_USER=meridian
 POSTGRES_PASSWORD={db_password}
 POSTGRES_DB=remnawave
 """
+    if tg_enabled and telegram:
+        lines += f"\nTELEGRAM_BOT_TOKEN={telegram.bot_token}\n"
+        if telegram.notify_users:
+            lines += f"TELEGRAM_NOTIFY_USERS={telegram.notify_users}\n"
+        if telegram.notify_nodes:
+            lines += f"TELEGRAM_NOTIFY_NODES={telegram.notify_nodes}\n"
+        if telegram.notify_crm:
+            lines += f"TELEGRAM_NOTIFY_CRM={telegram.notify_crm}\n"
+        if telegram.notify_service:
+            lines += f"TELEGRAM_NOTIFY_SERVICE={telegram.notify_service}\n"
+        if telegram.notify_tblocker:
+            lines += f"TELEGRAM_NOTIFY_TBLOCKER={telegram.notify_tblocker}\n"
+    return lines
 
 
 def render_subscription_env(
@@ -397,6 +424,7 @@ class DeployRemnawavePanel:
             front_end_domain=front_end_domain,
             sub_public_domain=sub_public_domain,
             metrics_password=metrics_password,
+            telegram=ctx.cluster.telegram if ctx.cluster else None,
         )
         sub_env_content = render_subscription_env()
         compose_content = render_panel_compose(

@@ -764,19 +764,6 @@ class MeridianPanel:
         """Build the subscription URL for a user."""
         return f"{self._base}/api/sub/{short_uuid}"
 
-    # --- Xray Config ---
-
-    def get_xray_config(self) -> dict[str, Any]:
-        """Get the global Xray configuration (DNS, routing, etc.)."""
-        data = self._get("/api/xray/config")
-        if isinstance(data, dict):
-            return data
-        return {}
-
-    def update_xray_config(self, config: dict[str, Any]) -> None:
-        """Update the global Xray configuration."""
-        self._patch("/api/xray/config", json=config)
-
     # --- Auth (for initial setup — raw httpx, no SDK instance yet) ---
 
     @classmethod

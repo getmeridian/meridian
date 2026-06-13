@@ -44,6 +44,10 @@ services:
       - NET_ADMIN
     # Host networking required so Xray can bind to specific ports
     network_mode: host
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     env_file:
       - .env
     volumes:

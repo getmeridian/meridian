@@ -226,12 +226,3 @@ class PanelClient(Protocol):
         """Build the subscription URL for a user."""
         ...
 
-    # --- Xray Config ---
-
-    def get_xray_config(self) -> dict[str, Any]:
-        """Get the global Xray configuration (DNS, routing, etc.)."""
-        ...
-
-    def update_xray_config(self, config: dict[str, Any]) -> None:
-        """Update the global Xray configuration."""
-        ...
