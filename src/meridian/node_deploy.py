@@ -260,6 +260,43 @@ def create_hosts_for_node(
                     logger.warning("Could not create WSS host: %s", e)
 
 
+def enforce_host_ordering(panel: MeridianPanel) -> None:
+    """Reorder all hosts to enforce safest-first subscription ordering.
+
+    Order: relay hosts before direct, Reality before XHTTP before WSS.
+    This ensures subscription clients try the most censorship-resistant
+    transport first regardless of creation order or panel UI reordering.
+    """
+    hosts = panel.list_hosts()
+    if not hosts:
+        return
+
+    # Classify hosts by remark prefix
+    def _sort_key(host: Any) -> tuple[int, int, str]:
+        remark = host.remark.lower()
+        # Relay hosts come first (lower priority number)
+        is_relay = 0 if remark.startswith("relay-") else 1
+        # Protocol ordering: reality=0, xhttp=1, wss=2, unknown=3
+        if "reality" in remark:
+            proto = 0
+        elif "xhttp" in remark:
+            proto = 1
+        elif "wss" in remark:
+            proto = 2
+        else:
+            proto = 3
+        return (is_relay, proto, remark)
+
+    sorted_hosts = sorted(hosts, key=_sort_key)
+    ordered_uuids = [h.uuid for h in sorted_hosts if h.uuid]
+
+    try:
+        panel.reorder_hosts(ordered_uuids)
+        logger.info("Host ordering enforced: %d hosts reordered", len(ordered_uuids))
+    except RemnawaveError as e:
+        logger.warning("Could not reorder hosts: %s", e)
+
+
 def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     """Deploy the Remnawave node container with the given secret key.
 

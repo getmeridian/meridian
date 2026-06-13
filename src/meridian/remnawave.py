@@ -680,6 +680,18 @@ class MeridianPanel:
                 return host
         return None
 
+    def reorder_hosts(self, ordered_uuids: list[str]) -> None:
+        """Set explicit viewPosition for hosts to enforce subscription ordering.
+
+        Hosts appear in subscriptions ordered by viewPosition ASC. This
+        ensures safest-first ordering (Reality → XHTTP → WSS) regardless
+        of creation order or manual panel UI reordering.
+        """
+        from remnawave.models.hosts import ReorderHostItem, ReorderHostRequestDto
+
+        items = [ReorderHostItem(uuid=uuid, view_position=i) for i, uuid in enumerate(ordered_uuids)]
+        _sdk_call(self._sdk.hosts.reorder_hosts(ReorderHostRequestDto(hosts=items)))
+
     def enable_host(self, uuid: str) -> None:
         """Enable a disabled host."""
         _sdk_call(self._sdk.hosts_bulk_actions.enable_hosts([UUID(uuid)]))

@@ -33,6 +33,7 @@ from meridian.node_deploy import (
     create_api_token,
     create_hosts_for_node,
     deploy_node_container,
+    enforce_host_ordering,
     get_docker_gateway,
     panel_base_url,
     register_or_reuse_node,
@@ -434,6 +435,7 @@ def setup_first_deploy(
 
         # Create direct hosts for this node's protocols
         create_hosts_for_node(panel, cluster, resolved.ip, domain, sni, reality_port)
+        enforce_host_ordering(panel)
 
         # Create first client
         try:
@@ -604,6 +606,7 @@ def setup_redeploy(
             effective_domain = domain if domain else node.domain
             effective_sni = sni if sni else node.sni
             create_hosts_for_node(panel, cluster, resolved.ip, effective_domain, effective_sni, reality_port)
+            enforce_host_ordering(panel)
 
             # Update node metadata
             # For sni/domain: empty string from declarative apply means "clear",
@@ -690,6 +693,7 @@ def setup_new_node(
 
             # Create hosts for the new node
             create_hosts_for_node(panel, cluster, resolved.ip, domain, sni, reality_port)
+            enforce_host_ordering(panel)
 
     except RemnawaveError as e:
         raise PanelSetupError(f"Panel API error: {e}") from e

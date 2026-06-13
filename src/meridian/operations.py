@@ -373,6 +373,11 @@ def add_relay(
     if not host_uuids:
         raise RuntimeError(f"Relay {relay_ip}: no panel hosts created")
 
+    # Enforce safest-first host ordering after adding relay hosts
+    from meridian.node_deploy import enforce_host_ordering
+
+    enforce_host_ordering(panel)
+
     # Configure nginx SNI on exit node — only when relay SNI differs from
     # exit node's own SNI (same guard as imperative relay deploy).
     # Deploying nginx with the same SNI would hijack the exit node's Reality routing.
