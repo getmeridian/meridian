@@ -145,6 +145,8 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
                 d.pop("reality_private_key", None)
             if not d.get("warp"):
                 d.pop("warp", None)
+            if d.get("hysteria2", True):
+                d.pop("hysteria2", None)
             nodes_out.append(d)
         out["nodes"] = nodes_out
 
@@ -338,8 +340,8 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                 n,
                 NodeEntry,
                 _NODE_FIELDS,
-                defaults={**_SSH_DEFAULTS, "is_panel_host": False, "warp": False},
-                transforms={"is_panel_host": bool, "warp": bool},
+                defaults={**_SSH_DEFAULTS, "is_panel_host": False, "warp": False, "hysteria2": True},
+                transforms={"is_panel_host": bool, "warp": bool, "hysteria2": bool},
             )
         )
 

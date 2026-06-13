@@ -17,6 +17,7 @@ var T = {
     'primary.desc': 'Рекомендуется — самое быстрое и надёжное подключение. Используйте в первую очередь.',
     'backup.desc': 'Устаревший запасной — через CDN. Используйте, только если Основной и XHTTP не работают.',
     'xhttp.desc': 'Альтернатива — используйте, если Основной не работает. Труднее обнаружить.',
+    'hy2.desc': 'Резервный UDP — попробуйте, если TCP медленный или заблокирован.',
     open: 'Открыть в приложении',
     share: 'Поделиться',
     'copy.link': 'Скопировать ссылку',
@@ -76,6 +77,7 @@ var T = {
     'primary.desc': 'پیشنهادی \u2014 سریع\u200Cترین و پایدارترین اتصال. ابتدا این را امتحان کنید.',
     'backup.desc': 'جایگزین قدیمی \u2014 از طریق CDN. فقط اگر اصلی و XHTTP کار نکرد استفاده کنید.',
     'xhttp.desc': 'جایگزین \u2014 اگر اصلی کار نمی\u200Cکند استفاده کنید. شناسایی آن دشوارتر است.',
+    'hy2.desc': 'پشتیبان UDP — وقتی TCP کند یا مسدود است امتحان کنید.',
     open: 'باز کردن در برنامه',
     share: 'اشتراک\u200Cگذاری',
     'copy.link': 'کپی لینک',
@@ -135,6 +137,7 @@ var T = {
     'primary.desc': '推荐 — 最快最稳定的连接。请优先使用。',
     'backup.desc': '旧备用通道 — 通过 CDN 路由。仅在主连接和 XHTTP 都失败时使用。',
     'xhttp.desc': '备选 — 主连接不可用时使用。更难被检测。',
+    'hy2.desc': 'UDP 备用通道 — TCP 慢或被封锁时尝试。',
     open: '在应用中打开',
     share: '分享',
     'copy.link': '复制链接',
@@ -669,6 +672,8 @@ function renderProtocolCard(proto, platform, opts) {
     html += '<p class="card-desc" data-t="xhttp.desc">Alternative — use if Primary doesn\'t work. More hidden from censors.</p>';
   } else if (proto.key === 'wss') {
     html += '<p class="card-desc" data-t="backup.desc">Legacy CDN fallback — use only if Primary and XHTTP are blocked.</p>';
+  } else if (proto.key === 'hysteria2') {
+    html += '<p class="card-desc" data-t="hy2.desc">UDP fallback — try when TCP is slow or blocked. May not work on all networks.</p>';
   }
 
   /* SNI indicator — shows what domain the traffic appears as */

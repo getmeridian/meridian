@@ -229,6 +229,7 @@ class TestContractDrift:
             "ssh_port",
             "deployed_with",
             "warp",
+            "hysteria2",
         }
 
         unmapped = node_fields - topo_fields - EXCLUDED

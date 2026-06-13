@@ -19,6 +19,8 @@ from meridian.commands.probe import (
     check_ports,
     check_proxy_paths,
     check_reverse_dns,
+    check_secret_paths,
+    check_sni_camouflage,
     check_sni_consistency,
     check_tls_certificate,
     check_websocket_upgrade,
@@ -599,6 +601,94 @@ class TestCheckDomainRoot:
             result = check_domain_root(_TEST_IP, "vpn.example.com")
         assert result.passed
         assert any("skipped" in msg.lower() for msg in _finding_messages(result))
+
+
+# ---------------------------------------------------------------------------
+# Check: Secret path isolation
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSecretPaths:
+    def test_common_panel_paths_return_403_passes(self) -> None:
+        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
+            if path.startswith("/secret-panel"):
+                return (200, {}, b"panel")
+            return (403, {}, b"")
+
+        with patch("meridian.commands.probe._https_get", side_effect=path_response):
+            result = check_secret_paths(_TEST_IP, "secret-panel")
+        assert result.passed
+        assert any("accessible" in msg for msg in _finding_messages(result))
+
+    def test_panel_path_returning_200_fails(self) -> None:
+        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
+            if path == "/admin":
+                return (200, {}, b"<html>Admin</html>")
+            if path.startswith("/secret"):
+                return (200, {}, b"panel")
+            return (403, {}, b"")
+
+        with patch("meridian.commands.probe._https_get", side_effect=path_response):
+            result = check_secret_paths(_TEST_IP, "secret")
+        assert not result.passed
+        assert any("/admin" in msg for msg in _finding_messages(result))
+
+    def test_secret_path_accessible_passes(self) -> None:
+        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
+            if path == "/my-secret/":
+                return (301, {}, b"")
+            return (404, {}, b"")
+
+        with patch("meridian.commands.probe._https_get", side_effect=path_response):
+            result = check_secret_paths(_TEST_IP, "my-secret")
+        assert result.passed
+        assert any("accessible" in msg.lower() or "Panel" in msg for msg in _finding_messages(result))
+
+
+# ---------------------------------------------------------------------------
+# Check: SNI camouflage
+# ---------------------------------------------------------------------------
+
+
+class TestCheckSniCamouflage:
+    def test_matching_certs_passes(self) -> None:
+        same_cert = b"\x30\x82\x01\x00" + b"\x00" * 256
+        with (
+            patch("meridian.commands.probe._get_cert_der", return_value=same_cert),
+            patch("meridian.commands.probe._cert_identity", return_value="same-identity"),
+        ):
+            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
+        assert result.passed
+        assert any("matching" in msg for msg in _finding_messages(result))
+
+    def test_mismatched_certs_fails(self) -> None:
+        call_count = 0
+
+        def varying_cert(ip: str, sni: str, timeout: int = 5) -> bytes:
+            nonlocal call_count
+            call_count += 1
+            return b"\x30\x82" + call_count.to_bytes(2, "big") + b"\x00" * 256
+
+        identity_count = 0
+
+        def varying_identity(der: bytes) -> str:
+            nonlocal identity_count
+            identity_count += 1
+            return f"identity-{identity_count}"
+
+        with (
+            patch("meridian.commands.probe._get_cert_der", side_effect=varying_cert),
+            patch("meridian.commands.probe._cert_identity", side_effect=varying_identity),
+        ):
+            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
+        assert not result.passed
+        assert any("NOT match" in msg for msg in _finding_messages(result))
+
+    def test_connection_failure_skips(self) -> None:
+        with patch("meridian.commands.probe._get_cert_der", return_value=b""):
+            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
+        assert result.passed
+        assert any("skipped" in msg.lower() or "Could not" in msg for msg in _finding_messages(result))
 
 
 # ---------------------------------------------------------------------------

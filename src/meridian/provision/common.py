@@ -353,11 +353,10 @@ class EnsurePort443:
         if result.changed:
             detail_parts.append("opened 443/tcp")
 
-        # Hysteria2 UDP (experimental — only when explicitly enabled)
-        if ctx.hysteria2:
-            udp_result = ensure_ufw_rule(conn, "allow 443/udp")
-            if udp_result.changed:
-                detail_parts.append("opened 443/udp (Hysteria2)")
+        # Hysteria2 UDP (always open — Hysteria2 is enabled by default)
+        udp_result = ensure_ufw_rule(conn, "allow 443/udp")
+        if udp_result.changed:
+            detail_parts.append("opened 443/udp (Hysteria2)")
 
         return StepResult(
             name=self.name,
@@ -420,6 +419,18 @@ class ConfigureFirewall:
                 name=self.name,
                 status="failed",
                 detail=f"failed to allow HTTPS: {result.detail}",
+                commands=commands,
+            )
+        if result.changed:
+            changed = True
+
+        # Allow Hysteria2 UDP/443 (enabled by default — coexists with TCP/443)
+        result = ensure_ufw_rule(conn, "allow 443/udp")
+        if not result.ok:
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=f"failed to allow UDP/443: {result.detail}",
                 commands=commands,
             )
         if result.changed:

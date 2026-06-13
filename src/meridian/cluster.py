@@ -50,6 +50,7 @@ class ProtocolKey(StrEnum):
     REALITY = "reality"
     XHTTP = "xhttp"
     WSS = "wss"
+    HYSTERIA2 = "hysteria2"
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ class NodeEntry:
     reality_short_id: str = ""  # Reality short ID
     reality_private_key: str = field(default="", repr=False)  # Reality private key (for redeploy config rebuild)
     warp: bool = False  # Cloudflare WARP outbound enabled
+    hysteria2: bool = True  # Hysteria2 UDP/443 fallback enabled
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 

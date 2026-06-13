@@ -145,6 +145,7 @@ def cache_inbounds(panel: MeridianPanel, cluster: ClusterConfig) -> None:
             "vless-reality": ProtocolKey.REALITY,
             "vless-xhttp": ProtocolKey.XHTTP,
             "vless-wss": ProtocolKey.WSS,
+            "hysteria2": ProtocolKey.HYSTERIA2,
         }
         for ib in inbounds:
             key = tag_map.get(ib.tag)
@@ -258,6 +259,26 @@ def create_hosts_for_node(
                     logger.info("Host created: WSS via %s:443", domain)
                 except RemnawaveError as e:
                     logger.warning("Could not create WSS host: %s", e)
+
+    # Hysteria2 host (UDP/443, experimental — only when node has hysteria2 enabled)
+    hy2_ref = cluster.get_inbound(ProtocolKey.HYSTERIA2)
+    if hy2_ref and hy2_ref.uuid:
+        remark = f"hysteria2-{node_ip}"
+        if remark in existing_remarks:
+            logger.info("Host '%s' already exists, skipping", remark)
+        else:
+            try:
+                panel.create_host(
+                    remark=remark,
+                    address=node_ip,
+                    port=443,
+                    config_profile_uuid=cluster.config_profile_uuid,
+                    inbound_uuid=hy2_ref.uuid,
+                    security_layer="TLS",
+                )
+                logger.info("Host created: Hysteria2 via %s:443 (UDP)", node_ip)
+            except RemnawaveError as e:
+                logger.warning("Could not create Hysteria2 host: %s", e)
 
 
 def enforce_host_ordering(panel: MeridianPanel) -> None:

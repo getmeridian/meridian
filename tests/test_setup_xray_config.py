@@ -88,13 +88,13 @@ class TestBuildXrayConfigInboundSelection:
         result = _call_with_existing_keys(domain="")
         assert "vless-wss" not in _inbound_tags(result)
 
-    def test_inbound_count_no_domain_is_two(self) -> None:
+    def test_inbound_count_no_domain_is_three(self) -> None:
         result = _call_with_existing_keys(domain="")
-        assert len(result.config["inbounds"]) == 2
+        assert len(result.config["inbounds"]) == 3  # reality + xhttp + hysteria2
 
-    def test_inbound_count_with_domain_is_three(self) -> None:
+    def test_inbound_count_with_domain_is_four(self) -> None:
         result = _call_with_existing_keys(domain=_DOMAIN)
-        assert len(result.config["inbounds"]) == 3
+        assert len(result.config["inbounds"]) == 4  # reality + xhttp + wss + hysteria2
 
 
 # ---------------------------------------------------------------------------
@@ -400,3 +400,51 @@ class TestBuildXrayConfigReturnValue:
         assert isinstance(result.reality_public_key, str)
         assert isinstance(result.reality_short_id, str)
         assert isinstance(result.reality_private_key, str)
+
+
+# ---------------------------------------------------------------------------
+# Hysteria2 inbound details
+# ---------------------------------------------------------------------------
+
+
+class TestBuildXrayConfigHysteria2Inbound:
+    def _hy2(self, **kw: object) -> dict:
+        result = _call_with_existing_keys(**kw)
+        return next(ib for ib in result.config["inbounds"] if ib["tag"] == "hysteria2")
+
+    def test_hysteria2_inbound_present_by_default(self) -> None:
+        result = _call_with_existing_keys()
+        assert "hysteria2" in _inbound_tags(result)
+
+    def test_hysteria2_inbound_absent_when_disabled(self) -> None:
+        result = _call_with_existing_keys(hysteria2=False)
+        assert "hysteria2" not in _inbound_tags(result)
+
+    def test_hysteria2_listens_on_all_interfaces(self) -> None:
+        ib = self._hy2()
+        assert ib["listen"] == "::"
+
+    def test_hysteria2_uses_tls_with_certs(self) -> None:
+        ib = self._hy2()
+        stream = ib["streamSettings"]
+        assert stream["security"] == "tls"
+        certs = stream["tlsSettings"]["certificates"]
+        assert len(certs) == 1
+        assert certs[0]["certificateFile"] == "/etc/ssl/meridian/fullchain.pem"
+        assert certs[0]["keyFile"] == "/etc/ssl/meridian/key.pem"
+
+    def test_hysteria2_port_is_443(self) -> None:
+        ib = self._hy2()
+        assert ib["port"] == 443
+
+    def test_hysteria2_protocol_is_hysteria2(self) -> None:
+        ib = self._hy2()
+        assert ib["protocol"] == "hysteria2"
+
+    def test_hysteria2_alpn_is_h3(self) -> None:
+        ib = self._hy2()
+        assert ib["streamSettings"]["tlsSettings"]["alpn"] == ["h3"]
+
+    def test_hysteria2_clients_empty(self) -> None:
+        ib = self._hy2()
+        assert ib["settings"]["clients"] == []

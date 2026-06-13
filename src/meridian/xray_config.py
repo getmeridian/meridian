@@ -99,7 +99,7 @@ def build_xray_config(
     *,
     geo_block: bool,
     warp: bool = False,
-    hysteria2: bool = False,
+    hysteria2: bool = True,
     xhttp_path: str = "",
     ws_path: str = "",
     existing_private_key: str = "",
