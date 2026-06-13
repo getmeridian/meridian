@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 # ---------------------------------------------------------------------------
 # Stream layer (SNI routing — sits on port 443, no TLS termination)
 # ---------------------------------------------------------------------------
@@ -125,27 +124,17 @@ class NginxStreamBlock:
         lines.append(f"{inner}proxy_pass $meridian_backend;")
 
         # Proxy settings with comments
-        lines.append(
-            f"{inner}# Short timeout — don't wait 60s (default) if a backend is"
-        )
+        lines.append(f"{inner}# Short timeout — don't wait 60s (default) if a backend is")
         lines.append(f"{inner}# temporarily unavailable.")
         lines.append(f"{inner}proxy_connect_timeout {self.proxy_connect_timeout};")
 
-        lines.append(
-            f"{inner}# VPN sessions can idle for extended periods (user not browsing)."
-        )
-        lines.append(
-            f"{inner}# Default 10m kills these; 30m is more forgiving while still"
-        )
+        lines.append(f"{inner}# VPN sessions can idle for extended periods (user not browsing).")
+        lines.append(f"{inner}# Default 10m kills these; 30m is more forgiving while still")
         lines.append(f"{inner}# reclaiming truly dead connections.")
         lines.append(f"{inner}proxy_timeout {self.proxy_timeout};")
 
-        lines.append(
-            f"{inner}# TCP keepalives prevent NATs/firewalls from dropping idle"
-        )
-        lines.append(
-            f"{inner}# connections — critical for relay→exit paths."
-        )
+        lines.append(f"{inner}# TCP keepalives prevent NATs/firewalls from dropping idle")
+        lines.append(f"{inner}# connections — critical for relay→exit paths.")
         if self.proxy_socket_keepalive:
             lines.append(f"{inner}proxy_socket_keepalive on;")
 
@@ -203,19 +192,11 @@ def build_stream_block(
         f"SNI={reality_sni} -> Xray Reality (127.0.0.1:{reality_backend_port})",
     ]
     if server_ip:
-        flow.append(
-            f"SNI={server_ip} -> nginx HTTPS (127.0.0.1:{nginx_internal_port})"
-        )
+        flow.append(f"SNI={server_ip} -> nginx HTTPS (127.0.0.1:{nginx_internal_port})")
     if domain:
-        flow.append(
-            f"SNI={domain} -> nginx HTTPS (127.0.0.1:{nginx_internal_port})"
-        )
-    flow.append(
-        f"No SNI (bare IP) -> nginx HTTPS (127.0.0.1:{nginx_internal_port})"
-    )
-    flow.append(
-        f"Unknown SNI -> TCP proxy to {reality_sni}:443 (no differential)"
-    )
+        flow.append(f"SNI={domain} -> nginx HTTPS (127.0.0.1:{nginx_internal_port})")
+    flow.append(f"No SNI (bare IP) -> nginx HTTPS (127.0.0.1:{nginx_internal_port})")
+    flow.append(f"Unknown SNI -> TCP proxy to {reality_sni}:443 (no differential)")
 
     return NginxStreamBlock(
         listen_port=443,
