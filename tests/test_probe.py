@@ -442,6 +442,166 @@ class TestCertIdentity:
 
 
 # ---------------------------------------------------------------------------
+# Check 10: Internal ports (deployment-aware)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckInternalPorts:
+    def test_all_closed_passes(self) -> None:
+        from meridian.commands.probe import check_internal_ports
+
+        with patch("meridian.commands.probe.tcp_connect", return_value=False):
+            result = check_internal_ports(_TEST_IP, has_domain=False)
+        assert result.passed
+        assert any("closed externally" in msg for msg in _finding_messages(result))
+
+    def test_exposed_xhttp_port_fails(self) -> None:
+        from meridian.commands.probe import _compute_internal_ports, check_internal_ports
+
+        ports = _compute_internal_ports(_TEST_IP, has_domain=False)
+        xhttp_port = ports["xhttp"]
+
+        def selective_connect(ip: str, port: int, timeout: int = 3) -> bool:
+            return port == xhttp_port
+
+        with patch("meridian.commands.probe.tcp_connect", side_effect=selective_connect):
+            result = check_internal_ports(_TEST_IP, has_domain=False)
+        assert not result.passed
+        assert any("xhttp" in msg for msg in _finding_messages(result))
+
+    def test_domain_mode_includes_reality_port(self) -> None:
+        from meridian.commands.probe import _compute_internal_ports
+
+        ports = _compute_internal_ports(_TEST_IP, has_domain=True)
+        assert "reality" in ports
+        assert ports["reality"] != 443
+
+    def test_standalone_mode_omits_reality_port(self) -> None:
+        from meridian.commands.probe import _compute_internal_ports
+
+        ports = _compute_internal_ports(_TEST_IP, has_domain=False)
+        assert "reality" not in ports
+
+    def test_port_computation_is_deterministic(self) -> None:
+        from meridian.commands.probe import _compute_internal_ports
+
+        ports1 = _compute_internal_ports(_TEST_IP, has_domain=True)
+        ports2 = _compute_internal_ports(_TEST_IP, has_domain=True)
+        assert ports1 == ports2
+
+    def test_port_computation_matches_setup_algorithm(self) -> None:
+        """Port derivation must match the hashlib-based algorithm in setup.py."""
+        import hashlib as hl
+
+        from meridian.commands.probe import _compute_internal_ports
+
+        ip_hash = int(hl.sha256(_TEST_IP.encode()).hexdigest()[:8], 16)
+        ports = _compute_internal_ports(_TEST_IP, has_domain=True)
+        assert ports["xhttp"] == 30000 + (ip_hash % 10000)
+        assert ports["wss"] == 20000 + (ip_hash % 10000)
+        assert ports["reality"] == 10000 + (ip_hash % 1000)
+
+
+# ---------------------------------------------------------------------------
+# Check 11: Root indistinguishable (deployment-aware)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckRootIndistinguishable:
+    def test_all_stock_responses_passes(self) -> None:
+        from meridian.commands.probe import check_root_indistinguishable
+
+        with patch("meridian.commands.probe._https_get", return_value=(404, {}, b"")):
+            result = check_root_indistinguishable(_TEST_IP)
+        assert result.passed
+
+    def test_favicon_returns_200_fails(self) -> None:
+        from meridian.commands.probe import check_root_indistinguishable
+
+        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict[str, str], bytes]:
+            if path == "/favicon.ico":
+                return 200, {}, b"icon-data"
+            return 404, {}, b""
+
+        with patch("meridian.commands.probe._https_get", side_effect=path_response):
+            result = check_root_indistinguishable(_TEST_IP)
+        assert not result.passed
+        assert any("favicon" in msg for msg in _finding_messages(result))
+
+    def test_api_returns_200_fails(self) -> None:
+        from meridian.commands.probe import check_root_indistinguishable
+
+        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict[str, str], bytes]:
+            if path == "/api":
+                return 200, {}, b'{"status":"ok"}'
+            return 404, {}, b""
+
+        with patch("meridian.commands.probe._https_get", side_effect=path_response):
+            result = check_root_indistinguishable(_TEST_IP)
+        assert not result.passed
+        assert any("API" in msg for msg in _finding_messages(result))
+
+    def test_connection_failure_skips(self) -> None:
+        from meridian.commands.probe import check_root_indistinguishable
+
+        with patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")):
+            result = check_root_indistinguishable(_TEST_IP)
+        assert result.passed
+        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
+
+
+# ---------------------------------------------------------------------------
+# Check 12: Domain root (deployment-aware)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckDomainRoot:
+    def test_403_root_passes(self) -> None:
+        from meridian.commands.probe import check_domain_root
+
+        with patch("meridian.commands.probe._https_get") as mock:
+            mock.side_effect = [
+                (403, {}, b""),  # Host: domain root
+                (404, {}, b"Not Found"),  # ACME path
+            ]
+            result = check_domain_root(_TEST_IP, "vpn.example.com")
+        assert result.passed
+        assert any("vpn.example.com" in msg for msg in _finding_messages(result))
+
+    def test_root_returns_200_fails(self) -> None:
+        from meridian.commands.probe import check_domain_root
+
+        with patch("meridian.commands.probe._https_get") as mock:
+            mock.side_effect = [
+                (200, {}, b"<html>Welcome</html>"),  # bad
+                (404, {}, b""),  # ACME
+            ]
+            result = check_domain_root(_TEST_IP, "vpn.example.com")
+        assert not result.passed
+        assert any("expected 403/404" in msg for msg in _finding_messages(result))
+
+    def test_acme_directory_listing_fails(self) -> None:
+        from meridian.commands.probe import check_domain_root
+
+        with patch("meridian.commands.probe._https_get") as mock:
+            mock.side_effect = [
+                (403, {}, b""),  # root OK
+                (200, {}, b"<html><pre>Index of /.well-known/</pre></html>"),  # directory listing
+            ]
+            result = check_domain_root(_TEST_IP, "vpn.example.com")
+        assert not result.passed
+        assert any("directory listing" in msg for msg in _finding_messages(result))
+
+    def test_connection_failure_skips(self) -> None:
+        from meridian.commands.probe import check_domain_root
+
+        with patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")):
+            result = check_domain_root(_TEST_IP, "vpn.example.com")
+        assert result.passed
+        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
+
+
+# ---------------------------------------------------------------------------
 # CLI integration
 # ---------------------------------------------------------------------------
 

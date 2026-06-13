@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass, field
 
 from meridian.commands.resolve import resolve_server
-from meridian.config import SERVERS_FILE, is_ip
+from meridian.config import CREDS_BASE, SERVERS_FILE, is_ip
 from meridian.console import err_console, info, line, ok, warn
 from meridian.resolve import is_local_keyword
 from meridian.servers import ServerRegistry
@@ -541,6 +541,79 @@ def _resolve_domain(domain: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Deployment-aware checks (tier 2)
+# ---------------------------------------------------------------------------
+
+
+def _compute_internal_ports(ip: str, has_domain: bool) -> dict[str, int]:
+    """Compute Xray internal ports from IP — reuses core port layout."""
+    from meridian.core.deploy_planning import compute_deploy_ports
+
+    dp = compute_deploy_ports(ip)
+    ports: dict[str, int] = {"xhttp": dp.xhttp_port, "wss": dp.wss_port}
+    if has_domain:  # domain mode: Reality moves to localhost port
+        ports["reality"] = dp.reality_port
+    return ports
+
+
+def check_internal_ports(ip: str, has_domain: bool) -> CheckResult:
+    """Verify Xray internal ports are not publicly reachable."""
+    result = CheckResult(name="Internal ports", passed=True)
+    exposed = [f"{n}={p}" for n, p in _compute_internal_ports(ip, has_domain).items() if tcp_connect(ip, p, timeout=3)]
+    if exposed:
+        result.passed = False
+        result.findings.append((False, f"Internal port(s) reachable from outside: {', '.join(exposed)}"))
+    else:
+        result.findings.append((True, "All internal Xray ports are closed externally"))
+    return result
+
+
+def check_root_indistinguishable(ip: str) -> CheckResult:
+    """Verify common paths return stock nginx responses (no service leak)."""
+    result = CheckResult(name="Root indistinguishable", passed=True)
+    probes: list[tuple[str, list[int], str]] = [
+        ("/favicon.ico", [404], "Custom favicon reveals identity"),
+        ("/.env", [403, 404], "Config file path not blocked"),
+        ("/api", [403, 404], "API path proxied to backend"),
+    ]
+    for path, ok_codes, fail_msg in probes:
+        status, _, _ = _https_get(ip, path)
+        if status == 0:
+            continue
+        if status in ok_codes:
+            result.findings.append((True, f"GET {path} → {status}"))
+        else:
+            result.passed = False
+            result.findings.append((False, f"GET {path} → {status} — {fail_msg}"))
+    if not result.findings:
+        result.findings.append((True, "Could not connect (skipped)"))
+    return result
+
+
+def check_domain_root(ip: str, domain: str) -> CheckResult:
+    """Domain-mode: verify Host header and ACME path don't leak."""
+    result = CheckResult(name="Domain root", passed=True)
+    status, _, _ = _https_get(ip, "/", extra_headers={"Host": domain})
+    if status == 0:
+        result.findings.append((True, "Could not connect (skipped)"))
+        return result
+    if status in (403, 404):
+        result.findings.append((True, f"Host: {domain} root → {status}"))
+    else:
+        result.passed = False
+        result.findings.append((False, f"Host: {domain} root → {status} — expected 403/404"))
+    # ACME challenge path should not list directory
+    acme_status, _, acme_body = _https_get(ip, "/.well-known/acme-challenge/", extra_headers={"Host": domain})
+    if acme_status != 0:
+        if b"Index of" in acme_body or b"<pre>" in acme_body:
+            result.passed = False
+            result.findings.append((False, "ACME challenge path exposes directory listing"))
+        else:
+            result.findings.append((True, "ACME challenge path is not listable"))
+    return result
+
+
+# ---------------------------------------------------------------------------
 # run()
 # ---------------------------------------------------------------------------
 
@@ -650,6 +723,51 @@ def run(
     _print_result(tls_result)
     if not tls_result.passed:
         issues += 1
+
+    # -- Deployment-aware checks (when probed IP matches a configured server) --
+    creds = None
+    try:
+        from meridian.credentials import ServerCredentials, creds_path
+
+        proxy_file = creds_path(CREDS_BASE, resolved.ip)
+        if proxy_file.exists():
+            creds = ServerCredentials.load(proxy_file)
+    except Exception:
+        pass
+
+    if creds and creds.has_credentials:
+        err_console.print()
+        err_console.print("  [bold]Deployment checks[/bold]")
+        err_console.print(f"  [dim]Server {resolved.ip} found in local configuration[/dim]")
+        err_console.print()
+
+        has_domain = creds.has_domain
+        server_domain = creds.server.domain or ""
+
+        # -- Check 10: Internal ports --
+        info("Scanning internal Xray ports...")
+        internal_result = check_internal_ports(resolved.ip, has_domain)
+        checks_run += 1
+        _print_result(internal_result)
+        if not internal_result.passed:
+            issues += 1
+
+        # -- Check 11: Root indistinguishable --
+        info("Checking root path indistinguishability...")
+        root_result = check_root_indistinguishable(resolved.ip)
+        checks_run += 1
+        _print_result(root_result)
+        if not root_result.passed:
+            issues += 1
+
+        # -- Check 12: Domain root (domain mode only) --
+        if has_domain and server_domain:
+            info(f"Checking domain-mode root ({server_domain})...")
+            domain_result = check_domain_root(resolved.ip, server_domain)
+            checks_run += 1
+            _print_result(domain_result)
+            if not domain_result.passed:
+                issues += 1
 
     # -- Verdict --
     err_console.print()
