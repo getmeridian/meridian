@@ -308,6 +308,8 @@ def render_nginx_server_block(
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                 proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Forwarded-Port $server_port;
             }}
         """).rstrip()
 
@@ -346,6 +348,28 @@ def render_nginx_server_block(
             ssl_certificate     /etc/ssl/meridian/fullchain.pem;
             ssl_certificate_key /etc/ssl/meridian/key.pem;
             ssl_protocols TLSv1.2 TLSv1.3;
+
+            # TLS session resumption — avoids full handshake on reconnect
+            ssl_session_timeout 1d;
+            ssl_session_cache shared:MozSSL:10m;
+            ssl_session_tickets off;
+
+            # OCSP stapling — clients skip separate CA check, critical in censored regions
+            ssl_stapling on;
+            ssl_stapling_verify on;
+            ssl_trusted_certificate /etc/ssl/meridian/fullchain.pem;
+            resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 valid=60s;
+            resolver_timeout 2s;
+
+            # Gzip — reduces bandwidth for panel UI, API responses, subscription page
+            gzip on;
+            gzip_vary on;
+            gzip_proxied any;
+            gzip_comp_level 6;
+            gzip_min_length 256;
+            gzip_types application/json application/javascript text/javascript
+                       text/css text/plain text/xml application/xml
+                       application/xhtml+xml image/svg+xml;
     {extra_locations}
 
             # --- Remnawave Panel (management interface on secret path) ---
