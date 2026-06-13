@@ -42,7 +42,7 @@ def main() -> int:
         errors.append(f"  {name}: in _PWA_APPS (render.py) but missing from apps.json")
 
     # Check matching apps for field differences
-    compare_fields = ("platform", "url", "deeplink", "urls")
+    compare_fields = ("platform", "url", "deeplink", "urls", "protocols")
     for name in sorted(set(json_by_name) & set(py_by_name)):
         j = json_by_name[name]
         p = py_by_name[name]

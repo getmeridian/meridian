@@ -374,6 +374,32 @@ class TestPWAAppsSync:
         pwa_links = {a["name"]: a.get("deeplink") for a in _PWA_APPS}
         assert json_links == pwa_links, f"Deeplink mismatch:\n  apps.json: {json_links}\n  _PWA_APPS: {pwa_links}"
 
+    def test_protocols_field_present(self) -> None:
+        """Every app must have a protocols array."""
+        for app in _PWA_APPS:
+            assert "protocols" in app, f"{app['name']} missing protocols field"
+            assert isinstance(app["protocols"], list), f"{app['name']} protocols must be a list"
+            assert len(app["protocols"]) >= 1, f"{app['name']} protocols must not be empty"
+
+    def test_protocols_values_valid(self) -> None:
+        """Protocol values must be from the known set."""
+        valid = {"reality", "xhttp", "wss"}
+        for app in _PWA_APPS:
+            for proto in app.get("protocols", []):
+                assert proto in valid, f"{app['name']} has unknown protocol {proto!r}"
+
+    def test_protocols_sync_with_apps_json(self) -> None:
+        """Protocol values in _PWA_APPS must match apps.json."""
+        repo_root = Path(__file__).resolve().parent.parent
+        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
+        with open(apps_json_path) as f:
+            apps_json = json.load(f)
+        json_protocols = {a["name"]: a.get("protocols") for a in apps_json}
+        pwa_protocols = {a["name"]: a.get("protocols") for a in _PWA_APPS}
+        assert json_protocols == pwa_protocols, (
+            f"Protocols mismatch:\n  apps.json: {json_protocols}\n  _PWA_APPS: {pwa_protocols}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # TestUnicodeClientNames — non-ASCII names (Gap #6)

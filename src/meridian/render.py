@@ -138,36 +138,42 @@ _PWA_APPS: list[dict[str, Any]] = [
         "platform": "iOS",
         "url": "https://apps.apple.com/app/shadowrocket/id932747118",
         "deeplink": "sub://{url_b64}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "Streisand",
         "platform": "iOS",
         "url": "https://apps.apple.com/app/streisand/id6450534064",
         "deeplink": "streisand://import/{url}#{name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "v2RayTun",
         "platform": "iOS",
         "url": "https://apps.apple.com/app/v2raytun/id6476628951",
         "deeplink": "v2raytun://import/{url}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "v2rayNG",
         "platform": "Android",
         "url": "https://github.com/2dust/v2rayNG/releases/latest",
         "deeplink": "v2rayng://install-sub?url={url}&name={name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "NekoBox",
         "platform": "Android",
         "url": "https://github.com/MatsuriDayo/NekoBoxForAndroid/releases/latest",
         "deeplink": "sn://subscription?url={url}&name={name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "FlClash",
         "platform": "All platforms",
         "url": "https://github.com/chen08209/FlClash/releases/latest",
         "deeplink": "flclash://install-config?url={url}",
+        "protocols": ["reality", "wss"],
     },
     {
         "name": "sing-box",
@@ -178,6 +184,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "Android": "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa",
         },
         "deeplink": "sing-box://import-remote-profile?url={url}#{name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "Hiddify",
@@ -188,6 +195,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "Android": "https://play.google.com/store/apps/details?id=app.hiddify.com",
         },
         "deeplink": "hiddify://install-config/?url={url}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "Karing",
@@ -198,6 +206,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "Android": "https://play.google.com/store/apps/details?id=com.nebula.karing",
         },
         "deeplink": "karing://install-config?url={url}&name={name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "V2Box",
@@ -208,6 +217,7 @@ _PWA_APPS: list[dict[str, Any]] = [
             "Android": "https://play.google.com/store/apps/details?id=dev.hexasoftware.v2box",
         },
         "deeplink": "v2box://install-sub?url={url_b64}&name={name}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "Happ",
@@ -218,13 +228,21 @@ _PWA_APPS: list[dict[str, Any]] = [
             "Android": "https://play.google.com/store/apps/details?id=com.happproxy",
         },
         "deeplink": "happ://add/{url_raw}",
+        "protocols": ["reality", "xhttp", "wss"],
     },
-    {"name": "v2rayN", "platform": "Windows", "url": "https://github.com/2dust/v2rayN/releases/latest", "deeplink": "v2rayng://install-sub?url={url}&name={name}"},
+    {
+        "name": "v2rayN",
+        "platform": "Windows",
+        "url": "https://github.com/2dust/v2rayN/releases/latest",
+        "deeplink": "v2rayng://install-sub?url={url}&name={name}",
+        "protocols": ["reality", "xhttp", "wss"],
+    },
     {
         "name": "Clash Verge Rev",
         "platform": "Windows",
         "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/latest",
         "deeplink": "clash://install-config?url={url}",
+        "protocols": ["reality", "wss"],
     },
 ]
 
