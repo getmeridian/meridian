@@ -15,7 +15,7 @@ var T = {
     primary: 'Основной', backup: 'Резервный',
     'primary.rec': 'Рекомендовано',
     'primary.desc': 'Рекомендуется — самое быстрое и надёжное подключение. Используйте в первую очередь.',
-    'backup.desc': 'Запасной — через CDN. Используйте, только если оба варианта выше не работают.',
+    'backup.desc': 'Устаревший запасной — через CDN. Используйте, только если Основной и XHTTP не работают.',
     'xhttp.desc': 'Альтернатива — используйте, если Основной не работает. Труднее обнаружить.',
     open: 'Открыть в приложении',
     share: 'Поделиться',
@@ -74,7 +74,7 @@ var T = {
     primary: 'اصلی', backup: 'پشتیبان',
     'primary.rec': 'پیشنهادی',
     'primary.desc': 'پیشنهادی \u2014 سریع\u200Cترین و پایدارترین اتصال. ابتدا این را امتحان کنید.',
-    'backup.desc': 'جایگزین نهایی \u2014 از طریق CDN. فقط اگر هر دو گزینه بالا کار نکرد استفاده کنید.',
+    'backup.desc': 'جایگزین قدیمی \u2014 از طریق CDN. فقط اگر اصلی و XHTTP کار نکرد استفاده کنید.',
     'xhttp.desc': 'جایگزین \u2014 اگر اصلی کار نمی\u200Cکند استفاده کنید. شناسایی آن دشوارتر است.',
     open: 'باز کردن در برنامه',
     share: 'اشتراک\u200Cگذاری',
@@ -133,7 +133,7 @@ var T = {
     primary: '主要', backup: '备用',
     'primary.rec': '推荐',
     'primary.desc': '推荐 — 最快最稳定的连接。请优先使用。',
-    'backup.desc': '备用通道 — 通过 CDN 路由。仅在以上两种都失败时使用。',
+    'backup.desc': '旧备用通道 — 通过 CDN 路由。仅在主连接和 XHTTP 都失败时使用。',
     'xhttp.desc': '备选 — 主连接不可用时使用。更难被检测。',
     open: '在应用中打开',
     share: '分享',
@@ -668,7 +668,7 @@ function renderProtocolCard(proto, platform, opts) {
   } else if (proto.key === 'xhttp') {
     html += '<p class="card-desc" data-t="xhttp.desc">Alternative — use if Primary doesn\'t work. More hidden from censors.</p>';
   } else if (proto.key === 'wss') {
-    html += '<p class="card-desc" data-t="backup.desc">Fallback — routes through CDN. Use only if both above fail.</p>';
+    html += '<p class="card-desc" data-t="backup.desc">Legacy CDN fallback — use only if Primary and XHTTP are blocked.</p>';
   }
 
   /* SNI indicator — shows what domain the traffic appears as */

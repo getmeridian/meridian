@@ -52,7 +52,7 @@ flowchart TD
     Internet -.->|"CDN (Cloudflare)"| NginxHTTP
 ```
 
-Domain mode adds VLESS+WSS as a CDN fallback path. Traffic flows through Cloudflare's CDN via WebSocket, making the connection work even if the server's IP is blocked.
+Domain mode adds VLESS+WSS as a legacy CDN fallback path. WSS is maintained for backward compatibility with Cloudflare CDN deployments; new deployments should prefer XHTTP as the secondary transport. Traffic flows through Cloudflare's CDN via WebSocket, making the connection work even if the server's IP is blocked.
 
 ### Relay topology
 

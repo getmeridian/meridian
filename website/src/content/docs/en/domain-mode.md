@@ -11,9 +11,9 @@ Domain mode extends the standalone setup with three components:
 
 1. **nginx stream SNI routing** — routes domain traffic to nginx http alongside Reality traffic to Xray
 2. **nginx TLS** — certificates managed by acme.sh (Let's Encrypt) for your domain
-3. **VLESS+WSS inbound** — CDN fallback through Cloudflare
+3. **VLESS+WSS inbound** — legacy CDN fallback through Cloudflare (prefer XHTTP as the secondary transport)
 
-The WSS connection routes through Cloudflare's CDN, making it work even if your server's IP is blocked — Cloudflare's IP ranges are too widely used to block.
+The WSS connection routes through Cloudflare's CDN, making it work even if your server's IP is blocked — Cloudflare's IP ranges are too widely used to block. WSS is maintained for backward compatibility; XHTTP is the preferred alternative transport for new deployments.
 
 ## Deploy with domain
 
@@ -43,6 +43,6 @@ With domain mode, users get three connection options:
 |----------|----------|-------|
 | Reality | Primary | Direct to server IP |
 | XHTTP | Alternative | Through nginx on port 443 |
-| WSS | Backup | Through Cloudflare CDN |
+| WSS | Legacy backup | Through Cloudflare CDN |
 
-Users should try Reality first (fastest), XHTTP second, and WSS only if both fail (IP is blocked).
+Users should try Reality first (fastest), XHTTP second, and WSS only as a last resort if both fail (e.g. IP is blocked).
