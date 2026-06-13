@@ -152,6 +152,7 @@ class TestContractDrift:
             PanelConfig,
             RelayEntry,
             SubscriptionPageConfig,
+            TelegramConfig,
         )
 
         # Mapping of dataclass → known-fields set name in cluster.py
@@ -165,6 +166,7 @@ class TestContractDrift:
             DesiredRelay,
             ClusterConfig,
             SubscriptionPageConfig,
+            TelegramConfig,
         ):
             expected = {f.name for f in dataclasses.fields(cls) if not f.name.startswith("_")}
             # Just verify each class has typed public fields (the derivation test)

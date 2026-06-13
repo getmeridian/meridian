@@ -113,6 +113,20 @@ subscription_page:
   path: ""                                   # auto-generated; do not pre-fill
 
 # ---------------------------------------------------------------------------
+# Telegram notifications — passed through to Remnawave backend.
+# Omit entirely to disable. When bot_token is set, notifications are
+# enabled on next deploy/redeploy. Chat IDs use "chat_id" or
+# "chat_id:thread_id" format (thread_id for topics in group chats).
+# ---------------------------------------------------------------------------
+# telegram:
+#   bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+#   notify_users: "-100123456789"             # user events (create, expire, etc.)
+#   notify_nodes: "-100123456789:80"          # node events (online/offline)
+#   notify_crm: "-100123456789"              # CRM / billing events
+#   notify_service: "-100123456789"          # service events (login, restart)
+#   notify_tblocker: "-100123456789"         # torrent blocker events
+
+# ---------------------------------------------------------------------------
 # DESIRED STATE — read by `meridian plan` and `meridian apply`.
 #
 # Each desired_* section is independent. Omit the section to leave that

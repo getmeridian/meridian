@@ -28,6 +28,7 @@ from meridian.cluster import (
     PanelConfig,
     RelayEntry,
     SubscriptionPageConfig,
+    TelegramConfig,
     _load_warning,
 )
 
@@ -186,6 +187,12 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
             sub_page_dict.pop("deployed", None)
         if sub_page_dict:
             out["subscription_page"] = sub_page_dict
+
+    # Telegram notifications (v2 — only serialize if configured)
+    if cfg.telegram is not None:
+        tg_dict = _serialize_dataclass(cfg.telegram)
+        if tg_dict:
+            out["telegram"] = tg_dict
 
     # Desired state (v2 — serialize if present in config, even if empty)
     # An explicit empty list means "manage this type, want zero" vs absent = "don't manage".
@@ -374,6 +381,15 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             transforms={"enabled": bool},
         )
 
+    # Telegram notifications (v2) — None = unconfigured (disabled in panel)
+    telegram: TelegramConfig | None = None
+    if data.get("telegram") is not None:
+        telegram = _load_dataclass(
+            data.get("telegram"),
+            TelegramConfig,
+            _public_fields(TelegramConfig),
+        )
+
     # Desired state (v2) — tri-state semantics per cluster.example.yml:
     #   key absent OR explicit `null` → None (unmanaged)
     #   `[]` → managed, want zero
@@ -447,6 +463,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         branding=branding,
         inbounds=inbounds,
         subscription_page=subscription_page,
+        telegram=telegram,
         desired_nodes=desired_nodes,
         desired_clients=desired_clients,
         desired_relays=desired_relays,

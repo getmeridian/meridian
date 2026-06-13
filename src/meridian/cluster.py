@@ -148,6 +148,24 @@ class SubscriptionPageConfig:
 
 
 @dataclass
+class TelegramConfig:
+    """Optional Telegram bot notifications — passed through to Remnawave backend.
+
+    All fields are optional. When ``bot_token`` is set, notifications are
+    enabled in the panel's .env on next deploy/redeploy. Chat IDs use the
+    ``chat_id`` or ``chat_id:thread_id`` format per Remnawave docs.
+    """
+
+    bot_token: str = field(default="", repr=False)
+    notify_users: str = ""  # chat_id or chat_id:thread_id
+    notify_nodes: str = ""
+    notify_crm: str = ""
+    notify_service: str = ""
+    notify_tblocker: str = ""
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
 class DesiredNode:
     """A node that should exist in the fleet (desired state for plan/apply).
 
@@ -221,6 +239,8 @@ class ClusterConfig:
     inbounds: dict[str, InboundRef] = field(default_factory=dict)
     # v2: subscription page config (None = not declared, don't manage)
     subscription_page: SubscriptionPageConfig | None = None
+    # v2: Telegram notifications (None = not configured, disable in panel)
+    telegram: TelegramConfig | None = None
     # v2: desired state for declarative plan/apply workflow
     # None = not declared (don't manage). [] = declared empty (manage, want zero).
     desired_nodes: list[DesiredNode] | None = None
