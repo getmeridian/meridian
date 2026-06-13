@@ -378,6 +378,38 @@ class WSSProtocol(Protocol):
         )
 
 
+class Hysteria2Protocol(Protocol):
+    """Hysteria2 — experimental UDP/443 fallback for high-latency networks.
+
+    Uses QUIC/UDP on port 443, coexisting with TCP/443 (nginx/Reality/XHTTP).
+    Opt-in only — Russia suppresses unidentified UDP traffic.
+    """
+
+    @property
+    def key(self) -> str:
+        return "hysteria2"
+
+    @property
+    def display_label(self) -> str:
+        return "UDP (Experimental)"
+
+    @property
+    def requires_domain(self) -> bool:
+        return False
+
+    @property
+    def url_suffix(self) -> str:
+        return "-HY2"
+
+    def build_url(self, uuid: str, name: str, **kwargs: Any) -> str:
+        ip = kwargs["ip"]
+        port = kwargs.get("port", 443)
+        sni = kwargs.get("sni", "")
+        extra_suffix = kwargs.get("extra_suffix", "")
+        fragment = self._build_fragment(name, kwargs.get("server_name", ""), extra_suffix)
+        return f"hysteria2://{uuid}@{_bracket_ipv6(ip)}:{port}?sni={sni}&insecure=1{fragment}"
+
+
 # ---------------------------------------------------------------------------
 # Protocol registry
 # ---------------------------------------------------------------------------
@@ -393,7 +425,13 @@ PROTOCOLS: dict[str, Protocol] = {
 # but this makes the intent explicit and allows reordering without changing keys).
 PROTOCOL_ORDER: list[str] = ["reality", "xhttp", "wss"]
 
+# Experimental protocols — not in PROTOCOLS/PROTOCOL_ORDER by default.
+# Enabled per-node via cluster.yml hysteria2 flag.
+EXPERIMENTAL_PROTOCOLS: dict[str, Protocol] = {
+    "hysteria2": Hysteria2Protocol(),
+}
+
 
 def get_protocol(key: str) -> Protocol | None:
-    """Find a protocol by key (e.g., 'reality', 'wss', 'xhttp')."""
-    return PROTOCOLS.get(key)
+    """Find a protocol by key (e.g., 'reality', 'wss', 'xhttp', 'hysteria2')."""
+    return PROTOCOLS.get(key) or EXPERIMENTAL_PROTOCOLS.get(key)

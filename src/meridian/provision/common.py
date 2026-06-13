@@ -349,11 +349,20 @@ class EnsurePort443:
                 status="failed",
                 detail=f"failed to allow HTTPS: {result.detail}",
             )
+        detail_parts = []
+        if result.changed:
+            detail_parts.append("opened 443/tcp")
+
+        # Hysteria2 UDP (experimental — only when explicitly enabled)
+        if ctx.hysteria2:
+            udp_result = ensure_ufw_rule(conn, "allow 443/udp")
+            if udp_result.changed:
+                detail_parts.append("opened 443/udp (Hysteria2)")
 
         return StepResult(
             name=self.name,
-            status="changed" if result.changed else "ok",
-            detail="port 443 added to ufw" if result.changed else "already allowed",
+            status="changed" if detail_parts else "ok",
+            detail=", ".join(detail_parts) if detail_parts else "already allowed",
         )
 
 

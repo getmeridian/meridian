@@ -48,6 +48,7 @@ class ProvisionContext:
     sni: str = DEFAULT_SNI
     xhttp_enabled: bool = True
     warp: bool = False  # route egress through Cloudflare WARP (SOCKS5 proxy mode)
+    hysteria2: bool = False  # experimental UDP/443 fallback (opt-in)
     geo_block: bool = True  # block Russian domains/IPs at Xray routing level
     hosted_page: bool = False  # serve connection pages via HTTPS on server
     harden: bool = True  # enable SSH hardening + firewall (skip for shared servers)

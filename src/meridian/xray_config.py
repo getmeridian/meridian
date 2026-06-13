@@ -99,6 +99,7 @@ def build_xray_config(
     *,
     geo_block: bool,
     warp: bool = False,
+    hysteria2: bool = False,
     xhttp_path: str = "",
     ws_path: str = "",
     existing_private_key: str = "",
@@ -241,6 +242,36 @@ def build_xray_config(
             "streamSettings": ws_stream,
         }
         config["inbounds"].append(wss_inbound)
+
+    # Hysteria2 inbound (experimental — UDP/443, opt-in only)
+    # Coexists with TCP/443 (different L4 protocol). Handles its own TLS
+    # using the same acme.sh certificates as nginx. Listens on all
+    # interfaces since there is no nginx proxy for UDP traffic.
+    # The node container runs with network_mode:host so binding to :: works.
+    if hysteria2:
+        hy2_inbound = {
+            "tag": "hysteria2",
+            "protocol": "hysteria2",
+            "listen": "::",
+            "port": 443,
+            "settings": {
+                "clients": [],
+            },
+            "streamSettings": {
+                "network": "hysteria2",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "/etc/ssl/meridian/fullchain.pem",
+                            "keyFile": "/etc/ssl/meridian/key.pem",
+                        }
+                    ],
+                    "alpn": ["h3"],
+                },
+            },
+        }
+        config["inbounds"].append(hy2_inbound)
 
     return XrayConfigResult(
         config=config,

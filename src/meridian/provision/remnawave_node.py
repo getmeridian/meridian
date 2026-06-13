@@ -52,6 +52,7 @@ services:
       - .env
     volumes:
       - ./logs:/var/log/remnawave
+      - /etc/ssl/meridian:/etc/ssl/meridian:ro
     logging:
       driver: json-file
       options:
