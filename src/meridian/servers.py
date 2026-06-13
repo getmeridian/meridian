@@ -1,9 +1,14 @@
-"""Server registry — manages the ~/.meridian/servers index file."""
+"""Server registry — manages the ~/.meridian/servers.json index file.
+
+JSON-only persistence. Legacy text file (``servers``) is automatically
+migrated to ``servers.json`` on first load.
+"""
 
 from __future__ import annotations
 
 import builtins
 import json
+import logging
 import os
 import tempfile
 from dataclasses import dataclass
@@ -13,6 +18,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
+
+logger = logging.getLogger(__name__)
 
 SERVER_ROLE_EXIT = "exit"
 SERVER_ROLE_RELAY = "relay"
@@ -30,11 +37,6 @@ class ServerEntry:
     role: str = SERVER_ROLE_EXIT
     port: int = 22
     key_path: str = ""
-
-    # --- Aliases for ServerProfile field-name compatibility ---
-    # These properties let code that works with both ServerEntry and
-    # ServerProfile use a single set of field names (ssh_user, ssh_port,
-    # title) without getattr shims.
 
     @property
     def ssh_user(self) -> str:
@@ -56,15 +58,12 @@ class ServerEntry:
         if self.role == SERVER_ROLE_EXIT:
             if self.name:
                 parts.append(self.name)
-            # Append port only when non-default (backwards-compatible)
             if self.port != 22:
                 if not self.name:
                     parts.append("-")
                 parts.append(f"port={self.port}")
             return " ".join(parts)
 
-        # Relay entries need an explicit role marker so fresh machines can
-        # distinguish them from exit servers without relying on local cache.
         parts.extend([self.name or "-", self.role])
         if self.port != 22:
             parts.append(f"port={self.port}")
@@ -72,7 +71,7 @@ class ServerEntry:
 
     @classmethod
     def from_line(cls, line: str) -> ServerEntry | None:
-        """Parse a line from the servers file. Returns None for comments/blanks."""
+        """Parse a line from the legacy servers file. Returns None for comments/blanks."""
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             return None
@@ -80,7 +79,6 @@ class ServerEntry:
         if len(parts) < 2:
             return None
 
-        # Extract port=N from the end if present
         port = 22
         if parts[-1].startswith("port="):
             try:
@@ -93,42 +91,73 @@ class ServerEntry:
             name = "" if parts[2] == "-" else parts[2]
             return cls(host=parts[0], user=parts[1], name=name, role=parts[3], port=port)
         name = parts[2] if len(parts) > 2 else ""
-        # Handle the "-" placeholder for name when port was present
         if name == "-":
             name = ""
         return cls(host=parts[0], user=parts[1], name=name, port=port)
 
 
+def _migrate_legacy_file(legacy_path: Path, json_path: Path) -> None:
+    """One-shot migration: convert legacy text file to servers.json.
+
+    Only runs when the legacy file exists and servers.json does not.
+    After migration, the legacy file is left in place (read-only backup).
+    """
+    if not legacy_path.exists() or json_path.exists():
+        return
+
+    entries: list[ServerEntry] = []
+    for raw in legacy_path.read_text().splitlines():
+        entry = ServerEntry.from_line(raw)
+        if entry:
+            entries.append(entry)
+
+    if not entries:
+        return
+
+    profiles: list[ServerProfile] = []
+    for entry in entries:
+        draft = ServerConnectionDraft(
+            title=entry.name or entry.host,
+            host=entry.host,
+            ssh_user=entry.user,
+            ssh_port=entry.port,
+        )
+        profiles.append(profile_from_draft(draft, source="legacy"))
+
+    store = ServerProfileStore(json_path)
+    for profile in profiles:
+        store.upsert(profile)
+
+    logger.info("Migrated %d servers from legacy text file to servers.json", len(entries))
+
+
 class ServerRegistry:
     """CRUD operations on the servers index file.
 
-    File format: one server per line, space-separated: "host user [name]"
+    All persistence is through servers.json via ServerProfileStore.
+    Legacy text file is auto-migrated on first access.
     """
 
     def __init__(self, path: Path) -> None:
         self.path = path
-
-    def _read_lines(self) -> list[str]:
-        if not self.path.exists():
-            return []
-        return self.path.read_text().splitlines()
-
-    def _write_lines(self, lines: list[str]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text("\n".join(lines) + "\n" if lines else "")
+        self._json_path = path.with_suffix(".json")
+        _migrate_legacy_file(path, self._json_path)
+        self._store = ServerProfileStore(self._json_path)
 
     def _read_legacy_entries(self) -> list[ServerEntry]:
+        """Read legacy text entries (used only for migration)."""
         entries: list[ServerEntry] = []
-        for raw in self._read_lines():
+        if not self.path.exists():
+            return entries
+        for raw in self.path.read_text().splitlines():
             entry = ServerEntry.from_line(raw)
             if entry:
                 entries.append(entry)
         return entries
 
     def list(self) -> list[ServerEntry]:
-        """Return all registered servers."""
-        entries = self._read_legacy_entries()
-        return _merge_server_entries(entries, _profile_entries(_read_profiles_file(self.path.with_suffix(".json"))))
+        """Return all registered servers from JSON store."""
+        return _profile_entries(self._store.list())
 
     def count(self) -> int:
         return len(self.list())
@@ -136,36 +165,35 @@ class ServerRegistry:
     def find(self, query: str) -> ServerEntry | None:
         """Find a server by IP, name, or v2 profile ID (first match)."""
         needle = query.strip()
-        for profile in _read_profiles_file(self.path.with_suffix(".json")):
-            if profile.id == needle or profile.title == needle or profile.host == needle:
-                return ServerEntry(
-                    host=profile.host,
-                    user=profile.ssh_user,
-                    name=profile.title,
-                    port=profile.ssh_port,
-                    key_path=profile.key_path,
-                )
-        for entry in self.list():
-            if entry.host == needle or entry.name == needle:
-                return entry
+        profile = self._store.find(needle)
+        if profile:
+            return ServerEntry(
+                host=profile.host,
+                user=profile.ssh_user,
+                name=profile.title,
+                port=profile.ssh_port,
+                key_path=profile.key_path,
+            )
         return None
 
     def add(self, entry: ServerEntry) -> None:
         """Add a server, deduplicating by host IP."""
-        lines = self._read_lines()
-        # Remove existing entry for same host
-        new_lines = []
-        for raw in lines:
-            existing = ServerEntry.from_line(raw)
-            if existing and existing.host == entry.host:
-                continue
-            new_lines.append(raw)
-        new_lines.append(str(entry))
-        self._write_lines(new_lines)
+        # Also update legacy file for backward compat during transition
+        if self.path.exists():
+            lines = self.path.read_text().splitlines()
+            new_lines = [
+                raw
+                for raw in lines
+                if not (ServerEntry.from_line(raw) and ServerEntry.from_line(raw).host == entry.host)
+            ]
+            new_lines.append(str(entry))
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
+
         if entry.role != SERVER_ROLE_EXIT:
             return
-        profile_store = ServerProfileStore(self.path.with_suffix(".json"), legacy_path=self.path)
-        existing_profile = profile_store.find(entry.host) or (profile_store.find(entry.name) if entry.name else None)
+
+        existing_profile = self._store.find(entry.host) or (self._store.find(entry.name) if entry.name else None)
         draft = ServerConnectionDraft(
             title=entry.name or entry.host,
             host=entry.host,
@@ -186,23 +214,27 @@ class ServerRegistry:
                     "source": existing_profile.source if existing_profile else profile.source,
                 }
             )
-        profile_store.upsert(profile)
+        self._store.upsert(profile)
 
     def remove(self, query: str) -> bool:
         """Remove a server by IP or name. Returns True if found and removed."""
-        lines = self._read_lines()
-        new_lines = []
-        removed = False
-        for raw in lines:
-            existing = ServerEntry.from_line(raw)
-            if existing and (existing.host == query or existing.name == query):
-                removed = True
-                continue
-            new_lines.append(raw)
-        if removed:
-            self._write_lines(new_lines)
-        removed_profile = ServerProfileStore(self.path.with_suffix(".json"), legacy_path=self.path).remove(query)
-        return removed or removed_profile
+        # Also clean legacy file for backward compat
+        removed_legacy = False
+        if self.path.exists():
+            lines = self.path.read_text().splitlines()
+            new_lines = []
+            for raw in lines:
+                existing = ServerEntry.from_line(raw)
+                if existing and (existing.host == query or existing.name == query):
+                    removed_legacy = True
+                    continue
+                new_lines.append(raw)
+            if removed_legacy:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
+
+        removed_profile = self._store.remove(query)
+        return removed_legacy or removed_profile
 
 
 class ServerProfileStore:
@@ -213,13 +245,8 @@ class ServerProfileStore:
         self.legacy_path = legacy_path
 
     def list(self) -> list[ServerProfile]:
-        """Return saved server profiles, migrating readable legacy entries in memory."""
-        profiles: list[ServerProfile] = []
-        if self.legacy_path and self.legacy_path.exists():
-            profiles.extend(self._legacy_profiles())
-        if self.path.exists():
-            profiles.extend(self._read_profiles())
-        return _merge_profiles(profiles)
+        """Return saved server profiles from JSON only."""
+        return _read_profiles_file(self.path)
 
     def find(self, query: str) -> ServerProfile | None:
         """Find a server by stable ID, title, or host."""
@@ -253,9 +280,6 @@ class ServerProfileStore:
         self._write_profiles(remaining)
         return True
 
-    def _read_profiles(self) -> builtins.list[ServerProfile]:
-        return _read_profiles_file(self.path)
-
     def _write_profiles(self, profiles: builtins.list[ServerProfile]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         try:
@@ -281,19 +305,6 @@ class ServerProfileStore:
             if os.path.exists(tmp):
                 os.unlink(tmp)
             raise
-
-    def _legacy_profiles(self) -> builtins.list[ServerProfile]:
-        assert self.legacy_path is not None
-        profiles: builtins.list[ServerProfile] = []
-        for entry in ServerRegistry(self.legacy_path)._read_legacy_entries():
-            draft = ServerConnectionDraft(
-                title=entry.name or entry.host,
-                host=entry.host,
-                ssh_user=entry.user,
-                ssh_port=entry.port,
-            )
-            profiles.append(profile_from_draft(draft, source="legacy"))
-        return profiles
 
 
 def _read_profiles_file(path: Path) -> builtins.list[ServerProfile]:
@@ -321,27 +332,3 @@ def _profile_entries(profiles: list[ServerProfile]) -> list[ServerEntry]:
         )
         for profile in profiles
     ]
-
-
-def _merge_server_entries(entries: list[ServerEntry], extra: list[ServerEntry]) -> list[ServerEntry]:
-    merged: list[ServerEntry] = []
-    for entry in [*entries, *extra]:
-        merged = [
-            existing
-            for existing in merged
-            if existing.host != entry.host and (not entry.name or existing.name != entry.name)
-        ]
-        merged.append(entry)
-    return merged
-
-
-def _merge_profiles(profiles: list[ServerProfile]) -> list[ServerProfile]:
-    merged: list[ServerProfile] = []
-    for profile in profiles:
-        merged = [
-            existing
-            for existing in merged
-            if existing.id != profile.id and existing.title != profile.title and existing.host != profile.host
-        ]
-        merged.append(profile)
-    return merged

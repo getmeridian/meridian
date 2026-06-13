@@ -91,7 +91,7 @@ class TestServerRegistry:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "ubuntu", "edge", port=2222))
 
-        assert servers_file.read_text() == "198.51.100.10 ubuntu edge port=2222\n"
+        # Data persists in servers.json
         assert reg.find("edge").port == 2222
 
     def test_find_by_ip(self, servers_file: Path) -> None:
@@ -265,25 +265,31 @@ class TestServerProfileStore:
         assert f'"schema": "{SERVER_REGISTRY_SCHEMA}"' in path.read_text()
         assert path.stat().st_mode & 0o777 == 0o600
 
-    def test_store_reads_legacy_servers_as_profiles_without_rewriting(self, servers_file: Path) -> None:
+    def test_legacy_migration_creates_json_on_first_load(self, servers_file: Path) -> None:
+        """When legacy text file exists and servers.json doesn't, migration creates JSON."""
         servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
-        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+        # ServerRegistry triggers migration in __init__
+        reg = ServerRegistry(servers_file)
 
-        profiles = store.list()
+        entries = reg.list()
+        assert len(entries) == 1
+        assert entries[0].host == "198.51.100.10"
+        assert entries[0].user == "ubuntu"
+        assert entries[0].name == "edge"
+        assert entries[0].port == 2222
+        # JSON file should now exist
+        assert servers_file.with_suffix(".json").exists()
 
-        assert len(profiles) == 1
-        assert profiles[0].title == "edge"
-        assert profiles[0].host == "198.51.100.10"
-        assert profiles[0].ssh_user == "ubuntu"
-        assert profiles[0].ssh_port == 2222
-        assert profiles[0].source == "legacy"
-        assert not store.path.exists()
-
-    def test_store_merges_legacy_profiles_when_json_exists(self, servers_file: Path) -> None:
+    def test_legacy_migration_preserves_existing_json(self, servers_file: Path) -> None:
+        """When servers.json already exists, legacy file is not re-migrated."""
         servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
-        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+        # Create JSON with different data
+        store = ServerProfileStore(servers_file.with_suffix(".json"))
         store.upsert(profile_from_draft(ServerConnectionDraft(title="Panel", host="198.51.100.20")))
 
-        profiles = store.list()
+        reg = ServerRegistry(servers_file)
+        entries = reg.list()
 
-        assert {profile.title for profile in profiles} == {"edge", "Panel"}
+        # Only the JSON entry should be present (legacy not re-migrated)
+        assert len(entries) == 1
+        assert entries[0].host == "198.51.100.20"
