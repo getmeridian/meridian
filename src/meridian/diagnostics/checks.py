@@ -209,12 +209,17 @@ def check_firewall_port(conn: ServerConnection, port: int) -> CheckResult:
             detail="UFW is not active",
         )
 
-    # Check if port is allowed — look for the port number in ALLOW rules
+    # Check if port is allowed — match port at word boundary to avoid
+    # 80 matching 8080, 22 matching 2222, etc.
     raw = status_result.stdout
     port_str = str(port)
     for line in raw.splitlines():
         stripped = line.strip()
-        if port_str in stripped and "ALLOW" in stripped:
+        if "ALLOW" not in stripped:
+            continue
+        # UFW formats: "443/tcp  ALLOW", "443  ALLOW", "22/tcp (v6)  ALLOW"
+        rule_port = stripped.split("/")[0].split()[0] if "/" in stripped else stripped.split()[0]
+        if rule_port == port_str:
             return CheckResult(
                 name=f"firewall:{port}",
                 status="passed",

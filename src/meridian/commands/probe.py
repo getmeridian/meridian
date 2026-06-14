@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass, field
 
 from meridian.commands.resolve import resolve_server
-from meridian.config import CREDS_BASE, SERVERS_FILE, is_ip
+from meridian.config import SERVERS_FILE, is_ip
 from meridian.console import err_console, info, line, ok, warn
 from meridian.resolve import is_local_keyword
 from meridian.servers import ServerRegistry
@@ -771,25 +771,26 @@ def run(
     if not tls_result.passed:
         issues += 1
 
-    # -- Deployment-aware checks (when probed IP matches a configured server) --
-    creds = None
+    # -- Deployment-aware checks (when probed IP matches a configured node) --
     try:
-        from meridian.credentials import ServerCredentials, creds_path
+        from meridian.cluster import ClusterConfig
 
-        proxy_file = creds_path(CREDS_BASE, resolved.ip)
-        if proxy_file.exists():
-            creds = ServerCredentials.load(proxy_file)
+        cluster = ClusterConfig.load()
+        node = next((n for n in cluster.nodes if n.ip == resolved.ip), None)
+    except (FileNotFoundError, ValueError):
+        node = None
+        cluster = None  # type: ignore[assignment]
     except Exception:
-        pass
+        node = None
+        cluster = None  # type: ignore[assignment]
 
-    if creds and creds.has_credentials:
+    if node:
         err_console.print()
         err_console.print("  [bold]Deployment checks[/bold]")
-        err_console.print(f"  [dim]Server {resolved.ip} found in local configuration[/dim]")
+        err_console.print(f"  [dim]Server {resolved.ip} found in cluster config[/dim]")
         err_console.print()
 
-        has_domain = creds.has_domain
-        server_domain = creds.server.domain or ""
+        has_domain = bool(node.domain)
 
         # -- Check 10: Internal ports --
         info("Scanning internal Xray ports...")
@@ -808,25 +809,16 @@ def run(
             issues += 1
 
         # -- Check 12: Domain root (domain mode only) --
-        if has_domain and server_domain:
-            info(f"Checking domain-mode root ({server_domain})...")
-            domain_result = check_domain_root(resolved.ip, server_domain)
+        if has_domain:
+            info(f"Checking domain-mode root ({node.domain})...")
+            domain_result = check_domain_root(resolved.ip, node.domain)
             checks_run += 1
             _print_result(domain_result)
             if not domain_result.passed:
                 issues += 1
 
-    # -- Tier 3: Cluster-aware checks (secret path, SNI camouflage) --
-    try:
-        from meridian.cluster import ClusterConfig
-
-        cluster = ClusterConfig.load()
-        node = next((n for n in cluster.nodes if n.ip == resolved.ip), None)
-        if node and cluster.panel.secret_path:
-            err_console.print()
-            err_console.print("  [bold]Cluster-aware checks[/bold]")
-            err_console.print()
-
+        # -- Check 13: Secret path isolation --
+        if cluster and cluster.panel.secret_path:
             info("Checking secret path isolation...")
             sp_result = check_secret_paths(resolved.ip, cluster.panel.secret_path)
             checks_run += 1
@@ -834,15 +826,14 @@ def run(
             if not sp_result.passed:
                 issues += 1
 
-            if node.sni:
-                info("Checking SNI camouflage...")
-                sc_result = check_sni_camouflage(resolved.ip, node.sni)
-                checks_run += 1
-                _print_result(sc_result)
-                if not sc_result.passed:
-                    issues += 1
-    except Exception:
-        pass  # cluster not configured — skip tier 3
+        # -- Check 14: SNI camouflage --
+        if node.sni:
+            info("Checking SNI camouflage...")
+            sc_result = check_sni_camouflage(resolved.ip, node.sni)
+            checks_run += 1
+            _print_result(sc_result)
+            if not sc_result.passed:
+                issues += 1
 
     # -- Verdict --
     err_console.print()
