@@ -84,6 +84,8 @@ LIBRARY_MODULES = [
     SRC / "operations.py",
     SRC / "relay_ops.py",
     SRC / "panel_bootstrap.py",
+    SRC / "capabilities.py",
+    SRC / "node_deploy.py",
 ]
 
 

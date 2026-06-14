@@ -13,7 +13,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
 from meridian.panel_bootstrap import cache_inbounds, create_hosts_for_node
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.remnawave import Host, MeridianPanel, RemnawaveError
 
 # ---------------------------------------------------------------------------
 # Constants — RFC 5737 IPs only
@@ -395,3 +395,50 @@ class TestCacheInbounds:
 
         assert caplog.records
         assert len(cluster.inbounds) == 0
+
+
+# ===========================================================================
+# enforce_host_ordering
+# ===========================================================================
+
+
+class TestEnforceHostOrdering:
+    def test_orders_relay_before_direct(self) -> None:
+        from meridian.node_deploy import enforce_host_ordering
+
+        hosts = [
+            Host(uuid="d1", remark="reality-198.51.100.1"),
+            Host(uuid="r1", remark="Relay-msk-reality"),
+        ]
+        panel = MagicMock()
+        panel.list_hosts.return_value = hosts
+        enforce_host_ordering(panel)
+        # relay should come first
+        uuids = panel.reorder_hosts.call_args[0][0]
+        assert uuids[0] == "r1"
+        assert uuids[1] == "d1"
+
+    def test_orders_reality_before_xhttp_before_wss_before_hysteria2(self) -> None:
+        from meridian.node_deploy import enforce_host_ordering
+
+        hosts = [
+            Host(uuid="h", remark="hysteria2-198.51.100.1"),
+            Host(uuid="w", remark="wss-example.com"),
+            Host(uuid="x", remark="xhttp-198.51.100.1"),
+            Host(uuid="r", remark="reality-198.51.100.1"),
+        ]
+        panel = MagicMock()
+        panel.list_hosts.return_value = hosts
+        enforce_host_ordering(panel)
+        uuids = panel.reorder_hosts.call_args[0][0]
+        assert uuids == ["r", "x", "w", "h"]
+
+    def test_api_error_does_not_crash(self) -> None:
+        from meridian.node_deploy import enforce_host_ordering
+
+        hosts = [Host(uuid="a", remark="reality-1")]
+        panel = MagicMock()
+        panel.list_hosts.return_value = hosts
+        panel.reorder_hosts.side_effect = RemnawaveError("API down")
+        # Should not raise — just logs warning
+        enforce_host_ordering(panel)

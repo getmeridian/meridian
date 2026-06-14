@@ -448,3 +448,7 @@ class TestBuildXrayConfigHysteria2Inbound:
     def test_hysteria2_clients_empty(self) -> None:
         ib = self._hy2()
         assert ib["settings"]["clients"] == []
+
+    def test_hysteria2_network_is_hysteria2(self) -> None:
+        ib = self._hy2()
+        assert ib["streamSettings"]["network"] == "hysteria2"

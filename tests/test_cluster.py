@@ -17,6 +17,7 @@ from meridian.cluster import (
     ProtocolKey,
     RelayEntry,
     SubscriptionPageConfig,
+    TelegramConfig,
 )
 
 # ---------------------------------------------------------------------------
@@ -496,6 +497,30 @@ class TestClusterYAMLRoundTrip:
         caplog.set_level("WARNING", logger="meridian.cluster")
         ClusterConfig.load(p)
         assert "validation issue" not in caplog.text
+
+
+class TestTelegramConfigRoundTrip:
+    def test_telegram_saves_and_loads(self, tmp_path: Path) -> None:
+        cfg = ClusterConfig(telegram=TelegramConfig(
+            bot_token="123456:ABC",
+            notify_users="-100123",
+            notify_nodes="-100456:80",
+        ))
+        p = tmp_path / "cluster.yml"
+        cfg.save(p)
+        loaded = ClusterConfig.load(p)
+        assert loaded.telegram is not None
+        assert loaded.telegram.bot_token == "123456:ABC"
+        assert loaded.telegram.notify_users == "-100123"
+        assert loaded.telegram.notify_nodes == "-100456:80"
+        assert loaded.telegram.notify_crm == ""
+
+    def test_no_telegram_loads_as_none(self, tmp_path: Path) -> None:
+        cfg = ClusterConfig()  # no telegram
+        p = tmp_path / "cluster.yml"
+        cfg.save(p)
+        loaded = ClusterConfig.load(p)
+        assert loaded.telegram is None
 
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@ from meridian.credentials import (
 from meridian.protocols import (
     PROTOCOL_ORDER,
     PROTOCOLS,
+    Hysteria2Protocol,
     Protocol,
     RealityProtocol,
     WSSProtocol,
@@ -437,3 +438,38 @@ class TestIPv6URLConstruction:
         )
         assert "vless://test-uuid@198.51.100.1:443" in url
         assert "[198.51.100.1]" not in url
+
+
+# ---------------------------------------------------------------------------
+# Hysteria2 protocol
+# ---------------------------------------------------------------------------
+
+
+class TestHysteria2Protocol:
+    def test_basic_url(self) -> None:
+        proto = Hysteria2Protocol()
+        url = proto.build_url("test-uuid", "alice", ip="198.51.100.1", port=443, sni="")
+        assert url.startswith("hysteria2://test-uuid@198.51.100.1:443")
+        assert "insecure=1" in url
+
+    def test_url_with_sni_no_insecure(self) -> None:
+        proto = Hysteria2Protocol()
+        url = proto.build_url("test-uuid", "alice", ip="198.51.100.1", port=443, sni="vpn.example.com")
+        assert "sni=vpn.example.com" in url
+        assert "insecure=1" not in url
+
+    def test_url_without_sni_uses_ip(self) -> None:
+        proto = Hysteria2Protocol()
+        url = proto.build_url("test-uuid", "alice", ip="198.51.100.1", port=443)
+        assert "sni=198.51.100.1" in url
+
+    def test_get_protocol_finds_hysteria2(self) -> None:
+        proto = get_protocol("hysteria2")
+        assert proto is not None
+        assert proto.key == "hysteria2"
+
+    def test_display_label(self) -> None:
+        assert Hysteria2Protocol().display_label == "UDP (Experimental)"
+
+    def test_url_suffix(self) -> None:
+        assert Hysteria2Protocol().url_suffix == "-HY2"
