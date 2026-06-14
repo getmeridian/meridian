@@ -297,15 +297,17 @@ def enforce_host_ordering(panel: MeridianPanel) -> None:
         remark = host.remark.lower()
         # Relay hosts come first (lower priority number)
         is_relay = 0 if remark.startswith("relay-") else 1
-        # Protocol ordering: reality=0, xhttp=1, wss=2, unknown=3
+        # Protocol ordering: reality=0, xhttp=1, wss=2, hysteria2=3, unknown=4
         if "reality" in remark:
             proto = 0
         elif "xhttp" in remark:
             proto = 1
         elif "wss" in remark:
             proto = 2
-        else:
+        elif "hysteria2" in remark:
             proto = 3
+        else:
+            proto = 4
         return (is_relay, proto, remark)
 
     sorted_hosts = sorted(hosts, key=_sort_key)

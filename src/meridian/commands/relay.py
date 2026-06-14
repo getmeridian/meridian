@@ -221,6 +221,11 @@ def run_deploy(
             relay_sni,
             request.relay_name,
         )
+
+        # Enforce safest-first ordering after adding relay hosts
+        from meridian.node_deploy import enforce_host_ordering
+
+        enforce_host_ordering(panel)
     if not host_uuids:
         fail(
             "No host entries created -- check that inbounds are configured",
