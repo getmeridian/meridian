@@ -407,7 +407,12 @@ class Hysteria2Protocol(Protocol):
         sni = kwargs.get("sni", "")
         extra_suffix = kwargs.get("extra_suffix", "")
         fragment = self._build_fragment(name, kwargs.get("server_name", ""), extra_suffix)
-        return f"hysteria2://{uuid}@{_bracket_ipv6(ip)}:{port}?sni={sni}&insecure=1{fragment}"
+        # insecure=1 only when connecting by IP (cert won't match SNI);
+        # when a domain SNI is available the cert is valid (acme.sh issued)
+        params = f"sni={sni}" if sni else f"sni={_bracket_ipv6(ip)}"
+        if not sni:
+            params += "&insecure=1"
+        return f"hysteria2://{uuid}@{_bracket_ipv6(ip)}:{port}?{params}{fragment}"
 
 
 # ---------------------------------------------------------------------------

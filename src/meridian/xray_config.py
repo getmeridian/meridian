@@ -40,6 +40,8 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
         "docker exec 3x-ui /app/bin/xray-linux-amd64 x25519 2>/dev/null",
         "xray x25519 2>/dev/null",
     ]
+    private_key = ""
+    public_key = ""
     for cmd in cmds:
         result = conn.run(cmd, timeout=15)
         if result.returncode != 0 or not result.stdout.strip():
@@ -59,13 +61,15 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
 
     # Last resort: download a temporary Xray binary
     logger.info("Downloading Xray binary for key generation...")
+    from meridian.config import XRAY_VERSION
+
     dl_result = conn.run(
         "ARCH=$(uname -m); "
         'case "$ARCH" in '
         "aarch64|arm64) XRAY_ARCH=arm64-v8a ;; "
         "*) XRAY_ARCH=64 ;; "
         "esac; "
-        'curl -sL "https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-${XRAY_ARCH}.zip"'
+        f'curl -sL "https://github.com/XTLS/Xray-core/releases/download/v{XRAY_VERSION}/Xray-linux-${{XRAY_ARCH}}.zip"'
         " -o /tmp/xray.zip && cd /tmp && unzip -qo xray.zip xray && chmod +x xray"
         " && /tmp/xray x25519 && rm -f /tmp/xray /tmp/xray.zip",
         timeout=60,
@@ -252,7 +256,7 @@ def build_xray_config(
         hy2_inbound = {
             "tag": "hysteria2",
             "protocol": "hysteria2",
-            "listen": "::",
+            "listen": "0.0.0.0",
             "port": 443,
             "settings": {
                 "clients": [],

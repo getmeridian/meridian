@@ -422,7 +422,7 @@ class TestBuildXrayConfigHysteria2Inbound:
 
     def test_hysteria2_listens_on_all_interfaces(self) -> None:
         ib = self._hy2()
-        assert ib["listen"] == "::"
+        assert ib["listen"] == "0.0.0.0"
 
     def test_hysteria2_uses_tls_with_certs(self) -> None:
         ib = self._hy2()
