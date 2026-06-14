@@ -82,8 +82,8 @@ relays:
     ssh_user: root
     ssh_port: 22
     host_uuids:                              # populated after first deploy
-      REALITY: 00000000-0000-0000-0000-0000000000aa
-      XHTTP:   00000000-0000-0000-0000-0000000000bb
+      reality: 00000000-0000-0000-0000-0000000000aa
+      xhttp:   00000000-0000-0000-0000-0000000000bb
 
 # ---------------------------------------------------------------------------
 # Branding — shown on connection pages.

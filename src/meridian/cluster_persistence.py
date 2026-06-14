@@ -297,8 +297,9 @@ def _load_applied_list(raw: Any) -> list[str] | None:
     """
     if not isinstance(raw, list):
         return None
-    clean = [item for item in raw if isinstance(item, str)]
-    return clean if clean else None
+    # Preserve empty list — it means "managed, converged to zero" (distinct
+    # from None which means "no history"). Filtering non-strings is defensive.
+    return [item for item in raw if isinstance(item, str)]
 
 
 def _load_applied_state(raw: dict[str, Any]) -> AppliedState:
