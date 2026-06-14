@@ -267,7 +267,6 @@ def _run(coro: Any) -> Any:
     if loop is None or loop.is_closed():
         loop = asyncio.new_event_loop()
         _thread_loops.loop = loop
-        asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
 
 
@@ -689,7 +688,7 @@ class MeridianPanel:
         """
         from remnawave.models.hosts import ReorderHostItem, ReorderHostRequestDto
 
-        items = [ReorderHostItem(uuid=uuid, view_position=i) for i, uuid in enumerate(ordered_uuids)]
+        items = [ReorderHostItem(uuid=host_uuid, view_position=i) for i, host_uuid in enumerate(ordered_uuids)]
         _sdk_call(self._sdk.hosts.reorder_hosts(ReorderHostRequestDto(hosts=items)))
 
     def enable_host(self, uuid: str) -> None:
