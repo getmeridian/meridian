@@ -93,9 +93,12 @@ def render_nginx_stream_config(
             listen [::]:443;
             ssl_preread on;
             proxy_pass $meridian_backend;
-            # Short timeout — don't wait 60s (default) if a backend is
-            # temporarily unavailable.
-            proxy_connect_timeout 1s;
+            # Connect timeout: 1s is fine for localhost backends (xray_reality,
+            # nginx_https), but the reality_dest upstream proxies to an external
+            # server. Too-short timeout on external connections creates a
+            # detectable differential: known SNIs succeed instantly, unknown
+            # SNIs fail after timeout. 5s accommodates high-latency targets.
+            proxy_connect_timeout 5s;
             # VPN sessions can idle for extended periods (user not browsing).
             # Default 10m kills these; 30m is more forgiving while still
             # reclaiming truly dead connections.

@@ -607,7 +607,7 @@ class TestNginxFingerprinting:
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
-        assert "proxy_connect_timeout 1s" in cfg
+        assert "proxy_connect_timeout 5s" in cfg
 
     def test_stream_proxy_timeout(self):
         """Stream proxy needs a long idle timeout for VPN sessions."""
