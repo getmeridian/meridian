@@ -17,7 +17,7 @@ meridian deploy [IP] [flags]
 
 | پرچم | پیش‌فرض | توضیحات |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | هدف پوشش TLS |
+| `--sni HOST` | www.cloudflare.com | هدف پوشش TLS |
 | `--domain DOMAIN` | (هیچ) | دامنه بازگشت CDN Cloudflare |
 | `--client-name NAME` | default | نام برای اولین کلاینت |
 | `--display-name NAME` | (هیچ) | برچسب برای صفحات اتصال |

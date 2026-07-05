@@ -32,7 +32,7 @@ class TestServerCredentials:
         assert creds.panel.web_base_path == "abc123"
         assert creds.panel.info_page_path == "info456"
         assert creds.panel.port == 2053
-        assert creds.server.sni == "www.microsoft.com"
+        assert creds.server.sni == "www.cloudflare.com"
         assert creds.reality.uuid == "550e8400-e29b-41d4-a716-446655440000"
         assert creds.reality.private_key == "WBNp7SHzGMaqp6ohXMfJHUyBMWHoeHMflVPaaxdtRHo"
         assert creds.reality.public_key == "K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy"
@@ -60,7 +60,7 @@ class TestServerCredentials:
         assert creds.panel.password == "s3cret!pass"
         assert creds.panel.web_base_path == "abc123"
         assert creds.panel.info_page_path == "info456"
-        assert creds.server.sni == "www.microsoft.com"
+        assert creds.server.sni == "www.cloudflare.com"
         assert creds.server.ip == "1.2.3.4"
         assert creds.server.scanned_sni == "dl.google.com"
         assert creds.reality.uuid == "550e8400-e29b-41d4-a716-446655440000"

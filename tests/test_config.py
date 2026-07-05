@@ -5,7 +5,13 @@ from __future__ import annotations
 import importlib
 
 import meridian.config as config
-from meridian.config import is_ip, is_ipv4, sanitize_ip_for_path
+from meridian.config import (
+    CONNECT_TEST_URL_IPV4,
+    CONNECT_TEST_URL_IPV6,
+    is_ip,
+    is_ipv4,
+    sanitize_ip_for_path,
+)
 
 
 class TestIsIpv4:
@@ -65,6 +71,11 @@ class TestSanitizeIpForPath:
 
 
 class TestEnvOverrides:
+    def test_connect_test_url_defaults_to_address_family_endpoints(self) -> None:
+        assert config.CONNECT_TEST_URL == ""
+        assert CONNECT_TEST_URL_IPV4 == "https://api.ipify.org"
+        assert CONNECT_TEST_URL_IPV6 == "https://api6.ipify.org"
+
     def test_acme_server_override(self, monkeypatch) -> None:
         monkeypatch.setenv("MERIDIAN_ACME_SERVER", "https://pebble.test/dir")
         importlib.reload(config)

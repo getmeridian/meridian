@@ -14,14 +14,14 @@ meridian deploy 1.2.3.4
 جادوگر شما را از طریق پیکربندی هدایت می‌کند. یا هر چیز را از قبل مشخص کنید:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 1.2.3.4 --sni www.cloudflare.com --client-name alice --yes
 ```
 
 ## تمام پرچم‌ها
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | سایتی که Reality شخصیت‌سازی می‌کند |
+| `--sni HOST` | www.cloudflare.com | سایتی که Reality شخصیت‌سازی می‌کند |
 | `--domain DOMAIN` | (هیچ) | فعال کردن حالت دامنه با fallback CDN |
 | `--client-name NAME` | default | نام برای کلاینت اول |
 | `--display-name NAME` | (هیچ) | نام نمایشی در صفحات اتصال (مثلاً "VPN علی") |
@@ -51,7 +51,7 @@ meridian deploy 1.2.3.4 --display-name "VPN علی" --icon 🚀 --color sunset
 
 ## انتخاب هدف SNI
 
-هدف SNI (Server Name Indication) دامنه‌ای است که Reality شخصیت‌سازی می‌کند. مقدار پیش‌فرض (`www.microsoft.com`) برای اکثر موارد خوب عمل می‌کند.
+هدف SNI (Server Name Indication) دامنه‌ای است که Reality شخصیت‌سازی می‌کند. مقدار پیش‌فرض (`www.cloudflare.com`) برای اکثر موارد خوب عمل می‌کند.
 
 برای پنهان‌کاری بهینه، شبکه سرور خود را برای اهداف same-ASN اسکن کنید:
 
@@ -60,7 +60,7 @@ meridian scan 1.2.3.4
 ```
 
 **اهداف خوب** (CDN جهانی):
-- `www.microsoft.com` — Azure CDN، جهانی
+- `www.cloudflare.com` — Cloudflare CDN، جهانی
 - `www.twitch.tv` — Fastly CDN، جهانی
 - `dl.google.com` — Google CDN، جهانی
 - `github.com` — Fastly CDN، جهانی

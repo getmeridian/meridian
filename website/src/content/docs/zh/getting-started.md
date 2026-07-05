@@ -30,7 +30,7 @@ meridian deploy
 或者预先指定所有内容：
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 1.2.3.4 --sni www.cloudflare.com
 ```
 
 ## 发生了什么

@@ -332,7 +332,7 @@ class TestContextKeyConsistency:
             creds_path=tmp_path / "creds" / "proxy.yml",
             server_ip="198.51.100.1",
             domain="",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             first_client_name="default",
             panel_port=2053,
             xhttp_enabled=True,

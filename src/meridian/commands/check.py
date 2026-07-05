@@ -90,7 +90,7 @@ def run(
                 ok(f"Camouflage target is on the same ASN ({server_asn})")
             elif "Apple" in sni_org or "icloud.com" in sni_host or "apple.com" in sni_host:
                 warn(f"Camouflage target ({sni_host}) is risky -- Apple infrastructure, detectable ASN mismatch")
-                err_console.print("       Use a global CDN domain: www.microsoft.com, www.twitch.tv, github.com")
+                err_console.print("       Use a global CDN domain: www.cloudflare.com, www.twitch.tv, github.com")
                 issues += 1
             else:
                 info(f"Camouflage target on different ASN (server: {server_org}, target: {sni_org})")

@@ -17,7 +17,7 @@ meridian deploy [IP] [flags]
 
 | Флаг | По умолчанию | Описание |
 |------|--------------|---------|
-| `--sni HOST` | www.microsoft.com | Сайт, который Reality маскирует |
+| `--sni HOST` | www.cloudflare.com | Сайт, который Reality маскирует |
 | `--domain DOMAIN` | (нет) | Включить режим домена с резервом CDN |
 | `--client-name NAME` | default | Имя для первого клиента |
 | `--display-name NAME` | (нет) | Отображаемое имя на страницах подключения |

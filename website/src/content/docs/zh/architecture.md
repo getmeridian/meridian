@@ -66,7 +66,7 @@ flowchart LR
 ## Reality 协议如何工作
 
 1. 服务器生成一个 **x25519 密钥对**。公钥与客户端共享，私钥保留在服务器上。
-2. 客户端在端口 443 上连接，发送包含伪装域名（例如 `www.microsoft.com`）作为 SNI 的 TLS Client Hello。
+2. 客户端在端口 443 上连接，发送包含伪装域名（例如 `www.cloudflare.com`）作为 SNI 的 TLS Client Hello。
 3. 对于任何观察者来说，这看起来像一个到 microsoft.com 的正常 HTTPS 连接。
 4. 如果一个**探针**发送自己的 Client Hello，服务器会将连接代理到真实的 microsoft.com——探针看到一个有效的证书。
 5. 如果客户端包含有效的身份验证（从 x25519 密钥派生），服务器建立 VLESS 隧道。
