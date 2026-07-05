@@ -140,7 +140,7 @@ Files edited through Remote WSL live in the Linux filesystem, which avoids path 
 Some interactive terminal prompts can behave differently under WSL. If the deploy wizard does not accept input as expected, provide values explicitly:
 
 ```bash
-meridian deploy 198.51.100.10 --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
 You can also run a preflight check first:

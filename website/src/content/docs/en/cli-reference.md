@@ -17,7 +17,7 @@ meridian deploy [IP] [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | TLS camouflage target |
+| `--sni HOST` | www.cloudflare.com | TLS camouflage target |
 | `--domain DOMAIN` | (none) | Cloudflare CDN fallback domain |
 | `--client-name NAME` | default | Name for the first client |
 | `--display-name NAME` | (none) | Label for connection pages |

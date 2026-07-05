@@ -69,7 +69,7 @@ Things that require human action outside the codebase.
 ### Anti-censorship
 
 - [ ] **Legacy relays need SNI backfill** — new relay deploys now fail closed without a relay-local SNI; remaining work is to repair legacy relay entries with blank `relay.sni` and regenerate affected hosted pages
-- [ ] **Default SNI `www.microsoft.com` monitored** — make scanning the normal path, not the exceptional one
+- [ ] **Default SNI `www.cloudflare.com` monitored** — make scanning the normal path, not the exceptional one
 - [ ] **Make probe/check tooling mode-aware** — domain mode intentionally serves a real domain cert; verification must distinguish that from an IP-mode stealth leak
 
 ### Product

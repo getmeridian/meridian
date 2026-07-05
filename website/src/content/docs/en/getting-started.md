@@ -34,7 +34,7 @@ The interactive wizard asks for your server IP, SSH user, and camouflage target 
 Or specify everything upfront:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 1.2.3.4 --sni www.cloudflare.com
 ```
 
 If you're running directly on the VPS as root, skip SSH entirely:

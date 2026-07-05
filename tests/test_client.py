@@ -101,7 +101,7 @@ panel:
   port: 2053
 server:
   ip: 1.2.3.4
-  sni: www.microsoft.com
+  sni: www.cloudflare.com
   hosted_page: {"true" if hosted_page else "false"}
 {domain_line}protocols:
   reality:

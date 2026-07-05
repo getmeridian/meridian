@@ -127,14 +127,14 @@ class TestRealityBuildURL:
             "test-uuid",
             "alice",
             ip="1.2.3.4",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="myPBK",
             short_id="abc123",
         )
         assert url.startswith("vless://test-uuid@1.2.3.4:443")
         assert "flow=xtls-rprx-vision" in url
         assert "security=reality" in url
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.cloudflare.com" in url
         assert "fp=chrome" in url
         assert "pbk=myPBK" in url
         assert "sid=abc123" in url
@@ -150,7 +150,7 @@ class TestRealityBuildURL:
     def test_default_sni(self) -> None:
         proto = RealityProtocol()
         url = proto.build_url("uuid", "name", ip="1.2.3.4")
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.cloudflare.com" in url
 
     def test_different_sni(self) -> None:
         proto = RealityProtocol()
@@ -412,7 +412,7 @@ class TestAvailableProtocols:
 
 def _make_test_creds(
     ip: str = "198.51.100.1",
-    sni: str = "www.microsoft.com",
+    sni: str = "www.cloudflare.com",
     domain: str = "",
     xhttp_path: str = "",
     ws_path: str = "",
@@ -456,7 +456,7 @@ class TestBuildUrlFromCreds:
         creds = _make_test_creds()
         url = RealityProtocol().build_url_from_creds("r-uuid", "", creds, "alice")
         assert url.startswith("vless://r-uuid@198.51.100.1:443")
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.cloudflare.com" in url
         assert "pbk=testPBK" in url
         assert "sid=ab12" in url
         assert url.endswith("#alice")
@@ -511,7 +511,7 @@ class TestBuildRelayUrl:
             "r-uuid", "", creds, "alice", "198.51.100.50", 8443, relay_name="moscow"
         )
         assert "vless://r-uuid@198.51.100.50:8443" in url
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.cloudflare.com" in url
         assert "#alice-via-moscow" in url
 
     def test_reality_relay_with_relay_sni(self) -> None:
@@ -591,13 +591,13 @@ class TestIPv6URLConstruction:
             "test-uuid",
             "alice",
             ip="2001:db8::1",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="myPBK",
             short_id="abc123",
         )
         assert "vless://test-uuid@[2001:db8::1]:443" in url
         assert "security=reality" in url
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.cloudflare.com" in url
 
     def test_xhttp_ipv6_brackets_no_domain(self) -> None:
         proto = XHTTPProtocol()

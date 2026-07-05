@@ -30,7 +30,7 @@ panel:
   port: 2053
 server:
   ip: 5.6.7.8
-  sni: www.microsoft.com
+  sni: www.cloudflare.com
   hosted_page: true
 protocols:
   reality:
@@ -166,7 +166,7 @@ class TestBuildRelayUrls:
         assert "K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy" in reality_url.url  # public key
         assert "abcd1234" in reality_url.url  # short ID
         # Without relay_sni, Reality SNI defaults to exit's SNI
-        assert "www.microsoft.com" in reality_url.url
+        assert "www.cloudflare.com" in reality_url.url
         assert uuid in reality_url.url
 
         # Fragment should include relay identifier
@@ -202,7 +202,7 @@ class TestBuildRelayUrls:
 
         # Reality SNI should be relay-specific
         assert "sni=yandex.ru" in reality_url.url
-        assert "sni=www.microsoft.com" not in reality_url.url
+        assert "sni=www.cloudflare.com" not in reality_url.url
 
         # XHTTP should also use relay SNI
         xhttp_urls = [u for u in result.urls if u.key == "xhttp"]
@@ -226,7 +226,7 @@ class TestBuildRelayUrls:
 
         # Second relay has no sni → Reality URL uses exit's default
         r1_reality = next(u for u in results[1].urls if u.key == "reality")
-        assert "sni=www.microsoft.com" in r1_reality.url
+        assert "sni=www.cloudflare.com" in r1_reality.url
 
     def test_build_relay_urls_no_name(self, sample_proxy_with_relays: Path) -> None:
         from meridian.urls import build_relay_urls
@@ -755,7 +755,7 @@ class TestNginxStreamRelay:
         from meridian.provision.services import _render_nginx_stream_config
 
         config = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="5.6.7.8",

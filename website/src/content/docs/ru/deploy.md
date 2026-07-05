@@ -14,14 +14,14 @@ meridian deploy 1.2.3.4
 Мастер проведёт вас через конфигурацию. Или укажите всё заранее:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 1.2.3.4 --sni www.cloudflare.com --client-name alice --yes
 ```
 
 ## Все флаги
 
 | Флаг | По умолчанию | Описание |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | Цель маскировки TLS |
+| `--sni HOST` | www.cloudflare.com | Цель маскировки TLS |
 | `--domain DOMAIN` | (нет) | Домен для CDN-резерва через Cloudflare |
 | `--client-name NAME` | default | Имя для первого клиента |
 | `--display-name NAME` | (нет) | Надпись на страницах подключения (напр. "VPN Алисы") |
@@ -54,14 +54,14 @@ meridian deploy 1.2.3.4 --display-name "VPN Алисы" --icon 🚀 --color suns
 
 Цель SNI (Server Name Indication) — это домен, за который выдаёт себя ваш сервер. Это **не** ваш собственный домен — это любой популярный сайт с TLS. Когда цензор пробует подключиться к серверу, он видит настоящий сертификат этого сайта, что делает ваш сервер неотличимым от обычного трафика.
 
-По умолчанию (`www.microsoft.com`) хорошо работает в большинстве случаев. Для оптимальной скрытности отсканируйте сеть вашего сервера — цели из того же ASN труднее обнаружить, потому что диапазон IP совпадает:
+По умолчанию (`www.cloudflare.com`) хорошо работает в большинстве случаев. Для оптимальной скрытности отсканируйте сеть вашего сервера — цели из того же ASN труднее обнаружить, потому что диапазон IP совпадает:
 
 ```
 meridian scan 1.2.3.4
 ```
 
 **Хорошие цели** (глобальный CDN):
-- `www.microsoft.com` — Azure CDN, глобальный
+- `www.cloudflare.com` — Cloudflare CDN, глобальный
 - `www.twitch.tv` — Fastly CDN, глобальный
 - `dl.google.com` — Google CDN, глобальный
 - `github.com` — Fastly CDN, глобальный

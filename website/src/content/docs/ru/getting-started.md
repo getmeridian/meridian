@@ -32,7 +32,7 @@ meridian deploy
 Или укажите всё заранее:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 1.2.3.4 --sni www.cloudflare.com
 ```
 
 Если вы запускаете команду прямо на VPS под root, SSH пропускается:

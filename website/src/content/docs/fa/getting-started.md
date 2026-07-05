@@ -30,7 +30,7 @@ meridian deploy
 یا هر چیز را از قبل مشخص کنید:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 1.2.3.4 --sni www.cloudflare.com
 ```
 
 ## چه اتفاقی می‌افتد

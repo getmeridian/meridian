@@ -192,8 +192,8 @@ class TestInboundCRUD:
                 "realitySettings": {
                     "show": False,
                     "xver": 0,
-                    "dest": "www.microsoft.com:443",
-                    "serverNames": ["www.microsoft.com"],
+                    "dest": "www.cloudflare.com:443",
+                    "serverNames": ["www.cloudflare.com"],
                     "privateKey": "WBNp7SHzGMaqp6ohXMfJHUyBMWHoeHMflVPaaxdtRHo",
                     "minClient": "",
                     "maxClient": "",
@@ -260,7 +260,7 @@ class TestInboundCRUD:
             parsed_stream = json.loads(created["streamSettings"])
             assert parsed_stream["network"] == "tcp"
             assert parsed_stream["security"] == "reality"
-            assert parsed_stream["realitySettings"]["dest"] == "www.microsoft.com:443"
+            assert parsed_stream["realitySettings"]["dest"] == "www.cloudflare.com:443"
 
         finally:
             # Cleanup
