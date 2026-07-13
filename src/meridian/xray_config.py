@@ -267,15 +267,19 @@ def build_xray_config(
     if hysteria2:
         hy2_inbound = {
             "tag": "hysteria2",
-            "protocol": "hysteria2",
+            "protocol": "hysteria",
             "listen": "0.0.0.0",
             "port": 443,
             "settings": {
                 "clients": [],
+                "version": 2,
             },
             "streamSettings": {
-                "network": "hysteria2",
+                "network": "hysteria",
                 "security": "tls",
+                "hysteriaSettings": {
+                    "version": 2,
+                },
                 "tlsSettings": {
                     "certificates": [
                         {

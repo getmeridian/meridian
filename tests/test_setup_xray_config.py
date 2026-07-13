@@ -458,9 +458,9 @@ class TestBuildXrayConfigHysteria2Inbound:
         ib = self._hy2()
         assert ib["port"] == 443
 
-    def test_hysteria2_protocol_is_hysteria2(self) -> None:
+    def test_hysteria2_uses_remnawave_protocol_name(self) -> None:
         ib = self._hy2()
-        assert ib["protocol"] == "hysteria2"
+        assert ib["protocol"] == "hysteria"
 
     def test_hysteria2_alpn_is_h3(self) -> None:
         ib = self._hy2()
@@ -470,6 +470,11 @@ class TestBuildXrayConfigHysteria2Inbound:
         ib = self._hy2()
         assert ib["settings"]["clients"] == []
 
-    def test_hysteria2_network_is_hysteria2(self) -> None:
+    def test_hysteria2_selects_version_two(self) -> None:
         ib = self._hy2()
-        assert ib["streamSettings"]["network"] == "hysteria2"
+        assert ib["settings"]["version"] == 2
+        assert ib["streamSettings"]["hysteriaSettings"]["version"] == 2
+
+    def test_hysteria2_uses_remnawave_network_name(self) -> None:
+        ib = self._hy2()
+        assert ib["streamSettings"]["network"] == "hysteria"
