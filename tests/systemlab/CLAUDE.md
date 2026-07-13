@@ -32,3 +32,5 @@ make system-lab
 - Nested image pulls make cold runs slow; preserve BuildKit apt caches.
 - `systemd` may report `degraded` inside privileged containers; this is accepted when required services are healthy.
 - The controller image must copy the custom Hatch build hook before `pip install .`.
+- JSON CLI assertions must read the standard envelope under `data`, not obsolete top-level command fields.
+- Hysteria2 is enabled by default, so hardened exits must allow both TCP and UDP on port 443.

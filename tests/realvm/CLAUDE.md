@@ -27,6 +27,7 @@ Costs real money (~€0.01 per full single-topology run).
 - **Always teardown in `finally`** — the orchestrator does it; verify scripts must not hold the VM open on failure (except `--keep` explicitly).
 - **Hetzner server types deprecate** — CX22 was deprecated in 2025; harness defaults to `cx23`. Refresh topology YAMLs and `providers/hetzner.py::_HOURLY_EUR` when upstream sunsets a generation.
 - **Rich console ANSI in captured output** — `meridian fleet status` renders colors; prefer `meridian --json fleet status` in verify scripts for stable field access.
+- **JSON command output is enveloped** — read command fields below `data`; there are no legacy top-level payloads in v4.
 - **Let's Encrypt IP-cert rate limit** — the shortlived profile used for bare-IP certs caps at ~5 issuances per /32 IPv4 per 7 days. Iterating `make real-lab` >5 times on the same IP (Hetzner sometimes re-issues the same pool address within ~24h) trips the limit; `acme.sh` falls back to self-signed and the `cert chain issued by Let's Encrypt` assertion fails. Destroy + recreate the VM and the API will allocate a fresh Primary IPv4. For sustained iteration, prefer tier β (domain mode) — LE's domain profile is 50/week per registered domain.
 
 ## Links

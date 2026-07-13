@@ -138,7 +138,7 @@ CLIENTS_JSON=$(uv run meridian --json client list 2>/dev/null || true)
 if echo "$CLIENTS_JSON" | python3 -c "
 import sys, json
 data = json.loads(sys.stdin.read() or '[]')
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 print('    clients found:', names, file=sys.stderr)
 sys.exit(0 if 'realvm-testuser' in names else 1)

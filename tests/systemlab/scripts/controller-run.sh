@@ -188,7 +188,7 @@ echo ">>> Listing clients..."
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'alice' in names, f'alice not in {names}'
 assert 'bob' in names, f'bob not in {names}'
@@ -222,7 +222,7 @@ fi
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'alice' not in names, f'alice still in {names}'
 assert 'bob' in names, f'bob not in {names}'
@@ -590,7 +590,7 @@ fi
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'charlie' in names, f'charlie not in {names}'
 " 2>/dev/null; then
@@ -633,7 +633,7 @@ fi
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'charlie' not in names, f'charlie still in panel: {names}'
 " 2>/dev/null; then
@@ -662,7 +662,7 @@ meridian apply --yes 2>&1 >/dev/null
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'ghost-extras' in names, f'ghost-extras gone after --yes alone — safety default broken'
 " 2>/dev/null; then
@@ -676,7 +676,7 @@ meridian apply --yes --prune-extras=yes 2>&1 >/dev/null
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'ghost-extras' not in names, f'ghost-extras still in panel after --prune-extras=yes: {names}'
 " 2>/dev/null; then
@@ -703,7 +703,7 @@ meridian apply --yes --prune-extras=yes 2>&1 >/dev/null
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'state-test-alice' in names, f'state-test-alice not created: {names}'
 " 2>/dev/null; then
@@ -728,7 +728,7 @@ meridian apply --yes 2>&1 >/dev/null
 if meridian --json client list 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-clients = data if isinstance(data, list) else data.get('clients', [])
+clients = data['data']['clients']
 names = [c.get('username', '') for c in clients]
 assert 'state-test-alice' not in names, f'still present: {names}'
 " 2>/dev/null; then
@@ -960,6 +960,12 @@ else
   fail_test "ufw missing HTTPS rule (443/tcp)"
 fi
 
+if echo "$UFW_STATUS" | grep -q "443/udp"; then
+  pass "ufw allows Hysteria2 (443/udp)"
+else
+  fail_test "ufw missing Hysteria2 rule (443/udp)"
+fi
+
 if echo "$UFW_STATUS" | grep -q "22/tcp"; then
   pass "ufw allows SSH (22/tcp)"
 else
@@ -973,8 +979,8 @@ else
   fail_test "ufw missing HTTP rule (80/tcp)"
 fi
 
-# Verify no unexpected ports beyond 22, 80, 443 (and Docker internal ranges)
-UNEXPECTED=$(echo "$UFW_STATUS" | grep "ALLOW" | grep -v "22/tcp" | grep -v "80/tcp" | grep -v "443/tcp" | grep -v "172\." || true)
+# Verify no unexpected ports beyond 22, 80, 443/tcp, 443/udp (and Docker internal ranges)
+UNEXPECTED=$(echo "$UFW_STATUS" | grep "ALLOW" | grep -v "22/tcp" | grep -v "80/tcp" | grep -v "443/tcp" | grep -v "443/udp" | grep -v "172\." || true)
 if [ -n "$UNEXPECTED" ]; then
   fail_test "unexpected ufw rules: $UNEXPECTED"
 else
