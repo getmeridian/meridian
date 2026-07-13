@@ -78,6 +78,8 @@ meridian server remove NAME
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--name NAME` | (auto) | Display name for the server |
+| `--user/-u USER` | root | SSH user on the server |
+| `--ssh-port PORT` | 22 | SSH port on the server (if non-standard) |
 
 ### meridian node
 
