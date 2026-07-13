@@ -6,7 +6,7 @@ import { workflowOptions } from '../studio/contractDefaults.js';
 import { deployWorkflow } from '../studio/generated/index.js';
 
 const firstContext = studioJourneySteps[0];
-const colorOptions = workflowOptions(deployWorkflow, 'color');
+const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: string; value: string }>;
 ---
 
 <Base

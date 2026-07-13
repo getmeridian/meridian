@@ -43,7 +43,13 @@ Repository = "https://github.com/getmeridian/meridian"
 Issues = "https://github.com/getmeridian/meridian/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "ruff>=0.4", "mypy>=1.0", "types-PyYAML>=6.0"]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+    "mypy>=1.0",
+    "types-PyYAML>=6.0",
+    "hatchling>=1.31.0",
+]
 # Cloud providers for `meridian.infra` — used by tests/realvm/ harness and
 # (eventually) by `meridian deploy --create-vm <provider>`. Each provider is
 # optional: `pip install meridian-vpn[hetzner]` gets only Hetzner support.
@@ -53,11 +59,11 @@ hetzner = ["hcloud>=2.0"]
 path = "VERSION"
 pattern = "(?P<version>.+)"
 
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/meridian"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"website/dist" = "meridian/studio_assets"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
@@ -75,9 +81,6 @@ exclude = [
     "/uv.lock",
     "CLAUDE.md",
 ]
-
-[tool.hatch.build.targets.sdist.force-include]
-"website/dist" = "src/meridian/studio_assets"
 
 [tool.ruff]
 target-version = "py311"

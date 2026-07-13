@@ -182,6 +182,11 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
 
+      - name: Validate packaged Studio assets
+        run: |
+          uv build --wheel
+          python3 scripts/verify_package_assets.py dist/*.whl
+
       - name: Validate PWA demo generation
         run: |
           uv run meridian dev preview --output website/dist/demo

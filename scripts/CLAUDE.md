@@ -6,6 +6,8 @@
 
 **Deterministic output** — scripts that write tracked artifacts must have a `--check` mode for CI drift detection.
 
+**Conditional Studio packaging** — `hatch_build.py` bundles `website/dist` when present so clean source installs work; release/CI builds verify the generated Studio marker inside the wheel.
+
 ## What's done well
 
 - `export_contracts.py` keeps schemas, command catalog, workflow manifests, event types, and fixtures generated from one core source.

@@ -30,3 +30,4 @@ cd website && pnpm install && pnpm run build   # Astro + Pagefind
 - **Early `<head>` scripts** — detect lang + theme from localStorage before paint. Prevents RTL layout shift and dark mode flash.
 - **SEO structured data** — JSON-LD schemas (FAQPage, Organization, BreadcrumbList, Article) are baked at build time. Hreflang links on docs pages connect locale variants for search engines.
 - **Sitemap i18n** — Astro sitemap integration generates entries for all locale paths.
+- **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency; relying on Astro's optional edge leaves clean Linux builds without a linked image service.

@@ -99,6 +99,7 @@ studio-assets: ## Build website assets bundled into `meridian studio`
 
 build: ai-docs studio-assets ## Build wheel and sdist
 	uv build
+	uv run python scripts/verify_package_assets.py dist/*.whl
 
 publish: build ## Publish to PyPI (requires trusted publisher or token)
 	uv publish

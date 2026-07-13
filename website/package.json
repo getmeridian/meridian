@@ -16,7 +16,8 @@
   "dependencies": {
     "@astrojs/sitemap": "^3.7.1",
     "astro": "^5.7.0",
-    "mermaid": "^11.13.0"
+    "mermaid": "^11.13.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.2",

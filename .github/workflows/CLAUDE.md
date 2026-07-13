@@ -18,6 +18,7 @@
 - **System lab depends on lint+test** — syntax must be clean before spinning up Docker. Saves CI minutes on obvious failures.
 - **PWA demo validation** — CI generates a demo PWA page and verifies all required files exist, SW is disabled for static hosting, and client HTML renders correctly.
 - **Contract drift checks** — Python validate runs `scripts/export_contracts.py --check`; website build runs `pnpm run contracts:check`.
+- **Package asset check** — website CI builds a wheel after Astro and verifies the generated Studio entry point is bundled.
 
 ## Pitfalls
 

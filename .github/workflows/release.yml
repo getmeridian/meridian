@@ -225,6 +225,7 @@ jobs:
             echo ""
           done > src/meridian/data/ai-reference.md
           python -m build
+          python scripts/verify_package_assets.py dist/*.whl
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
