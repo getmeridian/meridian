@@ -31,3 +31,4 @@ make system-lab
 - Pebble is installed for domain-mode work, but current coverage uses IP mode.
 - Nested image pulls make cold runs slow; preserve BuildKit apt caches.
 - `systemd` may report `degraded` inside privileged containers; this is accepted when required services are healthy.
+- The controller image must copy the custom Hatch build hook before `pip install .`.

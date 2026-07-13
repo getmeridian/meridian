@@ -11,6 +11,7 @@ WORKDIR /workspace
 
 # Install Python deps first (cached unless pyproject.toml changes)
 COPY pyproject.toml VERSION README.md ./
+COPY scripts/hatch_build.py scripts/hatch_build.py
 COPY src/ src/
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir .
