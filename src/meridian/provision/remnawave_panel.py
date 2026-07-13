@@ -298,11 +298,6 @@ class DeployRemnawavePanel:
 
     Includes backend, PostgreSQL, Valkey, and subscription page.
     Idempotency: skipped when all core containers are already running.
-
-    Secrets generated here are stored in the provision context under:
-      - ctx["remnawave_db_password"]
-      - ctx["remnawave_jwt_auth_secret"]
-      - ctx["remnawave_jwt_api_secret"]
     """
 
     name = "Deploy Remnawave panel"
@@ -326,7 +321,7 @@ class DeployRemnawavePanel:
         host = ctx.domain or ctx.ip
         # Include the secret path so Remnawave's UI subscription URLs
         # route through the nginx panel location (not exposed at root).
-        web_base_path = ctx.get("web_base_path", "")
+        web_base_path = ctx.web_base_path
         if web_base_path:
             sub_public_domain = self.sub_public_domain or f"{host}/{web_base_path}/api/sub"
         else:
@@ -344,10 +339,6 @@ class DeployRemnawavePanel:
                 break
 
         if core_running:
-            env_read = conn.run(f"cat {shlex.quote(panel_dir)}/.env 2>/dev/null", timeout=15)
-            if env_read.returncode == 0:
-                _load_env_into_ctx(env_read.stdout, ctx)
-
             # Check if subscription page also running (upgrade from pre-subscription deploys)
             sub_check = conn.run(
                 f"docker inspect -f '{{{{.State.Running}}}}' {_SUBSCRIPTION_PAGE_CONTAINER} 2>/dev/null",
@@ -470,32 +461,4 @@ class DeployRemnawavePanel:
                 detail=deploy_result.detail,
             )
 
-        # -- Store secrets in context --
-        ctx["remnawave_db_password"] = db_password
-        ctx["remnawave_jwt_auth_secret"] = jwt_auth_secret
-        ctx["remnawave_jwt_api_secret"] = jwt_api_secret
-
         return StepResult(name=self.name, status="changed")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _load_env_into_ctx(env_text: str, ctx: ProvisionContext) -> None:
-    """Parse key=value lines from .env and populate known ctx keys."""
-    key_map = {
-        "POSTGRES_PASSWORD": "remnawave_db_password",
-        "JWT_AUTH_SECRET": "remnawave_jwt_auth_secret",
-        "JWT_API_TOKENS_SECRET": "remnawave_jwt_api_secret",
-    }
-    for line in env_text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        raw_key, _, raw_val = line.partition("=")
-        env_key = raw_key.strip()
-        env_val = raw_val.strip().strip('"')
-        if env_key in key_map:
-            ctx[key_map[env_key]] = env_val

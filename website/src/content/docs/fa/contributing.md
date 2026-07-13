@@ -7,15 +7,15 @@ section: reference
 
 ## گزارش مسائل
 
-- **باگ؟** از [template گزارش باگ](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml) استفاده کنید — ابتدا `meridian doctor` را اجرا کنید
-- **مسئله اتصال؟** از [template مسئله اتصال](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml) استفاده کنید — ابتدا `meridian test` و `meridian preflight` را اجرا کنید
-- **ایده ویژگی؟** از [template درخواست ویژگی](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml) استفاده کنید
+- **باگ؟** از [template گزارش باگ](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) استفاده کنید — ابتدا `meridian doctor` را اجرا کنید
+- **مسئله اتصال؟** از [template مسئله اتصال](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) استفاده کنید — ابتدا `meridian test` و `meridian preflight` را اجرا کنید
+- **ایده ویژگی؟** از [template درخواست ویژگی](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml) استفاده کنید
 - **آسیب‌پذیری امنیتی؟** [امنیت](/docs/fa/security/) را ببینید — یک issue عمومی باز نکنید
 
 ## تنظیم توسعه
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # نصب CLI در حالت قابل ویرایش با وابستگی‌های توسعه
 make install
@@ -41,7 +41,7 @@ CLI یک بسته Python است (`src/meridian/`) که از طریق PyPI به �
 ماژول‌های کلیدی:
 - `cli.py` — Typer app، ثبت subcommand
 - `commands/` — یک ماژول در هر subcommand
-- `credentials.py` — dataclass `ServerCredentials`
+- `cluster.py` + `cluster_persistence.py` — وضعیت نوع‌دار `cluster.yml` و ذخیره‌سازی آن
 - `servers.py` — `ServerRegistry` برای سرورهای شناخته‌شده
 - `provision/` — خط لوله مرحله idempotent
 
@@ -56,8 +56,8 @@ CLI یک بسته Python است (`src/meridian/`) که از طریق PyPI به �
 ## قراردادهای کلیدی
 
 - **مقادیر Shell از `shlex.quote()` استفاده می‌کنند** — هرگز مقادیر تمیز‌نشده را درون‌یاب نکنید
-- **template‌های connection-info باید همگام باشند** (CSS/JS/app links)
-- **پیکربندی nginx** به `/etc/nginx/conf.d/meridian-*.conf` می‌رود، نه nginx.conf اصلی
+- **PWA تنها پیاده‌سازی صفحه اتصال است** — دارایی‌های `templates/pwa/` و فهرست برنامه‌ها (`_PWA_APPS` در برابر `website/src/data/apps.json`) باید همگام بمانند
+- **پیکربندی nginx** از `/etc/nginx/stream.d/meridian.conf` و `/etc/nginx/conf.d/meridian-http.conf` استفاده می‌کند
 - **مراحل Provisioner** `StepResult` برمی‌گردانند (ok/changed/skipped/failed)
 
 ## تست

@@ -58,7 +58,7 @@ class TestFail:
         with pytest.raises(typer.Exit):
             fail("error occurred")
         captured = capsys.readouterr()
-        assert "github.com/uburuntu/meridian/issues" in captured.err
+        assert "github.com/getmeridian/meridian/issues" in captured.err
 
     def test_fail_hint_type_user_no_github_link(self, capsys: pytest.CaptureFixture[str]) -> None:
         """hint_type='user' should not show GitHub link."""
@@ -83,7 +83,7 @@ class TestFail:
         with pytest.raises(typer.Exit):
             fail("unexpected state", hint_type="bug")
         captured = capsys.readouterr()
-        assert "github.com/uburuntu/meridian/issues" in captured.err
+        assert "github.com/getmeridian/meridian/issues" in captured.err
 
     def test_fail_json_mode_emits_structured_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         set_json_mode(True)
@@ -169,14 +169,14 @@ class TestConfirm:
 
 class TestPrompt:
     def test_prompt_returns_input(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("1.2.3.4")):
+        with patch("builtins.open", return_value=_make_tty_mock("198.51.100.10")):
             result = prompt("IP address")
-        assert result == "1.2.3.4"
+        assert result == "198.51.100.10"
 
     def test_prompt_empty_returns_default(self) -> None:
         with patch("builtins.open", return_value=_make_tty_mock("")):
-            result = prompt("IP address", default="10.0.0.1")
-        assert result == "10.0.0.1"
+            result = prompt("IP address", default="198.51.100.11")
+        assert result == "198.51.100.11"
 
     def test_prompt_no_tty_returns_default(self) -> None:
         with patch("builtins.open", side_effect=OSError("No TTY")):

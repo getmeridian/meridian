@@ -8,10 +8,10 @@ import time
 
 from meridian.cluster import ClusterConfig
 from meridian.commands.resolve import resolve_server
-from meridian.config import DEFAULT_SNI, SERVERS_FILE
+from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
 from meridian.console import err_console, info, ok, warn
+from meridian.health import tcp_connect
 from meridian.servers import ServerRegistry
-from meridian.ssh import tcp_connect
 
 
 def run(
@@ -21,7 +21,7 @@ def run(
     requested_server: str = "",
 ) -> None:
     """Test proxy reachability from the current device. No SSH required."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip)
 
     # Load cluster config for node metadata

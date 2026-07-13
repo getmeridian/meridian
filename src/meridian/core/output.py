@@ -21,7 +21,6 @@ from meridian.core.models import (
     ResourceRef,
     Summary,
 )
-from meridian.core.plan import build_plan_result
 from meridian.core.redaction import redact
 from meridian.core.serde import to_plain
 
@@ -128,11 +127,6 @@ def json_dumps(value: Any) -> str:
 def jsonl_dumps(value: Any) -> str:
     """Return a redacted, compact JSON string for one JSONL record."""
     return json.dumps(redact(to_plain(value)), sort_keys=True, separators=(",", ":"))
-
-
-def plan_payload(plan: Any, *, exit_code: int) -> dict[str, Any]:
-    """Return the stable plan data payload used under output envelopes."""
-    return build_plan_result(plan, exit_code=exit_code).to_data()
 
 
 class EventStream:

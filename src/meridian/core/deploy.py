@@ -29,7 +29,6 @@ class DeployRequest(CoreModel):
     server_name: str = ""
     icon: str = ""
     color: str = ""
-    decoy: str = ""
     warp: bool = False
     geo_block: bool = True
     ssh_port: int = Field(default=22, ge=1, le=65535)

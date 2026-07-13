@@ -62,13 +62,13 @@ def test_operation_delegates_wrapped_step_attributes() -> None:
     assert operation._packages == ["curl"]
 
 
-def test_setup_pipeline_steps_are_operations_with_resources(tmp_path) -> None:
-    ctx = ProvisionContext(ip="198.51.100.1", domain="example.com", creds_dir=str(tmp_path))
+def test_setup_pipeline_steps_are_operations_with_resources() -> None:
+    ctx = ProvisionContext(ip="198.51.100.1", domain="example.com")
     steps = build_setup_steps(ctx)
 
     assert all(isinstance(step, Operation) for step in steps)
     by_name = {step.name: step for step in steps}
-    assert Resource.DOCKER_INSTALLED in by_name["Remove legacy 3x-ui panel"].requires
+    assert Resource.DOCKER_INSTALLED in by_name["Deploy Remnawave panel"].requires
     assert Resource.NGINX_INSTALLED in by_name["Configure nginx"].requires
     assert Resource.TLS_CERTIFICATE in by_name["Deploy PWA assets"].requires
 
@@ -85,8 +85,8 @@ def test_relay_pipeline_steps_are_operations_with_resources() -> None:
     assert Resource.REALM_CONFIGURED in by_name["Verify relay connectivity"].requires
 
 
-def test_node_pipeline_keeps_panel_out_of_graph(tmp_path) -> None:
-    ctx = ProvisionContext(ip="198.51.100.1", hosted_page=True, creds_dir=str(tmp_path))
+def test_node_pipeline_keeps_panel_out_of_graph() -> None:
+    ctx = ProvisionContext(ip="198.51.100.1", hosted_page=True)
     steps = build_node_steps(ctx)
 
     names = [step.name for step in steps]

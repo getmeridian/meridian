@@ -145,7 +145,7 @@ def _make_command_envelope(
     data_type: type,
     *,
     success_statuses: Any = None,
-    failure_data_type: type = EmptyData,
+    failure_data_type: Any = EmptyData,
     doc: str = "",
 ) -> tuple[type[_ContractEnvelope], type[_ContractEnvelope], type[RootModel]]:  # type: ignore[type-arg]
     """Build (SuccessEnvelope, TerminalEnvelope, OutputEnvelope) for a command.
@@ -185,7 +185,7 @@ def _make_command_envelope(
         errors=(list[MeridianError], Field(min_length=1)),
     )
 
-    union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]
+    union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]  # type: ignore[valid-type]
     root_cls = type(f"{prefix}OutputEnvelope", (RootModel[union_type],), {"__doc__": doc})
 
     return success_cls, terminal_cls, root_cls

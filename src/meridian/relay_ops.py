@@ -10,15 +10,8 @@ import logging
 import re
 import shlex
 
-import yaml
-
 from meridian.cluster import ClusterConfig, ProtocolKey, RelayEntry
-from meridian.config import (
-    CREDS_BASE,
-    sanitize_ip_for_path,
-)
 from meridian.remnawave import MeridianPanel, RemnawaveError
-from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -38,48 +31,6 @@ def relay_xray_port(relay_ip: str) -> int:
     from meridian.core.deploy_planning import compute_relay_port
 
     return compute_relay_port(relay_ip)
-
-
-def relay_registry_user(registry: ServerRegistry, relay_ip: str, explicit_user: str) -> str:
-    """Pick the relay SSH user from explicit flag or the stored registry entry."""
-    if explicit_user:
-        return explicit_user
-    entry = registry.find(relay_ip)
-    return entry.user if entry and entry.user else "root"
-
-
-# ---------------------------------------------------------------------------
-# Local relay metadata
-# ---------------------------------------------------------------------------
-
-
-def save_relay_local(relay_ip: str, exit_ip: str, exit_port: int, listen_port: int) -> None:
-    """Save relay metadata to ~/.meridian/credentials/<relay-ip>/relay.yml (atomic)."""
-    import os
-    import tempfile
-
-    relay_creds_dir = CREDS_BASE / sanitize_ip_for_path(relay_ip)
-    relay_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    relay_meta = {
-        "role": "relay",
-        "exit_ip": exit_ip,
-        "exit_port": exit_port,
-        "listen_port": listen_port,
-    }
-    relay_file = relay_creds_dir / "relay.yml"
-    fd, tmp = tempfile.mkstemp(dir=str(relay_creds_dir), suffix=".tmp")
-    try:
-        os.write(fd, yaml.dump(relay_meta, default_flow_style=False, sort_keys=False).encode())
-        os.close(fd)
-        fd = -1
-        os.chmod(tmp, 0o600)
-        os.rename(tmp, str(relay_file))
-    except BaseException:
-        if fd >= 0:
-            os.close(fd)
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
 
 
 # ---------------------------------------------------------------------------

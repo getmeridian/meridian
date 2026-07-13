@@ -28,7 +28,6 @@ class TestFromXrayVersion:
         assert caps.finalmask is False
         assert caps.xhttp_h2 is False
         assert caps.xhttp_h3 is False
-        assert caps.vless_pq is False
 
     def test_version_25_no_advanced_features(self) -> None:
         caps = NodeCapabilities.from_xray_version("25.1.0")

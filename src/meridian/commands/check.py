@@ -5,16 +5,12 @@ from __future__ import annotations
 import shlex
 import time
 
-from meridian.commands.resolve import (
-    ensure_server_connection,
-    fetch_credentials,
-    resolve_server,
-)
-from meridian.config import DEFAULT_SNI, SERVERS_FILE
+from meridian.commands.resolve import ensure_server_connection, resolve_server
+from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
 from meridian.console import err_console, info, line, ok, warn
 from meridian.facts import ServerFacts
+from meridian.health import tcp_connect
 from meridian.servers import ServerRegistry
-from meridian.ssh import tcp_connect
 
 
 def run(
@@ -26,11 +22,10 @@ def run(
     requested_server: str = "",
 ) -> None:
     """Run pre-flight checks on a server."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
 
     resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
 
     err_console.print()
     err_console.print("  [bold]Pre-flight Check[/bold]")
@@ -116,7 +111,7 @@ def run(
 
         match = re.search(r'users:\(\("([^"]*)"', port_check)
         port_user = match.group(1) if match else "unknown"
-        allowed = {"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy", "3x-ui"}
+        allowed = {"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"}
         if port_user in allowed:
             ok(f"Port 443 is in use by {port_user} (Meridian -- OK)")
             results["port443"] = f"in use by {port_user} (OK)"

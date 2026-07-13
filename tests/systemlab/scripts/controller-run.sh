@@ -880,7 +880,7 @@ fi
 
 # Verify nginx route serves a response.
 #
-# The Remnawave subscription-page app (v7.1.8) routes by user short UUID
+# The Remnawave subscription-page app routes by user short UUID
 # and does NOT serve the root path — hitting `/` on the upstream leaves
 # the app waiting for a client identifier and the connection eventually
 # hangs. An earlier iteration of this test probed `/` and saw 502s not

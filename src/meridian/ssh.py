@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from meridian.core.execution import RemoteCommandResult
 
 from meridian.core.errors import MeridianError
-from meridian.health import tcp_connect  # noqa: F401  # re-export for backward compat
 from meridian.ssh_auth import (
     _DEFAULT_UI,
     SSHUI,
@@ -29,7 +28,6 @@ from meridian.ssh_auth import (
     _verify_host_key,
     ensure_askpass_script,
     ensure_multiplex_dir,
-    scp_host,  # noqa: F401  # re-export
 )
 from meridian.ssh_transfer import _FileTransferMixin
 
@@ -37,20 +35,7 @@ logger = logging.getLogger("meridian.ssh")
 
 
 class SSHError(MeridianError):
-    """Raised when an SSH operation fails.
-
-    Attributes:
-        hint: Optional recovery suggestion for the user.
-        hint_type: Backward-compatible alias for ``category``.
-    """
-
-    def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system") -> None:
-        super().__init__(msg, hint=hint, category=hint_type)  # type: ignore[arg-type]
-
-    @property
-    def hint_type(self) -> str:
-        """Backward-compatible alias for ``self.category``."""
-        return self.category
+    """Raised when an SSH operation fails."""
 
 
 # Patterns to redact from debug log output (env var assignments with secrets)
@@ -127,15 +112,6 @@ class CommandResult:
             operation_name=result.operation_name,
         )
 
-    def check_returncode(self) -> None:
-        if self.returncode != 0:
-            raise subprocess.CalledProcessError(
-                self.returncode,
-                self.args,
-                output=self.stdout,
-                stderr=self.stderr,
-            )
-
 
 def _stringify_output(value: str | bytes | None) -> str:
     if value is None:
@@ -144,15 +120,6 @@ def _stringify_output(value: str | bytes | None) -> str:
         return value.decode(errors="replace")
     return value
 
-
-SSH_OPTS: list[str] = [
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=yes",
-]
 
 # SSH multiplexing: reuse a single TCP connection for multiple commands
 # to the same host. ControlPersist=300 keeps the master alive for 5min
@@ -206,7 +173,7 @@ class ServerConnection(_FileTransferMixin):
         # in commands/client.py and commands/recover.py.
         return self
 
-    def __exit__(self, *exc_info: object) -> None:
+    def __exit__(self, *_exc_info: object) -> None:
         # Multiplexed connections persist for SSH_MULTIPLEX_OPTS' lifetime;
         # nothing to release here.
         return None
@@ -228,32 +195,6 @@ class ServerConnection(_FileTransferMixin):
         if self.port != 22:
             opts.extend(["-p", str(self.port)])
         return opts
-
-    @property
-    def _scp_opts(self) -> list[str]:
-        """SSH options for SCP commands (uses -P for port, not -p)."""
-        opts = [
-            "-o",
-            "BatchMode=no" if self.password else "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=10",
-            "-o",
-            "StrictHostKeyChecking=yes",
-        ]
-        if self.multiplex and not self.local_mode:
-            opts.extend(SSH_MULTIPLEX_OPTS)
-        if self.identity_file:
-            opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
-        if self.port != 22:
-            opts.extend(["-P", str(self.port)])
-        return opts
-
-    @property
-    def _scp_host(self) -> str:
-        """Host string for SCP commands (brackets IPv6 addresses)."""
-        if ":" in self.ip and not self.ip.startswith("["):
-            return f"[{self.ip}]"
-        return self.ip
 
     def _prepare_command(
         self,
@@ -452,40 +393,39 @@ class ServerConnection(_FileTransferMixin):
                 raise SSHError(
                     f"Host key for {self.ip} not accepted",
                     hint="Verify the fingerprint matches your VPS provider's console.",
-                    hint_type="user",
+                    category="user",
                 )
 
         try:
             result = self.run("echo ok", timeout=10)
         except FileNotFoundError:
-            raise SSHError("ssh command not found. Please install OpenSSH client.", hint_type="system")
+            raise SSHError("ssh command not found. Please install OpenSSH client.", category="system")
 
         if result.returncode != 0:
             stderr = result.stderr.strip()
             # run() converts TimeoutExpired to returncode=124
             if result.returncode == 124:
-                raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", hint_type="system")
+                raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", category="system")
             # Host key changed
             if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
                 ui.host_key_changed(self.ip)
-                raise SSHError(f"Host key verification failed for {self.ip}", hint_type="system")
+                raise SSHError(f"Host key verification failed for {self.ip}", category="system")
             # sudo not found
             if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
                 raise SSHError(
                     f"sudo is not installed on {self.ip}",
                     hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
-                    hint_type="system",
+                    category="system",
                 )
             ui.ssh_failed(self.ip, self.user, stderr)
-            raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", hint_type="system")
+            raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", category="system")
         ui.ok("SSH connection successful")
 
     def detect_local_mode(self) -> bool:
         """Check if we're running on the target server itself.
 
-        Detection is file-based only: /etc/meridian/node.yml (v4) or
-        /etc/meridian/proxy.yml (v3 compat) readable (root), or
-        /etc/meridian/ directory exists but files not readable (non-root).
+        Detection is file-based only: /etc/meridian/node.yml readable (root),
+        or /etc/meridian/ exists but the identity file is unreadable (non-root).
 
         Does NOT use public IP matching — that produces false positives when
         the user is connected to the server via TUN mode (VPN), since their
@@ -495,18 +435,8 @@ class ServerConnection(_FileTransferMixin):
 
         file_check_failed = False
 
-        # v4: node.yml
         try:
             if SERVER_NODE_CONFIG.is_file() and SERVER_NODE_CONFIG.stat().st_size > 0:
-                self.local_mode = True
-                return True
-        except (PermissionError, OSError):
-            file_check_failed = True
-
-        # v3 compat: proxy.yml
-        proxy = SERVER_CREDS_DIR / "proxy.yml"
-        try:
-            if proxy.is_file() and proxy.stat().st_size > 0:
                 self.local_mode = True
                 return True
         except (PermissionError, OSError):

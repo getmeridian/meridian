@@ -4,15 +4,15 @@ Thanks for your interest! Here's how to help.
 
 ## Reporting Issues
 
-- **Bug?** Use the [bug report template](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml) — run `meridian doctor` first to collect info
-- **Connection not working?** Use the [connection issue template](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml) — run `meridian test` and `meridian preflight` first
-- **Feature idea?** Use the [feature request template](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
+- **Bug?** Use the [bug report template](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — run `meridian doctor` first to collect info
+- **Connection not working?** Use the [connection issue template](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — run `meridian test` and `meridian preflight` first
+- **Feature idea?** Use the [feature request template](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
 - **Security vulnerability?** See [SECURITY.md](SECURITY.md) — do NOT open a public issue
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # Install the CLI in editable mode with all dev dependencies (uses uv sync --extra dev)
 make install
@@ -38,7 +38,7 @@ The CLI is a Python package (`src/meridian/`) distributed via PyPI as `meridian-
 Key modules:
 - `cli.py` — Typer app, subcommand registration
 - `commands/` — One module per subcommand (setup, client, check, etc.)
-- `credentials.py` — `ServerCredentials` dataclass for YAML credential management
+- `cluster.py` + `cluster_persistence.py` — typed `cluster.yml` state and persistence
 - `servers.py` — `ServerRegistry` for the known servers index
 - `provision/` — Provisioner engine: idempotent steps with structured tracing and error output
 
@@ -55,18 +55,18 @@ Key modules:
 See [CLAUDE.md](CLAUDE.md) for detailed architecture, implicit dependencies, and conventions. Key points:
 
 - **Shell values use `shlex.quote()`** — never interpolate unsanitized values into shell commands
-- **Connection-info templates must stay in sync** (CSS/JS/app links)
-- **Caddy config** goes in `/etc/caddy/conf.d/meridian.caddy`, not the main Caddyfile
+- **PWA assets must stay in sync** (`templates/pwa/` and the application catalog)
+- **nginx config** uses `/etc/nginx/stream.d/meridian.conf` plus `/etc/nginx/conf.d/meridian-http.conf`
 - **Provisioner steps** return `StepResult` (ok/changed/skipped/failed) for structured tracing
 
 
 ## Testing
 
 There's no way to fully test without a real server. The CI pipeline validates:
-- Python tests (`pytest`) — credentials, servers, CLI, protocols, update logic
+- Python tests (`pytest`) — cluster state, server profiles, CLI, protocols, update logic
 - Python lint (`ruff`) — style and import checks
 - Type checking (`mypy`) — static type analysis
 - Jinja2 template rendering with mock variables
-- Shell script syntax (`install.sh`, `setup.sh`)
+- Shell script syntax (`install.sh`)
 
 For deployment testing, use a cheap VPS and run the full uninstall → install cycle.

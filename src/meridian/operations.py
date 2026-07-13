@@ -79,17 +79,12 @@ def add_node(
 
     effective_sni = sni or DEFAULT_SNI
 
-    # Establish SSH connection. ResolvedServer stores ip/user/local_mode/
-    # creds_dir/conn — the port already lives on `conn`. We start with
-    # local_mode=False; ensure_server_connection() flips it (and refreshes
-    # creds_dir) if the target turns out to be the deployer's own machine.
-    from meridian.config import creds_dir_for
-
+    # Start in remote mode; ensure_server_connection() switches to local mode
+    # if the target turns out to be the deployer's own machine.
     resolved = ResolvedServer(
         ip=ip,
         user=ssh_user,
         local_mode=False,
-        creds_dir=creds_dir_for(ip, local_mode=False),
         conn=ServerConnection(ip, ssh_user, port=ssh_port),
     )
     ensure_server_connection(resolved)
@@ -180,14 +175,11 @@ def update_node(
     if node is None:
         raise ValueError(f"Node {ip} not found in cluster")
 
-    from meridian.config import creds_dir_for
-
     conn = ServerConnection(ip, node.ssh_user, port=node.ssh_port)
     resolved = ResolvedServer(
         ip=ip,
         user=node.ssh_user,
         local_mode=False,
-        creds_dir=creds_dir_for(ip, local_mode=False),
         conn=conn,
     )
 
@@ -315,15 +307,13 @@ def add_relay(
 ) -> RelayEntry:
     """Provision a relay and register host entries in the panel.
 
-    Reuses the same functions as the imperative ``meridian relay deploy``:
-    Realm provisioner, ``create_relay_hosts()``, ``deploy_relay_nginx()``,
-    and ``save_relay_local()``.
+    Reuses the same Realm provisioner and panel/nginx helpers as the
+    imperative ``meridian relay deploy`` command.
     """
     from meridian.config import DEFAULT_SNI
     from meridian.relay_ops import (
         create_relay_hosts,
         deploy_relay_nginx,
-        save_relay_local,
     )
     from meridian.resolve import ResolvedServer, ensure_server_connection
     from meridian.ssh import ServerConnection
@@ -337,14 +327,11 @@ def add_relay(
         raise ValueError(f"Exit node {exit_node_ip} not found in cluster")
 
     # SSH connections
-    from meridian.config import creds_dir_for
-
     relay_conn = ServerConnection(relay_ip, ssh_user, port=ssh_port)
     relay_resolved = ResolvedServer(
         ip=relay_ip,
         user=ssh_user,
         local_mode=False,
-        creds_dir=creds_dir_for(relay_ip, local_mode=False),
         conn=relay_conn,
     )
     ensure_server_connection(relay_resolved)
@@ -385,9 +372,6 @@ def add_relay(
         if not deploy_relay_nginx(exit_conn, effective_sni, relay_ip, relay_name):
             raise RuntimeError(f"Relay {relay_ip}: nginx configuration failed on exit node")
 
-    # Save local relay metadata (same as imperative path)
-    save_relay_local(relay_ip, exit_node.ip, port, port)
-
     # Save relay to cluster
     relay = RelayEntry(
         ip=relay_ip,
@@ -421,7 +405,7 @@ def remove_relay(
 
     Reuses the same functions as the imperative ``meridian relay remove``.
     """
-    from meridian.config import RELAY_SERVICE_NAME, sanitize_ip_for_path
+    from meridian.config import RELAY_SERVICE_NAME
     from meridian.relay_ops import delete_relay_hosts, remove_relay_nginx
     from meridian.ssh import ServerConnection
 
@@ -452,13 +436,6 @@ def remove_relay(
     # Remove from cluster.yml
     cluster.relays = [r for r in cluster.relays if r.ip != relay_ip]
     cluster.save()
-
-    # Clean local relay metadata
-    from meridian.config import CREDS_BASE
-
-    relay_file = CREDS_BASE / sanitize_ip_for_path(relay_ip) / "relay.yml"
-    if relay_file.exists():
-        relay_file.unlink()
 
     # Hybrid sync: drop from desired_relays too (only if managed declaratively).
     hybrid_sync_desired_relays_remove(cluster, relay_ip)

@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import shutil
-
 import typer
 
 from meridian.commands.resolve import (
     ensure_server_connection,
-    fetch_credentials,
     resolve_server,
     try_resolve_server,
 )
-from meridian.config import CREDS_BASE, RELAY_SERVICE_NAME, SERVERS_FILE, sanitize_ip_for_path
+from meridian.config import RELAY_SERVICE_NAME, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, ok, prompt, warn
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
@@ -26,7 +23,7 @@ def run(
     requested_server: str = "",
 ) -> None:
     """Uninstall Meridian from a server."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
 
     # If no IP given and resolution fails, prompt for it
     if not ip:
@@ -50,7 +47,6 @@ def run(
     err_console.print()
 
     resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
 
     info(f"Removing Meridian from {resolved.ip}...")
     err_console.print()
@@ -64,19 +60,13 @@ def run(
         info(f"Stopping {len(relays_for_node)} relay node(s)...")
         for relay in relays_for_node:
             try:
-                relay_conn = ServerConnection(ip=relay.ip, user=user)
+                relay_conn = ServerConnection(ip=relay.ip, user=relay.ssh_user, port=relay.ssh_port)
                 relay_conn.check_ssh(ui=RichSSHUI())
                 relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
                 relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
                 ok(f"Relay {relay.ip} stopped")
             except (OSError, RuntimeError):
                 warn(f"Could not reach relay {relay.ip} — service may still be running")
-            # Clean up local relay metadata
-            relay_creds_dir = CREDS_BASE / sanitize_ip_for_path(relay.ip)
-            relay_file = relay_creds_dir / "relay.yml"
-            if relay_file.exists():
-                relay_file.unlink()
-            registry.remove(relay.ip)
         err_console.print()
 
     # Run uninstall via provisioner
@@ -87,7 +77,6 @@ def run(
     ctx = ProvisionContext(
         ip=resolved.ip,
         user=resolved.user,
-        creds_dir=str(resolved.creds_dir),
     )
 
     provisioner = Provisioner([Uninstall()])
@@ -99,11 +88,6 @@ def run(
 
     # Remove from server registry
     registry.remove(resolved.ip)
-
-    # Remove local credentials
-    creds_dir = CREDS_BASE / sanitize_ip_for_path(resolved.ip)
-    if creds_dir.exists():
-        shutil.rmtree(creds_dir)
 
     # Clean up cluster.yml
     from meridian.config import CLUSTER_CONFIG

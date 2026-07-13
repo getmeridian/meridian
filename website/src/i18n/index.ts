@@ -13,12 +13,6 @@
 
 export type Locale = 'en' | 'ru' | 'fa' | 'zh';
 export const LOCALES: Locale[] = ['en', 'ru', 'fa', 'zh'];
-export const LOCALE_LABELS: Record<Locale, string> = {
-  en: 'EN',
-  ru: 'RU',
-  fa: 'فا',
-  zh: '中文',
-};
 
 const STORAGE_KEY = 'meridian-lang';
 

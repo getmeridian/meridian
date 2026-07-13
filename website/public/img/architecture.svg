@@ -30,7 +30,7 @@
 
   <!-- Xray Reality -->
   <rect x="80" y="230" width="200" height="40" class="node node-main"/>
-  <text x="180" y="255" text-anchor="middle" class="label">Xray Reality :10443</text>
+  <text x="180" y="255" text-anchor="middle" class="label">Xray Reality :10xxx</text>
 
   <!-- nginx http -->
   <rect x="520" y="230" width="200" height="40" class="node node-accent"/>
@@ -47,9 +47,9 @@
   <rect x="420" y="330" width="170" height="36" class="node node-main"/>
   <text x="505" y="353" text-anchor="middle" class="label">Connection Page</text>
 
-  <!-- 3x-ui Panel -->
+  <!-- Remnawave Panel -->
   <rect x="610" y="330" width="140" height="36" class="node node-main"/>
-  <text x="680" y="353" text-anchor="middle" class="label">3x-ui Panel</text>
+  <text x="680" y="353" text-anchor="middle" class="label">Remnawave Panel</text>
 
   <!-- Xray XHTTP -->
   <rect x="420" y="400" width="170" height="36" class="node node-main"/>

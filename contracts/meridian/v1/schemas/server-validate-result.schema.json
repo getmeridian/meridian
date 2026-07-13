@@ -53,9 +53,7 @@
           "default": "manual",
           "enum": [
             "manual",
-            "legacy",
-            "engine",
-            "imported"
+            "engine"
           ],
           "title": "Source",
           "type": "string"

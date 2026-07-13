@@ -30,7 +30,6 @@ class NodeCapabilities:
 
     # Experimental / future protocols
     hysteria2: bool = False  # requires UDP
-    vless_pq: bool = False  # requires per-user encryption fields
     finalmask: bool = False  # requires Xray 26.x+
 
     @classmethod

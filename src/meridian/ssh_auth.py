@@ -76,7 +76,7 @@ class _LogUI:
             raise SSHError(
                 f"Cannot verify host key for {ip} (no terminal available)",
                 hint="Run interactively, or pre-add the key: ssh-keyscan IP >> ~/.ssh/known_hosts",
-                hint_type="user",
+                category="user",
             )
         return answer in ("", "y", "yes")
 
@@ -112,13 +112,6 @@ def ensure_askpass_script() -> Path:
     script.write_text("#!/bin/sh\nprintf '%s\\n' \"$MERIDIAN_SSH_PASSWORD\"\n", encoding="utf-8")
     script.chmod(0o700)
     return script
-
-
-def scp_host(ip: str) -> str:
-    """Format IP for SCP host:path syntax (brackets IPv6)."""
-    if ":" in ip and not ip.startswith("["):
-        return f"[{ip}]"
-    return ip
 
 
 def _host_key_known(ip: str, port: int = 22) -> bool:

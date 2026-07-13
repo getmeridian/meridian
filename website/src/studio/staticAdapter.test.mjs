@@ -52,7 +52,6 @@ test("builds a DeployRequest from generated workflow form state", () => {
     harden: true,
     icon: "",
     ip: "198.51.100.10",
-    pq: false,
     server_name: "Family VPN",
     sni: "www.microsoft.com",
     user: "admin",

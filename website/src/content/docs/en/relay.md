@@ -52,7 +52,7 @@ The provisioner:
 ### Example with all options
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow --port 443 --user ubuntu
 ```
 
 ## How clients connect
@@ -62,14 +62,14 @@ After deploying a relay, all existing client connection pages are **automaticall
 When you add new clients, relay URLs are included automatically:
 
 ```bash
-meridian client add alice --server 1.2.3.4   # relay URLs included
+meridian client add alice   # relay URLs included
 ```
 
 ## Manage relays
 
 ```bash
 meridian relay list                    # all relays across all exit servers
-meridian relay list --exit 1.2.3.4     # relays for a specific exit
+meridian relay list --exit 198.51.100.10     # relays for a specific exit
 meridian relay check RELAY_IP          # 4-point health check
 meridian relay remove RELAY_IP         # stop service + remove from config
 ```
@@ -98,8 +98,8 @@ This stops the Realm service, removes the relay from exit server credentials, an
 You can attach multiple relays to one exit server — for example, relays in different cities or ISPs:
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 Clients see all relay options on their connection page.

@@ -7,15 +7,15 @@ section: reference
 
 ## Сообщение об ошибках
 
-- **Ошибка?** Используйте [шаблон отчёта об ошибке](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml) — сначала запустите `meridian doctor`
-- **Проблема с подключением?** Используйте [шаблон проблемы подключения](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian preflight`
-- **Идея функции?** Используйте [шаблон запроса функции](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
+- **Ошибка?** Используйте [шаблон отчёта об ошибке](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — сначала запустите `meridian doctor`
+- **Проблема с подключением?** Используйте [шаблон проблемы подключения](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian preflight`
+- **Идея функции?** Используйте [шаблон запроса функции](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
 - **Уязвимость безопасности?** Смотрите [Security](/docs/ru/security/) — НЕ открывайте публичный issue
 
 ## Настройка разработки
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # Установить CLI в режиме редактирования с зависимостями разработки
 make install
@@ -41,7 +41,7 @@ CLI — это Python пакет (`src/meridian/`) распространяем�
 Ключевые модули:
 - `cli.py` — Typer приложение, регистрация подкоманд
 - `commands/` — один модуль на подкоманду
-- `credentials.py` — dataclass `ServerCredentials`
+- `cluster.py` + `cluster_persistence.py` — типизированное состояние `cluster.yml` и его сохранение
 - `servers.py` — `ServerRegistry` для известных серверов
 - `provision/` — идемпотентный конвейер шагов
 
@@ -56,8 +56,8 @@ CLI — это Python пакет (`src/meridian/`) распространяем�
 ## Ключевые соглашения
 
 - **Shell значения используют `shlex.quote()`** — никогда не интерполируйте несанитизированные значения
-- **Шаблоны connection-info должны быть синхронизированы** (CSS/JS/app ссылки)
-- **Конфиг nginx** идёт в `/etc/nginx/conf.d/meridian-*.conf`, не в основной nginx.conf
+- **Ресурсы PWA должны быть синхронизированы** (`templates/pwa/` и каталог приложений)
+- **Конфиг nginx** использует `/etc/nginx/stream.d/meridian.conf` и `/etc/nginx/conf.d/meridian-http.conf`
 - **Шаги provisioner** возвращают `StepResult` (ok/changed/skipped/failed)
 
 ## Тестирование

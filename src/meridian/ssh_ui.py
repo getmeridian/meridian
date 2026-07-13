@@ -47,7 +47,7 @@ class RichSSHUI:
             raise SSHError(
                 f"Cannot verify host key for {ip} (no terminal available)",
                 hint="Run interactively, or pre-add the key: ssh-keyscan IP >> ~/.ssh/known_hosts",
-                hint_type="user",
+                category="user",
             )
         return answer in ("", "y", "yes")
 

@@ -85,7 +85,7 @@ def _run_inventory(*, operation: OperationContext) -> None:
             classify_error=_classify_panel_error,
         )
     except RemnawaveAuthError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
     except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
         fail(f"Could not collect fleet inventory: {exc}", hint_type="bug")
 
@@ -239,7 +239,7 @@ def _run_status(*, operation: OperationContext) -> None:
             classify_error=_classify_panel_error,
         )
     except RemnawaveAuthError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
     except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
         fail(f"Could not collect fleet status: {exc}", hint_type="bug")
 

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from meridian.credentials import ServerCredentials
+from meridian.cluster import ClusterConfig, NodeEntry
 from meridian.xray_client import (
     _find_free_port,
     _parse_dgst,
     build_reality_config,
-    build_test_configs,
+    build_test_configs_from_cluster,
     build_wss_config,
     build_xhttp_config,
 )
@@ -277,45 +277,48 @@ class TestBuildWssConfig:
 
 
 class TestBuildTestConfigs:
-    def _make_creds(
+    def _make_cluster(
         self,
         *,
         ip: str = "198.51.100.1",
         sni: str = "www.microsoft.com",
         domain: str = "",
         warp: bool = False,
-        reality_uuid: str = "",
         public_key: str = "",
         short_id: str = "",
-        wss_uuid: str = "",
         ws_path: str = "",
         xhttp_path: str = "",
-    ) -> ServerCredentials:
-        creds = ServerCredentials()
-        creds.server.ip = ip
-        creds.server.sni = sni
-        creds.server.domain = domain or None
-        creds.server.warp = warp
-        creds.reality.uuid = reality_uuid or None
-        creds.reality.public_key = public_key or None
-        creds.reality.short_id = short_id or None
-        creds.wss.uuid = wss_uuid or None
-        creds.wss.ws_path = ws_path or None
-        creds.xhttp.xhttp_path = xhttp_path or None
-        return creds
+    ) -> ClusterConfig:
+        return ClusterConfig(
+            nodes=[
+                NodeEntry(
+                    ip=ip,
+                    sni=sni,
+                    domain=domain,
+                    warp=warp,
+                    reality_public_key=public_key,
+                    reality_short_id=short_id,
+                    ws_path=ws_path,
+                    xhttp_path=xhttp_path,
+                )
+            ]
+        )
 
-    def test_empty_credentials_returns_empty(self) -> None:
-        creds = self._make_creds()
-        configs = build_test_configs(creds)
+    def test_empty_node_returns_empty(self) -> None:
+        cluster = self._make_cluster()
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="test-uuid")
         assert configs == []
 
     def test_reality_only(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="550e8400-e29b-41d4-a716-446655440000",
+        cluster = self._make_cluster(
             public_key="testpubkey",
             short_id="abcd1234",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(
+            cluster,
+            "198.51.100.1",
+            uuid="550e8400-e29b-41d4-a716-446655440000",
+        )
         assert len(configs) == 1
         label, config, expect_match = configs[0]
         assert label == "Reality (TCP)"
@@ -323,27 +326,24 @@ class TestBuildTestConfigs:
         assert config["outbounds"][0]["streamSettings"]["security"] == "reality"
 
     def test_reality_with_warp_no_ip_match(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
             warp=True,
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         assert len(configs) == 1
         _, _, expect_match = configs[0]
         assert expect_match is False  # WARP: exit IP differs
 
     def test_wss_with_domain(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
-            wss_uuid="wss-uuid",
             ws_path="wspath",
             domain="example.com",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         labels = [label for label, _, _ in configs]
         assert "WSS (CDN)" in labels
         # WSS CDN never expects IP match
@@ -353,64 +353,57 @@ class TestBuildTestConfigs:
         assert wss_config["outbounds"][0]["streamSettings"]["network"] == "ws"
 
     def test_wss_without_domain_not_included(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
-            wss_uuid="wss-uuid",
             ws_path="wspath",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         labels = [label for label, _, _ in configs]
         assert "WSS (CDN)" not in labels
 
     def test_xhttp_with_reality_uuid(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
             xhttp_path="xhttppath",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         labels = [label for label, _, _ in configs]
         assert "XHTTP" in labels
         xhttp_config = next(c for lbl, c, _ in configs if lbl == "XHTTP")
         assert xhttp_config["outbounds"][0]["streamSettings"]["network"] == "xhttp"
 
     def test_xhttp_domain_mode_no_ip_match(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
             xhttp_path="xhttppath",
             domain="example.com",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         xhttp_match = next(m for lbl, _, m in configs if lbl == "XHTTP")
         assert xhttp_match is False
 
     def test_xhttp_ip_mode_expects_match(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
             xhttp_path="xhttppath",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         xhttp_match = next(m for lbl, _, m in configs if lbl == "XHTTP")
         assert xhttp_match is True
 
     def test_all_protocols_active(self) -> None:
-        creds = self._make_creds(
-            reality_uuid="uuid",
+        cluster = self._make_cluster(
             public_key="pk",
             short_id="sid",
-            wss_uuid="wss-uuid",
             ws_path="wspath",
             xhttp_path="xhttppath",
             domain="example.com",
         )
-        configs = build_test_configs(creds)
+        configs = build_test_configs_from_cluster(cluster, "198.51.100.1", uuid="uuid")
         labels = {label for label, _, _ in configs}
         assert labels == {"Reality (TCP)", "XHTTP", "WSS (CDN)"}
 

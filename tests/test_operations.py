@@ -260,7 +260,7 @@ class TestAddClientErrorPaths:
 
 
 # ---------------------------------------------------------------------------
-# Hybrid imperative ↔ declarative sync (discussion uburuntu/meridian#27)
+# Hybrid imperative ↔ declarative sync (discussion getmeridian/meridian#27)
 # ---------------------------------------------------------------------------
 #
 # Imperative commands must mirror their effect into the matching desired_*
@@ -479,18 +479,18 @@ class TestHybridSyncAppliedSnapshot:
         """A bare string must NOT explode into a set of chars (Codex finding #3)."""
         cluster = _make_cluster()
         cluster.applied_state.clients = "alice"  # type: ignore[assignment]
-        assert load_applied_snapshot(cluster, "desired_clients_applied") is None
+        assert load_applied_snapshot(cluster, "clients") is None
 
     def test_load_snapshot_rejects_dict(self) -> None:
         cluster = _make_cluster()
         cluster.applied_state.clients = {"not": "a list"}  # type: ignore[assignment]
-        assert load_applied_snapshot(cluster, "desired_clients_applied") is None
+        assert load_applied_snapshot(cluster, "clients") is None
 
     def test_load_snapshot_filters_non_string_items(self) -> None:
         """Garbage entries are skipped; clean entries still load."""
         cluster = _make_cluster()
         cluster.applied_state.clients = ["alice", 42, None, "bob"]  # type: ignore[list-item]
-        result = load_applied_snapshot(cluster, "desired_clients_applied")
+        result = load_applied_snapshot(cluster, "clients")
         assert result == {"alice", "bob"}
 
     def test_load_snapshot_empty_list_returns_empty_set(self) -> None:
@@ -498,19 +498,19 @@ class TestHybridSyncAppliedSnapshot:
         This is semantically distinct from None ('no history')."""
         cluster = _make_cluster()
         cluster.applied_state.clients = []
-        result = load_applied_snapshot(cluster, "desired_clients_applied")
+        result = load_applied_snapshot(cluster, "clients")
         assert result == set()
 
     def test_load_snapshot_none_returns_none(self) -> None:
         """None snapshot means 'no history' -- conservative drift classification."""
         cluster = _make_cluster()
         cluster.applied_state.clients = None
-        assert load_applied_snapshot(cluster, "desired_clients_applied") is None
+        assert load_applied_snapshot(cluster, "clients") is None
 
     def test_load_snapshot_returns_set_when_populated(self) -> None:
         cluster = _make_cluster()
         cluster.applied_state.clients = ["alice", "bob"]
-        assert load_applied_snapshot(cluster, "desired_clients_applied") == {"alice", "bob"}
+        assert load_applied_snapshot(cluster, "clients") == {"alice", "bob"}
 
     def test_relay_remove_mirrors_into_applied_snapshot(self) -> None:
         from meridian.cluster import DesiredRelay

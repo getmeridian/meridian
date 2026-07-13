@@ -15,7 +15,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-import typer
 from pydantic import ValidationError
 
 from meridian.adapters import JsonlReporter
@@ -29,12 +28,11 @@ from meridian.commands.resolve import (
 )
 from meridian.config import (
     DEFAULT_SNI,
-    SERVERS_FILE,
+    SERVER_PROFILES_FILE,
     is_ip,
 )
 from meridian.console import (
     choose,
-    confirm,
     err_console,
     error_context,
     fail,
@@ -57,14 +55,14 @@ from meridian.core.deploy_planning import (
     DeployPlan,
 )
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
-from meridian.core.errors import MeridianError
+from meridian.core.errors import EngineError, MeridianError
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.services.deploy import deploy_server
 from meridian.core.validation import wrap_validation_error
-from meridian.engine.deploy import EngineError, dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
+from meridian.engine.deploy import dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
 from meridian.panel_bootstrap import configure_panel_and_node, run_provisioner
 from meridian.provision.progress import RichStepRenderer
 from meridian.remnawave import MeridianPanel, RemnawaveError
@@ -91,7 +89,6 @@ def run(
     server_name: str = "",
     icon: str = "",
     color: str = "",
-    decoy: str = "",
     warp: bool = False,
     geo_block: bool = True,
     ssh_port: int = 22,
@@ -124,7 +121,6 @@ def run(
                 server_name=server_name,
                 icon=icon,
                 color=color,
-                decoy=decoy,
                 warp=warp,
                 geo_block=geo_block,
                 ssh_port=ssh_port,
@@ -182,7 +178,7 @@ def run(
             )
 
         if dry_run:
-            registry = ServerRegistry(SERVERS_FILE)
+            registry = ServerRegistry(SERVER_PROFILES_FILE)
             try:
                 plan = dry_run_deploy_request(request, cluster=ClusterConfig.load(), registry=registry)
             except EngineError as exc:
@@ -321,10 +317,7 @@ def _execute_deploy_request(
     warp = request.warp
     geo_block = request.geo_block
 
-    # request.decoy is deprecated (403/404 is now always the default).
-    # Accept silently for backwards compatibility but don't use it.
-
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
     except EngineError as exc:
@@ -339,13 +332,6 @@ def _execute_deploy_request(
     )
     resolved = ensure_server_connection(resolved)
     _check_ports(resolved.conn, resolved.ip, yes)
-
-    # Load existing cluster config
-    cluster = ClusterConfig.load()
-
-    # Only check for legacy 3x-ui on first deploy — redeploy means v4 is already running
-    if not cluster.is_configured:
-        _check_legacy_panel(resolved.conn, resolved.ip, yes)
 
     # Load existing cluster config
     cluster = ClusterConfig.load()
@@ -444,7 +430,7 @@ def _execute_deploy_request(
         except (OSError, RuntimeError):
             pass  # Non-fatal
 
-    # Register server in legacy registry (for --server flag resolution)
+    # Register server for --server flag resolution
     registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=getattr(resolved.conn, "port", 22)))
 
     # Success output
@@ -534,62 +520,6 @@ def _check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
             choice = choose("Retry?", ["Yes", "No"])
             if choice == 2:
                 fail("Aborted -- port conflict", hint_type="user")
-
-
-def _check_legacy_panel(conn: ServerConnection, server_ip: str, yes: bool) -> None:
-    """Detect a running 3x-ui panel from Meridian 3.x and warn the user.
-
-    Shows migration context inline (client names, what will break) so the
-    user can make an informed decision without leaving the deploy flow.
-    The actual cleanup happens in the provisioner pipeline
-    (CleanupLegacyPanel step).
-    """
-    result = conn.run("docker inspect -f '{{.State.Status}}' 3x-ui 2>/dev/null", timeout=15)
-    if result.returncode != 0 or not result.stdout.strip():
-        return  # no 3x-ui container
-
-    from rich.panel import Panel
-
-    from meridian.config import CREDS_BASE
-    from meridian.credentials import ServerCredentials
-
-    # Try to read old v3 credentials for this server
-    client_names: list[str] = []
-    proxy_path = CREDS_BASE / server_ip / "proxy.yml"
-    if proxy_path.exists():
-        try:
-            creds = ServerCredentials.load(proxy_path)
-            client_names = [c.name for c in creds.clients if c.name]
-        except (OSError, ValueError, KeyError):
-            pass
-
-    lines = [
-        "This server has a Meridian 3.x deployment (3x-ui).",
-        "Meridian 4.0 replaces 3x-ui with [bold]Remnawave[/bold] -- a new panel.",
-        "",
-        "  [yellow]\u2022[/yellow] 3x-ui will be stopped and removed",
-        "  [yellow]\u2022[/yellow] Existing client connection configs will stop working",
-    ]
-    if client_names:
-        names = ", ".join(f"[bold]{n}[/bold]" for n in client_names)
-        lines.append(f"  [yellow]\u2022[/yellow] Re-create clients after deploy: {names}")
-    lines.append("  [yellow]\u2022[/yellow] Clients will need new QR codes / subscription links")
-
-    warning = "\n".join(lines)
-    if not is_quiet_mode():
-        err_console.print()
-        err_console.print(
-            Panel(
-                warning,
-                title="[bold yellow]Upgrading from 3.x[/bold yellow]",
-                border_style="yellow",
-                padding=(0, 2),
-            )
-        )
-
-    if not yes:
-        if not confirm("Continue with deployment?"):
-            raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -731,7 +661,7 @@ def _print_success(
         err_console.print("\n  [dim]Remnawave panel (advanced -- manage nodes, monitor traffic):[/dim]")
         err_console.print(f"  [dim]  {cluster.panel.display_url}[/dim]")
 
-    err_console.print("\n  [dim]Feedback & issues: https://github.com/uburuntu/meridian/issues[/dim]\n")
+    err_console.print("\n  [dim]Feedback & issues: https://github.com/getmeridian/meridian/issues[/dim]\n")
 
 
 def _offer_relay(resolved: ResolvedServer, yes: bool) -> None:

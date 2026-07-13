@@ -1,6 +1,6 @@
 """Relay node provisioner — deploys Realm TCP relay via SSH.
 
-A relay node is a lightweight TCP forwarder (no Docker, no 3x-ui, no panel).
+A relay node is a lightweight TCP forwarder with no Docker or panel.
 It runs Realm to forward port 443 to an exit server, preserving end-to-end
 VLESS+Reality encryption between the client and the exit.
 """

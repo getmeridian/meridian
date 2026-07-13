@@ -1,18 +1,13 @@
 """Tests for inter-step data contracts in the provisioner pipeline.
 
-These tests verify that the data each step writes to ctx is sufficient
-for all downstream steps that read from ctx. They catch bugs like:
-- A step forgets to set a context key that a downstream step needs
-- A step reads ctx["key"] (hard crash) instead of ctx.get("key")
-- A constructor argument isn't passed from build_setup_steps()
-- Port/path values don't flow correctly between steps
+These tests verify that typed context data written by each step is
+sufficient for downstream steps. They catch missing fields, omitted
+builder arguments, and broken port/path flow.
 
-4.0: Updated for Remnawave pipeline (replaces 3x-ui).
+Uses the Remnawave provisioning pipeline.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 from meridian.provision import build_setup_steps
 from meridian.provision.relay import RelayContext, build_relay_steps
@@ -25,8 +20,7 @@ def _make_pipeline_conn() -> MockConnection:
 
     Returns plausible success responses for every command the pipeline
     might issue. The goal is NOT to test each step's logic but to verify
-    the data contract: every key that step N writes to ctx is present
-    for step N+1.
+    the typed data contract between adjacent steps.
     """
     conn = MockConnection()
 
@@ -64,13 +58,6 @@ def _make_pipeline_conn() -> MockConnection:
     # Remnawave panel: already running
     conn.when("docker inspect", stdout='[{"State":{"Status":"running"}}]')
     conn.when("docker compose", rc=0)
-    conn.when(
-        "cat /opt/remnawave/.env",
-        stdout="REMNAWAVE_JWT_AUTH_SECRET=test\nREMNAWAVE_JWT_API_SECRET=test\nREMNAWAVE_DB_PASSWORD=test\n",
-    )
-
-    # Remnawave node: already running
-    conn.when("ss -tlnp", stdout="")
 
     # nginx
     conn.when("dpkg -l nginx", stdout="ii  nginx\n")
@@ -94,13 +81,12 @@ def _make_pipeline_conn() -> MockConnection:
 class TestFullPipelineContract:
     """Verify the data contract across the full deploy pipeline."""
 
-    def test_standalone_pipeline_no_keyerror(self, tmp_path: Path) -> None:
-        """Full standalone pipeline (no domain) runs without KeyError."""
+    def test_standalone_pipeline_uses_typed_context(self) -> None:
+        """Full standalone pipeline (no domain) uses valid context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             xhttp_enabled=True,
             hosted_page=True,
-            creds_dir=str(tmp_path / "creds"),
         )
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
@@ -111,24 +97,19 @@ class TestFullPipelineContract:
         for step in steps:
             try:
                 step.run(conn, ctx)
-            except KeyError as e:
-                raise AssertionError(
-                    f"Step '{step.name}' crashed with KeyError: {e}. Context keys available: {list(ctx._state.keys())}"
-                ) from e
             except AttributeError as e:
                 raise AssertionError(
                     f"Step '{step.name}' crashed with AttributeError: {e}. "
                     f"Likely a missing or wrong-typed context value."
                 ) from e
 
-    def test_domain_pipeline_no_keyerror(self, tmp_path: Path) -> None:
-        """Full domain-mode pipeline runs without KeyError."""
+    def test_domain_pipeline_uses_typed_context(self) -> None:
+        """Full domain-mode pipeline uses valid context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             domain="example.com",
             xhttp_enabled=True,
             hosted_page=True,
-            creds_dir=str(tmp_path / "creds"),
         )
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
@@ -140,20 +121,15 @@ class TestFullPipelineContract:
         for step in steps:
             try:
                 step.run(conn, ctx)
-            except KeyError as e:
-                raise AssertionError(
-                    f"Step '{step.name}' crashed with KeyError: {e}. Context keys: {list(ctx._state.keys())}"
-                ) from e
             except AttributeError as e:
                 raise AssertionError(f"Step '{step.name}' crashed with AttributeError: {e}.") from e
 
-    def test_no_harden_pipeline_no_keyerror(self, tmp_path: Path) -> None:
-        """Pipeline with harden=False still has all needed context keys."""
+    def test_no_harden_pipeline_uses_typed_context(self) -> None:
+        """Pipeline with harden=False still has all needed context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             harden=False,
             hosted_page=True,
-            creds_dir=str(tmp_path / "creds"),
         )
         ctx.xhttp_port = 31589
         ctx.reality_port = 10589
@@ -164,14 +140,14 @@ class TestFullPipelineContract:
         for step in steps:
             try:
                 step.run(conn, ctx)
-            except (KeyError, AttributeError) as e:
-                raise AssertionError(f"Step '{step.name}' crashed: {e}. Context keys: {list(ctx._state.keys())}") from e
+            except AttributeError as e:
+                raise AssertionError(f"Step '{step.name}' crashed: {e}.") from e
 
 
 class TestRelayPipelineContract:
     """Verify data contract across the relay pipeline."""
 
-    def test_relay_pipeline_no_keyerror(self) -> None:
+    def test_relay_pipeline_uses_typed_context(self) -> None:
         """Full relay pipeline runs without KeyError."""
         ctx = RelayContext(
             relay_ip="198.51.100.10",
@@ -195,5 +171,5 @@ class TestRelayPipelineContract:
         for step in steps:
             try:
                 step.run(conn, ctx)
-            except (KeyError, AttributeError) as e:
+            except AttributeError as e:
                 raise AssertionError(f"Relay step '{step.name}' crashed: {e}") from e

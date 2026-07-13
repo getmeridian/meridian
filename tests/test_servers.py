@@ -11,53 +11,17 @@ import typer
 from meridian.commands.server import run_add
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
-from meridian.servers import SERVER_REGISTRY_SCHEMA, SERVER_ROLE_RELAY, ServerEntry, ServerProfileStore, ServerRegistry
+from meridian.servers import SERVER_REGISTRY_SCHEMA, ServerEntry, ServerProfileStore, ServerRegistry
 
 
 class TestServerEntry:
-    def test_from_line_basic(self) -> None:
-        entry = ServerEntry.from_line("1.2.3.4 root myserver")
-        assert entry is not None
-        assert entry.host == "1.2.3.4"
-        assert entry.user == "root"
-        assert entry.name == "myserver"
+    def test_fields(self) -> None:
+        entry = ServerEntry("198.51.100.10", "ubuntu", "edge", port=2222)
 
-    def test_from_line_no_name(self) -> None:
-        entry = ServerEntry.from_line("1.2.3.4 ubuntu")
-        assert entry is not None
-        assert entry.host == "1.2.3.4"
-        assert entry.user == "ubuntu"
-        assert entry.name == ""
-
-    def test_from_line_with_role(self) -> None:
-        entry = ServerEntry.from_line("1.2.3.4 root relay-a relay")
-        assert entry is not None
-        assert entry.host == "1.2.3.4"
-        assert entry.user == "root"
-        assert entry.name == "relay-a"
-        assert entry.role == SERVER_ROLE_RELAY
-
-    def test_from_line_with_role_and_empty_name(self) -> None:
-        entry = ServerEntry.from_line("1.2.3.4 root - relay")
-        assert entry is not None
-        assert entry.name == ""
-        assert entry.role == SERVER_ROLE_RELAY
-
-    def test_from_line_comment(self) -> None:
-        assert ServerEntry.from_line("# comment") is None
-
-    def test_from_line_blank(self) -> None:
-        assert ServerEntry.from_line("") is None
-        assert ServerEntry.from_line("   ") is None
-
-    def test_from_line_single_word(self) -> None:
-        assert ServerEntry.from_line("onlyone") is None
-
-    def test_str(self) -> None:
-        assert str(ServerEntry("1.2.3.4", "root", "test")) == "1.2.3.4 root test"
-        assert str(ServerEntry("1.2.3.4", "root")) == "1.2.3.4 root"
-        assert str(ServerEntry("1.2.3.4", "root", "relay-a", SERVER_ROLE_RELAY)) == "1.2.3.4 root relay-a relay"
-        assert str(ServerEntry("1.2.3.4", "root", role=SERVER_ROLE_RELAY)) == "1.2.3.4 root - relay"
+        assert entry.host == "198.51.100.10"
+        assert entry.ssh_user == "ubuntu"
+        assert entry.title == "edge"
+        assert entry.port == 2222
 
 
 class TestServerRegistry:
@@ -69,18 +33,18 @@ class TestServerRegistry:
 
     def test_add_and_list(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "server1"))
-        reg.add(ServerEntry("5.6.7.8", "ubuntu", "server2"))
+        reg.add(ServerEntry("198.51.100.10", "root", "server1"))
+        reg.add(ServerEntry("198.51.100.11", "ubuntu", "server2"))
 
         entries = reg.list()
         assert len(entries) == 2
-        assert entries[0].host == "1.2.3.4"
-        assert entries[1].host == "5.6.7.8"
+        assert entries[0].host == "198.51.100.10"
+        assert entries[1].host == "198.51.100.11"
 
     def test_add_deduplicates_by_host(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "old-name"))
-        reg.add(ServerEntry("1.2.3.4", "ubuntu", "new-name"))
+        reg.add(ServerEntry("198.51.100.10", "root", "old-name"))
+        reg.add(ServerEntry("198.51.100.10", "ubuntu", "new-name"))
 
         entries = reg.list()
         assert len(entries) == 1
@@ -96,26 +60,26 @@ class TestServerRegistry:
 
     def test_find_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "myserver"))
+        reg.add(ServerEntry("198.51.100.10", "root", "myserver"))
 
-        found = reg.find("1.2.3.4")
+        found = reg.find("198.51.100.10")
         assert found is not None
         assert found.name == "myserver"
 
     def test_find_by_name(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "myserver"))
+        reg.add(ServerEntry("198.51.100.10", "root", "myserver"))
 
         found = reg.find("myserver")
         assert found is not None
-        assert found.host == "1.2.3.4"
+        assert found.host == "198.51.100.10"
 
     def test_find_not_found(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "myserver"))
+        reg.add(ServerEntry("198.51.100.10", "root", "myserver"))
         assert reg.find("nonexistent") is None
 
-    def test_list_reads_v2_profiles_for_cli_compat(self, servers_file: Path) -> None:
+    def test_list_reads_json_profiles(self, servers_file: Path) -> None:
         profile = profile_from_draft(
             ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
         )
@@ -129,7 +93,7 @@ class TestServerRegistry:
         assert entry.user == "ubuntu"
         assert entry.port == 2222
 
-    def test_find_reads_v2_profile_ids_for_cli_compat(self, servers_file: Path) -> None:
+    def test_find_reads_profile_ids(self, servers_file: Path) -> None:
         profile = profile_from_draft(
             ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
         ).model_copy(update={"key_path": "/tmp/meridian_ed25519"})
@@ -148,7 +112,7 @@ class TestServerRegistry:
         profile = profile_from_draft(
             ServerConnectionDraft(title="Family VPN", host="198.51.100.10", ssh_user="ubuntu", ssh_port=2222)
         ).model_copy(update={"auth_state": "key_ready", "key_path": "/tmp/meridian_ed25519"})
-        store = ServerProfileStore(servers_file.with_suffix(".json"), legacy_path=servers_file)
+        store = ServerProfileStore(servers_file)
         store.upsert(profile)
 
         ServerRegistry(servers_file).add(ServerEntry("198.51.100.10", "ubuntu", "Family VPN", port=2222))
@@ -160,16 +124,16 @@ class TestServerRegistry:
 
     def test_remove_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "s1"))
-        reg.add(ServerEntry("5.6.7.8", "root", "s2"))
+        reg.add(ServerEntry("198.51.100.10", "root", "s1"))
+        reg.add(ServerEntry("198.51.100.11", "root", "s2"))
 
-        assert reg.remove("1.2.3.4") is True
+        assert reg.remove("198.51.100.10") is True
         assert reg.count() == 1
-        assert reg.find("1.2.3.4") is None
+        assert reg.find("198.51.100.10") is None
 
     def test_remove_by_name(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("1.2.3.4", "root", "s1"))
+        reg.add(ServerEntry("198.51.100.10", "root", "s1"))
 
         assert reg.remove("s1") is True
         assert reg.count() == 0
@@ -177,15 +141,6 @@ class TestServerRegistry:
     def test_remove_not_found(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         assert reg.remove("nonexistent") is False
-
-    def test_preserves_comments(self, servers_file: Path) -> None:
-        servers_file.write_text("# My servers\n1.2.3.4 root old\n")
-        reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("5.6.7.8", "root", "new"))
-
-        raw = servers_file.read_text()
-        assert "# My servers" in raw
-        assert "5.6.7.8" in raw
 
 
 def test_server_add_invalid_input_prints_readable_validation_error(capsys: pytest.CaptureFixture[str]) -> None:
@@ -225,15 +180,11 @@ def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest
     mock_connection.assert_not_called()
 
 
-def test_server_add_persists_custom_port(servers_file: Path, tmp_path: Path) -> None:
+def test_server_add_persists_custom_port(servers_file: Path) -> None:
     with (
-        patch("meridian.commands.server.SERVERS_FILE", servers_file),
-        patch("meridian.commands.server.CREDS_BASE", tmp_path / "credentials"),
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
         patch("meridian.commands.server.ServerConnection") as mock_connection,
     ):
-        conn = mock_connection.return_value
-        conn.fetch_credentials.return_value = False
-
         run_add("198.51.100.10", name="edge-a", user="ubuntu", ssh_port=2222)
 
     mock_connection.assert_called_once_with(ip="198.51.100.10", user="ubuntu", local_mode=False, port=2222)
@@ -264,32 +215,3 @@ class TestServerProfileStore:
 
         assert f'"schema": "{SERVER_REGISTRY_SCHEMA}"' in path.read_text()
         assert path.stat().st_mode & 0o777 == 0o600
-
-    def test_legacy_migration_creates_json_on_first_load(self, servers_file: Path) -> None:
-        """When legacy text file exists and servers.json doesn't, migration creates JSON."""
-        servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
-        # ServerRegistry triggers migration in __init__
-        reg = ServerRegistry(servers_file)
-
-        entries = reg.list()
-        assert len(entries) == 1
-        assert entries[0].host == "198.51.100.10"
-        assert entries[0].user == "ubuntu"
-        assert entries[0].name == "edge"
-        assert entries[0].port == 2222
-        # JSON file should now exist
-        assert servers_file.with_suffix(".json").exists()
-
-    def test_legacy_migration_preserves_existing_json(self, servers_file: Path) -> None:
-        """When servers.json already exists, legacy file is not re-migrated."""
-        servers_file.write_text("198.51.100.10 ubuntu edge port=2222\n")
-        # Create JSON with different data
-        store = ServerProfileStore(servers_file.with_suffix(".json"))
-        store.upsert(profile_from_draft(ServerConnectionDraft(title="Panel", host="198.51.100.20")))
-
-        reg = ServerRegistry(servers_file)
-        entries = reg.list()
-
-        # Only the JSON entry should be present (legacy not re-migrated)
-        assert len(entries) == 1
-        assert entries[0].host == "198.51.100.20"

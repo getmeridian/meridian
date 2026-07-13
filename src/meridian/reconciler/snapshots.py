@@ -11,22 +11,17 @@ freshly-added resource as drift and proposes to remove it.
 Contract: only sync when the user has already opted into declarative
 for the relevant resource type (the matching ``desired_*`` attribute is not
 None). A None value means "this category is unmanaged declaratively" —
-leaving it alone preserves backwards-compatible imperative behaviour for
-users who never wrote ``desired_*`` into cluster.yml.
+leaving imperative-only workflows untouched for users who never wrote
+``desired_*`` into cluster.yml.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from meridian.cluster import ClusterConfig, DesiredNode, DesiredRelay, NodeEntry, RelayEntry
 
-# Map legacy _extra key names to AppliedState field names
-_KEY_MAP = {
-    "desired_clients_applied": "clients",
-    "desired_nodes_applied": "nodes",
-    "desired_relays_applied": "relays",
-}
+AppliedField = Literal["clients", "nodes", "relays"]
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +29,7 @@ _KEY_MAP = {
 # ---------------------------------------------------------------------------
 
 
-def load_applied_snapshot(cluster: ClusterConfig, key: str) -> set[str] | None:
+def load_applied_snapshot(cluster: ClusterConfig, field_name: AppliedField) -> set[str] | None:
     """Read a reconciler applied-state snapshot from ``cluster.applied_state``.
 
     Returns a set of strings or None. None means "no history" -- the caller
@@ -44,7 +39,6 @@ def load_applied_snapshot(cluster: ClusterConfig, key: str) -> set[str] | None:
     which is semantically distinct from None (no history). Empty lists
     return an empty set so compute_plan can distinguish them.
     """
-    field_name = _KEY_MAP.get(key, key)
     snap = getattr(cluster.applied_state, field_name, None)
     if snap is None:
         return None
@@ -60,7 +54,7 @@ def load_applied_snapshot(cluster: ClusterConfig, key: str) -> set[str] | None:
     return clean
 
 
-def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -> None:
+def _applied_snapshot_mirror_add(cluster: ClusterConfig, field_name: AppliedField, entry: Any) -> None:
     """Mirror a successful imperative add into the applied snapshot.
 
     Without this, compute_plan classifies the imperative addition as drift
@@ -69,7 +63,6 @@ def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -
     The applied snapshot must reflect "panel state after the last reconciled
     add/remove operation we executed" — and `meridian client add` IS such an op.
     """
-    field_name = _KEY_MAP.get(key, key)
     snap = getattr(cluster.applied_state, field_name, None)
     if not isinstance(snap, list):
         snap = []
@@ -78,8 +71,7 @@ def _applied_snapshot_mirror_add(cluster: ClusterConfig, key: str, entry: Any) -
     setattr(cluster.applied_state, field_name, snap)
 
 
-def _applied_snapshot_mirror_remove(cluster: ClusterConfig, key: str, entry: Any) -> None:
-    field_name = _KEY_MAP.get(key, key)
+def _applied_snapshot_mirror_remove(cluster: ClusterConfig, field_name: AppliedField, entry: Any) -> None:
     snap = getattr(cluster.applied_state, field_name, None)
     if not isinstance(snap, list):
         return
@@ -97,7 +89,7 @@ def hybrid_sync_desired_clients_add(cluster: ClusterConfig, name: str) -> None:
     if name in cluster.desired_clients:
         return
     cluster.desired_clients.append(name)
-    _applied_snapshot_mirror_add(cluster, "desired_clients_applied", name)
+    _applied_snapshot_mirror_add(cluster, "clients", name)
     cluster.save()
 
 
@@ -107,7 +99,7 @@ def hybrid_sync_desired_clients_remove(cluster: ClusterConfig, name: str) -> Non
     if name not in cluster.desired_clients:
         return
     cluster.desired_clients = [c for c in cluster.desired_clients if c != name]
-    _applied_snapshot_mirror_remove(cluster, "desired_clients_applied", name)
+    _applied_snapshot_mirror_remove(cluster, "clients", name)
     cluster.save()
 
 
@@ -127,7 +119,7 @@ def hybrid_sync_desired_nodes_add(cluster: ClusterConfig, node: NodeEntry, ssh_u
             warp=node.warp,
         )
     )
-    _applied_snapshot_mirror_add(cluster, "desired_nodes_applied", node.ip)
+    _applied_snapshot_mirror_add(cluster, "nodes", node.ip)
     cluster.save()
 
 
@@ -167,7 +159,7 @@ def hybrid_sync_desired_nodes_remove(cluster: ClusterConfig, node_ip: str) -> No
     if not any(d.host == node_ip for d in cluster.desired_nodes):
         return
     cluster.desired_nodes = [d for d in cluster.desired_nodes if d.host != node_ip]
-    _applied_snapshot_mirror_remove(cluster, "desired_nodes_applied", node_ip)
+    _applied_snapshot_mirror_remove(cluster, "nodes", node_ip)
     cluster.save()
 
 
@@ -186,7 +178,7 @@ def hybrid_sync_desired_relays_add(cluster: ClusterConfig, relay: RelayEntry, ex
             ssh_port=relay.ssh_port,
         )
     )
-    _applied_snapshot_mirror_add(cluster, "desired_relays_applied", relay.ip)
+    _applied_snapshot_mirror_add(cluster, "relays", relay.ip)
     cluster.save()
 
 
@@ -196,5 +188,5 @@ def hybrid_sync_desired_relays_remove(cluster: ClusterConfig, relay_ip: str) -> 
     if not any(d.host == relay_ip for d in cluster.desired_relays):
         return
     cluster.desired_relays = [d for d in cluster.desired_relays if d.host != relay_ip]
-    _applied_snapshot_mirror_remove(cluster, "desired_relays_applied", relay_ip)
+    _applied_snapshot_mirror_remove(cluster, "relays", relay_ip)
     cluster.save()

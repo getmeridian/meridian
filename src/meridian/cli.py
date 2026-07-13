@@ -272,8 +272,6 @@ def apply_cmd(
 
         fail(f"Invalid --prune-extras value: {prune_extras!r}", hint="Use ask, yes, or no", hint_type="user")
 
-    # Parallel node provisioning is temporarily disabled — see executor.py
-    # for the reasoning. The flag is hidden but still accepted.
     json_enabled = json_output or is_json_mode()
     if json_enabled:
         _enable_json_output()
@@ -319,7 +317,6 @@ def deploy_cmd(
     color: str = typer.Option(
         "", "--color", help="Page color theme (ocean/sunset/forest/lavender/rose/slate)", rich_help_panel="Branding"
     ),
-    decoy: str = typer.Option("", "--decoy", hidden=True, help="Deprecated: 403/404 is now always used"),
     warp: bool = typer.Option(
         False,
         "--warp/--no-warp",
@@ -365,7 +362,6 @@ def deploy_cmd(
         server_name=display_name,
         icon=icon,
         color=color,
-        decoy=decoy,
         warp=warp,
         geo_block=geo_block,
         ssh_port=ssh_port,
@@ -615,14 +611,6 @@ def update_cmd() -> None:
     run_self_update()
 
 
-@app.command("migrate")
-def migrate_cmd() -> None:
-    """Migrate from Meridian 3.x to 4.0 (3x-ui to Remnawave)"""
-    from meridian.commands.migrate import run_migrate
-
-    run_migrate()
-
-
 # =============================================================================
 # Relay
 # =============================================================================
@@ -642,9 +630,9 @@ def relay_deploy_cmd(
     """Deploy a TCP relay that forwards to an exit node.
 
     [dim]Examples:[/dim]
-      [cyan]meridian relay deploy 1.2.3.4 --exit 5.6.7.8[/cyan]
-      [cyan]meridian relay deploy 1.2.3.4 --exit myserver --name ru-moscow[/cyan]
-      [cyan]meridian relay deploy 1.2.3.4 --exit 5.6.7.8 --sni yandex.ru[/cyan]
+      [cyan]meridian relay deploy 203.0.113.10 --exit 198.51.100.10[/cyan]
+      [cyan]meridian relay deploy 203.0.113.10 --exit myserver --name ru-moscow[/cyan]
+      [cyan]meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --sni yandex.ru[/cyan]
     """
     from meridian.commands.relay import run_deploy
 
@@ -709,9 +697,9 @@ def node_add_cmd(
     registers with the panel, and creates host entries.
 
     [dim]Examples:[/dim]
-      [cyan]meridian node add 1.2.3.4[/cyan]
-      [cyan]meridian node add 1.2.3.4 --name finland --sni www.google.com[/cyan]
-      [cyan]meridian node add 1.2.3.4 --domain proxy.example.com --yes[/cyan]
+      [cyan]meridian node add 198.51.100.10[/cyan]
+      [cyan]meridian node add 198.51.100.10 --name finland --sni www.google.com[/cyan]
+      [cyan]meridian node add 198.51.100.10 --domain proxy.example.com --yes[/cyan]
     """
     from meridian.commands.node import run_add
 
@@ -788,7 +776,7 @@ def fleet_recover_cmd(
     Use when ~/.meridian/ is lost but the panel is still running.
 
     [dim]Examples:[/dim]
-      [cyan]meridian fleet recover --panel-url https://1.2.3.4/panel --api-token eyJ...[/cyan]
+      [cyan]meridian fleet recover --panel-url https://198.51.100.10/panel --api-token eyJ...[/cyan]
     """
     from meridian.commands.recover import run_recover
 

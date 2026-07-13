@@ -8,6 +8,7 @@ section: reference
 ## Technology stack
 
 - **VLESS+Reality** (Xray-core) — proxy protocol that impersonates a legitimate TLS website. Censors probing the server see a real certificate (e.g., from microsoft.com). Only clients with the correct private key can connect.
+- **Hysteria2** (Xray-core) — UDP/443 fallback for lossy or high-latency networks. Subscription ordering keeps the TCP transports first.
 - **Remnawave** — modern panel stack for Xray, deployed as separate `remnawave/backend`, `remnawave/node`, and `remnawave/subscription-page` Docker containers. Backend exposes a REST API (managed via the official `remnawave` Python SDK); node runs Xray in `network_mode: host`; subscription-page serves per-user config URLs.
 - **nginx** — single-process web server handling both SNI routing and TLS. The stream module listens on port 443 and routes traffic by SNI hostname without terminating TLS. The http module on port 8443 terminates TLS, serves connection pages, reverse-proxies the Remnawave admin UI + subscription page, and proxies XHTTP/WSS traffic to Xray. Certificates are managed by [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt).
 - **Docker** — runs Remnawave backend + PostgreSQL + Valkey (panel host only), Remnawave node (every exit node), and Remnawave subscription-page (panel host, optional).
@@ -135,7 +136,7 @@ Whenever an admin edits state directly in the Remnawave UI (e.g. adds a user, re
 
 ## nginx configuration pattern
 
-Meridian writes to `/etc/nginx/conf.d/meridian-stream.conf` and `/etc/nginx/conf.d/meridian-http.conf` (never the main `nginx.conf`). This allows Meridian to coexist with user's own nginx configuration.
+Meridian writes stream routing to `/etc/nginx/stream.d/meridian.conf` and HTTP routing to `/etc/nginx/conf.d/meridian-http.conf`. If needed, it appends one `stream` include block to the main `nginx.conf`.
 
 nginx handles:
 - SNI routing on port 443 (stream module, no TLS termination)
@@ -150,7 +151,8 @@ nginx handles:
 
 | Port | Service | Scope |
 |------|---------|-------|
-| 443 | nginx stream (SNI router) | Public |
+| 443/TCP | nginx stream (SNI router) | Public |
+| 443/UDP | Xray Hysteria2 fallback | Public |
 | 80 | nginx (ACME challenges) | Public |
 | 8443 | nginx http (internal terminus) | Internal |
 | 3000 | Remnawave backend (admin UI + API) | localhost |
@@ -161,7 +163,7 @@ nginx handles:
 | 30000-39999 | Xray XHTTP (per-node deterministic) | host network |
 | 5432 | PostgreSQL (Remnawave DB) | internal Docker network |
 
-XHTTP, WSS, and Reality ports on the node host are opened on the host network because the node container uses `network_mode: host`. Meridian's UFW profile blocks them from the public internet; nginx reverse-proxies as needed.
+XHTTP, WSS, and Reality backend ports use the node container's host network but are blocked from the public internet by UFW. Hysteria2 listens directly on public UDP/443; nginx handles public TCP/443.
 
 ## Provisioning pipeline
 
@@ -178,13 +180,12 @@ Steps execute sequentially via `build_setup_steps()` (panel host) or `build_node
 | 7 | ConfigureBBR | `common.py` | TCP congestion control |
 | 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 (when hardening) |
 | 9 | InstallDocker | `docker.py` | Docker CE |
-| 10 | CleanupLegacyPanel | `legacy_cleanup.py` | Remove old 3x-ui if upgrading from v3 |
-| 11 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
-| 12 | InstallWarp | `warp.py` | Cloudflare WARP (optional) |
-| 13 | InstallNginx | `nginx.py` | SNI routing + TLS + reverse proxy |
-| 14 | ConfigureNginx | `nginx.py` + `nginx_render.py` | nginx config for IP or domain mode |
-| 15 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
-| 16 | DeployPWAAssets | `services.py` | PWA connection page assets |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP (optional) |
+| 12 | InstallNginx | `nginx.py` | SNI routing + TLS + reverse proxy |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | nginx config for IP or domain mode |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | PWA connection page assets |
 
 After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.py` uses the Remnawave REST API to register inbounds, create the node container, assign hosts, and create the default client. Node container deployment, host creation, and inbound caching helpers live in `node_deploy.py`. The node container is NOT part of the SSH pipeline because it requires a panel-issued secret key.
 
@@ -199,7 +200,7 @@ After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.p
 3. **Apply**: panel + node containers brought up, inbounds and hosts created via REST API
 4. **Sync**: Remnawave panel database (Postgres) and `cluster.yml` both hold the canonical state; drift is reported by `meridian plan`
 5. **Re-runs**: Reality keys and client UUIDs are preserved across redeploys (the panel refuses to regenerate when they exist)
-6. **Recovery**: `meridian fleet recover <IP>` rebuilds `cluster.yml` from the live panel API when the local copy is lost
+6. **Recovery**: `meridian fleet recover --panel-url URL --api-token TOKEN` rebuilds `cluster.yml` from the live panel API when the local copy is lost
 7. **Uninstall**: `meridian teardown <IP>` stops and removes all Remnawave containers, nginx config, and local `cluster.yml` panel entry (optionally the whole file)
 
 ## File locations
@@ -207,7 +208,7 @@ After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.p
 ### On the panel host
 - `/opt/remnawave/` — panel compose file + `.env` + subscription page `.env`
 - `/opt/remnawave/data/` — PostgreSQL data volume
-- `/etc/nginx/conf.d/meridian-stream.conf` — nginx stream config (SNI routing)
+- `/etc/nginx/stream.d/meridian.conf` — nginx stream config (SNI routing)
 - `/etc/nginx/conf.d/meridian-http.conf` — nginx http config (TLS, reverse proxy)
 - `/etc/ssl/meridian/` — TLS certificates (managed by acme.sh)
 
@@ -217,7 +218,7 @@ After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.p
 ### On the local (deployer) machine
 - `~/.meridian/cluster.yml` — fleet state (panel creds, nodes, relays, desired state)
 - `~/.meridian/cluster.yml.bak` — automatic backup before destructive operations
+- `~/.meridian/servers.json` — saved SSH server profiles
+- `~/.meridian/ssh/meridian_ed25519` — managed SSH key, when generated
 - `~/.meridian/cache/` — update check throttle cache
 - `~/.local/bin/meridian` — CLI entry point (installed via uv/pipx)
-
-Legacy files (`~/.meridian/credentials/`, `~/.meridian/servers`) persist only for upgrade migration from Meridian 3.x.

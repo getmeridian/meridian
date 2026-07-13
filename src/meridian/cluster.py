@@ -1,6 +1,6 @@
 """Fleet configuration data model.
 
-Replaces the per-server credentials.py with a single cluster-wide manifest.
+Uses a single cluster-wide manifest instead of per-server credential files.
 Users/clients live in Remnawave's PostgreSQL — this file stores only
 deployment topology and panel access.
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,9 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
         logger.warning("%s", message)
 
 
+CURRENT_CLUSTER_VERSION = 2
+
+
 class ClusterConfigExternallyModifiedError(RuntimeError):
     """cluster.yml was modified on disk between load() and save().
 
@@ -34,14 +37,6 @@ class ClusterConfigExternallyModifiedError(RuntimeError):
     process's) writes. Most callers should surface the error and ask
     the user to retry after reloading.
     """
-
-
-# StrEnum backport for Python 3.10 (stdlib StrEnum is 3.11+)
-class StrEnum(str, Enum):
-    """String enum compatible with Python 3.10+."""
-
-    def __str__(self) -> str:
-        return self.value
 
 
 class ProtocolKey(StrEnum):
@@ -230,7 +225,7 @@ class ClusterConfig:
     Client/user state lives in Remnawave's database, not here.
     """
 
-    version: int = 2
+    version: int = CURRENT_CLUSTER_VERSION
     panel: PanelConfig = field(default_factory=PanelConfig)
     config_profile_uuid: str = ""
     config_profile_name: str = ""
@@ -386,13 +381,13 @@ class ClusterConfig:
         if self.desired_relays is not None:
             desired_relay_hosts: list[str] = []
             desired_relay_labels: set[str] = set()
-            desired_node_hosts = {node.host for node in self.desired_nodes or [] if node.host}
+            desired_node_host_set = {node.host for node in self.desired_nodes or [] if node.host}
             for i, dr in enumerate(self.desired_relays):
                 if dr.host:
                     if dr.host in desired_relay_hosts:
                         errors.append(f"desired_relays[{i}].host is a duplicate: {dr.host}")
                     desired_relay_hosts.append(dr.host)
-                    if dr.host in desired_node_hosts:
+                    if dr.host in desired_node_host_set:
                         errors.append(
                             f"desired_relays[{i}].host also appears in desired_nodes: {dr.host}. "
                             "Use capability routing for same-server relay+exit designs."

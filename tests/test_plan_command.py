@@ -212,7 +212,7 @@ class TestPlanJsonOutput:
                 panel_cls.return_value.__enter__.side_effect = RemnawaveAuthError(
                     "Panel authentication failed",
                     hint="Check your API token.",
-                    hint_type="user",
+                    category="user",
                 )
                 with pytest.raises(typer.Exit) as exc_info:
                     plan_run(json_output=True)

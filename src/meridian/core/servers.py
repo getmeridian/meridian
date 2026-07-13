@@ -20,7 +20,7 @@ from meridian.core.models import CoreModel
 from meridian.core.workflow import InputField, InputSection, WorkflowPlan
 
 ServerAuthState = Literal["unknown", "validated", "key_ready", "failed"]
-ServerSource = Literal["manual", "legacy", "engine", "imported"]
+ServerSource = Literal["manual", "engine"]
 ServerKeyPolicy = Literal["generate_meridian", "use_existing"]
 
 

@@ -15,10 +15,11 @@ section: guides
 بعد از نصب، نمی‌توانم اتصال برقرار کنم → meridian test IP
   "آیا proxy از جایی که اکنون هستم قابل دسترسی است؟"
   بررسی‌کنند: TCP پورت 443، TLS handshake، HTTPS دامنه (اگر دامنه‌ای باشد)
+  به SSH نیاز ندارد — روی دستگاه کلاینت اجرا می‌شود.
 
 بعد از نصب، چیزی شکسته است             → meridian doctor IP
   "هر چیز را برای اشکال‌زدایی جمع‌آوری کنید."
-  جمع‌آوری‌کنند: سیستم‌عامل، لاگ‌های Docker، پورت‌های listening، فایروال، مقدار SNI، DNS
+  جمع‌آوری می‌کند: سیستم‌عامل سرور، Docker، لاگ‌های پنل و نود Remnawave، پورت‌ها، فایروال، SNI و DNS
 ```
 
 برای یک پیام تشخیصی آماده برای AI، `--ai` را به preflight یا doctor اضافه کنید.
@@ -36,7 +37,7 @@ section: guides
 **راه‌حل‌ها:**
 1. کنسول فراهم‌کننده ابری را بررسی کنید — اطمینان حاصل کنید 443/TCP ورودی مجاز است
 2. از یک شبکه متفاوت امتحان کنید (داده موبایل، Wi-Fi دیگر)
-3. SSH کنید و بررسی کنید: `docker ps` (آیا 3x-ui اجرا می‌شود؟)، `ss -tlnp sport = :443`
+3. با SSH وارد شوید و بررسی کنید: `docker ps` (آیا `remnawave` و `remnawave-node` اجرا می‌شوند؟)، `systemctl status nginx`، `ss -tlnp sport = :443`
 4. UFW را بررسی کنید: `ufw status` — باید 443/tcp ALLOW را نشان دهد
 
 ### TLS handshake ناکام است
@@ -47,7 +48,7 @@ section: guides
 3. هدف SNI Reality از سرور قابل دسترسی نیست
 
 **راه‌حل‌ها:**
-1. Xray را بررسی کنید: `docker logs 3x-ui --tail 20`
+1. Xray را بررسی کنید: `docker logs remnawave-node --tail 20`
 2. پورت را بررسی کنید: `ss -tlnp sport = :443` — باید nginx باشد
 3. SNI را آزمایش کنید: `meridian preflight IP`
 
@@ -61,7 +62,7 @@ section: guides
 **راه‌حل‌ها:**
 1. DNS را بررسی کنید: `dig +short yourdomain.com @8.8.8.8`
 2. nginx را بررسی کنید: `systemctl status nginx`
-3. پیکربندی nginx را بررسی کنید: `/etc/nginx/conf.d/meridian-stream.conf`
+3. پیکربندی nginx را بررسی کنید: `/etc/nginx/stream.d/meridian.conf`
 
 ## اتصال بعد از چند ثانیه قطع می‌شود
 
@@ -89,17 +90,15 @@ section: guides
 
 SSH را دستی آزمایش کنید: `ssh root@SERVER_IP`. اطمینان حاصل کنید که دسترسی مبتنی بر کلید دارید. اگر root نیستید، از `--user` flag استفاده کنید.
 
-### Xray راه‌اندازی نمی‌شود (خطای invalid JSON / MarshalJSON)
+### Xray در کانتینر نود راه‌اندازی نمی‌شود
 
-فیلدهای `settings` یا `streamSettings` ورودی 3x-ui حاوی JSON خراب است. این زمانی اتفاق می‌افتد که `settings` به جای رشته JSON به عنوان شیء تودرتو ارسال شود — ساختار Go 3x-ui نوع `string` انتظار دارد. API مقدار `success: true` برمی‌گرداند اما فقط نام اولین کلید را به جای شیء کامل JSON ذخیره می‌کند.
+کانتینر را بررسی کنید: `docker logs remnawave-node --tail 50`. علت‌های رایج عبارت‌اند از تداخل پورت روی میزبان (نود در `network_mode: host` اجرا می‌شود، پس پورت‌های ثبت‌شده در `cluster.yml` باید آزاد باشند)، در دسترس نبودن پنل (ثبت نود هنگام راه‌اندازی به `node_secret_key` پنل نیاز دارد)، یا نبود قابلیت `NET_ADMIN`.
 
-**راه‌حل:** حذف و نصب مجدد: `meridian teardown IP && meridian deploy IP`. برای بررسی پایگاه داده: `sqlite3 /opt/3x-ui/db/x-ui.db "SELECT settings FROM inbounds;"` — هر فیلد باید JSON معتبر باشد.
+**راه‌حل:** فرمان `meridian teardown IP && meridian deploy IP` نود را از نو و تمیز می‌سازد. برای بررسی وضعیت پنل Remnawave، رابط مدیریت را در `https://<IP>/<secret_path>/` باز کنید و بخش **Nodes** را ببینید؛ وضعیت نود باید `connected` باشد. `meridian fleet status` همین اطلاعات را در CLI نشان می‌دهد.
 
 ### خطای ایجاد XHTTP inbound (تداخل پورت)
 
-در نسخه‌های قدیمی‌تر (قبل از v3.6.0)، هم Reality و هم XHTTP سعی در استفاده از پورت 443 داشتند. 3x-ui پورت‌های تکراری را رد می‌کند.
-
-**راه‌حل:** به v3.6.0+ به‌روزرسانی کنید. XHTTP اکنون روی پورت localhost اجرا و از طریق nginx مسیریابی می‌شود.
+نسخه‌های قدیمی Meridian (پیش از v3.6.0) تلاش می‌کردند Reality و XHTTP را هر دو روی پورت 443 قرار دهند. نسخه 4 برای پورت‌های XHTTP، Reality و WSS هر نود مقادیر قطعی اختصاص می‌دهد (بخش [معماری ← اختصاص پورت](/docs/fa/architecture/#اختصاص-پورت) را ببینید) و ترافیک را از طریق nginx پروکسی معکوس می‌کند؛ بنابراین این تداخل دیگر رخ نمی‌دهد.
 
 ### فضای دیسک ناکافی
 
@@ -111,12 +110,12 @@ SSH را دستی آزمایش کنید: `ssh root@SERVER_IP`. اطمینان ح
 
 ## کار می‌کرد، اکنون متوقف شده
 
-**معمول‌ترین علت:** IP سرور مسدود شد. این در مناطق سانسور بسیار معمول است.
+**معمول‌ترین علت:** IP سرور مسدود شده است. `meridian test IP` را اجرا کنید؛ اگر بررسی TCP ناموفق باشد، احتمالاً IP مسدود شده است.
 
 برای دستورالعمل‌های مفصل بازیابی، [راهنمای بازیابی IP مسدود](/docs/fa/recovery/) را ببینید.
 
 دیگر علل:
-- سرور دوباره راه‌اندازی شد و Docker به‌طور خودکار شروع نشد → `docker start 3x-ui`
+- سرور دوباره راه‌اندازی شد و سرویس‌ها خودکار شروع نشدند → در `/opt/remnawave` و `/opt/remnanode` فرمان `docker compose up -d` را اجرا کنید، سپس `systemctl restart nginx`
 - دیسک پر است → `df -h /`، `docker system prune -af`
 
 ## سرعت کند
@@ -136,7 +135,7 @@ meridian doctor --ai
 
 یک پیام تشخیصی را برای استفاده با هر دستیار AI در کلیپ‌بورد خود کپی می‌کند.
 
-یا تشخیص‌ها را برای یک [GitHub issue](https://github.com/uburuntu/meridian/issues) جمع‌آوری کنید:
+یا تشخیص‌ها را برای یک [GitHub issue](https://github.com/getmeridian/meridian/issues) جمع‌آوری کنید:
 
 ```
 meridian doctor
@@ -164,8 +163,8 @@ meridian doctor
 |------|---------------------|
 | ماشین محلی | سازگاری سیستم‌عامل |
 | سرور | نسخه سیستم‌عامل، زمان فعالیت (ریبوت اخیر؟)، مصرف دیسک/حافظه |
-| Docker | آیا کانتینر 3x-ui در حال اجرا است؟ وضعیت باید "Up" باشد |
-| لاگ‌های 3x-ui | پیام‌های خطا، ورودی‌های "failed to start"، مشکلات گواهی |
+| Docker | آیا کانتینرهای `remnawave` و `remnawave-node` اجرا می‌شوند؟ وضعیت باید "Up" باشد |
+| لاگ‌های Remnawave | پیام‌های خطای backend پنل یا نود، ورودی‌های "failed to start" و مشکلات گواهی |
 | پورت‌های در حال گوش دادن | پورت 443 باید nginx نشان دهد. اگر نیست، پروکسی اجرا نمی‌شود |
 | فایروال (UFW) | پورت 443/tcp باید ALLOW باشد. اگر لیست نشده، مسدود است |
 | هدف SNI | باید CONNECTED با زنجیره گواهی نشان دهد |

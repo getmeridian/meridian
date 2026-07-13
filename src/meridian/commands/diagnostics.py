@@ -7,12 +7,8 @@ import re
 import shlex
 
 from meridian.cluster import ClusterConfig
-from meridian.commands.resolve import (
-    ensure_server_connection,
-    fetch_credentials,
-    resolve_server,
-)
-from meridian.config import DEFAULT_SNI, SERVERS_FILE
+from meridian.commands.resolve import ensure_server_connection, resolve_server
+from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
 from meridian.console import err_console, line
 from meridian.facts import ServerFacts
 from meridian.servers import ServerRegistry
@@ -27,11 +23,10 @@ def run(
     requested_server: str = "",
 ) -> None:
     """Collect system info from the server for bug reports. Redacts secrets."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
 
     resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
 
     from meridian import __version__
 
@@ -125,7 +120,7 @@ def run(
 
     caps = detect_capabilities(resolved.conn)
     cap_lines = [f"Xray version: {caps.xray_version or 'unknown'}"]
-    enabled = [k for k in ("reality", "xhttp", "wss", "hysteria2", "finalmask", "vless_pq") if getattr(caps, k)]
+    enabled = [k for k in ("reality", "xhttp", "wss", "hysteria2", "finalmask") if getattr(caps, k)]
     cap_lines.append(f"Enabled: {', '.join(enabled) if enabled else 'none detected'}")
     sections.append(("Node Capabilities", "\n".join(cap_lines)))
 
@@ -201,7 +196,7 @@ def run(
         err_console.print()
         err_console.print("  1. Review the output below for any private info you want to remove")
         err_console.print("  2. Copy the markdown block into a new issue:")
-        err_console.print("     [info]https://github.com/uburuntu/meridian/issues/new[/info]")
+        err_console.print("     [info]https://github.com/getmeridian/meridian/issues/new[/info]")
         err_console.print()
         line()
         err_console.print()

@@ -362,11 +362,14 @@ class TestStructuralHealth:
         The _extra dict is for forward-compat unknown YAML keys only.
         Applied-state snapshots belong in cluster.applied_state.
         """
-        APPLIED_KEYS = {"desired_clients_applied", "desired_nodes_applied", "desired_relay_hosts_applied"}
+        APPLIED_KEYS = {
+            "desired_clients_applied",
+            "desired_nodes_applied",
+            "desired_relays_applied",
+            "desired_relay_hosts_applied",
+        }
         violations = []
         for path in sorted(SRC.rglob("*.py")):
-            if path.name in ("cluster.py", "cluster_persistence.py"):
-                continue  # cluster persistence handles migration from _extra → applied_state
             text = path.read_text()
             for key in APPLIED_KEYS:
                 if f'_extra["{key}"]' in text or f"_extra['{key}']" in text or f'_extra.get("{key}")' in text:

@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from meridian.cluster import (
+    CURRENT_CLUSTER_VERSION,
     AppliedState,
     BrandingConfig,
     ClusterConfig,
@@ -53,12 +54,12 @@ _INBOUND_REF_FIELDS = _public_fields(InboundRef)
 _SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
 _DESIRED_NODE_FIELDS = _public_fields(DesiredNode)
 _DESIRED_RELAY_FIELDS = _public_fields(DesiredRelay)
-_KNOWN_TOP = _public_fields(ClusterConfig) | {
-    # Legacy keys (migrated into applied_state on load)
+_PRE_V4_1_APPLIED_KEYS = {
     "desired_clients_applied",
     "desired_nodes_applied",
     "desired_relays_applied",
 }
+_KNOWN_TOP = _public_fields(ClusterConfig) | _PRE_V4_1_APPLIED_KEYS
 
 
 _SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
@@ -311,11 +312,8 @@ def _load_applied_state(raw: dict[str, Any]) -> AppliedState:
     )
 
 
-def _migrate_legacy_applied_state(data: dict[str, Any]) -> AppliedState:
-    """Migrate legacy desired_*_applied top-level keys into AppliedState.
-
-    Pre-v4.1 stored these as top-level YAML keys via cluster._extra.
-    """
+def _migrate_pre_v4_1_applied_state(data: dict[str, Any]) -> AppliedState:
+    """Load v4.0 top-level applied snapshots into the typed v4.1 shape."""
     return AppliedState(
         nodes=_load_applied_list(data.get("desired_nodes_applied")),
         clients=_load_applied_list(data.get("desired_clients_applied")),
@@ -436,21 +434,11 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
                 )
             )
 
-    # Applied state (v2) — load from typed key, or migrate from legacy _extra keys
-    applied_state = AppliedState()
+    # Applied state (v2): v4.0 stored snapshots as top-level keys.
     _applied_raw = data.get("applied_state")
-    if isinstance(_applied_raw, dict):
-        # New format: typed applied_state key
-        applied_state = _load_applied_state(_applied_raw)
-    else:
-        # Backward compat: migrate from legacy top-level _extra keys
-        applied_state = _migrate_legacy_applied_state(data)
-
-    # Migrate subscription_page._extra["deployed"] → subscription_page.deployed
-    if subscription_page is not None:
-        legacy_deployed = subscription_page._extra.pop("deployed", None)
-        if legacy_deployed is not None and not subscription_page.deployed:
-            subscription_page.deployed = bool(legacy_deployed)
+    applied_state = (
+        _load_applied_state(_applied_raw) if isinstance(_applied_raw, dict) else _migrate_pre_v4_1_applied_state(data)
+    )
 
     # Extra fields
     extra = {k: v for k, v in data.items() if k not in _KNOWN_TOP}
@@ -500,20 +488,18 @@ def load_cluster(path: Path | None = None) -> ClusterConfig:
         return ClusterConfig()
     if not isinstance(data, dict):
         return ClusterConfig()
-    version = data.get("version", 1)
-    if isinstance(version, int) and version > 2:
+    version = data.get("version", CURRENT_CLUSTER_VERSION)
+    if isinstance(version, int) and version > CURRENT_CLUSTER_VERSION:
         _load_warning(
-            f"cluster.yml has version {version}, but this CLI only understands version 2. "
+            f"cluster.yml has version {version}, but this CLI only understands version {CURRENT_CLUSTER_VERSION}. "
             "Some fields may be ignored. Upgrade Meridian: pip install --upgrade meridian-vpn"
         )
-    from meridian.migrations import migrate
-
-    data = migrate(data)
+    data.setdefault("version", CURRENT_CLUSTER_VERSION)
     cfg = _load_cluster(data)
     cfg._loaded_mtime_ns = load_mtime_ns
 
     # Mark future-version configs as read-only to prevent data loss
-    if isinstance(version, int) and version > 2:
+    if isinstance(version, int) and version > CURRENT_CLUSTER_VERSION:
         cfg._readonly = True
 
     # Warn about validation errors on load (don't hard-fail — recover/doctor need corrupt configs)

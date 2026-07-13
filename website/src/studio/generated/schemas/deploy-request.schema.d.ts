@@ -7,13 +7,11 @@
 
 export type ClientName = string;
 export type Color = string;
-export type Decoy = string;
 export type Domain = string;
 export type GeoBlock = boolean;
 export type Harden = boolean;
 export type Icon = string;
 export type Ip = string;
-export type Pq = boolean;
 export type RequestedServer = string;
 export type ServerName = string;
 export type Sni = string;
@@ -28,13 +26,11 @@ export type Yes = boolean;
 export interface DeployRequest {
   client_name?: ClientName;
   color?: Color;
-  decoy?: Decoy;
   domain?: Domain;
   geo_block?: GeoBlock;
   harden?: Harden;
   icon?: Icon;
   ip?: Ip;
-  pq?: Pq;
   requested_server?: RequestedServer;
   server_name?: ServerName;
   sni?: Sni;

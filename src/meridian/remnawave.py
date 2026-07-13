@@ -34,14 +34,6 @@ logger = logging.getLogger("meridian.api")
 class RemnawaveError(MeridianError):
     """Raised when a Remnawave API call fails."""
 
-    def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system"):
-        super().__init__(msg, hint=hint, category=hint_type)  # type: ignore[arg-type]
-
-    @property
-    def hint_type(self) -> str:
-        """Backward-compatible alias for ``self.category``."""
-        return self.category
-
 
 class RemnawaveNotFoundError(RemnawaveError):
     """Resource not found (404)."""
@@ -56,7 +48,7 @@ class RemnawaveNetworkError(RemnawaveError):
 
 
 # ---------------------------------------------------------------------------
-# Response models — lightweight dataclasses kept for backward compatibility
+# Response models — stable internal shapes around SDK responses
 # ---------------------------------------------------------------------------
 
 
@@ -285,31 +277,31 @@ def _sdk_call(coro: Any) -> Any:
     except (RemnawaveError, RemnawaveNotFoundError, RemnawaveAuthError, RemnawaveNetworkError):
         raise
     except NetworkError as e:
-        raise RemnawaveNetworkError(f"Panel network error: {e}", hint_type="system") from e
+        raise RemnawaveNetworkError(f"Panel network error: {e}", category="system") from e
     except httpx.HTTPStatusError as e:
         status_code = e.response.status_code
         if status_code in (401, 403):
             raise RemnawaveAuthError(
                 f"Panel authentication failed: {e}",
                 hint="Check your API token — it may have expired",
-                hint_type="user",
+                category="user",
             ) from e
         if status_code == 404:
-            raise RemnawaveNotFoundError(f"Resource not found: {e}", hint_type="system") from e
-        raise RemnawaveError(f"Panel API error: {e}", hint_type="system") from e
+            raise RemnawaveNotFoundError(f"Resource not found: {e}", category="system") from e
+        raise RemnawaveError(f"Panel API error: {e}", category="system") from e
     except httpx.RequestError as e:
-        raise RemnawaveNetworkError(f"Panel network error: {e}", hint_type="system") from e
+        raise RemnawaveNetworkError(f"Panel network error: {e}", category="system") from e
     except ApiError as e:
         if isinstance(e, NotFoundError):
-            raise RemnawaveNotFoundError(f"Resource not found: {e}", hint_type="system") from e
+            raise RemnawaveNotFoundError(f"Resource not found: {e}", category="system") from e
         if isinstance(e, (UnauthorizedError, ForbiddenError)):
             raise RemnawaveAuthError(
                 f"Panel authentication failed: {e}",
                 hint="Check your API token — it may have expired",
-                hint_type="user",
+                category="user",
             ) from e
         if isinstance(e, ApiError):
-            raise RemnawaveError(f"Panel API error: {e}", hint_type="system") from e
+            raise RemnawaveError(f"Panel API error: {e}", category="system") from e
         raise
 
 
@@ -391,16 +383,16 @@ class MeridianPanel:
                     raise RemnawaveAuthError(
                         "Panel authentication failed (401)",
                         hint="Check your API token — it may have expired",
-                        hint_type="user",
+                        category="user",
                     )
                 if resp.status_code == 403:
                     raise RemnawaveAuthError(
                         "Panel access forbidden (403)",
                         hint="API token lacks required permissions",
-                        hint_type="user",
+                        category="user",
                     )
                 if resp.status_code == 404:
-                    raise RemnawaveNotFoundError(f"Resource not found: {path}", hint_type="system")
+                    raise RemnawaveNotFoundError(f"Resource not found: {path}", category="system")
                 if resp.status_code >= 500:
                     last_error = RemnawaveError(f"Panel server error ({resp.status_code}): {resp.text[:200]}")
                     if attempt < self._max_retries - 1:
@@ -414,7 +406,7 @@ class MeridianPanel:
                     raise RemnawaveError(
                         f"Panel returned invalid JSON ({len(resp.content)} bytes)",
                         hint=f"Response may be truncated by firewall or DPI: {e}",
-                        hint_type="system",
+                        category="system",
                     ) from e
                 if isinstance(data, dict) and "response" in data:
                     return data["response"]
@@ -423,7 +415,7 @@ class MeridianPanel:
                 last_error = RemnawaveNetworkError(
                     f"Cannot connect to panel at {self._base}",
                     hint=f"Is the panel running? Check: curl {self._base}/api/health\n{e}",
-                    hint_type="system",
+                    category="system",
                 )
                 if attempt < self._max_retries - 1:
                     time.sleep(2**attempt)
@@ -432,7 +424,7 @@ class MeridianPanel:
                 last_error = RemnawaveNetworkError(
                     f"Panel request timed out after {self._timeout}s",
                     hint=f"Panel may be overloaded or unreachable: {e}",
-                    hint_type="system",
+                    category="system",
                 )
                 if attempt < self._max_retries - 1:
                     time.sleep(2**attempt)
@@ -444,17 +436,8 @@ class MeridianPanel:
             raise last_error
         raise RemnawaveError("Request failed after retries")
 
-    def _get(self, path: str, **params: Any) -> Any:
-        return self._request("GET", path, params=params if params else None)
-
     def _post(self, path: str, json: Any = None) -> Any:
         return self._request("POST", path, json=json)
-
-    def _patch(self, path: str, json: Any = None) -> Any:
-        return self._request("PATCH", path, json=json)
-
-    def _delete(self, path: str) -> Any:
-        return self._request("DELETE", path)
 
     # --- Health ---
 
@@ -807,12 +790,12 @@ class MeridianPanel:
             raise RemnawaveNetworkError(
                 f"Cannot connect to panel at {base_url}",
                 hint=f"Is the panel running? {e}",
-                hint_type="system",
+                category="system",
             ) from e
         except httpx.TimeoutException:
             raise RemnawaveNetworkError(
                 f"Panel {error_label} timed out after {timeout}s",
-                hint_type="system",
+                category="system",
             )
         if resp.status_code not in accepted_codes:
             detail = resp.text[:200] if resp.status_code >= 400 else ""
@@ -822,17 +805,17 @@ class MeridianPanel:
             raise RemnawaveError(
                 msg,
                 hint="Check panel credentials" if resp.status_code in (401, 403) else "",
-                hint_type="user" if resp.status_code in (401, 403) else "system",
+                category="user" if resp.status_code in (401, 403) else "system",
             )
         try:
             data = resp.json()
         except (ValueError, TypeError) as e:
-            raise RemnawaveError(f"Panel returned invalid JSON during {error_label}", hint_type="system") from e
+            raise RemnawaveError(f"Panel returned invalid JSON during {error_label}", category="system") from e
         if isinstance(data, dict) and "response" in data:
             data = data["response"]
         token = data.get("accessToken", "") or data.get("token", "")
         if not token:
-            raise RemnawaveError(f"{error_label.capitalize()} succeeded but no token returned", hint_type="bug")
+            raise RemnawaveError(f"{error_label.capitalize()} succeeded but no token returned", category="bug")
         return token
 
     @classmethod

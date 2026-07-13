@@ -993,7 +993,7 @@ class TestSdkExceptionTranslation:
         with pytest.raises(RemnawaveNetworkError) as exc_info:
             _sdk_call(coro())
 
-        assert exc_info.value.hint_type == "system"
+        assert exc_info.value.category == "system"
 
     def _http_status_error(self, status_code: int) -> httpx.HTTPStatusError:
         request = httpx.Request("GET", "https://panel.example/api")

@@ -25,10 +25,8 @@ meridian deploy [IP] [flags]
 | `--color PALETTE` | ocean | Page color theme (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH user |
 | `--harden / --no-harden` | enabled | Harden SSH + firewall |
-| `--pq / --no-pq` | disabled | Post-quantum encryption — ML-KEM-768 hybrid (experimental) |
 | `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
 | `--server NAME` | | Target server (name or IP) |
-| `--decoy MODE` | ignored | Deprecated; unknown paths always use the hardened default response |
 | `--geo-block` / `--no-geo-block` | enabled | Block Russian domains and IPs (geosite:category-ru + geoip:ru) |
 | `--ssh-port PORT` | 22 | SSH port (if non-standard) |
 | `--yes` | | Skip confirmation prompts |
@@ -87,7 +85,8 @@ Manage additional exit nodes in a multi-node fleet. The first server (panel host
 
 ```
 meridian node add IP [flags]
-meridian node list [--json]
+meridian node list
+meridian --json node list
 meridian node remove IP [--yes] [--force]
 meridian node check IP
 ```
@@ -99,19 +98,18 @@ meridian node check IP
 | `--name NAME` | (auto, from IP) | Friendly name shown in panel / subscription |
 | `--domain DOMAIN` | (none) | Per-node domain for WSS/CDN fallback |
 | `--sni HOST` | www.microsoft.com | Reality camouflage target for this node |
-| `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP on this node |
 | `--harden / --no-harden` | enabled | OS + SSH + firewall hardening for the node |
 | `--yes` | | Skip confirmation prompts (applies to `node remove`) |
 | `--force` | | On `node remove`, proceed even if relays reference this node as their exit |
-| `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
+| global `--json` | | Place before `node` to emit `node list` as a `meridian.output/v1` envelope |
 
-**How it works**: `meridian node add` provisions the node host (OS packages, Docker, nginx, TLS, Remnawave node container), registers the node against the panel's REST API, and creates `reality` and `xhttp` host entries so clients automatically receive the new exit in their next subscription refresh. The new entry is added to `nodes[]` in `cluster.yml`; `desired_nodes[]` is also updated if that list is non-null (hybrid sync). Node deployment logic lives in `node_deploy.py`.
+**How it works**: `meridian node add` provisions the node host (OS packages, Docker, nginx, TLS, Remnawave node container), registers it through the panel API, and creates `reality`, `xhttp`, and `hysteria2` host entries (plus `wss` in domain mode). Clients receive the new exit on their next subscription refresh. The new entry is added to `nodes[]` in `cluster.yml`; `desired_nodes[]` is also updated if that list is non-null (hybrid sync).
 
 **Health checks**: `meridian node check` runs panel status, SSH, container, port, and TLS checks. When a check fails, it prints a remediation hint (e.g. `Run: docker compose up -d`).
 
 **Removal**: `meridian node remove` SSHs into the node to stop containers before removing the node from the cluster and panel. It refuses to delete a node that is still the `exit_node` of one or more relays; pass `--force` to override.
 
-**JSON output**: `node list --json` uses the `meridian.output/v1` envelope with `data.nodes[]` containing ip, name, uuid, status, xray_version, and traffic_bytes.
+**JSON output**: `meridian --json node list` uses the `meridian.output/v1` envelope with `data.nodes[]` containing ip, name, uuid, status, xray_version, and traffic_bytes.
 
 ### meridian fleet
 
@@ -133,7 +131,7 @@ meridian fleet recover --panel-url URL --api-token TOKEN
 
 **`fleet inventory`** — shows the configured panel, nodes, relays, desired topology, and live panel node status when reachable. It never prints the panel API token or secret URL paths. With `--json`, output uses the `meridian.output/v1` envelope. Stable field access inside `data` includes `data.sources.*`, `data.servers[].roles`, `data.summary.*`, `data.nodes[].desired`, `data.nodes[].protocols`, `data.relays[].exit_node_*`, and `data.desired_nodes[].present`. Inventory presence fields are not reconciliation truth; use `plan --json` for drift/apply decisions.
 
-**`fleet recover`** — rebuilds `~/.meridian/cluster.yml` from the live panel. Use it when the local file is lost, or when picking up someone else's deployment. Connects via SSH to read stable server-side metadata, then queries the panel API for nodes, relays, inbounds, hosts, and users.
+**`fleet recover`** — rebuilds `~/.meridian/cluster.yml` from the live panel. It queries the config profile, nodes, and inbound UUIDs, then uses SSH to recover server-side metadata and derive the Reality public key. Review SSH settings, panel-host selection, and relays manually afterward.
 
 ### meridian api
 
@@ -166,7 +164,8 @@ Manage relay nodes — lightweight TCP forwarders that route traffic through a d
 
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
-meridian relay list [--exit EXIT] [--json]
+meridian relay list [--exit EXIT]
+meridian --json relay list [--exit EXIT]
 meridian relay remove RELAY_IP [--exit EXIT] [--yes]
 meridian relay check RELAY_IP [--exit EXIT]
 ```
@@ -179,11 +178,11 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--user/-u USER` | root | SSH user on relay |
 | `--ssh-port PORT` | 22 | SSH port on the relay server (if non-standard) |
 | `--yes/-y` | | Skip confirmation prompts |
-| `--json` | | Emit `relay list` as a `meridian.output/v1` envelope |
+| global `--json` | | Place before `relay` to emit `relay list` as a `meridian.output/v1` envelope |
 
 **How relays work**: Client connects to the relay's domestic IP. Relay forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext. All protocols (Reality, XHTTP, WSS) work through the relay.
 
-**JSON output**: `relay list --json` uses the `meridian.output/v1` envelope with `data.relays[]`.
+**JSON output**: `meridian --json relay list` uses the `meridian.output/v1` envelope with `data.relays[]`.
 
 ### meridian plan
 

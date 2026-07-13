@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Protocol
 
 from meridian.config import MERIDIAN_SSH_KEY_FILE
+from meridian.core.errors import EngineError
 from meridian.core.execution import ServerCommandResult, ServerConnection
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -20,7 +21,6 @@ from meridian.core.servers import (
     ServerValidateResult,
     profile_from_draft,
 )
-from meridian.engine.errors import EngineError
 from meridian.ssh_keys import host_key_known, host_key_lookup
 
 
@@ -37,11 +37,6 @@ class ServerProfileStoreLike(Protocol):
         """Insert or replace a server profile."""
 
 
-# Re-export core protocols under their legacy engine names.
-CommandResultLike = ServerCommandResult
-ServerConnectionLike = ServerConnection
-
-
 class ServerConnectionFactory(Protocol):
     """Construct SSH connections, optionally pinned to a specific private key."""
 
@@ -51,7 +46,7 @@ class ServerConnectionFactory(Protocol):
         *,
         identity_file: str = "",
         password: str = "",
-    ) -> ServerConnectionLike:
+    ) -> ServerConnection:
         """Build a connection for a saved server profile."""
 
 
@@ -75,7 +70,7 @@ def _missing_server_connection_factory(
     *,
     identity_file: str = "",
     password: str = "",
-) -> ServerConnectionLike:
+) -> ServerConnection:
     raise EngineError(
         "No server connection adapter configured",
         hint="Start through `meridian studio` or pass a ServerConnectionFactory.",
@@ -285,7 +280,7 @@ def _with_validation_state(
     return profile.model_copy(update=updates)
 
 
-def _detect_os(conn: ServerConnectionLike) -> str:
+def _detect_os(conn: ServerConnection) -> str:
     result = conn.run(
         '. /etc/os-release 2>/dev/null && printf \'%s %s\\n\' "$ID" "$VERSION_ID" || uname -s',
         timeout=10,
@@ -296,7 +291,7 @@ def _detect_os(conn: ServerConnectionLike) -> str:
     return result.stdout.strip()
 
 
-def _check_sudo(profile: ServerProfile, conn: ServerConnectionLike) -> bool:
+def _check_sudo(profile: ServerProfile, conn: ServerConnection) -> bool:
     if profile.ssh_user == "root":
         return True
     result = conn.run("sudo -n true", timeout=10, sudo=False)
@@ -342,19 +337,19 @@ def _normalize_public_key(public_key: str) -> str:
     return normalized
 
 
-def _ssh_failure_message(result: CommandResultLike) -> str:
+def _ssh_failure_message(result: ServerCommandResult) -> str:
     text = (result.stderr or result.stdout or "").strip()
     if not text:
         return f"SSH command failed with exit code {result.returncode}."
     return text.splitlines()[0][:240]
 
 
-def _looks_network_reachable(result: CommandResultLike) -> bool:
+def _looks_network_reachable(result: ServerCommandResult) -> bool:
     text = f"{result.stderr}\n{result.stdout}".lower()
     return any(fragment in text for fragment in ("permission denied", "host key verification failed", "identification"))
 
 
-def _ssh_failure_hints(profile: ServerProfile, result: CommandResultLike) -> list[str]:
+def _ssh_failure_hints(profile: ServerProfile, result: ServerCommandResult) -> list[str]:
     text = f"{result.stderr}\n{result.stdout}".lower()
     if "remote host identification has changed" in text:
         return [

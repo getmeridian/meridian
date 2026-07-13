@@ -28,11 +28,12 @@ def _extract_config_metadata(profile_raw: dict[str, Any]) -> dict[str, str]:
     short IDs, SNI targets, and protocol paths. These are essential for
     preserving existing client configs across recovery + redeploy.
 
-    Returns a dict with keys: private_key, short_id, sni, xhttp_path, ws_path.
+    Returns private/public keys, short ID, SNI, and transport paths.
     Missing values default to empty string.
     """
     result: dict[str, str] = {
         "private_key": "",
+        "public_key": "",
         "short_id": "",
         "sni": "",
         "xhttp_path": "",
@@ -64,6 +65,7 @@ def _extract_config_metadata(profile_raw: dict[str, Any]) -> dict[str, str]:
             rs = stream.get("realitySettings")
             if isinstance(rs, dict):
                 result["private_key"] = rs.get("privateKey", "") or ""
+                result["public_key"] = rs.get("publicKey", "") or ""
                 short_ids = rs.get("shortIds")
                 if isinstance(short_ids, list) and short_ids:
                     result["short_id"] = str(short_ids[0])
@@ -132,7 +134,7 @@ def run_recover(panel_url: str, api_token: str) -> None:
         try:
             api_nodes = panel.list_nodes()
         except RemnawaveError as e:
-            fail(f"Could not fetch nodes: {e}", hint=e.hint, hint_type=e.hint_type)
+            fail(f"Could not fetch nodes: {e}", hint=e.hint, hint_type=e.category)
 
         info(f"Found {len(api_nodes)} node(s)")
 
@@ -142,29 +144,50 @@ def run_recover(panel_url: str, api_token: str) -> None:
         metadata: dict[str, str] = {}
         try:
             profiles = panel.list_config_profiles()
-            if profiles:
-                # Use the first profile as the active one
-                config_profile_uuid = profiles[0].uuid
-                config_profile_name = profiles[0].name
-                info(f"Config profile: {config_profile_name}")
-                # Extract Reality keys and protocol paths from the config
-                metadata = _extract_config_metadata(profiles[0]._raw)
-                if metadata.get("private_key"):
-                    ok("Reality private key recovered from config profile")
-                if metadata.get("xhttp_path"):
-                    info(f"XHTTP path recovered: {metadata['xhttp_path']}")
-                if metadata.get("ws_path"):
-                    info(f"WS path recovered: {metadata['ws_path']}")
-        except RemnawaveError:
-            warn("Could not fetch config profiles")
+        except RemnawaveError as exc:
+            fail(
+                f"Could not fetch config profiles: {exc}",
+                hint="Recovery stopped before writing cluster.yml; restore panel API access and retry.",
+                hint_type=exc.category,
+            )
+        if not profiles:
+            fail(
+                "Panel has no config profile to recover",
+                hint="Recovery stopped before writing cluster.yml; repair the panel configuration first.",
+                hint_type="system",
+            )
+
+        # Use the first profile as the active one.
+        config_profile_uuid = profiles[0].uuid
+        config_profile_name = profiles[0].name
+        info(f"Config profile: {config_profile_name}")
+        metadata = _extract_config_metadata(profiles[0]._raw)
+        missing_key_fields = [field for field in ("private_key", "short_id", "sni") if not metadata.get(field)]
+        if missing_key_fields:
+            fail(
+                "Config profile is missing recoverable Reality key material",
+                hint=(
+                    "Recovery stopped before writing cluster.yml; refusing to create state that could rotate "
+                    f"client credentials. Missing: {', '.join(missing_key_fields)}"
+                ),
+                hint_type="system",
+            )
+        ok("Reality private key recovered from config profile")
+        if metadata.get("xhttp_path"):
+            info(f"XHTTP path recovered: {metadata['xhttp_path']}")
+        if metadata.get("ws_path"):
+            info(f"WS path recovered: {metadata['ws_path']}")
 
         # Fetch inbounds
         inbounds: dict[str, InboundRef] = {}
         try:
+            from meridian.node_deploy import inbound_protocol_key
+
             api_inbounds = panel.list_inbounds()
             for ib in api_inbounds:
-                if ib.tag:
-                    inbounds[ib.tag] = InboundRef(uuid=ib.uuid, tag=ib.tag)
+                key = inbound_protocol_key(ib.tag)
+                if key:
+                    inbounds[str(key)] = InboundRef(uuid=ib.uuid, tag=ib.tag)
             info(f"Found {len(inbounds)} inbound(s)")
         except RemnawaveError:
             warn("Could not fetch inbounds")
@@ -178,15 +201,13 @@ def run_recover(panel_url: str, api_token: str) -> None:
             name=api_node.name,
             is_panel_host=(i == 0),  # assume first node is panel host
             sni=metadata.get("sni", ""),
+            reality_public_key=metadata.get("public_key", ""),
             reality_private_key=metadata.get("private_key", ""),
             reality_short_id=metadata.get("short_id", ""),
             xhttp_path=metadata.get("xhttp_path", ""),
             ws_path=metadata.get("ws_path", ""),
         )
         nodes.append(node)
-
-    if metadata.get("private_key") and not metadata.get("public_key"):
-        warn("Reality public key not available from panel — will be derived on next redeploy")
 
     # Build cluster config
     panel_config = PanelConfig(
@@ -199,16 +220,23 @@ def run_recover(panel_url: str, api_token: str) -> None:
         # Try to recover sub_path from server (not stored in panel API)
         try:
             from meridian.ssh import ServerConnection
+            from meridian.xray_config import derive_reality_public_key
 
             with ServerConnection(nodes[0].ip, user=nodes[0].ssh_user, port=nodes[0].ssh_port) as conn:
+                if metadata.get("private_key") and not metadata.get("public_key"):
+                    metadata["public_key"] = derive_reality_public_key(conn, metadata["private_key"])
+                    for node in nodes:
+                        node.reality_public_key = metadata["public_key"]
                 result = conn.run("cat /etc/meridian/sub_path 2>/dev/null", timeout=10)
                 if result.returncode == 0 and result.stdout.strip():
                     panel_config.sub_path = result.stdout.strip()
         except (OSError, RuntimeError):
             pass  # Non-fatal — sub_path can be re-generated on next deploy
 
+    if metadata.get("private_key") and not metadata.get("public_key"):
+        warn("Reality public key could not be derived; redeploy is blocked until key material is restored")
+
     cluster = ClusterConfig(
-        version=1,
         panel=panel_config,
         config_profile_uuid=config_profile_uuid,
         config_profile_name=config_profile_name,

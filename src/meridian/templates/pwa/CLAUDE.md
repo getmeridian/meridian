@@ -1,6 +1,6 @@
 # PWA Connection Page
 
-Server-hosted Progressive Web App. The old `connection-info.html.j2` is kept for local-save pages only.
+Server-hosted Progressive Web App and the only connection-page implementation.
 
 ## Design decisions
 

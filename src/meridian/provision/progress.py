@@ -7,7 +7,7 @@ RichStepRenderer lives here so Rich imports stay out of steps.py.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class StepRenderer(Protocol):
     """Callback protocol for rendering provisioning step progress."""
 
-    def step_starting(self, name: str, index: int, total: int) -> Iterator[None]:
+    def step_starting(self, name: str, index: int, total: int) -> AbstractContextManager[None]:
         """Context manager shown while a step is running."""
         ...  # pragma: no cover
 

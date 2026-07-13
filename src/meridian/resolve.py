@@ -10,15 +10,10 @@ from __future__ import annotations
 import re
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING
 
-from meridian.config import SERVER_CREDS_DIR, creds_dir_for, is_ip
-from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
+from meridian.config import is_ip
+from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import SSHUI, ServerConnection
-
-if TYPE_CHECKING:
-    from meridian.credentials import ServerCredentials
 
 LOCAL_KEYWORDS = ("local", "locally")
 
@@ -72,24 +67,14 @@ class ResolvedServer:
     ip: str
     user: str
     local_mode: bool
-    creds_dir: Path
     conn: ServerConnection
 
-    @property
-    def creds(self) -> ServerCredentials:
-        """Load credentials from the resolved creds_dir."""
-        from meridian.credentials import ServerCredentials
 
-        return ServerCredentials.load(self.creds_dir / "proxy.yml")
-
-
-def detect_local_mode_from_creds() -> str | None:
+def detect_local_server_ip() -> str | None:
     """Check if we're running on a deployed server and extract its IP.
 
-    Tries v4 cluster.yml first (node with is_panel_host), then falls back
-    to v3 /etc/meridian/proxy.yml. Only succeeds for root.
+    Requires the v4 server identity marker and a panel node in cluster.yml.
     """
-    # v4: check cluster.yml for a panel node matching this server
     try:
         from meridian.cluster import ClusterConfig
         from meridian.config import SERVER_NODE_CONFIG
@@ -101,91 +86,29 @@ def detect_local_mode_from_creds() -> str | None:
                 return panel_node.ip
     except (PermissionError, OSError):
         pass
-
-    # v3 compat: /etc/meridian/proxy.yml
-    proxy = SERVER_CREDS_DIR / "proxy.yml"
-    try:
-        if not proxy.is_file():
-            return None
-        from meridian.credentials import ServerCredentials
-
-        creds = ServerCredentials.load(proxy)
-        return creds.server.ip or None
-    except (PermissionError, OSError):
-        return None
-
-
-def _find_proxy_file(host: str) -> Path | None:
-    """Find locally cached credentials for a host, if present."""
-    from meridian import config as cfg
-
-    remote = cfg.CREDS_BASE / cfg.sanitize_ip_for_path(host) / "proxy.yml"
-    if remote.is_file():
-        return remote
-
-    local = cfg.SERVER_CREDS_DIR / "proxy.yml"
-    try:
-        if local.is_file():
-            from meridian.credentials import ServerCredentials
-
-            creds = ServerCredentials.load(local)
-            if creds.server.ip == host:
-                return local
-    except (PermissionError, OSError):
-        return None
-
     return None
-
-
-def _find_relay_file(host: str) -> Path | None:
-    """Find locally cached relay metadata for a host, if present."""
-    from meridian import config as cfg
-
-    relay = cfg.CREDS_BASE / cfg.sanitize_ip_for_path(host) / "relay.yml"
-    if relay.is_file():
-        return relay
-    return None
-
-
-def _cached_relay_hosts(entries: list[ServerEntry]) -> set[str]:
-    """Infer legacy relay entries from locally cached exit credentials."""
-    from meridian.credentials import ServerCredentials
-
-    relay_hosts: set[str] = set()
-    for entry in entries:
-        proxy_file = _find_proxy_file(entry.host)
-        if proxy_file is None:
-            continue
-        try:
-            creds = ServerCredentials.load(proxy_file)
-        except (PermissionError, OSError):
-            continue
-        relay_hosts.update(relay.ip for relay in creds.relays if relay.ip)
-    return relay_hosts
-
-
-def _is_relay_entry(entry: ServerEntry, cached_relay_hosts: set[str]) -> bool:
-    """Determine whether a registry entry is a relay rather than an exit."""
-    if entry.role == SERVER_ROLE_RELAY:
-        return True
-    if _find_relay_file(entry.host) is not None:
-        return True
-    return entry.host in cached_relay_hosts
 
 
 def auto_selectable_entries(registry: ServerRegistry) -> list[ServerEntry]:
     """Return the best registry subset for implicit server selection.
 
-    Relay nodes share the registry with exit servers. New relay entries are
-    tagged explicitly; older ones are inferred from local relay metadata or
-    from cached exit credentials that mention them.
+    Relay-only hosts are excluded using cluster.yml. A server that is both an
+    exit node and a relay remains selectable.
     """
     entries = registry.list()
-    cached_relay_hosts = _cached_relay_hosts(entries)
-    exit_entries = [entry for entry in entries if not _is_relay_entry(entry, cached_relay_hosts)]
+    try:
+        from meridian.cluster import ClusterConfig
+
+        cluster = ClusterConfig.load()
+        node_hosts = {node.ip for node in cluster.nodes if node.ip}
+        relay_only_hosts = {relay.ip for relay in cluster.relays if relay.ip} - node_hosts
+    except (OSError, ValueError):
+        relay_only_hosts = set()
+
+    exit_entries = [entry for entry in entries if entry.host not in relay_only_hosts]
     if exit_entries:
         return exit_entries
-    if cached_relay_hosts or any(entry.role == SERVER_ROLE_RELAY or _find_relay_file(entry.host) for entry in entries):
+    if relay_only_hosts:
         return []
     return entries
 
@@ -198,10 +121,9 @@ def ensure_server_connection(
     """Detect local mode if not already set, then verify SSH connectivity.
 
     Local mode activates for root (who can read /etc/meridian/) and for
-    non-root users (who use sudo for commands). Non-root users keep
-    creds_dir in their home directory (sudo copies from /etc/meridian/).
+    non-root users (who use sudo for commands).
 
-    Returns a new ResolvedServer with updated local_mode/creds_dir if changed.
+    Returns a new ResolvedServer with updated local_mode if changed.
     """
     if not resolved.local_mode:
         if resolved.conn.detect_local_mode():
@@ -209,7 +131,6 @@ def ensure_server_connection(
                 ip=resolved.ip,
                 user=resolved.user,
                 local_mode=True,
-                creds_dir=creds_dir_for(resolved.ip, local_mode=True),
                 conn=resolved.conn,
             )
     resolved.conn.check_ssh(ui=ui)

@@ -125,16 +125,6 @@ export const deployWorkflow = {
     },
     {
       "default": false,
-      "help_text": "Experimental ML-KEM-768 hybrid encryption.",
-      "id": "pq",
-      "kind": "boolean",
-      "label": "Post-quantum encryption",
-      "options": [],
-      "required": false,
-      "secret": false
-    },
-    {
-      "default": false,
       "help_text": "Route outgoing traffic through Cloudflare WARP.",
       "id": "warp",
       "kind": "boolean",
@@ -201,7 +191,6 @@ export const deployWorkflow = {
     {
       "description": "",
       "field_ids": [
-        "pq",
         "warp",
         "geo_block",
         "confirm"

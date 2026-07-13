@@ -11,11 +11,11 @@ import subprocess
 from dataclasses import dataclass, field
 
 from meridian.commands.resolve import resolve_server
-from meridian.config import SERVERS_FILE, is_ip
+from meridian.config import SERVER_PROFILES_FILE, is_ip
 from meridian.console import err_console, info, line, ok, warn
+from meridian.health import tcp_connect
 from meridian.resolve import is_local_keyword
 from meridian.servers import ServerRegistry
-from meridian.ssh import tcp_connect
 
 # Ports that suggest VPN/proxy infrastructure
 _SUSPICIOUS_PORTS: dict[int, str] = {
@@ -681,7 +681,7 @@ def run(
             ip = resolved_ip
         # else: let resolve_server handle it (might be a registry name)
 
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip)
 
     # Header

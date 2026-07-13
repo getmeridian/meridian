@@ -11,14 +11,14 @@ section: guides
 
 1. **nginx stream SNI 路由**——将域名流量路由到 nginx http，将 Reality 流量路由到 Xray
 2. **nginx TLS**——证书由 acme.sh (Let's Encrypt) 管理
-3. **VLESS+WSS 入站**——通过 Cloudflare 的 CDN 回退
+3. **VLESS+WSS 入站**——通过 Cloudflare 的旧版 CDN 回退（次要传输方式优先使用 XHTTP）
 
-WSS 连接通过 Cloudflare 的 CDN 路由，即使您的服务器 IP 被阻断也能工作——Cloudflare 的 IP 范围太广泛无法阻止。
+WSS 连接通过 Cloudflare 的 CDN 路由，即使您的服务器 IP 被阻断也能工作——Cloudflare 的 IP 范围用途广泛，难以整体封锁。WSS 仅为向后兼容而保留；新部署应优先使用 XHTTP 作为备用传输方式。
 
 ## 使用域名部署
 
 ```
-meridian deploy 1.2.3.4 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain proxy.example.com
 ```
 
 ## Cloudflare 设置
@@ -33,7 +33,7 @@ meridian deploy 1.2.3.4 --domain proxy.example.com
 
 > **重要：** acme.sh 通过端口 80 上的 HTTP-01 挑战获取证书。如果启用了 Cloudflare 的"始终使用 HTTPS"，会破坏挑战。禁用它或为 `/.well-known/acme-challenge/*` 添加页面规则。
 
-> **还要注意：** 在域名模式下，托管的连接页面和隐藏的 3x-ui 面板路径也使用这个 hostname。把记录切换到橙云后，这些页面也会经过 Cloudflare。请在这个 hostname 上关闭会注入脚本或修改 HTML 的 Cloudflare 功能（例如 Website Analytics / RUM），因为 Meridian 的连接页面刻意使用严格的 self-hosted CSP。如果页面在开启代理后开始失败，先临时切回 DNS only，以确认问题是否来自 Cloudflare 这一侧。
+> **还要注意：** 在域名模式下，托管的连接页面、隐藏的 Remnawave 管理 UI 和 subscription-page 路径都使用这个 hostname。把记录切换到橙云后，这些页面也会经过 Cloudflare。请在这个 hostname 上关闭会注入脚本或修改 HTML 的 Cloudflare 功能（例如 Website Analytics / RUM），因为 Meridian 的连接页面刻意使用严格的 self-hosted CSP。如果页面在开启代理后开始失败，先临时切回 DNS only，以确认问题是否来自 Cloudflare 这一侧。
 
 ## 连接链接
 
@@ -43,6 +43,6 @@ meridian deploy 1.2.3.4 --domain proxy.example.com
 |----------|----------|-------|
 | Reality | 主要 | 直接到服务器 IP |
 | XHTTP | 替代 | 通过端口 443 上的 nginx |
-| WSS | 备份 | 通过 Cloudflare CDN |
+| WSS | 旧版后备 | 通过 Cloudflare CDN |
 
-用户应首先尝试 Reality（最快），其次是 XHTTP，仅当两者都失败时才尝试 WSS（IP 被阻止）。
+用户应首先尝试 Reality（最快），其次是 XHTTP，仅当两者都失败时才把 WSS 作为最后手段（例如 IP 被阻止）。

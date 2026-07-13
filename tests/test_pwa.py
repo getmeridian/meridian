@@ -50,7 +50,7 @@ class TestGenerateClientFiles:
     def test_relay_entries_in_config(self, protocol_urls: list[ProtocolURL]) -> None:
         relays = [
             RelayURLSet(
-                relay_ip="10.0.0.1",
+                relay_ip="203.0.113.10",
                 relay_name="test-relay",
                 urls=[ProtocolURL(key="reality", label="Via relay", url=REALITY_URL)],
             ),

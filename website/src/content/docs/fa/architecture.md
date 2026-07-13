@@ -8,6 +8,7 @@ section: reference
 ## پشته فناوری
 
 - **VLESS+Reality** (Xray-core) — پروتکل پروکسی که خود را به عنوان یک وب‌سایت TLS معتبر جا می‌زند. سانسورچی‌هایی که سرور را بررسی می‌کند یک گواهی واقعی (مثلاً از microsoft.com) می‌بینند. فقط کلاینت‌هایی با کلید خصوصی صحیح می‌توانند متصل شوند.
+- **Hysteria2** (Xray-core) — مسیر جایگزین UDP/443 برای شبکه‌های پرتلفات یا با تأخیر بالا. ترتیب اشتراک، انتقال‌های TCP را در اولویت نگه می‌دارد.
 - **Remnawave** — پشته پنل مدرن برای Xray، به عنوان کانتینرهای جداگانه `remnawave/backend`، `remnawave/node` و `remnawave/subscription-page` مستقر شده. Backend یک REST API را نمایش می‌دهد (مدیریت شده با SDK رسمی `remnawave` Python)؛ نود Xray را در `network_mode: host` اجرا می‌کند؛ صفحه اشتراک URL‌های پیکربندی هر کاربر را ارائه می‌کند.
 - **nginx** — وب‌سرور تک‌پردازشی که هم مسیریابی SNI و هم TLS را مدیریت می‌کند. ماژول stream روی پورت 443 گوش می‌دهد و ترافیک را بر اساس نام میزبان SNI بدون خاتمه دادن TLS مسیریابی می‌کند. ماژول http روی پورت 8443 TLS را خاتمه می‌دهد، صفحات اتصال را ارائه می‌دهد، UI مدیریت Remnawave + صفحه اشتراک را پروکسی معکوس می‌کند و ترافیق XHTTP/WSS را به Xray پروکسی می‌کند. گواهینامه‌ها توسط [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt) مدیریت می‌شوند.
 - **Docker** — Remnawave backend + PostgreSQL + Valkey (میزبان پنل فقط)، نود Remnawave (هر نود خروجی) و صفحه اشتراک Remnawave (میزبان پنل، اختیاری) را اجرا می‌کند.
@@ -52,7 +53,7 @@ flowchart TD
     Internet -.->|"CDN (Cloudflare)"| NginxHTTP
 ```
 
-حالت دامنه VLESS+WSS را به عنوان مسیر fallback CDN اضافه می‌کند. ترافیک از طریق CDN Cloudflare با WebSocket جریان می‌یابد، که اتصال حتی اگر IP سرور مسدود شود کار می‌کند.
+حالت دامنه VLESS+WSS را به‌عنوان مسیر fallback قدیمی CDN اضافه می‌کند. WSS برای سازگاری با استقرارهای Cloudflare CDN نگه داشته شده است؛ استقرارهای جدید باید XHTTP را به‌عنوان transport دوم ترجیح دهند. ترافیک WSS از طریق CDN Cloudflare عبور می‌کند و حتی در صورت مسدود شدن IP سرور نیز کار می‌کند.
 
 ### توپولوژی Relay
 
@@ -126,7 +127,7 @@ UI مدیریت توسط nginx در `/<panel.secret_path>/` روی پورت 443 
 
 ## الگوی پیکربندی nginx
 
-Meridian در `/etc/nginx/conf.d/meridian-stream.conf` و `/etc/nginx/conf.d/meridian-http.conf` می‌نویسد (هرگز در `nginx.conf` اصلی). این اجازه می‌دهد Meridian با پیکربندی خود کاربر همزیستی کند.
+Meridian مسیریابی stream را در `/etc/nginx/stream.d/meridian.conf` و مسیریابی HTTP را در `/etc/nginx/conf.d/meridian-http.conf` می‌نویسد. در صورت نیاز، یک بلوک include برای `stream` به `nginx.conf` اصلی افزوده می‌شود.
 
 nginx مدیریت می‌کند:
 - مسیریابی SNI روی پورت 443 (ماژول stream، بدون خاتمه TLS)
@@ -141,7 +142,8 @@ nginx مدیریت می‌کند:
 
 | پورت | سرویس | دسترسی |
 |------|---------|-------|
-| 443 | nginx stream (SNI router) | عمومی |
+| 443/TCP | nginx stream (SNI router) | عمومی |
+| 443/UDP | مسیر جایگزین Xray Hysteria2 | عمومی |
 | 80 | nginx (ACME challenges) | عمومی |
 | 8443 | nginx http (داخلی terminus) | داخلی |
 | 3000 | Remnawave backend (UI مدیریت + API) | localhost |
@@ -152,7 +154,7 @@ nginx مدیریت می‌کند:
 | 30000-39999 | Xray XHTTP (per-node deterministic) | host network |
 | 5432 | PostgreSQL (Remnawave DB) | شبکه داخلی Docker |
 
-پورت‌های XHTTP، WSS و Reality روی میزبان نود روی شبکه میزبان باز می‌شوند زیرا کانتینر نود از `network_mode: host` استفاده می‌کند. پروفایل UFW Meridian آن‌ها را از اینترنت عمومی مسدود می‌کند؛ nginx به‌طور لازم پروکسی معکوس می‌کند.
+پورت‌های backend مربوط به XHTTP، WSS و Reality از شبکه میزبان استفاده می‌کنند، اما UFW دسترسی عمومی به آن‌ها را مسدود می‌کند. Hysteria2 مستقیماً روی UDP/443 عمومی گوش می‌دهد و nginx، TCP/443 عمومی را مدیریت می‌کند.
 
 ## خط لوله Provisioning
 
@@ -169,13 +171,12 @@ nginx مدیریت می‌کند:
 | 7 | ConfigureBBR | `common.py` | کنترل ازدحام TCP |
 | 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 (وقتی سخت‌سازی) |
 | 9 | InstallDocker | `docker.py` | Docker CE |
-| 10 | CleanupLegacyPanel | `legacy_cleanup.py` | حذف 3x-ui قدیمی اگر ارتقاء از v3 |
-| 11 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
-| 12 | InstallWarp | `warp.py` | Cloudflare WARP (اختیاری) |
-| 13 | InstallNginx | `nginx.py` | مسیریابی SNI + TLS + پروکسی معکوس |
-| 14 | ConfigureNginx | `nginx.py` + `nginx_render.py` | پیکربندی nginx برای حالت IP یا دامنه |
-| 15 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
-| 16 | DeployPWAAssets | `services.py` | تجهیزات صفحه اتصال PWA |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP (اختیاری) |
+| 12 | InstallNginx | `nginx.py` | مسیریابی SNI + TLS + پروکسی معکوس |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | پیکربندی nginx برای حالت IP یا دامنه |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | تجهیزات صفحه اتصال PWA |
 
 بعد از خط لوله provisioner، `configure_panel_and_node` در `panel_bootstrap.py` از REST API Remnawave برای ثبت inbounds، ایجاد کانتینر نود، اختصاص میزبان‌ها و ایجاد کلاینت پیش‌فرض استفاده می‌کند. استقرار کانتینر نود، ایجاد میزبان و کمک‌کننده‌های caching inbound در `node_deploy.py` زندگی می‌کند. کانتینر نود جزء خط لوله SSH نیست زیرا نیاز به کلید مخفی صادرشده توسط پنل دارد.
 
@@ -189,8 +190,8 @@ nginx مدیریت می‌کند:
 2. **ذخیره محلی**: `~/.meridian/cluster.yml` — بلافاصله قبل از عملیات API/SSH ذخیره‌شده تا روی deploy سقوط فرایند را از سر شروع می‌توانید
 3. **اعمال**: پنل + کانتینرهای نود بالا آمده، inbounds و میزبان‌ها از طریق REST API ایجاد شده
 4. **تزامن**: پایگاه داده پنل Remnawave (Postgres) و `cluster.yml` هر دو wضعیت قانونی را نگه می‌داری؛ drift توسط `meridian plan` گزارش می‌شود
-5. **Re-runs**: کلیدهای Reality و UUID کلاینت در redeploys تجدید می‌شوند (پنل وقتی موجود هستند دوباره تولید کردن را نمی‌پذیرد)
-6. **بازیابی**: `meridian fleet recover <IP>` `cluster.yml` را از API پنل زندگی بازسازی می‌کند وقتی کپی محلی گم شود
+5. **اجرای دوباره**: کلیدهای Reality و UUID کلاینت‌ها در استقرار مجدد حفظ می‌شوند (پنل در صورت وجود آن‌ها اجازه تولید دوباره نمی‌دهد)
+6. **بازیابی**: `meridian fleet recover --panel-url URL --api-token TOKEN` فایل `cluster.yml` را از API پنل زنده بازسازی می‌کند وقتی کپی محلی گم شود
 7. **حذف**: `meridian teardown <IP>` تمام کانتینرهای Remnawave، پیکربندی nginx و ورودی `cluster.yml` پنل محلی (اختیاری تمام فایل) را متوقف و حذف می‌کند
 
 ## مکان فایل‌ها
@@ -198,7 +199,7 @@ nginx مدیریت می‌کند:
 ### روی میزبان پنل
 - `/opt/remnawave/` — فایل compose پنل + `.env` + `.env` صفحه اشتراک
 - `/opt/remnawave/data/` — حجم داده PostgreSQL
-- `/etc/nginx/conf.d/meridian-stream.conf` — پیکربندی nginx stream (مسیریابی SNI)
+- `/etc/nginx/stream.d/meridian.conf` — پیکربندی nginx stream (مسیریابی SNI)
 - `/etc/nginx/conf.d/meridian-http.conf` — پیکربندی nginx http (TLS، پروکسی معکوس)
 - `/etc/ssl/meridian/` — گواهینامه‌های TLS (مدیریت‌شده توسط acme.sh)
 
@@ -210,5 +211,3 @@ nginx مدیریت می‌کند:
 - `~/.meridian/cluster.yml.bak` — پشتیبان خودکار قبل از عملیات مخرب
 - `~/.meridian/cache/` — کش throttle check به‌روزرسانی
 - `~/.local/bin/meridian` — نقطه ورود CLI (نصب‌شده از طریق uv/pipx)
-
-فایل‌های ورثی (`~/.meridian/credentials/`، `~/.meridian/servers`) فقط برای ارتقاء migration از Meridian 3.x باقی می‌ماند.

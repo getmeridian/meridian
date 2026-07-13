@@ -120,10 +120,10 @@ class TestExtractConfigMetadataFromRealityInbound:
         assert meta["sni"] == _SAMPLE_SNI
 
     def test_all_keys_present(self) -> None:
-        """All five keys must be present in the result."""
+        """All recovery metadata keys must be present in the result."""
         raw = _make_profile_raw()
         meta = _extract_config_metadata(raw)
-        assert set(meta.keys()) == {"private_key", "short_id", "sni", "xhttp_path", "ws_path"}
+        assert set(meta.keys()) == {"private_key", "public_key", "short_id", "sni", "xhttp_path", "ws_path"}
 
 
 class TestExtractConfigMetadataMissingInbound:
@@ -188,7 +188,14 @@ class TestExtractConfigMetadataWithXhttpPath:
 class TestExtractConfigMetadataEmptyConfig:
     def test_none_input(self) -> None:
         meta = _extract_config_metadata(None)  # type: ignore[arg-type]
-        assert meta == {"private_key": "", "short_id": "", "sni": "", "xhttp_path": "", "ws_path": ""}
+        assert meta == {
+            "private_key": "",
+            "public_key": "",
+            "short_id": "",
+            "sni": "",
+            "xhttp_path": "",
+            "ws_path": "",
+        }
 
     def test_empty_dict(self) -> None:
         meta = _extract_config_metadata({})

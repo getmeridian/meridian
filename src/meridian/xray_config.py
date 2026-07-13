@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import shlex
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,34 +29,52 @@ class XrayConfigResult:
     reality_private_key: str
 
 
+def _parse_reality_key_output(output: str) -> tuple[str, str]:
+    """Extract private/public x25519 values from Xray CLI output."""
+    private_key = ""
+    public_key = ""
+    for raw_line in output.strip().splitlines():
+        line = raw_line.strip()
+        lowered = line.lower()
+        if "private" in lowered and ":" in line:
+            private_key = line.split(":", 1)[1].strip().strip('"')
+        elif ("public" in lowered or "password" in lowered) and ":" in line and "hash" not in lowered:
+            public_key = line.split(":", 1)[1].strip().strip('"')
+    return private_key, public_key
+
+
+def derive_reality_public_key(conn: ServerConnection, private_key: str) -> str:
+    """Derive a Reality public key without rotating recovered key material."""
+    quoted_private_key = shlex.quote(private_key)
+    commands = [
+        f"docker exec remnawave-node rw-core x25519 -i {quoted_private_key} 2>/dev/null",
+        f"xray x25519 -i {quoted_private_key} 2>/dev/null",
+    ]
+    for command in commands:
+        result = conn.run(command, timeout=15, sensitive=True)
+        if result.returncode == 0:
+            _, public_key = _parse_reality_key_output(result.stdout)
+            if public_key:
+                return public_key
+    return ""
+
+
 def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
     """Generate x25519 keypair for Reality using tools available on the server.
 
-    Tries multiple sources: Xray in any running container, xray on host.
+    Tries the Remnawave node container, then xray on the host.
     Returns (private_key, public_key) as base64 strings.
     """
     # Try various Xray binaries that might be available
     cmds = [
         "docker exec remnawave-node rw-core x25519 2>/dev/null",
-        "docker exec 3x-ui /app/bin/xray-linux-amd64 x25519 2>/dev/null",
         "xray x25519 2>/dev/null",
     ]
-    private_key = ""
-    public_key = ""
     for cmd in cmds:
         result = conn.run(cmd, timeout=15)
         if result.returncode != 0 or not result.stdout.strip():
             continue
-        private_key = ""
-        public_key = ""
-        for raw_line in result.stdout.strip().splitlines():
-            ln = raw_line.strip()
-            low = ln.lower()
-            if "private" in low and ":" in ln:
-                private_key = ln.split(":", 1)[1].strip().strip('"')
-            elif ("public" in low or "password" in low) and ":" in ln:
-                if "hash" not in low:
-                    public_key = ln.split(":", 1)[1].strip().strip('"')
+        private_key, public_key = _parse_reality_key_output(result.stdout)
         if private_key and public_key:
             return private_key, public_key
 
@@ -75,14 +94,7 @@ def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
         timeout=60,
     )
     if dl_result.returncode == 0:
-        for raw_line in dl_result.stdout.strip().splitlines():
-            ln = raw_line.strip()
-            low = ln.lower()
-            if "private" in low and ":" in ln:
-                private_key = ln.split(":", 1)[1].strip().strip('"')
-            elif ("public" in low or "password" in low) and ":" in ln:
-                if "hash" not in low:
-                    public_key = ln.split(":", 1)[1].strip().strip('"')
+        private_key, public_key = _parse_reality_key_output(dl_result.stdout)
         if private_key and public_key:
             return private_key, public_key
 
@@ -247,7 +259,7 @@ def build_xray_config(
         }
         config["inbounds"].append(wss_inbound)
 
-    # Hysteria2 inbound (experimental — UDP/443, opt-in only)
+    # Hysteria2 inbound (UDP/443 fallback, ordered after TCP transports)
     # Coexists with TCP/443 (different L4 protocol). Handles its own TLS
     # using the same acme.sh certificates as nginx. Listens on all
     # interfaces since there is no nginx proxy for UDP traffic.

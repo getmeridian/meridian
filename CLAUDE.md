@@ -17,7 +17,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 
@@ -50,8 +50,9 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── xray_config.py                      — Xray inbound/outbound config generation
 ├── cluster_persistence.py              — cluster.yml serialization/deserialization
 ├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
-├── core/defaults.py                    — core-owned constants (DEFAULT_SNI)
-├── core/errors.py                      — shared error base types
+├── core/CLAUDE.md                      — transport-neutral API contracts
+│   ├── defaults.py                     — core-owned constants (DEFAULT_SNI)
+│   └── errors.py                       — shared error base types
 ├── commands/CLAUDE.md                  — per-subcommand pattern
 │   └── wizard.py                       — interactive deploy wizard
 ├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
@@ -100,7 +101,7 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 - **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
 - **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked
 - **Self-hosted everything**: zero external requests (fonts, JS, CSS). Target regions block CDNs
-- **Commit per change**: each logical change gets its own commit; include `Refs: uburuntu/meridian#NN` footer when resolving an issue
+- **Commit per change**: each logical change gets its own commit; include `Refs: getmeridian/meridian#NN` footer when resolving an issue
 - **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
 - **ctx7 CLI**: check library docs before writing code that depends on external packages
 
@@ -130,7 +131,7 @@ make real-lab    # optional real-VM on Hetzner (local-only, ~€0.01)
 
 ## Where things live
 
-- Concrete tracked work → **[GitHub issues](https://github.com/uburuntu/meridian/issues)**
+- Concrete tracked work → **[GitHub issues](https://github.com/getmeridian/meridian/issues)**
 - High-level direction → **[ROADMAP.md](ROADMAP.md)**
 - Shipped history → **[CHANGELOG.md](CHANGELOG.md)**
 - Cross-tool agent rules → **[AGENTS.md](AGENTS.md)**

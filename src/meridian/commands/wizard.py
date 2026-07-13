@@ -87,7 +87,7 @@ def interactive_wizard(
             server_ip = prompt("Server IP address", default=detected_ip)
             if is_ip(server_ip) or is_local_keyword(server_ip):
                 break
-            err_console.print("  [error]Enter a valid IP address (e.g. 123.45.67.89)[/error]")
+            err_console.print("  [error]Enter a valid IP address (e.g. 198.51.100.10)[/error]")
 
         if is_local_keyword(server_ip):
             is_local = True

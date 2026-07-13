@@ -32,7 +32,7 @@ class FakeExecutor:
         self.closed = True
 
 
-def test_remote_executor_connection_preserves_legacy_run_surface() -> None:
+def test_remote_executor_connection_adapts_run_surface() -> None:
     executor = FakeExecutor()
     conn = RemoteExecutorConnection(executor)
 

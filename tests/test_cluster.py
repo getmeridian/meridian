@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from meridian.cluster import (
+    CURRENT_CLUSTER_VERSION,
     BrandingConfig,
     ClusterConfig,
     DesiredNode,
@@ -212,6 +213,15 @@ class TestClusterValidation:
         cfg = ClusterConfig.load(p)
         assert cfg._readonly is True
 
+    def test_missing_version_uses_current_schema_default(self, tmp_path: Path) -> None:
+        p = tmp_path / "cluster.yml"
+        p.write_text("nodes: []\n")
+
+        cfg = ClusterConfig.load(p)
+
+        assert cfg.version == CURRENT_CLUSTER_VERSION
+        assert cfg._readonly is False
+
     def test_readonly_config_cannot_be_saved(self, tmp_path: Path) -> None:
         cfg = ClusterConfig()
         cfg._readonly = True
@@ -255,6 +265,58 @@ class TestClusterYAMLRoundTrip:
         cfg.save(p)
         loaded = ClusterConfig.load(p)
         assert loaded._extra.get("future_field") == "hello"
+
+    def test_node_hysteria2_false_round_trip(self, tmp_path: Path) -> None:
+        cfg = ClusterConfig(nodes=[NodeEntry(ip=_IP_A, hysteria2=False)])
+        p = tmp_path / "cluster.yml"
+
+        cfg.save(p)
+        loaded = ClusterConfig.load(p)
+
+        assert loaded.nodes[0].hysteria2 is False
+        assert "hysteria2: false" in p.read_text()
+
+    def test_node_hysteria2_defaults_true_when_omitted(self, tmp_path: Path) -> None:
+        p = tmp_path / "cluster.yml"
+        p.write_text(f"version: 2\nnodes:\n  - ip: {_IP_A}\n")
+
+        loaded = ClusterConfig.load(p)
+
+        assert loaded.nodes[0].hysteria2 is True
+
+    def test_v4_0_applied_snapshots_migrate_to_typed_state(self, tmp_path: Path) -> None:
+        from meridian.reconciler.snapshots import load_applied_snapshot
+
+        p = tmp_path / "cluster.yml"
+        p.write_text(
+            "version: 2\n"
+            "desired_nodes_applied:\n"
+            f"  - {_IP_A}\n"
+            "desired_clients_applied:\n"
+            "  - alice\n"
+            "desired_relays_applied: []\n"
+        )
+
+        loaded = ClusterConfig.load(p)
+
+        assert loaded.applied_state.nodes == [_IP_A]
+        assert loaded.applied_state.clients == ["alice"]
+        assert loaded.applied_state.relays == []
+        assert load_applied_snapshot(loaded, "nodes") == {_IP_A}
+        assert load_applied_snapshot(loaded, "clients") == {"alice"}
+        assert load_applied_snapshot(loaded, "relays") == set()
+        assert not loaded._extra.keys() & {
+            "desired_nodes_applied",
+            "desired_clients_applied",
+            "desired_relays_applied",
+        }
+
+        loaded.save(p)
+        saved = p.read_text()
+        assert "applied_state:" in saved
+        assert "desired_nodes_applied" not in saved
+        assert "desired_clients_applied" not in saved
+        assert "desired_relays_applied" not in saved
 
     def test_save_and_load_preserves_strenum_keys(self, tmp_path: Path) -> None:
         cfg = ClusterConfig(
@@ -501,11 +563,13 @@ class TestClusterYAMLRoundTrip:
 
 class TestTelegramConfigRoundTrip:
     def test_telegram_saves_and_loads(self, tmp_path: Path) -> None:
-        cfg = ClusterConfig(telegram=TelegramConfig(
-            bot_token="123456:ABC",
-            notify_users="-100123",
-            notify_nodes="-100456:80",
-        ))
+        cfg = ClusterConfig(
+            telegram=TelegramConfig(
+                bot_token="123456:ABC",
+                notify_users="-100123",
+                notify_nodes="-100456:80",
+            )
+        )
         p = tmp_path / "cluster.yml"
         cfg.save(p)
         loaded = ClusterConfig.load(p)

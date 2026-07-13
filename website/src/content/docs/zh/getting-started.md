@@ -30,24 +30,37 @@ meridian deploy
 或者预先指定所有内容：
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.microsoft.com
 ```
 
 ## 发生了什么
 
-1. **安装 Docker** 并通过 3x-ui 管理面板部署 Xray
+1. **安装 Docker** 并部署由 Remnawave 面板管理的 Xray
 2. **生成 x25519 密钥对** — Reality 认证的唯一密钥
 3. **加固服务器** — UFW 防火墙、SSH 仅密钥认证、BBR 拥塞控制
 4. **配置 VLESS+Reality** 在端口 443 上 — 伪装为真实的 TLS 服务器
 5. **启用 XHTTP 传输** — 额外的隐身层，通过 nginx 路由
-6. **输出 QR 码** 并保存 HTML 连接页面
+6. **部署可共享的 PWA**，提供 QR 码和订阅导入
+
+## 文件位置
+
+Meridian 通过 SSH 连接到 VPS（也可使用 `deploy local` 直接在服务器上运行）。部署后，状态会缓存在本地：
+
+| 内容 | 位置 |
+|------|------|
+| 拓扑、面板令牌和密钥 | 本机的 `~/.meridian/cluster.yml` |
+| SSH 服务器配置 | 本机的 `~/.meridian/servers.json` |
+| 代理服务 | VPS 上的 Docker、Xray 和 nginx |
+
+运行 `meridian client add alice` 时，Meridian 会使用 `cluster.yml` 中记录的 Remnawave API；客户端操作不需要 SSH。
+
+管理多台服务器时，只有需要连接服务器的命令才使用 `--server NAME` 指定 SSH 主机。
 
 ## 连接
 
 deploy 命令输出：
-- 一个可以用手机扫描的 **QR 码**
-- 一个可以与家人分享的带有连接链接的 **HTML 文件**
-- 一个 **可共享的 URL**（如果启用了服务器托管页面）
+- 一个带有 QR 码和应用链接的 **可共享 PWA URL**
+- 一个供兼容客户端使用的 **订阅 URL**
 
 安装这些应用之一，然后扫描 QR 码或点击"在应用中打开"：
 
@@ -72,11 +85,11 @@ meridian client add alice
 
 ```
 meridian server list                # 查看所有管理的服务器
-meridian server add 5.6.7.8        # 添加现有服务器
+meridian server add 198.51.100.11  # 添加现有服务器
 meridian server remove finland     # 从注册表中删除
 ```
 
-`--server` 标志可以为任何命令指定特定服务器：`meridian client add alice --server finland`。
+`--server` 标志可为需要连接服务器的命令指定目标，例如 `meridian preflight --server finland`。客户端命令直接操作集群面板，不接受 `--server`。
 
 ## 后续步骤
 

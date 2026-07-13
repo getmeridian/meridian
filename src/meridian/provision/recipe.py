@@ -30,7 +30,6 @@ class Resource(str, Enum):
     FIREWALL_CONFIGURED = "firewall_configured"
     HTTPS_ALLOWED = "https_allowed"
     DOCKER_INSTALLED = "docker_installed"
-    LEGACY_PANEL_CLEANED = "legacy_panel_cleaned"
     REMNAWAVE_PANEL_RUNNING = "remnawave_panel_running"
     WARP_CONNECTED = "warp_connected"
     NGINX_INSTALLED = "nginx_installed"

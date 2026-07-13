@@ -52,19 +52,16 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Generate PWA demo page
-        run: |
-          sudo apt-get install -y qrencode
-          uv run meridian dev preview --output website/dist/demo
+        run: uv run meridian dev preview --output website/dist/demo
 
-      - name: Add deploy artifacts
+      - name: Add website artifacts
         run: |
-          # Copy CLI files into Astro dist
+          # Copy the CLI installer into Astro dist
           cp install.sh website/dist/install.sh
-          cp setup.sh website/dist/setup.sh
           cp VERSION website/dist/version
           # Generate checksums
           cd website/dist
-          sha256sum install.sh setup.sh > SHA256SUMS
+          sha256sum install.sh > SHA256SUMS
           cd ../..
           # Bundle AI docs
           mkdir -p website/dist/ai

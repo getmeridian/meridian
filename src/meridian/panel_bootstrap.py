@@ -12,6 +12,7 @@ import logging
 import secrets
 import shlex
 
+from meridian import pwa
 from meridian.adapters import RemoteExecutorConnection, SSHRemoteExecutor
 from meridian.cluster import (
     ClusterConfig,
@@ -39,8 +40,6 @@ from meridian.node_deploy import (
     register_or_reuse_node,
     select_default_squad_uuid,
 )
-from meridian.node_deploy import deploy_client_page as deploy_client_page  # noqa: F401
-from meridian.node_deploy import wait_for_panel_api as wait_for_panel_api  # noqa: F401
 from meridian.provision.progress import StepRenderer
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.resolve import ResolvedServer
@@ -94,15 +93,14 @@ def run_provisioner(
     ctx.reality_port = reality_port
     ctx.wss_port = wss_port
 
-    # Store cluster and secret path in context for provisioner steps
+    # Store cluster and generated paths for provisioner steps
     ctx.cluster = cluster
-    ctx["secret_path"] = secret_path
     # nginx needs these paths for reverse proxy and connection page locations
-    ctx["web_base_path"] = secret_path
-    ctx["info_page_path"] = info_page_path or cluster.panel.sub_path or secrets.token_hex(8)
+    ctx.web_base_path = secret_path
+    ctx.info_page_path = info_page_path or cluster.panel.sub_path or secrets.token_hex(8)
     # Provide xhttp/ws paths — reuse saved paths on redeploy, generate fresh otherwise
-    ctx["xhttp_path"] = xhttp_path or secrets.token_hex(8)
-    ctx["ws_path"] = ws_path or secrets.token_hex(8)
+    ctx.xhttp_path = xhttp_path or secrets.token_hex(8)
+    ctx.ws_path = ws_path or secrets.token_hex(8)
     # Subscription page path for nginx reverse proxy — reuse if already set,
     # otherwise generate. The v4 panel stack always deploys the subscription
     # page container, so we always need a stable path persisted to cluster.yml
@@ -114,7 +112,7 @@ def run_provisioner(
     if cluster.subscription_page and cluster.subscription_page.path:
         sub_page_path = cluster.subscription_page.path
     sub_page_path = sub_page_path or secrets.token_hex(8)
-    ctx["subscription_page_path"] = sub_page_path
+    ctx.subscription_page_path = sub_page_path
     if cluster.subscription_page is None:
         cluster.subscription_page = SubscriptionPageConfig(path=sub_page_path)
     else:
@@ -459,7 +457,7 @@ def setup_first_deploy(
             if user and isinstance(getattr(user, "vless_uuid", None), str) and user.vless_uuid:
                 try:
                     sub_url = panel.get_subscription_url(user.short_uuid) if user.short_uuid else ""
-                    page_url = deploy_client_page(
+                    page_url = pwa.deploy_client_page(
                         resolved.conn, cluster, node_entry, user.vless_uuid, client_name, sub_url
                     )
                     if page_url:
@@ -518,7 +516,12 @@ def setup_redeploy(
 
             # Build Xray config reusing existing Reality keys
             # If we have saved keys, skip keygen (preserves client configs)
-            if node.reality_private_key and node.reality_public_key and node.reality_short_id:
+            reality_key_material = (
+                node.reality_private_key,
+                node.reality_public_key,
+                node.reality_short_id,
+            )
+            if all(reality_key_material):
                 logger.info("Reusing existing Reality keys (client configs preserved)")
                 xray_result = build_xray_config(
                     None,  # no SSH needed when reusing keys
@@ -535,6 +538,12 @@ def setup_redeploy(
                     existing_private_key=node.reality_private_key,
                     existing_public_key=node.reality_public_key,
                     existing_short_id=node.reality_short_id,
+                )
+            elif any(reality_key_material):
+                raise PanelSetupError(
+                    "Reality key material is incomplete; refusing to rotate keys during redeploy",
+                    hint="Restore reality_private_key, reality_public_key, and reality_short_id in cluster.yml.",
+                    category="user",
                 )
             else:
                 # No saved keys — must regenerate (breaks existing client configs)

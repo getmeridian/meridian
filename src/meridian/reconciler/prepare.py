@@ -69,7 +69,7 @@ def compute_reconciliation_plan(
     return compute_plan(
         desired,
         actual,
-        applied_clients=load_applied_snapshot(cluster, "desired_clients_applied"),
-        applied_node_hosts=load_applied_snapshot(cluster, "desired_nodes_applied"),
-        applied_relay_hosts=load_applied_snapshot(cluster, "desired_relays_applied"),
+        applied_clients=load_applied_snapshot(cluster, "clients"),
+        applied_node_hosts=load_applied_snapshot(cluster, "nodes"),
+        applied_relay_hosts=load_applied_snapshot(cluster, "relays"),
     )

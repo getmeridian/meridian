@@ -25,10 +25,8 @@ meridian deploy [IP] [flags]
 | `--color PALETTE` | ocean | تم رنگ صفحه (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | کاربر SSH |
 | `--harden / --no-harden` | فعال | سخت‌سازی SSH + فایروال |
-| `--pq / --no-pq` | غیرفعال | رمزنگاری پساکوانتومی — ML-KEM-768 ترکیبی (آزمایشی) |
 | `--warp / --no-warp` | غیرفعال | مسیریابی ترافیک خروجی از طریق Cloudflare WARP |
 | `--server NAME` | | سرور هدف (نام یا IP) |
-| `--decoy MODE` | نادیده گرفته می‌شود | پاسخ فریبنده؛ مسیرهای نشناخته‌شده همیشه از پاسخ سخت‌سازی‌شده استفاده می‌کنند |
 | `--geo-block` / `--no-geo-block` | فعال | مسدود کردن دومنه‌ها و IP‌های روسیه (geosite:category-ru + geoip:ru) |
 | `--ssh-port PORT` | 22 | پورت SSH (در صورت عدم استاندارد) |
 | `--yes` | | رد شدن از درخواست‌های تأیید |
@@ -87,7 +85,8 @@ meridian server remove NAME
 
 ```
 meridian node add IP [flags]
-meridian node list [--json]
+meridian node list
+meridian --json node list
 meridian node remove IP [--yes] [--force]
 meridian node check IP
 ```
@@ -99,19 +98,18 @@ meridian node check IP
 | `--name NAME` | (خودکار، از IP) | نام دوستانه نشان‌داده‌شده در پنل / اشتراک |
 | `--domain DOMAIN` | (هیچ) | دامنه هر نود برای fallback WSS/CDN |
 | `--sni HOST` | www.microsoft.com | هدف پوشش Reality برای این نود |
-| `--warp / --no-warp` | غیرفعال | مسیریابی ترافیق خروجی از طریق Cloudflare WARP روی این نود |
 | `--harden / --no-harden` | فعال | سخت‌سازی OS + SSH + فایروال برای نود |
 | `--yes` | | رد شدن از درخواست‌های تأیید (بر روی `node remove`) |
 | `--force` | | روی `node remove`، ادامه حتی اگر relay‌ها این نود را به عنوان خروجی خود ارجاع دهند |
-| `--json` | | صادر کردن `node list` به عنوان `meridian.output/v1` envelope |
+| `--json` سراسری | | آن را پیش از `node` قرار دهید تا `node list` به صورت envelope نوع `meridian.output/v1` صادر شود |
 
-**نحوه کار**: `meridian node add` نود میزبان را فراهم می‌کند (بسته‌های OS، Docker، nginx، TLS، کانتینر نود Remnawave)، نود را در برابر REST API پنل ثبت می‌کند و ورودی‌های `reality` و `xhttp` میزبان ایجاد می‌کند تا کلاینت‌ها خروجی جدید را در تازه‌سازی اشتراک بعدی دریافت کنند. ورودی جدید به `nodes[]` در `cluster.yml` اضافه می‌شود؛ `desired_nodes[]` نیز به‌روز می‌شود اگر آن لیست غیرخالی باشد (تزامن هیبریدی). منطق استقرار نود در `node_deploy.py` زندگی می‌کند.
+**نحوه کار**: `meridian node add` میزبان نود را آماده و از طریق API پنل ثبت می‌کند، سپس ورودی‌های میزبان `reality`، `xhttp` و `hysteria2` (و در حالت دامنه، `wss`) را می‌سازد. کلاینت‌ها در تازه‌سازی بعدی اشتراک خروجی جدید را دریافت می‌کنند. ورودی به `nodes[]` افزوده می‌شود و اگر `desired_nodes[]` برابر null نباشد، آن هم به‌روز می‌شود.
 
 **بررسی‌های سلامت**: `meridian node check` وضعیت پنل، SSH، کانتینر، پورت و بررسی‌های TLS را اجرا می‌کند. وقتی یک بررسی شکست می‌خورد، یک نکته اصلاح را چاپ می‌کند (مثل `Run: docker compose up -d`).
 
 **حذف**: `meridian node remove` با SSH در نود وارد می‌شود تا کانتینر‌ها را متوقف کند قبل از حذف نود از کلاستر و پنل. نود را حذف کردن را نمی‌پذیرد اگر هنوز `exit_node` یک یا چند relay باشد؛ از `--force` برای نادیده گرفتن استفاده کنید.
 
-**خروجی JSON**: `node list --json` از `meridian.output/v1` envelope با `data.nodes[]` استفاده می‌کند که شامل ip، نام، uuid، وضعیت، xray_version و traffic_bytes می‌باشد.
+**خروجی JSON**: `meridian --json node list` از `meridian.output/v1` envelope با `data.nodes[]` استفاده می‌کند که شامل ip، نام، uuid، وضعیت، xray_version و traffic_bytes می‌باشد.
 
 ### meridian fleet
 
@@ -133,7 +131,7 @@ meridian fleet recover --panel-url URL --api-token TOKEN
 
 **`fleet inventory`** — پنل پیکربندی شده، نودها، relay‌ها، توپولوژی مطلوب و وضعیت نود پنل زندگی را وقتی قابل دسترسی است نشان می‌دهد. هرگز توکن API پنل یا مسیرهای URL مخفی را چاپ نمی‌کند. با `--json`، خروجی از `meridian.output/v1` envelope استفاده می‌کند. دسترسی فیلد پایدار درون `data` شامل `data.sources.*`، `data.servers[].roles`، `data.summary.*`، `data.nodes[].desired`، `data.nodes[].protocols`، `data.relays[].exit_node_*` و `data.desired_nodes[].present` می‌باشد. فیلدهای حضور inventory حقیقت تطابق نیستند؛ از `plan --json` برای تصمیمات drift/apply استفاده کنید.
 
-**`fleet recover`** — `~/.meridian/cluster.yml` را از پنل زندگی بازسازی می‌کند. هنگامی که فایل محلی گم شود یا هنگام جذب استقرار دیگری استفاده کنید. از طریق SSH متصل می‌شود تا ابرداده سرور‌کنار پایدار را بخواند، سپس پنل API را برای نودها، relay‌ها، inbound‌ها، میزبان‌ها و کاربران جستجو می‌کند.
+**`fleet recover`** — فایل `~/.meridian/cluster.yml` را از پنل زنده بازسازی می‌کند. پروفایل پیکربندی، نودها و UUID ورودی‌ها را می‌گیرد، سپس با SSH ابرداده سرور را بازیابی و کلید عمومی Reality را استخراج می‌کند. پس از آن تنظیمات SSH، انتخاب میزبان پنل و relayها را دستی بررسی کنید.
 
 ### meridian api
 
@@ -166,7 +164,8 @@ meridian api workflow NAME [--json]
 
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
-meridian relay list [--exit EXIT] [--json]
+meridian relay list [--exit EXIT]
+meridian --json relay list [--exit EXIT]
 meridian relay remove RELAY_IP [--exit EXIT] [--yes]
 meridian relay check RELAY_IP [--exit EXIT]
 ```
@@ -179,11 +178,11 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--user/-u USER` | root | کاربر SSH روی relay |
 | `--ssh-port PORT` | 22 | پورت SSH روی سرور relay (در صورت عدم استاندارد) |
 | `--yes/-y` | | رد شدن از درخواست‌های تأیید |
-| `--json` | | صادر کردن `relay list` به عنوان `meridian.output/v1` envelope |
+| `--json` سراسری | | آن را پیش از `relay` قرار دهید تا `relay list` به صورت envelope نوع `meridian.output/v1` صادر شود |
 
 **نحوه کار relay‌ها**: کلاینت به IP داخلی relay متصل می‌شود. Relay TCP خام را به سرور خروجی در خارج منتقل می‌کند. تمامی رمزگذاری انتها به انتها بین کلاینت و خروجی است — relay هرگز plaintext را نمی‌بیند. تمام پروتکل‌ها (Reality، XHTTP، WSS) از طریق relay کار می‌کنند.
 
-**خروجی JSON**: `relay list --json` از `meridian.output/v1` envelope با `data.relays[]` استفاده می‌کند.
+**خروجی JSON**: `meridian --json relay list` از `meridian.output/v1` envelope با `data.relays[]` استفاده می‌کند.
 
 ### meridian plan
 

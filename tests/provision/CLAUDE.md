@@ -18,4 +18,4 @@ This catches regressions where a step stops checking state before acting.
 ## Pitfalls
 
 - **Mock rule order** — first matching pattern wins. Register more specific patterns first.
-- **`ProvisionContext` dict keys** — steps read from `ctx["key"]`. Missing key = `KeyError` at runtime, not test time. Pipeline contract tests (`test_contract.py`) catch these.
+- **Provision context stays typed** — add explicit `ProvisionContext` fields for inter-step data; pipeline contract tests catch missing or misspelled fields.

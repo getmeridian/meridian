@@ -18,7 +18,6 @@ export type Mode = "first_deploy" | "redeploy";
 export type NodeCount = number;
 export type PanelSecretPath = string;
 export type PanelUrl = string;
-export type Pq = boolean;
 export type RelayCount = number;
 export type ServerIp = string;
 export type Sni = string;
@@ -52,7 +51,6 @@ export interface DeployResult {
   node_count: NodeCount;
   panel_secret_path: PanelSecretPath;
   panel_url: PanelUrl;
-  pq: Pq;
   relay_count: RelayCount;
   server_ip: ServerIp;
   sni: Sni;

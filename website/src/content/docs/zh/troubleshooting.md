@@ -10,12 +10,16 @@ section: guides
 ```
 安装前               → meridian preflight IP
   "这个服务器是否适合 Meridian？"
+  测试：SNI 可达性、端口 443、DNS、操作系统和磁盘空间。
 
 安装后，无法连接 → meridian test IP
   "从我所在的位置代理是否可达？"
+  测试：TCP 端口 443、TLS 握手（Reality）和域名 HTTPS。
+  无需 SSH — 在客户端设备上运行。
 
 安装后，出现问题 → meridian doctor IP
   "收集所有内容用于调试。"
+  收集：服务器操作系统、Docker、Remnawave 面板和节点日志、端口、防火墙、SNI 与 DNS。
 ```
 
 添加 `--ai` 到 preflight 或 doctor 以获得 AI 就绪的诊断提示。
@@ -33,7 +37,7 @@ section: guides
 **修复：**
 1. 检查云提供商控制台 — 确保入站端口 443/TCP 被允许
 2. 从不同的网络尝试（移动数据、另一个 Wi-Fi）
-3. SSH 进入并检查：`docker ps`（3x-ui 是否运行？），`ss -tlnp sport = :443`
+3. SSH 进入并检查：`docker ps`（`remnawave` 和 `remnawave-node` 是否运行？）、`systemctl status nginx`、`ss -tlnp sport = :443`
 4. 检查 UFW：`ufw status` — 应该显示 443/tcp ALLOW
 
 ### TLS 握手失败
@@ -44,7 +48,7 @@ section: guides
 3. Reality SNI 目标从服务器无法访问
 
 **修复：**
-1. 检查 Xray：`docker logs 3x-ui --tail 20`
+1. 检查 Xray：`docker logs remnawave-node --tail 20`
 2. 检查端口：`ss -tlnp sport = :443` — 应该是 nginx
 3. 测试 SNI：`meridian preflight IP`
 
@@ -58,7 +62,7 @@ section: guides
 **修复：**
 1. 检查 DNS：`dig +short yourdomain.com @8.8.8.8`
 2. 检查 nginx：`systemctl status nginx`
-3. 检查 nginx 配置：`/etc/nginx/conf.d/meridian-stream.conf`
+3. 检查 nginx 配置：`/etc/nginx/stream.d/meridian.conf`
 
 ## 连接在几秒钟后中断
 
@@ -86,17 +90,15 @@ section: guides
 
 手动测试 SSH：`ssh root@SERVER_IP`。确保您有基于密钥的访问。如果不是 root，请使用 `--user` 标志。
 
-### Xray 启动失败（invalid JSON / MarshalJSON 错误）
+### 节点容器中的 Xray 无法启动
 
-3x-ui 入站的 `settings` 或 `streamSettings` 字段包含损坏的 JSON。这是因为 `settings` 作为嵌套对象而非 JSON 字符串发送 — 3x-ui 的 Go 结构体期望 `string` 类型。API 返回 `success: true` 但只存储第一个键名而非完整的 JSON 对象。
+检查容器日志：`docker logs remnawave-node --tail 50`。常见原因包括主机端口冲突（节点使用 `network_mode: host`，因此 `cluster.yml` 中的端口必须空闲）、面板不可达（节点启动时需要面板的 `node_secret_key`）或缺少 `NET_ADMIN` 能力。
 
-**解决方案：** 卸载并重新安装：`meridian teardown IP && meridian deploy IP`。验证数据库：`sqlite3 /opt/3x-ui/db/x-ui.db "SELECT settings FROM inbounds;"` — 每个字段应该是有效的 JSON。
+**修复：** `meridian teardown IP && meridian deploy IP` 会重新构建节点。要验证 Remnawave 面板状态，请登录 `https://<IP>/<secret_path>/` 的管理 UI 并查看 **Nodes**；节点应显示为 `connected`。`meridian fleet status` 可在 CLI 中显示相同信息。
 
 ### XHTTP 入站创建失败（端口冲突）
 
-在旧版本（v3.6.0 之前），Reality 和 XHTTP 都尝试使用端口 443。3x-ui 拒绝重复端口。
-
-**解决方案：** 升级到 v3.6.0+。XHTTP 现在在 localhost 端口上运行，通过 nginx 路由。
+旧版 Meridian（v3.6.0 之前）曾让 Reality 和 XHTTP 同时使用端口 443。v4 会为每个节点分配确定性的 XHTTP、Reality 和 WSS 端口，并通过 nginx 反向代理，因此该冲突不会再次出现。
 
 ### 磁盘空间不足
 
@@ -108,12 +110,12 @@ section: guides
 
 ## 曾经可以工作，现在停止了
 
-**最常见的原因：** 服务器 IP 被阻止。这在被审查的地区很常见。
+**最常见的原因：** 服务器 IP 被阻止。运行 `meridian test IP`；如果 TCP 检查失败，IP 很可能已被阻止。
 
-有关详细的恢复说明，请参阅 [IP 被阻止恢复指南](/docs/zh/recovery/)。
+有关分步恢复选项（更换服务器、切换中继、CDN 回退），请参阅 [IP 被阻止恢复指南](/docs/zh/recovery/)。
 
 其他原因：
-- 服务器重启且 Docker 未自动启动 → `docker start 3x-ui`
+- 服务器重启且服务未自动启动 → 在 `/opt/remnawave` 和 `/opt/remnanode` 中运行 `docker compose up -d`，然后运行 `systemctl restart nginx`
 - 磁盘已满 → `df -h /`、`docker system prune -af`
 
 ## 速度缓慢
@@ -125,7 +127,7 @@ section: guides
 
 **不要** 在同一服务器上运行其他协议（OpenVPN、WireGuard）— 这会标记该 IP。
 
-## AI 动力帮助
+## AI 辅助
 
 ```
 meridian doctor --ai
@@ -133,7 +135,7 @@ meridian doctor --ai
 
 将诊断提示复制到您的剪贴板以与任何 AI 助手一起使用。
 
-或为 [GitHub issue](https://github.com/uburuntu/meridian/issues) 收集诊断：
+或为 [GitHub issue](https://github.com/getmeridian/meridian/issues) 收集诊断：
 
 ```
 meridian doctor
@@ -161,8 +163,8 @@ meridian doctor
 |------|---------|
 | 本地机器 | 系统兼容性 |
 | 服务器 | 系统版本、运行时间（最近重启？）、磁盘/内存使用 |
-| Docker | 3x-ui 容器是否运行？状态应为 "Up" |
-| 3x-ui 日志 | 错误消息、"failed to start" 条目、证书问题 |
+| Docker | `remnawave` 和 `remnawave-node` 容器是否运行？状态应为 "Up" |
+| Remnawave 日志 | 面板后端或节点的错误消息、"failed to start" 条目、证书问题 |
 | 监听端口 | 端口 443 应显示 nginx。如缺失，代理未运行 |
 | 防火墙 (UFW) | 端口 443/tcp 应为 ALLOW。如未列出，已被阻止 |
 | SNI 目标 | 应显示 CONNECTED 及证书链 |

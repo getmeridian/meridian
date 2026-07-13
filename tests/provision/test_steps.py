@@ -57,21 +57,24 @@ class TestProvisionContextNeedsWebServer:
         assert ctx.needs_web_server is False
 
 
-class TestProvisionContextDictAccess:
-    def test_dict_access(self):
+class TestProvisionContextInterStepState:
+    def test_path_fields_are_typed(self):
         ctx = ProvisionContext(ip="198.51.100.1")
-        ctx["key"] = "val"
-        assert ctx["key"] == "val"
-        assert "key" in ctx
+        ctx.web_base_path = "panel"
+        ctx.info_page_path = "connect"
 
-    def test_dict_get_default(self):
+        assert ctx.web_base_path == "panel"
+        assert ctx.info_page_path == "connect"
+
+    def test_object_fields_default_to_none(self):
         ctx = ProvisionContext(ip="198.51.100.1")
-        assert ctx.get("missing", "default") == "default"
+        assert ctx.panel_api is None
+        assert ctx.cluster is None
 
 
 class TestProvisionContextDefaults:
     def test_harden_defaults_true(self):
-        ctx = ProvisionContext(ip="1.2.3.4")
+        ctx = ProvisionContext(ip="198.51.100.10")
         assert ctx.harden is True
 
 

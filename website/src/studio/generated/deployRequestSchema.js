@@ -15,11 +15,6 @@ export const deployRequestSchema = {
       "title": "Color",
       "type": "string"
     },
-    "decoy": {
-      "default": "",
-      "title": "Decoy",
-      "type": "string"
-    },
     "domain": {
       "default": "",
       "title": "Domain",
@@ -57,11 +52,6 @@ export const deployRequestSchema = {
       ],
       "default": "",
       "title": "Ip"
-    },
-    "pq": {
-      "default": false,
-      "title": "Pq",
-      "type": "boolean"
     },
     "requested_server": {
       "default": "",

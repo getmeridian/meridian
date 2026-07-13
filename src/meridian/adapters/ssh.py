@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from meridian.core.execution import (
     CommandSpec,
     PutBytesSpec,
@@ -14,7 +12,7 @@ from meridian.core.execution import (
 from meridian.ssh import CommandResult, ServerConnection
 
 
-def remote_command_result(result: CommandResult) -> RemoteCommandResult:
+def _remote_result(result: CommandResult) -> RemoteCommandResult:
     """Convert the current SSH command result into a core result."""
     return result.to_remote()
 
@@ -24,19 +22,6 @@ class SSHRemoteExecutor:
 
     def __init__(self, connection: ServerConnection) -> None:
         self.connection = connection
-
-    @classmethod
-    def connect(
-        cls,
-        host: str,
-        *,
-        user: str = "root",
-        local_mode: bool = False,
-        port: int = 22,
-        multiplex: bool = True,
-    ) -> SSHRemoteExecutor:
-        """Create an executor from connection parameters."""
-        return cls(ServerConnection(host, user=user, local_mode=local_mode, port=port, multiplex=multiplex))
 
     @property
     def target(self) -> RemoteTarget:
@@ -48,12 +33,8 @@ class SSHRemoteExecutor:
             transport="ssh",
         )
 
-    def as_server_connection(self) -> ServerConnection:
-        """Return the wrapped connection for migration-period call sites."""
-        return self.connection
-
     def run(self, spec: CommandSpec) -> RemoteCommandResult:
-        return remote_command_result(
+        return _remote_result(
             self.connection.run(
                 spec.command,
                 timeout=spec.timeout,
@@ -70,7 +51,7 @@ class SSHRemoteExecutor:
         )
 
     def put_bytes(self, spec: PutBytesSpec) -> RemoteCommandResult:
-        return remote_command_result(
+        return _remote_result(
             self.connection.put_bytes(
                 spec.remote_path,
                 spec.data,
@@ -86,7 +67,7 @@ class SSHRemoteExecutor:
         )
 
     def put_text(self, spec: PutTextSpec) -> RemoteCommandResult:
-        return remote_command_result(
+        return _remote_result(
             self.connection.put_text(
                 spec.remote_path,
                 spec.text,
@@ -103,14 +84,9 @@ class SSHRemoteExecutor:
         )
 
     def get_text(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> RemoteCommandResult:
-        return remote_command_result(self.connection.get_text(remote_path, timeout=timeout, sudo=sudo))
+        return _remote_result(self.connection.get_text(remote_path, timeout=timeout, sudo=sudo))
 
     def close(self) -> None:
         close = getattr(self.connection, "close", None)
         if callable(close):
             close()
-
-
-def ssh_remote_executor(connection: ServerConnection | Any) -> SSHRemoteExecutor:
-    """Wrap a ServerConnection-compatible object as an SSH executor."""
-    return SSHRemoteExecutor(connection)

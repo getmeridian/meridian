@@ -23,41 +23,31 @@ meridian test IP
 
 ## 恢复选项
 
-### 选项 A：部署新服务器
+### 选项 A：添加替代出口
 
-如果客户端少且没有中继，这是最快的方式：
+当前面板仍可访问时，这是最快的方式：
 
 ```bash
 # 1. 从您的提供商获得新 VPS（新 IP）
-# 2. 部署 Meridian
-meridian deploy NEW_IP
-
-# 3. 重新添加每个客户端
-meridian client add alice --server NEW_IP
-meridian client add bob --server NEW_IP
-
-# 4. 向用户发送新的连接页面
+# 2. 将其添加到现有舰队
+meridian node add NEW_IP --name replacement
 ```
 
-部署是幂等的——在同一 IP 上重新运行是安全的，并从中断处继续。
+现有客户端会在下次刷新订阅时收到替代出口，无需重新创建账户。
 
 ### 选项 B：新出站服务器 + 现有中继
 
 如果您已部署中继，这是最佳方案——您的客户端保留中继连接，同时交换其后的出站服务器：
 
 ```bash
-# 1. 部署新出站服务器
-meridian deploy NEW_EXIT_IP
+# 1. 将新出站节点添加到现有集群
+meridian node add NEW_EXIT_IP --name replacement-exit
 
-# 2. 在新出站上重新添加客户端
-meridian client add alice --server NEW_EXIT_IP
-meridian client add bob --server NEW_EXIT_IP
-
-# 3. 将中继切换到新出站
+# 2. 将中继切换到新出站
 meridian relay remove RELAY_IP --exit OLD_EXIT_IP
 meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
 
-# 客户端自动重新连接——中继 IP 不变
+# 客户端刷新订阅后自动获得新路径——中继 IP 不变
 ```
 
 ### 选项 C：添加域名模式以实现 CDN 回退
@@ -65,10 +55,12 @@ meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
 如果您之前未使用域名模式，现在添加它以防止未来中断：
 
 ```bash
-meridian deploy NEW_IP --domain proxy.example.com
+meridian node add NEW_IP --domain proxy.example.com
 ```
 
 使用域名模式，即使服务器 IP 被封锁，WSS/CDN 连接也能工作——流量通过 Cloudflare 路由。有关 Cloudflare 设置的详细信息，请参阅[域名模式指南](/docs/zh/domain-mode/)。
+
+`meridian node add` 需要当前 Remnawave 面板保持可访问。如果丢失的服务器同时托管面板，请先恢复该主机；目前尚不支持自动迁移面板。
 
 ## 主动防御
 
@@ -88,13 +80,15 @@ meridian deploy NEW_IP --domain proxy.example.com
 
 ## 客户端迁移
 
-每个客户端都必须在新服务器上手动重新添加——尚无自动迁移工具。工作流程：
+如果要替换整个面板主机，每个客户端都必须在新面板上重新创建——目前没有跨面板自动迁移工具。仅在现有集群中添加或替换出口节点时无需重新添加客户端；Remnawave 面板仍是客户端状态的事实来源。
+
+替换整个面板时的工作流程：
 
 1. 部署新服务器
 2. 为每个客户端运行 `meridian client add NAME`
-3. 与用户共享新的连接页面（二维码、可共享 URL 或 HTML 文件）
+3. 与用户共享新的连接页面（二维码、可共享 PWA URL 或订阅 URL）
 
-连接页面自动生成，包含所有可用的连接选项（直接、中继、CDN）。如果启用了服务器托管的页面，可共享的 URL 会自动更新。
+连接页面会自动提供所有可用的连接选项（直接、中继、CDN），可共享的 PWA URL 会随订阅状态更新。
 
 ## 保留旧服务器
 

@@ -33,6 +33,7 @@ _UUID_B = "660e8400-e29b-41d4-a716-446655440001"
 _UUID_C = "770e8400-e29b-41d4-a716-446655440002"
 
 _SAMPLE_PRIVATE_KEY = "WDMnPFb3sIZpJGcNhI8jBh7bSCIhRak-bNWDaeqJe1Y"
+_SAMPLE_PUBLIC_KEY = "QfM7gQZ4h_4XfBfNqGShYqzEgXd6xT2c3YhW_F8m9A0"
 _SAMPLE_SHORT_ID = "a1b2c3d4"
 _SAMPLE_SNI = "www.example.com"
 
@@ -140,7 +141,7 @@ class TestFleetStatus:
         panel.ping.side_effect = RemnawaveAuthError(
             "Panel authentication failed",
             hint="Check your API token.",
-            hint_type="user",
+            category="user",
         )
 
         with (
@@ -606,6 +607,7 @@ class TestFleetRecover:
                             "security": "reality",
                             "realitySettings": {
                                 "privateKey": _SAMPLE_PRIVATE_KEY,
+                                "publicKey": _SAMPLE_PUBLIC_KEY,
                                 "shortIds": [_SAMPLE_SHORT_ID],
                                 "serverNames": [_SAMPLE_SNI],
                             },
@@ -627,6 +629,7 @@ class TestFleetRecover:
             run_recover("https://198.51.100.1/panel", "test-token")
 
         saved = ClusterConfig.load(tmp_home / "cluster.yml")
+        assert saved.version == 2
         assert saved.panel.url == "https://198.51.100.1/panel"
         assert saved.panel.api_token == "test-token"
         assert len(saved.nodes) == 1
@@ -646,6 +649,47 @@ class TestFleetRecover:
 
         assert exc_info.value.exit_code != 0
 
+    def test_recover_profile_api_failure_does_not_write_unsafe_state(
+        self, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Recovery stops if existing Reality credentials cannot be read."""
+        import meridian.config as cfg
+
+        monkeypatch.setattr(cfg, "CLUSTER_CONFIG", tmp_home / "cluster.yml")
+        panel = self._make_recover_panel()
+        panel.list_config_profiles.side_effect = RemnawaveError("profile API unavailable")
+
+        with (
+            patch("meridian.commands.recover.MeridianPanel", return_value=panel),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_recover("https://198.51.100.1/panel", "test-token")
+
+        assert exc_info.value.exit_code != 0
+        assert not (tmp_home / "cluster.yml").exists()
+
+    def test_recover_missing_private_key_does_not_write_unsafe_state(
+        self, tmp_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Recovery refuses all-empty key state that redeploy could rotate."""
+        import meridian.config as cfg
+
+        monkeypatch.setattr(cfg, "CLUSTER_CONFIG", tmp_home / "cluster.yml")
+        panel = self._make_recover_panel()
+        reality_settings = panel.list_config_profiles.return_value[0]._raw["config"]["inbounds"][0]["streamSettings"][
+            "realitySettings"
+        ]
+        reality_settings.pop("privateKey")
+
+        with (
+            patch("meridian.commands.recover.MeridianPanel", return_value=panel),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_recover("https://198.51.100.1/panel", "test-token")
+
+        assert exc_info.value.exit_code != 0
+        assert not (tmp_home / "cluster.yml").exists()
+
     def test_recover_extracts_reality_keys(self, tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Recovery extracts Reality private key, short ID, and SNI from config profile."""
         import meridian.config as cfg
@@ -659,8 +703,33 @@ class TestFleetRecover:
         saved = ClusterConfig.load(tmp_home / "cluster.yml")
         node = saved.nodes[0]
         assert node.reality_private_key == _SAMPLE_PRIVATE_KEY
+        assert node.reality_public_key == _SAMPLE_PUBLIC_KEY
         assert node.reality_short_id == _SAMPLE_SHORT_ID
         assert node.sni == _SAMPLE_SNI
+
+    def test_recover_derives_missing_reality_public_key(self, tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Recovery derives the public key instead of rotating Reality keys."""
+        import meridian.config as cfg
+
+        monkeypatch.setattr(cfg, "CLUSTER_CONFIG", tmp_home / "cluster.yml")
+        panel = self._make_recover_panel()
+        reality_settings = panel.list_config_profiles.return_value[0]._raw["config"]["inbounds"][0]["streamSettings"][
+            "realitySettings"
+        ]
+        reality_settings.pop("publicKey")
+        conn = MagicMock()
+        conn.__enter__.return_value = conn
+        conn.run.return_value = MagicMock(returncode=1, stdout="")
+
+        with (
+            patch("meridian.commands.recover.MeridianPanel", return_value=panel),
+            patch("meridian.ssh.ServerConnection", return_value=conn),
+            patch("meridian.xray_config.derive_reality_public_key", return_value=_SAMPLE_PUBLIC_KEY),
+        ):
+            run_recover("https://198.51.100.1/panel", "test-token")
+
+        saved = ClusterConfig.load(tmp_home / "cluster.yml")
+        assert saved.nodes[0].reality_public_key == _SAMPLE_PUBLIC_KEY
 
     def test_recover_multiple_nodes_first_is_panel_host(self, tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """First node from API is marked as panel host; others are not."""
@@ -707,9 +776,9 @@ class TestFleetRecover:
             run_recover("https://198.51.100.1/panel", "test-token")
 
         saved = ClusterConfig.load(tmp_home / "cluster.yml")
-        assert "vless-reality" in saved.inbounds
-        assert "vless-xhttp" in saved.inbounds
-        reality_ref = saved.get_inbound("vless-reality")
+        assert "reality" in saved.inbounds
+        assert "xhttp" in saved.inbounds
+        reality_ref = saved.get_inbound("reality")
         assert reality_ref is not None
         assert reality_ref.uuid == _UUID_C
         assert reality_ref.tag == "vless-reality"

@@ -18,7 +18,7 @@ export const GET: APIRoute = async () => {
     '## Links',
     '',
     '- [Website](https://getmeridian.org)',
-    '- [GitHub](https://github.com/uburuntu/meridian)',
+    '- [GitHub](https://github.com/getmeridian/meridian)',
     '- [Full docs as single file](https://getmeridian.org/llms-full.txt)',
     '',
   ];

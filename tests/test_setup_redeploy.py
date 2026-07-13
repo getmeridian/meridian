@@ -266,26 +266,26 @@ class TestSetupRedeployKeyPreservation:
         args, _ = build.call_args
         assert args[0] is resolved.conn
 
-    def test_regenerates_when_public_key_missing(self) -> None:
-        """If only private key is set but public key is missing, regenerate."""
+    def test_blocks_when_public_key_missing(self) -> None:
+        """Partial recovered key material must never be rotated silently."""
+        from meridian.panel_bootstrap import PanelSetupError
+
         cluster = _configured_cluster(with_keys=False)
         cluster.nodes[0].reality_private_key = "SOME_PRIV"
         # public_key and short_id are empty
-        result = _run_redeploy(cluster=cluster)
-        build = result["build_xray_config"]
-        _, kwargs = build.call_args
-        assert "existing_private_key" not in kwargs
+        with pytest.raises(PanelSetupError, match="incomplete"):
+            _run_redeploy(cluster=cluster)
 
-    def test_regenerates_when_short_id_missing(self) -> None:
-        """If private and public keys present but short_id empty, regenerate."""
+    def test_blocks_when_short_id_missing(self) -> None:
+        """A missing short ID blocks unsafe key regeneration."""
+        from meridian.panel_bootstrap import PanelSetupError
+
         cluster = _configured_cluster(with_keys=False)
         cluster.nodes[0].reality_private_key = "SOME_PRIV"
         cluster.nodes[0].reality_public_key = "SOME_PUB"
         # short_id is empty
-        result = _run_redeploy(cluster=cluster)
-        build = result["build_xray_config"]
-        _, kwargs = build.call_args
-        assert "existing_private_key" not in kwargs
+        with pytest.raises(PanelSetupError, match="incomplete"):
+            _run_redeploy(cluster=cluster)
 
     def test_regenerated_keys_saved_to_node(self) -> None:
         """After regeneration, new keys from xray_result are saved to node."""

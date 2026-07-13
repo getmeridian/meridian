@@ -2,15 +2,14 @@
 
 Extracted from ``ssh.py`` to keep the transport module under the 800-line
 budget.  ``ServerConnection`` inherits from ``_FileTransferMixin`` defined
-here; all file-oriented helpers (put_bytes, put_text, get_text, get_bytes,
-write_file, fetch_credentials) live in this module.
+here; file-oriented helpers (put_bytes, put_text, get_text, get_bytes) live
+in this module.
 """
 
 from __future__ import annotations
 
 import logging
 import shlex
-import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -36,10 +35,11 @@ class _FileTransferMixin:
     ip: str
     local_mode: bool
     needs_sudo: bool
-    _ssh_opts: list[str]
-    _scp_opts: list[str]
-    _scp_host: str
     _completed_to_result: Any
+
+    @property
+    def _ssh_opts(self) -> list[str]:
+        raise NotImplementedError
 
     def _synthetic_result(
         self,
@@ -315,106 +315,3 @@ class _FileTransferMixin:
         if result.returncode != 0:
             return b""
         return result.stdout.encode()
-
-    def write_file(self, local_path: Path, remote_path: str) -> bool:
-        """Backward-compatible wrapper around ``put_bytes``."""
-        if self.local_mode and Path(remote_path) == local_path:
-            return True
-        result = self.put_bytes(
-            remote_path,
-            local_path.read_bytes(),
-            mode="600",
-            atomic=False,
-            sensitive=True,
-            operation_name="write local file",
-        )
-        return result.returncode == 0
-
-    def fetch_credentials(self, local_creds_dir: Path) -> bool:
-        """Fetch credentials from server's /etc/meridian/ via SCP.
-
-        In local mode (root), copies directly from /etc/meridian/.
-        In remote mode, uses SCP for root or SSH+sudo for non-root users
-        (SCP can't read root-owned /etc/meridian/ without sudo).
-        """
-        if self.local_mode:
-            return self._copy_local_credentials(local_creds_dir)
-
-        local_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-
-        if self.user != "root":
-            # Non-root: SCP can't read root-owned /etc/meridian/.
-            # Use SSH + sudo cat instead (conn.run() adds sudo automatically).
-            result = self.run("cat /etc/meridian/proxy.yml", timeout=30)
-            if result.returncode == 0 and result.stdout:
-                dst = local_creds_dir / "proxy.yml"
-                dst.write_text(result.stdout, encoding="utf-8")
-                dst.chmod(0o600)
-                return True
-            return False
-
-        try:
-            scp_result = subprocess.run(
-                [
-                    "scp",
-                    *self._scp_opts,
-                    f"{self.user}@{self._scp_host}:/etc/meridian/proxy.yml",
-                    str(local_creds_dir / "proxy.yml"),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                stdin=subprocess.DEVNULL,
-            )
-            if scp_result.returncode == 0:
-                (local_creds_dir / "proxy.yml").chmod(0o600)
-                return True
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
-        return False
-
-    def _copy_local_credentials(self, local_creds_dir: Path) -> bool:
-        """Copy credentials from /etc/meridian/ in local mode.
-
-        When needs_sudo is set, uses sudo to read root-owned credential files.
-        """
-        from meridian.config import SERVER_CREDS_DIR
-
-        src = SERVER_CREDS_DIR / "proxy.yml"
-        dst = local_creds_dir / "proxy.yml"
-
-        if dst == src:
-            return True
-
-        local_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-
-        # Copy main credentials (required)
-        if not self._copy_one_file(SERVER_CREDS_DIR / "proxy.yml", local_creds_dir / "proxy.yml"):
-            return False
-        return True
-
-    def _copy_one_file(self, src: Path, dst: Path) -> bool:
-        """Copy a single file, using sudo if needed. Returns True on success."""
-        if self.needs_sudo:
-            try:
-                result = subprocess.run(
-                    ["sudo", "-n", "cat", str(src)],
-                    capture_output=True,
-                    timeout=5,
-                    stdin=subprocess.DEVNULL,
-                )
-                if result.returncode != 0:
-                    return False
-                dst.write_bytes(result.stdout)
-                dst.chmod(0o600)
-                return True
-            except (subprocess.TimeoutExpired, FileNotFoundError):
-                return False
-        try:
-            if src.is_file():
-                shutil.copy2(str(src), str(dst))
-                dst.chmod(0o600)
-                return True
-        except (PermissionError, OSError):
-            pass
-        return False

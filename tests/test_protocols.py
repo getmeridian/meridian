@@ -2,13 +2,6 @@
 
 from __future__ import annotations
 
-from meridian.credentials import (
-    RealityConfig,
-    ServerConfig,
-    ServerCredentials,
-    WSSConfig,
-    XHTTPConfig,
-)
 from meridian.protocols import (
     PROTOCOL_ORDER,
     PROTOCOLS,
@@ -76,12 +69,12 @@ class TestRealityBuildURL:
         url = proto.build_url(
             "test-uuid",
             "alice",
-            ip="1.2.3.4",
+            ip="198.51.100.10",
             sni="www.microsoft.com",
             public_key="myPBK",
             short_id="abc123",
         )
-        assert url.startswith("vless://test-uuid@1.2.3.4:443")
+        assert url.startswith("vless://test-uuid@198.51.100.10:443")
         assert "flow=xtls-rprx-vision" in url
         assert "security=reality" in url
         assert "sni=www.microsoft.com" in url
@@ -94,18 +87,28 @@ class TestRealityBuildURL:
 
     def test_custom_fingerprint(self) -> None:
         proto = RealityProtocol()
-        url = proto.build_url("uuid", "name", ip="1.2.3.4", fingerprint="firefox")
+        url = proto.build_url("uuid", "name", ip="198.51.100.10", fingerprint="firefox")
         assert "fp=firefox" in url
 
     def test_default_sni(self) -> None:
         proto = RealityProtocol()
-        url = proto.build_url("uuid", "name", ip="1.2.3.4")
+        url = proto.build_url("uuid", "name", ip="198.51.100.10")
         assert "sni=www.microsoft.com" in url
 
     def test_different_sni(self) -> None:
         proto = RealityProtocol()
-        url = proto.build_url("uuid", "name", ip="5.6.7.8", sni="dl.google.com")
+        url = proto.build_url("uuid", "name", ip="198.51.100.11", sni="dl.google.com")
         assert "sni=dl.google.com" in url
+
+    def test_server_name_is_preserved_in_fragment(self) -> None:
+        url = RealityProtocol().build_url(
+            "uuid",
+            "alice",
+            ip="198.51.100.10",
+            server_name="My VPN",
+        )
+
+        assert url.endswith("#alice @ My VPN")
 
 
 class TestXHTTPBuildURL:
@@ -114,10 +117,10 @@ class TestXHTTPBuildURL:
         url = proto.build_url(
             "test-uuid",
             "bob",
-            ip="1.2.3.4",
+            ip="198.51.100.10",
             xhttp_path="myxhttppath",
         )
-        assert url.startswith("vless://test-uuid@1.2.3.4:443")
+        assert url.startswith("vless://test-uuid@198.51.100.10:443")
         assert "security=tls" in url
         assert "type=xhttp" in url
         assert "path=%2Fmyxhttppath" in url
@@ -128,7 +131,7 @@ class TestXHTTPBuildURL:
         assert "pbk=" not in url
         assert "sid=" not in url
         # TLS params (sni defaults to host, fp defaults to chrome)
-        assert "sni=1.2.3.4" in url
+        assert "sni=198.51.100.10" in url
         assert "fp=chrome" in url
 
     def test_url_with_domain(self) -> None:
@@ -136,7 +139,7 @@ class TestXHTTPBuildURL:
         url = proto.build_url(
             "test-uuid",
             "bob",
-            ip="1.2.3.4",
+            ip="198.51.100.10",
             xhttp_path="mypath",
             domain="example.com",
         )
@@ -152,11 +155,11 @@ class TestXHTTPBuildURL:
         url = proto.build_url(
             "test-uuid",
             "bob",
-            ip="5.6.7.8",
+            ip="198.51.100.11",
             xhttp_path="p",
         )
-        assert "vless://test-uuid@5.6.7.8:443" in url
-        assert "sni=5.6.7.8" in url
+        assert "vless://test-uuid@198.51.100.11:443" in url
+        assert "sni=198.51.100.11" in url
 
     def test_url_suffix(self) -> None:
         assert XHTTPProtocol().url_suffix == "-XHTTP"
@@ -169,11 +172,22 @@ class TestXHTTPBuildURL:
         url = proto.build_url(
             "test-uuid",
             "bob",
-            ip="1.2.3.4",
+            ip="198.51.100.10",
             xhttp_path="p",
             fingerprint="firefox",
         )
         assert "fp=firefox" in url
+
+    def test_server_name_is_preserved_in_fragment(self) -> None:
+        url = XHTTPProtocol().build_url(
+            "uuid",
+            "bob",
+            ip="198.51.100.10",
+            xhttp_path="p",
+            server_name="My VPN",
+        )
+
+        assert url.endswith("#bob @ My VPN-XHTTP")
 
 
 class TestWSSBuildURL:
@@ -209,177 +223,16 @@ class TestWSSBuildURL:
         """WSS uses its own UUID (no shares_uuid_with)."""
         assert WSSProtocol().shares_uuid_with is None
 
-
-# ---------------------------------------------------------------------------
-# Credential-aware URL building
-# ---------------------------------------------------------------------------
-
-
-def _make_test_creds(
-    ip: str = "198.51.100.1",
-    sni: str = "www.microsoft.com",
-    domain: str = "",
-    xhttp_path: str = "",
-    ws_path: str = "",
-    encryption_key: str = "",
-) -> ServerCredentials:
-    """Build test credentials."""
-    creds = ServerCredentials(
-        server=ServerConfig(ip=ip, sni=sni, domain=domain or None),
-        protocols={
-            "reality": RealityConfig(
-                uuid="r-uuid",
-                public_key="testPBK",
-                short_id="ab12",
-                encryption_key=encryption_key or None,
-            ),
-        },
-    )
-    if xhttp_path:
-        creds.protocols["xhttp"] = XHTTPConfig(xhttp_path=xhttp_path)
-    if ws_path:
-        creds.protocols["wss"] = WSSConfig(uuid="w-uuid", ws_path=ws_path)
-    return creds
-
-
-class TestResolveUuid:
-    def test_reality_uses_reality_uuid(self) -> None:
-        proto = RealityProtocol()
-        assert proto._resolve_uuid("r-uuid", "w-uuid") == "r-uuid"
-
-    def test_xhttp_uses_reality_uuid_via_shares(self) -> None:
-        proto = XHTTPProtocol()
-        assert proto._resolve_uuid("r-uuid", "w-uuid") == "r-uuid"
-
-    def test_wss_uses_wss_uuid(self) -> None:
-        proto = WSSProtocol()
-        assert proto._resolve_uuid("r-uuid", "w-uuid") == "w-uuid"
-
-
-class TestBuildUrlFromCreds:
-    def test_reality_builds_url(self) -> None:
-        creds = _make_test_creds()
-        url = RealityProtocol().build_url_from_creds("r-uuid", "", creds, "alice")
-        assert url.startswith("vless://r-uuid@198.51.100.1:443")
-        assert "sni=www.microsoft.com" in url
-        assert "pbk=testPBK" in url
-        assert "sid=ab12" in url
-        assert url.endswith("#alice")
-
-    def test_reality_with_server_name(self) -> None:
-        creds = _make_test_creds()
-        url = RealityProtocol().build_url_from_creds("r-uuid", "", creds, "alice", server_name="My VPN")
-        assert url.endswith("#alice @ My VPN")
-
-    def test_xhttp_builds_url(self) -> None:
-        creds = _make_test_creds(xhttp_path="xp123")
-        url = XHTTPProtocol().build_url_from_creds("r-uuid", "", creds, "bob")
-        assert "vless://r-uuid@" in url
-        assert "type=xhttp" in url
-        assert "path=%2Fxp123" in url
-        assert url.endswith("#bob-XHTTP")
-
-    def test_xhttp_returns_empty_without_path(self) -> None:
-        creds = _make_test_creds()  # no xhttp_path
-        url = XHTTPProtocol().build_url_from_creds("r-uuid", "", creds, "bob")
-        assert url == ""
-
-    def test_wss_builds_url(self) -> None:
-        creds = _make_test_creds(domain="example.com", ws_path="ws789")
-        url = WSSProtocol().build_url_from_creds("", "w-uuid", creds, "carol")
-        assert "vless://w-uuid@example.com:443" in url
-        assert "type=ws" in url
-        assert "host=example.com" in url
-        assert "path=%2Fws789" in url
-        assert url.endswith("#carol-WSS")
-
-    def test_wss_returns_empty_without_domain(self) -> None:
-        creds = _make_test_creds(ws_path="ws789")  # no domain
-        url = WSSProtocol().build_url_from_creds("", "w-uuid", creds, "carol")
-        assert url == ""
-
-    def test_wss_returns_empty_without_uuid(self) -> None:
-        creds = _make_test_creds(domain="example.com", ws_path="ws789")
-        url = WSSProtocol().build_url_from_creds("", "", creds, "carol")
-        assert url == ""
-
-    def test_encryption_key_in_reality(self) -> None:
-        creds = _make_test_creds(encryption_key="pq-key-123")
-        url = RealityProtocol().build_url_from_creds("r-uuid", "", creds, "alice")
-        assert "encryption=pq-key-123" in url
-
-
-class TestBuildRelayUrl:
-    def test_reality_relay_url(self) -> None:
-        creds = _make_test_creds()
-        url = RealityProtocol().build_relay_url(
-            "r-uuid", "", creds, "alice", "198.51.100.50", 8443, relay_name="moscow"
+    def test_server_name_is_preserved_in_fragment(self) -> None:
+        url = WSSProtocol().build_url(
+            "uuid",
+            "carol",
+            domain="example.com",
+            ws_path="p",
+            server_name="My VPN",
         )
-        assert "vless://r-uuid@198.51.100.50:8443" in url
-        assert "sni=www.microsoft.com" in url
-        assert "#alice-via-moscow" in url
 
-    def test_reality_relay_with_relay_sni(self) -> None:
-        creds = _make_test_creds()
-        url = RealityProtocol().build_relay_url(
-            "r-uuid", "", creds, "alice", "198.51.100.50", relay_sni="relay.example.com"
-        )
-        assert "sni=relay.example.com" in url
-
-    def test_reality_relay_with_server_name(self) -> None:
-        creds = _make_test_creds()
-        url = RealityProtocol().build_relay_url(
-            "r-uuid", "", creds, "alice", "198.51.100.50", relay_name="moscow", server_name="My VPN"
-        )
-        assert "#alice @ My VPN-via-moscow" in url
-
-    def test_xhttp_relay_url(self) -> None:
-        creds = _make_test_creds(xhttp_path="xp123")
-        url = XHTTPProtocol().build_relay_url("r-uuid", "", creds, "bob", "198.51.100.50", 8443, relay_name="moscow")
-        assert "vless://r-uuid@198.51.100.50:8443" in url
-        assert "sni=198.51.100.1" in url  # exit IP as SNI (no domain)
-        assert "type=xhttp" in url
-        assert "#bob-via-moscow-XHTTP" in url
-
-    def test_xhttp_relay_with_domain(self) -> None:
-        creds = _make_test_creds(domain="example.com", xhttp_path="xp123")
-        url = XHTTPProtocol().build_relay_url("r-uuid", "", creds, "bob", "198.51.100.50", relay_name="moscow")
-        assert "sni=example.com" in url
-
-    def test_xhttp_relay_returns_empty_without_path(self) -> None:
-        creds = _make_test_creds()
-        url = XHTTPProtocol().build_relay_url("r-uuid", "", creds, "bob", "198.51.100.50")
-        assert url == ""
-
-    def test_xhttp_relay_with_relay_sni(self) -> None:
-        creds = _make_test_creds(domain="example.com", xhttp_path="xp123")
-        url = XHTTPProtocol().build_relay_url(
-            "r-uuid", "", creds, "bob", "198.51.100.50", relay_sni="yandex.ru", relay_name="moscow"
-        )
-        assert "sni=yandex.ru" in url
-        assert "sni=example.com" not in url
-
-    def test_wss_relay_url(self) -> None:
-        creds = _make_test_creds(domain="example.com", ws_path="ws789")
-        url = WSSProtocol().build_relay_url("", "w-uuid", creds, "carol", "198.51.100.50", 8443, relay_name="moscow")
-        assert "vless://w-uuid@198.51.100.50:8443" in url
-        assert "sni=example.com" in url
-        assert "host=example.com" in url
-        assert "#carol-via-moscow-WSS" in url
-
-    def test_wss_relay_with_relay_sni(self) -> None:
-        creds = _make_test_creds(domain="example.com", ws_path="ws789")
-        url = WSSProtocol().build_relay_url(
-            "", "w-uuid", creds, "carol", "198.51.100.50", relay_sni="yandex.ru", relay_name="moscow"
-        )
-        assert "sni=yandex.ru" in url
-        assert "sni=example.com" not in url
-        assert "host=example.com" in url  # host stays as exit domain for routing
-
-    def test_wss_relay_returns_empty_without_domain(self) -> None:
-        creds = _make_test_creds(ws_path="ws789")
-        url = WSSProtocol().build_relay_url("", "w-uuid", creds, "carol", "198.51.100.50")
-        assert url == ""
+        assert url.endswith("#carol @ My VPN-WSS")
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +322,7 @@ class TestHysteria2Protocol:
         assert proto.key == "hysteria2"
 
     def test_display_label(self) -> None:
-        assert Hysteria2Protocol().display_label == "UDP (Experimental)"
+        assert Hysteria2Protocol().display_label == "UDP fallback"
 
     def test_url_suffix(self) -> None:
         assert Hysteria2Protocol().url_suffix == "-HY2"

@@ -278,20 +278,20 @@ class ConfigureNginx:
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         # Resolve runtime values from context (populated by ConfigurePanel).
-        panel_web_base_path = resolve_ctx(self.panel_web_base_path, ctx.get("web_base_path", ""))
-        info_page_path = resolve_ctx(self.info_page_path, ctx.get("info_page_path", ""))
+        panel_web_base_path = resolve_ctx(self.panel_web_base_path, ctx.web_base_path)
+        info_page_path = resolve_ctx(self.info_page_path, ctx.info_page_path)
         panel_internal_port = resolve_ctx(self.panel_internal_port, REMNAWAVE_PANEL_PORT)
         server_ip = resolve_ctx(self.server_ip, ctx.ip)
-        xhttp_path = resolve_ctx(self.xhttp_path, ctx.get("xhttp_path", ""))
+        xhttp_path = resolve_ctx(self.xhttp_path, ctx.xhttp_path)
         xhttp_internal_port = resolve_ctx(
             self.xhttp_internal_port,
             ctx.xhttp_port if ctx.xhttp_enabled else 0,
         )
-        ws_path = resolve_ctx(self.ws_path, ctx.get("ws_path", ""))
+        ws_path = resolve_ctx(self.ws_path, ctx.ws_path)
         wss_internal_port = resolve_ctx(self.wss_internal_port, ctx.wss_port)
         reality_sni = resolve_ctx(self.reality_sni, ctx.sni)
         reality_backend_port = resolve_ctx(self.reality_backend_port, ctx.reality_port)
-        sub_page_path = resolve_ctx(self.subscription_page_path, ctx.get("subscription_page_path", ""))
+        sub_page_path = resolve_ctx(self.subscription_page_path, ctx.subscription_page_path)
         sub_page_port = resolve_ctx(self.subscription_page_port, REMNAWAVE_SUBSCRIPTION_PAGE_PORT)
 
         # -- DNS pre-check (domain mode only) --

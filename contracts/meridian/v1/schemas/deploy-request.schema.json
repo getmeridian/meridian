@@ -13,11 +13,6 @@
       "title": "Color",
       "type": "string"
     },
-    "decoy": {
-      "default": "",
-      "title": "Decoy",
-      "type": "string"
-    },
     "domain": {
       "default": "",
       "title": "Domain",

@@ -15,7 +15,6 @@ curl -sSf https://getmeridian.org/install.sh | bash
 1. اگر موجود نیست [uv](https://docs.astral.sh/uv/) را نصب می‌کند (یا pipx به عنوان fallback استفاده می‌کند)
 2. `meridian-vpn` را از PyPI نصب می‌کند
 3. یک symlink در `/usr/local/bin/meridian` برای دسترسی سراسری سیستم ایجاد می‌کند
-4. از CLI قدیمی مبتنی بر bash (اگر موجود باشد) مهاجرت می‌کند
 
 ## نصب دستی
 
@@ -42,9 +41,9 @@ Meridian به‌طور خودکار برای به‌روزرسانی‌ها بر
 
 ## نیازمندی‌ها
 
-- **Python 3.10+** (توسط uv/pipx به‌طور خودکار نصب می‌شود)
+- **Python 3.11+** (توسط uv/pipx به‌طور خودکار نصب می‌شود)
 - **دسترسی کلید SSH** به سرور هدف خود
-- **qrencode** (اختیاری، برای کدهای QR ترمینال): `brew install qrencode` یا `apt install qrencode`
+کدهای QR ترمینال با بستهٔ Python داخلی `segno` ساخته می‌شوند و به وابستگی سیستمی نیاز ندارند.
 
 ## تأیید نصب
 

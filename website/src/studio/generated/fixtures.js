@@ -131,7 +131,6 @@ export const studioFixtures = {
       "node_count": 1,
       "panel_secret_path": "[redacted]",
       "panel_url": "https://vpn.example/[redacted]",
-      "pq": false,
       "relay_count": 0,
       "server_ip": "198.51.100.10",
       "sni": "www.microsoft.com",

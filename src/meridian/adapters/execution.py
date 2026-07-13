@@ -1,4 +1,4 @@
-"""Compatibility adapters for the remote execution migration."""
+"""Adapters between core remote executors and provisioning connections."""
 
 from __future__ import annotations
 
@@ -8,17 +8,16 @@ from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, Remo
 from meridian.ssh import CommandResult
 
 
-def legacy_command_result(result: RemoteCommandResult) -> CommandResult:
-    """Convert a core command result into the legacy connection result."""
+def _connection_result(result: RemoteCommandResult) -> CommandResult:
+    """Convert a core command result into the provisioning result type."""
     return CommandResult.from_remote(result)
 
 
 class RemoteExecutorConnection:
     """ServerConnection-shaped facade backed by a core RemoteExecutor.
 
-    This is a migration bridge: provision steps can keep their existing
-    ``conn.run(...)`` surface while orchestration depends on executor
-    contracts that can later be implemented by SSH, local, or daemon transports.
+    Provision steps use ``conn.run(...)`` while orchestration depends on
+    executor contracts implemented by SSH, local, or daemon transports.
     """
 
     def __init__(self, executor: RemoteExecutor) -> None:
@@ -44,7 +43,7 @@ class RemoteExecutorConnection:
         input: str | None = None,
         operation_name: str = "",
     ) -> CommandResult:
-        return legacy_command_result(
+        return _connection_result(
             self.executor.run(
                 CommandSpec(
                     command=command,
@@ -76,7 +75,7 @@ class RemoteExecutorConnection:
         timeout: int = 30,
         operation_name: str = "write file",
     ) -> CommandResult:
-        return legacy_command_result(
+        return _connection_result(
             self.executor.put_bytes(
                 PutBytesSpec(
                     remote_path=remote_path,
@@ -108,7 +107,7 @@ class RemoteExecutorConnection:
         timeout: int = 30,
         operation_name: str = "write file",
     ) -> CommandResult:
-        return legacy_command_result(
+        return _connection_result(
             self.executor.put_text(
                 PutTextSpec(
                     remote_path=remote_path,
@@ -127,7 +126,7 @@ class RemoteExecutorConnection:
         )
 
     def get_text(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> CommandResult:
-        return legacy_command_result(self.executor.get_text(remote_path, timeout=timeout, sudo=sudo))
+        return _connection_result(self.executor.get_text(remote_path, timeout=timeout, sudo=sudo))
 
     def get_bytes(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> bytes:
         result = self.get_text(remote_path, timeout=timeout, sudo=sudo)

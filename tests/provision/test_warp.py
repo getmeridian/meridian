@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.warp import WARP_PROXY_PORT, InstallWarp
@@ -37,17 +36,17 @@ class _WarpMockConnection(MockConnection):
 
 
 class TestInstallWarp:
-    def test_already_connected_returns_ok(self, tmp_path: Path):
+    def test_already_connected_returns_ok(self):
         conn = MockConnection()
         # Pattern must match "warp-cli --accept-tos status 2>/dev/null"
         conn.when("accept-tos status", stdout="Status: Connected")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path), warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         result = InstallWarp().run(conn, ctx)
         assert result.status == "ok"
         assert "already connected" in result.detail
 
-    def test_fresh_install_returns_changed(self, tmp_path: Path):
+    def test_fresh_install_returns_changed(self):
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", rc=1)
         conn.when("curl -fsSL", stdout="")
@@ -58,12 +57,12 @@ class TestInstallWarp:
         conn.when("mode proxy", stdout="")
         conn.when("proxy port", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path), warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         result = InstallWarp().run(conn, ctx)
         assert result.status == "changed"
         assert str(WARP_PROXY_PORT) in result.detail
 
-    def test_already_installed_but_disconnected(self, tmp_path: Path):
+    def test_already_installed_but_disconnected(self):
         """warp-cli exists but not connected — register and connect."""
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", stdout="/usr/bin/warp-cli")
@@ -72,23 +71,23 @@ class TestInstallWarp:
         conn.when("mode proxy", stdout="")
         conn.when("proxy port", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path), warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         result = InstallWarp().run(conn, ctx)
         assert result.status == "changed"
         # Should NOT try to install the package
         conn.assert_not_called_with_pattern("apt-get install")
 
-    def test_gpg_key_failure_returns_failed(self, tmp_path: Path):
+    def test_gpg_key_failure_returns_failed(self):
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", rc=1)
         conn.when("curl -fsSL", rc=1)
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path), warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         result = InstallWarp().run(conn, ctx)
         assert result.status == "failed"
         assert "GPG" in result.detail
 
-    def test_sets_proxy_mode(self, tmp_path: Path):
+    def test_sets_proxy_mode(self):
         """Must use proxy mode (SOCKS5), not full tunnel (would break SSH)."""
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", stdout="/usr/bin/warp-cli")
@@ -97,7 +96,7 @@ class TestInstallWarp:
         conn.when("mode proxy", stdout="")
         conn.when("proxy port", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path), warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         InstallWarp().run(conn, ctx)
         conn.assert_called_with_pattern("mode proxy")
 
@@ -111,7 +110,7 @@ class TestWarpPipelineIntegration:
     def test_warp_disabled_no_steps(self):
         from meridian.provision import build_setup_steps
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir="/tmp/test", warp=False)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=False)
         steps = build_setup_steps(ctx)
         step_names = [s.name for s in steps]
         assert "Install Cloudflare WARP" not in step_names
@@ -119,7 +118,7 @@ class TestWarpPipelineIntegration:
     def test_warp_enabled_adds_install_step(self):
         from meridian.provision import build_setup_steps
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir="/tmp/test", warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         steps = build_setup_steps(ctx)
         step_names = [s.name for s in steps]
         assert "Install Cloudflare WARP" in step_names
@@ -128,7 +127,7 @@ class TestWarpPipelineIntegration:
         """WARP steps must come after Docker."""
         from meridian.provision import build_setup_steps
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir="/tmp/test", warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         steps = build_setup_steps(ctx)
         step_names = [s.name for s in steps]
         warp_idx = step_names.index("Install Cloudflare WARP")
@@ -139,7 +138,7 @@ class TestWarpPipelineIntegration:
         """WARP steps must come after Docker install."""
         from meridian.provision import build_setup_steps
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir="/tmp/test", warp=True)
+        ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         steps = build_setup_steps(ctx)
         step_names = [s.name for s in steps]
         docker_idx = step_names.index("Install Docker")

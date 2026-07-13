@@ -3,7 +3,7 @@
 The build_setup_steps() function assembles the full deployment pipeline:
   common -> docker -> remnawave (panel + node) -> nginx -> connection page
 
-4.0: Replaces 3x-ui with Remnawave panel/node architecture.
+Uses the Remnawave panel/node architecture.
 """
 
 from __future__ import annotations
@@ -117,31 +117,15 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Operation]:
         op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED]),
     ]
 
-    # -- Remove legacy 3x-ui if present (v3 → v4 upgrade) --
-    from meridian.provision.legacy_cleanup import CleanupLegacyPanel
-
-    operations.append(
-        op(
-            CleanupLegacyPanel(),
-            requires=[Resource.DOCKER_INSTALLED],
-            provides=[Resource.LEGACY_PANEL_CLEANED],
-        )
-    )
-
     # -- Remnawave panel (node deployed after API setup, not here) --
     operations.append(
         op(
             DeployRemnawavePanel(),
-            requires=[Resource.DOCKER_INSTALLED, Resource.LEGACY_PANEL_CLEANED],
+            requires=[Resource.DOCKER_INSTALLED],
             provides=[Resource.REMNAWAVE_PANEL_RUNNING],
             when=_panel_host,
         )
     )
-
-    # Note: DeployRemnawaveNode is NOT included here because it requires
-    # the node_secret_key from the panel API. The node is deployed in the
-    # post-provisioner phase (setup.py _configure_panel_and_node) after
-    # the panel is up and the node has been registered via REST API.
 
     # -- WARP client (optional) --
     from meridian.provision.warp import InstallWarp

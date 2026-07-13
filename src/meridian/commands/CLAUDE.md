@@ -6,14 +6,14 @@
 
 **Cluster-first pattern** — commands load `ClusterConfig` from `cluster.yml`, create `MeridianPanel` client, call REST API. No SSH needed for client/fleet operations.
 
-**Server resolution cascade** in `resolve.py` — re-exports `ResolvedServer` and helpers from `meridian.resolve` for backward compat, adds CLI-specific `resolve_server` (prompts, Rich output), `fetch_credentials`, and version-mismatch warnings. Strict priority order for server-touching commands (deploy, node add):
+**Server resolution cascade** in `resolve.py` — adds CLI-specific prompts and Rich output around the shared helpers in `meridian.resolve`. Strict priority order for server-touching commands (deploy, node add):
 1. Explicit IP → 2. `--server` name → 3. `local` keyword → 4. Single-server auto-select → 5. Multi-server prompt → 6. Fail with hint
 
 **Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr.
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `deploy`, `migrate`, `test`, `probe`, `doctor`, `teardown`.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `deploy`, `test`, `probe`, `doctor`, `teardown`.
 
 ## What's done well
 

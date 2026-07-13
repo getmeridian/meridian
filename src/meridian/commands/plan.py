@@ -45,7 +45,7 @@ def _run(*, json_output: bool, operation: OperationContext) -> None:
         with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
             plan = compute_reconciliation_plan(cluster, panel, panel_conn=panel_conn)
     except RemnawaveAuthError as e:
-        fail(f"Cannot authenticate to panel: {e}", hint=e.hint, hint_type=e.hint_type)
+        fail(f"Cannot authenticate to panel: {e}", hint=e.hint, hint_type=e.category)
     except RemnawaveError as e:
         fail(f"Cannot reach panel: {e}", hint_type="system")
 

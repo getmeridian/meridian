@@ -27,7 +27,7 @@
 
     <!-- Header -->
     <text x="0" y="32" class="tb w">  Meridian</text>
-    <text x="90" y="32" class="t d">v3.6.0</text>
+    <text x="90" y="32" class="t d">v4.0.0</text>
 
     <!-- Config -->
     <text x="0" y="60" class="t c">  → Configuring server at 198.51.100.42...</text>
@@ -41,11 +41,11 @@
     <text x="0" y="188" class="t g">  ✓</text><text x="28" y="188" class="t w">Enable BBR congestion control</text><text x="290" y="188" class="t d">(already enabled)</text>
     <text x="0" y="208" class="t g">  ✓</text><text x="28" y="208" class="t w">Configure firewall</text>
     <text x="0" y="228" class="t g">  ✓</text><text x="28" y="228" class="t w">Install Docker</text><text x="165" y="228" class="t d">(docker-ce already installed)</text>
-    <text x="0" y="248" class="t g">  ✓</text><text x="28" y="248" class="t w">Deploy 3x-ui panel</text>
-    <text x="0" y="268" class="t g">  ✓</text><text x="28" y="268" class="t w">Configure panel</text><text x="170" y="268" class="t d">(credentials saved)</text>
-    <text x="0" y="288" class="t g">  ✓</text><text x="28" y="288" class="t w">Log in to panel</text><text x="170" y="288" class="t d">(port 2053)</text>
-    <text x="0" y="308" class="t g">  ✓</text><text x="28" y="308" class="t w">Create Reality inbound</text><text x="230" y="308" class="t d">(port 10443)</text>
-    <text x="0" y="328" class="t g">  ✓</text><text x="28" y="328" class="t w">Create XHTTP inbound</text><text x="225" y="328" class="t d">(127.0.0.1:12345)</text>
+    <text x="0" y="248" class="t g">  ✓</text><text x="28" y="248" class="t w">Deploy Remnawave panel</text>
+    <text x="0" y="268" class="t g">  ✓</text><text x="28" y="268" class="t w">Start panel stack</text><text x="190" y="268" class="t d">(healthy)</text>
+    <text x="0" y="288" class="t g">  ✓</text><text x="28" y="288" class="t w">Register proxy node</text><text x="205" y="288" class="t d">(API connected)</text>
+    <text x="0" y="308" class="t g">  ✓</text><text x="28" y="308" class="t w">Create Reality inbound</text><text x="230" y="308" class="t d">(port 10xxx)</text>
+    <text x="0" y="328" class="t g">  ✓</text><text x="28" y="328" class="t w">Create XHTTP inbound</text><text x="225" y="328" class="t d">(port 30xxx)</text>
     <text x="0" y="348" class="t g">  ✓</text><text x="28" y="348" class="t w">Verify Xray configuration</text><text x="260" y="348" class="t d">(Xray running)</text>
     <text x="0" y="368" class="t g">  ✓</text><text x="28" y="368" class="t w">Install nginx</text><text x="160" y="368" class="t d">(SNI routing + TLS configured)</text>
     <text x="0" y="388" class="t g">  ✓</text><text x="28" y="388" class="t w">Deploy connection page</text><text x="230" y="388" class="t d">(live)</text>
@@ -65,11 +65,11 @@
     <text x="32" y="558" class="tb c">     https://198.51.100.42/xxxxxxxx/.../</text>
     <text x="32" y="576" class="t d">     (They open it, scan the QR code, and connect)</text>
 
-    <text x="0" y="606" class="t g">  3.</text>
+    <text x="0" y="606" class="t g">  2.</text>
     <text x="32" y="606" class="t w">Test that the proxy works:</text>
     <text x="32" y="626" class="tb c">     meridian test 198.51.100.42</text>
 
-    <text x="0" y="656" class="t g">  4.</text>
+    <text x="0" y="656" class="t g">  3.</text>
     <text x="32" y="656" class="t w">Share access with friends:</text>
     <text x="32" y="676" class="tb c">     meridian client add alice</text>
   </g>

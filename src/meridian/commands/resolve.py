@@ -7,11 +7,9 @@ prompts, or ``console.fail()``.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from meridian import resolve as _resolve_lib
-from meridian.config import creds_dir_for, is_ip
-from meridian.console import err_console, fail, info, warn
+from meridian.config import is_ip
+from meridian.console import err_console, fail, info
 from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
@@ -22,13 +20,9 @@ from meridian.ssh_ui import RichSSHUI
 
 __all__ = [
     "ensure_server_connection",
-    "fetch_credentials",
     "resolve_server",
     "try_resolve_server",
 ]
-
-# Servers that have already shown a version mismatch warning this session
-_warned_servers: set[str] = set()
 
 
 def resolve_server(
@@ -62,7 +56,7 @@ def resolve_server(
             if not detected_ip:
                 fail(
                     "Could not detect this server's public IP",
-                    hint="Provide the IP explicitly: meridian deploy 1.2.3.4",
+                    hint="Provide the IP explicitly: meridian deploy 198.51.100.10",
                     hint_type="system",
                 )
             ip = detected_ip
@@ -84,7 +78,7 @@ def resolve_server(
             if not detected_ip:
                 fail(
                     "Could not detect this server's public IP",
-                    hint="Provide the IP explicitly: meridian <command> 1.2.3.4",
+                    hint="Provide the IP explicitly: meridian <command> 198.51.100.10",
                     hint_type="system",
                 )
             ip = detected_ip
@@ -108,7 +102,7 @@ def resolve_server(
 
     # 3. Running on the server itself as root — /etc/meridian/ readable
     else:
-        local_ip = _resolve_lib.detect_local_mode_from_creds()
+        local_ip = _resolve_lib.detect_local_server_ip()
         if local_ip:
             ip = local_ip
             local_mode = True
@@ -154,9 +148,6 @@ def resolve_server(
     resolved_port = port if port else registry_port
     resolved_key_path = registry_key_path if registry_key_path and (not user or user == registry_user) else ""
 
-    # Determine creds_dir
-    creds_dir = creds_dir_for(ip, local_mode=local_mode)
-
     conn = ServerConnection(
         ip=ip,
         user=resolved_user,
@@ -170,7 +161,6 @@ def resolve_server(
         ip=ip,
         user=resolved_user,
         local_mode=local_mode,
-        creds_dir=creds_dir,
         conn=conn,
     )
 
@@ -198,70 +188,4 @@ def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
     try:
         return _ensure_server_connection(resolved, ui=RichSSHUI())
     except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
-
-
-def fetch_credentials(resolved: ResolvedServer, *, force: bool = False) -> bool:
-    """Fetch credentials from server.
-
-    When ``force`` is False, an existing local ``proxy.yml`` short-circuits.
-    Write commands should pass ``force=True`` so the server remains the source
-    of truth before local mutation.
-    """
-    proxy_file = resolved.creds_dir / "proxy.yml"
-    if not force:
-        try:
-            if proxy_file.is_file():
-                _check_version_mismatch(resolved.ip, proxy_file)
-                return True
-        except (PermissionError, OSError):
-            pass
-    try:
-        resolved.creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    except PermissionError:
-        return False
-    ok = resolved.conn.fetch_credentials(resolved.creds_dir)
-    if ok:
-        _check_version_mismatch(resolved.ip, proxy_file)
-    return ok
-
-
-def _check_version_mismatch(server_ip: str, proxy_file: Path) -> None:
-    """Warn once per session if the server was deployed with a different CLI version."""
-    if server_ip in _warned_servers:
-        return
-
-    from meridian.credentials import ServerCredentials
-
-    creds = ServerCredentials.load(proxy_file)
-    deployed_with = creds.server.deployed_with
-    if not deployed_with:
-        return  # Legacy credentials — no version info
-
-    from meridian import __version__
-
-    try:
-        from packaging.version import Version
-
-        deployed = Version(deployed_with)
-        current = Version(__version__)
-    except (ImportError, ValueError):
-        return  # Unparseable version or missing packaging — skip silently
-
-    if deployed.major == current.major and deployed.minor == current.minor:
-        return  # Patch differences are fine
-
-    _warned_servers.add(server_ip)
-    err_console.print()
-    warn("Version mismatch")
-    err_console.print(
-        f"    Server deployed with Meridian [bold]{deployed_with}[/bold] — you're running [bold]{__version__}[/bold]."
-    )
-    err_console.print()
-    err_console.print("    To update the server:")
-    err_console.print(f"      [info]meridian deploy {server_ip}[/info]       Re-provisions configs (nginx, services)")
-    err_console.print(f"      [info]meridian teardown {server_ip}[/info]    Full reset (then re-deploy from scratch)")
-    err_console.print()
-    err_console.print("    To match the server instead:")
-    err_console.print(f"      [info]uv tool install meridian-vpn=={deployed_with}[/info]")
-    err_console.print()
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)

@@ -11,11 +11,11 @@ from typing import Any
 from pydantic import ValidationError
 
 from meridian.core.deploy import DeployRequest
+from meridian.core.errors import EngineError
 from meridian.core.models import Event, EventLevel
 from meridian.core.operations import DeployOperationResult, OperationKind, OperationSnapshot, OperationState
 from meridian.core.output import now_iso
 from meridian.core.redaction import redact
-from meridian.engine.errors import EngineError
 
 OperationRunner = Callable[[DeployRequest, "EngineOperation"], dict[str, Any]]
 
@@ -59,7 +59,7 @@ class EngineOperation:
         with self._lock:
             warning_count = sum(1 for event in self.events if event.get("level") == "warning")
             error_count = sum(1 for event in self.events if event.get("level") == "error")
-            latest_event = dict(self.events[-1]) if self.events else None
+            latest_event = Event.model_validate(self.events[-1]) if self.events else None
             return OperationSnapshot(
                 id=self.id,
                 kind=self.kind,
@@ -71,7 +71,7 @@ class EngineOperation:
                 warning_count=warning_count,
                 error_count=error_count,
                 last_seq=len(self.events),
-                current_phase=str(latest_event.get("phase") or "") if latest_event else "",
+                current_phase=latest_event.phase if latest_event else "",
                 latest_event=latest_event,
                 cancelable=self.state in {"queued", "running"},
                 has_result=self.result is not None,

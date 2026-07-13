@@ -37,9 +37,7 @@ class StepResult:
 class ProvisionContext:
     """Carries state through the provisioning pipeline.
 
-    Typed fields for well-known configuration AND typed accessors for
-    inter-step communication. The _state dict is kept for edge cases
-    but typed properties are the preferred interface.
+    Configuration and inter-step communication use explicit typed fields.
     """
 
     ip: str
@@ -52,25 +50,23 @@ class ProvisionContext:
     geo_block: bool = True  # block Russian domains/IPs at Xray routing level
     hosted_page: bool = False  # serve connection pages via HTTPS on server
     harden: bool = True  # enable SSH hardening + firewall (skip for shared servers)
-    creds_dir: str = ""  # local credentials directory path
     is_panel_host: bool = True  # deploy Remnawave panel on this server
 
     results: list[StepResult] = field(default_factory=list)
 
     # Port layout — Xray ports configured in Remnawave config profile
     xhttp_port: int = 0  # computed from seed
-    reality_port: int = 443  # 443 standalone, ~10443 domain mode
+    reality_port: int = 443  # overridden with a deterministic per-node backend port
     wss_port: int = 0  # computed from seed (domain mode only)
 
-    @property
-    def panel_port(self) -> int:
-        """Panel internal port (Remnawave: 3000, legacy 3x-ui: 2053)."""
-        from meridian.config import REMNAWAVE_PANEL_PORT
-
-        return REMNAWAVE_PANEL_PORT
-
-    # Dynamic inter-step state
-    _state: dict[str, Any] = field(default_factory=dict, repr=False)
+    # Inter-step state
+    web_base_path: str = ""
+    info_page_path: str = ""
+    xhttp_path: str = ""
+    ws_path: str = ""
+    subscription_page_path: str = ""
+    panel_api: MeridianPanel | None = field(default=None, repr=False)
+    cluster: ClusterConfig | None = field(default=None, repr=False)
 
     @property
     def domain_mode(self) -> bool:
@@ -80,57 +76,6 @@ class ProvisionContext:
     def needs_web_server(self) -> bool:
         """Whether this setup needs nginx (domain mode OR hosted page)."""
         return self.domain_mode or self.hosted_page
-
-    def __getitem__(self, key: str) -> Any:
-        return self._state[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self._state[key] = value
-
-    def __contains__(self, key: object) -> bool:
-        return key in self._state
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self._state.get(key, default)
-
-    # --- Typed accessors for inter-step state ---
-
-    @property
-    def panel_api(self) -> MeridianPanel | None:
-        """Authenticated MeridianPanel client, set after panel setup."""
-        return self._state.get("panel_api")
-
-    @panel_api.setter
-    def panel_api(self, value: MeridianPanel) -> None:
-        self._state["panel_api"] = value
-
-    @property
-    def cluster(self) -> ClusterConfig | None:
-        """ClusterConfig being built during deployment."""
-        return self._state.get("cluster")
-
-    @cluster.setter
-    def cluster(self, value: ClusterConfig) -> None:
-        self._state["cluster"] = value
-
-    # Legacy typed accessors (kept for backward compat during migration)
-    @property
-    def panel(self) -> Any:
-        """Legacy: PanelClient for 3x-ui. Use panel_api for Remnawave."""
-        return self._state.get("panel")
-
-    @panel.setter
-    def panel(self, value: Any) -> None:
-        self._state["panel"] = value
-
-    @property
-    def credentials(self) -> Any:
-        """Legacy: ServerCredentials. Use cluster for 4.0."""
-        return self._state.get("credentials")
-
-    @credentials.setter
-    def credentials(self, value: Any) -> None:
-        self._state["credentials"] = value
 
 
 class StepContext(TypingProtocol):

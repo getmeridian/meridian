@@ -58,7 +58,7 @@ class TestCloudProviderAbstract:
                     id="x",
                     name="x",
                     status="running",
-                    public_ipv4="1.2.3.4",
+                    public_ipv4="198.51.100.10",
                     public_ipv6=None,
                     region="r",
                     labels={},

@@ -52,7 +52,7 @@ Provisioner:
 ### مثال با تمام گزینه‌ها
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow --port 443 --user ubuntu
 ```
 
 ## چگونه کلاینت‌ها اتصال برقرار می‌کنند
@@ -62,14 +62,14 @@ meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user
 هنگام افزودن کلاینت‌های جدید، URL‌های رله به‌طور خودکار شامل می‌شوند:
 
 ```bash
-meridian client add alice --server 1.2.3.4   # URL‌های رله شامل هستند
+meridian client add alice   # URL‌های رله به‌طور خودکار اضافه می‌شوند
 ```
 
 ## مدیریت نودهای رله
 
 ```bash
 meridian relay list                    # تمام نودهای رله در تمام سرورهای خروجی
-meridian relay list --exit 1.2.3.4     # نودهای رله برای یک خروجی خاص
+meridian relay list --exit 198.51.100.10     # نودهای رله برای یک خروجی خاص
 meridian relay check RELAY_IP          # بررسی سلامت 4 نقطه‌ای
 meridian relay remove RELAY_IP         # توقف سرویس + حذف از پیکربندی
 ```
@@ -91,15 +91,15 @@ meridian relay remove RELAY_IP         # توقف سرویس + حذف از پی�
 meridian relay remove RELAY_IP [--exit EXIT_IP] [--yes]
 ```
 
-این سرویس Realm را متوقف می‌کند، رله را از اعتبارات سرور خروجی حذف می‌کند و تمام صفحات اتصال کلاینت را دوباره تولید می‌کند (بازگشت به URL‌های مستقیم تنهایی).
+این سرویس Realm را متوقف می‌کند، رله را از `cluster.yml` حذف می‌کند و تمام صفحات اتصال کلاینت را دوباره تولید می‌کند (بازگشت به URL‌های مستقیم).
 
 ## رله‌های متعدد
 
 می‌توانید چندین رله را به یک سرور خروجی متصل کنید — برای مثال، رله‌هایی در شهرهای مختلف یا ISP‌های مختلف:
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 کلاینت‌ها تمام گزینه‌های رله را در صفحه اتصال خود می‌بینند.

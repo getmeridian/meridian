@@ -25,10 +25,8 @@ meridian deploy [IP] [flags]
 | `--color PALETTE` | ocean | Цветовая палитра (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH пользователь |
 | `--harden / --no-harden` | включен | Защита SSH + файрвол |
-| `--pq / --no-pq` | выключен | Постквантовое шифрование — ML-KEM-768 гибридное (экспериментально) |
 | `--warp / --no-warp` | выключен | Маршрутизировать исходящий трафик через Cloudflare WARP |
 | `--server NAME` | | Целевой сервер (имя или IP) |
-| `--decoy MODE` | ignored | Устаревший; неизвестные пути всегда используют защищённый ответ по умолчанию |
 | `--geo-block` / `--no-geo-block` | включен | Блокировать российские домены и IP (geosite:category-ru + geoip:ru) |
 | `--ssh-port PORT` | 22 | SSH порт (если нестандартный) |
 | `--yes` | | Пропустить подтверждающие диалоги |
@@ -87,7 +85,8 @@ meridian server remove NAME
 
 ```
 meridian node add IP [flags]
-meridian node list [--json]
+meridian node list
+meridian --json node list
 meridian node remove IP [--yes] [--force]
 meridian node check IP
 ```
@@ -99,19 +98,18 @@ meridian node check IP
 | `--name NAME` | (автоматически, из IP) | Дружественное имя отображаемое в панели / подписке |
 | `--domain DOMAIN` | (нет) | Домен для узла WSS/CDN резерва |
 | `--sni HOST` | www.microsoft.com | Цель маскировки Reality для этого узла |
-| `--warp / --no-warp` | выключен | Маршрутизировать исходящий трафик через Cloudflare WARP на этом узле |
 | `--harden / --no-harden` | включен | Защита ОС + SSH + файрвола для узла |
 | `--yes` | | Пропустить подтверждающие диалоги (применяется к `node remove`) |
 | `--force` | | При `node remove`, продолжить даже если ретрансляторы ссылаются на этот узел как на выход |
-| `--json` | | Выдать `node list` в виде конверта `meridian.output/v1` |
+| глобальный `--json` | | Разместите перед `node`, чтобы выдать `node list` в виде конверта `meridian.output/v1` |
 
-**Как это работает**: `meridian node add` подготавливает хост узла (пакеты ОС, Docker, nginx, TLS, контейнер узла Remnawave), регистрирует узел для REST API панели и создаёт записи хостов `reality` и `xhttp` так чтобы клиенты автоматически получали новый выход в их следующем обновлении подписки. Новая запись добавляется в `nodes[]` в `cluster.yml`; `desired_nodes[]` также обновляется если этот список не null (гибридная синхронизация). Логика развёртывания узла находится в `node_deploy.py`.
+**Как это работает**: `meridian node add` подготавливает хост узла (пакеты ОС, Docker, nginx, TLS, контейнер узла Remnawave), регистрирует его через API панели и создаёт записи `reality`, `xhttp` и `hysteria2` (а в режиме домена ещё `wss`). Клиенты получают новый выход при следующем обновлении подписки. Запись добавляется в `nodes[]`; `desired_nodes[]` также обновляется, если этот список не null.
 
 **Проверки здоровья**: `meridian node check` запускает проверки статуса панели, SSH, контейнера, порта и TLS. Когда проверка не пройдена, она выводит подсказку исправления (например `Run: docker compose up -d`).
 
 **Удаление**: `meridian node remove` использует SSH для входа в узел, чтобы остановить контейнеры перед удалением узла из кластера и панели. Он отказывается удалять узел, который всё ещё является `exit_node` одного или нескольких ретрансляторов; передайте `--force` для отмены.
 
-**JSON вывод**: `node list --json` использует конверт `meridian.output/v1` с `data.nodes[]` содержащим ip, name, uuid, status, xray_version и traffic_bytes.
+**JSON вывод**: `meridian --json node list` использует конверт `meridian.output/v1` с `data.nodes[]` содержащим ip, name, uuid, status, xray_version и traffic_bytes.
 
 ### meridian fleet
 
@@ -133,7 +131,7 @@ meridian fleet recover --panel-url URL --api-token TOKEN
 
 **`fleet inventory`** — показывает настроенную панель, узлы, ретрансляторы, желаемую топологию и живой статус узла панели когда он доступен. Он никогда не выводит токен API панели или пути секретных URL. С флагом `--json` вывод использует конверт `meridian.output/v1`. Стабильный доступ к полям внутри `data` включает `data.sources.*`, `data.servers[].roles`, `data.summary.*`, `data.nodes[].desired`, `data.nodes[].protocols`, `data.relays[].exit_node_*` и `data.desired_nodes[].present`. Поля присутствия инвентаря не являются истиной примирения; используйте `plan --json` для решений о дрейфе/применении.
 
-**`fleet recover`** — перестраивает `~/.meridian/cluster.yml` из активной панели. Используйте это когда локальный файл потерян или когда берётесь за чужое развёртывание. Подключается через SSH для чтения стабильных метаданных на стороне сервера, затем опрашивает REST API панели для узлов, ретрансляторов, входящих, хостов и пользователей.
+**`fleet recover`** — перестраивает `~/.meridian/cluster.yml` из активной панели. Команда получает профиль конфигурации, узлы и UUID входящих, затем через SSH восстанавливает серверные метаданные и выводит публичный ключ Reality. После этого вручную проверьте SSH-настройки, выбор хоста панели и ретрансляторы.
 
 ### meridian api
 
@@ -166,7 +164,8 @@ meridian api workflow NAME [--json]
 
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
-meridian relay list [--exit EXIT] [--json]
+meridian relay list [--exit EXIT]
+meridian --json relay list [--exit EXIT]
 meridian relay remove RELAY_IP [--exit EXIT] [--yes]
 meridian relay check RELAY_IP [--exit EXIT]
 ```
@@ -179,11 +178,11 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--user/-u USER` | root | SSH пользователь на ретрансляторе |
 | `--ssh-port PORT` | 22 | SSH порт на сервере ретранслятора (если нестандартный) |
 | `--yes/-y` | | Пропустить подтверждающие диалоги |
-| `--json` | | Выдать `relay list` в виде конверта `meridian.output/v1` |
+| глобальный `--json` | | Разместите перед `relay`, чтобы выдать `relay list` в виде конверта `meridian.output/v1` |
 
 **Как работают ретрансляторы**: клиент подключается к внутреннему IP-адресу ретранслятора. Ретранслятор пересылает необработанный TCP на выходной сервер за границей. Всё шифрование осуществляется от конца до конца между клиентом и выходом — ретранслятор никогда не видит открытый текст. Все протоколы (Reality, XHTTP, WSS) работают через ретранслятор.
 
-**JSON вывод**: `relay list --json` использует конверт `meridian.output/v1` с `data.relays[]`.
+**JSON вывод**: `meridian --json relay list` использует конверт `meridian.output/v1` с `data.relays[]`.
 
 ### meridian plan
 

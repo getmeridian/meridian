@@ -9,7 +9,6 @@ from meridian.engine.deploy import (
     project_deploy_cluster_state,
     resolve_deploy_target,
 )
-from meridian.engine.errors import EngineError
 from meridian.engine.servers import (
     KeyMaterial,
     bootstrap_server_key,
@@ -19,7 +18,6 @@ from meridian.engine.servers import (
 )
 
 __all__ = [
-    "EngineError",
     "LocalEngineSecurity",
     "ResolvedDeployTarget",
     "KeyMaterial",

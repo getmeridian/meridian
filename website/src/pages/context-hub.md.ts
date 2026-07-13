@@ -35,7 +35,7 @@ export const GET: APIRoute = async () => {
     '',
     '> Censorship-resistant proxy deployment CLI. One command deploys a fully configured, undetectable VLESS+Reality proxy server.',
     '> Source: https://getmeridian.org',
-    '> GitHub: https://github.com/uburuntu/meridian',
+    '> GitHub: https://github.com/getmeridian/meridian',
     '> llms.txt: https://getmeridian.org/llms.txt',
     '',
   ];

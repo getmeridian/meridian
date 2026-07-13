@@ -8,6 +8,7 @@ section: reference
 ## Стек технологий
 
 - **VLESS+Reality** (Xray-core) — прокси-протокол который маскируется под легитимный TLS-сайт. Цензоры проверяющие сервер видят реальный сертификат (например от microsoft.com). Подключиться могут только клиенты с правильным приватным ключом.
+- **Hysteria2** (Xray-core) — резервный транспорт по UDP/443 для сетей с потерями или высокой задержкой. В подписках TCP-транспорты остаются первыми.
 - **Remnawave** — современный стек панели для Xray развёрнутый как отдельные контейнеры Docker `remnawave/backend`, `remnawave/node` и `remnawave/subscription-page`. Backend выставляет REST API (управляется через официальный Python SDK `remnawave`); узел запускает Xray в `network_mode: host`; страница подписки обслуживает URL-конфигурации для каждого пользователя.
 - **nginx** — однопроцессный веб-сервер обрабатывающий как SNI маршрутизацию так и TLS. Модуль stream слушает на порту 443 и маршрутизирует трафик по SNI имени хоста без завершения TLS. Модуль http на порту 8443 завершает TLS, обслуживает страницы подключения, обратно проксирует UI админа Remnawave + страницу подписки и проксирует трафик XHTTP/WSS к Xray. Сертификаты управляются [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt).
 - **Docker** — запускает backend Remnawave + PostgreSQL + Valkey (хост панели только), узел Remnawave (каждый выходной узел) и страницу подписки Remnawave (хост панели, опционально).
@@ -126,7 +127,7 @@ UI админа обратно проксируется nginx'ом в `/<panel.s
 
 ## Конфигурационный паттерн nginx
 
-Meridian пишет в `/etc/nginx/conf.d/meridian-stream.conf` и `/etc/nginx/conf.d/meridian-http.conf` (никогда в основной `nginx.conf`). Это позволяет Meridian сосуществовать с пользовательской конфигурацией nginx.
+Meridian пишет stream-маршрутизацию в `/etc/nginx/stream.d/meridian.conf`, а HTTP-маршрутизацию — в `/etc/nginx/conf.d/meridian-http.conf`. При необходимости в основной `nginx.conf` добавляется один блок `stream` с include.
 
 nginx обрабатывает:
 - SNI маршрутизация на порту 443 (модуль stream, без завершения TLS)
@@ -141,7 +142,8 @@ nginx обрабатывает:
 
 | Порт | Сервис | Область |
 |------|--------|--------|
-| 443 | nginx stream (SNI маршрутизатор) | Публичный |
+| 443/TCP | nginx stream (SNI маршрутизатор) | Публичный |
+| 443/UDP | Резервный транспорт Xray Hysteria2 | Публичный |
 | 80 | nginx (ACME задачи) | Публичный |
 | 8443 | nginx http (внутренний конец) | Внутренний |
 | 3000 | Backend Remnawave (API админа + UI) | localhost |
@@ -152,7 +154,7 @@ nginx обрабатывает:
 | 30000-39999 | Xray XHTTP (по узлу детерминированный) | сеть хоста |
 | 5432 | PostgreSQL (БД Remnawave) | внутренняя сеть Docker |
 
-Порты XHTTP, WSS и Reality на хосте узла открыты на сети хоста потому что контейнер узла использует `network_mode: host`. Профиль UFW Meridian блокирует их от публичного интернета; nginx обратно проксирует по мере необходимости.
+Backend-порты XHTTP, WSS и Reality используют сеть хоста, но UFW блокирует к ним доступ из интернета. Hysteria2 слушает публичный UDP/443, а nginx обрабатывает публичный TCP/443.
 
 ## Конвейер подготовки
 
@@ -169,13 +171,12 @@ nginx обрабатывает:
 | 7 | ConfigureBBR | `common.py` | TCP управление перегруженностью |
 | 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 (при защите) |
 | 9 | InstallDocker | `docker.py` | Docker CE |
-| 10 | CleanupLegacyPanel | `legacy_cleanup.py` | Удалить старый 3x-ui при обновлении с v3 |
-| 11 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + страница подписки |
-| 12 | InstallWarp | `warp.py` | Cloudflare WARP (опционально) |
-| 13 | InstallNginx | `nginx.py` | SNI маршрутизация + TLS + обратный прокси |
-| 14 | ConfigureNginx | `nginx.py` + `nginx_render.py` | Конфигурация nginx для режима IP или домена |
-| 15 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
-| 16 | DeployPWAAssets | `services.py` | Ресурсы PWA страницы подключения |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + страница подписки |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP (опционально) |
+| 12 | InstallNginx | `nginx.py` | SNI маршрутизация + TLS + обратный прокси |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | Конфигурация nginx для режима IP или домена |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | Ресурсы PWA страницы подключения |
 
 После конвейера provisioner, `configure_panel_and_node` в `panel_bootstrap.py` использует REST API Remnawave чтобы регистрировать входящие, создавать контейнер узла, назначать хосты и создавать клиента по умолчанию. Развёртывание контейнера узла, создание хоста и помощники кэширования входящих живут в `node_deploy.py`. Контейнер узла **не** часть конвейера SSH потому что требует секретный ключ выпущенный панелью.
 
@@ -190,7 +191,7 @@ nginx обрабатывает:
 3. **Применение**: контейнеры панели + узла подняты, входящие и хосты созданы через REST API
 4. **Синхронизация**: база данных панели Remnawave (Postgres) и `cluster.yml` оба держат каноническое состояние; дрейф сообщается через `meridian plan`
 5. **Переустановка**: ключи Reality и UUID клиента сохраняются через переразворачивание (панель отказывается регенерировать когда они существуют)
-6. **Восстановление**: `meridian fleet recover <IP>` перестраивает `cluster.yml` из активного REST API панели когда локальная копия потеряна
+6. **Восстановление**: `meridian fleet recover --panel-url URL --api-token TOKEN` перестраивает `cluster.yml` из активного REST API панели когда локальная копия потеряна
 7. **Удаление**: `meridian teardown <IP>` останавливает и удаляет все контейнеры Remnawave, конфигурацию nginx и запись `cluster.yml` панели (опционально весь файл)
 
 ## Расположение файлов
@@ -198,7 +199,7 @@ nginx обрабатывает:
 ### На хосте панели
 - `/opt/remnawave/` — файл compose панели + `.env` + `.env` страницы подписки
 - `/opt/remnawave/data/` — том данных PostgreSQL
-- `/etc/nginx/conf.d/meridian-stream.conf` — конфигурация nginx stream (SNI маршрутизация)
+- `/etc/nginx/stream.d/meridian.conf` — конфигурация nginx stream (SNI маршрутизация)
 - `/etc/nginx/conf.d/meridian-http.conf` — конфигурация nginx http (TLS, обратный прокси)
 - `/etc/ssl/meridian/` — TLS сертификаты (управляются acme.sh)
 
@@ -210,5 +211,3 @@ nginx обрабатывает:
 - `~/.meridian/cluster.yml.bak` — автоматическая резервная копия перед деструктивными операциями
 - `~/.meridian/cache/` — кэш проверки обновлений
 - `~/.local/bin/meridian` — точка входа CLI (установлено через uv/pipx)
-
-Файлы наследия (`~/.meridian/credentials/`, `~/.meridian/servers`) сохраняются только для миграции обновления от Meridian 3.x.

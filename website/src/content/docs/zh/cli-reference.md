@@ -25,10 +25,8 @@ meridian deploy [IP] [flags]
 | `--color PALETTE` | ocean | 页面颜色主题 (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH 用户 |
 | `--harden / --no-harden` | 启用 | SSH + 防火墙加固 |
-| `--pq / --no-pq` | 禁用 | 后量子加密 — ML-KEM-768 混合模式（实验性） |
 | `--warp / --no-warp` | 禁用 | 通过 Cloudflare WARP 路由出站流量 |
 | `--server NAME` | | 目标服务器（名称或 IP） |
-| `--decoy MODE` | 忽略 | 已弃用；未知路径始终使用加固的默认响应 |
 | `--geo-block` / `--no-geo-block` | 启用 | 阻止俄罗斯域名和 IP (geosite:category-ru + geoip:ru) |
 | `--ssh-port PORT` | 22 | SSH 端口（如果非标准） |
 | `--yes` | | 跳过确认提示 |
@@ -87,7 +85,8 @@ meridian server remove NAME
 
 ```
 meridian node add IP [flags]
-meridian node list [--json]
+meridian node list
+meridian --json node list
 meridian node remove IP [--yes] [--force]
 meridian node check IP
 ```
@@ -99,19 +98,18 @@ meridian node check IP
 | `--name NAME` | (自动，来自 IP) | 在面板/订阅中显示的友好名称 |
 | `--domain DOMAIN` | (无) | 节点的 WSS/CDN 回退域名 |
 | `--sni HOST` | www.microsoft.com | 该节点的 Reality 伪装目标 |
-| `--warp / --no-warp` | 禁用 | 在该节点上通过 Cloudflare WARP 路由出站流量 |
 | `--harden / --no-harden` | 启用 | 节点的 OS + SSH + 防火墙加固 |
 | `--yes` | | 跳过确认提示（适用于 `node remove`） |
 | `--force` | | 在 `node remove` 时，即使继电器以此节点作为出口也继续 |
-| `--json` | | 将 `node list` 作为 `meridian.output/v1` 信封发出 |
+| 全局 `--json` | | 放在 `node` 前，将 `node list` 作为 `meridian.output/v1` 信封发出 |
 
-**工作原理**：`meridian node add` 配置节点主机（OS 包、Docker、nginx、TLS、Remnawave 节点容器），针对面板的 REST API 注册节点，并创建 `reality` 和 `xhttp` 主机条目，以便客户端在下次订阅刷新时自动接收新出口。新条目被添加到 `cluster.yml` 中的 `nodes[]`；如果该列表非空，`desired_nodes[]` 也会更新（混合同步）。节点部署逻辑位于 `node_deploy.py`。
+**工作原理**：`meridian node add` 配置节点主机并通过面板 API 注册，然后创建 `reality`、`xhttp` 和 `hysteria2` 主机条目（域名模式还包括 `wss`）。客户端在下次刷新订阅时收到新出口。新条目添加到 `nodes[]`；如果 `desired_nodes[]` 非 null，也会同步更新。
 
 **健康检查**：`meridian node check` 运行面板状态、SSH、容器、端口和 TLS 检查。当检查失败时，它打印修复提示（例如 `Run: docker compose up -d`）。
 
 **删除**：`meridian node remove` SSH 进入节点以在从集群和面板中移除节点之前停止容器。它拒绝删除仍然是一个或多个继电器的 `exit_node` 的节点；传递 `--force` 以覆盖。
 
-**JSON 输出**：`node list --json` 使用 `meridian.output/v1` 信封，其中 `data.nodes[]` 包含 ip、name、uuid、status、xray_version 和 traffic_bytes。
+**JSON 输出**：`meridian --json node list` 使用 `meridian.output/v1` 信封，其中 `data.nodes[]` 包含 ip、name、uuid、status、xray_version 和 traffic_bytes。
 
 ### meridian fleet
 
@@ -133,7 +131,7 @@ meridian fleet recover --panel-url URL --api-token TOKEN
 
 **`fleet inventory`** — 显示配置的面板、节点、继电器、所需拓扑以及可到达时的实时面板节点状态。它永远不会打印面板 API 令牌或秘密 URL 路径。使用 `--json` 时，输出使用 `meridian.output/v1` 信封。`data` 内的稳定字段访问包括 `data.sources.*`、`data.servers[].roles`、`data.summary.*`、`data.nodes[].desired`、`data.nodes[].protocols`、`data.relays[].exit_node_*` 和 `data.desired_nodes[].present`。库存存在字段不是对账真相；使用 `plan --json` 进行漂移/应用决策。
 
-**`fleet recover`** — 从实时面板重建 `~/.meridian/cluster.yml`。当本地文件丢失时使用，或者当接收某人的部署时。通过 SSH 连接以读取稳定的服务器端元数据，然后查询面板 API 获取节点、继电器、入站、主机和用户。
+**`fleet recover`** — 从实时面板重建 `~/.meridian/cluster.yml`。它获取配置文件、节点和入站 UUID，再通过 SSH 恢复服务器端元数据并推导 Reality 公钥。之后请手动检查 SSH 设置、面板主机选择和中继。
 
 ### meridian api
 
@@ -166,7 +164,8 @@ meridian api workflow NAME [--json]
 
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
-meridian relay list [--exit EXIT] [--json]
+meridian relay list [--exit EXIT]
+meridian --json relay list [--exit EXIT]
 meridian relay remove RELAY_IP [--exit EXIT] [--yes]
 meridian relay check RELAY_IP [--exit EXIT]
 ```
@@ -179,11 +178,11 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--user/-u USER` | root | 中继上的 SSH 用户 |
 | `--ssh-port PORT` | 22 | 中继服务器上的 SSH 端口（如果非标准） |
 | `--yes/-y` | | 跳过确认提示 |
-| `--json` | | 将 `relay list` 作为 `meridian.output/v1` 信封发出 |
+| 全局 `--json` | | 放在 `relay` 前，将 `relay list` 作为 `meridian.output/v1` 信封发出 |
 
 **中继如何工作**：客户端连接到中继的国内 IP。中继将原始 TCP 转发到国外的出口服务器。所有加密都是端到端的，在客户端和出口之间 — 中继永远看不到明文。所有协议（Reality、XHTTP、WSS）都通过中继工作。
 
-**JSON 输出**：`relay list --json` 使用 `meridian.output/v1` 信封，其中包含 `data.relays[]`。
+**JSON 输出**：`meridian --json relay list` 使用 `meridian.output/v1` 信封，其中包含 `data.relays[]`。
 
 ### meridian plan
 
@@ -352,7 +351,9 @@ meridian -v
 | `--sni HOST` | TLS 伪装目标（由部署、预检查、测试、医生使用） |
 | `--domain DOMAIN` | Cloudflare CDN 回退域名（由部署、预检查、测试使用） |
 
-客户端命令（`client add/show/list/remove/enable/disable`）直接在集群的面板上操作，不接受 `--server`。
+客户端命令（`client add/show/list/remove/enable/disable`）直接在集群的面板上操作。
+
+这些命令不接受 `--server`。
 
 ## 服务器解析
 

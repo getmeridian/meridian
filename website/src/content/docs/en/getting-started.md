@@ -34,7 +34,7 @@ The interactive wizard asks for your server IP, SSH user, and camouflage target 
 Or specify everything upfront:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.microsoft.com
 ```
 
 If you're running directly on the VPS as root, skip SSH entirely:
@@ -50,7 +50,7 @@ meridian deploy local
 3. **Hardens the server** — UFW firewall, SSH key-only auth, BBR congestion control
 4. **Configures VLESS+Reality** on port 443 — impersonates a real TLS server
 5. **Enables XHTTP transport** — additional stealth layer, routed through nginx
-6. **Outputs QR codes** and saves an HTML connection page
+6. **Deploys a shareable PWA** with QR codes and subscription import
 
 ## Where things live
 
@@ -58,18 +58,17 @@ Meridian connects to the VPS via SSH (or runs directly on it with `deploy local`
 
 | What | Where |
 |------|-------|
-| Credentials & keys | `~/.meridian/credentials/<IP>/` on your machine |
-| Server registry | `~/.meridian/servers` on your machine |
+| Topology, panel token, and keys | `~/.meridian/cluster.yml` on your machine |
+| SSH server profiles | `~/.meridian/servers.json` on your machine |
 | Proxy services | Docker, Xray, nginx on the VPS |
 
-When you run `meridian client add alice`, Meridian looks up the server in your local registry, SSHes in, creates the client, and updates the local cache. With multiple servers, target a specific one with `--server NAME`.
+When you run `meridian client add alice`, Meridian uses the Remnawave API recorded in `cluster.yml`; client operations do not require SSH. With multiple servers, target a specific SSH host with `--server NAME` for server-touching commands.
 
 ## Connect
 
 The deploy command outputs:
-- A **QR code** you can scan with your phone
-- An **HTML file** with connection links to share with family
-- A **shareable URL** (if server-hosted pages are enabled)
+- A **shareable PWA URL** with QR codes and app links
+- A **subscription URL** for compatible clients
 
 Install one of these apps, then scan the QR code or tap "Open in App":
 
@@ -88,17 +87,17 @@ meridian client add alice
 
 Each client gets their own key and connection page. List clients with `meridian client list`, revoke with `meridian client remove alice`.
 
-## Manage servers
+## Manage SSH profiles
 
-When you manage multiple VPS deployments:
+Save reusable SSH targets for diagnostics and maintenance:
 
 ```
 meridian server list                # view all managed servers
-meridian server add 5.6.7.8        # add an existing server
+meridian server add 198.51.100.11  # add an existing server
 meridian server remove finland     # remove from registry
 ```
 
-The `--server` flag lets you target a specific server for any command: `meridian client add alice --server finland`.
+Server-touching commands such as `preflight`, `doctor`, and `teardown` accept `--server NAME`. Client commands always use the cluster's panel and do not accept `--server`.
 
 ## Declarative workflow
 
@@ -108,15 +107,15 @@ A minimal desired-state block:
 
 ```yaml
 desired_nodes:
-  - host: 198.51.100.1
+  - host: 198.51.100.10
     name: germany-1
     sni: www.microsoft.com
-  - host: 198.51.100.2
+  - host: 198.51.100.11
     name: finland-1
     sni: www.microsoft.com
 
 desired_relays:
-  - host: 198.51.100.10
+  - host: 203.0.113.10
     name: moscow-relay
     exit_node: germany-1          # name or IP
 
@@ -137,7 +136,7 @@ Each section is independent. Omitting `desired_clients` entirely leaves client m
 
 `meridian plan` exits `0` when the cluster is converged, `2` when changes are pending — so you can gate CI workflows on it. Use `meridian plan --json` to inspect the typed plan, and `meridian apply --json --yes` when a process or UI client needs the final execution result. Both use the `meridian.output/v1` envelope. See [CLI reference](/docs/en/cli-reference/#meridian-plan) for full options.
 
-For an annotated reference of every field cluster.yml accepts (state, desired-state, branding, inbound cache), see the [`cluster.example.yml`](https://github.com/uburuntu/meridian/blob/v4/cluster.example.yml) at the repo root. Imperative commands (`meridian client add`, `meridian node add`, etc.) automatically mirror their effect into the matching `desired_*` list when that list is non-null — so mixing imperative and declarative is safe.
+For an annotated reference of every field cluster.yml accepts (state, desired-state, branding, inbound cache), see the [`cluster.example.yml`](https://github.com/getmeridian/meridian/blob/v4/cluster.example.yml) at the repo root. Imperative commands (`meridian client add`, `meridian node add`, etc.) automatically mirror their effect into the matching `desired_*` list when that list is non-null — so mixing imperative and declarative is safe.
 
 ## Next steps
 

@@ -16,7 +16,7 @@ class Uninstall:
     nginx Meridian configs, TLS certificates, web files, cron jobs,
     server credentials, CLI symlink, UFW rules.
 
-    Also cleans up legacy 3x-ui and HAProxy/Caddy configs from older deployments.
+    Also cleans up HAProxy/Caddy configs from earlier Meridian deployments.
 
     Does NOT remove: Docker engine, system packages, SSH settings.
     """
@@ -33,9 +33,6 @@ class Uninstall:
             "rm -rf /opt/remnanode",
             # Docker volumes (may remain after compose down)
             "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
-            # Legacy: 3x-ui (from v3 deployments)
-            "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
-            "rm -rf /opt/3x-ui",
             # nginx (+ systemd restart override)
             "systemctl stop nginx 2>/dev/null; systemctl disable nginx 2>/dev/null; true",
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",

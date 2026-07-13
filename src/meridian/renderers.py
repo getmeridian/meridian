@@ -20,8 +20,3 @@ def emit_jsonl(value: Any, *, stream: IO[str] | None = None) -> None:
     target = stream or sys.stdout
     target.write(jsonl_dumps(value) + "\n")
     target.flush()
-
-
-def json_output(data: Any) -> None:
-    """Legacy JSON renderer shape used by commands not yet on meridian-core envelopes."""
-    emit_json(data)

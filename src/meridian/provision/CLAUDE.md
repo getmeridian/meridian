@@ -8,7 +8,7 @@
 
 **Recipe graph** — builders wrap steps in `Operation` objects with explicit `requires`/`provides` resources. Add graph edges before relying on declaration order for new conditional chunks.
 
-**Typed context** — `ProvisionContext` has typed fields for configuration AND typed properties for inter-step data (`ctx.panel_api`, `ctx.cluster`). Legacy `_state` dict kept for edge cases.
+**Typed context** — `ProvisionContext` has explicit typed fields for configuration and inter-step data (`ctx.panel_api`, `ctx.cluster`, generated paths). Do not add dictionary-style escape hatches.
 
 **Remnawave containers** — Panel (backend + PostgreSQL) in bridge network, node in host network. Panel on `127.0.0.1:3000`, reverse-proxied by nginx. The node container carries `cap_add: NET_ADMIN` — mandatory per upstream panel 2.6.2+ / 2.7.0+ docs. It enables the node plugin system (Torrent Blocker, Ingress/Egress Filter, Connection Drop) and the IP Control panel feature; without it operators can activate those features in the panel UI and see nothing happen (kernel EPERM on nftables syscalls, swallowed). System lab Stage 3 asserts the capability is present on the live container.
 
@@ -20,7 +20,7 @@
 
 **Reporter hook** — `Provisioner.run()` may emit typed core events while preserving Rich rendering by default. CLI/UI renderers subscribe; steps still return `StepResult`.
 
-**Renderer abstraction** — `StepRenderer` protocol in `progress.py` decouples step execution from output. Rich stays in `progress.py`; `steps.py` has zero Rich imports. CLI passes `RichStepRenderer`; Engine/tests use `NoopStepRenderer`.
+**Renderer abstraction** — `StepRenderer.step_starting()` returns `AbstractContextManager[None]`. Rich stays in `progress.py`; `steps.py` has zero Rich imports. CLI passes `RichStepRenderer`; Engine/tests use `NoopStepRenderer`.
 
 **Executor bridge** — deploy provisioning enters through `RemoteExecutorConnection`; steps can keep `conn.run()` while transports move behind core executor contracts.
 

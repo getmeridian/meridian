@@ -37,7 +37,7 @@ Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Check cloud provider console — ensure port 443/TCP is allowed inbound
 2. Try from a different network (mobile data, another Wi-Fi)
-3. SSH in and check: `docker ps` (are `remnawave`, `remnawave-node`, `nginx` running?), `ss -tlnp sport = :443`
+3. SSH in and check: `docker ps` (are `remnawave` and `remnawave-node` running?), `systemctl status nginx`, `ss -tlnp sport = :443`
 4. Check UFW: `ufw status` — should show 443/tcp ALLOW
 
 ### TLS handshake fails
@@ -62,7 +62,7 @@ Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Check DNS: `dig +short yourdomain.com @8.8.8.8`
 2. Check nginx: `systemctl status nginx`
-3. Check nginx config: `/etc/nginx/conf.d/meridian-stream.conf`
+3. Check nginx config: `/etc/nginx/stream.d/meridian.conf`
 
 ## Connection drops after seconds
 
@@ -115,7 +115,7 @@ Domain doesn't resolve to server IP yet. Update the DNS A record. Propagation is
 See the [IP Blocked Recovery guide](/docs/en/recovery/) for step-by-step recovery options (new server, relay swap, CDN fallback).
 
 Other causes:
-- Server rebooted and Docker didn't auto-start → `docker start remnawave remnawave-node nginx` (or `cd /opt/remnawave && docker compose up -d`)
+- Server rebooted and services didn't auto-start → run `docker compose up -d` in `/opt/remnawave` and `/opt/remnanode`, then `systemctl restart nginx`
 - Disk full → `df -h /`, `docker system prune -af`
 
 ## Slow speeds
@@ -135,7 +135,7 @@ meridian doctor --ai
 
 Copies a diagnostic prompt to your clipboard for use with any AI assistant.
 
-Or collect diagnostics for a [GitHub issue](https://github.com/uburuntu/meridian/issues):
+Or collect diagnostics for a [GitHub issue](https://github.com/getmeridian/meridian/issues):
 
 ```
 meridian doctor
@@ -163,7 +163,7 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 |---------|-----------------|
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
-| Docker | Are `remnawave`, `remnawave-node`, `nginx` containers running? Status should be "Up" |
+| Docker | Are the `remnawave` and `remnawave-node` containers running? Status should be "Up" |
 | Remnawave Logs | Error messages from panel backend or node, "failed to start" entries, certificate issues |
 | Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |

@@ -30,7 +30,6 @@ from meridian.health import poll_until_ready
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
-    from meridian.credentials import ServerCredentials
 
 
 def _xray_bin_path() -> Path:
@@ -371,108 +370,13 @@ def test_connection(
             Path(config_file).unlink(missing_ok=True)
 
 
-def build_test_configs(creds: ServerCredentials) -> list[tuple[str, dict, bool]]:
-    """Build test configs for all active protocols.
-
-    Returns list of (label, config_dict, expect_ip_match) tuples.
-    """
-    ip = creds.server.ip or ""
-    sni = creds.server.sni or DEFAULT_SNI
-    domain = creds.server.domain or ""
-    warp = creds.server.warp
-    public_key = creds.reality.public_key or ""
-    short_id = creds.reality.short_id or ""
-    reality_uuid = creds.reality.uuid or ""
-    encryption = creds.reality.encryption_key or "none"
-    xhttp_path = creds.xhttp.xhttp_path or ""
-    wss_uuid = creds.wss.uuid or ""
-    ws_path = creds.wss.ws_path or ""
-
-    configs: list[tuple[str, dict, bool]] = []
-
-    if reality_uuid and public_key:
-        port = _find_free_port()
-        configs.append(
-            (
-                "Reality (TCP)",
-                build_reality_config(port, ip, reality_uuid, sni, public_key, short_id, encryption),
-                not warp,  # WARP: exit IP is Cloudflare, not server
-            )
-        )
-
-    if xhttp_path and reality_uuid:
-        host = domain or ip
-        port = _find_free_port()
-        configs.append(
-            (
-                "XHTTP",
-                build_xhttp_config(port, host, reality_uuid, xhttp_path),
-                not domain and not warp,  # IP mode without WARP: expect match
-            )
-        )
-
-    if domain and wss_uuid and ws_path:
-        port = _find_free_port()
-        configs.append(
-            (
-                "WSS (CDN)",
-                build_wss_config(port, domain, wss_uuid, ws_path),
-                False,  # CDN exit IP differs from server
-            )
-        )
-
-    # Relay configs — test each relay's Reality and XHTTP paths
-    for relay in creds.relays:
-        relay_label = relay.name or relay.ip
-        relay_sni = relay.sni or sni
-
-        if reality_uuid and public_key:
-            port = _find_free_port()
-            configs.append(
-                (
-                    f"Reality via {relay_label}",
-                    build_reality_config(
-                        port,
-                        relay.ip,
-                        reality_uuid,
-                        relay_sni,
-                        public_key,
-                        short_id,
-                        encryption,
-                        server_port=relay.port,
-                    ),
-                    not warp,
-                )
-            )
-
-        if xhttp_path and reality_uuid:
-            xhttp_host = domain or ip
-            port = _find_free_port()
-            # XHTTP via relay: connect to relay_ip:relay_port, TLS sni=exit
-            cfg = build_xhttp_config(port, xhttp_host, reality_uuid, xhttp_path, server_port=relay.port)
-            # Override address to relay IP (TLS serverName stays as exit)
-            cfg["outbounds"][0]["settings"]["vnext"][0]["address"] = relay.ip
-            configs.append(
-                (
-                    f"XHTTP via {relay_label}",
-                    cfg,
-                    not domain and not warp,
-                )
-            )
-
-    return configs
-
-
 def build_test_configs_from_cluster(
     cluster: ClusterConfig,
     node_ip: str,
     *,
     uuid: str = "",
 ) -> list[tuple[str, dict, bool]]:
-    """Build test configs from ClusterConfig data (v4).
-
-    Uses node metadata (Reality keys, paths) from cluster.yml instead of
-    the legacy ServerCredentials/proxy.yml format.
+    """Build test configs from cluster.yml node metadata.
 
     Args:
         cluster: Loaded ClusterConfig.

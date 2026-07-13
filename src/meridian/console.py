@@ -37,7 +37,7 @@ class ConsoleState:
 
 _state = ConsoleState()
 
-# Module-level aliases for backward compatibility.
+# Shared handles for callers that need direct Rich rendering.
 console = _state.console
 err_console = _state.err_console
 
@@ -75,13 +75,6 @@ def error_context(command: str, *, timer: Any | None = None) -> Iterator[None]:
     finally:
         _error_command.reset(command_token)
         _error_timer.reset(timer_token)
-
-
-def json_output(data: Any) -> None:
-    """Write JSON to stdout (for --json mode). Separate from Rich stderr output."""
-    from meridian.renderers import json_output as render_json
-
-    render_json(data)
 
 
 def info(msg: str) -> None:
@@ -129,7 +122,7 @@ def fail(
         hint = msg.hint
         hint_type = msg.category
         exit_code = msg.exit_code
-        msg = str(msg)
+    message = str(msg)
     code = exit_code if exit_code is not None else _EXIT_CODES.get(hint_type, 1)
     if _state.json_mode:
         from meridian.core.models import ErrorCategory, MeridianError
@@ -140,14 +133,14 @@ def fail(
         emit_json(
             command_envelope(
                 command=_error_command.get(),
-                summary=msg,
+                summary=message,
                 status="cancelled" if category == "cancelled" else "failed",
                 exit_code=code,
                 errors=[
                     MeridianError(
                         code=f"MERIDIAN_{category.upper()}_ERROR",
                         category=category,
-                        message=msg,
+                        message=message,
                         hint=hint,
                         retryable=category == "system",
                         exit_code=code,
@@ -158,7 +151,7 @@ def fail(
         )
         raise typer.Exit(code=code)
 
-    err_console.print(f"\n  [error]\u2717 {msg}[/error]")
+    err_console.print(f"\n  [error]\u2717 {message}[/error]")
     if hint:
         err_console.print(f"  [dim]{hint}[/dim]")
     if hint_type in ("user", "cancelled"):
@@ -166,7 +159,7 @@ def fail(
     elif hint_type == "system":
         err_console.print("  [dim]Run: meridian doctor  (to collect server info)[/dim]\n")
     else:  # "bug"
-        err_console.print("  [dim]Report: https://github.com/uburuntu/meridian/issues[/dim]\n")
+        err_console.print("  [dim]Report: https://github.com/getmeridian/meridian/issues[/dim]\n")
     raise typer.Exit(code=code)
 
 

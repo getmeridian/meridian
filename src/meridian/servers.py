@@ -1,14 +1,9 @@
-"""Server registry — manages the ~/.meridian/servers.json index file.
-
-JSON-only persistence. Legacy text file (``servers``) is automatically
-migrated to ``servers.json`` on first load.
-"""
+"""Server registry — manages the ~/.meridian/servers.json index file."""
 
 from __future__ import annotations
 
 import builtins
 import json
-import logging
 import os
 import tempfile
 from dataclasses import dataclass
@@ -19,11 +14,6 @@ from pydantic import ValidationError
 
 from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
 
-logger = logging.getLogger(__name__)
-
-SERVER_ROLE_EXIT = "exit"
-SERVER_ROLE_RELAY = "relay"
-_SERVER_ROLES = {SERVER_ROLE_EXIT, SERVER_ROLE_RELAY}
 SERVER_REGISTRY_SCHEMA = "meridian.servers/v2"
 
 
@@ -34,7 +24,6 @@ class ServerEntry:
     host: str
     user: str = "root"
     name: str = ""
-    role: str = SERVER_ROLE_EXIT
     port: int = 22
     key_path: str = ""
 
@@ -53,107 +42,13 @@ class ServerEntry:
         """Alias for ``name`` — matches ``ServerProfile.title``."""
         return self.name
 
-    def __str__(self) -> str:
-        parts = [self.host, self.user]
-        if self.role == SERVER_ROLE_EXIT:
-            if self.name:
-                parts.append(self.name)
-            if self.port != 22:
-                if not self.name:
-                    parts.append("-")
-                parts.append(f"port={self.port}")
-            return " ".join(parts)
-
-        parts.extend([self.name or "-", self.role])
-        if self.port != 22:
-            parts.append(f"port={self.port}")
-        return " ".join(parts)
-
-    @classmethod
-    def from_line(cls, line: str) -> ServerEntry | None:
-        """Parse a line from the legacy servers file. Returns None for comments/blanks."""
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            return None
-        parts = stripped.split()
-        if len(parts) < 2:
-            return None
-
-        port = 22
-        if parts[-1].startswith("port="):
-            try:
-                port = int(parts[-1].split("=", 1)[1])
-            except (ValueError, IndexError):
-                pass
-            parts = parts[:-1]
-
-        if len(parts) >= 4 and parts[3] in _SERVER_ROLES:
-            name = "" if parts[2] == "-" else parts[2]
-            return cls(host=parts[0], user=parts[1], name=name, role=parts[3], port=port)
-        name = parts[2] if len(parts) > 2 else ""
-        if name == "-":
-            name = ""
-        return cls(host=parts[0], user=parts[1], name=name, port=port)
-
-
-def _migrate_legacy_file(legacy_path: Path, json_path: Path) -> None:
-    """One-shot migration: convert legacy text file to servers.json.
-
-    Only runs when the legacy file exists and servers.json does not.
-    After migration, the legacy file is left in place (read-only backup).
-    """
-    if not legacy_path.exists() or json_path.exists():
-        return
-
-    entries: list[ServerEntry] = []
-    for raw in legacy_path.read_text().splitlines():
-        entry = ServerEntry.from_line(raw)
-        if entry:
-            entries.append(entry)
-
-    if not entries:
-        return
-
-    profiles: list[ServerProfile] = []
-    for entry in entries:
-        draft = ServerConnectionDraft(
-            title=entry.name or entry.host,
-            host=entry.host,
-            ssh_user=entry.user,
-            ssh_port=entry.port,
-        )
-        profiles.append(profile_from_draft(draft, source="legacy"))
-
-    store = ServerProfileStore(json_path)
-    for profile in profiles:
-        store.upsert(profile)
-
-    logger.info("Migrated %d servers from legacy text file to servers.json", len(entries))
-
 
 class ServerRegistry:
-    """CRUD operations on the servers index file.
-
-    All persistence is through servers.json via ServerProfileStore.
-    Legacy text file is auto-migrated on first access.
-    """
+    """CLI-facing adapter over the JSON server profile store."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
-        self._json_path = path.with_suffix(".json")
-        _migrate_legacy_file(path, self._json_path)
-        self._store = ServerProfileStore(self._json_path)
-
-    def _read_legacy_entries(self) -> list[ServerEntry]:
-        """Read legacy text entries (used only for migration)."""
-        entries: list[ServerEntry] = []
-        if not self.path.exists():
-            return entries
-        for raw in self.path.read_text().splitlines():
-            entry = ServerEntry.from_line(raw)
-            if entry:
-                entries.append(entry)
-        return entries
+        self._store = ServerProfileStore(path)
 
     def list(self) -> list[ServerEntry]:
         """Return all registered servers from JSON store."""
@@ -178,21 +73,6 @@ class ServerRegistry:
 
     def add(self, entry: ServerEntry) -> None:
         """Add a server, deduplicating by host IP."""
-        # Also update legacy file for backward compat during transition
-        if self.path.exists():
-            lines = self.path.read_text().splitlines()
-            new_lines = [
-                raw
-                for raw in lines
-                if not (ServerEntry.from_line(raw) and ServerEntry.from_line(raw).host == entry.host)
-            ]
-            new_lines.append(str(entry))
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
-
-        if entry.role != SERVER_ROLE_EXIT:
-            return
-
         existing_profile = self._store.find(entry.host) or (self._store.find(entry.name) if entry.name else None)
         draft = ServerConnectionDraft(
             title=entry.name or entry.host,
@@ -218,31 +98,14 @@ class ServerRegistry:
 
     def remove(self, query: str) -> bool:
         """Remove a server by IP or name. Returns True if found and removed."""
-        # Also clean legacy file for backward compat
-        removed_legacy = False
-        if self.path.exists():
-            lines = self.path.read_text().splitlines()
-            new_lines = []
-            for raw in lines:
-                existing = ServerEntry.from_line(raw)
-                if existing and (existing.host == query or existing.name == query):
-                    removed_legacy = True
-                    continue
-                new_lines.append(raw)
-            if removed_legacy:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text("\n".join(new_lines) + "\n" if new_lines else "")
-
-        removed_profile = self._store.remove(query)
-        return removed_legacy or removed_profile
+        return self._store.remove(query)
 
 
 class ServerProfileStore:
-    """JSON server profile registry for Studio and future Engine flows."""
+    """JSON server profile registry for CLI and Engine flows."""
 
-    def __init__(self, path: Path, *, legacy_path: Path | None = None) -> None:
+    def __init__(self, path: Path) -> None:
         self.path = path
-        self.legacy_path = legacy_path
 
     def list(self) -> list[ServerProfile]:
         """Return saved server profiles from JSON only."""

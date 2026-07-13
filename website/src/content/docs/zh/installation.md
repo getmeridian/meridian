@@ -42,9 +42,9 @@ Meridian 会自动检查更新：
 
 ## 要求
 
-- **Python 3.10+**（由 uv/pipx 自动安装）
+- **Python 3.11+**（由 uv/pipx 自动安装）
 - **SSH 密钥访问** 到您的目标服务器
-- **qrencode**（可选，用于终端 QR 码）：`brew install qrencode` 或 `apt install qrencode`
+终端 QR 码由内置的 Python `segno` 包生成，无需安装系统依赖。
 
 ## 验证安装
 

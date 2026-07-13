@@ -22,10 +22,12 @@ src/meridian/CLAUDE.md                  — Python CLI architecture
   panel_bootstrap.py                    — panel setup, node deploy, xray config
   relay_ops.py                          — relay infrastructure operations
   ssh_keys.py                           — host key utilities (shared by ssh.py + engine)
-  core/defaults.py                      — core-owned constants (DEFAULT_SNI)
-  core/errors.py                        — shared error base types
+  core/CLAUDE.md                        — transport-neutral API contracts
+    defaults.py                         — core-owned constants (DEFAULT_SNI)
+    errors.py                           — shared error base types
   commands/CLAUDE.md                    — per-subcommand pattern
     wizard.py                           — interactive deploy wizard
+  diagnostics/CLAUDE.md                 — reusable server health checks
   engine/CLAUDE.md                      — local Engine use-case boundary
     routes.py                           — FastAPI route handlers
   provision/CLAUDE.md                   — step pipeline + idempotency
@@ -55,13 +57,13 @@ CLAUDE.md files. All of these are enforced in code review.
 - **Demo data**: use RFC 5737 IPs (`198.51.100.x`) in tests, examples, and docs. Never real IPs.
 - **Privacy**: no real names, server IPs, or domains in commits, code, or public docs unless the user explicitly asks.
 - **Self-hosted**: zero external HTTP requests at runtime from connection pages, CLI update checks aside. Target users are in regions that block CDNs.
-- **Commit per change**: one logical change per commit. Footer `Refs: uburuntu/meridian#NN` when resolving an issue.
+- **Commit per change**: one logical change per commit. Footer `Refs: getmeridian/meridian#NN` when resolving an issue.
 - **Ask before posting** anything public — GitHub issues, PR descriptions, comments, discussions. Always show the text first.
 
 ## Project management
 
 - High-level direction: [ROADMAP.md](ROADMAP.md)
-- Concrete trackable work: [GitHub issues](https://github.com/uburuntu/meridian/issues)
+- Concrete trackable work: [GitHub issues](https://github.com/getmeridian/meridian/issues)
 - Shipped history: [CHANGELOG.md](CHANGELOG.md)
 - Security policy: [SECURITY.md](SECURITY.md)
 - Contribution guide: [CONTRIBUTING.md](CONTRIBUTING.md)

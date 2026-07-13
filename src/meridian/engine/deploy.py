@@ -21,9 +21,9 @@ from meridian.core.deploy_validation import (
     normalize_deploy_request,
     validate_deploy_target,
 )
+from meridian.core.errors import EngineError
 from meridian.core.inputs import is_ip_deploy_target, is_local_deploy_target
 from meridian.core.servers import ServerProfile
-from meridian.engine.errors import EngineError
 from meridian.servers import ServerEntry
 
 

@@ -12,10 +12,9 @@ meridian client add alice
 ```
 
 This creates a unique connection key for "alice" and displays:
-- A **QR code** in the terminal — scan it with a VPN app to connect instantly
-- **Connection URLs** — VLESS links for each protocol (Reality, XHTTP, and WSS if domain mode is enabled)
-- A **shareable page URL** — hosted on your server, ready to send via any messenger
-- An **HTML file** saved locally — backup for offline sharing
+- A **QR code** in the terminal — scan it to open the connection page or import the subscription
+- A **subscription URL** — one link for compatible VPN apps
+- A **shareable PWA URL** — hosted on your server, ready to send via any messenger
 
 Pass multiple names to add several clients at once:
 
@@ -43,9 +42,9 @@ To re-display connection info for an existing client at any time:
 meridian client show alice
 ```
 
-This outputs the same QR code, connection URLs, and shareable page link — without creating a new key. Use this when:
+This outputs the same QR code, subscription URL, and shareable page link — without creating a new key. Use this when:
 - You need to re-share the connection page with someone
-- You lost the original QR code or HTML file
+- You lost the original QR code or URL
 - You want to verify what a client's connection looks like
 
 ## List clients

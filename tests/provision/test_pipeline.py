@@ -1,11 +1,9 @@
 """Tests for build_setup_steps() pipeline assembly.
 
-4.0: Updated for Remnawave panel/node architecture (replaces 3x-ui).
+Uses the Remnawave panel/node architecture.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 
@@ -28,7 +26,7 @@ def step_names(ctx: ProvisionContext) -> list[str]:
 
 
 @pytest.fixture
-def base_ctx(tmp_path: Path) -> ProvisionContext:
+def base_ctx() -> ProvisionContext:
     """Minimal context: no domain, no hosted page, harden off, xhttp off."""
     return ProvisionContext(
         ip="198.51.100.1",
@@ -36,12 +34,11 @@ def base_ctx(tmp_path: Path) -> ProvisionContext:
         xhttp_enabled=False,
         hosted_page=False,
         domain="",
-        creds_dir=str(tmp_path / "creds"),
     )
 
 
 @pytest.fixture
-def domain_ctx(tmp_path: Path) -> ProvisionContext:
+def domain_ctx() -> ProvisionContext:
     """Context with domain mode enabled and all features on."""
     return ProvisionContext(
         ip="198.51.100.1",
@@ -49,7 +46,6 @@ def domain_ctx(tmp_path: Path) -> ProvisionContext:
         harden=True,
         xhttp_enabled=True,
         hosted_page=False,
-        creds_dir=str(tmp_path / "creds"),
     )
 
 
@@ -61,10 +57,10 @@ def domain_ctx(tmp_path: Path) -> ProvisionContext:
 class TestMinimalPipeline:
     def test_minimal_step_count(self, base_ctx: ProvisionContext):
         """Minimal config: disk check, packages, auto-upgrades, timezone, BBR,
-        ensure port 443, docker, legacy cleanup, remnawave panel = 9 steps (no nginx without hosted_page)."""
+        ensure port 443, docker, remnawave panel = 8 steps (no nginx without hosted_page)."""
         steps = build_setup_steps(base_ctx)
         names = [s.name for s in steps]
-        assert len(steps) == 9, f"Expected 9 minimal steps, got {len(steps)}: {names}"
+        assert len(steps) == 8, f"Expected 8 minimal steps, got {len(steps)}: {names}"
 
     def test_no_services_without_domain_or_hosted_page(self, base_ctx: ProvisionContext):
         names = step_names(base_ctx)
@@ -155,14 +151,13 @@ class TestHostedPage:
 
 
 class TestDomainMode:
-    def test_domain_mode_adds_services(self, tmp_path: Path):
+    def test_domain_mode_adds_services(self):
         ctx = ProvisionContext(
             ip="198.51.100.1",
             domain="example.com",
             harden=False,
             xhttp_enabled=False,
             hosted_page=False,
-            creds_dir=str(tmp_path / "creds"),
         )
         names = step_names(ctx)
         assert "Install nginx" in names

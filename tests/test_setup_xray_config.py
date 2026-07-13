@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from meridian.core.errors import MeridianError
-from meridian.xray_config import XrayConfigResult, build_xray_config
+from meridian.xray_config import XrayConfigResult, build_xray_config, derive_reality_public_key
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -268,6 +268,27 @@ class TestBuildXrayConfigKeyReuse:
         assert result.reality_public_key == "GENERATED_PUB"
         assert result.reality_private_key == "GENERATED_PRIV"
         assert len(result.reality_short_id) == 8  # secrets.token_hex(4)
+
+    def test_derives_public_key_from_existing_private_key(self) -> None:
+        conn = _make_keygen_conn()
+
+        public_key = derive_reality_public_key(conn, _EXISTING_PRIVATE)
+
+        assert public_key == "GENERATED_PUB"
+        conn.run.assert_called_once_with(
+            f"docker exec remnawave-node rw-core x25519 -i {_EXISTING_PRIVATE} 2>/dev/null",
+            timeout=15,
+            sensitive=True,
+        )
+
+    def test_public_key_derivation_falls_back_to_host_xray(self) -> None:
+        conn = MagicMock()
+        unavailable = MagicMock(returncode=1, stdout="")
+        derived = MagicMock(returncode=0, stdout="Private key: EXISTING\nPassword: DERIVED_PUB\n")
+        conn.run.side_effect = [unavailable, derived]
+
+        assert derive_reality_public_key(conn, _EXISTING_PRIVATE) == "DERIVED_PUB"
+        assert conn.run.call_count == 2
 
     def test_fails_without_conn_when_keys_missing(self) -> None:
         with pytest.raises(MeridianError, match="without SSH connection"):

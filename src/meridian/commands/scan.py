@@ -5,12 +5,8 @@ from __future__ import annotations
 import shlex
 
 from meridian.cluster import ClusterConfig
-from meridian.commands.resolve import (
-    ensure_server_connection,
-    fetch_credentials,
-    resolve_server,
-)
-from meridian.config import SERVERS_FILE
+from meridian.commands.resolve import ensure_server_connection, resolve_server
+from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import err_console, info, line, ok, prompt, warn
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
@@ -155,11 +151,10 @@ def run(
     requested_server: str = "",
 ) -> None:
     """Download RealiTLScanner, scan the server's subnet, and let user pick an SNI target."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
 
     resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
 
     err_console.print()
     err_console.print("  [bold]SNI Scanner[/bold]")

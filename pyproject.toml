@@ -39,8 +39,8 @@ meridian = "meridian.cli:app"
 
 [project.urls]
 Homepage = "https://getmeridian.org"
-Repository = "https://github.com/uburuntu/meridian"
-Issues = "https://github.com/uburuntu/meridian/issues"
+Repository = "https://github.com/getmeridian/meridian"
+Issues = "https://github.com/getmeridian/meridian/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "ruff>=0.4", "mypy>=1.0", "types-PyYAML>=6.0"]
@@ -62,16 +62,13 @@ packages = ["src/meridian"]
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/.github",
-    "/docs",
     "/website",
     "/tests",
     "/dist",
     "*.tar",
     "*.tar.gz",
-    "/docker-compose.test.yml",
     "/context7.json",
     "/Makefile",
-    "/BACKLOG.md",
     "/CODE_OF_CONDUCT.md",
     "/CONTRIBUTING.md",
     "/SECURITY.md",

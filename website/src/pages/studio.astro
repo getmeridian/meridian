@@ -149,7 +149,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
             <p>Studio fills the technical fields from the command. Give the server a friendly title so you can recognize it later.</p>
           </div>
 
-          <div class="studio__recommended-path studio__field-grid--server">
+          <div class="studio__recommended-path">
             <label class="studio__field studio__field--wide" for="server-ssh-command">
               <span>Paste SSH command <StudioHelp helpKey="sshCommandPaste" text={studioHelp.sshCommandPaste} /></span>
               <input id="server-ssh-command" type="text" autocomplete="off" placeholder="ssh ubuntu@198.51.100.10 -p 2222" />
@@ -630,7 +630,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
   let pollTimer = 0;
   let latestPlan = null;
   let latestPlanSource = '';
-  let lastDeployResult = null;
   let lastFailure = null;
   let lastTerminalOperationId = '';
   let commandSheetReturnFocus = null;
@@ -979,11 +978,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
     container.replaceChildren(strong, span);
   }
 
-  function hideStatus(container) {
-    container.hidden = true;
-    container.replaceChildren();
-  }
-
   function renderValidationFacts(result) {
     if (!result) {
       els.validationFacts.hidden = true;
@@ -1215,7 +1209,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
   }
 
   function renderDeploySuccess(result, options = {}) {
-    lastDeployResult = result;
     lastFailure = null;
     els.result.dataset.status = options.afterCancel ? 'warning' : 'ok';
     const title = document.createElement('strong');
@@ -1410,7 +1403,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
   async function startDeploy() {
     const request = deployRequest(true);
     journey.confirmDeploy = true;
-    lastDeployResult = null;
     lastFailure = null;
     lastTerminalOperationId = '';
     resetTerminalPanels();
@@ -2705,12 +2697,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
     color: var(--t1);
   }
 
-  .studio__secondary--small {
-    font-size: 0.8rem;
-    min-height: 34px;
-    padding: 6px 10px;
-  }
-
   .studio__ghost {
     background: transparent;
     color: var(--t1);
@@ -2775,30 +2761,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color');
 
   .studio__context-row h2 {
     margin: 0;
-  }
-
-  .studio__context-block--live {
-    background: var(--ok2);
-    border-color: color-mix(in srgb, var(--ok), transparent 72%);
-    border-left: 3px solid var(--ok);
-  }
-
-  .studio__context-block--live[data-tone="running"] {
-    background: var(--ac2);
-    border-color: color-mix(in srgb, var(--ac), transparent 68%);
-    border-left-color: var(--studio-accent-bg);
-  }
-
-  .studio__context-block--live[data-tone="warning"] {
-    background: var(--warn2);
-    border-color: color-mix(in srgb, var(--warn), transparent 68%);
-    border-left-color: var(--warn);
-  }
-
-  .studio__context-block--live[data-tone="error"] {
-    background: var(--err2);
-    border-color: color-mix(in srgb, var(--err), transparent 70%);
-    border-left-color: var(--err);
   }
 
   .studio__context-block--quiet {

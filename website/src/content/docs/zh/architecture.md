@@ -8,6 +8,7 @@ section: reference
 ## 技术栈
 
 - **VLESS+Reality**（Xray-core）— 伪装成合法 TLS 网站的代理协议。审查者探测服务器时会看到真实证书（例如来自 microsoft.com）。只有拥有正确私钥的客户端才能连接。
+- **Hysteria2**（Xray-core）— 面向高丢包或高延迟网络的 UDP/443 回退传输。订阅排序仍优先使用 TCP 传输。
 - **Remnawave** — Xray 现代面板堆栈，部署为单独的 `remnawave/backend`、`remnawave/node` 和 `remnawave/subscription-page` Docker 容器。后端公开 REST API（通过官方 `remnawave` Python SDK 管理）；节点在 `network_mode: host` 中运行 Xray；subscription-page 提供按用户配置 URL。
 - **nginx** — 单进程 Web 服务器，同时处理 SNI 路由和 TLS。stream 模块监听端口 443 并根据 SNI 主机名路由流量，无需终止 TLS。http 模块在端口 8443 终止 TLS，提供连接页面、反向代理 Remnawave 管理 UI + subscription page，以及代理 XHTTP/WSS 流量到 Xray。证书由[acme.sh](https://github.com/acmesh-official/acme.sh)管理（Let's Encrypt）。
 - **Docker** — 运行 Remnawave 后端 + PostgreSQL + Valkey（面板主机），Remnawave 节点（每个出口节点），以及 Remnawave subscription-page（面板主机，可选）。
@@ -52,7 +53,7 @@ flowchart TD
     Internet -.->|"CDN (Cloudflare)"| NginxHTTP
 ```
 
-域名模式添加 VLESS+WSS 作为 CDN 回退路径。流量通过 Cloudflare 的 CDN 经由 WebSocket 流动，即使服务器 IP 被阻断也能工作。
+域名模式添加 VLESS+WSS 作为旧版 CDN 回退路径。WSS 为兼容现有 Cloudflare CDN 部署而保留；新部署应优先使用 XHTTP 作为次要传输方式。流量通过 Cloudflare 的 CDN 经由 WebSocket 流动，即使服务器 IP 被阻断也能工作。
 
 ### 中继拓扑
 
@@ -126,7 +127,7 @@ Reality x25519 密钥对不从面板获取 — Meridian 在节点上使用 xray 
 
 ## nginx 配置模式
 
-Meridian 写入 `/etc/nginx/conf.d/meridian-stream.conf` 和 `/etc/nginx/conf.d/meridian-http.conf`（从不修改主 `nginx.conf`）。这允许 Meridian 与用户自己的 nginx 配置共存。
+Meridian 将 stream 路由写入 `/etc/nginx/stream.d/meridian.conf`，将 HTTP 路由写入 `/etc/nginx/conf.d/meridian-http.conf`。如有需要，它会在主 `nginx.conf` 中追加一个 `stream` include 块。
 
 nginx 处理：
 - 端口 443 上的 SNI 路由（stream 模块，不终止 TLS）
@@ -141,7 +142,8 @@ nginx 处理：
 
 | 端口 | 服务 | 范围 |
 |------|---------|-------|
-| 443 | nginx stream（SNI 路由器） | 公开 |
+| 443/TCP | nginx stream（SNI 路由器） | 公开 |
+| 443/UDP | Xray Hysteria2 回退 | 公开 |
 | 80 | nginx（ACME 挑战） | 公开 |
 | 8443 | nginx http（内部终点） | 内部 |
 | 3000 | Remnawave 后端（管理 UI + API） | localhost |
@@ -152,7 +154,7 @@ nginx 处理：
 | 30000-39999 | Xray XHTTP（每个节点确定性） | host network |
 | 5432 | PostgreSQL（Remnawave 数据库） | 内部 Docker 网络 |
 
-XHTTP、WSS 和 Reality 端口在节点主机上被打开在 host network 上，因为节点容器使用 `network_mode: host`。Meridian 的 UFW 配置文件将它们从公开互联网阻止；nginx 根据需要反向代理。
+XHTTP、WSS 和 Reality 后端端口使用 host network，但 UFW 阻止公网访问。Hysteria2 直接监听公网 UDP/443，nginx 处理公网 TCP/443。
 
 ## 配置管道
 
@@ -169,13 +171,12 @@ XHTTP、WSS 和 Reality 端口在节点主机上被打开在 host network 上，
 | 7 | ConfigureBBR | `common.py` | TCP 拥塞控制 |
 | 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443（加固时） |
 | 9 | InstallDocker | `docker.py` | Docker CE |
-| 10 | CleanupLegacyPanel | `legacy_cleanup.py` | 从 v3 升级时删除旧 3x-ui |
-| 11 | DeployRemnawavePanel | `remnawave_panel.py` | 后端 + PostgreSQL + Valkey + subscription-page |
-| 12 | InstallWarp | `warp.py` | Cloudflare WARP（可选） |
-| 13 | InstallNginx | `nginx.py` | SNI 路由 + TLS + 反向代理 |
-| 14 | ConfigureNginx | `nginx.py` + `nginx_render.py` | IP 或域名模式的 nginx 配置 |
-| 15 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
-| 16 | DeployPWAAssets | `services.py` | PWA 连接页资产 |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | 后端 + PostgreSQL + Valkey + subscription-page |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP（可选） |
+| 12 | InstallNginx | `nginx.py` | SNI 路由 + TLS + 反向代理 |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | IP 或域名模式的 nginx 配置 |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | PWA 连接页资产 |
 
 在配置管道之后，`panel_bootstrap.py` 中的 `configure_panel_and_node` 使用 Remnawave REST API 注册入站、创建节点容器、分配主机并创建默认客户端。节点容器部署、主机创建和入站缓存帮助者位于 `node_deploy.py`。节点容器不属于 SSH 管道的一部分，因为它需要面板颁发的秘密密钥。
 
@@ -190,7 +191,7 @@ XHTTP、WSS 和 Reality 端口在节点主机上被打开在 host network 上，
 3. **应用**：面板 + 节点容器启动，通过 REST API 创建入站和主机
 4. **同步**：Remnawave 面板数据库（Postgres）和 `cluster.yml` 都保有规范状态；漂移由 `meridian plan` 报告
 5. **重新运行**：Reality 密钥和客户端 UUID 在重新部署中保留（当存在时面板拒绝重新生成）
-6. **恢复**：`meridian fleet recover <IP>` 在本地副本丢失时从实时面板 API 重建 `cluster.yml`
+6. **恢复**：`meridian fleet recover --panel-url URL --api-token TOKEN` 在本地副本丢失时从实时面板 API 重建 `cluster.yml`
 7. **卸载**：`meridian teardown <IP>` 停止并删除所有 Remnawave 容器、nginx 配置和本地 `cluster.yml` 面板条目（可选整个文件）
 
 ## 文件位置
@@ -198,7 +199,7 @@ XHTTP、WSS 和 Reality 端口在节点主机上被打开在 host network 上，
 ### 在面板主机上
 - `/opt/remnawave/` — 面板 compose 文件 + `.env` + subscription 页 `.env`
 - `/opt/remnawave/data/` — PostgreSQL 数据卷
-- `/etc/nginx/conf.d/meridian-stream.conf` — nginx stream 配置（SNI 路由）
+- `/etc/nginx/stream.d/meridian.conf` — nginx stream 配置（SNI 路由）
 - `/etc/nginx/conf.d/meridian-http.conf` — nginx http 配置（TLS、反向代理）
 - `/etc/ssl/meridian/` — TLS 证书（由 acme.sh 管理）
 
@@ -210,5 +211,3 @@ XHTTP、WSS 和 Reality 端口在节点主机上被打开在 host network 上，
 - `~/.meridian/cluster.yml.bak` — 破坏性操作之前的自动备份
 - `~/.meridian/cache/` — 更新检查限流缓存
 - `~/.local/bin/meridian` — CLI 入口点（通过 uv/pipx 安装）
-
-遗留文件（`~/.meridian/credentials/`、`~/.meridian/servers`）仅从 Meridian 3.x 升级迁移时持久化。

@@ -15,12 +15,7 @@ import typer
 from meridian.cluster import RelayEntry
 from meridian.commands._helpers import load_cluster, make_panel
 from meridian.commands._validation import validate_command_input
-from meridian.config import (
-    CREDS_BASE,
-    RELAY_SERVICE_NAME,
-    SERVERS_FILE,
-    sanitize_ip_for_path,
-)
+from meridian.config import RELAY_SERVICE_NAME
 from meridian.console import confirm, err_console, fail, info, line, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.models import Summary
@@ -30,12 +25,9 @@ from meridian.relay_ops import (
     delete_relay_hosts,
     deploy_relay_nginx,
     find_exit_node,
-    relay_registry_user,
     remove_relay_nginx,
-    save_relay_local,
 )
 from meridian.remnawave import RemnawaveError
-from meridian.servers import SERVER_ROLE_RELAY, ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
 
@@ -65,7 +57,6 @@ def run_deploy(
     )
 
     cluster = load_cluster()
-    registry = ServerRegistry(SERVERS_FILE)
     try:
         exit_ip = find_exit_node(cluster, request.exit_arg)
     except ValueError as exc:
@@ -105,7 +96,7 @@ def run_deploy(
     try:
         relay_conn.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.hint_type)
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
 
     ok("SSH OK")
 
@@ -262,17 +253,6 @@ def run_deploy(
     cluster.backup()
     cluster.relays.append(relay_entry)
     cluster.save()
-    save_relay_local(request.relay_ip, exit_ip, 443, request.listen_port)
-    if request.relay_ip != exit_ip:
-        registry.add(
-            ServerEntry(
-                host=request.relay_ip,
-                user=request.user,
-                name=request.relay_name,
-                role=SERVER_ROLE_RELAY,
-                port=request.ssh_port,
-            )
-        )
 
     # Hybrid sync — mirror the relay into desired_relays when the user manages
     # relays declaratively. Use the exit node's name when available so the
@@ -436,7 +416,6 @@ def run_remove(
     )
 
     cluster = load_cluster()
-    registry = ServerRegistry(SERVERS_FILE)
 
     # Find relay entry
     relay_entry = cluster.find_relay(request.relay_ip)
@@ -460,7 +439,7 @@ def run_remove(
         if not confirm(f"Remove relay {relay_label} from exit {relay_entry.exit_node_ip}?"):
             raise typer.Exit(1)
 
-    relay_user = relay_registry_user(registry, request.relay_ip, request.user)
+    relay_user = request.user or relay_entry.ssh_user or "root"
 
     # Delete Remnawave hosts
     with make_panel(cluster) as panel:
@@ -500,11 +479,6 @@ def run_remove(
 
     hybrid_sync_desired_relays_remove(cluster, request.relay_ip)
 
-    relay_file = CREDS_BASE / sanitize_ip_for_path(request.relay_ip) / "relay.yml"
-    if relay_file.exists():
-        relay_file.unlink()
-    if request.relay_ip != relay_entry.exit_node_ip:
-        registry.remove(request.relay_ip)
     ok(f"Relay {request.relay_ip} removed")
     err_console.print()
 
@@ -524,7 +498,6 @@ def run_check(
     )
 
     cluster = load_cluster()
-    registry = ServerRegistry(SERVERS_FILE)
 
     relay_entry = cluster.find_relay(request.relay_ip)
     if relay_entry is None:
@@ -533,7 +506,7 @@ def run_check(
     info(f"Checking relay: {relay_entry.name or request.relay_ip} -> exit: {relay_entry.exit_node_ip}")
     err_console.print()
     all_ok = True
-    relay_user = relay_registry_user(registry, request.relay_ip, request.user)
+    relay_user = request.user or relay_entry.ssh_user or "root"
 
     # 1. SSH connectivity to relay
     try:
@@ -563,7 +536,7 @@ def run_check(
         all_ok = False
 
     # 4. Local -> relay TCP connectivity
-    from meridian.ssh import tcp_connect
+    from meridian.health import tcp_connect
 
     if tcp_connect(request.relay_ip, relay_entry.port):
         ok(f"Local -> relay TCP: reachable ({request.relay_ip}:{relay_entry.port})")

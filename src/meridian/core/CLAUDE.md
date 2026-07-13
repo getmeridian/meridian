@@ -14,7 +14,7 @@
 - **Topology uses capabilities plus policy** - a server may be both relay and exit; routing rules decide where traffic exits.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
-- **Panel client protocol** — `core/panel.py` defines `PanelClient` Protocol. `MeridianPanel` in `remnawave.py` satisfies it. Services depend on the protocol, not the implementation. Narrow service-specific protocols (`FleetPanelClient`, `ClientPanelClient`) remain in `core/services/` for interface segregation.
+- **Panel interfaces are narrow** — services depend on service-specific protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave implementation.
 
 ## What's done well
 - No barrel re-exports in `__init__.py` — all consumers import from specific submodules, keeping the dependency graph explicit.

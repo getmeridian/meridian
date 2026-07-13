@@ -8,9 +8,7 @@ from pathlib import Path
 MERIDIAN_HOME = Path(os.environ.get("MERIDIAN_HOME", Path.home() / ".meridian"))
 CLUSTER_CONFIG = MERIDIAN_HOME / "cluster.yml"
 CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
-CREDS_BASE = MERIDIAN_HOME / "credentials"  # legacy (3.x migration only)
 CACHE_DIR = MERIDIAN_HOME / "cache"
-SERVERS_FILE = MERIDIAN_HOME / "servers"  # legacy (3.x migration only)
 SERVER_PROFILES_FILE = MERIDIAN_HOME / "servers.json"
 MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
 SERVER_CREDS_DIR = Path("/etc/meridian")
@@ -30,8 +28,6 @@ REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to 
 REMNAWAVE_PANEL_DIR = "/opt/remnawave"
 REMNAWAVE_NODE_DIR = "/opt/remnanode"
 
-# Legacy 3x-ui (kept for migration)
-DEFAULT_PANEL_PORT = 2053
 CONNECT_TEST_URL = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "https://ifconfig.me").strip() or "https://ifconfig.me"
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
@@ -42,9 +38,7 @@ DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip
 
 PYPI_PACKAGE = "meridian-vpn"
 PYPI_JSON_URL = f"https://pypi.org/pypi/{PYPI_PACKAGE}/json"
-GITHUB_REPO = "https://github.com/uburuntu/meridian"
-GITHUB_ISSUES = f"{GITHUB_REPO}/issues"
-WEBSITE_URL = "https://getmeridian.org"
+GITHUB_REPO = "https://github.com/getmeridian/meridian"
 
 # Update throttle (seconds)
 UPDATE_CHECK_INTERVAL = 60
@@ -72,14 +66,6 @@ XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
 }
 
 
-def is_ipv4(s: str) -> bool:
-    """Check if string looks like an IPv4 address."""
-    parts = s.split(".")
-    if len(parts) != 4:
-        return False
-    return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
-
-
 def is_ip(s: str) -> bool:
     """Check if string is a valid IPv4 or IPv6 address."""
     import ipaddress
@@ -89,25 +75,3 @@ def is_ip(s: str) -> bool:
         return True
     except ValueError:
         return False
-
-
-def sanitize_ip_for_path(ip: str) -> str:
-    """Convert an IP address to a filesystem-safe directory name.
-
-    IPv4 addresses are returned unchanged (backward compatible).
-    IPv6 colons are replaced with hyphens: 2001:db8::1 -> 2001-db8--1
-    """
-    if ":" in ip:
-        return ip.replace(":", "-")
-    return ip
-
-
-def creds_dir_for(ip: str, *, local_mode: bool) -> Path:
-    """Determine the local credential directory for a server.
-
-    Root in local mode reads/writes /etc/meridian directly.
-    Everything else uses ~/.meridian/credentials/<ip>.
-    """
-    if local_mode and os.geteuid() == 0:
-        return SERVER_CREDS_DIR
-    return CREDS_BASE / sanitize_ip_for_path(ip)

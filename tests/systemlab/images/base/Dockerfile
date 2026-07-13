@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     curl wget openssl ca-certificates \
     python3 python3-pip python3-venv \
     iproute2 iptables nftables netcat-openbsd \
-    qrencode dnsutils jq unzip socat \
+    dnsutils jq unzip socat \
     ufw cron fail2ban unattended-upgrades apt-listchanges \
     apt-transport-https gnupg software-properties-common \
     procps psmisc less vim-tiny

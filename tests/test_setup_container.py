@@ -4,7 +4,7 @@ Covers:
 - _deploy_node_container: dir creation, file writes, docker pull retries,
   health gate polling, UFW rule, and failure modes
 - _check_ports: free ports, allowed Meridian processes, conflict handling
-- _wait_for_panel_api: immediate success, retry success, timeout, exceptions
+- check_panel_api_ready: immediate success, retry success, timeout, exceptions
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ import pytest
 import typer
 
 from meridian.commands.setup import _check_ports
+from meridian.node_deploy import check_panel_api_ready
 from meridian.panel_bootstrap import deploy_node_container as _deploy_node_container
-from meridian.panel_bootstrap import wait_for_panel_api as _wait_for_panel_api
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -491,11 +491,11 @@ class TestCheckPortsConflict:
 
 
 # ---------------------------------------------------------------------------
-# _wait_for_panel_api
+# check_panel_api_ready
 # ---------------------------------------------------------------------------
 
 
-class TestWaitForPanelApi:
+class TestCheckPanelApiReady:
     """Polling httpx.get for panel readiness via poll_until_ready."""
 
     @patch("meridian.health.time.sleep")
@@ -507,7 +507,7 @@ class TestWaitForPanelApi:
         resp = MagicMock()
         resp.status_code = 200
         mock_get.return_value = resp
-        assert _wait_for_panel_api("https://198.51.100.2") is True
+        assert check_panel_api_ready("https://198.51.100.2") is True
         mock_get.assert_called_once()
         mock_sleep.assert_not_called()
 
@@ -520,7 +520,7 @@ class TestWaitForPanelApi:
         resp = MagicMock()
         resp.status_code = 405
         mock_get.return_value = resp
-        assert _wait_for_panel_api("https://198.51.100.2") is True
+        assert check_panel_api_ready("https://198.51.100.2") is True
 
     @patch("meridian.health.time.sleep")
     @patch("meridian.health.time.monotonic")
@@ -534,7 +534,7 @@ class TestWaitForPanelApi:
         resp_200 = MagicMock()
         resp_200.status_code = 200
         mock_get.side_effect = [resp_500, resp_200]
-        assert _wait_for_panel_api("https://198.51.100.2", retries=3) is True
+        assert check_panel_api_ready("https://198.51.100.2", retries=3) is True
         assert mock_get.call_count == 2
 
     @patch("meridian.health.time.sleep")
@@ -550,7 +550,7 @@ class TestWaitForPanelApi:
         resp = MagicMock()
         resp.status_code = 500
         mock_get.return_value = resp
-        assert _wait_for_panel_api("https://198.51.100.2", retries=3) is False
+        assert check_panel_api_ready("https://198.51.100.2", retries=3) is False
         assert mock_get.call_count == 3
 
     @patch("meridian.health.time.sleep")
@@ -564,7 +564,7 @@ class TestWaitForPanelApi:
         resp_ok = MagicMock()
         resp_ok.status_code = 200
         mock_get.side_effect = [httpx.ConnectError("refused"), resp_ok]
-        assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
+        assert check_panel_api_ready("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
     @patch("meridian.health.time.sleep")
@@ -578,7 +578,7 @@ class TestWaitForPanelApi:
         resp_ok = MagicMock()
         resp_ok.status_code = 200
         mock_get.side_effect = [httpx.TimeoutException("timed out"), resp_ok]
-        assert _wait_for_panel_api("https://198.51.100.2", retries=5) is True
+        assert check_panel_api_ready("https://198.51.100.2", retries=5) is True
         assert mock_get.call_count == 2
 
     @patch("meridian.health.time.sleep")
@@ -595,7 +595,7 @@ class TestWaitForPanelApi:
             httpx.ConnectError("refused"),
             httpx.ConnectError("refused"),
         ]
-        result = _wait_for_panel_api("https://198.51.100.2", retries=3, delay=5.0)
+        result = check_panel_api_ready("https://198.51.100.2", retries=3, delay=5.0)
         assert result is False
         assert mock_sleep.call_count >= 2
 
@@ -610,7 +610,7 @@ class TestWaitForPanelApi:
         resp = MagicMock()
         resp.status_code = 200
         mock_get.return_value = resp
-        _wait_for_panel_api("https://198.51.100.3")
+        check_panel_api_ready("https://198.51.100.3")
         mock_get.assert_called_once_with(
             "https://198.51.100.3/api/auth/login",
             timeout=10,
@@ -639,7 +639,7 @@ class TestRenderNodeCompose:
         NET_ADMIN those syscalls fail with EPERM and the panel UI silently
         reports nothing.
         """
-        from meridian.provision.remnawave_node import render_node_compose
+        from meridian.node_deploy import render_node_compose
 
         content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
 
@@ -650,13 +650,13 @@ class TestRenderNodeCompose:
         """`network_mode: host` is required so Xray can bind to arbitrary
         ports on the server (Reality, XHTTP, WSS). Losing it regresses core
         proxying."""
-        from meridian.provision.remnawave_node import render_node_compose
+        from meridian.node_deploy import render_node_compose
 
         content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
         assert "network_mode: host" in content
 
     def test_interpolates_image_tag(self) -> None:
-        from meridian.provision.remnawave_node import render_node_compose
+        from meridian.node_deploy import render_node_compose
 
         content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
         assert "image: remnawave/node:2.7.0" in content

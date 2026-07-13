@@ -52,24 +52,24 @@ meridian relay deploy RELAY_IP --exit EXIT_IP
 ### 包含所有选项的示例
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow --port 443 --user ubuntu
 ```
 
 ## 客户端如何连接
 
-部署中继节点后，所有现有的客户端连接页面都会**自动重新生成**。中继 URL 显示为推荐连接，直接 URL 作为备份。
+部署中继节点后，Meridian 会在 Remnawave 面板中创建中继主机条目。现有客户端下次刷新订阅时会自动获得中继 URL，直接 URL 则作为备用。
 
-添加新客户端时，中继 URL 会自动包含：
+添加新客户端时，其订阅也会自动包含中继 URL：
 
 ```bash
-meridian client add alice --server 1.2.3.4   # 包含中继 URL
+meridian client add alice   # 订阅中包含中继 URL
 ```
 
 ## 管理中继节点
 
 ```bash
 meridian relay list                    # 所有出口服务器上的所有中继节点
-meridian relay list --exit 1.2.3.4     # 特定出口的中继节点
+meridian relay list --exit 198.51.100.10     # 特定出口的中继节点
 meridian relay check RELAY_IP          # 4 点健康检查
 meridian relay remove RELAY_IP         # 停止服务 + 从配置中移除
 ```
@@ -91,15 +91,15 @@ meridian relay remove RELAY_IP         # 停止服务 + 从配置中移除
 meridian relay remove RELAY_IP [--exit EXIT_IP] [--yes]
 ```
 
-这会停止 Realm 服务、从出口服务器凭证中移除中继，并重新生成所有客户端连接页面（回到仅直接 URL）。
+这会停止 Realm 服务，删除 Remnawave 中的中继主机条目和出口服务器上的 nginx 中继配置，并从 `cluster.yml` 中移除中继。客户端下次刷新订阅后将不再看到该中继。
 
 ## 多个中继节点
 
 您可以将多个中继节点连接到一个出口服务器 — 例如，不同城市或 ISP 中的中继节点：
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 客户端在其连接页面上看到所有中继选项。

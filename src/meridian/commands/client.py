@@ -188,7 +188,7 @@ def _run_add(
                 # Deploy connection page files
                 if deploy_pages and _conn is not None and page_url and panel_node:
                     try:
-                        from meridian.panel_bootstrap import deploy_client_page
+                        from meridian.pwa import deploy_client_page
 
                         sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
                         deploy_client_page(_conn, cluster, panel_node, new_user.vless_uuid, name, sub_url)
@@ -279,7 +279,7 @@ def _run_show(
         fail(
             f"Could not show client: {e}",
             hint=e.hint or "Check panel connectivity",
-            hint_type=e.hint_type,
+            hint_type=e.category,
         )
 
     detail = result.client.client
@@ -337,7 +337,7 @@ def _run_list(
         fail(
             f"Could not list clients: {e}",
             hint=e.hint or "Check panel connectivity",
-            hint_type=e.hint_type,
+            hint_type=e.category,
         )
 
     if is_json_mode():
@@ -521,7 +521,7 @@ def _run_enable(
             fail(
                 f"Could not enable client '{name}': {e}",
                 hint=e.hint or "Check panel connectivity",
-                hint_type=e.hint_type,
+                hint_type=e.category,
             )
 
         if is_json_mode():
@@ -581,7 +581,7 @@ def _run_disable(
             fail(
                 f"Could not disable client '{name}': {e}",
                 hint=e.hint or "Check panel connectivity",
-                hint_type=e.hint_type,
+                hint_type=e.category,
             )
 
         if is_json_mode():

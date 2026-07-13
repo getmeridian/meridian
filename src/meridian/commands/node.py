@@ -54,7 +54,7 @@ def run_add(
         yes=yes,
     )
     from meridian.commands.resolve import ensure_server_connection, resolve_server
-    from meridian.config import DEFAULT_SNI, SERVERS_FILE
+    from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
     from meridian.core.errors import MeridianError
     from meridian.panel_bootstrap import run_provisioner, setup_new_node
     from meridian.servers import ServerRegistry
@@ -71,7 +71,7 @@ def run_add(
         )
 
     # Resolve and connect
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, explicit_ip=request.ip, user=request.user, port=request.ssh_port)
     ensure_server_connection(resolved)
 
@@ -302,7 +302,7 @@ def _run_list(*, operation: OperationContext) -> None:
             fail(
                 f"Could not query nodes: {e}",
                 hint=e.hint or "Check panel connectivity",
-                hint_type=e.hint_type,
+                hint_type=e.category,
             )
 
     # Index API nodes by UUID for quick lookup

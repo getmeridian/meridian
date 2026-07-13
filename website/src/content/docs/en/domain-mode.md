@@ -18,7 +18,7 @@ The WSS connection routes through Cloudflare's CDN, making it work even if your 
 ## Deploy with domain
 
 ```
-meridian deploy 1.2.3.4 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain proxy.example.com
 ```
 
 ## Cloudflare setup

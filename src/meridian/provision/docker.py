@@ -2,7 +2,7 @@
 
 InstallDocker is panel-agnostic — it installs Docker CE from the official
 repository. The panel/node container deployment is handled by
-remnawave_panel.py and remnawave_node.py respectively.
+remnawave_panel.py and node_deploy.py respectively.
 """
 
 from __future__ import annotations
@@ -13,9 +13,6 @@ from meridian.facts import ServerFacts
 from meridian.provision.ensure import ensure_service_running
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
-
-# Services allowed on port 443 (our own stack components)
-_PORT_443_ALLOWED = ("remnawave", "xray", "nginx", "haproxy", "caddy", "3x-ui")
 
 # Conflicting Docker packages to remove before installing docker-ce
 _CONFLICTING_PACKAGES = [

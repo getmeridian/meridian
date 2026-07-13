@@ -118,11 +118,17 @@ def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) 
         return False
 
 
-# Backward-compatible alias for tests
-wait_for_panel_api = check_panel_api_ready
-
-
 # Panel API helpers
+def inbound_protocol_key(tag: str) -> ProtocolKey | None:
+    """Map a Remnawave inbound tag to Meridian's stable protocol key."""
+    return {
+        "vless-reality": ProtocolKey.REALITY,
+        "vless-xhttp": ProtocolKey.XHTTP,
+        "vless-wss": ProtocolKey.WSS,
+        "hysteria2": ProtocolKey.HYSTERIA2,
+    }.get(tag)
+
+
 def select_default_squad_uuid(squads: list[dict[str, Any]]) -> str:
     """Select the Default-Squad UUID from a list of squads.
 
@@ -141,14 +147,8 @@ def cache_inbounds(panel: MeridianPanel, cluster: ClusterConfig) -> None:
     """Fetch inbound definitions from the panel and cache their UUIDs."""
     try:
         inbounds = panel.list_inbounds()
-        tag_map = {
-            "vless-reality": ProtocolKey.REALITY,
-            "vless-xhttp": ProtocolKey.XHTTP,
-            "vless-wss": ProtocolKey.WSS,
-            "hysteria2": ProtocolKey.HYSTERIA2,
-        }
         for ib in inbounds:
-            key = tag_map.get(ib.tag)
+            key = inbound_protocol_key(ib.tag)
             if key:
                 cluster.inbounds[str(key)] = InboundRef(uuid=ib.uuid, tag=ib.tag)
         logger.info("Cached %d inbound references", len(cluster.inbounds))
@@ -260,7 +260,7 @@ def create_hosts_for_node(
                 except RemnawaveError as e:
                     logger.warning("Could not create WSS host: %s", e)
 
-    # Hysteria2 host (UDP/443, experimental — only when node has hysteria2 enabled)
+    # Hysteria2 host (UDP/443 fallback, ordered after TCP transports)
     hy2_ref = cluster.get_inbound(ProtocolKey.HYSTERIA2)
     if hy2_ref and hy2_ref.uuid:
         remark = f"hysteria2-{node_ip}"
@@ -320,6 +320,49 @@ def enforce_host_ordering(panel: MeridianPanel) -> None:
         logger.warning("Could not reorder hosts: %s", e)
 
 
+def render_node_compose(image: str, node_api_port: int) -> str:
+    """Render the Remnawave node Compose configuration."""
+    return f"""\
+# Remnawave Node - Xray Proxy Node
+# Managed by Meridian. Manual edits will be overwritten on next run.
+services:
+  remnawave-node:
+    image: {image}
+    container_name: remnawave-node
+    restart: always
+    # Required for Remnawave node plugins and IP Control, which manage
+    # nftables rules in the host network namespace.
+    cap_add:
+      - NET_ADMIN
+    network_mode: host
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/var/log/remnawave
+      - /etc/ssl/meridian:/etc/ssl/meridian:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+"""
+
+
+def render_node_env(node_api_port: int, secret_key: str) -> str:
+    """Render the Remnawave node environment file."""
+    return f"""\
+# Remnawave Node environment
+# Managed by Meridian. Manual edits will be overwritten on next run.
+
+NODE_PORT={node_api_port}
+SECRET_KEY={secret_key}
+"""
+
+
 def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     """Deploy the Remnawave node container with the given secret key.
 
@@ -329,7 +372,6 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     """
     from meridian.config import REMNAWAVE_NODE_API_PORT, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
     from meridian.provision.containers import EnvFile, deploy_compose_stack
-    from meridian.provision.remnawave_node import render_node_compose, render_node_env
 
     node_dir = REMNAWAVE_NODE_DIR
 
@@ -377,7 +419,3 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
         )
 
     return node_healthy
-
-
-# Re-export deploy_client_page for backward compatibility (moved to pwa.py)
-from meridian.pwa import deploy_client_page  # noqa: F401, E402

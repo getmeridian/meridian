@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from meridian.core.deploy import DeployRequest
+from meridian.core.errors import EngineError
 from meridian.core.inputs import ServerReferenceValue
 from meridian.core.redaction import redact
 from meridian.core.schema import schema_catalog
@@ -26,7 +27,6 @@ from meridian.core.servers import (
 )
 from meridian.core.services import collect_workflow, workflow_catalog
 from meridian.engine.deploy import dry_run_deploy_request, resolve_deploy_target
-from meridian.engine.errors import EngineError
 from meridian.engine.operations import ActiveDeployOperationError, OperationManager
 from meridian.engine.servers import (
     bootstrap_server_key,
