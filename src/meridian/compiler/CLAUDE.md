@@ -6,6 +6,8 @@
 
 **Reviewed payloads** — every resource has a stable logical ID, sorted dependencies, typed postconditions, ownership marker, and SHA-256 payload hash. The plan hash covers the ordered graph.
 
+**Workload profiles are aggregate** — each exit Profile owns its complete typed Inbound set; derived Inbound resources expose the profile-scoped identities needed by bindings, Hosts, and squads.
+
 ## What's done well
 - Ports, tags, listener routes, and dependency order are deterministic.
 - TCP paths terminate through typed nginx artifacts; Hysteria2 stays direct UDP.
@@ -15,3 +17,4 @@
 - Never import SSH, HTTP, commands, console, config, Remnawave, or randomness here.
 - Do not put generated credentials or private Reality keys in a resource plan.
 - A Host is published only after its listener and node runtime dependencies.
+- One exit workload per server: a Remnawave node runtime can activate only one Profile.

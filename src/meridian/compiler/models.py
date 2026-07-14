@@ -50,14 +50,6 @@ class ControlPlaneRuntimePayload(CoreModel):
     public_hostname: str = ""
 
 
-class ConfigProfilePayload(CoreModel):
-    kind: Literal["config_profile"] = "config_profile"
-    workload_id: str
-    name: str
-    inbound_refs: list[str]
-    outbound_tags: list[str] = Field(default_factory=list)
-
-
 class InboundPayload(CoreModel):
     kind: Literal["inbound"] = "inbound"
     workload_ref: str
@@ -71,10 +63,20 @@ class InboundPayload(CoreModel):
     path: str = ""
 
 
+class ConfigProfilePayload(CoreModel):
+    kind: Literal["config_profile"] = "config_profile"
+    workload_id: str
+    name: str
+    inbound_refs: list[str]
+    inbounds: list[InboundPayload]
+    outbound_tags: list[str] = Field(default_factory=list)
+
+
 class NodeBindingPayload(CoreModel):
     kind: Literal["node_binding"] = "node_binding"
     workload_ref: str
     server_ref: str
+    name: str
     profile_ref: str
     inbound_refs: list[str]
 
@@ -85,19 +87,25 @@ class NodeRuntimePayload(CoreModel):
     server_ref: str
     binding_ref: str
     api_port: int = 3010
+    warp: bool = False
 
 
 class HostPayload(CoreModel):
     kind: Literal["host"] = "host"
     owner_ref: str
+    remark: str
     node_ref: str
     inbound_ref: str
     address_server_ref: str
+    address: str = ""
     public_port: int
     protocol: ProtocolKind
     sni: str = ""
     host: str = ""
     path: str = ""
+    alpn: str = ""
+    fingerprint: str = ""
+    security_layer: Literal["DEFAULT", "TLS", "NONE", "REALITY"] = "DEFAULT"
     advertised: bool = True
 
 

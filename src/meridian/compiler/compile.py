@@ -8,6 +8,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from meridian.compiler.allocations import PortAllocator
+from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import (
     AccessUserPayload,
     CertificatePayload,
@@ -37,11 +39,7 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
-from meridian.core.topology import ExitIntent, ProtocolKind, ProtocolPathIntent, SetupIntent
-
-
-class TopologyCompileError(ValueError):
-    """User intent cannot be represented by Meridian's finite V4 resources."""
+from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
 
 
 @dataclass
@@ -87,49 +85,10 @@ class _PlanBuilder:
         return emitted
 
 
-@dataclass
-class _PortAllocator:
-    used: dict[tuple[str, str], set[int]] = field(default_factory=lambda: defaultdict(set))
-
-    def path_port(self, exit_: ExitIntent, path: ProtocolPathIntent) -> int:
-        transport = "udp" if path.protocol == "hysteria2" else "tcp"
-        key = (exit_.server_ref, transport)
-        if path.listen_port:
-            return self._reserve(key, path.listen_port, f"{exit_.id}/{path.id}")
-        if path.protocol == "hysteria2":
-            return self._reserve(key, path.public_port, f"{exit_.id}/{path.id}")
-        ranges: dict[ProtocolKind, tuple[int, int]] = {
-            "reality": (10000, 1999),
-            "wss": (20000, 9999),
-            "xhttp": (30000, 9999),
-            "hysteria2": (443, 1),
-        }
-        base, size = ranges[path.protocol]
-        return self._allocate(key, f"path:{exit_.id}:{path.id}", base, size)
-
-    def auxiliary_tcp(self, server_ref: str, identity: str, *, base: int, size: int) -> int:
-        return self._allocate((server_ref, "tcp"), identity, base, size)
-
-    def _allocate(self, key: tuple[str, str], identity: str, base: int, size: int) -> int:
-        offset = int(hashlib.sha256(identity.encode("utf-8")).hexdigest()[:8], 16) % size
-        for increment in range(size):
-            candidate = base + ((offset + increment) % size)
-            if candidate not in self.used[key]:
-                self.used[key].add(candidate)
-                return candidate
-        raise TopologyCompileError(f"No free deterministic ports remain for {key[0]} {key[1]}.")
-
-    def _reserve(self, key: tuple[str, str], port: int, owner: str) -> int:
-        if port in self.used[key]:
-            raise TopologyCompileError(f"{key[0]} has conflicting {key[1]} listener port {port} at {owner}.")
-        self.used[key].add(port)
-        return port
-
-
 def compile_topology(intent: SetupIntent) -> ResourcePlan:
     """Compile complete setup intent without network, filesystem, or randomness."""
     builder = _PlanBuilder()
-    ports = _PortAllocator()
+    ports = PortAllocator()
     control_id = builder.add(
         "control:runtime",
         ControlPlaneRuntimePayload(
@@ -152,26 +111,28 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
     direct_host_ids: list[str] = []
 
+    exit_servers = [exit_.server_ref for exit_ in intent.exits]
+    if len(exit_servers) != len(set(exit_servers)):
+        raise TopologyCompileError(
+            "Each V4 exit workload requires its own server because one Remnawave node runtime "
+            "can activate only one config profile."
+        )
+
     for exit_ in sorted(intent.exits, key=lambda item: item.id):
         profile_id = f"profile:{exit_.id}"
-        path_refs = [f"inbound:{exit_.id}:{path.id}" for path in sorted(exit_.paths, key=lambda item: item.id)]
-        builder.add(
-            profile_id,
-            ConfigProfilePayload(
-                workload_id=exit_.id,
-                name=f"Meridian {exit_.id}",
-                inbound_refs=path_refs,
-                outbound_tags=["warp"] if exit_.warp else ["direct"],
-            ),
-            dependencies=[control_id],
-        )
-        for path in sorted(exit_.paths, key=lambda item: item.id):
+        sorted_paths = sorted(exit_.paths, key=lambda item: item.id)
+        path_refs = [f"inbound:{exit_.id}:{path.id}" for path in sorted_paths]
+        inbound_specs: list[InboundPayload] = []
+        for path in sorted_paths:
+            if path.protocol == "hysteria2" and path.listen_port and path.listen_port != path.public_port:
+                raise TopologyCompileError(
+                    f"Hysteria2 path {exit_.id}/{path.id} must listen on its public UDP port."
+                )
             inbound_id = f"inbound:{exit_.id}:{path.id}"
             listen_port = ports.path_port(exit_, path)
             allocated_path_ports[(exit_.id, path.id)] = listen_port
             inbound_by_path[(exit_.id, path.id)] = inbound_id
-            builder.add(
-                inbound_id,
+            inbound_specs.append(
                 InboundPayload(
                     workload_ref=exit_.id,
                     protocol=path.protocol,
@@ -182,12 +143,25 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
                     tls_sni=path.tls_sni,
                     host=path.host,
                     path=path.path,
-                ),
+                )
+            )
+        builder.add(
+            profile_id,
+            ConfigProfilePayload(
+                workload_id=exit_.id,
+                name=f"Meridian v4 / {exit_.id}",
+                inbound_refs=path_refs,
+                inbounds=inbound_specs,
+                outbound_tags=["warp"] if exit_.warp else ["direct"],
+            ),
+            dependencies=[control_id],
+        )
+        for path, inbound_spec in zip(sorted_paths, inbound_specs, strict=True):
+            inbound_id = f"inbound:{exit_.id}:{path.id}"
+            builder.add(
+                inbound_id,
+                inbound_spec,
                 dependencies=[profile_id],
-                postconditions=[
-                    _exists(inbound_id),
-                    ResourcePostcondition(kind="listening", target_ref=inbound_id, detail=str(listen_port)),
-                ],
             )
 
         binding_id = builder.add(
@@ -195,14 +169,11 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             NodeBindingPayload(
                 workload_ref=exit_.id,
                 server_ref=exit_.server_ref,
+                name=f"Meridian v4 / {exit_.id}",
                 profile_ref=profile_id,
                 inbound_refs=path_refs,
             ),
             dependencies=[profile_id, *path_refs],
-            postconditions=[
-                _exists(f"binding:{exit_.id}"),
-                ResourcePostcondition(kind="connected", target_ref=f"binding:{exit_.id}"),
-            ],
         )
         runtime_id = builder.add(
             f"node:{exit_.id}",
@@ -210,6 +181,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
                 workload_ref=exit_.id,
                 server_ref=exit_.server_ref,
                 binding_ref=binding_id,
+                warp=exit_.warp,
             ),
             dependencies=[binding_id],
             postconditions=[
@@ -222,6 +194,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             workload_ref=exit_.id,
             server_ref=exit_.server_ref,
             binding_ref=binding_id,
+            warp=exit_.warp,
         ).api_port
         _add_firewall(
             builder,
@@ -309,7 +282,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
 def _compile_exit_endpoints(
     *,
     builder: _PlanBuilder,
-    ports: _PortAllocator,
+    ports: PortAllocator,
     exit_: ExitIntent,
     runtime_id: str,
     inbound_by_path: dict[tuple[str, str], str],
@@ -320,11 +293,20 @@ def _compile_exit_endpoints(
     direct_host_ids: list[str],
 ) -> None:
     tls_groups: dict[tuple[str, int], list[ProtocolPathIntent]] = defaultdict(list)
+    direct_dependencies: dict[str, list[str]] = defaultdict(list)
     for path in sorted(exit_.paths, key=lambda item: item.id):
         inbound_id = inbound_by_path[(exit_.id, path.id)]
         backend_port = allocated_path_ports[(exit_.id, path.id)]
         if path.protocol == "hysteria2":
-            _add_firewall(builder, exit_.server_ref, "udp", path.public_port)
+            firewall_id = _add_firewall(builder, exit_.server_ref, "udp", path.public_port)
+            certificate_id = _ensure_certificate(
+                builder,
+                exit_id=exit_.id,
+                server_ref=exit_.server_ref,
+                hostname=path.tls_sni,
+                runtime_id=runtime_id,
+            )
+            direct_dependencies[path.id].extend([certificate_id, firewall_id])
         elif path.protocol == "reality":
             stream_key = (exit_.server_ref, path.public_port)
             _reserve_stream_name(
@@ -349,10 +331,12 @@ def _compile_exit_endpoints(
             tls_groups[(path.tls_sni, path.public_port)].append(path)
 
     for (tls_sni, public_port), paths in sorted(tls_groups.items()):
-        certificate_id = builder.add(
-            f"certificate:{exit_.id}:{_token(tls_sni)}",
-            CertificatePayload(server_ref=exit_.server_ref, hostname=tls_sni),
-            dependencies=[runtime_id],
+        certificate_id = _ensure_certificate(
+            builder,
+            exit_id=exit_.id,
+            server_ref=exit_.server_ref,
+            hostname=tls_sni,
+            runtime_id=runtime_id,
         )
         tls_port = ports.auxiliary_tcp(
             exit_.server_ref,
@@ -410,26 +394,28 @@ def _compile_exit_endpoints(
     for path in sorted(exit_.paths, key=lambda item: item.id):
         inbound_id = inbound_by_path[(exit_.id, path.id)]
         host_id = f"host:{exit_.id}:{path.id}:direct"
-        dependencies = [runtime_id, inbound_id]
+        dependencies = [runtime_id, inbound_id, *direct_dependencies[path.id]]
+        is_tls = path.protocol in {"xhttp", "wss", "hysteria2"}
         direct_host_ids.append(
             builder.add(
                 host_id,
                 HostPayload(
                     owner_ref=exit_.id,
+                    remark=f"Meridian v4 / {exit_.id} / {path.id} / direct",
                     node_ref=runtime_id,
                     inbound_ref=inbound_id,
                     address_server_ref=exit_.server_ref,
+                    address=(path.host or path.tls_sni) if is_tls else "",
                     public_port=path.public_port,
                     protocol=path.protocol,
                     sni=path.reality_sni or path.tls_sni,
                     host=path.host,
-                    path=path.path,
+                    path=f"/{path.path}" if path.path else "",
+                    alpn="h3" if path.protocol == "hysteria2" else "",
+                    fingerprint="chrome" if path.protocol == "reality" else "",
+                    security_layer="TLS" if is_tls else "DEFAULT",
                 ),
                 dependencies=dependencies,
-                postconditions=[
-                    _exists(host_id),
-                    ResourcePostcondition(kind="subscription_contains", target_ref=host_id),
-                ],
             )
         )
 
@@ -550,6 +536,7 @@ def _compile_relays(
                 host_id,
                 HostPayload(
                     owner_ref=relay.id,
+                    remark=f"Meridian v4 / {relay.id} / {path.id} / relay",
                     node_ref=runtime_by_exit[exit_.id],
                     inbound_ref=inbound_id,
                     address_server_ref=relay.hop_server_refs[0],
@@ -557,13 +544,11 @@ def _compile_relays(
                     protocol=path.protocol,
                     sni=path.reality_sni or path.tls_sni,
                     host=path.host,
-                    path=path.path,
+                    path=f"/{path.path}" if path.path else "",
+                    fingerprint="chrome" if path.protocol == "reality" else "",
+                    security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
                 ),
                 dependencies=[first_hop_id, inbound_id],
-                postconditions=[
-                    _exists(host_id),
-                    ResourcePostcondition(kind="subscription_contains", target_ref=host_id),
-                ],
             )
         )
     return host_ids
@@ -689,6 +674,24 @@ def _compile_probes(
             dependencies=[gateway_id],
             postconditions=[ResourcePostcondition(kind="probe_succeeds", target_ref=gateway_id)],
         )
+
+
+def _ensure_certificate(
+    builder: _PlanBuilder,
+    *,
+    exit_id: str,
+    server_ref: str,
+    hostname: str,
+    runtime_id: str,
+) -> str:
+    logical_id = f"certificate:{exit_id}:{_token(hostname)}"
+    if logical_id in builder.resources:
+        return logical_id
+    return builder.add(
+        logical_id,
+        CertificatePayload(server_ref=server_ref, hostname=hostname),
+        dependencies=[runtime_id],
+    )
 
 
 def _add_firewall(
