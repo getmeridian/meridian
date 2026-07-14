@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 from typing import Literal, Self
+from uuid import uuid4
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -131,9 +131,9 @@ class ServerBootstrapKeyResult(CoreModel):
 
 
 def server_profile_id(host: str, ssh_user: str = "root", ssh_port: int = 22) -> str:
-    """Build a stable local ID for a server profile from connection identity."""
-    digest = hashlib.sha1(f"{host}|{ssh_user}|{ssh_port}".encode("utf-8")).hexdigest()[:12]
-    return f"srv-{digest}"
+    """Generate an immutable local ID independent of mutable connection details."""
+    del host, ssh_user, ssh_port
+    return f"srv-{uuid4().hex[:12]}"
 
 
 def profile_from_draft(
@@ -141,10 +141,11 @@ def profile_from_draft(
     *,
     auth_state: ServerAuthState = "unknown",
     source: ServerSource = "manual",
+    profile_id: str = "",
 ) -> ServerProfile:
     """Convert UX-shaped draft input into a saved profile contract."""
     return ServerProfile(
-        id=server_profile_id(draft.host, draft.ssh_user, draft.ssh_port),
+        id=profile_id or server_profile_id(draft.host, draft.ssh_user, draft.ssh_port),
         title=draft.title,
         host=draft.host,
         ssh_user=draft.ssh_user,

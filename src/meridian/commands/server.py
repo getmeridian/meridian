@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
+from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
+from meridian.core.errors import LocalStateError
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
@@ -31,7 +35,16 @@ def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22) -> 
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.category)
 
-    registry.add(ServerEntry(host=request.ip, user=request.user, name=request.name, port=request.ssh_port))
+    registry.add(
+        ServerEntry(
+            host=request.ip,
+            user=request.user,
+            name=request.name,
+            port=request.ssh_port,
+            auth_state="validated",
+            last_validated_at=datetime.now(UTC).isoformat(),
+        )
+    )
     ok(f"Server added: {request.name or request.ip}")
 
 
@@ -62,6 +75,9 @@ def run_remove(query: str) -> None:
     if not entry:
         fail(f"Server '{request.query}' not found", hint_type="user")
 
-    registry.remove(request.query)
+    try:
+        registry.remove(request.query, cluster=ClusterConfig.load())
+    except LocalStateError as exc:
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
 
     ok(f"Server removed: {request.query}")

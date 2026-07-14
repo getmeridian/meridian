@@ -8,8 +8,10 @@ from unittest.mock import patch
 import pytest
 import typer
 
+from meridian.cluster import ClusterConfig, NodeEntry
 from meridian.commands.server import run_add
 from meridian.console import set_json_mode, set_quiet_mode
+from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
 from meridian.servers import SERVER_REGISTRY_SCHEMA, ServerEntry, ServerProfileStore, ServerRegistry
 
@@ -122,6 +124,39 @@ class TestServerRegistry:
         assert saved.key_path == "/tmp/meridian_ed25519"
         assert saved.auth_state == "key_ready"
 
+    def test_registry_update_preserves_immutable_profile_id(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+        original = registry.find("edge")
+        assert original is not None
+
+        registry.add(
+            ServerEntry(
+                "198.51.100.11",
+                "ubuntu",
+                "renamed-edge",
+                port=2222,
+                id=original.id,
+            )
+        )
+
+        updated = registry.find(original.id)
+        assert updated is not None
+        assert updated.id == original.id
+        assert updated.host == "198.51.100.11"
+        assert updated.name == "renamed-edge"
+        assert registry.count() == 1
+
+    def test_registry_remove_rejects_deployed_server(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+        cluster = ClusterConfig(nodes=[NodeEntry(ip="198.51.100.10", name="edge")])
+
+        with pytest.raises(LocalStateError, match="still used by node"):
+            registry.remove("edge", cluster=cluster)
+
+        assert registry.find("edge") is not None
+
     def test_remove_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "s1"))
@@ -191,9 +226,21 @@ def test_server_add_persists_custom_port(servers_file: Path) -> None:
     entry = ServerRegistry(servers_file).find("edge-a")
     assert entry is not None
     assert entry.port == 2222
+    assert entry.auth_state == "validated"
+    assert entry.last_validated_at
 
 
 class TestServerProfileStore:
+    def test_new_profiles_get_unique_connection_independent_ids(self) -> None:
+        draft = ServerConnectionDraft(title="Edge", host="198.51.100.10")
+
+        first = profile_from_draft(draft)
+        second = profile_from_draft(draft)
+
+        assert first.id.startswith("srv-")
+        assert second.id.startswith("srv-")
+        assert first.id != second.id
+
     def test_upsert_find_and_remove_profiles_by_human_refs(self, tmp_path: Path) -> None:
         store = ServerProfileStore(tmp_path / "servers.json")
         profile = profile_from_draft(
@@ -208,10 +255,44 @@ class TestServerProfileStore:
         assert store.remove("Family VPN") is True
         assert store.list() == []
 
-    def test_json_store_uses_v2_schema(self, tmp_path: Path) -> None:
+    def test_json_store_uses_current_schema(self, tmp_path: Path) -> None:
         path = tmp_path / "servers.json"
         store = ServerProfileStore(path)
         store.upsert(profile_from_draft(ServerConnectionDraft(title="Edge", host="198.51.100.10")))
 
         assert f'"schema": "{SERVER_REGISTRY_SCHEMA}"' in path.read_text()
         assert path.stat().st_mode & 0o777 == 0o600
+
+    def test_empty_json_store_requires_recovery(self, tmp_path: Path) -> None:
+        path = tmp_path / "servers.json"
+        path.write_text("")
+
+        with pytest.raises(LocalStateCorruptedError, match="file is empty"):
+            ServerProfileStore(path).list()
+
+    def test_malformed_json_store_requires_recovery(self, tmp_path: Path) -> None:
+        path = tmp_path / "servers.json"
+        path.write_text("{broken")
+
+        with pytest.raises(LocalStateCorruptedError, match="JSON is malformed"):
+            ServerProfileStore(path).list()
+
+    def test_invalid_profile_is_not_silently_dropped(self, tmp_path: Path) -> None:
+        path = tmp_path / "servers.json"
+        path.write_text(
+            '{"schema":"meridian.servers/v3","servers":[{"id":"srv-one","title":"Edge","host":"not-an-ip"}]}'
+        )
+
+        with pytest.raises(LocalStateCorruptedError, match=r"servers\[0\] is invalid"):
+            ServerProfileStore(path).list()
+
+    def test_duplicate_profile_identity_requires_recovery(self, tmp_path: Path) -> None:
+        path = tmp_path / "servers.json"
+        profile = profile_from_draft(ServerConnectionDraft(title="Edge", host="198.51.100.10"))
+        duplicate = profile.model_copy(update={"host": "198.51.100.11"})
+        path.write_text(
+            f'{{"schema":"meridian.servers/v3","servers":[{profile.model_dump_json()},{duplicate.model_dump_json()}]}}'
+        )
+
+        with pytest.raises(LocalStateCorruptedError, match="duplicate server id"):
+            ServerProfileStore(path).list()

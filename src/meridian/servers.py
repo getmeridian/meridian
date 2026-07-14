@@ -8,13 +8,24 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
+from meridian.core.errors import LocalStateCorruptedError, LocalStateError
+from meridian.core.servers import (
+    ServerAuthState,
+    ServerConnectionDraft,
+    ServerProfile,
+    ServerSource,
+    profile_from_draft,
+)
 
-SERVER_REGISTRY_SCHEMA = "meridian.servers/v2"
+if TYPE_CHECKING:
+    from meridian.cluster import ClusterConfig
+
+SERVER_REGISTRY_SCHEMA = "meridian.servers/v3"
+_SUPPORTED_SERVER_REGISTRY_SCHEMAS = {"meridian.servers/v2", SERVER_REGISTRY_SCHEMA}
 
 
 @dataclass
@@ -26,6 +37,11 @@ class ServerEntry:
     name: str = ""
     port: int = 22
     key_path: str = ""
+    id: str = ""
+    auth_state: ServerAuthState = "unknown"
+    last_validated_at: str = ""
+    last_error: str = ""
+    source: ServerSource = "manual"
 
     @property
     def ssh_user(self) -> str:
@@ -68,36 +84,60 @@ class ServerRegistry:
                 name=profile.title,
                 port=profile.ssh_port,
                 key_path=profile.key_path,
+                id=profile.id,
+                auth_state=profile.auth_state,
+                last_validated_at=profile.last_validated_at,
+                last_error=profile.last_error,
+                source=profile.source,
             )
         return None
 
     def add(self, entry: ServerEntry) -> None:
         """Add a server, deduplicating by host IP."""
-        existing_profile = self._store.find(entry.host) or (self._store.find(entry.name) if entry.name else None)
+        existing_profile = (
+            (self._store.find(entry.id) if entry.id else None)
+            or self._store.find(entry.host)
+            or (self._store.find(entry.name) if entry.name else None)
+        )
         draft = ServerConnectionDraft(
             title=entry.name or entry.host,
             host=entry.host,
             ssh_user=entry.user,
             ssh_port=entry.port,
         )
-        profile = profile_from_draft(draft)
+        profile = profile_from_draft(
+            draft,
+            auth_state=entry.auth_state,
+            source=entry.source,
+            profile_id=existing_profile.id if existing_profile else entry.id,
+        )
         preserved_key_path = entry.key_path or (existing_profile.key_path if existing_profile else "")
-        if preserved_key_path:
-            profile = profile.model_copy(
-                update={
-                    "auth_state": existing_profile.auth_state if existing_profile else profile.auth_state,
-                    "key_path": preserved_key_path,
-                    "last_error": existing_profile.last_error if existing_profile else profile.last_error,
-                    "last_validated_at": existing_profile.last_validated_at
-                    if existing_profile
-                    else profile.last_validated_at,
-                    "source": existing_profile.source if existing_profile else profile.source,
-                }
-            )
+        existing_auth = existing_profile.auth_state if existing_profile else "unknown"
+        auth_state = _stronger_auth_state(existing_auth, entry.auth_state)
+        profile = profile.model_copy(
+            update={
+                "auth_state": auth_state,
+                "key_path": preserved_key_path,
+                "last_error": entry.last_error or (existing_profile.last_error if existing_profile else ""),
+                "last_validated_at": entry.last_validated_at
+                or (existing_profile.last_validated_at if existing_profile else ""),
+                "source": existing_profile.source if existing_profile else entry.source,
+            }
+        )
         self._store.upsert(profile)
 
-    def remove(self, query: str) -> bool:
-        """Remove a server by IP or name. Returns True if found and removed."""
+    def remove(self, query: str, *, cluster: ClusterConfig | None = None) -> bool:
+        """Remove an unreferenced server by ID, IP, or name."""
+        profile = self._store.find(query)
+        if profile is not None and cluster is not None:
+            references = _cluster_references(profile, cluster)
+            if references:
+                joined = ", ".join(references)
+                raise LocalStateError(
+                    f"Server '{profile.title}' is still used by {joined}.",
+                    hint="Remove or reassign those deployment roles before deleting the saved server.",
+                    category="user",
+                )
         return self._store.remove(query)
 
 
@@ -121,6 +161,16 @@ class ServerProfileStore:
 
     def upsert(self, profile: ServerProfile) -> None:
         """Insert or replace a profile by stable ID, title, or host."""
+        existing = next(
+            (
+                candidate
+                for candidate in self.list()
+                if candidate.id == profile.id or candidate.title == profile.title or candidate.host == profile.host
+            ),
+            None,
+        )
+        if existing is not None and existing.id != profile.id:
+            profile = profile.model_copy(update={"id": existing.id})
         profiles = [
             existing
             for existing in self.list()
@@ -173,14 +223,34 @@ class ServerProfileStore:
 def _read_profiles_file(path: Path) -> builtins.list[ServerProfile]:
     if not path.exists():
         return []
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    raw_profiles = payload.get("servers", []) if isinstance(payload, dict) else []
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise LocalStateError(
+            f"Cannot read {path}: {exc}.",
+            hint="Check the file permissions and disk health, then retry.",
+        ) from exc
+    if not raw.strip():
+        raise _server_state_error(path, "the file is empty")
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise _server_state_error(path, f"the JSON is malformed ({exc})") from exc
+    if not isinstance(payload, dict):
+        raise _server_state_error(path, f"the document root must be an object, got {type(payload).__name__}")
+    schema = payload.get("schema")
+    if schema not in _SUPPORTED_SERVER_REGISTRY_SCHEMAS:
+        raise _server_state_error(path, f"unsupported or missing schema {schema!r}")
+    raw_profiles = payload.get("servers")
+    if not isinstance(raw_profiles, list):
+        raise _server_state_error(path, f"servers must be an array, got {type(raw_profiles).__name__}")
     profiles: builtins.list[ServerProfile] = []
-    for raw in raw_profiles:
+    for index, item in enumerate(raw_profiles):
         try:
-            profiles.append(ServerProfile.model_validate(raw))
-        except ValidationError:
-            continue
+            profiles.append(ServerProfile.model_validate(item))
+        except ValidationError as exc:
+            raise _server_state_error(path, f"servers[{index}] is invalid ({exc.errors()[0]['msg']})") from exc
+    _validate_profile_uniqueness(path, profiles)
     return profiles
 
 
@@ -192,6 +262,50 @@ def _profile_entries(profiles: list[ServerProfile]) -> list[ServerEntry]:
             name=profile.title,
             port=profile.ssh_port,
             key_path=profile.key_path,
+            id=profile.id,
+            auth_state=profile.auth_state,
+            last_validated_at=profile.last_validated_at,
+            last_error=profile.last_error,
+            source=profile.source,
         )
         for profile in profiles
     ]
+
+
+def _server_state_error(path: Path, reason: str) -> LocalStateCorruptedError:
+    return LocalStateCorruptedError(
+        f"Cannot safely load {path}: {reason}.",
+        hint=(
+            "Restore a known-good servers.json file or repair it explicitly. "
+            "Meridian will not silently discard saved server records."
+        ),
+    )
+
+
+def _validate_profile_uniqueness(path: Path, profiles: list[ServerProfile]) -> None:
+    for field_name in ("id", "title", "host"):
+        seen: set[str] = set()
+        for profile in profiles:
+            value = getattr(profile, field_name)
+            if value in seen:
+                raise _server_state_error(path, f"duplicate server {field_name} {value!r}")
+            seen.add(value)
+
+
+def _stronger_auth_state(current: ServerAuthState, requested: ServerAuthState) -> ServerAuthState:
+    rank: dict[ServerAuthState, int] = {
+        "failed": 0,
+        "unknown": 1,
+        "validated": 2,
+        "key_ready": 3,
+    }
+    return requested if rank[requested] >= rank[current] else current
+
+
+def _cluster_references(profile: ServerProfile, cluster: ClusterConfig) -> list[str]:
+    references: list[str] = []
+    if cluster.panel.server_ip == profile.host:
+        references.append("the control plane")
+    references.extend(f"node '{node.name or node.ip}'" for node in cluster.nodes if node.ip == profile.host)
+    references.extend(f"relay '{relay.name or relay.ip}'" for relay in cluster.relays if relay.ip == profile.host)
+    return references

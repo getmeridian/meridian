@@ -28,7 +28,7 @@
 - **Architecture tests** — `tests/test_architecture.py` enforces layer boundaries, file size budget, private import bans, commands/resolve import ban for library modules, and contract drift checks at CI time.
 
 ## Pitfalls
-- **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed existing files require explicit recovery.
+- **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files require recovery, and generated `srv-*` IDs survive connection edits.
 - **Shell injection**: ALL `conn.run()` interpolated values MUST use `shlex.quote()`.
 - **ProtocolKey is StrEnum** — works as dict key but YAML serialization needs `_stringify_keys()` to avoid Python-tagged output.
 - **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.
