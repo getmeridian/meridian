@@ -19,6 +19,7 @@ from meridian.reconciler.resources import (
     ResourceExecutionResult,
     UnknownResourceOutcome,
 )
+from meridian.reconciler.server_drivers import ServerDriverContext, build_server_drivers
 from meridian.reconciler.state import ActualState, DesiredState
 
 __all__ = [
@@ -31,7 +32,9 @@ __all__ = [
     "ResourceAction",
     "ResourceActionResult",
     "ResourceExecutionResult",
+    "ServerDriverContext",
     "UnknownResourceOutcome",
+    "build_server_drivers",
     "compute_plan",
     "execute_resource_plan",
 ]

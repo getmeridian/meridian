@@ -100,7 +100,7 @@ class ExitIntent(CoreModel):
 
 
 class TransparentRelayIntent(CoreModel):
-    """An ordered downstream-first Realm chain that advertises only its first hop."""
+    """A client-first Realm hop list whose first server is the advertised endpoint."""
 
     id: RequiredNameValue
     hop_server_refs: list[ServerReferenceValue] = Field(min_length=1)

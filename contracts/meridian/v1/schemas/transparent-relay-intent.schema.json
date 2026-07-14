@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "An ordered downstream-first Realm chain that advertises only its first hop.",
+  "description": "A client-first Realm hop list whose first server is the advertised endpoint.",
   "properties": {
     "exit_ref": {
       "minLength": 1,

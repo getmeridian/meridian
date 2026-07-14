@@ -75,10 +75,12 @@ class IssueTLSCert:
         domain: str,
         ip_mode: bool = False,
         server_ip: str | None = None,
+        certificate_directory: str = "/etc/ssl/meridian",
     ) -> None:
         self.domain = domain
         self.ip_mode = ip_mode
         self.server_ip = server_ip
+        self.certificate_directory = certificate_directory
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         server_ip = resolve_ctx(self.server_ip, ctx.ip)
@@ -111,11 +113,24 @@ class IssueTLSCert:
         cert_issued = result.returncode in (0, 2)
 
         if cert_issued:
+            q_certificate_directory = shlex.quote(self.certificate_directory)
+            directory = conn.run(
+                f"mkdir -p {q_certificate_directory} && chmod 700 {q_certificate_directory}",
+                timeout=15,
+            )
+            if directory.returncode != 0:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"Failed to prepare TLS certificate directory for {cert_host}",
+                )
+            q_key_file = shlex.quote(f"{self.certificate_directory}/key.pem")
+            q_fullchain_file = shlex.quote(f"{self.certificate_directory}/fullchain.pem")
             # Install cert and set reload command for auto-renewal
             install = conn.run(
                 f"/root/.acme.sh/acme.sh --install-cert -d {q_cert_host} "
-                f"--key-file /etc/ssl/meridian/key.pem "
-                f"--fullchain-file /etc/ssl/meridian/fullchain.pem "
+                f"--key-file {q_key_file} "
+                f"--fullchain-file {q_fullchain_file} "
                 f'--reloadcmd "systemctl reload nginx" 2>&1',
                 timeout=60,
             )

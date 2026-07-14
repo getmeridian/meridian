@@ -109,6 +109,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     stream_routes: dict[tuple[str, int], list[NginxRouteSpec]] = defaultdict(list)
     stream_dependencies: dict[tuple[str, int], set[str]] = defaultdict(set)
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
+    stream_fallbacks: dict[tuple[str, int], str] = {}
     direct_host_ids: list[str] = []
     reality_names_by_path = _reality_names_by_path(intent)
 
@@ -216,10 +217,16 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             stream_routes=stream_routes,
             stream_dependencies=stream_dependencies,
             stream_targets=stream_targets,
+            stream_fallbacks=stream_fallbacks,
             direct_host_ids=direct_host_ids,
         )
 
-    stream_ids = _compile_stream_artifacts(builder, stream_routes, stream_dependencies)
+    stream_ids = _compile_stream_artifacts(
+        builder,
+        stream_routes,
+        stream_dependencies,
+        stream_fallbacks,
+    )
     _attach_stream_dependencies(builder, direct_host_ids, stream_ids)
 
     relay_host_ids = _compile_relays(
@@ -292,6 +299,7 @@ def _compile_exit_endpoints(
     stream_routes: dict[tuple[str, int], list[NginxRouteSpec]],
     stream_dependencies: dict[tuple[str, int], set[str]],
     stream_targets: dict[tuple[str, int, str], tuple[str, int]],
+    stream_fallbacks: dict[tuple[str, int], str],
     direct_host_ids: list[str],
 ) -> None:
     tls_groups: dict[tuple[str, int], list[ProtocolPathIntent]] = defaultdict(list)
@@ -311,6 +319,7 @@ def _compile_exit_endpoints(
             direct_dependencies[path.id].extend([certificate_id, firewall_id])
         elif path.protocol == "reality":
             stream_key = (exit_.server_ref, path.public_port)
+            stream_fallbacks[stream_key] = path.reality_sni
             inbound = builder.resources[inbound_id].payload
             assert isinstance(inbound, InboundPayload)
             for server_name in inbound.reality_server_names or [path.reality_sni]:
@@ -429,6 +438,7 @@ def _compile_stream_artifacts(
     builder: _PlanBuilder,
     routes: dict[tuple[str, int], list[NginxRouteSpec]],
     dependencies: dict[tuple[str, int], set[str]],
+    fallbacks: dict[tuple[str, int], str],
 ) -> dict[tuple[str, int], str]:
     stream_ids: dict[tuple[str, int], str] = {}
     for (server_ref, port), route_specs in sorted(routes.items()):
@@ -439,6 +449,7 @@ def _compile_stream_artifacts(
                 server_ref=server_ref,
                 listener_port=port,
                 layer="stream",
+                fallback_server_name=fallbacks.get((server_ref, port), ""),
                 routes=sorted(
                     route_specs,
                     key=lambda route: (route.server_names, route.backend_server_ref, route.backend_port),

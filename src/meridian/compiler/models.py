@@ -173,6 +173,7 @@ class NginxArtifactPayload(CoreModel):
     listener_port: int
     layer: Literal["stream", "http"]
     tls_hostname: str = ""
+    fallback_server_name: str = ""
     routes: list[NginxRouteSpec]
 
 

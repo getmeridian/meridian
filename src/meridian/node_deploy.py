@@ -8,6 +8,7 @@ No CLI interaction (prompts, Rich tables) — those stay in commands/.
 from __future__ import annotations
 
 import logging
+import shlex
 from dataclasses import dataclass
 from typing import Any
 
@@ -492,7 +493,13 @@ SECRET_KEY={secret_key}
 """
 
 
-def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
+def deploy_node_container(
+    conn: ServerConnection,
+    secret_key: str,
+    *,
+    node_api_port: int | None = None,
+    image: str | None = None,
+) -> bool:
     """Deploy the Remnawave node container with the given secret key.
 
     Creates /opt/remnanode, writes docker-compose.yml and .env, pulls the
@@ -503,9 +510,11 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     from meridian.provision.containers import EnvFile, deploy_compose_stack
 
     node_dir = REMNAWAVE_NODE_DIR
+    effective_port = REMNAWAVE_NODE_API_PORT if node_api_port is None else node_api_port
+    effective_image = REMNAWAVE_NODE_IMAGE if image is None else image
 
-    env_content = render_node_env(REMNAWAVE_NODE_API_PORT, secret_key)
-    compose_content = render_node_compose(REMNAWAVE_NODE_IMAGE, REMNAWAVE_NODE_API_PORT)
+    env_content = render_node_env(effective_port, secret_key)
+    compose_content = render_node_compose(effective_image, effective_port)
 
     def _node_running() -> bool:
         check = conn.run(
@@ -541,8 +550,9 @@ def deploy_node_container(conn: ServerConnection, secret_key: str) -> bool:
     # skip only on total deploy failure (mkdir/pull/compose-up).
     deploy_reached_containers = deploy_result.changed or "healthy" in deploy_result.detail
     if deploy_reached_containers:
+        q_port = shlex.quote(str(effective_port))
         conn.run(
-            f"ufw allow from 172.16.0.0/12 to any port {REMNAWAVE_NODE_API_PORT} proto tcp"
+            f"ufw allow from 172.16.0.0/12 to any port {q_port} proto tcp"
             f" comment 'Meridian node API (Docker internal)' 2>/dev/null; true",
             timeout=15,
         )
