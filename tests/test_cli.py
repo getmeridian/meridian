@@ -39,6 +39,7 @@ class TestCLIBasics:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         output = _strip_ansi(result.output)
+        assert "setup" in output
         assert "deploy" in output
         assert "studio" in output
         assert "client" in output
@@ -51,6 +52,13 @@ class TestCLIBasics:
 
 
 class TestSubcommandHelp:
+    def test_setup_help(self) -> None:
+        result = runner.invoke(app, ["setup", "--help"])
+        assert result.exit_code == 0
+        output = _strip_ansi(result.output)
+        assert "--intent" in output
+        assert "--restart" in output
+
     def test_deploy_help(self) -> None:
         result = runner.invoke(app, ["deploy", "--help"])
         assert result.exit_code == 0
@@ -61,6 +69,54 @@ class TestSubcommandHelp:
         assert "--events" in output
         assert "--request" in output
         assert "--dry-run" in output
+
+    def test_setup_forwards_resumable_options(self, monkeypatch) -> None:
+        called: dict[str, object] = {}
+
+        def fake_run(**kwargs: object) -> None:
+            called.update(kwargs)
+
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr("meridian.commands.setup_v4.run", fake_run)
+
+        result = runner.invoke(
+            app,
+            [
+                "setup",
+                "--intent",
+                "intent.json",
+                "--restart",
+                "--yes",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert called == {
+            "intent_path": "intent.json",
+            "restart": True,
+            "yes": True,
+        }
+
+    def test_bare_deploy_is_a_compatibility_alias_for_setup(
+        self,
+        monkeypatch,
+    ) -> None:
+        called = False
+
+        def fake_setup(**_kwargs: object) -> None:
+            nonlocal called
+            called = True
+
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr(
+            "meridian.commands.setup_v4.run",
+            fake_setup,
+        )
+
+        result = runner.invoke(app, ["deploy"])
+
+        assert result.exit_code == 0
+        assert called is True
 
     def test_studio_help(self) -> None:
         result = runner.invoke(app, ["studio", "--help"])

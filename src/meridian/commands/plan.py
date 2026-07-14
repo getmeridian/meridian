@@ -11,6 +11,7 @@ from __future__ import annotations
 import typer
 
 from meridian.cluster import ClusterConfig
+from meridian.commands.v4_topology import run_v4_plan as _run_v4_plan
 from meridian.console import err_console, error_context, fail, info
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -30,6 +31,13 @@ def run(json_output: bool = False) -> None:
 def _run(*, json_output: bool, operation: OperationContext) -> None:
     """Implementation for plan with command metadata already attached."""
     cluster = ClusterConfig.load()
+    if cluster.topology_intent is not None:
+        _run_v4_plan(
+            cluster,
+            json_output=json_output,
+            operation=operation,
+        )
+        return
     validate_cluster_for_reconciliation(cluster, "plan")
 
     info("Fetching actual state from panel...")

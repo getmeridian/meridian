@@ -1,0 +1,177 @@
+"""Shared CLI presentation for compiled V4 topology plans."""
+
+from __future__ import annotations
+
+import typer
+
+from meridian.cluster import ClusterConfig
+from meridian.console import confirm, err_console, fail, ok, warn
+from meridian.core.models import MeridianError, OutputStatus, Summary
+from meridian.core.output import OperationContext, command_envelope
+from meridian.renderers import emit_json
+
+
+def run_v4_apply(
+    cluster: ClusterConfig,
+    *,
+    yes: bool,
+    json_output: bool,
+    operation: OperationContext,
+) -> None:
+    """Apply compiler-owned V4 topology through the checkpointed executor."""
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.core.setup import SetupDraft
+    from meridian.servers import ServerRegistry
+    from meridian.setup.runtime import SetupRuntime
+
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("V4 topology intent is missing")
+    runtime = SetupRuntime(
+        ServerRegistry(SERVER_PROFILES_FILE),
+        cluster_loader=lambda: cluster,
+    )
+    draft = SetupDraft.from_intent(intent)
+    review = runtime.review(draft)
+    if not yes:
+        if json_output:
+            error = MeridianError(
+                code="MERIDIAN_CONFIRMATION_REQUIRED",
+                category="user",
+                message="Apply requires explicit confirmation",
+                hint="Review data.plan_hash, then pass --yes.",
+                retryable=False,
+                exit_code=2,
+            )
+            emit_json(
+                command_envelope(
+                    command="apply",
+                    data={
+                        "plan_hash": review.plan.plan_hash,
+                        "resource_count": len(review.plan.resources),
+                    },
+                    summary=Summary(
+                        text=error.message,
+                        changed=False,
+                    ),
+                    status="failed",
+                    exit_code=2,
+                    errors=[error],
+                    timer=operation.timer,
+                )
+            )
+            raise typer.Exit(2)
+        err_console.print(
+            f"  [bold]V4 topology[/bold]: "
+            f"{len(review.plan.resources)} managed resources\n"
+            f"  [dim]{review.plan.plan_hash}[/dim]"
+        )
+        if not confirm("Apply this reviewed topology?"):
+            raise typer.Exit(1)
+
+    result = runtime.apply_intent(intent)
+    status: OutputStatus = "changed" if result.changed else "no_changes" if result.all_succeeded else "failed"
+    if json_output:
+        emit_json(
+            command_envelope(
+                command="apply",
+                data={
+                    "plan_hash": result.plan_hash,
+                    "generation": result.generation,
+                    "all_succeeded": result.all_succeeded,
+                    "changed": result.changed,
+                    "actions": [
+                        {
+                            "resource_id": item.action.resource.logical_id,
+                            "status": item.status,
+                            "changed": item.changed,
+                            "error": item.error,
+                        }
+                        for item in result.results
+                    ],
+                },
+                summary=Summary(
+                    text=("V4 topology converged." if result.all_succeeded else "V4 topology apply failed."),
+                    changed=result.changed,
+                    counts={
+                        "actions": len(result.results),
+                        "failed": len(result.failed),
+                    },
+                ),
+                status=status,
+                exit_code=0 if result.all_succeeded else 3,
+                timer=operation.timer,
+            )
+        )
+    if not result.all_succeeded:
+        for item in result.failed:
+            warn(f"Failed: {item.action.resource.logical_id} — {item.error}")
+        fail(
+            "V4 topology apply failed.",
+            hint="Fix the failed resource and rerun `meridian apply`.",
+            hint_type="system",
+        )
+    if result.changed:
+        ok("V4 topology applied.")
+    else:
+        ok("No changes needed — V4 topology is converged.")
+
+
+def run_v4_plan(
+    cluster: ClusterConfig,
+    *,
+    json_output: bool,
+    operation: OperationContext,
+) -> None:
+    """Render the deterministic compiler graph used by V4 apply."""
+    from meridian.compiler import compile_topology
+
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("V4 topology intent is missing")
+    plan = compile_topology(intent)
+    converged = cluster.active_plan_hash == plan.plan_hash and not cluster.pending_plan_hash
+    exit_code = 0 if converged else 2
+    counts: dict[str, int] = {}
+    for resource in plan.resources:
+        resource_kind = resource.payload.kind
+        counts[resource_kind] = counts.get(resource_kind, 0) + 1
+    if json_output:
+        emit_json(
+            command_envelope(
+                command="plan",
+                data={
+                    "plan_hash": plan.plan_hash,
+                    "intent_hash": plan.intent_hash,
+                    "converged": converged,
+                    "resources": [
+                        {
+                            "logical_id": resource.logical_id,
+                            "kind": resource.payload.kind,
+                            "desired_hash": resource.desired_hash,
+                            "dependencies": resource.dependencies,
+                        }
+                        for resource in plan.resources
+                    ],
+                },
+                summary=Summary(
+                    text=(
+                        "V4 topology is converged."
+                        if converged
+                        else (f"{len(plan.resources)} V4 resources require observation.")
+                    ),
+                    changed=not converged,
+                    counts=counts,
+                ),
+                status="no_changes" if converged else "changed",
+                exit_code=exit_code,
+                timer=operation.timer,
+            )
+        )
+    else:
+        state = "[green]converged[/green]" if converged else "[yellow]apply/observation required[/yellow]"
+        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{plan.plan_hash}[/dim]\n")
+        for kind_name, count in sorted(counts.items()):
+            err_console.print(f"  {kind_name}: {count}")
+        err_console.print()
+    raise typer.Exit(exit_code)

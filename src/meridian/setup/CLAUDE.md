@@ -6,10 +6,13 @@
 
 **Server shelf IDs** — human names and IPs resolve to immutable `srv-*` profile IDs before entering the draft.
 
+**Reviewed runtime** — setup recompiles before apply, persists topology intent before mutation, shares runtime-only node secrets in memory, and verifies canonical subscriptions before handoff.
+
 ## What's done well
 - Downstream answers are invalidated whenever an earlier stage changes.
 - Apply accepts only the exact hash shown at review.
 - Core contracts stay independent of filesystem, SSH, console, and Remnawave adapters.
+- Existing `plan` and `apply` commands select the same V4 compiler/runtime whenever cluster state contains topology intent.
 
 ## Pitfalls
 - Never add credential-shaped fields to `SetupDraft`.

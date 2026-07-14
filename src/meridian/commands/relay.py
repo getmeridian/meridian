@@ -12,7 +12,7 @@ import shlex
 
 import typer
 
-from meridian.cluster import RelayEntry
+from meridian.cluster import ClusterConfig, RelayEntry
 from meridian.commands._helpers import load_cluster, make_panel
 from meridian.commands._validation import validate_command_input
 from meridian.config import RELAY_SERVICE_NAME
@@ -57,6 +57,9 @@ def run_deploy(
     )
 
     cluster = load_cluster()
+    if cluster.topology_intent is not None:
+        _run_deploy_v4(request, cluster)
+        return
     try:
         exit_ip = find_exit_node(cluster, request.exit_arg)
     except ValueError as exc:
@@ -278,6 +281,83 @@ def run_deploy(
     err_console.print("    meridian relay list                [dim]# list all relays[/dim]")
     err_console.print()
     line()
+
+
+def _run_deploy_v4(
+    request: RelayDeployRequest,
+    cluster: ClusterConfig,
+) -> None:
+    """Translate imperative relay deploy into reviewed V4 topology intent."""
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.servers import ServerEntry, ServerRegistry
+    from meridian.setup.editor import add_relay_to_intent
+    from meridian.setup.runtime import SetupRuntime
+
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("V4 topology intent is missing")
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    exit_ref = ""
+    for exit_ in intent.exits:
+        entry = registry.find(exit_.server_ref)
+        selectors = {
+            exit_.id,
+            exit_.server_ref,
+            *({entry.host, entry.name} if entry is not None else set()),
+        }
+        if request.exit_arg in selectors:
+            exit_ref = exit_.id
+            break
+    if not exit_ref:
+        fail(
+            f"Exit {request.exit_arg!r} was not found in V4 topology.",
+            hint="Run `meridian setup` to review exit roles.",
+            hint_type="user",
+        )
+    if not request.yes and not confirm(f"Add {request.relay_name or request.relay_ip} as a relay to {exit_ref}?"):
+        raise typer.Exit(1)
+
+    connection = ServerConnection(
+        ip=request.relay_ip,
+        user=request.user,
+        port=request.ssh_port,
+    )
+    try:
+        connection.check_ssh(ui=RichSSHUI())
+    except SSHError as exc:
+        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+    registry.add(
+        ServerEntry(
+            host=request.relay_ip,
+            user=request.user,
+            name=request.relay_name or request.relay_ip,
+            port=request.ssh_port,
+            auth_state="validated",
+        )
+    )
+    entry = registry.find(request.relay_ip)
+    if entry is None:
+        raise RuntimeError("Validated relay server was not saved")
+    updated = add_relay_to_intent(
+        intent,
+        server_ref=entry.id,
+        title=(request.relay_name or f"relay-{len(intent.transparent_relays) + 1}"),
+        exit_ref=exit_ref,
+        listen_port=request.listen_port,
+        reality_sni=request.sni,
+    )
+    result = SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+    ).apply_intent(updated)
+    if not result.all_succeeded:
+        failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
+        fail(
+            "V4 relay did not converge.",
+            hint=failures,
+            hint_type="system",
+        )
+    ok(f"Relay {request.relay_name or request.relay_ip} {'added' if result.changed else 'already converged'}")
 
 
 def run_list(

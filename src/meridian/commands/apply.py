@@ -12,6 +12,7 @@ from typing import Any
 import typer
 
 from meridian.cluster import ClusterConfig
+from meridian.commands.v4_topology import run_v4_apply as _run_v4_topology
 from meridian.console import confirm, err_console, error_context, fail, info, ok, warn
 from meridian.core.apply import build_apply_result
 from meridian.core.models import MeridianError, OutputStatus, Summary
@@ -532,6 +533,14 @@ def _run(
     - ``"no"``: skip extras (filtered out of the plan before execute).
     """
     cluster = ClusterConfig.load()
+    if cluster.topology_intent is not None:
+        _run_v4_topology(
+            cluster,
+            yes=yes,
+            json_output=json_output,
+            operation=operation,
+        )
+        return
     validate_cluster_for_reconciliation(cluster, "apply")
 
     info("Fetching actual state from panel...")

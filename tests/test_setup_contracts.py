@@ -236,6 +236,21 @@ class TestSetupDraft:
         assert intent.transparent_relays[0].reality_sni == "relay.example.com"
         assert intent.default_egress_ref == "primary"
 
+    def test_complete_intent_can_seed_review_without_losing_choices(self) -> None:
+        intent = _draft_at_review().to_intent()
+
+        draft = SetupDraft.from_intent(intent)
+
+        assert draft.current_stage == "review"
+        assert draft.completed_stages == [
+            "servers",
+            "roles",
+            "paths",
+            "routing",
+            "access",
+        ]
+        assert draft.to_intent() == intent
+
     def test_editing_paths_invalidates_every_downstream_stage(self) -> None:
         reviewed = _draft_at_review().model_copy(update={"review_hash": "sha256:review"}).complete_current_stage()
 

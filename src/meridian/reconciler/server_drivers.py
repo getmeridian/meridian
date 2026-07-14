@@ -48,6 +48,10 @@ from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
 
 ConnectionFactory = Callable[[str], ServerConnection]
+NodePreparation = Callable[
+    [ServerConnection, NodeRuntimePayload, str],
+    None,
+]
 PayloadT = TypeVar(
     "PayloadT",
     FirewallRulePayload,
@@ -66,6 +70,7 @@ class ServerDriverContext:
     connection_for: ConnectionFactory
     server_addresses: Mapping[str, str]
     node_secrets: dict[str, str] = field(default_factory=dict, repr=False)
+    prepare_node: NodePreparation | None = None
 
     def connection(self, server_ref: str) -> ServerConnection:
         return self.connection_for(server_ref)
@@ -555,6 +560,12 @@ class NodeRuntimeDriver:
     ) -> ResourceApplyReceipt:
         payload = _payload(action, NodeRuntimePayload)
         conn = self.context.connection(payload.server_ref)
+        if self.context.prepare_node is not None:
+            self.context.prepare_node(
+                conn,
+                payload,
+                self.context.address(payload.server_ref),
+            )
         if payload.warp:
             result = InstallWarp().run(
                 conn,

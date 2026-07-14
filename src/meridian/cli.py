@@ -279,8 +279,37 @@ def apply_cmd(
 
 
 # =============================================================================
-# Deploy
+# Setup and legacy deploy
 # =============================================================================
+
+
+@app.command("setup")
+def setup_cmd(
+    intent_path: str = typer.Option(
+        "",
+        "--intent",
+        help="Start at review from a complete SetupIntent JSON file, or '-' for stdin",
+    ),
+    restart: bool = typer.Option(
+        False,
+        "--restart",
+        help="Explicitly discard saved setup progress before starting",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Approve review and apply without confirmation",
+    ),
+) -> None:
+    """Configure the complete topology with a resumable guided wizard."""
+    from meridian.commands.setup_v4 import run
+
+    run(
+        intent_path=intent_path,
+        restart=restart,
+        yes=yes,
+    )
 
 
 @app.command("deploy")
@@ -344,6 +373,29 @@ def deploy_cmd(
       [cyan]meridian deploy 198.51.100.10 --no-harden[/cyan]  Skip SSH and firewall hardening
       [cyan]meridian deploy --request deploy.json --json --events=jsonl[/cyan]
     """
+    if (
+        not ip
+        and not server
+        and not request_path
+        and not dry_run
+        and not json_output
+        and not events
+        and not domain
+        and not sni
+        and not client_name
+        and not display_name
+        and not icon
+        and not color
+        and not warp
+        and geo_block
+        and harden
+        and not yes
+    ):
+        from meridian.commands.setup_v4 import run as run_setup
+
+        run_setup()
+        return
+
     from meridian.commands.setup import run
     from meridian.console import is_json_mode
 

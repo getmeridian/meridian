@@ -151,6 +151,74 @@ class SetupDraft(CoreModel):
     verified_at: str = ""
     updated_at: str = ""
 
+    @classmethod
+    def from_intent(cls, intent: SetupIntent) -> SetupDraft:
+        """Start the resumable journey at review for a complete typed intent."""
+        server_refs = list(
+            dict.fromkeys(
+                [
+                    intent.control.server_ref,
+                    *[exit_.server_ref for exit_ in intent.exits],
+                    *[server_ref for relay in intent.transparent_relays for server_ref in relay.hop_server_refs],
+                    *[gateway.server_ref for gateway in intent.routing_gateways],
+                ]
+            )
+        )
+        roles = SetupRoleSelection(
+            control=intent.control,
+            exits=[
+                SetupExitRole(
+                    id=exit_.id,
+                    server_ref=exit_.server_ref,
+                    region=exit_.region,
+                    warp=exit_.warp,
+                )
+                for exit_ in intent.exits
+            ],
+            transparent_relays=[
+                SetupRelayRole(
+                    id=relay.id,
+                    hop_server_refs=relay.hop_server_refs,
+                    exit_ref=relay.exit_ref,
+                    protocol_path_ref=relay.protocol_path_ref,
+                    reality_sni=relay.reality_sni,
+                )
+                for relay in intent.transparent_relays
+            ],
+            routing_gateways=[
+                SetupGatewayRole(
+                    id=gateway.id,
+                    server_ref=gateway.server_ref,
+                    bridge_path_ref=gateway.bridge_path_ref,
+                )
+                for gateway in intent.routing_gateways
+            ],
+        )
+        return cls(
+            current_stage="review",
+            completed_stages=list(SETUP_STAGE_ORDER[:5]),
+            server_refs=server_refs,
+            roles=roles,
+            paths=SetupPathSelection(
+                exits=[
+                    SetupExitPaths(
+                        exit_ref=exit_.id,
+                        paths=exit_.paths,
+                    )
+                    for exit_ in intent.exits
+                ]
+            ),
+            routing=SetupRoutingSelection(
+                default_egress_ref=intent.default_egress_ref,
+                egress_pools=intent.egress_pools,
+                routes=intent.routes,
+            ),
+            access=SetupAccessSelection(
+                access=intent.access,
+                delivery=intent.delivery,
+            ),
+        )
+
     @model_validator(mode="after")
     def validate_progress(self) -> Self:
         if len(self.server_refs) != len(set(self.server_refs)):

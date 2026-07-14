@@ -48,6 +48,53 @@ def _make_cluster_with_relay(relay_ip: str = "198.51.100.20") -> ClusterConfig:
     return cluster
 
 
+def _v4_cluster() -> ClusterConfig:
+    from meridian.core.topology import (
+        AccessIntent,
+        ControlPlaneIntent,
+        ExitIntent,
+        ProtocolPathIntent,
+        SetupIntent,
+    )
+
+    return ClusterConfig(
+        topology_intent=SetupIntent(
+            control=ControlPlaneIntent(server_ref="srv-control"),
+            exits=[
+                ExitIntent(
+                    id="exit-a",
+                    server_ref="srv-exit",
+                    paths=[
+                        ProtocolPathIntent(
+                            id="reality",
+                            protocol="reality",
+                            reality_sni="www.microsoft.com",
+                        )
+                    ],
+                )
+            ],
+            default_egress_ref="exit-a",
+            access=AccessIntent(users=["default"]),
+        )
+    )
+
+
+def test_v4_apply_routes_through_checkpointed_setup_runtime() -> None:
+    cluster = _v4_cluster()
+    with (
+        patch(
+            "meridian.commands.apply.ClusterConfig.load",
+            return_value=cluster,
+        ),
+        patch("meridian.commands.apply._run_v4_topology") as run_v4,
+        patch("meridian.commands.apply.validate_cluster_for_reconciliation") as validate_legacy,
+    ):
+        apply_run(yes=True)
+
+    run_v4.assert_called_once()
+    validate_legacy.assert_not_called()
+
+
 class TestHandleUpdateRelayPreflight:
     """Bug #4 regression: UPDATE_RELAY used to delete the old relay before
     attempting to provision the new one. If the new SSH target was unreachable

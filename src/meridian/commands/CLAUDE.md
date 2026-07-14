@@ -11,9 +11,11 @@
 
 **Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr.
 
+**V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
+
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `deploy`, `test`, `probe`, `doctor`, `teardown`.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `setup`, `deploy`, `test`, `probe`, `doctor`, `teardown`.
 
 ## What's done well
 

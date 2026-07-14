@@ -35,6 +35,46 @@ def _configured_cluster_with_desired() -> ClusterConfig:
     )
 
 
+def test_v4_plan_routes_through_compiler_graph() -> None:
+    from meridian.core.topology import (
+        AccessIntent,
+        ControlPlaneIntent,
+        ExitIntent,
+        ProtocolPathIntent,
+        SetupIntent,
+    )
+
+    cluster = ClusterConfig(
+        topology_intent=SetupIntent(
+            control=ControlPlaneIntent(server_ref="srv-control"),
+            exits=[
+                ExitIntent(
+                    id="exit-a",
+                    server_ref="srv-exit",
+                    paths=[
+                        ProtocolPathIntent(
+                            id="reality",
+                            protocol="reality",
+                            reality_sni="www.microsoft.com",
+                        )
+                    ],
+                )
+            ],
+            default_egress_ref="exit-a",
+            access=AccessIntent(users=["default"]),
+        )
+    )
+    with (
+        patch.object(ClusterConfig, "load", return_value=cluster),
+        patch("meridian.commands.plan._run_v4_plan") as run_v4,
+        patch("meridian.commands.plan.validate_cluster_for_reconciliation") as validate_legacy,
+    ):
+        plan_run()
+
+    run_v4.assert_called_once()
+    validate_legacy.assert_not_called()
+
+
 def _capture_plan_json(plan: Plan) -> tuple[dict, int]:
     """Run plan command in --json mode against a stubbed plan; return (parsed_json, exit_code)."""
     cluster = _configured_cluster_with_desired()

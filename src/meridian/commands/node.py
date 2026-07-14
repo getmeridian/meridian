@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import typer
 
+from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_cluster, make_panel
 from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, info, ok, warn
@@ -60,6 +61,9 @@ def run_add(
     from meridian.servers import ServerRegistry
 
     cluster = load_cluster()
+    if cluster.topology_intent is not None:
+        _run_add_v4(request, cluster)
+        return
 
     # Check for duplicate
     existing = cluster.find_node(request.ip)
@@ -144,6 +148,74 @@ def run_add(
     err_console.print("  [dim]List nodes:     meridian node list[/dim]")
     err_console.print("  [dim]Fleet status:   meridian fleet status[/dim]")
     err_console.print()
+
+
+def _run_add_v4(
+    request: NodeAddRequest,
+    cluster: ClusterConfig,
+) -> None:
+    """Translate imperative node add into reviewed V4 topology intent."""
+    from meridian.commands.resolve import (
+        ensure_server_connection,
+        resolve_server,
+    )
+    from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
+    from meridian.servers import ServerEntry, ServerRegistry
+    from meridian.setup.editor import add_exit_to_intent
+    from meridian.setup.runtime import SetupRuntime
+
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("V4 topology intent is missing")
+    if not request.harden:
+        fail(
+            "V4 topology keeps server hardening enabled.",
+            hint=("Use `meridian setup` to review topology-managed server choices."),
+            hint_type="user",
+        )
+    if not request.yes and not confirm(f"Add {request.name or request.ip} as a V4 exit?"):
+        raise typer.Exit(1)
+
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    resolved = ensure_server_connection(
+        resolve_server(
+            registry,
+            explicit_ip=request.ip,
+            user=request.user,
+            port=request.ssh_port,
+        )
+    )
+    registry.add(
+        ServerEntry(
+            host=resolved.ip,
+            user=resolved.user,
+            name=request.name or resolved.ip,
+            port=request.ssh_port,
+            auth_state="validated",
+        )
+    )
+    entry = registry.find(resolved.ip)
+    if entry is None:
+        raise RuntimeError("Validated server was not saved")
+    updated = add_exit_to_intent(
+        intent,
+        server_ref=entry.id,
+        title=request.name or f"exit-{len(intent.exits) + 1}",
+        reality_sni=request.sni or DEFAULT_SNI,
+        tls_hostname=request.domain,
+    )
+    result = SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+    ).apply_intent(updated)
+    if not result.all_succeeded:
+        failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
+        fail(
+            "V4 exit did not converge.",
+            hint=failures,
+            hint_type="system",
+        )
+    ok(f"Exit {request.name or resolved.ip} {'added' if result.changed else 'already converged'}")
 
 
 # -- Node Check --

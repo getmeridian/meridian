@@ -313,70 +313,16 @@ def setup_first_deploy(
     info_page_path: str = "",
 ) -> None:
     """First deploy: full panel bootstrap from scratch."""
-    base_url = panel_base_url(resolved.ip, domain, secret_path)
-
-    # Wait for panel API to become accessible
-    logger.info("Waiting for panel API...")
-    if not check_panel_api_ready(base_url):
-        raise PanelSetupError(
-            "Panel API is not reachable",
-            hint=(
-                f"Panel should be at {base_url}\n"
-                f"Check: ssh {resolved.user}@{resolved.ip} docker logs remnawave --tail 30"
-            ),
-        )
-
-    # Register admin user (reuse saved credentials on re-run after partial failure)
-    if cluster.panel.admin_user and cluster.panel.admin_pass:
-        admin_user = cluster.panel.admin_user
-        admin_pass = cluster.panel.admin_pass
-    else:
-        admin_user = f"meridian-{secrets.token_hex(4)}"
-        # Remnawave requires: ≥24 chars, uppercase + lowercase + numbers
-        admin_pass = f"Mx{secrets.token_hex(16)}9A"
-
-    try:
-        auth_token = MeridianPanel.register_admin(base_url, admin_user, admin_pass)
-    except RemnawaveError as e:
-        # Admin may already exist on re-run after partial failure — try login
-        try:
-            auth_token = MeridianPanel.login(base_url, admin_user, admin_pass)
-        except RemnawaveError as login_err:
-            raise PanelSetupError(
-                f"Panel admin registration failed ({e}), login also failed ({login_err})",
-                hint="Panel may need a fresh start: meridian teardown, then redeploy",
-            )
-    logger.info("Panel admin registered")
-
-    # Save admin credentials BEFORE API token step (lockout prevention:
-    # if API token creation fails, we can still login with these creds)
-    # Reuse the info_page_path generated for the provisioner (nginx uses it),
-    # so the connection page URL matches the nginx location.
-    sub_path = info_page_path or secrets.token_hex(8)
-    cluster.panel = PanelConfig(
-        url=base_url,
-        api_token="",  # filled after API token creation
-        admin_user=admin_user,
-        admin_pass=admin_pass,
-        server_ip=resolved.ip,
-        ssh_user=resolved.user,
-        ssh_port=getattr(resolved.conn, "port", 22),
+    ensure_control_plane_access(
+        resolved=resolved,
+        cluster=cluster,
+        domain=domain,
         secret_path=secret_path,
-        sub_path=sub_path,
-        deployed_with=version,
+        info_page_path=info_page_path,
+        version=version,
     )
-    cluster.backup()
-    cluster.save()  # Create a long-lived API token (auth token is browser-session only)
-    api_token = create_api_token(base_url, auth_token)
-    logger.info("API token created")
-
-    # Update cluster with the API token
-    cluster.panel.api_token = api_token
-    cluster.save()
-
-    # Configure subscription page with the real API token
-    _update_subscription_page(resolved.conn, cluster, api_token)
-    logger.info("Subscription page configured")
+    base_url = cluster.panel.url
+    api_token = cluster.panel.api_token
 
     with MeridianPanel(base_url, api_token) as panel:
         # Create config profile (Xray inbound definitions)
@@ -471,6 +417,82 @@ def setup_first_deploy(
             logger.warning("Could not create client '%s': %s", client_name, e)
 
     logger.info("Panel configuration complete")
+
+
+def ensure_control_plane_access(
+    *,
+    resolved: ResolvedServer,
+    cluster: ClusterConfig,
+    domain: str,
+    secret_path: str,
+    info_page_path: str,
+    version: str,
+) -> None:
+    """Bootstrap only panel credentials; compiled resources own the topology."""
+    base_url = panel_base_url(resolved.ip, domain, secret_path)
+    if cluster.panel.url == base_url and cluster.panel.api_token:
+        with MeridianPanel(base_url, cluster.panel.api_token) as panel:
+            if panel.ping():
+                return
+
+    logger.info("Waiting for panel API...")
+    if not check_panel_api_ready(base_url):
+        raise PanelSetupError(
+            "Panel API is not reachable",
+            hint=(
+                f"Panel should be at {base_url}\n"
+                f"Check: ssh {resolved.user}@{resolved.ip} "
+                "docker logs remnawave --tail 30"
+            ),
+        )
+
+    if cluster.panel.admin_user and cluster.panel.admin_pass:
+        admin_user = cluster.panel.admin_user
+        admin_pass = cluster.panel.admin_pass
+    else:
+        admin_user = f"meridian-{secrets.token_hex(4)}"
+        admin_pass = f"Mx{secrets.token_hex(16)}9A"
+
+    try:
+        auth_token = MeridianPanel.register_admin(
+            base_url,
+            admin_user,
+            admin_pass,
+        )
+    except RemnawaveError as exc:
+        try:
+            auth_token = MeridianPanel.login(
+                base_url,
+                admin_user,
+                admin_pass,
+            )
+        except RemnawaveError as login_error:
+            raise PanelSetupError(
+                f"Panel admin registration failed ({exc}), login also failed ({login_error})",
+                hint="Recover the saved panel credentials or redeploy the panel.",
+            ) from login_error
+
+    cluster.panel = PanelConfig(
+        url=base_url,
+        api_token="",
+        admin_user=admin_user,
+        admin_pass=admin_pass,
+        server_ip=resolved.ip,
+        ssh_user=resolved.user,
+        ssh_port=getattr(resolved.conn, "port", 22),
+        secret_path=secret_path,
+        sub_path=info_page_path or cluster.panel.sub_path or secrets.token_hex(8),
+        deployed_with=version,
+    )
+    cluster.backup()
+    cluster.save()
+    cluster.panel.api_token = create_api_token(base_url, auth_token)
+    cluster.save()
+    _update_subscription_page(
+        resolved.conn,
+        cluster,
+        cluster.panel.api_token,
+    )
 
 
 def setup_redeploy(
