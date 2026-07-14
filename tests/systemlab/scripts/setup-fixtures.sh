@@ -16,7 +16,7 @@ fi
 
 # Pebble root CA (extracted from Docker image)
 if [ ! -f "$DIR/pebble-ca.pem" ]; then
-  CID=$(docker create ghcr.io/letsencrypt/pebble:latest 2>/dev/null) || true
+  CID=$(docker create ghcr.io/letsencrypt/pebble:2.10.0 2>/dev/null) || true
   if [ -n "$CID" ]; then
     docker cp "$CID:/test/certs/pebble.minica.pem" "$DIR/pebble-ca.pem" 2>/dev/null
     docker rm "$CID" >/dev/null 2>&1
