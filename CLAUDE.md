@@ -58,6 +58,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 │   └── routes.py                       — FastAPI route handlers
+├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
 ├── reconciler/CLAUDE.md                — compute_plan purity + executor ordering

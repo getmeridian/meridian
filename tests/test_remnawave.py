@@ -21,10 +21,10 @@ from meridian.remnawave import (
     RemnawaveError,
     RemnawaveNetworkError,
     RemnawaveNotFoundError,
-    _host_from_sdk,
-    _inbound_from_sdk,
-    _node_from_sdk,
-    _user_from_sdk,
+    host_from_sdk,
+    inbound_from_sdk,
+    node_from_sdk,
+    user_from_sdk,
 )
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class TestFindConfigProfileByName:
 class TestUserFromSdk:
     """Tests use snake_case field names because real SDK Pydantic models expose
     Python attributes in snake_case (camelCase is only the JSON serialization alias).
-    Reading via camelCase silently returns defaults — see _user_from_sdk docstring.
+    Reading via camelCase silently returns defaults — see user_from_sdk docstring.
     """
 
     def test_converts_all_fields(self) -> None:
@@ -163,7 +163,7 @@ class TestUserFromSdk:
             sub_revoked_at="",
             user_traffic=_ns(used_traffic_bytes=1024, online_at="2026-04-01"),
         )
-        user = _user_from_sdk(obj)
+        user = user_from_sdk(obj)
         assert user.uuid == "u-1"
         assert user.short_uuid == "abc"
         assert user.username == "alice"
@@ -173,18 +173,18 @@ class TestUserFromSdk:
         assert user.online_at == "2026-04-01"
 
     def test_handles_missing_fields(self) -> None:
-        user = _user_from_sdk(_ns(uuid="u-1"))
+        user = user_from_sdk(_ns(uuid="u-1"))
         assert user.uuid == "u-1"
         assert user.username == ""
         assert user.used_traffic_bytes == 0
 
     def test_handles_none_traffic(self) -> None:
-        user = _user_from_sdk(_ns(traffic_limit_bytes=None, user_traffic=None))
+        user = user_from_sdk(_ns(traffic_limit_bytes=None, user_traffic=None))
         assert user.used_traffic_bytes == 0
         assert user.traffic_limit_bytes == 0
 
     def test_reads_nested_user_traffic_fields(self) -> None:
-        user = _user_from_sdk(_ns(user_traffic=_ns(used_traffic_bytes=4096, online_at="2026-04-02")))
+        user = user_from_sdk(_ns(user_traffic=_ns(used_traffic_bytes=4096, online_at="2026-04-02")))
         assert user.used_traffic_bytes == 4096
         assert user.online_at == "2026-04-02"
 
@@ -193,7 +193,7 @@ class TestUserFromSdk:
         # Python attributes. If we ever revert to getattr(..., "shortUuid", ...) the
         # field will become empty without any error.
         obj = _ns(uuid="u-1", shortUuid="WRONG_CAMEL", short_uuid="right_snake")
-        user = _user_from_sdk(obj)
+        user = user_from_sdk(obj)
         assert user.short_uuid == "right_snake"
 
 
@@ -228,7 +228,7 @@ class TestUserFromRealSdkModel:
             "subscriptionUrl": "https://panel/api/sub/short_42",
         }
         sdk_obj = GetUserByUsernameResponseDto.model_validate(payload)
-        user = _user_from_sdk(sdk_obj)
+        user = user_from_sdk(sdk_obj)
         # All these would be defaults if we read camelCase aliases via getattr.
         assert user.short_uuid == "short_42"
         assert user.vless_uuid == "00000000-0000-0000-0000-000000000002"
@@ -250,7 +250,7 @@ class TestNodeFromSdk:
             xray_version="26.2.6",
             traffic_used_bytes=5000,
         )
-        node = _node_from_sdk(obj)
+        node = node_from_sdk(obj)
         assert node.uuid == "n-1"
         assert node.name == "finland"
         assert node.address == "198.51.100.1"
@@ -259,7 +259,7 @@ class TestNodeFromSdk:
         assert node.traffic_used == 5000
 
     def test_handles_missing_fields(self) -> None:
-        node = _node_from_sdk(_ns())
+        node = node_from_sdk(_ns())
         assert node.uuid == ""
         assert node.is_connected is False
 
@@ -293,7 +293,7 @@ class TestNodeFromRealSdkModel:
             },
         }
         sdk_obj = NodeResponseDto.model_validate(payload)
-        node = _node_from_sdk(sdk_obj)
+        node = node_from_sdk(sdk_obj)
         assert node.is_connected is True
         assert node.xray_version == "26.2.6"
         assert node.traffic_used == 5000
@@ -316,7 +316,7 @@ class TestHostFromSdk:
             is_disabled=False,
             inbound=_ns(config_profile_uuid="profile-1", config_profile_inbound_uuid="ib-1"),
         )
-        host = _host_from_sdk(obj)
+        host = host_from_sdk(obj)
         assert host.uuid == "h-1"
         assert host.remark == "reality-198.51.100.1"
         assert host.sni == "www.google.com"
@@ -328,26 +328,26 @@ class TestHostFromSdk:
         assert host.inbound_uuid == "ib-1"
 
     def test_handles_missing_fields(self) -> None:
-        host = _host_from_sdk(_ns())
+        host = host_from_sdk(_ns())
         assert host.uuid == ""
         assert host.sni == ""
 
     def test_reads_nested_inbound_uuid(self) -> None:
-        host = _host_from_sdk(_ns(inbound=_ns(config_profile_inbound_uuid="ib-2")))
+        host = host_from_sdk(_ns(inbound=_ns(config_profile_inbound_uuid="ib-2")))
         assert host.inbound_uuid == "ib-2"
 
 
 class TestInboundFromSdk:
     def test_converts_all_fields(self) -> None:
         obj = _ns(uuid="ib-1", tag="vless-reality", type="vless", network="tcp", security="reality")
-        ib = _inbound_from_sdk(obj)
+        ib = inbound_from_sdk(obj)
         assert ib.uuid == "ib-1"
         assert ib.tag == "vless-reality"
         assert ib.type == "vless"
         assert ib.security == "reality"
 
     def test_handles_empty(self) -> None:
-        ib = _inbound_from_sdk(_ns())
+        ib = inbound_from_sdk(_ns())
         assert ib.uuid == ""
         assert ib.tag == ""
 
@@ -535,7 +535,9 @@ class TestCreateUser:
     def test_create_user_calls_api(self) -> None:
         panel = _make_panel()
         panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="u-1", shortUuid="abc", username="alice")):
+        with patch(
+            "meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", shortUuid="abc", username="alice")
+        ):
             user = panel.create_user("alice")
         assert user.uuid == "u-1"
         assert user.username == "alice"
@@ -548,7 +550,7 @@ class TestCreateUser:
     def test_create_user_with_squad_uuids(self) -> None:
         panel = _make_panel()
         panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="u-1", username="bob")):
+        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", username="bob")):
             panel.create_user(
                 "bob",
                 squad_uuids=[
@@ -565,7 +567,7 @@ class TestCreateUser:
     def test_create_user_with_traffic_limit(self) -> None:
         panel = _make_panel()
         panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="u-1", username="bob")):
+        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", username="bob")):
             panel.create_user("bob", traffic_limit_bytes=1073741824)
         body = panel._sdk.users.create_user.call_args[0][0]
         assert body.traffic_limit_bytes == 1073741824
@@ -577,7 +579,7 @@ class TestCreateNode:
         panel._sdk.nodes.create_node = MagicMock(return_value="create-node-coro")
         panel._sdk.keygen.generate_key = MagicMock(return_value="keygen-coro")
         with patch(
-            "meridian.remnawave._sdk_call",
+            "meridian.remnawave.client.sdk_call",
             side_effect=[_ns(uuid="n-1"), _ns(pub_key="secret-key-data")],
         ):
             creds = panel.create_node(
@@ -594,7 +596,7 @@ class TestCreateNode:
         panel._sdk.nodes.create_node = MagicMock(return_value="create-node-coro")
         panel._sdk.keygen.generate_key = MagicMock(return_value="keygen-coro")
         with patch(
-            "meridian.remnawave._sdk_call",
+            "meridian.remnawave.client.sdk_call",
             side_effect=[_ns(uuid="n-2"), _ns(pubKey="secret-key-data")],
         ):
             panel.create_node(
@@ -710,7 +712,7 @@ class TestConfigProfiles:
     def test_create_config_profile(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.create_config_profile = MagicMock(return_value="create-config-profile-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="cp-1", name="meridian-default")):
+        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="cp-1", name="meridian-default")):
             profile = panel.create_config_profile("meridian-default", {"inbounds": []})
         assert profile.uuid == "cp-1"
         assert profile.name == "meridian-default"
@@ -721,7 +723,7 @@ class TestConfigProfiles:
     def test_get_config_profile_found(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="cp-1", name="test")):
+        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="cp-1", name="test")):
             profile = panel.get_config_profile("cp-1")
             assert profile is not None
             assert profile.name == "test"
@@ -729,14 +731,14 @@ class TestConfigProfiles:
     def test_get_config_profile_not_found(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave._sdk_call", side_effect=RemnawaveNotFoundError("404")):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveNotFoundError("404")):
             assert panel.get_config_profile("nonexistent") is None
 
     def test_list_config_profiles(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profiles = MagicMock(return_value="list-config-profiles-coro")
         with patch(
-            "meridian.remnawave._sdk_call",
+            "meridian.remnawave.client.sdk_call",
             return_value=_ns(
                 config_profiles=[
                     _ns(uuid="cp-1", name="default"),
@@ -780,7 +782,7 @@ class TestConfigProfiles:
         sdk_resp = GetAllConfigProfilesResponseDto.model_validate(payload)
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profiles = MagicMock(return_value="coro")
-        with patch("meridian.remnawave._sdk_call", return_value=sdk_resp):
+        with patch("meridian.remnawave.client.sdk_call", return_value=sdk_resp):
             profiles = panel.list_config_profiles()
         assert [p.name for p in profiles] == ["default", "other"]
 
@@ -797,7 +799,7 @@ class TestInternalSquads:
         mock_squad = MagicMock()
         mock_squad.model_dump.return_value = {"uuid": "sq-1", "name": "Default-Squad"}
         with patch(
-            "meridian.remnawave._sdk_call",
+            "meridian.remnawave.client.sdk_call",
             return_value=_ns(internalSquads=[mock_squad]),
         ):
             squads = panel.list_internal_squads()
@@ -807,7 +809,7 @@ class TestInternalSquads:
     def test_assign_inbounds_to_squad_uses_sdk(self) -> None:
         panel = _make_panel()
         panel._sdk.internal_squads.update_internal_squad = MagicMock(return_value="update-internal-squad-coro")
-        with patch("meridian.remnawave._sdk_call", return_value=_ns(uuid="sq-1")):
+        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="sq-1")):
             panel.assign_inbounds_to_squad(
                 "00000000-0000-0000-0000-0000000000f0",
                 ["00000000-0000-0000-0000-0000000000f1"],
@@ -905,13 +907,13 @@ class TestGetMethodErrorPropagation:
     def test_get_config_profile_not_found_returns_none(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave._sdk_call", side_effect=RemnawaveNotFoundError("404")):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveNotFoundError("404")):
             assert panel.get_config_profile("cp-1") is None
 
     def test_get_config_profile_auth_error_propagates(self) -> None:
         panel = _make_panel()
         panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave._sdk_call", side_effect=RemnawaveAuthError("expired")):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveAuthError("expired")):
             with pytest.raises(RemnawaveAuthError):
                 panel.get_config_profile("cp-1")
 
@@ -925,12 +927,12 @@ class TestListUsersPagination:
         panel._sdk.users.get_all_users = MagicMock(return_value="coro")
 
         # Build 2.5 pages worth of fake users (2500 users).
-        # _sdk_call return values, one per loop iteration.
+        # sdk_call return values, one per loop iteration.
         page1 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(1000)])
         page2 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(1000, 2000)])
         page3 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(2000, 2500)])
 
-        with patch("meridian.remnawave._sdk_call", side_effect=[page1, page2, page3]):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=[page1, page2, page3]):
             users = panel.list_users()
 
         assert len(users) == 2500
@@ -941,7 +943,7 @@ class TestListUsersPagination:
         panel = _make_panel()
         panel._sdk.users.get_all_users = MagicMock(return_value="coro")
 
-        with patch("meridian.remnawave._sdk_call", side_effect=[_ns(users=[])]):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=[_ns(users=[])]):
             users = panel.list_users()
 
         assert users == []
@@ -951,21 +953,21 @@ class TestListUsersPagination:
         panel = _make_panel()
         panel._sdk.users.get_all_users = MagicMock(return_value="coro")
 
-        with patch("meridian.remnawave._sdk_call", side_effect=[_ns(users=[])]):
+        with patch("meridian.remnawave.client.sdk_call", side_effect=[_ns(users=[])]):
             panel.list_users()
         kwargs = panel._sdk.users.get_all_users.call_args.kwargs
         assert kwargs.get("size", 0) <= 1000
 
 
 class TestSdkExceptionTranslation:
-    """_sdk_call must convert the official SDK's exception hierarchy into our
+    """sdk_call must convert the official SDK's exception hierarchy into our
     RemnawaveError types. The handlers in commands/ rely on RemnawaveNotFoundError
     vs RemnawaveAuthError vs RemnawaveError to decide what to do — if SDK
     upgrades change exception types we must trip these tests, not silently
     let bare exceptions bubble up."""
 
     def test_remnawave_errors_pass_through_unchanged(self) -> None:
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         original = RemnawaveAuthError("token expired")
 
@@ -973,7 +975,7 @@ class TestSdkExceptionTranslation:
             raise original
 
         with pytest.raises(RemnawaveAuthError) as exc_info:
-            _sdk_call(coro())
+            sdk_call(coro())
         # Identity is preserved; we did not double-wrap.
         assert exc_info.value is original
 
@@ -985,7 +987,7 @@ class TestSdkExceptionTranslation:
     def test_sdk_not_found_becomes_remnawave_not_found(self) -> None:
         from remnawave.exceptions import NotFoundError
 
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         err = self._api_err("user does not exist")
 
@@ -993,12 +995,12 @@ class TestSdkExceptionTranslation:
             raise NotFoundError(404, err)
 
         with pytest.raises(RemnawaveNotFoundError):
-            _sdk_call(coro())
+            sdk_call(coro())
 
     def test_sdk_unauthorized_becomes_remnawave_auth_error(self) -> None:
         from remnawave.exceptions import UnauthorizedError
 
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         err = self._api_err("bad token")
 
@@ -1006,12 +1008,12 @@ class TestSdkExceptionTranslation:
             raise UnauthorizedError(401, err)
 
         with pytest.raises(RemnawaveAuthError):
-            _sdk_call(coro())
+            sdk_call(coro())
 
     def test_sdk_forbidden_becomes_remnawave_auth_error(self) -> None:
         from remnawave.exceptions import ForbiddenError
 
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         err = self._api_err("scope insufficient")
 
@@ -1019,12 +1021,12 @@ class TestSdkExceptionTranslation:
             raise ForbiddenError(403, err)
 
         with pytest.raises(RemnawaveAuthError):
-            _sdk_call(coro())
+            sdk_call(coro())
 
     def test_sdk_network_error_becomes_remnawave_network_error(self) -> None:
         from remnawave.exceptions import NetworkError
 
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         err = self._api_err("connection refused")
 
@@ -1032,16 +1034,16 @@ class TestSdkExceptionTranslation:
             raise NetworkError(0, err)
 
         with pytest.raises(RemnawaveNetworkError):
-            _sdk_call(coro())
+            sdk_call(coro())
 
     def test_sdk_httpx_timeout_becomes_remnawave_network_error(self) -> None:
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         async def coro() -> None:
             raise httpx.ReadTimeout("slow")
 
         with pytest.raises(RemnawaveNetworkError) as exc_info:
-            _sdk_call(coro())
+            sdk_call(coro())
 
         assert exc_info.value.category == "system"
 
@@ -1064,20 +1066,20 @@ class TestSdkExceptionTranslation:
         status_code: int,
         expected: type[RemnawaveError],
     ) -> None:
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         async def coro() -> None:
             raise self._http_status_error(status_code)
 
         with pytest.raises(expected) as exc_info:
-            _sdk_call(coro())
+            sdk_call(coro())
 
         assert not isinstance(exc_info.value, RemnawaveNetworkError)
 
     def test_sdk_api_error_becomes_remnawave_error(self) -> None:
         from remnawave.exceptions import ApiError
 
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         err = self._api_err("server exploded")
 
@@ -1085,15 +1087,15 @@ class TestSdkExceptionTranslation:
             raise ApiError(500, err)
 
         with pytest.raises(RemnawaveError):
-            _sdk_call(coro())
+            sdk_call(coro())
 
     def test_unknown_exception_bubbles_up_unchanged(self) -> None:
         """An unrelated exception (programmer error, attribute error, etc.)
         must not be silently wrapped — that would hide bugs."""
-        from meridian.remnawave import _sdk_call
+        from meridian.remnawave import sdk_call
 
         async def coro() -> None:
             raise AttributeError("some_attr")
 
         with pytest.raises(AttributeError):
-            _sdk_call(coro())
+            sdk_call(coro())
