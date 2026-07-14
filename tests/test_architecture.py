@@ -78,6 +78,24 @@ ENGINE_FORBIDDEN = (
 # adapters/ bridge core↔concrete — never depend on engine.
 ADAPTER_FORBIDDEN = ("meridian.engine",)
 
+# compiler/ is a pure transformation from typed intent to typed resources.
+COMPILER_FORBIDDEN = (
+    "meridian.commands",
+    "meridian.config",
+    "meridian.console",
+    "meridian.engine",
+    "meridian.provision",
+    "meridian.remnawave",
+    "meridian.ssh",
+    "httpx",
+    "requests",
+    "urllib",
+    "os",
+    "pathlib",
+    "random",
+    "secrets",
+)
+
 # operations.py + relay_ops.py + panel_bootstrap.py must not import
 # private (_-prefixed) symbols from commands/.
 LIBRARY_MODULES = [
@@ -103,6 +121,10 @@ class TestLayerBoundaries:
     def test_adapters_never_import_engine(self) -> None:
         violations = _scan_violations(SRC / "adapters", ADAPTER_FORBIDDEN)
         assert violations == [], "adapters/ has forbidden imports:\n" + "\n".join(violations)
+
+    def test_compiler_has_no_runtime_or_randomness_dependencies(self) -> None:
+        violations = _scan_violations(SRC / "compiler", COMPILER_FORBIDDEN)
+        assert violations == [], "compiler/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_library_modules_never_import_private_from_commands(self) -> None:
         """operations.py and friends must not import _foo from commands/.

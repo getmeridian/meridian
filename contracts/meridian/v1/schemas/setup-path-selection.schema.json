@@ -27,9 +27,9 @@
           "type": "string"
         },
         "listen_port": {
-          "default": 443,
+          "default": 0,
           "maximum": 65535,
-          "minimum": 1,
+          "minimum": 0,
           "title": "Listen Port",
           "type": "integer"
         },

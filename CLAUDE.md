@@ -56,6 +56,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── commands/CLAUDE.md                  — per-subcommand pattern
 │   └── wizard.py                       — interactive deploy wizard
 ├── setup/CLAUDE.md                     — resumable setup draft + server shelf
+├── compiler/CLAUDE.md                  — pure finite topology compiler
 ├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 │   └── routes.py                       — FastAPI route handlers

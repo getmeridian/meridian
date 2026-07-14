@@ -49,7 +49,7 @@ class ProtocolPathIntent(CoreModel):
 
     id: RequiredNameValue
     protocol: ProtocolKind
-    listen_port: PortValue = 443
+    listen_port: int = Field(default=0, ge=0, le=65535)
     public_port: PortValue = 443
     reality_sni: OptionalHostnameValue = ""
     tls_sni: OptionalHostnameValue = ""

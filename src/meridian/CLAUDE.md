@@ -20,6 +20,8 @@
 
 **Resumable setup** — `core/setup.py` owns secret-free contracts; `setup/` owns atomic draft persistence, stage invalidation, and immutable server-shelf selection.
 
+**Finite compiler** — `compiler/` purely transforms complete setup intent into typed, dependency-ordered, hash-reviewed V4 resources. It never performs I/O or generates secrets.
+
 **Errors over exits** — library modules raise typed exceptions (`MeridianError` hierarchy in `core/errors.py`) and expose their classification as `category`; `hint_type` belongs only to `console.fail()`. Only CLI command entry points call `console.fail()`.
 
 ## What's done well
