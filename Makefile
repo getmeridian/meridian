@@ -43,13 +43,15 @@ ci: check templates ## Run full CI locally
 
 system-lab: ## Run multi-node system lab (clean state, ~10min)
 	bash tests/systemlab/scripts/setup-fixtures.sh
-	docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
-	docker compose -f tests/systemlab/compose.yml down -v
+	@cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
+		trap cleanup EXIT; \
+		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
 system-lab-fast: ## Re-run system lab preserving cached images (~3-4min after first run)
 	bash tests/systemlab/scripts/setup-fixtures.sh
-	docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
-	docker compose -f tests/systemlab/compose.yml down
+	@cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \
+		trap cleanup EXIT; \
+		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
 ## —— Real-VM harness (LOCAL ONLY, costs real money) ————————————————
 
