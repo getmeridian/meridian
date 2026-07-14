@@ -8,6 +8,7 @@ No CLI interaction (prompts, Rich tables) — those stay in commands/.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from meridian.cluster import (
@@ -21,6 +22,22 @@ from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
+_PUBLIC_PROXY_PORT = 443
+
+
+@dataclass(frozen=True)
+class _ManagedHost:
+    remark: str
+    address: str
+    port: int
+    config_profile_uuid: str
+    inbound_uuid: str
+    sni: str = ""
+    host_header: str = ""
+    path: str = ""
+    alpn: str | None = None
+    fingerprint: str | None = None
+    security_layer: str = "DEFAULT"
 
 
 # Panel API utilities
@@ -153,7 +170,10 @@ def cache_inbounds(panel: MeridianPanel, cluster: ClusterConfig) -> None:
                 cluster.inbounds[str(key)] = InboundRef(uuid=ib.uuid, tag=ib.tag)
         logger.info("Cached %d inbound references", len(cluster.inbounds))
     except RemnawaveError as e:
-        logger.warning("Could not cache inbound references: %s", e)
+        raise PanelSetupError(
+            f"Could not read required Remnawave inbounds: {e}",
+            hint="No Hosts were changed. Check the panel and profile, then retry.",
+        ) from e
 
 
 def register_or_reuse_node(
@@ -186,99 +206,193 @@ def create_hosts_for_node(
     node_ip: str,
     domain: str,
     sni: str,
-    reality_port: int,
+    reality_backend_port: int | None = None,
 ) -> None:
-    """Create direct host entries for a node's protocols."""
+    """Converge direct Host entries to the node's public protocol listeners."""
+    if reality_backend_port is not None:
+        logger.debug(
+            "Ignoring internal Reality backend port %s when publishing public Host",
+            reality_backend_port,
+        )
+    node = cluster.find_node(node_ip)
+    if node is None:
+        raise PanelSetupError(
+            f"Cannot publish Hosts for unknown node {node_ip}",
+            hint="Persist the node before reconciling its Remnawave Hosts.",
+            category="bug",
+        )
+    if not cluster.config_profile_uuid:
+        raise PanelSetupError(
+            "Cannot publish Hosts without a config profile",
+            hint="Create and observe the Remnawave config profile before reconciling Hosts.",
+            category="bug",
+        )
+    required_protocols = [ProtocolKey.REALITY, ProtocolKey.XHTTP]
+    if domain:
+        required_protocols.append(ProtocolKey.WSS)
+    if node.hysteria2:
+        required_protocols.append(ProtocolKey.HYSTERIA2)
+    missing_protocols: list[str] = []
+    for protocol in required_protocols:
+        ref = cluster.get_inbound(protocol)
+        if ref is None or not ref.uuid:
+            missing_protocols.append(str(protocol))
+    if missing_protocols:
+        raise PanelSetupError(
+            f"Config profile is missing required inbounds: {', '.join(missing_protocols)}",
+            hint="Refresh the profile and inbound cache before publishing any Hosts.",
+        )
     host_address = domain or node_ip
-
-    # Batch-fetch all hosts once instead of per-protocol find_host_by_remark
     try:
-        existing_remarks = {h.remark for h in panel.list_hosts()}
-    except RemnawaveError:
-        existing_remarks = set()
+        existing_hosts = panel.list_hosts()
+    except RemnawaveError as exc:
+        raise PanelSetupError(
+            f"Could not observe existing Remnawave Hosts: {exc}",
+            hint="No Hosts were changed. Check panel connectivity, then retry.",
+        ) from exc
+    by_remark: dict[str, Any] = {}
+    for host in existing_hosts:
+        if host.remark in by_remark:
+            raise PanelSetupError(
+                f"Remnawave contains duplicate Hosts named '{host.remark}'",
+                hint="Rename or remove the duplicate in Remnawave before retrying.",
+                category="user",
+            )
+        by_remark[host.remark] = host
 
-    # Reality host (direct IP, port 443 or computed)
+    desired: list[_ManagedHost] = []
     reality_ref = cluster.get_inbound(ProtocolKey.REALITY)
     if reality_ref and reality_ref.uuid:
-        remark = f"reality-{node_ip}"
-        if remark in existing_remarks:
-            logger.info("Host '%s' already exists, skipping", remark)
-        else:
-            try:
-                panel.create_host(
-                    remark=remark,
-                    address=node_ip,
-                    port=reality_port,
-                    config_profile_uuid=cluster.config_profile_uuid,
-                    inbound_uuid=reality_ref.uuid,
-                    sni=sni,
-                    fingerprint="chrome",
-                    security_layer="DEFAULT",
-                )
-                logger.info("Host created: Reality via %s:%s", node_ip, reality_port)
-            except RemnawaveError as e:
-                logger.warning("Could not create Reality host: %s", e)
+        desired.append(
+            _ManagedHost(
+                remark=f"reality-{node_ip}",
+                address=node_ip,
+                port=_PUBLIC_PROXY_PORT,
+                config_profile_uuid=cluster.config_profile_uuid,
+                inbound_uuid=reality_ref.uuid,
+                sni=sni,
+                fingerprint="chrome",
+            )
+        )
 
-    # XHTTP host (via domain or IP, port 443 through nginx)
     xhttp_ref = cluster.get_inbound(ProtocolKey.XHTTP)
     if xhttp_ref and xhttp_ref.uuid:
-        remark = f"xhttp-{host_address}"
-        if remark in existing_remarks:
-            logger.info("Host '%s' already exists, skipping", remark)
-        else:
-            try:
-                panel.create_host(
-                    remark=remark,
-                    address=host_address,
-                    port=443,
-                    config_profile_uuid=cluster.config_profile_uuid,
-                    inbound_uuid=xhttp_ref.uuid,
-                    security_layer="TLS",
-                )
-                logger.info("Host created: XHTTP via %s:443", host_address)
-            except RemnawaveError as e:
-                logger.warning("Could not create XHTTP host: %s", e)
+        desired.append(
+            _ManagedHost(
+                remark=f"xhttp-{host_address}",
+                address=host_address,
+                port=_PUBLIC_PROXY_PORT,
+                config_profile_uuid=cluster.config_profile_uuid,
+                inbound_uuid=xhttp_ref.uuid,
+                sni=domain,
+                host_header=domain,
+                path=f"/{node.xhttp_path}" if node.xhttp_path else "",
+                security_layer="TLS",
+            )
+        )
 
-    # WSS host (domain mode only, port 443 through CDN)
     if domain:
         wss_ref = cluster.get_inbound(ProtocolKey.WSS)
         if wss_ref and wss_ref.uuid:
-            remark = f"wss-{domain}"
-            if remark in existing_remarks:
-                logger.info("Host '%s' already exists, skipping", remark)
-            else:
-                try:
-                    panel.create_host(
-                        remark=remark,
-                        address=domain,
-                        port=443,
-                        config_profile_uuid=cluster.config_profile_uuid,
-                        inbound_uuid=wss_ref.uuid,
-                        security_layer="TLS",
-                    )
-                    logger.info("Host created: WSS via %s:443", domain)
-                except RemnawaveError as e:
-                    logger.warning("Could not create WSS host: %s", e)
-
-    # Hysteria2 host (UDP/443 fallback, ordered after TCP transports)
-    hy2_ref = cluster.get_inbound(ProtocolKey.HYSTERIA2)
-    if hy2_ref and hy2_ref.uuid:
-        remark = f"hysteria2-{node_ip}"
-        if remark in existing_remarks:
-            logger.info("Host '%s' already exists, skipping", remark)
-        else:
-            try:
-                panel.create_host(
-                    remark=remark,
-                    address=node_ip,
-                    port=443,
+            desired.append(
+                _ManagedHost(
+                    remark=f"wss-{domain}",
+                    address=domain,
+                    port=_PUBLIC_PROXY_PORT,
                     config_profile_uuid=cluster.config_profile_uuid,
-                    inbound_uuid=hy2_ref.uuid,
+                    inbound_uuid=wss_ref.uuid,
+                    sni=domain,
+                    host_header=domain,
+                    path=f"/{node.ws_path}" if node.ws_path else "",
                     security_layer="TLS",
                 )
-                logger.info("Host created: Hysteria2 via %s:443 (UDP)", node_ip)
-            except RemnawaveError as e:
-                logger.warning("Could not create Hysteria2 host: %s", e)
+            )
+
+    hy2_ref = cluster.get_inbound(ProtocolKey.HYSTERIA2)
+    if hy2_ref and hy2_ref.uuid:
+        desired.append(
+            _ManagedHost(
+                remark=f"hysteria2-{host_address}",
+                address=host_address,
+                port=_PUBLIC_PROXY_PORT,
+                config_profile_uuid=cluster.config_profile_uuid,
+                inbound_uuid=hy2_ref.uuid,
+                sni=domain,
+                alpn="h3",
+                security_layer="TLS",
+            )
+        )
+
+    for spec in desired:
+        _reconcile_host(panel, by_remark.get(spec.remark), spec)
+
+
+def _reconcile_host(panel: MeridianPanel, existing: Any | None, desired: _ManagedHost) -> None:
+    try:
+        if existing is None:
+            panel.create_host(
+                remark=desired.remark,
+                address=desired.address,
+                port=desired.port,
+                config_profile_uuid=desired.config_profile_uuid,
+                inbound_uuid=desired.inbound_uuid,
+                sni=desired.sni,
+                host_header=desired.host_header,
+                path=desired.path,
+                alpn=desired.alpn,
+                fingerprint=desired.fingerprint,
+                security_layer=desired.security_layer,
+                is_disabled=False,
+            )
+            logger.info("Host created: %s via %s:%s", desired.remark, desired.address, desired.port)
+            return
+        if _host_matches(existing, desired):
+            logger.info("Host '%s' already converged", desired.remark)
+            return
+        if not existing.uuid:
+            raise PanelSetupError(
+                f"Cannot update Host '{desired.remark}' because Remnawave returned no UUID",
+                category="bug",
+            )
+        panel.update_host(
+            existing.uuid,
+            remark=desired.remark,
+            address=desired.address,
+            port=desired.port,
+            config_profile_uuid=desired.config_profile_uuid,
+            inbound_uuid=desired.inbound_uuid,
+            sni=desired.sni,
+            host_header=desired.host_header,
+            path=desired.path,
+            alpn=desired.alpn,
+            fingerprint=desired.fingerprint,
+            security_layer=desired.security_layer,
+            is_disabled=False,
+        )
+        logger.info("Host updated: %s", desired.remark)
+    except RemnawaveError as exc:
+        raise PanelSetupError(
+            f"Could not reconcile required Host '{desired.remark}': {exc}",
+            hint="The Host was not considered applied. Fix panel connectivity and retry.",
+        ) from exc
+
+
+def _host_matches(host: Any, desired: _ManagedHost) -> bool:
+    expected = {
+        "remark": desired.remark,
+        "address": desired.address,
+        "port": desired.port,
+        "config_profile_uuid": desired.config_profile_uuid,
+        "inbound_uuid": desired.inbound_uuid,
+        "sni": desired.sni,
+        "host": desired.host_header,
+        "path": desired.path,
+        "alpn": desired.alpn or "",
+        "fingerprint": desired.fingerprint or "",
+        "security_layer": desired.security_layer,
+        "is_disabled": False,
+    }
+    return all(getattr(host, field, None) == value for field, value in expected.items())
 
 
 def enforce_host_ordering(panel: MeridianPanel) -> None:

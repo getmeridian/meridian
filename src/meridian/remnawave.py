@@ -93,6 +93,12 @@ class Host:
     address: str = ""
     port: int = 0
     sni: str = ""
+    host: str = ""
+    path: str = ""
+    alpn: str = ""
+    fingerprint: str = ""
+    security_layer: str = "DEFAULT"
+    config_profile_uuid: str = ""
     inbound_uuid: str = ""
     is_disabled: bool = False
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -178,12 +184,19 @@ def _host_from_sdk(obj: Any) -> Host:
         address=getattr(obj, "address", "") or "",
         port=int(getattr(obj, "port", 0) or 0),
         sni=getattr(obj, "sni", "") or "",
+        host=getattr(obj, "host", "") or "",
+        path=getattr(obj, "path", "") or "",
+        alpn=str(getattr(obj, "alpn", "") or ""),
+        fingerprint=getattr(obj, "fingerprint", "") or "",
+        security_layer=_enum_string(getattr(obj, "security_layer", "DEFAULT")),
+        config_profile_uuid=str(getattr(inbound, "config_profile_uuid", "") or ""),
         # SDK field is `config_profile_inbound_uuid` (Pydantic snake_case for
         # the JSON alias `configProfileInboundUuid`). Mapped to our simpler
         # `inbound_uuid`. If a future SDK bump renames this field, the getattr
         # silently returns "" — keep this comment as a breadcrumb.
         inbound_uuid=str(getattr(inbound, "config_profile_inbound_uuid", "") or ""),
         is_disabled=bool(getattr(obj, "is_disabled", False)),
+        _raw=_sdk_to_dict(obj) if obj is not None else {},
     )
 
 
@@ -234,6 +247,11 @@ def _sdk_to_dict(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {key: _sdk_to_dict(value) for key, value in obj.items()}
     return obj
+
+
+def _enum_string(value: Any) -> str:
+    """Return an enum's wire value or a plain string."""
+    return str(getattr(value, "value", value) or "")
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +456,9 @@ class MeridianPanel:
 
     def _post(self, path: str, json: Any = None) -> Any:
         return self._request("POST", path, json=json)
+
+    def _patch(self, path: str, json: Any = None) -> Any:
+        return self._request("PATCH", path, json=json)
 
     # --- Health ---
 
@@ -655,6 +676,44 @@ class MeridianPanel:
         hosts_list = _sdk_items(resp)
         return [_host_from_sdk(h) for h in hosts_list]
 
+    def update_host(
+        self,
+        uuid: str,
+        *,
+        remark: str,
+        address: str,
+        port: int,
+        config_profile_uuid: str,
+        inbound_uuid: str,
+        sni: str = "",
+        host_header: str = "",
+        path: str = "",
+        alpn: str | None = None,
+        fingerprint: str | None = None,
+        security_layer: str = "DEFAULT",
+        is_disabled: bool = False,
+    ) -> Host:
+        """Replace all Meridian-owned Host connection fields."""
+        body: dict[str, Any] = {
+            "uuid": uuid,
+            "remark": remark,
+            "address": address,
+            "port": port,
+            "inbound": {
+                "configProfileUuid": config_profile_uuid,
+                "configProfileInboundUuid": inbound_uuid,
+            },
+            "sni": sni or None,
+            "host": host_header or None,
+            "path": path or None,
+            "alpn": alpn,
+            "fingerprint": fingerprint,
+            "securityLayer": security_layer,
+            "isDisabled": is_disabled,
+        }
+        data = self._patch("/api/hosts", json=body)
+        return _parse_host(data)
+
     def find_host_by_remark(self, remark: str) -> Host | None:
         """Find a host by its remark string. Returns None if not found."""
         for host in self.list_hosts():
@@ -853,13 +912,23 @@ class MeridianPanel:
 def _parse_host(data: Any) -> Host:
     if not isinstance(data, dict):
         return Host()
+    inbound = data.get("inbound")
+    inbound = inbound if isinstance(inbound, dict) else {}
     return Host(
         uuid=data.get("uuid", ""),
         remark=data.get("remark", ""),
         address=data.get("address", ""),
         port=data.get("port", 0),
-        sni=data.get("sni", ""),
-        inbound_uuid=data.get("inboundUuid", "") or data.get("inbound_uuid", ""),
+        sni=data.get("sni") or "",
+        host=data.get("host") or "",
+        path=data.get("path") or "",
+        alpn=data.get("alpn") or "",
+        fingerprint=data.get("fingerprint") or "",
+        security_layer=_enum_string(data.get("securityLayer", "DEFAULT")),
+        config_profile_uuid=str(inbound.get("configProfileUuid") or ""),
+        inbound_uuid=str(
+            inbound.get("configProfileInboundUuid") or data.get("inboundUuid") or data.get("inbound_uuid") or ""
+        ),
         is_disabled=data.get("isDisabled", False),
         _raw=data,
     )

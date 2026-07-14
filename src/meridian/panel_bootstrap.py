@@ -439,7 +439,7 @@ def setup_first_deploy(
         cluster.save()
 
         # Create direct hosts for this node's protocols
-        create_hosts_for_node(panel, cluster, resolved.ip, domain, sni, reality_port)
+        create_hosts_for_node(panel, cluster, resolved.ip, domain, sni)
         enforce_host_ordering(panel)
 
         # Create first client
@@ -624,7 +624,7 @@ def setup_redeploy(
             # (which means "not specified" from imperative commands, or "clear" from apply)
             effective_domain = domain if domain else node.domain
             effective_sni = sni if sni else node.sni
-            create_hosts_for_node(panel, cluster, resolved.ip, effective_domain, effective_sni, reality_port)
+            create_hosts_for_node(panel, cluster, resolved.ip, effective_domain, effective_sni)
             enforce_host_ordering(panel)
 
             # Update node metadata
@@ -711,7 +711,7 @@ def setup_new_node(
             cluster.save()
 
             # Create hosts for the new node
-            create_hosts_for_node(panel, cluster, resolved.ip, domain, sni, reality_port)
+            create_hosts_for_node(panel, cluster, resolved.ip, domain, sni)
             enforce_host_ordering(panel)
 
     except RemnawaveError as e:

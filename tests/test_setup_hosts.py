@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
+from meridian.core.errors import PanelSetupError
 from meridian.panel_bootstrap import cache_inbounds, create_hosts_for_node
 from meridian.remnawave import Host, MeridianPanel, RemnawaveError
 
@@ -41,6 +42,7 @@ def _make_panel() -> MeridianPanel:
     # Default: no existing hosts, create_host succeeds
     panel.list_hosts = MagicMock(return_value=[])
     panel.create_host = MagicMock(return_value=MagicMock(uuid="host-uuid"))
+    panel.update_host = MagicMock(return_value=MagicMock(uuid="host-uuid"))
     panel.list_inbounds = MagicMock(return_value=[])
     return panel
 
@@ -48,8 +50,9 @@ def _make_panel() -> MeridianPanel:
 def _configured_cluster() -> ClusterConfig:
     """Cluster with all three inbound protocols cached."""
     return ClusterConfig(
+        config_profile_uuid="profile-uuid",
         panel=PanelConfig(url="https://198.51.100.1/panel", api_token="test-token"),
-        nodes=[NodeEntry(ip=_IP)],
+        nodes=[NodeEntry(ip=_IP, xhttp_path="xhttp-path", ws_path="ws-path", hysteria2=False)],
         inbounds={
             ProtocolKey.REALITY: InboundRef(uuid="ib-reality-uuid", tag="vless-reality"),
             ProtocolKey.XHTTP: InboundRef(uuid="ib-xhttp-uuid", tag="vless-xhttp"),
@@ -58,9 +61,45 @@ def _configured_cluster() -> ClusterConfig:
     )
 
 
-def _host_with_remark(remark: str) -> SimpleNamespace:
-    """Simulate a Host returned by panel.list_hosts()."""
-    return SimpleNamespace(remark=remark)
+def _host_with_remark(remark: str) -> Host:
+    """Build the converged Host shape returned by panel.list_hosts()."""
+    if remark.startswith("reality-"):
+        return Host(
+            uuid=f"host-{remark}",
+            remark=remark,
+            address=_IP,
+            port=443,
+            sni=_SNI,
+            fingerprint="chrome",
+            security_layer="DEFAULT",
+            config_profile_uuid="profile-uuid",
+            inbound_uuid="ib-reality-uuid",
+        )
+    if remark.startswith("xhttp-"):
+        return Host(
+            uuid=f"host-{remark}",
+            remark=remark,
+            address=_DOMAIN,
+            port=443,
+            sni=_DOMAIN,
+            host=_DOMAIN,
+            path="/xhttp-path",
+            security_layer="TLS",
+            config_profile_uuid="profile-uuid",
+            inbound_uuid="ib-xhttp-uuid",
+        )
+    return Host(
+        uuid=f"host-{remark}",
+        remark=remark,
+        address=_DOMAIN,
+        port=443,
+        sni=_DOMAIN,
+        host=_DOMAIN,
+        path="/ws-path",
+        security_layer="TLS",
+        config_profile_uuid="profile-uuid",
+        inbound_uuid="ib-wss-uuid",
+    )
 
 
 def _inbound(uuid: str, tag: str) -> SimpleNamespace:
@@ -92,7 +131,7 @@ class TestCreateHostsForNodeHappyPath:
         kw = _find_create_call(panel, f"reality-{_IP}")
         assert kw is not None
         assert kw["address"] == _IP
-        assert kw["port"] == _REALITY_PORT
+        assert kw["port"] == 443
         assert kw["sni"] == _SNI
         assert kw["inbound_uuid"] == "ib-reality-uuid"
 
@@ -106,6 +145,9 @@ class TestCreateHostsForNodeHappyPath:
         assert kw["address"] == _DOMAIN
         assert kw["port"] == 443
         assert kw["inbound_uuid"] == "ib-xhttp-uuid"
+        assert kw["sni"] == _DOMAIN
+        assert kw["host_header"] == _DOMAIN
+        assert kw["path"] == "/xhttp-path"
 
     def test_creates_wss_host_only_with_domain(self) -> None:
         panel = _make_panel()
@@ -117,6 +159,9 @@ class TestCreateHostsForNodeHappyPath:
         assert kw["address"] == _DOMAIN
         assert kw["port"] == 443
         assert kw["inbound_uuid"] == "ib-wss-uuid"
+        assert kw["sni"] == _DOMAIN
+        assert kw["host_header"] == _DOMAIN
+        assert kw["path"] == "/ws-path"
 
     def test_no_wss_host_without_domain(self) -> None:
         panel = _make_panel()
@@ -150,13 +195,14 @@ class TestCreateHostsForNodeHappyPath:
         panel = _make_panel()
         cluster = _configured_cluster()
         other_ip = "198.51.100.99"
+        cluster.nodes[0].ip = other_ip
         create_hosts_for_node(panel, cluster, other_ip, _DOMAIN, _SNI, _REALITY_PORT)
 
         kw = _find_create_call(panel, f"reality-{other_ip}")
         assert kw is not None
         assert kw["address"] == other_ip
 
-    def test_reality_port_matches_parameter(self) -> None:
+    def test_reality_host_advertises_public_listener_not_backend_port(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
         custom_port = 22345
@@ -164,7 +210,25 @@ class TestCreateHostsForNodeHappyPath:
 
         kw = _find_create_call(panel, f"reality-{_IP}")
         assert kw is not None
-        assert kw["port"] == custom_port
+        assert kw["port"] == 443
+
+    def test_hysteria_host_uses_certificate_name_and_h3(self) -> None:
+        panel = _make_panel()
+        cluster = _configured_cluster()
+        cluster.nodes[0].hysteria2 = True
+        cluster.inbounds[ProtocolKey.HYSTERIA2] = InboundRef(
+            uuid="ib-hysteria-uuid",
+            tag="hysteria2",
+        )
+
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+
+        kw = _find_create_call(panel, f"hysteria2-{_DOMAIN}")
+        assert kw is not None
+        assert kw["address"] == _DOMAIN
+        assert kw["port"] == 443
+        assert kw["sni"] == _DOMAIN
+        assert kw["alpn"] == "h3"
 
 
 # ===========================================================================
@@ -228,6 +292,33 @@ class TestCreateHostsForNodeIdempotency:
         create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         panel.create_host.assert_not_called()
+        panel.update_host.assert_not_called()
+
+    def test_existing_host_drift_is_updated_in_place(self) -> None:
+        panel = _make_panel()
+        drifted = _host_with_remark(f"reality-{_IP}")
+        drifted.port = _REALITY_PORT
+        panel.list_hosts.return_value = [drifted]
+        cluster = _configured_cluster()
+
+        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+
+        panel.update_host.assert_any_call(
+            drifted.uuid,
+            remark=f"reality-{_IP}",
+            address=_IP,
+            port=443,
+            config_profile_uuid="profile-uuid",
+            inbound_uuid="ib-reality-uuid",
+            sni=_SNI,
+            host_header="",
+            path="",
+            alpn=None,
+            fingerprint="chrome",
+            security_layer="DEFAULT",
+            is_disabled=False,
+        )
+        assert _find_create_call(panel, f"reality-{_IP}") is None
 
 
 # ===========================================================================
@@ -235,10 +326,10 @@ class TestCreateHostsForNodeIdempotency:
 # ===========================================================================
 
 
-class TestCreateHostsForNodePartialFailure:
-    """Individual host creation failures warn but don't abort."""
+class TestCreateHostsForNodeFailure:
+    """Required Host observation and mutation failures abort the apply."""
 
-    def test_reality_host_creation_fails_warns_continues(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_reality_host_creation_failure_is_hard(self) -> None:
         panel = _make_panel()
 
         def _fail_on_reality(**kwargs: object) -> MagicMock:
@@ -248,17 +339,13 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_reality
         cluster = _configured_cluster()
-        import logging
 
-        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+        with pytest.raises(PanelSetupError, match="required Host"):
             create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
-        assert caplog.records
-        # XHTTP and WSS should still be attempted
-        assert _find_create_call(panel, f"xhttp-{_DOMAIN}") is not None
-        assert _find_create_call(panel, f"wss-{_DOMAIN}") is not None
+        assert panel.create_host.call_count == 1
 
-    def test_one_of_three_hosts_fail_creates_other_two(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_later_host_failure_stops_before_publish_completes(self) -> None:
         panel = _make_panel()
 
         def _fail_on_xhttp(**kwargs: object) -> MagicMock:
@@ -268,23 +355,21 @@ class TestCreateHostsForNodePartialFailure:
 
         panel.create_host.side_effect = _fail_on_xhttp
         cluster = _configured_cluster()
-        import logging
 
-        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+        with pytest.raises(PanelSetupError, match="xhttp"):
             create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
-        # 3 attempts total (reality, xhttp, wss)
-        assert panel.create_host.call_count == 3
-        assert caplog.records  # warning for xhttp failure
+        assert panel.create_host.call_count == 2
 
-    def test_list_hosts_fails_still_attempts_creation(self) -> None:
+    def test_list_hosts_failure_does_not_assume_empty_remote_state(self) -> None:
         panel = _make_panel()
         panel.list_hosts.side_effect = RemnawaveError("api down")
         cluster = _configured_cluster()
-        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
-        # Should fall back to empty set and attempt all creations
-        assert panel.create_host.call_count == 3
+        with pytest.raises(PanelSetupError, match="observe existing"):
+            create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+
+        panel.create_host.assert_not_called()
 
 
 # ===========================================================================
@@ -293,27 +378,29 @@ class TestCreateHostsForNodePartialFailure:
 
 
 class TestCreateHostsForNodeMissingInbounds:
-    """No hosts created when the corresponding inbound is absent."""
+    """Required profile inbounds must exist before any Host is published."""
 
-    def test_no_reality_inbound_skips_reality_host(self) -> None:
+    def test_no_reality_inbound_fails_before_mutation(self) -> None:
         panel = _make_panel()
         cluster = _configured_cluster()
         del cluster.inbounds[ProtocolKey.REALITY]
-        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
-        assert _find_create_call(panel, f"reality-{_IP}") is None
-        # XHTTP and WSS should still be created
-        assert _find_create_call(panel, f"xhttp-{_DOMAIN}") is not None
-        assert _find_create_call(panel, f"wss-{_DOMAIN}") is not None
+        with pytest.raises(PanelSetupError, match="missing required inbounds: reality"):
+            create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
-    def test_empty_inbounds_creates_no_hosts(self) -> None:
+        panel.create_host.assert_not_called()
+
+    def test_empty_inbounds_fail_before_mutation(self) -> None:
         panel = _make_panel()
         cluster = ClusterConfig(
+            config_profile_uuid="profile-uuid",
             panel=PanelConfig(url="https://198.51.100.1/panel", api_token="test-token"),
-            nodes=[NodeEntry(ip=_IP)],
+            nodes=[NodeEntry(ip=_IP, hysteria2=False)],
             inbounds={},
         )
-        create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
+
+        with pytest.raises(PanelSetupError, match="reality, xhttp, wss"):
+            create_hosts_for_node(panel, cluster, _IP, _DOMAIN, _SNI, _REALITY_PORT)
 
         panel.create_host.assert_not_called()
 
@@ -384,16 +471,14 @@ class TestCacheInbounds:
         assert len(cluster.inbounds) == 1
         assert ProtocolKey.REALITY in cluster.inbounds
 
-    def test_handles_api_error_gracefully(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_api_error_is_hard_before_host_reconciliation(self) -> None:
         panel = _make_panel()
         panel.list_inbounds.side_effect = RemnawaveError("unreachable")
         cluster = ClusterConfig()
-        import logging
 
-        with caplog.at_level(logging.WARNING, logger="meridian.panel_bootstrap"):
+        with pytest.raises(PanelSetupError, match="required Remnawave inbounds"):
             cache_inbounds(panel, cluster)
 
-        assert caplog.records
         assert len(cluster.inbounds) == 0
 
 

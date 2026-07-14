@@ -30,6 +30,7 @@
 ## Pitfalls
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files require recovery, and generated `srv-*` IDs survive connection edits.
 - **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path values before nginx, Xray, or Remnawave serialization.
+- **Published Hosts are assertions** — reconcile complete protocol fields against public listeners; observation or mutation failure must stop apply.
 - **Shell injection**: ALL `conn.run()` interpolated values MUST use `shlex.quote()`.
 - **ProtocolKey is StrEnum** — works as dict key but YAML serialization needs `_stringify_keys()` to avoid Python-tagged output.
 - **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.

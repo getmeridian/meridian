@@ -309,13 +309,22 @@ class TestHostFromSdk:
             address="198.51.100.1",
             port=443,
             sni="www.google.com",
+            host="vpn.example.com",
+            path="/connect",
+            fingerprint="chrome",
+            security_layer="TLS",
             is_disabled=False,
-            inbound=_ns(config_profile_inbound_uuid="ib-1"),
+            inbound=_ns(config_profile_uuid="profile-1", config_profile_inbound_uuid="ib-1"),
         )
         host = _host_from_sdk(obj)
         assert host.uuid == "h-1"
         assert host.remark == "reality-198.51.100.1"
         assert host.sni == "www.google.com"
+        assert host.host == "vpn.example.com"
+        assert host.path == "/connect"
+        assert host.fingerprint == "chrome"
+        assert host.security_layer == "TLS"
+        assert host.config_profile_uuid == "profile-1"
         assert host.inbound_uuid == "ib-1"
 
     def test_handles_missing_fields(self) -> None:
@@ -649,6 +658,47 @@ class TestCreateHost:
         assert call_json["fingerprint"] == "chrome"
         assert call_json["securityLayer"] == "REALITY"
         assert call_json["isDisabled"] is True
+
+    def test_update_host_serializes_complete_managed_shape(self) -> None:
+        panel = _make_panel()
+        panel._patch = MagicMock(
+            return_value={
+                "uuid": "h-2",
+                "remark": "xhttp-vpn.example.com",
+                "address": "vpn.example.com",
+                "port": 443,
+                "path": "/connect",
+                "sni": "vpn.example.com",
+                "host": "vpn.example.com",
+                "securityLayer": "TLS",
+                "inbound": {
+                    "configProfileUuid": "00000000-0000-0000-0000-0000000000e0",
+                    "configProfileInboundUuid": "00000000-0000-0000-0000-0000000000e1",
+                },
+            }
+        )
+
+        host = panel.update_host(
+            "h-2",
+            remark="xhttp-vpn.example.com",
+            address="vpn.example.com",
+            port=443,
+            config_profile_uuid="00000000-0000-0000-0000-0000000000e0",
+            inbound_uuid="00000000-0000-0000-0000-0000000000e1",
+            sni="vpn.example.com",
+            host_header="vpn.example.com",
+            path="/connect",
+            security_layer="TLS",
+        )
+
+        body = panel._patch.call_args.kwargs["json"]
+        assert body["uuid"] == "h-2"
+        assert body["path"] == "/connect"
+        assert body["sni"] == "vpn.example.com"
+        assert body["host"] == "vpn.example.com"
+        assert body["securityLayer"] == "TLS"
+        assert host.config_profile_uuid == "00000000-0000-0000-0000-0000000000e0"
+        assert host.inbound_uuid == "00000000-0000-0000-0000-0000000000e1"
 
 
 # ---------------------------------------------------------------------------
