@@ -118,6 +118,26 @@ class TestClusterValidation:
         cfg = _configured_cluster()
         assert cfg.validate() == []
 
+    def test_unsafe_hostname_and_transport_path_are_rejected(self) -> None:
+        cfg = ClusterConfig(
+            nodes=[
+                NodeEntry(
+                    ip=_IP_A,
+                    sni="safe.example.com; include /tmp/x",
+                    domain="VPN.Example.COM",
+                    xhttp_path="../private",
+                    ws_path="/leading-slash",
+                )
+            ]
+        )
+
+        errors = cfg.validate()
+
+        assert any("nodes[0].sni is invalid" in error for error in errors)
+        assert any("nodes[0].domain must use canonical form: vpn.example.com" in error for error in errors)
+        assert any("nodes[0].xhttp_path is invalid" in error for error in errors)
+        assert any("nodes[0].ws_path must be relative" in error for error in errors)
+
     def test_invalid_panel_server_ip_detected(self) -> None:
         cfg = ClusterConfig(panel=PanelConfig(server_ip="bogus"))
         errors = cfg.validate()

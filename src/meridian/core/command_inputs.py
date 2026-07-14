@@ -5,6 +5,7 @@ from __future__ import annotations
 from meridian.core.inputs import (
     IPAddressValue,
     NameValue,
+    OptionalHostnameValue,
     OptionalSelectorValue,
     OptionalSshUserValue,
     PortValue,
@@ -43,8 +44,8 @@ class NodeAddRequest(CoreModel):
     name: NameValue = ""
     user: SshUserValue = "root"
     ssh_port: PortValue = 22
-    sni: str = ""
-    domain: str = ""
+    sni: OptionalHostnameValue = ""
+    domain: OptionalHostnameValue = ""
     harden: bool = True
     yes: bool = False
 
@@ -65,7 +66,7 @@ class RelayDeployRequest(CoreModel):
     relay_name: NameValue = ""
     listen_port: PortValue = 443
     yes: bool = False
-    sni: str = ""
+    sni: OptionalHostnameValue = ""
     ssh_port: PortValue = 22
 
 

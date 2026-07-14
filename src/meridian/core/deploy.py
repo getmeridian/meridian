@@ -7,7 +7,13 @@ from typing import Any, Literal
 from pydantic import Field
 
 from meridian.core.defaults import DEFAULT_SNI
-from meridian.core.inputs import DeployIpValue, NameValue, OptionalServerReferenceValue, SshUserValue
+from meridian.core.inputs import (
+    DeployIpValue,
+    NameValue,
+    OptionalHostnameValue,
+    OptionalServerReferenceValue,
+    SshUserValue,
+)
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
@@ -19,8 +25,8 @@ class DeployRequest(CoreModel):
     """Trusted local request for deploying or redeploying a Meridian server."""
 
     ip: DeployIpValue = ""
-    domain: str = ""
-    sni: str = ""
+    domain: OptionalHostnameValue = ""
+    sni: OptionalHostnameValue = ""
     client_name: NameValue = ""
     user: SshUserValue = "root"
     yes: bool = False
@@ -39,8 +45,8 @@ class DeployWorkflowAnswers(CoreModel):
 
     ip: DeployIpValue = ""
     user: SshUserValue = "root"
-    sni: str = ""
-    domain: str = ""
+    sni: OptionalHostnameValue = ""
+    domain: OptionalHostnameValue = ""
     harden: bool = True
     client_name: NameValue = ""
     server_name: str = ""

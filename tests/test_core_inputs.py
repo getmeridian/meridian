@@ -11,7 +11,11 @@ from meridian.core.command_inputs import (
     RelayDeployRequest,
     ServerAddRequest,
 )
-from meridian.core.inputs import is_ip_deploy_target
+from meridian.core.inputs import (
+    is_ip_deploy_target,
+    validate_hostname_value,
+    validate_optional_transport_path_value,
+)
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
     ServerConnectionDraft,
@@ -65,6 +69,26 @@ def test_node_add_request_validates_user_and_port() -> None:
     hint = validation_error_hint(exc_info.value)
     assert "user: Use letters, numbers, dots, hyphens, and underscores." in hint
     assert "ssh_port" in hint
+
+
+def test_hostname_inputs_normalize_idna_and_reject_nginx_injection() -> None:
+    assert validate_hostname_value("VPN.Example.COM.") == "vpn.example.com"
+    assert validate_hostname_value("пример.рф").startswith("xn--")
+
+    with pytest.raises(ValueError, match="valid domain"):
+        NodeAddRequest(ip="198.51.100.10", sni="safe.example.com; include /tmp/x")
+    with pytest.raises(ValueError, match="full domain"):
+        RelayDeployRequest(relay_ip="198.51.100.20", sni="localhost")
+
+
+def test_transport_paths_are_relative_and_reject_traversal() -> None:
+    assert validate_optional_transport_path_value("/connect/path") == "connect/path"
+    assert validate_optional_transport_path_value("") == ""
+
+    with pytest.raises(ValueError, match="URL-safe"):
+        validate_optional_transport_path_value("../private")
+    with pytest.raises(ValueError, match="URL-safe"):
+        validate_optional_transport_path_value("path with spaces")
 
 
 def test_server_connection_draft_accepts_ip_title_and_port() -> None:

@@ -16,6 +16,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from meridian.core.inputs import validate_hostname_value, validate_optional_transport_path_value
+
 logger = logging.getLogger("meridian.cluster")
 
 
@@ -320,6 +322,10 @@ class ClusterConfig:
                 errors.append(f"{label}.uuid is not a valid UUID: {node.uuid}")
             if not _is_valid_port(node.ssh_port):
                 errors.append(f"{label}.ssh_port is out of range: {node.ssh_port}")
+            _append_hostname_error(errors, f"{label}.sni", node.sni)
+            _append_hostname_error(errors, f"{label}.domain", node.domain)
+            _append_path_error(errors, f"{label}.xhttp_path", node.xhttp_path)
+            _append_path_error(errors, f"{label}.ws_path", node.ws_path)
 
         # Relay validations
         relay_endpoints: set[tuple[str, int]] = set()
@@ -332,6 +338,7 @@ class ClusterConfig:
                 errors.append(f"{label}.port is out of range: {relay.port}")
             if not _is_valid_port(relay.ssh_port):
                 errors.append(f"{label}.ssh_port is out of range: {relay.ssh_port}")
+            _append_hostname_error(errors, f"{label}.sni", relay.sni)
             if relay.exit_node_ip and node_ips and relay.exit_node_ip not in node_ips:
                 errors.append(f"{label}.exit_node_ip references unknown node: {relay.exit_node_ip}")
             # Relay endpoint uniqueness
@@ -377,6 +384,8 @@ class ClusterConfig:
                     if dn.name in desired_node_names:
                         errors.append(f"desired_nodes[{i}].name is a duplicate: {dn.name}")
                     desired_node_names.append(dn.name)
+                _append_hostname_error(errors, f"desired_nodes[{i}].sni", dn.sni)
+                _append_hostname_error(errors, f"desired_nodes[{i}].domain", dn.domain)
 
         if self.desired_relays is not None:
             desired_relay_hosts: list[str] = []
@@ -393,6 +402,7 @@ class ClusterConfig:
                             "Use capability routing for same-server relay+exit designs."
                         )
                 relay_label = _relay_label_value(dr.name, dr.host)
+                _append_hostname_error(errors, f"desired_relays[{i}].sni", dr.sni)
                 if relay_label:
                     if relay_label in desired_relay_labels:
                         errors.append(f"desired_relays[{i}].name creates a duplicate relay identity: {relay_label}")
@@ -493,3 +503,27 @@ def _relay_label_value(name: str, ip: str) -> str:
     """Return the relay identity used by nginx/Remnawave remark names."""
     value = name or ip
     return re.sub(r"[^a-zA-Z0-9_-]", "-", value) if value else ""
+
+
+def _append_hostname_error(errors: list[str], field_name: str, value: str) -> None:
+    if not value:
+        return
+    try:
+        normalized = validate_hostname_value(value)
+    except ValueError as exc:
+        errors.append(f"{field_name} is invalid: {exc}")
+        return
+    if normalized != value:
+        errors.append(f"{field_name} must use canonical form: {normalized}")
+
+
+def _append_path_error(errors: list[str], field_name: str, value: str) -> None:
+    if not value:
+        return
+    try:
+        normalized = validate_optional_transport_path_value(value)
+    except ValueError as exc:
+        errors.append(f"{field_name} is invalid: {exc}")
+        return
+    if normalized != value:
+        errors.append(f"{field_name} must be relative without a leading slash")

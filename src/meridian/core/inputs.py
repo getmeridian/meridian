@@ -32,6 +32,21 @@ _SERVER_REF_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 120, "patte
 _OPTIONAL_SERVER_REF_SCHEMA = {"type": "string", "maxLength": 120, "pattern": r"^$|^[^\r\n\t]+$"}
 _COUNTRY_CODE_SCHEMA = {"type": "string", "minLength": 2, "maxLength": 2, "pattern": r"^[A-Za-z]{2}$"}
 _OPTIONAL_COUNTRY_CODE_SCHEMA = {"type": "string", "maxLength": 2, "pattern": r"^$|^[A-Za-z]{2}$"}
+_HOSTNAME_SCHEMA = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 253,
+    "pattern": (
+        r"^(?=.{1,253}\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+        r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$"
+    ),
+}
+_OPTIONAL_HOSTNAME_SCHEMA = {"anyOf": [{"type": "string", "const": ""}, _HOSTNAME_SCHEMA]}
+_TRANSPORT_PATH_SCHEMA = {
+    "type": "string",
+    "maxLength": 200,
+    "pattern": r"^$|^/?[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*$",
+}
 
 
 def is_local_deploy_target(value: str) -> bool:
@@ -160,6 +175,52 @@ def validate_optional_country_code_value(value: str) -> str:
     return validate_country_code_value(value)
 
 
+def validate_hostname_value(value: str) -> str:
+    """Validate and canonicalize a DNS hostname used for TLS or Reality SNI."""
+    normalized = value.strip().rstrip(".")
+    if not normalized:
+        raise ValueError("Enter a valid domain name.")
+    try:
+        ascii_name = normalized.encode("idna").decode("ascii").lower()
+    except UnicodeError as exc:
+        raise ValueError("Enter a valid domain name.") from exc
+    if len(ascii_name) > 253:
+        raise ValueError("Domain names must be 253 characters or fewer.")
+    labels = ascii_name.split(".")
+    if len(labels) < 2:
+        raise ValueError("Enter a full domain name such as vpn.example.com.")
+    for label in labels:
+        if (
+            not label
+            or len(label) > 63
+            or label.startswith("-")
+            or label.endswith("-")
+            or re.fullmatch(r"[a-z0-9-]+", label) is None
+        ):
+            raise ValueError("Enter a valid domain name.")
+    return ascii_name
+
+
+def validate_optional_hostname_value(value: str) -> str:
+    """Validate an optional DNS hostname."""
+    if not value:
+        return value
+    return validate_hostname_value(value)
+
+
+def validate_optional_transport_path_value(value: str) -> str:
+    """Validate a relative XHTTP/WebSocket path before nginx rendering."""
+    normalized = value.strip().lstrip("/")
+    if not normalized:
+        return ""
+    if len(normalized) > 200:
+        raise ValueError("Transport paths must be 200 characters or fewer.")
+    parts = normalized.split("/")
+    if any(part in {".", ".."} or re.fullmatch(r"[A-Za-z0-9._~-]+", part) is None for part in parts):
+        raise ValueError("Use only URL-safe path segments without spaces or traversal.")
+    return normalized
+
+
 IPAddressValue = Annotated[
     str,
     WithJsonSchema(_IP_ADDRESS_SCHEMA),
@@ -224,5 +285,20 @@ OptionalCountryCodeValue = Annotated[
     str,
     WithJsonSchema(_OPTIONAL_COUNTRY_CODE_SCHEMA),
     AfterValidator(validate_optional_country_code_value),
+]
+HostnameValue = Annotated[
+    str,
+    WithJsonSchema(_HOSTNAME_SCHEMA),
+    AfterValidator(validate_hostname_value),
+]
+OptionalHostnameValue = Annotated[
+    str,
+    WithJsonSchema(_OPTIONAL_HOSTNAME_SCHEMA),
+    AfterValidator(validate_optional_hostname_value),
+]
+OptionalTransportPathValue = Annotated[
+    str,
+    WithJsonSchema(_TRANSPORT_PATH_SCHEMA),
+    AfterValidator(validate_optional_transport_path_value),
 ]
 PortValue = Annotated[int, Field(ge=1, le=65535)]
