@@ -169,14 +169,19 @@ class TestContractDrift:
         it silently drops into _extra on load — a data loss bug.
         """
         from meridian.cluster import (
+            ActionCheckpoint,
             ClusterConfig,
             DesiredNode,
             DesiredRelay,
+            ManagedResourceBinding,
             NodeEntry,
             PanelConfig,
+            RealityKeyBinding,
             RelayEntry,
+            ResourceAllocation,
             SubscriptionPageConfig,
             TelegramConfig,
+            WorkloadBinding,
         )
 
         # Mapping of dataclass → known-fields set name in cluster.py
@@ -188,6 +193,11 @@ class TestContractDrift:
             RelayEntry,
             DesiredNode,
             DesiredRelay,
+            RealityKeyBinding,
+            WorkloadBinding,
+            ManagedResourceBinding,
+            ResourceAllocation,
+            ActionCheckpoint,
             ClusterConfig,
             SubscriptionPageConfig,
             TelegramConfig,

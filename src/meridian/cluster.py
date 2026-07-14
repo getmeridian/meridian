@@ -14,9 +14,10 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from meridian.core.inputs import validate_hostname_value, validate_optional_transport_path_value
+from meridian.core.topology import SetupIntent
 
 logger = logging.getLogger("meridian.cluster")
 
@@ -29,7 +30,7 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
         logger.warning("%s", message)
 
 
-CURRENT_CLUSTER_VERSION = 2
+CURRENT_CLUSTER_VERSION = 3
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):
@@ -220,6 +221,84 @@ class AppliedState:
 
 
 @dataclass
+class RealityKeyBinding:
+    """Atomic Reality key material retained for one workload server."""
+
+    public_key: str = ""
+    private_key: str = field(default="", repr=False)
+    short_id: str = ""
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class WorkloadBinding:
+    """Generation-scoped remote bindings for one effective Xray workload."""
+
+    id: str = ""
+    kind: Literal["exit", "routing_gateway"] = "exit"
+    generation: int = 0
+    active: bool = True
+    server_refs: list[str] = field(default_factory=list)
+    config_profile_uuid: str = ""
+    config_profile_name: str = ""
+    node_uuids: dict[str, str] = field(default_factory=dict)
+    inbound_uuids: dict[str, str] = field(default_factory=dict)
+    host_uuids: dict[str, str] = field(default_factory=dict)
+    reality_keys: dict[str, RealityKeyBinding] = field(default_factory=dict, repr=False)
+    desired_hash: str = ""
+    adopted: bool = False
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class ManagedResourceBinding:
+    """Observed remote identity for one compiled logical resource generation."""
+
+    logical_id: str = ""
+    resource_kind: str = ""
+    generation: int = 0
+    remote_id: str = ""
+    desired_hash: str = ""
+    observed_hash: str = ""
+    active: bool = False
+    adopted: bool = False
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class ResourceAllocation:
+    """Stable compiler allocation persisted across observation and apply."""
+
+    logical_id: str = ""
+    server_ref: str = ""
+    transport: Literal["tcp", "udp", "none"] = "none"
+    port: int = 0
+    path: str = ""
+    tag: str = ""
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped"]
+
+
+@dataclass
+class ActionCheckpoint:
+    """Compact durable checkpoint for one immutable resource action."""
+
+    idempotency_key: str = ""
+    resource_id: str = ""
+    expected_hash: str = ""
+    generation: int = 0
+    status: ActionCheckpointStatus = "pending"
+    attempts: int = 0
+    observed_hash: str = ""
+    remote_id: str = ""
+    last_error: str = ""
+    updated_at: str = ""
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
 class ClusterConfig:
     """Fleet-wide configuration — the sole local state for Meridian 4.0.
 
@@ -247,6 +326,16 @@ class ClusterConfig:
     desired_relays: list[DesiredRelay] | None = None
     # v2: reconciler applied-state snapshot (last successful apply)
     applied_state: AppliedState = field(default_factory=AppliedState)
+    # v3: workload-scoped topology and durable compiled-resource state.
+    topology_intent: SetupIntent | None = None
+    workloads: list[WorkloadBinding] = field(default_factory=list)
+    managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
+    allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
+    action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
+    active_generation: int = 0
+    active_plan_hash: str = ""
+    pending_generation: int = 0
+    pending_plan_hash: str = ""
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
     _readonly: bool = field(default=False, repr=False)
     _lock: Any = field(default=None, repr=False)  # threading.RLock for parallel save safety
@@ -407,6 +496,73 @@ class ClusterConfig:
                     if relay_label in desired_relay_labels:
                         errors.append(f"desired_relays[{i}].name creates a duplicate relay identity: {relay_label}")
                     desired_relay_labels.add(relay_label)
+
+        workload_keys: set[tuple[str, int]] = set()
+        active_workloads: set[str] = set()
+        for i, workload in enumerate(self.workloads):
+            label = f"workloads[{i}]"
+            workload_key = (workload.id, workload.generation)
+            if not workload.id:
+                errors.append(f"{label}.id is empty")
+            elif workload_key in workload_keys:
+                errors.append(f"{label} duplicates workload generation {workload.id}@{workload.generation}")
+            workload_keys.add(workload_key)
+            if workload.active:
+                if workload.id in active_workloads:
+                    errors.append(f"{label}: workload {workload.id} has multiple active generations")
+                active_workloads.add(workload.id)
+            if workload.generation < 0:
+                errors.append(f"{label}.generation cannot be negative")
+            if workload.config_profile_uuid and not _is_valid_uuid(workload.config_profile_uuid):
+                errors.append(f"{label}.config_profile_uuid is not a valid UUID: {workload.config_profile_uuid}")
+            for server_ref, node_uuid in workload.node_uuids.items():
+                if node_uuid and not _is_valid_uuid(node_uuid):
+                    errors.append(f"{label}.node_uuids[{server_ref}] is not a valid UUID: {node_uuid}")
+            for protocol, inbound_uuid in workload.inbound_uuids.items():
+                if inbound_uuid and not _is_valid_uuid(inbound_uuid):
+                    errors.append(f"{label}.inbound_uuids[{protocol}] is not a valid UUID: {inbound_uuid}")
+            for server_ref, keys in workload.reality_keys.items():
+                present = [bool(keys.public_key), bool(keys.private_key), bool(keys.short_id)]
+                if any(present) and not all(present):
+                    errors.append(
+                        f"{label}.reality_keys[{server_ref}] must contain public, private, and short-ID values"
+                    )
+            if workload.desired_hash and re.fullmatch(r"[0-9a-f]{64}", workload.desired_hash) is None:
+                errors.append(f"{label}.desired_hash is not a SHA-256 hash")
+
+        for key, binding in self.managed_bindings.items():
+            if key != f"{binding.logical_id}@{binding.generation}":
+                errors.append(f"managed_bindings[{key}] key does not match its logical ID and generation")
+            if binding.desired_hash and re.fullmatch(r"[0-9a-f]{64}", binding.desired_hash) is None:
+                errors.append(f"managed_bindings[{key}].desired_hash is not a SHA-256 hash")
+            if binding.observed_hash and re.fullmatch(r"[0-9a-f]{64}", binding.observed_hash) is None:
+                errors.append(f"managed_bindings[{key}].observed_hash is not a SHA-256 hash")
+
+        for key, allocation in self.allocations.items():
+            if key != allocation.logical_id:
+                errors.append(f"allocations[{key}] key does not match logical_id")
+            if allocation.port and not _is_valid_port(allocation.port):
+                errors.append(f"allocations[{key}].port is out of range: {allocation.port}")
+            _append_path_error(errors, f"allocations[{key}].path", allocation.path)
+
+        for key, checkpoint in self.action_checkpoints.items():
+            if key != checkpoint.idempotency_key:
+                errors.append(f"action_checkpoints[{key}] key does not match idempotency_key")
+            if checkpoint.expected_hash and re.fullmatch(r"[0-9a-f]{64}", checkpoint.expected_hash) is None:
+                errors.append(f"action_checkpoints[{key}].expected_hash is not a SHA-256 hash")
+            if checkpoint.observed_hash and re.fullmatch(r"[0-9a-f]{64}", checkpoint.observed_hash) is None:
+                errors.append(f"action_checkpoints[{key}].observed_hash is not a SHA-256 hash")
+            if checkpoint.attempts < 0:
+                errors.append(f"action_checkpoints[{key}].attempts cannot be negative")
+
+        for field_name, value in (
+            ("active_plan_hash", self.active_plan_hash),
+            ("pending_plan_hash", self.pending_plan_hash),
+        ):
+            if value and re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                errors.append(f"{field_name} is not a SHA-256 hash")
+        if self.active_generation < 0 or self.pending_generation < 0:
+            errors.append("cluster generations cannot be negative")
 
         return errors
 

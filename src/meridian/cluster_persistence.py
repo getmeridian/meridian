@@ -32,6 +32,7 @@ from meridian.cluster import (
     TelegramConfig,
     _load_warning,
 )
+from meridian.cluster_v3 import load_cluster_v3, serialize_cluster_v3, validate_cluster_v3_structure
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 
 logger = logging.getLogger("meridian.cluster")
@@ -232,6 +233,8 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         applied_dict["relays"] = list(cfg.applied_state.relays)
     if applied_dict:
         out["applied_state"] = applied_dict
+
+    out.update(serialize_cluster_v3(cfg))
 
     # Extra fields (forward-compat)
     for k, v in cfg._extra.items():
@@ -441,15 +444,27 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         _load_applied_state(_applied_raw) if isinstance(_applied_raw, dict) else _migrate_pre_v4_1_applied_state(data)
     )
 
+    source_version = data.get("version", CURRENT_CLUSTER_VERSION)
+    profile_uuid = data.get("config_profile_uuid", "")
+    profile_name = data.get("config_profile_name", "")
+    squad_uuid = data.get("squad_uuid", "")
+    v3 = load_cluster_v3(
+        data,
+        panel=panel,
+        nodes=nodes,
+        inbounds=inbounds,
+        relays=relays,
+    )
+
     # Extra fields
     extra = {k: v for k, v in data.items() if k not in _KNOWN_TOP}
 
     return ClusterConfig(
-        version=data.get("version", 2),
+        version=CURRENT_CLUSTER_VERSION if isinstance(source_version, int) and source_version < 3 else source_version,
         panel=panel,
-        config_profile_uuid=data.get("config_profile_uuid", ""),
-        config_profile_name=data.get("config_profile_name", ""),
-        squad_uuid=data.get("squad_uuid", ""),
+        config_profile_uuid=profile_uuid,
+        config_profile_name=profile_name,
+        squad_uuid=squad_uuid,
         nodes=nodes,
         relays=relays,
         branding=branding,
@@ -460,6 +475,15 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         desired_clients=desired_clients,
         desired_relays=desired_relays,
         applied_state=applied_state,
+        topology_intent=v3.topology_intent,
+        workloads=v3.workloads,
+        managed_bindings=v3.managed_bindings,
+        allocations=v3.allocations,
+        action_checkpoints=v3.action_checkpoints,
+        active_generation=v3.active_generation,
+        active_plan_hash=v3.active_plan_hash,
+        pending_generation=v3.pending_generation,
+        pending_plan_hash=v3.pending_plan_hash,
         _extra=extra,
     )
 
@@ -533,6 +557,8 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
                 raise ValueError("inbounds keys must be strings")
             if not isinstance(value, dict):
                 raise ValueError(f"inbounds[{key}] must be a mapping, got {type(value).__name__}")
+
+    validate_cluster_v3_structure(data)
 
 
 def load_cluster(path: Path | None = None) -> ClusterConfig:

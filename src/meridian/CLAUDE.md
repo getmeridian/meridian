@@ -2,7 +2,7 @@
 ## Design decisions
 **Protocol registry** — `protocols.py` keeps ordered TCP transports in `PROTOCOLS` and the UDP fallback in `ADDITIONAL_PROTOCOLS`; `get_protocol()` spans both. `ProtocolKey(StrEnum)` provides stable cluster keys.
 
-**Cluster config** — Single `cluster.yml` at `~/.meridian/cluster.yml` replaces per-server `proxy.yml` files. Client/user state lives in Remnawave's PostgreSQL, not locally. Only deployment topology (panel URL, API token, nodes, relays) is stored locally.
+**Cluster config** — Schema V3 stores workload-scoped topology intent, generation bindings, allocations, and compact action checkpoints in one hidden `cluster.yml`. Client/user runtime state remains in Remnawave PostgreSQL.
 
 **Remnawave integration** — `remnawave.py` wraps the REST API with `httpx`. Direct HTTPS calls from deployer's machine (no SSH tunneling for API). JWT auth, retry with backoff, Meridian-specific error types.
 
