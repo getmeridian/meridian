@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from datetime import UTC, datetime
 
 import pytest
@@ -14,7 +15,10 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
-from meridian.reconciler.resource_executor import execute_resource_plan
+from meridian.reconciler.resource_executor import (
+    execute_resource_plan,
+    inspect_resource_plan,
+)
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -141,6 +145,51 @@ class TestResourceActions:
         one = build_resource_actions(plan, generation=1)[0]
         two = build_resource_actions(plan, generation=2)[0]
         assert one.idempotency_key != two.idempotency_key
+
+
+class TestResourceInspection:
+    def test_observes_active_generation_without_mutating_or_applying(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=4)[0]
+        cluster = ClusterConfig(
+            active_generation=4,
+            active_plan_hash=plan.plan_hash,
+        )
+        before = copy.deepcopy({key: value for key, value in vars(cluster).items() if key != "_lock"})
+        driver = ScriptedDriver([_converged(action)])
+
+        result = inspect_resource_plan(
+            plan,
+            cluster,
+            {"firewall_rule": driver},
+        )
+
+        assert result.converged
+        assert result.generation == 4
+        assert result.drifted == []
+        assert driver.apply_calls == []
+        assert {key: value for key, value in vars(cluster).items() if key != "_lock"} == before
+
+    def test_reports_missing_and_failed_observations_as_drift(self) -> None:
+        plan = _plan(with_probe=True)
+        firewall = ScriptedDriver([_missing()])
+        probe = ScriptedDriver([OSError("probe unavailable")])
+
+        result = inspect_resource_plan(
+            plan,
+            ClusterConfig(),
+            {
+                "firewall_rule": firewall,
+                "probe": probe,
+            },
+        )
+
+        assert not result.converged
+        assert len(result.drifted) == 2
+        assert result.drifted[0].observation == _missing()
+        assert result.drifted[1].error == ("observation failed: probe unavailable")
+        assert firewall.apply_calls == []
+        assert probe.apply_calls == []
 
 
 class TestCheckpointedExecution:

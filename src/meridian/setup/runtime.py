@@ -28,10 +28,14 @@ from meridian.reconciler.remnawave_drivers import (
     RemnawaveDriverContext,
     build_remnawave_drivers,
 )
-from meridian.reconciler.resource_executor import execute_resource_plan
+from meridian.reconciler.resource_executor import (
+    execute_resource_plan,
+    inspect_resource_plan,
+)
 from meridian.reconciler.resources import (
     ResourceDrivers,
     ResourceExecutionResult,
+    ResourceInspectionResult,
     ResourceReconcileError,
 )
 from meridian.reconciler.server_drivers import (
@@ -105,6 +109,45 @@ class SetupRuntime:
         plan_hash = self.review(draft).plan.plan_hash
         return self.apply(draft.model_copy(update={"review_hash": plan_hash}))
 
+    def inspect_intent(
+        self,
+        intent: SetupIntent,
+    ) -> ResourceInspectionResult:
+        """Observe a compiled topology without mutating remote or local state."""
+        draft = SetupDraft.from_intent(intent)
+        review = self.review(draft)
+        cluster = self._cluster_loader()
+        if not cluster.panel.url or not cluster.panel.api_token:
+            raise LocalStateError(
+                "Saved panel credentials are missing.",
+                hint="Resume setup before checking topology drift.",
+            )
+        entries = self._entries(draft.server_refs)
+        connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
+        addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
+        panel = self._panel_factory(
+            cluster.panel.url,
+            cluster.panel.api_token,
+        )
+        try:
+            shadow = cluster.clone()
+            drivers = self._build_drivers(
+                review.plan,
+                shadow,
+                panel,
+                connections,
+                addresses,
+                persist=lambda _state: None,
+                prepare_node=None,
+            )
+            return inspect_resource_plan(
+                review.plan,
+                shadow,
+                drivers,
+            )
+        finally:
+            panel.close()
+
     def apply(self, draft: SetupDraft) -> ResourceExecutionResult:
         review = self.review(draft)
         if not draft.review_hash or draft.review_hash != review.plan.plan_hash:
@@ -138,35 +181,15 @@ class SetupRuntime:
             cluster.panel.api_token,
         )
         try:
-            shared_node_secrets: dict[str, str] = {}
-            workloads = WorkloadStateManager(
+            drivers = self._build_drivers(
+                review.plan,
                 cluster,
+                panel=panel,
+                connections=connections,
+                addresses=addresses,
                 persist=self._persist,
-                key_factory=SSHRealityKeyFactory(connections.__getitem__),
-            )
-            remnawave = RemnawaveDriverContext(
-                panel=panel,
-                plan=review.plan,
-                cluster=cluster,
-                workloads=workloads,
-                server_addresses=addresses,
-                node_secrets=shared_node_secrets,
-            )
-            servers = ServerDriverContext(
-                plan=review.plan,
-                cluster=cluster,
-                panel=panel,
-                connection_for=connections.__getitem__,
-                server_addresses=addresses,
-                node_secrets=shared_node_secrets,
                 prepare_node=_prepare_node_runtime,
             )
-            drivers: ResourceDrivers = {}
-            drivers.update(build_remnawave_drivers(remnawave))
-            drivers.update(build_server_drivers(servers))
-            contract_driver = ContractResourceDriver()
-            drivers["control_plane_runtime"] = contract_driver
-            drivers["probe"] = contract_driver
             result = execute_resource_plan(
                 review.plan,
                 cluster,
@@ -176,6 +199,52 @@ class SetupRuntime:
         finally:
             panel.close()
         return result
+
+    def _build_drivers(
+        self,
+        plan: ResourcePlan,
+        cluster: ClusterConfig,
+        panel: MeridianPanel,
+        connections: Mapping[str, ServerConnection],
+        addresses: Mapping[str, str],
+        *,
+        persist: PersistCluster,
+        prepare_node: Callable[
+            [ServerConnection, NodeRuntimePayload, str],
+            None,
+        ]
+        | None,
+    ) -> ResourceDrivers:
+        shared_node_secrets: dict[str, str] = {}
+        workloads = WorkloadStateManager(
+            cluster,
+            persist=persist,
+            key_factory=SSHRealityKeyFactory(connections.__getitem__),
+        )
+        remnawave = RemnawaveDriverContext(
+            panel=panel,
+            plan=plan,
+            cluster=cluster,
+            workloads=workloads,
+            server_addresses=addresses,
+            node_secrets=shared_node_secrets,
+        )
+        servers = ServerDriverContext(
+            plan=plan,
+            cluster=cluster,
+            panel=panel,
+            connection_for=connections.__getitem__,
+            server_addresses=addresses,
+            node_secrets=shared_node_secrets,
+            prepare_node=prepare_node,
+        )
+        drivers: ResourceDrivers = {}
+        drivers.update(build_remnawave_drivers(remnawave))
+        drivers.update(build_server_drivers(servers))
+        contract_driver = ContractResourceDriver()
+        drivers["control_plane_runtime"] = contract_driver
+        drivers["probe"] = contract_driver
+        return drivers
 
     def verify(self, draft: SetupDraft) -> SetupVerification:
         review = self.review(draft)

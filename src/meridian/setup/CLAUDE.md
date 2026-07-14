@@ -18,3 +18,4 @@
 - Never add credential-shaped fields to `SetupDraft`.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.
 - Keep remote action checkpoints in typed cluster state, not `setup.json`.
+- Inspect a cloned cluster through read-only drivers; cached plan hashes cannot detect managed remote drift.

@@ -15,6 +15,8 @@ from meridian.reconciler.resources import (
     ResourceDriver,
     ResourceDrivers,
     ResourceExecutionResult,
+    ResourceInspection,
+    ResourceInspectionResult,
     ResourceObservation,
     ResourceReconcileError,
     UnknownResourceOutcome,
@@ -80,6 +82,61 @@ def execute_resource_plan(
     if execution.all_succeeded:
         _commit_generation(plan, generation, cluster, save)
     return execution
+
+
+def inspect_resource_plan(
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+    drivers: ResourceDrivers,
+) -> ResourceInspectionResult:
+    """Observe every reviewed resource without writing state or mutating it."""
+    generation = _inspection_generation(plan, cluster)
+    inspections: list[ResourceInspection] = []
+    for action in build_resource_actions(plan, generation):
+        driver = drivers.get(action.resource.payload.kind)
+        if driver is None:
+            inspections.append(
+                ResourceInspection(
+                    action=action,
+                    error=(f"no resource driver registered for {action.resource.payload.kind}"),
+                )
+            )
+            continue
+        try:
+            observation = driver.observe(
+                action,
+                _binding(action, cluster),
+            )
+        except Exception as exc:
+            inspections.append(
+                ResourceInspection(
+                    action=action,
+                    error=f"observation failed: {exc}",
+                )
+            )
+            continue
+        inspections.append(
+            ResourceInspection(
+                action=action,
+                observation=observation,
+            )
+        )
+    return ResourceInspectionResult(
+        plan_hash=plan.plan_hash,
+        generation=generation,
+        inspections=inspections,
+    )
+
+
+def _inspection_generation(
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+) -> int:
+    if cluster.pending_plan_hash == plan.plan_hash and cluster.pending_generation > 0:
+        return cluster.pending_generation
+    if cluster.active_plan_hash == plan.plan_hash and cluster.active_generation > 0:
+        return cluster.active_generation
+    return max(cluster.active_generation, cluster.pending_generation) + 1
 
 
 def _begin_apply(

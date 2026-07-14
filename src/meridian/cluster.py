@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from meridian.core.inputs import validate_hostname_value, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
@@ -369,6 +369,16 @@ class ClusterConfig:
         from meridian.cluster_persistence import save_cluster
 
         save_cluster(self, path)
+
+    def clone(self) -> Self:
+        """Return an isolated in-memory copy with an independent save lock."""
+        import copy
+        import threading
+
+        return copy.deepcopy(
+            self,
+            {id(self._lock): threading.RLock()},
+        )
 
     # --- Convenience ---
 

@@ -113,6 +113,34 @@ class ResourceExecutionResult(CoreModel):
         return [result for result in self.results if not result.succeeded]
 
 
+class ResourceInspection(CoreModel):
+    """Read-only comparison of one reviewed resource with remote state."""
+
+    action: ResourceAction
+    observation: ResourceObservation | None = None
+    error: str = ""
+
+    @property
+    def converged(self) -> bool:
+        return not self.error and self.observation is not None and observation_converges(self.action, self.observation)
+
+
+class ResourceInspectionResult(CoreModel):
+    """Read-only drift result for a complete reviewed resource plan."""
+
+    plan_hash: str
+    generation: int
+    inspections: list[ResourceInspection] = Field(default_factory=list)
+
+    @property
+    def converged(self) -> bool:
+        return all(inspection.converged for inspection in self.inspections)
+
+    @property
+    def drifted(self) -> list[ResourceInspection]:
+        return [inspection for inspection in self.inspections if not inspection.converged]
+
+
 class ResourceDriver(Protocol):
     """Runtime adapter for one finite compiler resource kind."""
 

@@ -124,16 +124,24 @@ def run_v4_plan(
     operation: OperationContext,
 ) -> None:
     """Render the deterministic compiler graph used by V4 apply."""
-    from meridian.compiler import compile_topology
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.servers import ServerRegistry
+    from meridian.setup.runtime import SetupRuntime
 
     intent = cluster.topology_intent
     if intent is None:
         raise RuntimeError("V4 topology intent is missing")
-    plan = compile_topology(intent)
-    converged = cluster.active_plan_hash == plan.plan_hash and not cluster.pending_plan_hash
+    inspection = SetupRuntime(
+        ServerRegistry(SERVER_PROFILES_FILE),
+        cluster_loader=lambda: cluster,
+    ).inspect_intent(intent)
+    resources = [item.action.resource for item in inspection.inspections]
+    converged = (
+        inspection.converged and cluster.active_plan_hash == inspection.plan_hash and not cluster.pending_plan_hash
+    )
     exit_code = 0 if converged else 2
     counts: dict[str, int] = {}
-    for resource in plan.resources:
+    for resource in resources:
         resource_kind = resource.payload.kind
         counts[resource_kind] = counts.get(resource_kind, 0) + 1
     if json_output:
@@ -141,9 +149,15 @@ def run_v4_plan(
             command_envelope(
                 command="plan",
                 data={
-                    "plan_hash": plan.plan_hash,
-                    "intent_hash": plan.intent_hash,
+                    "plan_hash": inspection.plan_hash,
                     "converged": converged,
+                    "drifted_resources": [
+                        {
+                            "logical_id": item.action.resource.logical_id,
+                            "error": item.error,
+                        }
+                        for item in inspection.drifted
+                    ],
                     "resources": [
                         {
                             "logical_id": resource.logical_id,
@@ -151,14 +165,14 @@ def run_v4_plan(
                             "desired_hash": resource.desired_hash,
                             "dependencies": resource.dependencies,
                         }
-                        for resource in plan.resources
+                        for resource in resources
                     ],
                 },
                 summary=Summary(
                     text=(
                         "V4 topology is converged."
                         if converged
-                        else (f"{len(plan.resources)} V4 resources require observation.")
+                        else (f"{len(inspection.drifted)} of {len(resources)} V4 resources require repair.")
                     ),
                     changed=not converged,
                     counts=counts,
@@ -169,9 +183,12 @@ def run_v4_plan(
             )
         )
     else:
-        state = "[green]converged[/green]" if converged else "[yellow]apply/observation required[/yellow]"
-        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{plan.plan_hash}[/dim]\n")
+        state = "[green]converged[/green]" if converged else "[yellow]repair required[/yellow]"
+        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{inspection.plan_hash}[/dim]\n")
         for kind_name, count in sorted(counts.items()):
             err_console.print(f"  {kind_name}: {count}")
+        for item in inspection.drifted:
+            detail = f" — {item.error}" if item.error else ""
+            err_console.print(f"  [yellow]repair[/yellow] {item.action.resource.logical_id}{detail}")
         err_console.print()
     raise typer.Exit(exit_code)

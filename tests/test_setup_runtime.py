@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import MagicMock
@@ -164,6 +165,9 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
 
     first = runtime.apply(draft)
     second = runtime.apply(draft)
+    before_inspection = copy.deepcopy({key: value for key, value in vars(cluster).items() if key != "_lock"})
+    persist_count = len(persists)
+    inspection = runtime.inspect_intent(_intent())
 
     assert first.all_succeeded, [
         (
@@ -176,6 +180,10 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     ]
     assert first.changed
     assert second.all_succeeded and not second.changed
+    assert inspection.converged
+    assert inspection.drifted == []
+    assert {key: value for key, value in vars(cluster).items() if key != "_lock"} == before_inspection
+    assert len(persists) == persist_count
     assert cluster.active_plan_hash == plan_hash
     assert cluster.topology_intent == _intent()
     bootstrap.assert_not_called()
