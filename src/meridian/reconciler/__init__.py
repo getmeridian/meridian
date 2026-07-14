@@ -12,6 +12,13 @@ existing provisioning code.
 
 from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind, compute_plan
 from meridian.reconciler.executor import ActionHandler
+from meridian.reconciler.resource_executor import execute_resource_plan
+from meridian.reconciler.resources import (
+    ResourceAction,
+    ResourceActionResult,
+    ResourceExecutionResult,
+    UnknownResourceOutcome,
+)
 from meridian.reconciler.state import ActualState, DesiredState
 
 __all__ = [
@@ -21,5 +28,10 @@ __all__ = [
     "Plan",
     "PlanAction",
     "PlanActionKind",
+    "ResourceAction",
+    "ResourceActionResult",
+    "ResourceExecutionResult",
+    "UnknownResourceOutcome",
     "compute_plan",
+    "execute_resource_plan",
 ]
