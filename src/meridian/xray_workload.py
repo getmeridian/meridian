@@ -90,7 +90,7 @@ def _render_inbound(
                 "security": "reality",
                 "realitySettings": {
                     "dest": f"{inbound.reality_sni}:443",
-                    "serverNames": [inbound.reality_sni],
+                    "serverNames": inbound.reality_server_names or [inbound.reality_sni],
                     "privateKey": keys.private_key,
                     "shortIds": [keys.short_id],
                     "fingerprint": "chrome",

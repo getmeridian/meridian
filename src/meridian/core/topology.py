@@ -107,6 +107,7 @@ class TransparentRelayIntent(CoreModel):
     exit_ref: RequiredNameValue
     protocol_path_ref: RequiredNameValue
     listen_port: PortValue = 443
+    reality_sni: OptionalHostnameValue = ""
 
     @field_validator("hop_server_refs")
     @classmethod
@@ -269,6 +270,10 @@ class SetupIntent(CoreModel):
                 )
             if path.protocol == "hysteria2":
                 raise ValueError("Transparent Realm chains cannot relay Hysteria2 or other UDP paths.")
+            if relay.reality_sni and path.protocol != "reality":
+                raise ValueError("A custom relay Reality SNI can only target a Reality path.")
+            if exit_.server_ref in relay.hop_server_refs:
+                raise ValueError(f"Relay {relay.id} cannot include its exit server as a Realm hop.")
 
         priorities: set[int] = set()
         for route in self.routes:

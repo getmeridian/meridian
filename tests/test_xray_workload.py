@@ -18,6 +18,7 @@ def _profile(*, warp: bool = False) -> ConfigProfilePayload:
             listen_port=10443,
             public_port=443,
             reality_sni="www.microsoft.com",
+            reality_server_names=["www.microsoft.com", "relay.example.com"],
         ),
         InboundPayload(
             workload_ref="exit-a",
@@ -82,7 +83,7 @@ def test_renders_exact_reviewed_protocols_and_paths() -> None:
     reality = config["inbounds"][0]
     assert reality["streamSettings"]["realitySettings"] == {
         "dest": "www.microsoft.com:443",
-        "serverNames": ["www.microsoft.com"],
+        "serverNames": ["www.microsoft.com", "relay.example.com"],
         "privateKey": "private-a",
         "shortIds": ["0123456789abcdef"],
         "fingerprint": "chrome",

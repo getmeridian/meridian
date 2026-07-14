@@ -91,6 +91,7 @@ def _intent(*, reverse_exits: bool = False) -> SetupIntent:
                 hop_server_refs=["srv-relay-edge", "srv-relay-core"],
                 exit_ref="exit-a",
                 protocol_path_ref="reality-a",
+                reality_sni="relay-a.example.com",
             )
         ],
         routing_gateways=[
@@ -304,6 +305,31 @@ class TestPureCompiler:
             if isinstance(resource.payload, HostPayload) and resource.payload.owner_ref == "relay-a"
         ]
         assert [host.address_server_ref for host in relay_hosts] == ["srv-relay-edge"]
+
+    def test_custom_relay_sni_is_accepted_before_its_host_is_published(self) -> None:
+        plan = compile_topology(_intent())
+        resources = {resource.logical_id: resource for resource in plan.resources}
+        inbound = resources["inbound:exit-a:reality-a"]
+        assert isinstance(inbound.payload, InboundPayload)
+        assert inbound.payload.reality_sni == "www.microsoft.com"
+        assert inbound.payload.reality_server_names == [
+            "www.microsoft.com",
+            "relay-a.example.com",
+        ]
+
+        stream = next(
+            resource
+            for resource in plan.resources
+            if resource.logical_id.startswith("nginx:")
+            and any(
+                getattr(route, "server_names", []) == ["relay-a.example.com"]
+                for route in getattr(resource.payload, "routes", [])
+            )
+        )
+        relay_host = resources["host:relay-a:reality-a"]
+        assert relay_host.payload.sni == "relay-a.example.com"
+        assert stream.logical_id in resources["realm:relay-a:1"].dependencies
+        assert "realm:relay-a:0" in relay_host.dependencies
 
     def test_changing_endpoint_changes_plan_hash(self) -> None:
         original = _intent()

@@ -58,9 +58,25 @@ class InboundPayload(CoreModel):
     listen_port: int
     public_port: int
     reality_sni: str = ""
+    reality_server_names: list[str] = Field(default_factory=list)
     tls_sni: str = ""
     host: str = ""
     path: str = ""
+
+    @model_validator(mode="after")
+    def validate_reality_names(self) -> InboundPayload:
+        if self.protocol != "reality":
+            if self.reality_server_names:
+                raise ValueError("Only Reality Inbounds can declare accepted Reality server names.")
+            return self
+        if self.reality_server_names:
+            expected = [
+                self.reality_sni,
+                *sorted(set(self.reality_server_names) - {self.reality_sni}),
+            ]
+            if self.reality_server_names != expected:
+                raise ValueError("Reality server names must keep the primary SNI first, then sorted unique aliases.")
+        return self
 
 
 class ConfigProfilePayload(CoreModel):

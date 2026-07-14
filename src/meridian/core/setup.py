@@ -6,7 +6,12 @@ from typing import Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from meridian.core.inputs import OptionalCountryCodeValue, RequiredNameValue, ServerReferenceValue
+from meridian.core.inputs import (
+    OptionalCountryCodeValue,
+    OptionalHostnameValue,
+    RequiredNameValue,
+    ServerReferenceValue,
+)
 from meridian.core.models import CoreModel
 from meridian.core.topology import (
     AccessIntent,
@@ -52,6 +57,7 @@ class SetupRelayRole(CoreModel):
     hop_server_refs: list[ServerReferenceValue] = Field(min_length=1)
     exit_ref: RequiredNameValue
     protocol_path_ref: RequiredNameValue
+    reality_sni: OptionalHostnameValue = ""
 
     @field_validator("hop_server_refs")
     @classmethod
@@ -241,6 +247,7 @@ class SetupDraft(CoreModel):
                 hop_server_refs=relay.hop_server_refs,
                 exit_ref=relay.exit_ref,
                 protocol_path_ref=relay.protocol_path_ref,
+                reality_sni=relay.reality_sni,
             )
             for relay in self.roles.transparent_relays
         ]

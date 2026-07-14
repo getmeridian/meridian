@@ -53,6 +53,7 @@ def _roles() -> SetupRoleSelection:
                 hop_server_refs=["srv-relay"],
                 exit_ref="exit-a",
                 protocol_path_ref="reality-primary",
+                reality_sni="relay.example.com",
             )
         ],
     )
@@ -159,6 +160,56 @@ class TestSetupIntent:
                 access=AccessIntent(users=["default"]),
             )
 
+    def test_custom_reality_sni_rejects_non_reality_path(self) -> None:
+        exit_ = ExitIntent(
+            id="exit-a",
+            server_ref="srv-exit",
+            paths=[
+                _reality(),
+                _xhttp(),
+            ],
+        )
+
+        with pytest.raises(ValidationError, match="only target a Reality path"):
+            SetupIntent(
+                control=ControlPlaneIntent(server_ref="srv-control"),
+                exits=[exit_],
+                transparent_relays=[
+                    TransparentRelayIntent(
+                        id="relay-a",
+                        hop_server_refs=["srv-relay"],
+                        exit_ref="exit-a",
+                        protocol_path_ref="xhttp-fallback",
+                        reality_sni="relay.example.com",
+                    )
+                ],
+                default_egress_ref="exit-a",
+                access=AccessIntent(users=["default"]),
+            )
+
+    def test_relay_chain_rejects_exit_server_as_a_hop(self) -> None:
+        with pytest.raises(ValidationError, match="cannot include its exit server"):
+            SetupIntent(
+                control=ControlPlaneIntent(server_ref="srv-control"),
+                exits=[
+                    ExitIntent(
+                        id="exit-a",
+                        server_ref="srv-exit",
+                        paths=[_reality()],
+                    )
+                ],
+                transparent_relays=[
+                    TransparentRelayIntent(
+                        id="relay-a",
+                        hop_server_refs=["srv-relay", "srv-exit"],
+                        exit_ref="exit-a",
+                        protocol_path_ref="reality-primary",
+                    )
+                ],
+                default_egress_ref="exit-a",
+                access=AccessIntent(users=["default"]),
+            )
+
     def test_failover_pool_is_fail_closed(self) -> None:
         with pytest.raises(ValidationError, match="must fail closed"):
             EgressPoolIntent(id="primary", exit_refs=["exit-a"], fail_closed=False)
@@ -174,6 +225,7 @@ class TestSetupDraft:
         assert intent.control.server_ref == "srv-control"
         assert intent.exits[0].paths[1].protocol == "xhttp"
         assert intent.transparent_relays[0].hop_server_refs == ["srv-relay"]
+        assert intent.transparent_relays[0].reality_sni == "relay.example.com"
         assert intent.default_egress_ref == "primary"
 
     def test_editing_paths_invalidates_every_downstream_stage(self) -> None:

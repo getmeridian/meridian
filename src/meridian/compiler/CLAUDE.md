@@ -12,6 +12,7 @@
 - Ports, tags, listener routes, and dependency order are deterministic.
 - TCP paths terminate through typed nginx artifacts; Hysteria2 stays direct UDP.
 - Realm hops are emitted downstream-first through graph dependencies.
+- Custom relay Reality SNI is added to both the Profile’s accepted server names and the exit stream route before the relay Host.
 
 ## Pitfalls
 - Never import SSH, HTTP, commands, console, config, Remnawave, or randomness here.

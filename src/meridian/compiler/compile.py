@@ -110,6 +110,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     stream_dependencies: dict[tuple[str, int], set[str]] = defaultdict(set)
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
     direct_host_ids: list[str] = []
+    reality_names_by_path = _reality_names_by_path(intent)
 
     exit_servers = [exit_.server_ref for exit_ in intent.exits]
     if len(exit_servers) != len(set(exit_servers)):
@@ -140,6 +141,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
                     listen_port=listen_port,
                     public_port=path.public_port,
                     reality_sni=path.reality_sni,
+                    reality_server_names=reality_names_by_path.get((exit_.id, path.id), []),
                     tls_sni=path.tls_sni,
                     host=path.host,
                     path=path.path,
@@ -309,22 +311,25 @@ def _compile_exit_endpoints(
             direct_dependencies[path.id].extend([certificate_id, firewall_id])
         elif path.protocol == "reality":
             stream_key = (exit_.server_ref, path.public_port)
-            _reserve_stream_name(
-                stream_targets,
-                server_ref=exit_.server_ref,
-                public_port=path.public_port,
-                server_name=path.reality_sni,
-                target=(exit_.server_ref, backend_port),
-            )
-            stream_routes[stream_key].append(
-                NginxRouteSpec(
-                    match="sni",
-                    server_names=[path.reality_sni],
-                    backend_server_ref=exit_.server_ref,
-                    backend_port=backend_port,
-                    protocol="reality",
+            inbound = builder.resources[inbound_id].payload
+            assert isinstance(inbound, InboundPayload)
+            for server_name in inbound.reality_server_names or [path.reality_sni]:
+                _reserve_stream_name(
+                    stream_targets,
+                    server_ref=exit_.server_ref,
+                    public_port=path.public_port,
+                    server_name=server_name,
+                    target=(exit_.server_ref, backend_port),
                 )
-            )
+                stream_routes[stream_key].append(
+                    NginxRouteSpec(
+                        match="sni",
+                        server_names=[server_name],
+                        backend_server_ref=exit_.server_ref,
+                        backend_port=backend_port,
+                        protocol="reality",
+                    )
+                )
             stream_dependencies[stream_key].update({runtime_id, inbound_id})
             _add_firewall(builder, exit_.server_ref, "tcp", path.public_port)
         else:
@@ -542,7 +547,7 @@ def _compile_relays(
                     address_server_ref=relay.hop_server_refs[0],
                     public_port=relay.listen_port,
                     protocol=path.protocol,
-                    sni=path.reality_sni or path.tls_sni,
+                    sni=relay.reality_sni or path.reality_sni or path.tls_sni,
                     host=path.host,
                     path=f"/{path.path}" if path.path else "",
                     fingerprint="chrome" if path.protocol == "reality" else "",
@@ -674,6 +679,23 @@ def _compile_probes(
             dependencies=[gateway_id],
             postconditions=[ResourcePostcondition(kind="probe_succeeds", target_ref=gateway_id)],
         )
+
+
+def _reality_names_by_path(intent: SetupIntent) -> dict[tuple[str, str], list[str]]:
+    names: dict[tuple[str, str], set[str]] = {}
+    for exit_ in intent.exits:
+        for path in exit_.paths:
+            if path.protocol == "reality":
+                names[(exit_.id, path.id)] = {path.reality_sni}
+    for relay in intent.transparent_relays:
+        if relay.reality_sni:
+            names[(relay.exit_ref, relay.protocol_path_ref)].add(relay.reality_sni)
+    result: dict[tuple[str, str], list[str]] = {}
+    for key, accepted in names.items():
+        exit_ = next(item for item in intent.exits if item.id == key[0])
+        path = next(item for item in exit_.paths if item.id == key[1])
+        result[key] = [path.reality_sni, *sorted(accepted - {path.reality_sni})]
+    return result
 
 
 def _ensure_certificate(
