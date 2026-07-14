@@ -16,7 +16,7 @@ from meridian.remnawave.models import (
     parse_user,
 )
 
-_FIXTURE = Path(__file__).parent / "fixtures" / "remnawave" / "2.7.1.json"
+_FIXTURE = Path(__file__).parent / "fixtures" / "remnawave" / "2.8.0.json"
 
 
 def _panel() -> MeridianPanel:

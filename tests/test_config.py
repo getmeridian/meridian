@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from importlib.metadata import version
 
 import meridian.config as config
 from meridian.config import is_ip
@@ -36,6 +37,15 @@ class TestIsIp:
 
     def test_rejects_ipv4_overflow(self) -> None:
         assert is_ip("256.1.2.3") is False
+
+
+class TestPinnedRemnawaveTuple:
+    def test_runtime_components_match_tested_2_8_tuple(self) -> None:
+        assert config.REMNAWAVE_BACKEND_IMAGE == "remnawave/backend:2.8.0"
+        assert config.REMNAWAVE_NODE_IMAGE == "remnawave/node:2.8.0"
+        assert config.REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE == "remnawave/subscription-page:7.2.6"
+        assert config.XRAY_VERSION == "26.6.27"
+        assert version("remnawave") == "2.8.0"
 
 
 class TestEnvOverrides:
