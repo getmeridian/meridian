@@ -6,8 +6,15 @@ import json
 
 import pytest
 
+from meridian.cluster import BrandingConfig, ClusterConfig, NodeEntry, PanelConfig
 from meridian.models import ProtocolURL, RelayURLSet
-from meridian.pwa import generate_client_files, load_pwa_static_assets, upload_client_files, upload_pwa_assets
+from meridian.pwa import (
+    deploy_client_page,
+    generate_client_files,
+    load_pwa_static_assets,
+    upload_client_files,
+    upload_pwa_assets,
+)
 from tests.support.mock_connection import MockConnection
 
 REALITY_URL = "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=reality#Test"
@@ -21,12 +28,12 @@ def protocol_urls() -> list[ProtocolURL]:
 
 
 class TestGenerateClientFiles:
-    def test_returns_four_files(self, protocol_urls: list[ProtocolURL]) -> None:
+    def test_returns_shell_files_without_shadow_subscription(self, protocol_urls: list[ProtocolURL]) -> None:
         files = generate_client_files(protocol_urls, "198.51.100.1")
         assert "index.html" in files
         assert "config.json" in files
         assert "manifest.webmanifest" in files
-        assert "sub.txt" in files
+        assert "sub.txt" not in files
 
     def test_config_json_has_client_name(self, protocol_urls: list[ProtocolURL]) -> None:
         files = generate_client_files(protocol_urls, "198.51.100.1", client_name="alice")
@@ -43,9 +50,17 @@ class TestGenerateClientFiles:
         parsed = json.loads(files["manifest.webmanifest"])
         assert parsed["display"] == "standalone"
 
-    def test_sub_txt_not_empty(self, protocol_urls: list[ProtocolURL]) -> None:
-        files = generate_client_files(protocol_urls, "198.51.100.1")
-        assert len(files["sub.txt"]) > 0
+    def test_config_uses_canonical_remnawave_subscription(self, protocol_urls: list[ProtocolURL]) -> None:
+        canonical_url = "https://vpn.example.com/api/sub/abc123"
+
+        files = generate_client_files(
+            protocol_urls,
+            "198.51.100.1",
+            subscription_url=canonical_url,
+        )
+
+        config = json.loads(files["config.json"])
+        assert config["subscription_url"] == canonical_url
 
     def test_relay_entries_in_config(self, protocol_urls: list[ProtocolURL]) -> None:
         relays = [
@@ -59,6 +74,63 @@ class TestGenerateClientFiles:
         config = json.loads(files["config.json"])
         assert len(config["relays"]) == 1
         assert config["relays"][0]["name"] == "test-relay"
+
+
+class TestDeployClientPage:
+    def test_embeds_only_canonical_remnawave_subscription(self) -> None:
+        conn = MockConnection()
+        node = NodeEntry(
+            ip="198.51.100.1",
+            sni="www.microsoft.com",
+            reality_public_key="public-key",
+            reality_short_id="deadbeef",
+        )
+        cluster = ClusterConfig(
+            panel=PanelConfig(sub_path="connections"),
+            nodes=[node],
+            branding=BrandingConfig(server_name="Family VPN"),
+        )
+        canonical_url = "https://panel.example.com/api/sub/short-id"
+
+        page_url = deploy_client_page(
+            conn,
+            cluster,
+            node,
+            "550e8400-e29b-41d4-a716-446655440000",
+            "alice",
+            canonical_url,
+        )
+
+        config_path = "/var/www/private/550e8400-e29b-41d4-a716-446655440000/config.json"
+        config = json.loads(conn.write_map[config_path])
+        assert page_url == "https://198.51.100.1/connections/550e8400-e29b-41d4-a716-446655440000/"
+        assert config["subscription_url"] == canonical_url
+        assert not any(path.endswith("/sub.txt") for path in conn.write_map)
+
+    def test_refuses_page_without_canonical_subscription(self) -> None:
+        conn = MockConnection()
+        node = NodeEntry(
+            ip="198.51.100.1",
+            sni="www.microsoft.com",
+            reality_public_key="public-key",
+        )
+        cluster = ClusterConfig(
+            panel=PanelConfig(sub_path="connections"),
+            nodes=[node],
+        )
+
+        assert (
+            deploy_client_page(
+                conn,
+                cluster,
+                node,
+                "550e8400-e29b-41d4-a716-446655440000",
+                "alice",
+                "",
+            )
+            == ""
+        )
+        assert conn.writes == []
 
 
 class TestLoadPWAStaticAssets:

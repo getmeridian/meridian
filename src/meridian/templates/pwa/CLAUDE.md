@@ -8,13 +8,13 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 **Runtime config** — `config.json` fetched at load, not baked into HTML. Enables server-side credential rotation without redeploying pages.
 
-**Shared/per-client split** — static assets (`app.js`, `styles.css`, `sw.js`, `icon.svg`) deployed once to `/pwa/`. Per-client files (`index.html`, `config.json`, `manifest.webmanifest`, `sub.txt`) in `/{uuid}/`. Saves bandwidth, enables independent updates.
+**Shared/per-client split** — static assets (`app.js`, `styles.css`, `sw.js`, `icon.svg`) deploy once to `/pwa/`; per-client shell/config files live in `/{uuid}/`. `config.json` points at Remnawave's canonical subscription URL; Meridian never rebuilds it.
 
 **Security model** — all user/config data goes through `escapeHtml()` (uses `textContent` via dummy div). QR base64 validated with `/^[A-Za-z0-9+/=]+$/` before `<img src>` injection. iOS deep links stored in `data-` attributes, never inline JS strings.
 
 **i18n** — English is the HTML default, NOT a translation dict. Non-EN languages swap via `data-t` attributes. Switching back to EN requires full `renderPage()` re-render.
 
-**Subscription QR hero layout** — the subscription QR (encodes `sub.txt` URL) is the first thing after the header. Rationale: scanning one QR imports ALL protocols at once — most users don't need to understand individual protocol cards. Deep link "Add to App" buttons sit directly below the QR for one-tap import. Everything else is secondary:
+**Subscription QR hero layout** — the subscription QR (encodes Remnawave's URL) is the first thing after the header. Rationale: scanning one QR imports ALL protocols at once — most users don't need to understand individual protocol cards. Deep link "Add to App" buttons sit directly below the QR for one-tap import. Everything else is secondary:
 - Apps list collapsed — we assume the user already has an app installed
 - Quick setup collapsed — returning users skip it
 - Individual protocol cards collapsed under "Individual connections" — for advanced users or troubleshooting

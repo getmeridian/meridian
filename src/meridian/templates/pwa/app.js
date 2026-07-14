@@ -341,8 +341,7 @@ function getSubscriptionUrl(config) {
   if (config && config.subscription_url) {
     return config.subscription_url;
   }
-  var path = location.pathname.replace(/\/?$/, '');
-  return location.origin + path + '/sub.txt';
+  return '';
 }
 
 function buildDeepLink(template, subUrl, name) {
@@ -538,7 +537,9 @@ function renderPage(config) {
   /* ---- Subscription QR hero ---- */
   var subUrl = getSubscriptionUrl(config);
   var serverLabel = config.server_name || 'Meridian';
-  html += renderImportCard(config.apps, subUrl, platform, serverLabel, config.subscription_qr_b64);
+  if (subUrl) {
+    html += renderImportCard(config.apps, subUrl, platform, serverLabel, config.subscription_qr_b64);
+  }
 
   /* ---- Client Apps (open for first-time visitors, collapsed for returning) ---- */
   var isReturning = 'serviceWorker' in navigator && navigator.serviceWorker.controller;

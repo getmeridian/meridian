@@ -1,7 +1,7 @@
 """PWA file generation and deployment helpers.
 
 Centralizes the creation and upload of per-client PWA files
-(index.html, config.json, manifest.webmanifest, sub.txt) and
+(index.html, config.json, manifest.webmanifest) and
 shared static assets (app.js, styles.css, sw.js, icon.svg).
 
 Called from:
@@ -20,7 +20,6 @@ from meridian.render import (
     render_config_json,
     render_manifest,
     render_pwa_shell,
-    render_subscription,
 )
 
 if TYPE_CHECKING:
@@ -42,14 +41,13 @@ def generate_client_files(
     server_name: str = "",
     server_icon: str = "",
     color: str = "",
-    page_url: str = "",
+    subscription_url: str = "",
 ) -> dict[str, str]:
     """Generate all per-client PWA files as a {filename: content} dict.
 
-    Returns a dict with keys: ``index.html``, ``config.json``,
-    ``manifest.webmanifest``, ``sub.txt``.
+    Remnawave's subscription URL is canonical; Meridian does not synthesize a
+    second subscription from local topology state.
     """
-    subscription_url = f"{page_url}sub.txt" if page_url else ""
     return {
         "index.html": render_pwa_shell(client_name=client_name, server_name=server_name),
         "config.json": render_config_json(
@@ -64,10 +62,6 @@ def generate_client_files(
             subscription_url=subscription_url,
         ),
         "manifest.webmanifest": render_manifest(client_name=client_name, server_name=server_name),
-        "sub.txt": render_subscription(
-            protocol_urls,
-            relay_entries=relay_entries,
-        ),
     }
 
 
@@ -189,6 +183,9 @@ def deploy_client_page(
     info_page_path = cluster.panel.sub_path or ""
     if not info_page_path:
         return ""
+    if not sub_url:
+        logger.warning("Cannot deploy connection page without the canonical Remnawave subscription URL")
+        return ""
 
     page_url = f"https://{host}/{info_page_path}/{user_uuid}/"
 
@@ -248,7 +245,7 @@ def deploy_client_page(
         server_name=cluster.branding.server_name,
         server_icon=cluster.branding.icon,
         color=cluster.branding.color,
-        page_url=page_url,
+        subscription_url=sub_url,
     )
 
     error = upload_client_files(conn, user_uuid, files)
