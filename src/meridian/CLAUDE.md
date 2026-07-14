@@ -18,6 +18,8 @@
 
 **Pinned version tuple** — `config.py` pins Remnawave images/SDK plus external binaries. Move the tuple together and update the CHANGELOG compatibility matrix; mismatched Remnawave backend/node/SDK versions silently lose data.
 
+**Resumable setup** — `core/setup.py` owns secret-free contracts; `setup/` owns atomic draft persistence, stage invalidation, and immutable server-shelf selection.
+
 **Errors over exits** — library modules raise typed exceptions (`MeridianError` hierarchy in `core/errors.py`) and expose their classification as `category`; `hint_type` belongs only to `console.fail()`. Only CLI command entry points call `console.fail()`.
 
 ## What's done well
