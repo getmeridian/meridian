@@ -211,6 +211,7 @@ def build_node_steps(ctx: ProvisionContext) -> list[Operation]:
         SetTimezone,
     )
     from meridian.provision.docker import InstallDocker
+    from meridian.provision.warp import InstallWarp
 
     extra_pkgs = ["fail2ban"] if ctx.harden else []
 
@@ -242,6 +243,12 @@ def build_node_steps(ctx: ProvisionContext) -> list[Operation]:
         ),
         op(EnsurePort443(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.HTTPS_ALLOWED], when=_not_harden),
         op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED]),
+        op(
+            InstallWarp(),
+            requires=[Resource.DOCKER_INSTALLED],
+            provides=[Resource.WARP_CONNECTED],
+            when=_warp,
+        ),
         # Node deployed after API setup (setup.py), not in pipeline
     ]
 

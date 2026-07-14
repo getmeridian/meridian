@@ -41,3 +41,4 @@
 - **Per-relay nginx files** — relay SNI routing uses per-file config, not monolithic rewrite.
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
+- **WARP belongs in both recipes** — a WARP-enabled exit may be node-only, so `build_node_steps()` must install it after Docker just like first setup.
