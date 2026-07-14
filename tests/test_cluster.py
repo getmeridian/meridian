@@ -20,6 +20,7 @@ from meridian.cluster import (
     SubscriptionPageConfig,
     TelegramConfig,
 )
+from meridian.core.errors import LocalStateCorruptedError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -497,13 +498,13 @@ class TestClusterYAMLRoundTrip:
         collapse into set('a','l','i','c','e') downstream."""
         p = tmp_path / "cluster.yml"
         p.write_text("version: 2\ndesired_clients: alice\n")
-        with pytest.raises(ValueError, match="desired_clients must be a list"):
+        with pytest.raises(LocalStateCorruptedError, match="desired_clients must be a list"):
             ClusterConfig.load(p)
 
     def test_desired_nodes_wrong_type_rejected(self, tmp_path: Path) -> None:
         p = tmp_path / "cluster.yml"
         p.write_text("version: 2\ndesired_nodes: {host: x}\n")
-        with pytest.raises(ValueError, match="desired_nodes must be a list"):
+        with pytest.raises(LocalStateCorruptedError, match="desired_nodes must be a list"):
             ClusterConfig.load(p)
 
     def test_save_uses_lock_for_concurrency(self, tmp_path: Path) -> None:
@@ -530,26 +531,38 @@ class TestClusterYAMLRoundTrip:
         assert cfg.nodes == []
         assert cfg.panel.url == ""
 
-    def test_load_empty_file_returns_empty(self, tmp_path: Path) -> None:
+    def test_load_empty_file_requires_recovery(self, tmp_path: Path) -> None:
         p = tmp_path / "cluster.yml"
         p.write_text("")
-        cfg = ClusterConfig.load(p)
-        assert cfg.nodes == []
+        with pytest.raises(LocalStateCorruptedError, match="file is empty"):
+            ClusterConfig.load(p)
 
-    def test_load_corrupted_yaml_returns_empty(self, tmp_path: Path) -> None:
+    def test_load_corrupted_yaml_requires_recovery(self, tmp_path: Path) -> None:
         p = tmp_path / "cluster.yml"
         p.write_text(":\n  - :\n    [invalid yaml{{{")
-        cfg = ClusterConfig.load(p)
-        assert cfg.nodes == []
+        with pytest.raises(LocalStateCorruptedError, match="YAML is malformed"):
+            ClusterConfig.load(p)
 
-    def test_load_with_invalid_node_ip_warns(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Loading cluster.yml with invalid node IP should warn but not crash."""
+    def test_load_with_invalid_node_ip_requires_recovery(self, tmp_path: Path) -> None:
+        """Invalid deployment identity cannot be treated as usable state."""
         p = tmp_path / "cluster.yml"
         p.write_text("version: 1\nnodes:\n  - ip: not-an-ip\n    uuid: 550e8400-e29b-41d4-a716-446655440000\n")
-        caplog.set_level("WARNING", logger="meridian.cluster")
-        cfg = ClusterConfig.load(p)
-        assert len(cfg.nodes) == 1
-        assert "validation issue" in caplog.text
+        with pytest.raises(LocalStateCorruptedError, match="validation failed"):
+            ClusterConfig.load(p)
+
+    def test_load_non_mapping_document_requires_recovery(self, tmp_path: Path) -> None:
+        p = tmp_path / "cluster.yml"
+        p.write_text("- version\n- 2\n")
+
+        with pytest.raises(LocalStateCorruptedError, match="root must be a mapping"):
+            ClusterConfig.load(p)
+
+    def test_load_invalid_node_entry_requires_recovery(self, tmp_path: Path) -> None:
+        p = tmp_path / "cluster.yml"
+        p.write_text("version: 2\nnodes:\n  - not-a-mapping\n")
+
+        with pytest.raises(LocalStateCorruptedError, match=r"nodes\[0\] must be a mapping"):
+            ClusterConfig.load(p)
 
     def test_load_valid_config_no_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
         """Loading a valid cluster.yml should produce no warnings."""

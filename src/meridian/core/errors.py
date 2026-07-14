@@ -79,3 +79,14 @@ class PanelSetupError(MeridianError):
 
     def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "system") -> None:
         super().__init__(message, hint=hint, category=category)
+
+
+class LocalStateError(MeridianError):
+    """A machine-owned Meridian state file cannot be loaded safely."""
+
+    def __init__(self, message: str, *, hint: str = "", category: ErrorCategory = "user") -> None:
+        super().__init__(message, hint=hint, category=category)
+
+
+class LocalStateCorruptedError(LocalStateError):
+    """An existing state file is empty, malformed, or structurally invalid."""

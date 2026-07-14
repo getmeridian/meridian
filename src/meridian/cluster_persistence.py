@@ -32,6 +32,7 @@ from meridian.cluster import (
     TelegramConfig,
     _load_warning,
 )
+from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 
 logger = logging.getLogger("meridian.cluster")
 
@@ -468,8 +469,74 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
 # ---------------------------------------------------------------------------
 
 
+def _state_error(path: Path, reason: str) -> LocalStateCorruptedError:
+    """Build the fail-closed error used for an unreadable existing state file."""
+    return LocalStateCorruptedError(
+        f"Cannot safely load {path}: {reason}.",
+        hint=(
+            f"Restore a known-good backup, or run Meridian recovery before changing the deployment. "
+            f"Do not delete {path} unless you intentionally want to abandon its local state."
+        ),
+    )
+
+
+def _require_mapping(data: dict[str, Any], key: str, *, nullable: bool = False) -> None:
+    value = data.get(key)
+    if value is None and nullable:
+        return
+    if key in data and not isinstance(value, dict):
+        expected = "a mapping or null" if nullable else "a mapping"
+        raise ValueError(f"{key} must be {expected}, got {type(value).__name__}")
+
+
+def _require_object_list(data: dict[str, Any], key: str, *, nullable: bool = False) -> None:
+    value = data.get(key)
+    if value is None and nullable:
+        return
+    if key not in data:
+        return
+    if not isinstance(value, list):
+        expected = "a list or null" if nullable else "a list"
+        raise ValueError(f"{key} must be {expected}, got {type(value).__name__}")
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"{key}[{index}] must be a mapping, got {type(item).__name__}")
+
+
+def _validate_cluster_structure(data: dict[str, Any]) -> None:
+    """Reject malformed known fields instead of coercing them into empty state."""
+    version = data.get("version", CURRENT_CLUSTER_VERSION)
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise ValueError(f"version must be an integer, got {type(version).__name__}")
+
+    for key in ("panel", "branding", "inbounds", "applied_state"):
+        _require_mapping(data, key)
+    for key in ("subscription_page", "telegram"):
+        _require_mapping(data, key, nullable=True)
+    for key in ("nodes", "relays"):
+        _require_object_list(data, key)
+    for key in ("desired_nodes", "desired_relays"):
+        _require_object_list(data, key, nullable=True)
+
+    desired_clients = data.get("desired_clients")
+    if desired_clients is not None:
+        if not isinstance(desired_clients, list):
+            raise ValueError(f"desired_clients must be a list or null, got {type(desired_clients).__name__}")
+        for index, item in enumerate(desired_clients):
+            if not isinstance(item, str):
+                raise ValueError(f"desired_clients[{index}] must be a string, got {type(item).__name__}")
+
+    inbounds = data.get("inbounds", {})
+    if isinstance(inbounds, dict):
+        for key, value in inbounds.items():
+            if not isinstance(key, str):
+                raise ValueError("inbounds keys must be strings")
+            if not isinstance(value, dict):
+                raise ValueError(f"inbounds[{key}] must be a mapping, got {type(value).__name__}")
+
+
 def load_cluster(path: Path | None = None) -> ClusterConfig:
-    """Load ClusterConfig from cluster.yml. Returns empty config if file doesn't exist."""
+    """Load cluster.yml, treating only a missing file as fresh state."""
     if path is None:
         from meridian.config import CLUSTER_CONFIG
 
@@ -477,17 +544,26 @@ def load_cluster(path: Path | None = None) -> ClusterConfig:
     logger.debug("Loading cluster config from %s", path)
     if not path.exists():
         return ClusterConfig()
-    load_mtime_ns = path.stat().st_mtime_ns
-    raw = path.read_text()
+    try:
+        load_mtime_ns = path.stat().st_mtime_ns
+        raw = path.read_text()
+    except OSError as exc:
+        raise LocalStateError(
+            f"Cannot read {path}: {exc}.",
+            hint="Check the file permissions and disk health, then retry.",
+        ) from exc
     if not raw.strip():
-        return ClusterConfig()
+        raise _state_error(path, "the file is empty")
     try:
         data = yaml.safe_load(raw)
     except yaml.YAMLError as e:
-        _load_warning(f"cluster.yml is corrupted and could not be parsed: {e}")
-        return ClusterConfig()
+        raise _state_error(path, f"the YAML is malformed ({e})") from e
     if not isinstance(data, dict):
-        return ClusterConfig()
+        raise _state_error(path, f"the document root must be a mapping, got {type(data).__name__}")
+    try:
+        _validate_cluster_structure(data)
+    except (TypeError, ValueError) as exc:
+        raise _state_error(path, str(exc)) from exc
     version = data.get("version", CURRENT_CLUSTER_VERSION)
     if isinstance(version, int) and version > CURRENT_CLUSTER_VERSION:
         _load_warning(
@@ -495,20 +571,22 @@ def load_cluster(path: Path | None = None) -> ClusterConfig:
             "Some fields may be ignored. Upgrade Meridian: pip install --upgrade meridian-vpn"
         )
     data.setdefault("version", CURRENT_CLUSTER_VERSION)
-    cfg = _load_cluster(data)
+    try:
+        cfg = _load_cluster(data)
+    except (TypeError, ValueError) as exc:
+        raise _state_error(path, str(exc)) from exc
     cfg._loaded_mtime_ns = load_mtime_ns
 
     # Mark future-version configs as read-only to prevent data loss
     if isinstance(version, int) and version > CURRENT_CLUSTER_VERSION:
         cfg._readonly = True
 
-    # Warn about validation errors on load (don't hard-fail — recover/doctor need corrupt configs)
     errors = cfg.validate()
     if errors:
-        details = [f"- {err}" for err in errors[:3]]
+        preview = "; ".join(errors[:3])
         if len(errors) > 3:
-            details.append(f"... and {len(errors) - 3} more")
-        _load_warning(f"cluster.yml has {len(errors)} validation issue(s):", details=details)
+            preview += f"; ... and {len(errors) - 3} more"
+        raise _state_error(path, f"validation failed ({preview})")
 
     return cfg
 
