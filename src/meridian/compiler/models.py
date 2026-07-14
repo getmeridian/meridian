@@ -10,9 +10,10 @@ from typing import Annotated, Any, Literal, Self, TypeAlias
 from pydantic import Field, model_validator
 
 from meridian.core.models import CoreModel
-from meridian.core.topology import DeliveryFormat, EgressStrategy, ProtocolKind, RouteMatchKind, TrafficRouteAction
+from meridian.core.topology import EgressStrategy, ProtocolKind, RouteMatchKind, TrafficRouteAction
 
 OwnershipMarker = Literal["meridian/v4"]
+SubscriptionType = Literal["XRAY_JSON", "XRAY_BASE64", "MIHOMO"]
 ResourceKind = Literal[
     "control_plane_runtime",
     "config_profile",
@@ -21,6 +22,7 @@ ResourceKind = Literal[
     "node_runtime",
     "host",
     "internal_squad",
+    "external_squad",
     "access_user",
     "service_user",
     "subscription_template",
@@ -54,7 +56,9 @@ class InboundPayload(CoreModel):
     kind: Literal["inbound"] = "inbound"
     workload_ref: str
     protocol: ProtocolKind
+    purpose: Literal["client", "bridge"] = "client"
     tag: str
+    listen_address: str = ""
     listen_port: int
     public_port: int
     reality_sni: str = ""
@@ -79,13 +83,69 @@ class InboundPayload(CoreModel):
         return self
 
 
+class ServiceOutboundSpec(CoreModel):
+    """One credential-resolved VLESS+Reality edge from a gateway to an exit."""
+
+    edge_id: str
+    tag: str
+    service_user_ref: str
+    target_workload_ref: str
+    target_server_ref: str
+    target_inbound_ref: str
+    target_port: int
+    target_sni: str
+
+
+class EgressBalancerSpec(CoreModel):
+    """One health-observed fail-closed Xray balancer."""
+
+    pool_id: str
+    tag: str
+    outbound_tags: list[str] = Field(min_length=1)
+    strategy: EgressStrategy
+    probe_url: str
+    fallback_tag: Literal["block"] = "block"
+
+
+class WorkloadRouteSpec(CoreModel):
+    """One first-match route embedded in a gateway Profile."""
+
+    route_id: str
+    priority: int
+    match: RouteMatchKind
+    match_values: list[str]
+    target_type: Literal["outbound", "balancer"]
+    target_tag: str
+
+
 class ConfigProfilePayload(CoreModel):
     kind: Literal["config_profile"] = "config_profile"
     workload_id: str
+    workload_kind: Literal["exit", "routing_gateway"] = "exit"
     name: str
     inbound_refs: list[str]
     inbounds: list[InboundPayload]
     outbound_tags: list[str] = Field(default_factory=list)
+    service_outbounds: list[ServiceOutboundSpec] = Field(default_factory=list)
+    egress_balancers: list[EgressBalancerSpec] = Field(default_factory=list)
+    routing_rules: list[WorkloadRouteSpec] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_aggregate_profile(self) -> ConfigProfilePayload:
+        if len(self.inbound_refs) != len(self.inbounds):
+            raise ValueError("Profile Inbound references must align with its reviewed Inbound specs.")
+        if self.routing_rules != sorted(
+            self.routing_rules,
+            key=lambda rule: (rule.priority, rule.route_id),
+        ):
+            raise ValueError("Profile routing rules must remain in reviewed priority order.")
+        outbound_tags = {outbound.tag for outbound in self.service_outbounds}
+        if len(outbound_tags) != len(self.service_outbounds):
+            raise ValueError("Profile service Outbound tags must be unique.")
+        for balancer in self.egress_balancers:
+            if not set(balancer.outbound_tags) <= outbound_tags:
+                raise ValueError(f"Balancer {balancer.pool_id} selects an unknown service Outbound.")
+        return self
 
 
 class NodeBindingPayload(CoreModel):
@@ -123,6 +183,10 @@ class HostPayload(CoreModel):
     fingerprint: str = ""
     security_layer: Literal["DEFAULT", "TLS", "NONE", "REALITY"] = "DEFAULT"
     advertised: bool = True
+    tags: list[str] = Field(default_factory=list)
+    is_hidden: bool = False
+    xray_json_template_ref: str = ""
+    exclude_from_subscription_types: list[SubscriptionType] = Field(default_factory=list)
 
 
 class InternalSquadPayload(CoreModel):
@@ -131,15 +195,23 @@ class InternalSquadPayload(CoreModel):
     inbound_refs: list[str]
 
 
+class ExternalSquadPayload(CoreModel):
+    kind: Literal["external_squad"] = "external_squad"
+    name: str
+    template_refs: list[str]
+
+
 class AccessUserPayload(CoreModel):
     kind: Literal["access_user"] = "access_user"
     username: str
     squad_ref: str
+    external_squad_ref: str = ""
 
 
 class ServiceUserPayload(CoreModel):
     kind: Literal["service_user"] = "service_user"
     username: str
+    edge_id: str
     squad_ref: str
     gateway_ref: str
     target_ref: str
@@ -149,12 +221,15 @@ class SubscriptionTemplatePayload(CoreModel):
     kind: Literal["subscription_template"] = "subscription_template"
     name: str
     profile_title: str
-    formats: list[DeliveryFormat]
+    template_type: Literal["XRAY_JSON", "MIHOMO"]
+    template_json: dict[str, Any] | None = None
+    template_yaml: str = ""
 
 
 class SubscriptionSettingsPayload(CoreModel):
     kind: Literal["subscription_settings"] = "subscription_settings"
-    template_ref: str
+    profile_title: str
+    randomize_hosts: bool = False
     preserve_unmanaged_response_rules: bool = True
 
 
@@ -207,25 +282,37 @@ class RoutingGatewayPayload(CoreModel):
     gateway_id: str
     server_ref: str
     bridge_path_ref: str
+    profile_ref: str
+    node_ref: str
+    inbound_ref: str
 
 
 class EgressPoolPayload(CoreModel):
     kind: Literal["egress_pool"] = "egress_pool"
     pool_id: str
+    gateway_ref: str
+    profile_ref: str
     exit_refs: list[str]
+    outbound_tags: list[str]
+    balancer_tag: str
     strategy: EgressStrategy
+    probe_url: str
     fail_closed: Literal[True] = True
 
 
 class RouteRulePayload(CoreModel):
     kind: Literal["route_rule"] = "route_rule"
     route_id: str
+    gateway_ref: str
+    profile_ref: str
     priority: int
     match: RouteMatchKind
     match_values: list[str]
     action: TrafficRouteAction
     target_ref: str = ""
     source_gateway_ref: str = ""
+    target_type: Literal["outbound", "balancer"]
+    target_tag: str
 
 
 class ProbePayload(CoreModel):
@@ -244,6 +331,7 @@ ResourcePayload: TypeAlias = Annotated[
     | NodeRuntimePayload
     | HostPayload
     | InternalSquadPayload
+    | ExternalSquadPayload
     | AccessUserPayload
     | ServiceUserPayload
     | SubscriptionTemplatePayload
@@ -318,9 +406,7 @@ class ResourcePlan(CoreModel):
         for resource in self.resources:
             missing = [dependency for dependency in resource.dependencies if dependency not in seen]
             if missing:
-                raise ValueError(
-                    f"Resource {resource.logical_id} appears before dependencies: {', '.join(missing)}."
-                )
+                raise ValueError(f"Resource {resource.logical_id} appears before dependencies: {', '.join(missing)}.")
             seen.add(resource.logical_id)
         expected = compute_plan_hash(
             compiler_version=self.compiler_version,
@@ -368,8 +454,7 @@ def compute_plan_hash(
             "compiler_version": compiler_version,
             "intent_hash": intent_hash,
             "resources": [
-                {"logical_id": resource.logical_id, "desired_hash": resource.desired_hash}
-                for resource in resources
+                {"logical_id": resource.logical_id, "desired_hash": resource.desired_hash} for resource in resources
             ],
         }
     )

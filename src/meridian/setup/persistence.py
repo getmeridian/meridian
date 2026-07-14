@@ -55,11 +55,14 @@ class SetupDraftStore:
         persisted = SetupDraft.model_validate(
             draft.model_copy(update={"updated_at": timestamp}).model_dump(mode="json", by_alias=True)
         )
-        payload = json.dumps(
-            persisted.model_dump(mode="json", by_alias=True),
-            indent=2,
-            sort_keys=True,
-        ).encode("utf-8") + b"\n"
+        payload = (
+            json.dumps(
+                persisted.model_dump(mode="json", by_alias=True),
+                indent=2,
+                sort_keys=True,
+            ).encode("utf-8")
+            + b"\n"
+        )
 
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         try:

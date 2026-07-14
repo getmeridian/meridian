@@ -215,11 +215,7 @@ class SetupDraft(CoreModel):
         role_servers = {
             self.roles.control.server_ref,
             *[exit_.server_ref for exit_ in self.roles.exits],
-            *[
-                server_ref
-                for relay in self.roles.transparent_relays
-                for server_ref in relay.hop_server_refs
-            ],
+            *[server_ref for relay in self.roles.transparent_relays for server_ref in relay.hop_server_refs],
             *[gateway.server_ref for gateway in self.roles.routing_gateways],
         }
         missing_servers = sorted(role_servers - selected_servers)

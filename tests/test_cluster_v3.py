@@ -114,11 +114,7 @@ class TestV2Migration:
     def test_partial_v2_reality_keys_fail_closed_instead_of_rotating(self, tmp_path: Path) -> None:
         path = tmp_path / "cluster.yml"
         path.write_text(
-            "version: 2\n"
-            "nodes:\n"
-            "  - ip: 198.51.100.20\n"
-            f"    uuid: {_NODE_UUID}\n"
-            "    reality_public_key: public-only\n"
+            f"version: 2\nnodes:\n  - ip: 198.51.100.20\n    uuid: {_NODE_UUID}\n    reality_public_key: public-only\n"
         )
 
         with pytest.raises(LocalStateCorruptedError, match="must contain public, private, and short-ID"):

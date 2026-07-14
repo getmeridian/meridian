@@ -214,6 +214,14 @@ class TestSetupIntent:
         with pytest.raises(ValidationError, match="must fail closed"):
             EgressPoolIntent(id="primary", exit_refs=["exit-a"], fail_closed=False)
 
+    def test_server_pool_rejects_fake_priority_failover(self) -> None:
+        with pytest.raises(ValidationError, match="least_ping"):
+            EgressPoolIntent(
+                id="primary",
+                exit_refs=["exit-a", "exit-b"],
+                strategy="priority",  # type: ignore[arg-type]
+            )
+
 
 class TestSetupDraft:
     def test_progress_advances_in_order_and_builds_compiler_intent(self) -> None:

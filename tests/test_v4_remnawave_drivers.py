@@ -14,8 +14,11 @@ from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
+    EgressPoolIntent,
     ExitIntent,
+    OrderedRouteIntent,
     ProtocolPathIntent,
+    RoutingGatewayIntent,
     SetupIntent,
 )
 from meridian.reconciler.remnawave_drivers import (
@@ -34,12 +37,16 @@ from meridian.reconciler.resources import (
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.remnawave import (
     ConfigProfile,
+    ExternalSquad,
     Host,
     Inbound,
     InternalSquad,
     MeridianPanel,
     Node,
     NodeCredentials,
+    SubscriptionSettings,
+    SubscriptionTemplate,
+    User,
 )
 
 
@@ -49,8 +56,15 @@ class StatefulPanel:
         self.nodes: dict[str, Node] = {}
         self.hosts: dict[str, Host] = {}
         self.squads: dict[str, InternalSquad] = {}
+        self.external_squads: dict[str, ExternalSquad] = {}
+        self.templates: dict[str, SubscriptionTemplate] = {}
+        self.users: dict[str, User] = {}
         self.calls: Counter[str] = Counter()
         self._next_id = 1
+        self.subscription_settings = SubscriptionSettings(
+            uuid=self._uuid(),
+            profile_title="",
+        )
 
     def _uuid(self) -> str:
         value = str(UUID(int=self._next_id))
@@ -191,6 +205,10 @@ class StatefulPanel:
             fingerprint=str(values["fingerprint"] or ""),
             security_layer=str(values["security_layer"]),
             is_disabled=bool(values["is_disabled"]),
+            tags=list(cast(list[str], values["tags"])),
+            is_hidden=bool(values["is_hidden"]),
+            xray_json_template_uuid=str(values["xray_json_template_uuid"]),
+            exclude_from_subscription_types=list(cast(list[str], values["exclude_from_subscription_types"])),
         )
 
     def create_internal_squad(self, name: str, inbound_uuids: list[str]) -> InternalSquad:
@@ -220,6 +238,168 @@ class StatefulPanel:
     def list_internal_squads(self) -> list[InternalSquad]:
         return list(self.squads.values())
 
+    def create_subscription_template(
+        self,
+        name: str,
+        template_type: str,
+    ) -> SubscriptionTemplate:
+        self.calls["create_template"] += 1
+        template = SubscriptionTemplate(
+            uuid=self._uuid(),
+            name=name,
+            template_type=template_type,
+        )
+        self.templates[template.uuid] = template
+        return template
+
+    def update_subscription_template(
+        self,
+        uuid: str,
+        *,
+        name: str | None = None,
+        template_json: dict | None = None,
+        encoded_template_yaml: str | None = None,
+    ) -> SubscriptionTemplate:
+        self.calls["update_template"] += 1
+        template = self.templates[uuid]
+        if name is not None:
+            template.name = name
+        if template_json is not None:
+            template.template_json = template_json
+        if encoded_template_yaml is not None:
+            template.encoded_template_yaml = encoded_template_yaml
+        return template
+
+    def get_subscription_template(self, uuid: str) -> SubscriptionTemplate | None:
+        return self.templates.get(uuid)
+
+    def list_subscription_templates(self) -> list[SubscriptionTemplate]:
+        return list(self.templates.values())
+
+    def create_external_squad(self, name: str) -> ExternalSquad:
+        self.calls["create_external_squad"] += 1
+        squad = ExternalSquad(uuid=self._uuid(), name=name)
+        self.external_squads[squad.uuid] = squad
+        return squad
+
+    def update_external_squad(
+        self,
+        uuid: str,
+        *,
+        name: str | None = None,
+        templates: list[dict[str, str]] | None = None,
+        subscription_settings: dict | None = None,
+        response_headers: dict[str, str] | None = None,
+    ) -> ExternalSquad:
+        self.calls["update_external_squad"] += 1
+        squad = self.external_squads[uuid]
+        if name is not None:
+            squad.name = name
+        if templates is not None:
+            squad.templates = templates
+        return squad
+
+    def get_external_squad(self, uuid: str) -> ExternalSquad | None:
+        return self.external_squads.get(uuid)
+
+    def list_external_squads(self) -> list[ExternalSquad]:
+        return list(self.external_squads.values())
+
+    def create_access_user(
+        self,
+        username: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+        expire_at: str = "2099-12-31T23:59:59.000Z",
+    ) -> User:
+        self.calls["create_access_user"] += 1
+        user = User(
+            uuid=self._uuid(),
+            username=username,
+            vless_uuid=self._uuid(),
+            status="ACTIVE",
+            active_internal_squad_uuids=list(squad_uuids),
+            external_squad_uuid=external_squad_uuid,
+            description="Managed by Meridian access",
+        )
+        self.users[user.uuid] = user
+        return user
+
+    def update_access_user(
+        self,
+        uuid: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+    ) -> User:
+        self.calls["update_access_user"] += 1
+        self.users[uuid].active_internal_squad_uuids = list(squad_uuids)
+        self.users[uuid].external_squad_uuid = external_squad_uuid
+        return self.users[uuid]
+
+    def get_subscription_settings(self) -> SubscriptionSettings:
+        return self.subscription_settings
+
+    def update_subscription_settings(
+        self,
+        uuid: str,
+        *,
+        profile_title: str | None = None,
+        response_rules: list[dict] | None = None,
+        serve_json_at_base_subscription: bool | None = None,
+        randomize_hosts: bool | None = None,
+    ) -> SubscriptionSettings:
+        self.calls["update_subscription_settings"] += 1
+        assert uuid == self.subscription_settings.uuid
+        assert response_rules is None
+        if profile_title is not None:
+            self.subscription_settings.profile_title = profile_title
+        if randomize_hosts is not None:
+            self.subscription_settings.randomize_hosts = randomize_hosts
+        return self.subscription_settings
+
+    def create_service_user(
+        self,
+        username: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+        expire_at: str = "2099-12-31T23:59:59.000Z",
+    ) -> User:
+        self.calls["create_service_user"] += 1
+        uuid = self._uuid()
+        user = User(
+            uuid=uuid,
+            username=username,
+            vless_uuid=self._uuid(),
+            status="ACTIVE",
+            active_internal_squad_uuids=list(squad_uuids),
+            description="Managed by Meridian service routing",
+        )
+        self.users[uuid] = user
+        return user
+
+    def update_service_user(
+        self,
+        uuid: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+    ) -> User:
+        self.calls["update_service_user"] += 1
+        self.users[uuid].active_internal_squad_uuids = list(squad_uuids)
+        return self.users[uuid]
+
+    def get_user_by_uuid(self, uuid: str) -> User | None:
+        return self.users.get(uuid)
+
+    def get_user(self, username: str) -> User | None:
+        return next(
+            (user for user in self.users.values() if user.username == username),
+            None,
+        )
+
 
 class AlreadyConvergedDriver:
     def observe(
@@ -232,8 +412,7 @@ class AlreadyConvergedDriver:
             observed_hash=action.expected_hash,
             remote_id=action.resource.logical_id,
             satisfied_postconditions=sorted(
-                postcondition_key(item.kind, item.target_ref, item.detail)
-                for item in action.resource.postconditions
+                postcondition_key(item.kind, item.target_ref, item.detail) for item in action.resource.postconditions
             ),
         )
 
@@ -310,6 +489,7 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     plan = compile_topology(_intent())
     cluster = ClusterConfig()
     panel = StatefulPanel()
+    panel.subscription_settings.response_rules = [{"name": "unmanaged"}]
     key_calls: list[str] = []
     workloads = WorkloadStateManager(
         cluster,
@@ -353,14 +533,8 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
         "meridian-exit-b-reality",
         "meridian-exit-b-wss",
     ]
-    assert (
-        exit_a_profile.config["inbounds"][0]["streamSettings"]["realitySettings"]["privateKey"]
-        == "private-exit-a"
-    )
-    assert (
-        exit_b_profile.config["inbounds"][1]["streamSettings"]["realitySettings"]["privateKey"]
-        == "private-exit-b"
-    )
+    assert exit_a_profile.config["inbounds"][0]["streamSettings"]["realitySettings"]["privateKey"] == "private-exit-a"
+    assert exit_b_profile.config["inbounds"][1]["streamSettings"]["realitySettings"]["privateKey"] == "private-exit-b"
     assert [item["tag"] for item in exit_a_profile.config["outbounds"]] == ["direct", "block"]
     assert [item["tag"] for item in exit_b_profile.config["outbounds"]] == [
         "warp",
@@ -372,31 +546,37 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     nodes = {node.name: node for node in panel.nodes.values()}
     assert nodes["Meridian v4 / exit-a"].active_config_profile_uuid == exit_a_profile.uuid
     assert nodes["Meridian v4 / exit-b"].active_config_profile_uuid == exit_b_profile.uuid
-    assert set(nodes["Meridian v4 / exit-a"].active_inbound_uuids) == {
-        item.uuid for item in exit_a_profile.inbounds
-    }
-    assert set(nodes["Meridian v4 / exit-b"].active_inbound_uuids) == {
-        item.uuid for item in exit_b_profile.inbounds
-    }
+    assert set(nodes["Meridian v4 / exit-a"].active_inbound_uuids) == {item.uuid for item in exit_a_profile.inbounds}
+    assert set(nodes["Meridian v4 / exit-b"].active_inbound_uuids) == {item.uuid for item in exit_b_profile.inbounds}
 
-    assert len(panel.hosts) == 5
-    hosts = {host.remark: host for host in panel.hosts.values()}
-    assert hosts["Meridian v4 / exit-a / xhttp-a / direct"].path == "/xhttp-a"
-    assert hosts["Meridian v4 / exit-b / wss-b / direct"].path == "/ws-b"
-    assert hosts["Meridian v4 / exit-b / hy2-b / direct"].alpn == "h3"
-    assert hosts["Meridian v4 / exit-a / reality-a / direct"].fingerprint == "chrome"
-    assert all(not host.is_disabled for host in hosts.values())
+    assert len(panel.hosts) == 11
+    hosts = list(panel.hosts.values())
+    direct_hosts = [host for host in hosts if not host.is_hidden and not host.xray_json_template_uuid]
+    hidden_edges = [host for host in hosts if host.is_hidden]
+    virtual_hosts = [host for host in hosts if host.xray_json_template_uuid]
+    assert len(direct_hosts) == 5
+    assert len(hidden_edges) == 5
+    assert len(virtual_hosts) == 1
+    assert any(host.path == "/xhttp-a" for host in direct_hosts)
+    assert any(host.path == "/ws-b" for host in direct_hosts)
+    assert any(host.alpn == "h3" for host in direct_hosts)
+    assert sum(host.fingerprint == "chrome" for host in direct_hosts) == 2
+    assert all(host.tags == ["MERIDIAN_V4_VISIBLE"] for host in direct_hosts)
+    assert all(host.tags == ["MERIDIAN_V4_XRAY_EDGE"] for host in hidden_edges)
+    assert all(host.exclude_from_subscription_types == ["MIHOMO", "XRAY_BASE64"] for host in hidden_edges)
+    assert virtual_hosts[0].tags == ["MERIDIAN_V4_XRAY_VIRTUAL"]
+    assert all(not host.is_disabled for host in hosts)
+    assert all(len(host.remark) <= 40 for host in hosts)
 
     squad = next(iter(panel.squads.values()))
     assert len(squad.inbound_uuids) == 5
     assert set(squad.inbound_uuids) == {
-        inbound.uuid
-        for profile in panel.profiles.values()
-        for inbound in profile.inbounds
+        inbound.uuid for profile in panel.profiles.values() for inbound in profile.inbounds
     }
     assert cluster.workloads[0].reality_keys["srv-exit-a"].private_key == "private-exit-a"
     assert cluster.workloads[1].reality_keys["srv-exit-b"].private_key == "private-exit-b"
     assert cluster.workloads[0].config_profile_uuid != cluster.workloads[1].config_profile_uuid
+    assert panel.subscription_settings.response_rules == [{"name": "unmanaged"}]
 
     mutation_counts = panel.calls.copy()
     second = execute_resource_plan(
@@ -412,13 +592,113 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     assert panel.calls == mutation_counts
 
 
+def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() -> None:
+    base = _intent()
+    intent = SetupIntent(
+        control=base.control,
+        exits=base.exits,
+        routing_gateways=[
+            RoutingGatewayIntent(
+                id="gateway-a",
+                server_ref="srv-gateway",
+                bridge_path_ref="reality-a",
+            )
+        ],
+        egress_pools=[
+            EgressPoolIntent(
+                id="primary",
+                exit_refs=["exit-a", "exit-b"],
+                strategy="least_ping",
+            )
+        ],
+        routes=[
+            OrderedRouteIntent(
+                id="regional",
+                priority=10,
+                match="country",
+                match_values=["DE"],
+                target_ref="exit-a",
+                source_gateway_ref="gateway-a",
+            )
+        ],
+        default_egress_ref="primary",
+        access=base.access,
+    )
+    plan = compile_topology(intent)
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    key_calls: list[str] = []
+    workloads = WorkloadStateManager(
+        cluster,
+        persist=lambda _state: None,
+        key_factory=lambda server_ref: (key_calls.append(server_ref), _keys(server_ref))[1],
+    )
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=workloads,
+        server_addresses={
+            "srv-control": "198.51.100.10",
+            "srv-exit-a": "198.51.100.20",
+            "srv-exit-b": "198.51.100.30",
+            "srv-gateway": "198.51.100.40",
+        },
+    )
+    fallback = AlreadyConvergedDriver()
+    drivers = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+    drivers.update(build_remnawave_drivers(context))
+
+    result = execute_resource_plan(
+        plan,
+        cluster,
+        drivers,
+        persist=lambda _state: None,
+    )
+
+    assert result.all_succeeded
+    assert sorted(key_calls) == ["srv-exit-a", "srv-exit-b", "srv-gateway"]
+    service_users = [user for user in panel.users.values() if user.description == "Managed by Meridian service routing"]
+    assert len(service_users) == 2
+    assert any(user.description == "Managed by Meridian access" for user in panel.users.values())
+    assert len(panel.profiles) == 3
+    profiles = {profile.name: profile for profile in panel.profiles.values()}
+    gateway = profiles["Meridian v4 / gateway-a"]
+    assert [outbound["tag"] for outbound in gateway.config["outbounds"][:2]] == [
+        "meridian-edge-gateway-a-exit-a",
+        "meridian-edge-gateway-a-exit-b",
+    ]
+    assert gateway.config["routing"]["balancers"][0]["fallbackTag"] == "block"
+    assert gateway.config["routing"]["rules"][-1]["balancerTag"] == ("meridian-pool-gateway-a-primary")
+    assert gateway.config["observatory"]["subjectSelector"] == [
+        "meridian-edge-gateway-a-exit-a",
+        "meridian-edge-gateway-a-exit-b",
+    ]
+    assert {
+        inbound.tag for profile in profiles.values() for inbound in profile.inbounds if "bridge" in inbound.tag
+    } == {
+        "meridian-exit-a-bridge-gateway-a",
+        "meridian-exit-b-bridge-gateway-a",
+    }
+
+    mutation_counts = panel.calls.copy()
+    second = execute_resource_plan(
+        plan,
+        cluster,
+        drivers,
+        persist=lambda _state: None,
+    )
+    assert second.all_succeeded
+    assert not second.changed
+    assert panel.calls == mutation_counts
+
+
 def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:
     plan = compile_topology(_intent())
     profile_resource = next(
         resource
         for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload)
-        and resource.payload.workload_id == "exit-a"
+        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id == "exit-a"
     )
     action = next(
         action

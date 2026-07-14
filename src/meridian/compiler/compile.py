@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-import hashlib
-import re
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 from meridian.compiler.allocations import PortAllocator
+from meridian.compiler.builder import PlanBuilder
+from meridian.compiler.client_delivery import compile_xray_delivery_hosts
+from meridian.compiler.delivery import mihomo_template, xray_json_template
 from meridian.compiler.errors import TopologyCompileError
+from meridian.compiler.firewalls import add_firewall, stable_token
+from meridian.compiler.gateway_compile import compile_routing_gateways
 from meridian.compiler.models import (
     AccessUserPayload,
     CertificatePayload,
-    CompiledResource,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
-    EgressPoolPayload,
-    FirewallRulePayload,
+    ExternalSquadPayload,
     HostPayload,
     InboundPayload,
     InternalSquadPayload,
@@ -27,67 +27,21 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     ProbePayload,
     RealmHopPayload,
-    ResourcePayload,
     ResourcePlan,
     ResourcePostcondition,
-    RouteRulePayload,
-    RoutingGatewayPayload,
-    ServiceUserPayload,
     SubscriptionSettingsPayload,
     SubscriptionTemplatePayload,
     canonical_hash,
     compute_plan_hash,
     make_resource,
 )
+from meridian.compiler.routing import bridge_inbound_id, compile_gateway_routing
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
-
-
-@dataclass
-class _PlanBuilder:
-    resources: dict[str, CompiledResource] = field(default_factory=dict)
-
-    def add(
-        self,
-        logical_id: str,
-        payload: ResourcePayload,
-        *,
-        dependencies: list[str] | None = None,
-        postconditions: list[ResourcePostcondition] | None = None,
-    ) -> str:
-        if logical_id in self.resources:
-            raise TopologyCompileError(f"Compiler produced duplicate logical resource {logical_id}.")
-        self.resources[logical_id] = make_resource(
-            logical_id,
-            payload,
-            dependencies=dependencies,
-            postconditions=postconditions or [_exists(logical_id)],
-        )
-        return logical_id
-
-    def ordered(self) -> list[CompiledResource]:
-        pending = dict(self.resources)
-        emitted: list[CompiledResource] = []
-        emitted_ids: set[str] = set()
-        while pending:
-            ready = sorted(
-                logical_id
-                for logical_id, resource in pending.items()
-                if set(resource.dependencies) <= emitted_ids
-            )
-            if not ready:
-                unresolved = ", ".join(sorted(pending))
-                raise TopologyCompileError(
-                    f"Compiled dependency graph contains a cycle or missing reference: {unresolved}."
-                )
-            for logical_id in ready:
-                emitted.append(pending.pop(logical_id))
-                emitted_ids.add(logical_id)
-        return emitted
 
 
 def compile_topology(intent: SetupIntent) -> ResourcePlan:
     """Compile complete setup intent without network, filesystem, or randomness."""
-    builder = _PlanBuilder()
+    builder = PlanBuilder()
     ports = PortAllocator()
     control_id = builder.add(
         "control:runtime",
@@ -100,8 +54,8 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             ResourcePostcondition(kind="listening", target_ref="control:runtime", detail="HTTPS control plane"),
         ],
     )
-    _add_firewall(builder, intent.control.server_ref, "tcp", 80)
-    _add_firewall(builder, intent.control.server_ref, "tcp", 443)
+    add_firewall(builder, intent.control.server_ref, "tcp", 80)
+    add_firewall(builder, intent.control.server_ref, "tcp", 443)
 
     inbound_by_path: dict[tuple[str, str], str] = {}
     runtime_by_exit: dict[str, str] = {}
@@ -112,6 +66,49 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     stream_fallbacks: dict[tuple[str, int], str] = {}
     direct_host_ids: list[str] = []
     reality_names_by_path = _reality_names_by_path(intent)
+    gateway_plans = {
+        gateway.id: compile_gateway_routing(intent, gateway)
+        for gateway in sorted(intent.routing_gateways, key=lambda item: item.id)
+    }
+    bridge_specs_by_exit: dict[str, list[tuple[str, InboundPayload, str]]] = defaultdict(list)
+    bridge_ports: dict[tuple[str, str], int] = {}
+    exits_by_id = {exit_.id: exit_ for exit_ in intent.exits}
+    for plan in gateway_plans.values():
+        for target_exit_ref in plan.target_exit_refs:
+            target = exits_by_id[target_exit_ref]
+            port = ports.auxiliary_tcp(
+                target.server_ref,
+                f"bridge:{plan.gateway.id}:{target_exit_ref}",
+                base=40000,
+                size=9999,
+            )
+            bridge_ports[(plan.gateway.id, target_exit_ref)] = port
+            reality_path = next(path for path in target.paths if path.protocol == "reality")
+            inbound_id = bridge_inbound_id(plan.gateway.id, target_exit_ref)
+            firewall_id = add_firewall(
+                builder,
+                target.server_ref,
+                "tcp",
+                port,
+                source_server_refs=[plan.gateway.server_ref],
+            )
+            bridge_specs_by_exit[target_exit_ref].append(
+                (
+                    inbound_id,
+                    InboundPayload(
+                        workload_ref=target_exit_ref,
+                        protocol="reality",
+                        purpose="bridge",
+                        tag=f"meridian-{target_exit_ref}-bridge-{plan.gateway.id}",
+                        listen_address="0.0.0.0",
+                        listen_port=port,
+                        public_port=port,
+                        reality_sni=reality_path.reality_sni,
+                        reality_server_names=[reality_path.reality_sni],
+                    ),
+                    firewall_id,
+                )
+            )
 
     exit_servers = [exit_.server_ref for exit_ in intent.exits]
     if len(exit_servers) != len(set(exit_servers)):
@@ -123,13 +120,13 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     for exit_ in sorted(intent.exits, key=lambda item: item.id):
         profile_id = f"profile:{exit_.id}"
         sorted_paths = sorted(exit_.paths, key=lambda item: item.id)
-        path_refs = [f"inbound:{exit_.id}:{path.id}" for path in sorted_paths]
+        client_path_refs = [f"inbound:{exit_.id}:{path.id}" for path in sorted_paths]
+        bridge_specs = sorted(bridge_specs_by_exit[exit_.id], key=lambda item: item[0])
+        path_refs = [*client_path_refs, *(item[0] for item in bridge_specs)]
         inbound_specs: list[InboundPayload] = []
         for path in sorted_paths:
             if path.protocol == "hysteria2" and path.listen_port and path.listen_port != path.public_port:
-                raise TopologyCompileError(
-                    f"Hysteria2 path {exit_.id}/{path.id} must listen on its public UDP port."
-                )
+                raise TopologyCompileError(f"Hysteria2 path {exit_.id}/{path.id} must listen on its public UDP port.")
             inbound_id = f"inbound:{exit_.id}:{path.id}"
             listen_port = ports.path_port(exit_, path)
             allocated_path_ports[(exit_.id, path.id)] = listen_port
@@ -148,6 +145,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
                     path=path.path,
                 )
             )
+        inbound_specs.extend(item[1] for item in bridge_specs)
         builder.add(
             profile_id,
             ConfigProfilePayload(
@@ -157,14 +155,24 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
                 inbounds=inbound_specs,
                 outbound_tags=["warp"] if exit_.warp else ["direct"],
             ),
-            dependencies=[control_id],
+            dependencies=[control_id, *(item[2] for item in bridge_specs)],
         )
-        for path, inbound_spec in zip(sorted_paths, inbound_specs, strict=True):
+        for path, inbound_spec in zip(
+            sorted_paths,
+            inbound_specs[: len(sorted_paths)],
+            strict=True,
+        ):
             inbound_id = f"inbound:{exit_.id}:{path.id}"
             builder.add(
                 inbound_id,
                 inbound_spec,
                 dependencies=[profile_id],
+            )
+        for inbound_id, inbound_spec, firewall_id in bridge_specs:
+            builder.add(
+                inbound_id,
+                inbound_spec,
+                dependencies=[profile_id, firewall_id],
             )
 
         binding_id = builder.add(
@@ -199,7 +207,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             binding_ref=binding_id,
             warp=exit_.warp,
         ).api_port
-        _add_firewall(
+        add_firewall(
             builder,
             exit_.server_ref,
             "tcp",
@@ -221,6 +229,22 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             direct_host_ids=direct_host_ids,
         )
 
+    gateway_ids = compile_routing_gateways(
+        builder=builder,
+        ports=ports,
+        intent=intent,
+        control_id=control_id,
+        plans=gateway_plans,
+        bridge_ports=bridge_ports,
+        runtime_by_exit=runtime_by_exit,
+        inbound_by_path=inbound_by_path,
+        allocated_path_ports=allocated_path_ports,
+        stream_routes=stream_routes,
+        stream_dependencies=stream_dependencies,
+        stream_targets=stream_targets,
+        stream_fallbacks=stream_fallbacks,
+        direct_host_ids=direct_host_ids,
+    )
     stream_ids = _compile_stream_artifacts(
         builder,
         stream_routes,
@@ -243,36 +267,69 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
         InternalSquadPayload(name=intent.access.squad_name, inbound_refs=all_inbounds),
         dependencies=all_inbounds,
     )
+    template_ids: list[str] = []
+    xray_template_id = ""
+    if "xray_json" in intent.delivery.formats:
+        xray_template_id = builder.add(
+            f"template:{intent.delivery.template_name}:xray-json",
+            SubscriptionTemplatePayload(
+                name=f"Meridian v4 / {intent.delivery.template_name} / Xray JSON",
+                profile_title=intent.delivery.profile_title,
+                template_type="XRAY_JSON",
+                template_json=xray_json_template(),
+            ),
+            dependencies=[control_id],
+        )
+        template_ids.append(xray_template_id)
+    if "mihomo" in intent.delivery.formats:
+        template_ids.append(
+            builder.add(
+                f"template:{intent.delivery.template_name}:mihomo",
+                SubscriptionTemplatePayload(
+                    name=f"Meridian v4 / {intent.delivery.template_name} / Mihomo",
+                    profile_title=intent.delivery.profile_title,
+                    template_type="MIHOMO",
+                    template_yaml=mihomo_template(),
+                ),
+                dependencies=[control_id],
+            )
+        )
+    if xray_template_id:
+        compile_xray_delivery_hosts(
+            builder,
+            template_ref=xray_template_id,
+        )
+    external_squad_id = ""
+    if template_ids:
+        external_squad_id = builder.add(
+            "external-squad:access",
+            ExternalSquadPayload(
+                name="Meridian v4 / delivery",
+                template_refs=template_ids,
+            ),
+            dependencies=template_ids,
+        )
+    user_dependencies = [squad_id, *([external_squad_id] if external_squad_id else [])]
     user_ids = [
         builder.add(
             f"user:{username}",
-            AccessUserPayload(username=username, squad_ref=squad_id),
-            dependencies=[squad_id],
+            AccessUserPayload(
+                username=username,
+                squad_ref=squad_id,
+                external_squad_ref=external_squad_id,
+            ),
+            dependencies=user_dependencies,
         )
         for username in sorted(intent.access.users)
     ]
-    template_id = builder.add(
-        f"template:{intent.delivery.template_name}",
-        SubscriptionTemplatePayload(
-            name=intent.delivery.template_name,
+    settings_id = builder.add(
+        "subscription:settings",
+        SubscriptionSettingsPayload(
             profile_title=intent.delivery.profile_title,
-            formats=intent.delivery.formats,
         ),
         dependencies=[control_id],
     )
-    settings_id = builder.add(
-        "subscription:settings",
-        SubscriptionSettingsPayload(template_ref=template_id),
-        dependencies=[template_id],
-    )
 
-    gateway_ids = _compile_routing(
-        builder=builder,
-        intent=intent,
-        control_id=control_id,
-        squad_id=squad_id,
-        runtime_by_exit=runtime_by_exit,
-    )
     _compile_probes(
         builder=builder,
         runtime_by_exit=runtime_by_exit,
@@ -290,7 +347,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
 
 def _compile_exit_endpoints(
     *,
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     ports: PortAllocator,
     exit_: ExitIntent,
     runtime_id: str,
@@ -308,7 +365,7 @@ def _compile_exit_endpoints(
         inbound_id = inbound_by_path[(exit_.id, path.id)]
         backend_port = allocated_path_ports[(exit_.id, path.id)]
         if path.protocol == "hysteria2":
-            firewall_id = _add_firewall(builder, exit_.server_ref, "udp", path.public_port)
+            firewall_id = add_firewall(builder, exit_.server_ref, "udp", path.public_port)
             certificate_id = _ensure_certificate(
                 builder,
                 exit_id=exit_.id,
@@ -340,7 +397,7 @@ def _compile_exit_endpoints(
                     )
                 )
             stream_dependencies[stream_key].update({runtime_id, inbound_id})
-            _add_firewall(builder, exit_.server_ref, "tcp", path.public_port)
+            add_firewall(builder, exit_.server_ref, "tcp", path.public_port)
         else:
             tls_groups[(path.tls_sni, path.public_port)].append(path)
 
@@ -358,7 +415,7 @@ def _compile_exit_endpoints(
             base=18000,
             size=1000,
         )
-        http_id = f"nginx:{exit_.id}:{_token(tls_sni)}:http"
+        http_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:http"
         http_routes = [
             NginxRouteSpec(
                 match="host_path",
@@ -403,7 +460,7 @@ def _compile_exit_endpoints(
             )
         )
         stream_dependencies[stream_key].add(http_id)
-        _add_firewall(builder, exit_.server_ref, "tcp", public_port)
+        add_firewall(builder, exit_.server_ref, "tcp", public_port)
 
     for path in sorted(exit_.paths, key=lambda item: item.id):
         inbound_id = inbound_by_path[(exit_.id, path.id)]
@@ -435,7 +492,7 @@ def _compile_exit_endpoints(
 
 
 def _compile_stream_artifacts(
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     routes: dict[tuple[str, int], list[NginxRouteSpec]],
     dependencies: dict[tuple[str, int], set[str]],
     fallbacks: dict[tuple[str, int], str],
@@ -466,7 +523,7 @@ def _compile_stream_artifacts(
 
 
 def _attach_stream_dependencies(
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     host_ids: list[str],
     stream_ids: dict[tuple[str, int], str],
 ) -> None:
@@ -486,7 +543,7 @@ def _attach_stream_dependencies(
 
 def _compile_relays(
     *,
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     intent: SetupIntent,
     runtime_by_exit: dict[str, str],
     inbound_by_path: dict[tuple[str, str], str],
@@ -512,14 +569,12 @@ def _compile_relays(
                     f"Relay listener {server_ref}:{relay.listen_port} is assigned more than once."
                 )
             relay_listeners.add(listener)
-            firewall_id = _add_firewall(
+            firewall_id = add_firewall(
                 builder,
                 server_ref,
                 "tcp",
                 relay.listen_port,
-                source_server_refs=(
-                    [] if hop_index == 0 else [relay.hop_server_refs[hop_index - 1]]
-                ),
+                source_server_refs=([] if hop_index == 0 else [relay.hop_server_refs[hop_index - 1]]),
             )
             hop_id = f"realm:{relay.id}:{hop_index}"
             builder.add(
@@ -570,85 +625,9 @@ def _compile_relays(
     return host_ids
 
 
-def _compile_routing(
-    *,
-    builder: _PlanBuilder,
-    intent: SetupIntent,
-    control_id: str,
-    squad_id: str,
-    runtime_by_exit: dict[str, str],
-) -> list[str]:
-    target_dependencies = dict(runtime_by_exit)
-    for pool in sorted(intent.egress_pools, key=lambda item: item.id):
-        pool_id = builder.add(
-            f"egress-pool:{pool.id}",
-            EgressPoolPayload(
-                pool_id=pool.id,
-                exit_refs=pool.exit_refs,
-                strategy=pool.strategy,
-                fail_closed=True,
-            ),
-            dependencies=[runtime_by_exit[exit_ref] for exit_ref in pool.exit_refs],
-            postconditions=[
-                _exists(f"egress-pool:{pool.id}"),
-                ResourcePostcondition(kind="probe_succeeds", target_ref=f"egress-pool:{pool.id}", detail="fail closed"),
-            ],
-        )
-        target_dependencies[pool.id] = pool_id
-
-    gateway_ids: list[str] = []
-    for gateway in sorted(intent.routing_gateways, key=lambda item: item.id):
-        gateway_id = builder.add(
-            f"gateway:{gateway.id}",
-            RoutingGatewayPayload(
-                gateway_id=gateway.id,
-                server_ref=gateway.server_ref,
-                bridge_path_ref=gateway.bridge_path_ref,
-            ),
-            dependencies=[control_id],
-        )
-        gateway_ids.append(gateway_id)
-
-    gateway_by_name = {gateway.id: f"gateway:{gateway.id}" for gateway in intent.routing_gateways}
-    service_users: set[tuple[str, str]] = set()
-    for route in sorted(intent.routes, key=lambda item: (item.priority, item.id)):
-        dependencies: list[str] = []
-        if route.target_ref:
-            dependencies.append(target_dependencies[route.target_ref])
-        if route.source_gateway_ref:
-            dependencies.append(gateway_by_name[route.source_gateway_ref])
-            user_key = (route.source_gateway_ref, route.target_ref)
-            if route.action == "route" and user_key not in service_users:
-                service_users.add(user_key)
-                builder.add(
-                    f"service-user:{route.source_gateway_ref}:{route.target_ref}",
-                    ServiceUserPayload(
-                        username=f"meridian_{route.source_gateway_ref}_{route.target_ref}",
-                        squad_ref=squad_id,
-                        gateway_ref=route.source_gateway_ref,
-                        target_ref=route.target_ref,
-                    ),
-                    dependencies=[squad_id, *dependencies],
-                )
-        builder.add(
-            f"route:{route.id}",
-            RouteRulePayload(
-                route_id=route.id,
-                priority=route.priority,
-                match=route.match,
-                match_values=route.match_values,
-                action=route.action,
-                target_ref=route.target_ref,
-                source_gateway_ref=route.source_gateway_ref,
-            ),
-            dependencies=dependencies,
-        )
-    return gateway_ids
-
-
 def _compile_probes(
     *,
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     runtime_by_exit: dict[str, str],
     host_ids: list[str],
     user_ids: list[str],
@@ -710,44 +689,20 @@ def _reality_names_by_path(intent: SetupIntent) -> dict[tuple[str, str], list[st
 
 
 def _ensure_certificate(
-    builder: _PlanBuilder,
+    builder: PlanBuilder,
     *,
     exit_id: str,
     server_ref: str,
     hostname: str,
     runtime_id: str,
 ) -> str:
-    logical_id = f"certificate:{exit_id}:{_token(hostname)}"
+    logical_id = f"certificate:{exit_id}:{stable_token(hostname)}"
     if logical_id in builder.resources:
         return logical_id
     return builder.add(
         logical_id,
         CertificatePayload(server_ref=server_ref, hostname=hostname),
         dependencies=[runtime_id],
-    )
-
-
-def _add_firewall(
-    builder: _PlanBuilder,
-    server_ref: str,
-    transport: Literal["tcp", "udp"],
-    port: int,
-    *,
-    source_server_refs: list[str] | None = None,
-) -> str:
-    source_refs = sorted(set(source_server_refs or []))
-    source_identity = ",".join(source_refs) or "public"
-    logical_id = f"firewall:{_token(server_ref)}:{transport}:{port}:{_token(source_identity)}"
-    if logical_id in builder.resources:
-        return logical_id
-    return builder.add(
-        logical_id,
-        FirewallRulePayload(
-            server_ref=server_ref,
-            transport=transport,
-            port=port,
-            source_server_refs=source_refs,
-        ),
     )
 
 
@@ -769,13 +724,7 @@ def _reserve_stream_name(
 
 
 def _stream_id(server_ref: str, port: int) -> str:
-    return f"nginx:{_token(server_ref)}:{port}:stream"
-
-
-def _token(value: str) -> str:
-    normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "resource"
-    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
-    return f"{normalized[:32]}-{digest}"
+    return f"nginx:{stable_token(server_ref)}:{port}:stream"
 
 
 def _exists(target_ref: str) -> ResourcePostcondition:

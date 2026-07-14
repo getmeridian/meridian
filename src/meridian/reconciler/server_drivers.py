@@ -150,8 +150,7 @@ class CertificateDriver:
         cert_dir = certificate_directory(payload.hostname)
         certificate_path = f"{cert_dir}/fullchain.pem"
         result = conn.run(
-            f"openssl x509 -in {shlex.quote(certificate_path)} "
-            "-noout -checkend 86400 -ext subjectAltName 2>/dev/null",
+            f"openssl x509 -in {shlex.quote(certificate_path)} -noout -checkend 86400 -ext subjectAltName 2>/dev/null",
             timeout=15,
         )
         matches = result.returncode == 0 and f"DNS:{payload.hostname}" in result.stdout
@@ -229,9 +228,7 @@ class CertificateDriver:
             ),
         )
         if result.status == "failed":
-            raise ResourceReconcileError(
-                f"Could not issue TLS certificate for {payload.hostname}: {result.detail}"
-            )
+            raise ResourceReconcileError(f"Could not issue TLS certificate for {payload.hostname}: {result.detail}")
         return ResourceApplyReceipt(remote_id=f"{cert_dir}/fullchain.pem")
 
 
@@ -573,9 +570,7 @@ class NodeRuntimeDriver:
         if not secret:
             secret = self.context.panel.get_node_secret_key()
         if not secret:
-            raise ResourceReconcileError(
-                f"Remnawave returned no node secret for workload {payload.workload_ref!r}."
-            )
+            raise ResourceReconcileError(f"Remnawave returned no node secret for workload {payload.workload_ref!r}.")
         deployed = deploy_node_container(
             conn,
             secret,
@@ -583,18 +578,14 @@ class NodeRuntimeDriver:
             image=REMNAWAVE_NODE_IMAGE,
         )
         if not deployed:
-            raise ResourceReconcileError(
-                f"Remnawave node runtime {payload.workload_ref!r} did not become healthy."
-            )
+            raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
         return ResourceApplyReceipt(remote_id=REMNAWAVE_NODE_DIR)
 
 
 def _payload(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
     payload = action.resource.payload
     if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(
-            f"Server driver received {payload.kind}, expected {expected_type.__name__}."
-        )
+        raise ResourceReconcileError(f"Server driver received {payload.kind}, expected {expected_type.__name__}.")
     return payload
 
 
@@ -640,24 +631,15 @@ def _firewall_rules(
         source = addresses.get(source_ref, "")
         if not source:
             raise ResourceReconcileError(f"Firewall source {source_ref} has no resolved address.")
-        rules.append(
-            f"allow from {shlex.quote(source)} to any port {q_port} "
-            f"proto {q_transport} comment {q_marker}"
-        )
+        rules.append(f"allow from {shlex.quote(source)} to any port {q_port} proto {q_transport} comment {q_marker}")
     return rules
 
 
 def _port_in_ss(output: str, port: int) -> bool:
     suffix = f":{port}"
-    return any(
-        field.endswith(suffix)
-        for line in output.splitlines()
-        for field in line.split()
-    )
+    return any(field.endswith(suffix) for line in output.splitlines() for field in line.split())
 
 
 def _raise_if_timeout(action: ResourceAction, result: object | None) -> None:
     if result is not None and getattr(result, "returncode", None) == 124:
-        raise UnknownResourceOutcome(
-            f"Timed out while mutating {action.resource.logical_id}; observation is required."
-        )
+        raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")

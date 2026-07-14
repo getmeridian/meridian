@@ -109,8 +109,7 @@ def _missing() -> ResourceObservation:
 
 def _converged(action: ResourceAction, *, remote_id: str = "remote-1") -> ResourceObservation:
     postconditions = sorted(
-        postcondition_key(item.kind, item.target_ref, item.detail)
-        for item in action.resource.postconditions
+        postcondition_key(item.kind, item.target_ref, item.detail) for item in action.resource.postconditions
     )
     return ResourceObservation(
         exists=True,

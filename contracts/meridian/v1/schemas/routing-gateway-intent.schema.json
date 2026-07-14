@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "An Xray gateway that accepts service-user traffic for server-side routing.",
+  "description": "A smart entry workload using a reviewed Reality path as its public blueprint.",
   "properties": {
     "bridge_path_ref": {
       "minLength": 1,

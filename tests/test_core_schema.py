@@ -135,7 +135,12 @@ def test_topology_schemas_model_capabilities_and_country_routes() -> None:
     route_rule = schema_for("traffic-route-rule")["properties"]
     route_card = schema_for("route-card")["properties"]
 
-    assert server_capabilities["capabilities"]["items"]["enum"] == ["panel", "exit", "relay"]
+    assert server_capabilities["capabilities"]["items"]["enum"] == [
+        "panel",
+        "exit",
+        "relay",
+        "routing_gateway",
+    ]
     assert server_capabilities["region"]["pattern"] == r"^$|^[A-Za-z]{2}$"
     assert route_rule["action"]["enum"] == ["route", "block"]
     assert route_rule["country_codes"]["items"]["pattern"] == r"^[A-Za-z]{2}$"

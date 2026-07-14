@@ -653,12 +653,23 @@ class TestCreateHost:
             fingerprint="chrome",
             security_layer="REALITY",
             is_disabled=True,
+            tags=["MERIDIAN_V4_XRAY_EDGE"],
+            is_hidden=True,
+            xray_json_template_uuid="00000000-0000-0000-0000-0000000000e2",
+            exclude_from_subscription_types=["MIHOMO", "XRAY_BASE64"],
         )
         call_json = panel._post.call_args[1]["json"]
         assert call_json["sni"] == "www.google.com"
         assert call_json["fingerprint"] == "chrome"
         assert call_json["securityLayer"] == "REALITY"
         assert call_json["isDisabled"] is True
+        assert call_json["tags"] == ["MERIDIAN_V4_XRAY_EDGE"]
+        assert call_json["isHidden"] is True
+        assert call_json["xrayJsonTemplateUuid"] == "00000000-0000-0000-0000-0000000000e2"
+        assert call_json["excludeFromSubscriptionTypes"] == [
+            "MIHOMO",
+            "XRAY_BASE64",
+        ]
 
     def test_update_host_serializes_complete_managed_shape(self) -> None:
         panel = _make_panel()

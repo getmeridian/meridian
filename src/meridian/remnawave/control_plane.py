@@ -187,7 +187,45 @@ class ControlPlaneMixin:
         data = self._request("DELETE", f"/api/external-squads/{quote(uuid, safe='')}")
         return bool(data.get("isDeleted")) if isinstance(data, dict) else False
 
-    # --- Dedicated service users ---
+    # --- Managed access and service users ---
+
+    def create_access_user(
+        self,
+        username: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+        expire_at: str = "2099-12-31T23:59:59.000Z",
+    ) -> User:
+        body: dict[str, Any] = {
+            "username": username,
+            "expireAt": expire_at,
+            "description": "Managed by Meridian access",
+            "tag": "MERIDIAN_ACCESS",
+            "activeInternalSquads": squad_uuids,
+        }
+        if external_squad_uuid:
+            body["externalSquadUuid"] = external_squad_uuid
+        return parse_user(self._request("POST", "/api/users", json=body))
+
+    def update_access_user(
+        self,
+        uuid: str,
+        *,
+        squad_uuids: list[str],
+        external_squad_uuid: str = "",
+    ) -> User:
+        return parse_user(
+            self._request(
+                "PATCH",
+                "/api/users",
+                json={
+                    "uuid": uuid,
+                    "activeInternalSquads": squad_uuids,
+                    "externalSquadUuid": external_squad_uuid or None,
+                },
+            )
+        )
 
     def create_service_user(
         self,

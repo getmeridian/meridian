@@ -62,6 +62,10 @@ class Host:
     config_profile_uuid: str = ""
     inbound_uuid: str = ""
     is_disabled: bool = False
+    tags: list[str] = field(default_factory=list)
+    is_hidden: bool = False
+    xray_json_template_uuid: str = ""
+    exclude_from_subscription_types: list[str] = field(default_factory=list)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -231,6 +235,12 @@ def host_from_sdk(obj: Any) -> Host:
         # silently returns "" — keep this comment as a breadcrumb.
         inbound_uuid=str(getattr(inbound, "config_profile_inbound_uuid", "") or ""),
         is_disabled=bool(getattr(obj, "is_disabled", False)),
+        tags=[str(value) for value in (getattr(obj, "tags", None) or [])],
+        is_hidden=bool(getattr(obj, "is_hidden", False)),
+        xray_json_template_uuid=str(getattr(obj, "xray_json_template_uuid", "") or ""),
+        exclude_from_subscription_types=[
+            enum_string(value) for value in (getattr(obj, "exclude_from_subscription_types", None) or [])
+        ],
         _raw=sdk_to_dict(obj) if obj is not None else {},
     )
 
@@ -314,6 +324,10 @@ def parse_host(data: Any) -> Host:
             inbound.get("configProfileInboundUuid") or data.get("inboundUuid") or data.get("inbound_uuid") or ""
         ),
         is_disabled=data.get("isDisabled", False),
+        tags=[str(value) for value in (data.get("tags") or [])],
+        is_hidden=bool(data.get("isHidden", False)),
+        xray_json_template_uuid=str(data.get("xrayJsonTemplateUuid") or ""),
+        exclude_from_subscription_types=[str(value) for value in (data.get("excludeFromSubscriptionTypes") or [])],
         _raw=data,
     )
 

@@ -5,8 +5,18 @@ from __future__ import annotations
 import pytest
 
 from meridian.cluster import RealityKeyBinding
-from meridian.compiler.models import ConfigProfilePayload, InboundPayload
-from meridian.xray_workload import WorkloadConfigError, render_workload_config
+from meridian.compiler.models import (
+    ConfigProfilePayload,
+    EgressBalancerSpec,
+    InboundPayload,
+    ServiceOutboundSpec,
+    WorkloadRouteSpec,
+)
+from meridian.xray_workload import (
+    ServiceRouteCredential,
+    WorkloadConfigError,
+    render_workload_config,
+)
 
 
 def _profile(*, warp: bool = False) -> ConfigProfilePayload:
@@ -102,6 +112,140 @@ def test_warp_is_preferred_without_removing_direct_or_block() -> None:
         "block",
     ]
     assert config["outbounds"][0]["protocol"] == "socks"
+
+
+def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> None:
+    profile = ConfigProfilePayload(
+        workload_id="gateway-a",
+        workload_kind="routing_gateway",
+        name="Meridian v4 / gateway-a",
+        inbound_refs=["inbound:gateway-a:entry"],
+        inbounds=[
+            InboundPayload(
+                workload_ref="gateway-a",
+                protocol="reality",
+                tag="meridian-gateway-a-reality",
+                listen_port=11443,
+                public_port=443,
+                reality_sni="www.microsoft.com",
+                reality_server_names=["www.microsoft.com"],
+            )
+        ],
+        service_outbounds=[
+            ServiceOutboundSpec(
+                edge_id="gateway-a:exit-a",
+                tag="meridian-edge-gateway-a-exit-a",
+                service_user_ref="service-user:gateway-a:exit-a",
+                target_workload_ref="exit-a",
+                target_server_ref="srv-exit-a",
+                target_inbound_ref="inbound:exit-a:bridge:gateway-a",
+                target_port=41001,
+                target_sni="www.microsoft.com",
+            ),
+            ServiceOutboundSpec(
+                edge_id="gateway-a:exit-b",
+                tag="meridian-edge-gateway-a-exit-b",
+                service_user_ref="service-user:gateway-a:exit-b",
+                target_workload_ref="exit-b",
+                target_server_ref="srv-exit-b",
+                target_inbound_ref="inbound:exit-b:bridge:gateway-a",
+                target_port=41002,
+                target_sni="www.cloudflare.com",
+            ),
+        ],
+        egress_balancers=[
+            EgressBalancerSpec(
+                pool_id="primary",
+                tag="meridian-pool-gateway-a-primary",
+                outbound_tags=[
+                    "meridian-edge-gateway-a-exit-a",
+                    "meridian-edge-gateway-a-exit-b",
+                ],
+                strategy="least_ping",
+                probe_url="https://www.apple.com/library/test/success.html",
+            )
+        ],
+        routing_rules=[
+            WorkloadRouteSpec(
+                route_id="regional",
+                priority=10,
+                match="country",
+                match_values=["DE"],
+                target_type="outbound",
+                target_tag="meridian-edge-gateway-a-exit-a",
+            ),
+            WorkloadRouteSpec(
+                route_id="default",
+                priority=11,
+                match="all",
+                match_values=[],
+                target_type="balancer",
+                target_tag="meridian-pool-gateway-a-primary",
+            ),
+        ],
+    )
+    credentials = {
+        "gateway-a:exit-a": ServiceRouteCredential(
+            address="198.51.100.10",
+            vless_uuid="11111111-1111-4111-8111-111111111111",
+            public_key="public-a",
+            short_id="aaaaaaaaaaaaaaaa",
+        ),
+        "gateway-a:exit-b": ServiceRouteCredential(
+            address="198.51.100.20",
+            vless_uuid="22222222-2222-4222-8222-222222222222",
+            public_key="public-b",
+            short_id="bbbbbbbbbbbbbbbb",
+        ),
+    }
+
+    config = render_workload_config(
+        profile,
+        reality_keys=_keys(),
+        service_credentials=credentials,
+    )
+
+    assert [outbound["tag"] for outbound in config["outbounds"]] == [
+        "meridian-edge-gateway-a-exit-a",
+        "meridian-edge-gateway-a-exit-b",
+        "direct",
+        "block",
+    ]
+    assert config["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"] == "public-a"
+    assert config["routing"]["rules"][1]["ip"] == ["geoip:de"]
+    assert not any("domain" in rule and "geosite:category-de" in rule["domain"] for rule in config["routing"]["rules"])
+    assert config["routing"]["rules"][-1] == {
+        "type": "field",
+        "balancerTag": "meridian-pool-gateway-a-primary",
+    }
+    assert config["routing"]["balancers"][0]["fallbackTag"] == "block"
+    assert config["observatory"]["subjectSelector"] == [
+        "meridian-edge-gateway-a-exit-a",
+        "meridian-edge-gateway-a-exit-b",
+    ]
+    assert config["observatory"]["probeUrl"] == ("https://www.apple.com/library/test/success.html")
+
+
+def test_gateway_refuses_to_guess_missing_service_credentials() -> None:
+    profile = _profile().model_copy(
+        update={
+            "service_outbounds": [
+                ServiceOutboundSpec(
+                    edge_id="gateway-a:exit-a",
+                    tag="edge-a",
+                    service_user_ref="service-user:a",
+                    target_workload_ref="exit-a",
+                    target_server_ref="srv-exit-a",
+                    target_inbound_ref="inbound:bridge",
+                    target_port=41001,
+                    target_sni="www.microsoft.com",
+                )
+            ]
+        }
+    )
+
+    with pytest.raises(WorkloadConfigError, match="credentials do not match"):
+        render_workload_config(profile, reality_keys=_keys())
 
 
 @pytest.mark.parametrize(

@@ -9,7 +9,10 @@ from pydantic import ValidationError
 
 from meridian.compiler import TopologyCompileError, compile_topology
 from meridian.compiler.models import (
+    AccessUserPayload,
     ConfigProfilePayload,
+    EgressPoolPayload,
+    ExternalSquadPayload,
     FirewallRulePayload,
     HostPayload,
     InboundPayload,
@@ -18,6 +21,10 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     RealmHopPayload,
     ResourcePlan,
+    RouteRulePayload,
+    ServiceUserPayload,
+    SubscriptionSettingsPayload,
+    SubscriptionTemplatePayload,
 )
 from meridian.core.topology import (
     AccessIntent,
@@ -105,7 +112,7 @@ def _intent(*, reverse_exits: bool = False) -> SetupIntent:
             EgressPoolIntent(
                 id="primary",
                 exit_refs=["exit-a", "exit-b"],
-                strategy="priority",
+                strategy="least_ping",
             )
         ],
         routes=[
@@ -154,6 +161,7 @@ class TestPureCompiler:
             "node_runtime",
             "host",
             "internal_squad",
+            "external_squad",
             "access_user",
             "service_user",
             "subscription_template",
@@ -168,6 +176,58 @@ class TestPureCompiler:
             "probe",
         } <= kinds
 
+    def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
+        plan = compile_topology(_intent())
+        templates = [
+            resource.payload for resource in plan.resources if isinstance(resource.payload, SubscriptionTemplatePayload)
+        ]
+        external = next(
+            resource.payload for resource in plan.resources if isinstance(resource.payload, ExternalSquadPayload)
+        )
+        settings = next(
+            resource.payload for resource in plan.resources if isinstance(resource.payload, SubscriptionSettingsPayload)
+        )
+
+        assert {template.template_type for template in templates} == {
+            "XRAY_JSON",
+            "MIHOMO",
+        }
+        xray = next(template for template in templates if template.template_type == "XRAY_JSON")
+        assert xray.template_json is not None
+        assert xray.template_json["routing"]["balancers"][0]["fallbackTag"] == "BLOCK"
+        assert xray.template_json["remnawave"]["injectHosts"][0]["selectFrom"] == "HIDDEN"
+        assert xray.template_json["burstObservatory"]["pingConfig"]["destination"].startswith("https://")
+        mihomo = next(template.template_yaml for template in templates if template.template_type == "MIHOMO")
+        assert mihomo is not None
+        assert "type: fallback" in mihomo
+        assert mihomo.count("# LEAVE THIS LINE!") == 2
+        hosts = [resource.payload for resource in plan.resources if isinstance(resource.payload, HostPayload)]
+        direct_hosts = [host for host in hosts if not host.is_hidden and not host.xray_json_template_ref]
+        hidden_edges = [host for host in hosts if host.is_hidden]
+        virtual_hosts = [host for host in hosts if host.xray_json_template_ref]
+        assert len(hidden_edges) == len(direct_hosts)
+        assert len(virtual_hosts) == 1
+        assert all("XRAY_JSON" in host.exclude_from_subscription_types for host in direct_hosts)
+        assert all(host.exclude_from_subscription_types == ["MIHOMO", "XRAY_BASE64"] for host in hidden_edges)
+        assert virtual_hosts[0].exclude_from_subscription_types == [
+            "MIHOMO",
+            "XRAY_BASE64",
+        ]
+        assert len(external.template_refs) == 2
+        assert settings.profile_title == "Family VPN"
+
+    def test_base64_delivery_publishes_alternatives_without_fake_failover_template(self) -> None:
+        intent = _intent().model_copy(update={"delivery": DeliveryIntent(formats=["base64"])})
+        plan = compile_topology(intent)
+
+        assert not any(
+            isinstance(resource.payload, (SubscriptionTemplatePayload, ExternalSquadPayload))
+            for resource in plan.resources
+        )
+        users = [resource.payload for resource in plan.resources if isinstance(resource.payload, AccessUserPayload)]
+        assert users
+        assert all(user.external_squad_ref == "" for user in users)
+
     def test_resources_are_dependency_ordered_with_unique_tags_and_ports(self) -> None:
         plan = compile_topology(_intent())
         positions = {resource.logical_id: index for index, resource in enumerate(plan.resources)}
@@ -176,11 +236,7 @@ class TestPureCompiler:
             assert resource.dependencies == sorted(set(resource.dependencies))
             assert all(positions[dependency] < positions[resource.logical_id] for dependency in resource.dependencies)
 
-        inbounds = [
-            resource.payload
-            for resource in plan.resources
-            if isinstance(resource.payload, InboundPayload)
-        ]
+        inbounds = [resource.payload for resource in plan.resources if isinstance(resource.payload, InboundPayload)]
         tags = [inbound.tag for inbound in inbounds]
         assert len(tags) == len(set(tags))
         listeners = [(inbound.workload_ref, inbound.listen_port) for inbound in inbounds]
@@ -204,17 +260,30 @@ class TestPureCompiler:
             if isinstance(resource.payload, NodeRuntimePayload)
         }
 
-        assert set(profiles) == {"exit-a", "exit-b"}
-        assert [item.protocol for item in profiles["exit-a"].inbounds] == ["reality", "xhttp"]
-        assert [item.protocol for item in profiles["exit-b"].inbounds] == ["hysteria2", "reality", "wss"]
+        assert set(profiles) == {"exit-a", "exit-b", "gateway-a"}
+        assert [(item.protocol, item.purpose) for item in profiles["exit-a"].inbounds] == [
+            ("reality", "client"),
+            ("xhttp", "client"),
+            ("reality", "bridge"),
+        ]
+        assert [(item.protocol, item.purpose) for item in profiles["exit-b"].inbounds] == [
+            ("hysteria2", "client"),
+            ("reality", "client"),
+            ("wss", "client"),
+            ("reality", "bridge"),
+        ]
         assert profiles["exit-a"].outbound_tags == ["direct"]
         assert profiles["exit-b"].outbound_tags == ["warp"]
+        assert profiles["gateway-a"].workload_kind == "routing_gateway"
+        assert len(profiles["gateway-a"].service_outbounds) == 2
+        assert profiles["gateway-a"].egress_balancers[0].fallback_tag == "block"
         assert set(bindings["exit-a"].inbound_refs) == set(profiles["exit-a"].inbound_refs)
         assert set(bindings["exit-b"].inbound_refs) == set(profiles["exit-b"].inbound_refs)
         assert bindings["exit-a"].profile_ref == "profile:exit-a"
         assert bindings["exit-b"].profile_ref == "profile:exit-b"
         assert runtimes["exit-a"].warp is False
         assert runtimes["exit-b"].warp is True
+        assert runtimes["gateway-a"].warp is False
 
         exit_a_wire = profiles["exit-a"].model_dump_json()
         exit_b_wire = profiles["exit-b"].model_dump_json()
@@ -222,6 +291,9 @@ class TestPureCompiler:
         assert "vpn-b.example.com" not in exit_a_wire
         assert "www.microsoft.com" not in exit_b_wire
         assert "vpn-a.example.com" not in exit_b_wire
+        gateway_wire = profiles["gateway-a"].model_dump_json()
+        assert "www.microsoft.com" in gateway_wire
+        assert "private" not in gateway_wire
 
     def test_two_exits_publish_exact_owned_hosts_and_shared_access_squad(self) -> None:
         plan = compile_topology(_intent())
@@ -238,6 +310,7 @@ class TestPureCompiler:
             "host:exit-b:hy2-b:direct",
             "host:exit-b:reality-b:direct",
             "host:exit-b:wss-b:direct",
+            "host:gateway-a:entry:direct",
         }
         assert direct_hosts["host:exit-a:reality-a:direct"].fingerprint == "chrome"
         assert direct_hosts["host:exit-a:xhttp-a:direct"].path == "/xhttp-a"
@@ -254,14 +327,43 @@ class TestPureCompiler:
         )
         assert any(dependency.startswith("certificate:exit-b:") for dependency in hysteria.dependencies)
 
-        squad = next(
-            resource.payload
-            for resource in plan.resources
-            if isinstance(resource.payload, InternalSquadPayload)
-        )
+        squad = resources["squad:access"].payload
+        assert isinstance(squad, InternalSquadPayload)
         assert squad.inbound_refs == sorted(
-            [*profiles_inbound_refs(plan, "exit-a"), *profiles_inbound_refs(plan, "exit-b")]
+            [
+                *client_inbound_refs(plan, "exit-a"),
+                *client_inbound_refs(plan, "exit-b"),
+                *client_inbound_refs(plan, "gateway-a"),
+            ]
         )
+
+    def test_gateway_compiles_private_edges_ordered_rules_and_fail_closed_pool(self) -> None:
+        plan = compile_topology(_intent())
+        resources = {resource.logical_id: resource for resource in plan.resources}
+        profile = resources["profile:gateway-a"].payload
+        assert isinstance(profile, ConfigProfilePayload)
+
+        assert [edge.target_workload_ref for edge in profile.service_outbounds] == [
+            "exit-a",
+            "exit-b",
+        ]
+        assert all(edge.target_port >= 40000 for edge in profile.service_outbounds)
+        assert [rule.route_id for rule in profile.routing_rules] == ["regional", "default"]
+        assert profile.routing_rules[-1].target_type == "balancer"
+        assert profile.routing_rules[-1].target_tag == "meridian-pool-gateway-a-primary"
+
+        pool = resources["egress-pool:gateway-a:primary"].payload
+        assert isinstance(pool, EgressPoolPayload)
+        assert pool.fail_closed is True
+        assert pool.balancer_tag == "meridian-pool-gateway-a-primary"
+        route = resources["route:gateway-a:regional"].payload
+        assert isinstance(route, RouteRulePayload)
+        assert route.priority == 10
+        users = [resource.payload for resource in plan.resources if isinstance(resource.payload, ServiceUserPayload)]
+        assert {(user.gateway_ref, user.target_ref) for user in users} == {
+            ("gateway-a", "exit-a"),
+            ("gateway-a", "exit-b"),
+        }
 
     def test_control_plane_resources_do_not_claim_runtime_postconditions(self) -> None:
         plan = compile_topology(_intent())
@@ -272,19 +374,15 @@ class TestPureCompiler:
     def test_hosts_are_published_after_live_listener_dependencies(self) -> None:
         plan = compile_topology(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
-        host_resources = [
-            resource
-            for resource in plan.resources
-            if isinstance(resource.payload, HostPayload)
-        ]
+        host_resources = [resource for resource in plan.resources if isinstance(resource.payload, HostPayload)]
 
         assert host_resources
         for host in host_resources:
             assert host.payload.inbound_ref in host.dependencies
-            assert any(
-                dependency.startswith(("nginx:", "realm:"))
-                for dependency in host.dependencies
-            ) or host.payload.protocol == "hysteria2"
+            assert (
+                any(dependency.startswith(("nginx:", "realm:")) for dependency in host.dependencies)
+                or host.payload.protocol == "hysteria2"
+            )
             assert resources[host.payload.inbound_ref].payload.kind == "inbound"
 
     def test_realm_hops_execute_downstream_first_and_only_first_is_advertised(self) -> None:
@@ -302,7 +400,10 @@ class TestPureCompiler:
         relay_hosts = [
             resource.payload
             for resource in plan.resources
-            if isinstance(resource.payload, HostPayload) and resource.payload.owner_ref == "relay-a"
+            if isinstance(resource.payload, HostPayload)
+            and resource.payload.owner_ref == "relay-a"
+            and not resource.payload.is_hidden
+            and not resource.payload.xray_json_template_ref
         ]
         assert [host.address_server_ref for host in relay_hosts] == ["srv-relay-edge"]
 
@@ -377,14 +478,10 @@ class TestCompilerFailures:
         original = _intent()
         exit_b = original.exits[1]
         paths = [
-            path.model_copy(update={"listen_port": 10443})
-            if path.protocol == "hysteria2"
-            else path
+            path.model_copy(update={"listen_port": 10443}) if path.protocol == "hysteria2" else path
             for path in exit_b.paths
         ]
-        intent = original.model_copy(
-            update={"exits": [original.exits[0], exit_b.model_copy(update={"paths": paths})]}
-        )
+        intent = original.model_copy(update={"exits": [original.exits[0], exit_b.model_copy(update={"paths": paths})]})
 
         with pytest.raises(TopologyCompileError, match="public UDP port"):
             compile_topology(intent)
@@ -422,7 +519,23 @@ def profiles_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
     profile = next(
         resource.payload
         for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload)
-        and resource.payload.workload_id == workload_id
+        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id == workload_id
     )
     return profile.inbound_refs
+
+
+def client_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
+    profile = next(
+        resource.payload
+        for resource in plan.resources
+        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id == workload_id
+    )
+    return [
+        inbound_ref
+        for inbound_ref, inbound in zip(
+            profile.inbound_refs,
+            profile.inbounds,
+            strict=True,
+        )
+        if inbound.purpose == "client"
+    ]

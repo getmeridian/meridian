@@ -25,12 +25,17 @@
           "title": "Id",
           "type": "string"
         },
+        "probe_url": {
+          "default": "https://www.apple.com/library/test/success.html",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Probe Url",
+          "type": "string"
+        },
         "strategy": {
-          "default": "priority",
-          "enum": [
-            "priority",
-            "least_ping"
-          ],
+          "const": "least_ping",
+          "default": "least_ping",
           "title": "Strategy",
           "type": "string"
         }

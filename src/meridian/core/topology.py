@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 from typing import Literal, Self
 
-from pydantic import Field, ValidationInfo, field_validator, model_validator
+from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
 from meridian.core.inputs import (
     CountryCodeValue,
@@ -28,7 +28,7 @@ TrafficRouteAction = Literal["route", "block"]
 RegionalTrafficMode = Literal["block", "regional_exit", "default_exit"]
 ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
 RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
-EgressStrategy = Literal["priority", "least_ping"]
+EgressStrategy = Literal["least_ping"]
 DeliveryFormat = Literal["base64", "xray_json", "mihomo"]
 
 
@@ -118,7 +118,7 @@ class TransparentRelayIntent(CoreModel):
 
 
 class RoutingGatewayIntent(CoreModel):
-    """An Xray gateway that accepts service-user traffic for server-side routing."""
+    """A smart entry workload using a reviewed Reality path as its public blueprint."""
 
     id: RequiredNameValue
     server_ref: ServerReferenceValue
@@ -130,8 +130,9 @@ class EgressPoolIntent(CoreModel):
 
     id: RequiredNameValue
     exit_refs: list[RequiredNameValue] = Field(min_length=1)
-    strategy: EgressStrategy = "priority"
+    strategy: EgressStrategy = "least_ping"
     fail_closed: bool = True
+    probe_url: HttpUrl = HttpUrl("https://www.apple.com/library/test/success.html")
 
     @model_validator(mode="after")
     def validate_pool(self) -> Self:
@@ -251,6 +252,8 @@ class SetupIntent(CoreModel):
         pools = {pool.id: pool for pool in self.egress_pools}
         gateways = {gateway.id for gateway in self.routing_gateways}
         valid_targets = set(exits) | set(pools)
+        if self.routes and not gateways:
+            raise ValueError("Server-side routing rules require at least one routing gateway.")
         if self.default_egress_ref not in valid_targets:
             raise ValueError(f"Default egress {self.default_egress_ref!r} does not name an exit or pool.")
 
@@ -259,20 +262,45 @@ class SetupIntent(CoreModel):
             if missing:
                 raise ValueError(f"Egress pool {pool.id} references unknown exits: {', '.join(missing)}.")
 
+        gateway_servers = [gateway.server_ref for gateway in self.routing_gateways]
+        if len(gateway_servers) != len(set(gateway_servers)):
+            raise ValueError("Each routing gateway requires its own server.")
+        exit_servers = {exit_.server_ref for exit_ in self.exits}
+        reused_servers = sorted(exit_servers & set(gateway_servers))
+        if reused_servers:
+            raise ValueError(
+                "A server cannot run both an exit Profile and a routing-gateway Profile: "
+                + ", ".join(reused_servers)
+                + "."
+            )
+        paths_by_id: dict[str, list[ProtocolPathIntent]] = {}
+        for exit_ in self.exits:
+            for path in exit_.paths:
+                paths_by_id.setdefault(path.id, []).append(path)
+        for gateway in self.routing_gateways:
+            matches = paths_by_id.get(gateway.bridge_path_ref, [])
+            if len(matches) != 1:
+                raise ValueError(f"Gateway {gateway.id} must reference one globally unique protocol path blueprint.")
+            if matches[0].protocol != "reality":
+                raise ValueError("Routing gateways currently require a Reality entry path.")
+
         for relay in self.transparent_relays:
-            exit_ = exits.get(relay.exit_ref)
-            if exit_ is None:
+            relay_exit = exits.get(relay.exit_ref)
+            if relay_exit is None:
                 raise ValueError(f"Relay {relay.id} references unknown exit {relay.exit_ref!r}.")
-            path = next((candidate for candidate in exit_.paths if candidate.id == relay.protocol_path_ref), None)
-            if path is None:
+            relay_path = next(
+                (candidate for candidate in relay_exit.paths if candidate.id == relay.protocol_path_ref),
+                None,
+            )
+            if relay_path is None:
                 raise ValueError(
                     f"Relay {relay.id} references unknown path {relay.protocol_path_ref!r} on exit {relay.exit_ref}."
                 )
-            if path.protocol == "hysteria2":
+            if relay_path.protocol == "hysteria2":
                 raise ValueError("Transparent Realm chains cannot relay Hysteria2 or other UDP paths.")
-            if relay.reality_sni and path.protocol != "reality":
+            if relay.reality_sni and relay_path.protocol != "reality":
                 raise ValueError("A custom relay Reality SNI can only target a Reality path.")
-            if exit_.server_ref in relay.hop_server_refs:
+            if relay_exit.server_ref in relay.hop_server_refs:
                 raise ValueError(f"Relay {relay.id} cannot include its exit server as a Realm hop.")
 
         priorities: set[int] = set()
@@ -284,6 +312,11 @@ class SetupIntent(CoreModel):
                 raise ValueError(f"Route {route.id} references unknown egress target {route.target_ref!r}.")
             if route.source_gateway_ref and route.source_gateway_ref not in gateways:
                 raise ValueError(f"Route {route.id} references unknown routing gateway {route.source_gateway_ref!r}.")
+        catch_all_priorities = [route.priority for route in self.routes if route.enabled and route.match == "all"]
+        if catch_all_priorities and max(route.priority for route in self.routes if route.enabled) > min(
+            catch_all_priorities
+        ):
+            raise ValueError("Catch-all routing rules must come after every more specific rule.")
         return self
 
 

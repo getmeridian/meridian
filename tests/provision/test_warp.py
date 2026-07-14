@@ -148,12 +148,8 @@ class TestWarpPipelineIntegration:
     def test_node_recipe_honors_per_exit_warp_choice(self):
         from meridian.provision import build_node_steps
 
-        direct_steps = build_node_steps(
-            ProvisionContext(ip="198.51.100.20", is_panel_host=False, warp=False)
-        )
-        warp_steps = build_node_steps(
-            ProvisionContext(ip="198.51.100.30", is_panel_host=False, warp=True)
-        )
+        direct_steps = build_node_steps(ProvisionContext(ip="198.51.100.20", is_panel_host=False, warp=False))
+        warp_steps = build_node_steps(ProvisionContext(ip="198.51.100.30", is_panel_host=False, warp=True))
 
         assert "Install Cloudflare WARP" not in [step.name for step in direct_steps]
         warp_names = [step.name for step in warp_steps]

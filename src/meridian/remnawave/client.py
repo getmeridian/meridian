@@ -352,6 +352,10 @@ class MeridianPanel(ControlPlaneMixin):
         fingerprint: str | None = None,
         security_layer: str = "DEFAULT",
         is_disabled: bool = False,
+        tags: list[str] | None = None,
+        is_hidden: bool = False,
+        xray_json_template_uuid: str = "",
+        exclude_from_subscription_types: list[str] | None = None,
     ) -> Host:
         """Create a host entry (direct address or relay).
 
@@ -382,6 +386,14 @@ class MeridianPanel(ControlPlaneMixin):
             body["securityLayer"] = security_layer
         if is_disabled:
             body["isDisabled"] = True
+        if tags:
+            body["tags"] = tags
+        if is_hidden:
+            body["isHidden"] = True
+        if xray_json_template_uuid:
+            body["xrayJsonTemplateUuid"] = xray_json_template_uuid
+        if exclude_from_subscription_types:
+            body["excludeFromSubscriptionTypes"] = exclude_from_subscription_types
         data = self._post("/api/hosts", json=body)
         return parse_host(data)
 
@@ -407,6 +419,10 @@ class MeridianPanel(ControlPlaneMixin):
         fingerprint: str | None = None,
         security_layer: str = "DEFAULT",
         is_disabled: bool = False,
+        tags: list[str] | None = None,
+        is_hidden: bool = False,
+        xray_json_template_uuid: str = "",
+        exclude_from_subscription_types: list[str] | None = None,
     ) -> Host:
         """Replace all Meridian-owned Host connection fields."""
         body: dict[str, Any] = {
@@ -425,6 +441,10 @@ class MeridianPanel(ControlPlaneMixin):
             "fingerprint": fingerprint,
             "securityLayer": security_layer,
             "isDisabled": is_disabled,
+            "tags": tags or [],
+            "isHidden": is_hidden,
+            "xrayJsonTemplateUuid": xray_json_template_uuid or None,
+            "excludeFromSubscriptionTypes": exclude_from_subscription_types or [],
         }
         data = self._patch("/api/hosts", json=body)
         return parse_host(data)

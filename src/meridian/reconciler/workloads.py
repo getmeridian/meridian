@@ -62,6 +62,7 @@ class WorkloadStateManager:
         if workload is None:
             workload = WorkloadBinding(
                 id=profile.workload_id,
+                kind=profile.workload_kind,
                 generation=generation,
                 active=self.cluster.active_generation == generation,
                 server_refs=[server_ref],
@@ -70,6 +71,7 @@ class WorkloadStateManager:
             )
             self.cluster.workloads.append(workload)
         else:
+            workload.kind = profile.workload_kind
             workload.server_refs = [server_ref]
             workload.config_profile_name = profile.name
             workload.desired_hash = desired_hash

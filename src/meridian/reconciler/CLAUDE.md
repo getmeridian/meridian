@@ -7,7 +7,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 
 - **`compute_plan` is a pure function** — no I/O, no network, no side effects. Takes `(desired, actual, applied_*)` dataclasses, returns `Plan[PlanAction]`. Fully unit-testable; covers every diff case.
 - **Compiled-resource apply is checkpointed** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
-- **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic `Meridian v4 / …` names recover unknown creates, while mismatched unbound collisions fail instead of being adopted.
+- **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic `Meridian v4 / …` names recover unknown creates, mismatched collisions fail, and global settings updates preserve unmanaged Response Rules.
 - **Server artifacts are per-resource and rollback-safe** — Realm services and nginx files use hashed logical IDs; failed reloads restore previous files before the action fails.
 - **Typed `PlanAction.kind`** — `ADD_NODE / UPDATE_NODE / REMOVE_NODE / ADD_RELAY / UPDATE_RELAY / REMOVE_RELAY / ADD_CLIENT / REMOVE_CLIENT / ADD_SUBSCRIPTION_PAGE / REMOVE_SUBSCRIPTION_PAGE`. Executor dispatches by kind.
 - **Applied-state snapshot** — `cluster.applied_state` (typed `AppliedState` dataclass) recorded after every successful apply. Distinguishes intentional removal (in applied -> from_extras=False -> executes under `--yes`) from drift (not in applied -> from_extras=True -> requires `--prune-extras=yes`).

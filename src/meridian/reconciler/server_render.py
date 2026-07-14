@@ -163,9 +163,7 @@ def _render_http(
         upstreams.append(f"upstream {upstream} {{\n    server {_endpoint(host, route.backend_port)};\n}}\n")
         locations.append(_render_http_route(route, upstream))
     return (
-        "# Managed by Meridian v4. Manual edits will be replaced.\n"
-        + "\n".join(upstreams)
-        + "\n"
+        "# Managed by Meridian v4. Manual edits will be replaced.\n" + "\n".join(upstreams) + "\n"
         "server {\n"
         f"    listen 127.0.0.1:{payload.listener_port} ssl;\n"
         f"    server_name {payload.tls_hostname};\n"

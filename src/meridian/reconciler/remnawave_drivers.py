@@ -4,17 +4,21 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
     ConfigProfilePayload,
+    EgressPoolPayload,
     HostPayload,
     InboundPayload,
     InternalSquadPayload,
     NodeBindingPayload,
     NodeRuntimePayload,
     ResourcePlan,
+    RouteRulePayload,
+    RoutingGatewayPayload,
+    ServiceUserPayload,
     canonical_hash,
 )
 from meridian.reconciler.resources import (
@@ -26,6 +30,7 @@ from meridian.reconciler.resources import (
     UnknownResourceOutcome,
     postcondition_key,
 )
+from meridian.reconciler.routing_credentials import resolve_service_credentials
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.remnawave import (
     ConfigProfile,
@@ -46,6 +51,10 @@ PayloadT = TypeVar(
     NodeRuntimePayload,
     HostPayload,
     InternalSquadPayload,
+    ServiceUserPayload,
+    EgressPoolPayload,
+    RouteRulePayload,
+    RoutingGatewayPayload,
 )
 ValueT = TypeVar("ValueT")
 
@@ -65,9 +74,7 @@ class RemnawaveDriverContext:
             None,
         )
         if resource is None or not isinstance(resource.payload, expected_type):
-            raise ResourceReconcileError(
-                f"Reviewed dependency {logical_id} is missing or has the wrong resource kind."
-            )
+            raise ResourceReconcileError(f"Reviewed dependency {logical_id} is missing or has the wrong resource kind.")
         return resource.payload
 
     def remote_id(self, logical_id: str, generation: int) -> str:
@@ -103,13 +110,25 @@ class RemnawaveDriverContext:
 
 def build_remnawave_drivers(context: RemnawaveDriverContext) -> ResourceDrivers:
     """Build the finite Remnawave subset used by exit workloads."""
-    return {
+    from meridian.reconciler.delivery_drivers import build_delivery_drivers
+    from meridian.reconciler.routing_drivers import (
+        ProfileProjectionDriver,
+        ServiceUserDriver,
+    )
+
+    drivers: ResourceDrivers = {
         "config_profile": ConfigProfileDriver(context),
         "inbound": InboundDriver(context),
         "node_binding": NodeBindingDriver(context),
         "host": HostDriver(context),
         "internal_squad": InternalSquadDriver(context),
+        "service_user": ServiceUserDriver(context),
+        "egress_pool": ProfileProjectionDriver(context),
+        "route_rule": ProfileProjectionDriver(context),
+        "routing_gateway": ProfileProjectionDriver(context),
     }
+    drivers.update(cast(ResourceDrivers, build_delivery_drivers(context)))
+    return drivers
 
 
 class ConfigProfileDriver:
@@ -132,6 +151,11 @@ class ConfigProfileDriver:
         expected_config = render_workload_config(
             payload,
             reality_keys=workload.reality_keys.get(server_ref),
+            service_credentials=resolve_service_credentials(
+                self.context,
+                payload,
+                action.generation,
+            ),
         )
         profile = _bound_or_named_profile(self.context, payload, binding)
         if profile is None:
@@ -157,6 +181,11 @@ class ConfigProfileDriver:
         expected_config = render_workload_config(
             payload,
             reality_keys=workload.reality_keys.get(server_ref),
+            service_credentials=resolve_service_credentials(
+                self.context,
+                payload,
+                action.generation,
+            ),
         )
         existing = _bound_or_named_profile(self.context, payload, binding)
         if existing is None:
@@ -296,9 +325,7 @@ class NodeBindingDriver:
                 f"create Node {payload.name}",
             )
             if not credentials.uuid or not credentials.secret_key:
-                raise ResourceReconcileError(
-                    f"Remnawave returned incomplete credentials for Node {payload.name!r}."
-                )
+                raise ResourceReconcileError(f"Remnawave returned incomplete credentials for Node {payload.name!r}.")
             self.context.node_secrets[payload.workload_ref] = credentials.secret_key
             return ResourceApplyReceipt(remote_id=credentials.uuid)
         if binding is None and not self.context.was_managed(action.resource.logical_id, existing.uuid):
@@ -353,6 +380,7 @@ class HostDriver:
         expected = _host_expected(
             self.context,
             payload,
+            generation=action.generation,
             profile_uuid=profile_uuid,
             inbound_uuid=inbound_uuid,
         )
@@ -381,6 +409,7 @@ class HostDriver:
         expected = _host_expected(
             self.context,
             payload,
+            generation=action.generation,
             profile_uuid=profile_uuid,
             inbound_uuid=inbound_uuid,
         )
@@ -398,6 +427,10 @@ class HostDriver:
             "fingerprint": payload.fingerprint or None,
             "security_layer": payload.security_layer,
             "is_disabled": not payload.advertised,
+            "tags": payload.tags,
+            "is_hidden": payload.is_hidden,
+            "xray_json_template_uuid": expected["xray_json_template_uuid"],
+            "exclude_from_subscription_types": payload.exclude_from_subscription_types,
         }
         if existing is None:
             host = _mutation(
@@ -469,9 +502,7 @@ class InternalSquadDriver:
 def _payload(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
     payload = action.resource.payload
     if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(
-            f"Driver received {payload.kind}, expected {expected_type.__name__}."
-        )
+        raise ResourceReconcileError(f"Driver received {payload.kind}, expected {expected_type.__name__}.")
     return payload
 
 
@@ -483,9 +514,7 @@ def _profile_server_ref(context: RemnawaveDriverContext, profile: ConfigProfileP
         and resource.payload.profile_ref == f"profile:{profile.workload_id}"
     ]
     if len(bindings) != 1:
-        raise ResourceReconcileError(
-            f"Profile {profile.workload_id!r} must have exactly one reviewed Node binding."
-        )
+        raise ResourceReconcileError(f"Profile {profile.workload_id!r} must have exactly one reviewed Node binding.")
     return bindings[0].server_ref
 
 
@@ -503,9 +532,7 @@ def _resolved_ids(
     values = [context.remote_id(logical_id, generation) for logical_id in logical_ids]
     missing = [logical_id for logical_id, remote_id in zip(logical_ids, values, strict=True) if not remote_id]
     if missing:
-        raise ResourceReconcileError(
-            f"Remote identities are missing for reviewed dependencies: {', '.join(missing)}."
-        )
+        raise ResourceReconcileError(f"Remote identities are missing for reviewed dependencies: {', '.join(missing)}.")
     return values
 
 
@@ -534,9 +561,7 @@ def _node_api_port(
         and resource.payload.binding_ref == f"binding:{payload.workload_ref}"
     ]
     if len(runtimes) != 1:
-        raise ResourceReconcileError(
-            f"Node binding {payload.workload_ref!r} must have exactly one reviewed runtime."
-        )
+        raise ResourceReconcileError(f"Node binding {payload.workload_ref!r} must have exactly one reviewed runtime.")
     return runtimes[0].api_port
 
 
@@ -552,9 +577,7 @@ def _resolved_host_dependencies(
     if not inbound_uuid:
         inbound_uuid = workload.inbound_uuids.get(payload.inbound_ref, "")
     if not profile_uuid or not inbound_uuid:
-        raise ResourceReconcileError(
-            f"Profile-scoped Inbound identity is missing for Host {payload.remark!r}."
-        )
+        raise ResourceReconcileError(f"Profile-scoped Inbound identity is missing for Host {payload.remark!r}.")
     return profile_uuid, inbound_uuid, inbound.workload_ref
 
 
@@ -618,11 +641,7 @@ def _bound_or_named_squad(
 
 
 def _generation_from_workload(context: RemnawaveDriverContext, workload_id: str) -> int:
-    generations = [
-        workload.generation
-        for workload in context.cluster.workloads
-        if workload.id == workload_id
-    ]
+    generations = [workload.generation for workload in context.cluster.workloads if workload.id == workload_id]
     return max(generations, default=0)
 
 
@@ -696,9 +715,18 @@ def _host_expected(
     context: RemnawaveDriverContext,
     payload: HostPayload,
     *,
+    generation: int,
     profile_uuid: str,
     inbound_uuid: str,
 ) -> dict[str, Any]:
+    template_uuid = ""
+    if payload.xray_json_template_ref:
+        template_uuid = context.remote_id(
+            payload.xray_json_template_ref,
+            generation,
+        )
+        if not template_uuid:
+            raise ResourceReconcileError(f"Template identity is missing for Host {payload.remark!r}.")
     return {
         "remark": payload.remark,
         "address": payload.address or context.address(payload.address_server_ref),
@@ -712,6 +740,10 @@ def _host_expected(
         "fingerprint": payload.fingerprint,
         "security_layer": payload.security_layer,
         "is_disabled": not payload.advertised,
+        "tags": sorted(payload.tags),
+        "is_hidden": payload.is_hidden,
+        "xray_json_template_uuid": template_uuid,
+        "exclude_from_subscription_types": sorted(payload.exclude_from_subscription_types),
     }
 
 
@@ -729,6 +761,10 @@ def _host_projection(host: Host) -> dict[str, Any]:
         "fingerprint": host.fingerprint,
         "security_layer": host.security_layer,
         "is_disabled": host.is_disabled,
+        "tags": sorted(host.tags),
+        "is_hidden": host.is_hidden,
+        "xray_json_template_uuid": host.xray_json_template_uuid,
+        "exclude_from_subscription_types": sorted(host.exclude_from_subscription_types),
     }
 
 

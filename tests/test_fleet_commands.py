@@ -629,7 +629,7 @@ class TestFleetRecover:
             run_recover("https://198.51.100.1/panel", "test-token")
 
         saved = ClusterConfig.load(tmp_home / "cluster.yml")
-        assert saved.version == 2
+        assert saved.version == 3
         assert saved.panel.url == "https://198.51.100.1/panel"
         assert saved.panel.api_token == "test-token"
         assert len(saved.nodes) == 1

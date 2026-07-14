@@ -211,10 +211,7 @@ def _load_workloads(raw: Any) -> list[WorkloadBinding]:
 def _load_reality_keys(raw: Any) -> dict[str, RealityKeyBinding]:
     if not isinstance(raw, dict):
         return {}
-    return {
-        str(server_ref): _load_dataclass(value, RealityKeyBinding)
-        for server_ref, value in raw.items()
-    }
+    return {str(server_ref): _load_dataclass(value, RealityKeyBinding) for server_ref, value in raw.items()}
 
 
 def _load_map(raw: Any, cls: type[Any]) -> dict[str, Any]:

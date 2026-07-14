@@ -163,6 +163,32 @@ def test_service_user_creation_is_explicitly_tagged_and_scoped() -> None:
     assert body["externalSquadUuid"] == "external-1"
 
 
+def test_access_user_creation_is_owned_and_assigned_to_delivery_squad() -> None:
+    panel = _panel()
+    panel._request.return_value = {
+        "uuid": "user-1",
+        "username": "family",
+        "status": "ACTIVE",
+        "description": "Managed by Meridian access",
+        "activeInternalSquads": [{"uuid": "squad-1"}],
+        "externalSquadUuid": "external-1",
+        "userTraffic": {},
+    }
+
+    user = panel.create_access_user(
+        "family",
+        squad_uuids=["squad-1"],
+        external_squad_uuid="external-1",
+    )
+
+    assert user.external_squad_uuid == "external-1"
+    body = panel._request.call_args.kwargs["json"]
+    assert body["tag"] == "MERIDIAN_ACCESS"
+    assert body["description"] == "Managed by Meridian access"
+    assert body["activeInternalSquads"] == ["squad-1"]
+    assert body["externalSquadUuid"] == "external-1"
+
+
 def test_template_crud_keeps_content_typed() -> None:
     panel = _panel()
     panel._request.side_effect = [

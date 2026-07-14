@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from meridian.cluster import RealityKeyBinding
-from meridian.compiler.models import ConfigProfilePayload, InboundPayload
+from meridian.compiler.models import (
+    ConfigProfilePayload,
+    InboundPayload,
+    ServiceOutboundSpec,
+    WorkloadRouteSpec,
+)
 from meridian.core.errors import MeridianError
 from meridian.provision.warp import WARP_PROXY_PORT
 
@@ -14,17 +20,35 @@ class WorkloadConfigError(MeridianError):
     """A reviewed workload cannot be rendered without rotating or guessing state."""
 
 
+@dataclass(frozen=True)
+class ServiceRouteCredential:
+    """Runtime-only credentials for one reviewed gateway edge."""
+
+    address: str
+    vless_uuid: str
+    public_key: str
+    short_id: str
+
+
 def render_workload_config(
     profile: ConfigProfilePayload,
     *,
     reality_keys: RealityKeyBinding | None,
+    service_credentials: dict[str, ServiceRouteCredential] | None = None,
 ) -> dict[str, Any]:
     """Render exactly the protocols and egress policy reviewed in a Profile payload."""
-    inbounds = [
-        _render_inbound(inbound, reality_keys=reality_keys)
-        for inbound in profile.inbounds
+    inbounds = [_render_inbound(inbound, reality_keys=reality_keys) for inbound in profile.inbounds]
+    credentials = service_credentials or {}
+    expected_edges = {edge.edge_id for edge in profile.service_outbounds}
+    if set(credentials) != expected_edges:
+        missing = sorted(expected_edges - set(credentials))
+        extra = sorted(set(credentials) - expected_edges)
+        raise WorkloadConfigError(
+            f"Service-route credentials do not match {profile.workload_id}: missing={missing}, extra={extra}."
+        )
+    outbounds: list[dict[str, Any]] = [
+        _render_service_outbound(edge, credentials[edge.edge_id]) for edge in profile.service_outbounds
     ]
-    outbounds: list[dict[str, Any]] = []
     if "warp" in profile.outbound_tags:
         outbounds.append(
             {
@@ -46,7 +70,29 @@ def render_workload_config(
             {"tag": "block", "protocol": "blackhole"},
         ]
     )
-    return {
+    routing: dict[str, Any] = {
+        "domainStrategy": "IPIfNonMatch",
+        "rules": [
+            {
+                "type": "field",
+                "ip": ["geoip:private"],
+                "outboundTag": "block",
+            }
+        ],
+    }
+    for rule in profile.routing_rules:
+        routing["rules"].extend(_render_route(rule))
+    if profile.egress_balancers:
+        routing["balancers"] = [
+            {
+                "tag": balancer.tag,
+                "selector": balancer.outbound_tags,
+                "strategy": {"type": "leastPing"},
+                "fallbackTag": balancer.fallback_tag,
+            }
+            for balancer in profile.egress_balancers
+        ]
+    config: dict[str, Any] = {
         "log": {"loglevel": "warning"},
         "dns": {
             "servers": [
@@ -57,19 +103,23 @@ def render_workload_config(
                 "8.8.8.8",
             ]
         },
-        "routing": {
-            "domainStrategy": "IPIfNonMatch",
-            "rules": [
-                {
-                    "type": "field",
-                    "ip": ["geoip:private"],
-                    "outboundTag": "block",
-                }
-            ],
-        },
+        "routing": routing,
         "inbounds": inbounds,
         "outbounds": outbounds,
     }
+    if profile.egress_balancers:
+        probe_urls = {balancer.probe_url for balancer in profile.egress_balancers}
+        if len(probe_urls) != 1:
+            raise WorkloadConfigError("One gateway Profile cannot use multiple observatory probe URLs.")
+        config["observatory"] = {
+            "subjectSelector": sorted(
+                {outbound_tag for balancer in profile.egress_balancers for outbound_tag in balancer.outbound_tags}
+            ),
+            "probeUrl": next(iter(probe_urls)),
+            "probeInterval": "10s",
+            "enableConcurrency": True,
+        }
+    return config
 
 
 def _render_inbound(
@@ -77,12 +127,13 @@ def _render_inbound(
     *,
     reality_keys: RealityKeyBinding | None,
 ) -> dict[str, Any]:
+    listen_address = inbound.listen_address or ("0.0.0.0" if inbound.protocol == "hysteria2" else "127.0.0.1")
     if inbound.protocol == "reality":
         keys = _require_complete_reality_keys(reality_keys, inbound)
         return {
             "tag": inbound.tag,
             "protocol": "vless",
-            "listen": "127.0.0.1",
+            "listen": listen_address,
             "port": inbound.listen_port,
             "settings": {"clients": [], "decryption": "none"},
             "streamSettings": {
@@ -104,7 +155,7 @@ def _render_inbound(
         return {
             "tag": inbound.tag,
             "protocol": "vless",
-            "listen": "127.0.0.1",
+            "listen": listen_address,
             "port": inbound.listen_port,
             "settings": {"clients": [], "decryption": "none"},
             "streamSettings": {
@@ -120,7 +171,7 @@ def _render_inbound(
         return {
             "tag": inbound.tag,
             "protocol": "vless",
-            "listen": "127.0.0.1",
+            "listen": listen_address,
             "port": inbound.listen_port,
             "settings": {"clients": [], "decryption": "none"},
             "streamSettings": stream,
@@ -128,7 +179,7 @@ def _render_inbound(
     return {
         "tag": inbound.tag,
         "protocol": "hysteria",
-        "listen": "0.0.0.0",
+        "listen": listen_address,
         "port": inbound.listen_port,
         "settings": {"clients": [], "version": 2},
         "streamSettings": {
@@ -146,6 +197,65 @@ def _render_inbound(
             },
         },
     }
+
+
+def _render_service_outbound(
+    edge: ServiceOutboundSpec,
+    credential: ServiceRouteCredential,
+) -> dict[str, Any]:
+    if not all(
+        [
+            credential.address,
+            credential.vless_uuid,
+            credential.public_key,
+            credential.short_id,
+        ]
+    ):
+        raise WorkloadConfigError(f"Service-route credential {edge.edge_id} is incomplete.")
+    return {
+        "tag": edge.tag,
+        "protocol": "vless",
+        "settings": {
+            "vnext": [
+                {
+                    "address": credential.address,
+                    "port": edge.target_port,
+                    "users": [
+                        {
+                            "id": credential.vless_uuid,
+                            "encryption": "none",
+                        }
+                    ],
+                }
+            ]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "security": "reality",
+            "realitySettings": {
+                "fingerprint": "chrome",
+                "serverName": edge.target_sni,
+                "publicKey": credential.public_key,
+                "shortId": credential.short_id,
+            },
+        },
+    }
+
+
+def _render_route(rule: WorkloadRouteSpec) -> list[dict[str, Any]]:
+    target_key = "balancerTag" if rule.target_type == "balancer" else "outboundTag"
+    target = {target_key: rule.target_tag}
+    base: dict[str, Any] = {"type": "field", **target}
+    if rule.match == "all":
+        return [base]
+    if rule.match == "country":
+        country_codes = [value.lower() for value in rule.match_values]
+        return [{**base, "ip": [f"geoip:{country}" for country in country_codes]}]
+    if rule.match == "domain":
+        return [{**base, "domain": [f"domain:{value}" for value in rule.match_values]}]
+    if rule.match == "ip":
+        return [{**base, "ip": rule.match_values}]
+    return [{**base, "network": ",".join(rule.match_values)}]
 
 
 def _require_complete_reality_keys(
