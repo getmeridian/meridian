@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
-from meridian.compiler.models import ResourcePlan
+from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -166,8 +166,9 @@ def _execute_action(
         except Exception as exc:
             return _record_failure(action, cluster, persist, clock, f"apply failed: {exc}")
 
+        observed_binding = _binding_from_receipt(action, binding, receipt)
         try:
-            observation = driver.observe(action, binding)
+            observation = driver.observe(action, observed_binding)
         except Exception as exc:
             checkpoint.status = "unknown"
             checkpoint.last_error = f"post-apply observation failed: {exc}"
@@ -243,6 +244,22 @@ def _binding(action: ResourceAction, cluster: ClusterConfig) -> ManagedResourceB
     return cluster.managed_bindings.get(f"{action.resource.logical_id}@{action.generation}")
 
 
+def _binding_from_receipt(
+    action: ResourceAction,
+    binding: ManagedResourceBinding | None,
+    receipt: ResourceApplyReceipt,
+) -> ManagedResourceBinding | None:
+    if binding is not None or not receipt.remote_id:
+        return binding
+    return ManagedResourceBinding(
+        logical_id=action.resource.logical_id,
+        resource_kind=action.resource.payload.kind,
+        generation=action.generation,
+        remote_id=receipt.remote_id,
+        desired_hash=action.expected_hash,
+    )
+
+
 def _record_success(
     action: ResourceAction,
     observation: ResourceObservation,
@@ -313,8 +330,14 @@ def _commit_generation(
 ) -> None:
     current_ids = {resource.logical_id for resource in plan.resources}
     for binding in cluster.managed_bindings.values():
-        if binding.logical_id in current_ids:
-            binding.active = binding.generation == generation
+        binding.active = binding.generation == generation and binding.logical_id in current_ids
+    current_workloads = {
+        resource.payload.workload_id
+        for resource in plan.resources
+        if isinstance(resource.payload, ConfigProfilePayload)
+    }
+    for workload in cluster.workloads:
+        workload.active = workload.generation == generation and workload.id in current_workloads
     cluster.active_generation = generation
     cluster.active_plan_hash = plan.plan_hash
     cluster.pending_generation = 0

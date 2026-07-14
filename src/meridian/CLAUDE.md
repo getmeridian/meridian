@@ -22,6 +22,8 @@
 
 **Finite compiler** — `compiler/` purely transforms complete setup intent into typed, dependency-ordered, hash-reviewed V4 resources. It never performs I/O or generates secrets.
 
+**Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only the reviewed protocols and egress policy.
+
 **Errors over exits** — library modules raise typed exceptions (`MeridianError` hierarchy in `core/errors.py`) and expose their classification as `category`; `hint_type` belongs only to `console.fail()`. Only CLI command entry points call `console.fail()`.
 
 ## What's done well
