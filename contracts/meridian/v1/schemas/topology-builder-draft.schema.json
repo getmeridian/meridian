@@ -62,7 +62,8 @@
             "enum": [
               "panel",
               "exit",
-              "relay"
+              "relay",
+              "routing_gateway"
             ],
             "type": "string"
           },

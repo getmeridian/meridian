@@ -2,23 +2,284 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Literal, Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from meridian.core.inputs import (
     CountryCodeValue,
     OptionalCountryCodeValue,
+    OptionalHostnameValue,
     OptionalServerReferenceValue,
+    OptionalTransportPathValue,
+    PortValue,
     RequiredNameValue,
     ServerReferenceValue,
+    ServerTitleValue,
+    validate_country_code_value,
+    validate_hostname_value,
 )
 from meridian.core.models import CoreModel
 
-ServerCapability = Literal["panel", "exit", "relay"]
+ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
 TrafficScope = Literal["default", "country"]
 TrafficRouteAction = Literal["route", "block"]
 RegionalTrafficMode = Literal["block", "regional_exit", "default_exit"]
+ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
+RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
+EgressStrategy = Literal["priority", "least_ping"]
+DeliveryFormat = Literal["base64", "xray_json", "mihomo"]
+
+
+def _default_delivery_formats() -> list[DeliveryFormat]:
+    return ["base64", "xray_json", "mihomo"]
+
+
+class ControlPlaneIntent(CoreModel):
+    """One server that owns the Remnawave control-plane workload."""
+
+    server_ref: ServerReferenceValue
+    public_hostname: OptionalHostnameValue = ""
+    title: ServerTitleValue = "Meridian"
+
+
+class ProtocolPathIntent(CoreModel):
+    """One protocol-specific public path backed by an exit workload."""
+
+    id: RequiredNameValue
+    protocol: ProtocolKind
+    listen_port: PortValue = 443
+    public_port: PortValue = 443
+    reality_sni: OptionalHostnameValue = ""
+    tls_sni: OptionalHostnameValue = ""
+    host: OptionalHostnameValue = ""
+    path: OptionalTransportPathValue = ""
+
+    @model_validator(mode="after")
+    def validate_protocol_fields(self) -> Self:
+        if self.protocol == "reality":
+            if not self.reality_sni:
+                raise ValueError("Reality paths require a camouflage SNI.")
+            if self.tls_sni or self.host or self.path:
+                raise ValueError("Reality camouflage SNI is separate from TLS Host and path fields.")
+            return self
+        if self.reality_sni:
+            raise ValueError(f"{self.protocol} paths cannot use a Reality camouflage SNI.")
+        if self.protocol in {"xhttp", "wss"}:
+            if not self.tls_sni or not self.host or not self.path:
+                raise ValueError(f"{self.protocol.upper()} paths require certificate SNI, Host, and path.")
+            return self
+        if not self.tls_sni:
+            raise ValueError("Hysteria2 paths require a certificate SNI.")
+        if self.host or self.path:
+            raise ValueError("Hysteria2 paths do not use HTTP Host or path fields.")
+        return self
+
+
+class ExitIntent(CoreModel):
+    """One independent Xray exit workload and its public protocol paths."""
+
+    id: RequiredNameValue
+    server_ref: ServerReferenceValue
+    region: OptionalCountryCodeValue = ""
+    paths: list[ProtocolPathIntent] = Field(min_length=1)
+    warp: bool = False
+
+    @model_validator(mode="after")
+    def validate_paths(self) -> Self:
+        path_ids = [path.id for path in self.paths]
+        if len(path_ids) != len(set(path_ids)):
+            raise ValueError(f"Exit {self.id} lists a protocol path ID more than once.")
+        protocols = [path.protocol for path in self.paths]
+        if len(protocols) != len(set(protocols)):
+            raise ValueError(f"Exit {self.id} lists a protocol more than once.")
+        if "reality" not in protocols:
+            raise ValueError(f"Exit {self.id} must keep a Reality path.")
+        return self
+
+
+class TransparentRelayIntent(CoreModel):
+    """An ordered downstream-first Realm chain that advertises only its first hop."""
+
+    id: RequiredNameValue
+    hop_server_refs: list[ServerReferenceValue] = Field(min_length=1)
+    exit_ref: RequiredNameValue
+    protocol_path_ref: RequiredNameValue
+    listen_port: PortValue = 443
+
+    @field_validator("hop_server_refs")
+    @classmethod
+    def reject_duplicate_hops(cls, hops: list[str]) -> list[str]:
+        if len(hops) != len(set(hops)):
+            raise ValueError("A transparent relay chain cannot visit the same server twice.")
+        return hops
+
+
+class RoutingGatewayIntent(CoreModel):
+    """An Xray gateway that accepts service-user traffic for server-side routing."""
+
+    id: RequiredNameValue
+    server_ref: ServerReferenceValue
+    bridge_path_ref: RequiredNameValue
+
+
+class EgressPoolIntent(CoreModel):
+    """An ordered set of exits used for server-side failover."""
+
+    id: RequiredNameValue
+    exit_refs: list[RequiredNameValue] = Field(min_length=1)
+    strategy: EgressStrategy = "priority"
+    fail_closed: bool = True
+
+    @model_validator(mode="after")
+    def validate_pool(self) -> Self:
+        if len(self.exit_refs) != len(set(self.exit_refs)):
+            raise ValueError(f"Egress pool {self.id} lists an exit more than once.")
+        if not self.fail_closed:
+            raise ValueError("Meridian egress pools must fail closed when every exit is down.")
+        return self
+
+
+class OrderedRouteIntent(CoreModel):
+    """One explicit first-match routing rule."""
+
+    id: RequiredNameValue
+    priority: int = Field(ge=0)
+    match: RouteMatchKind = "all"
+    match_values: list[str] = Field(default_factory=list)
+    action: TrafficRouteAction = "route"
+    target_ref: OptionalServerReferenceValue = ""
+    source_gateway_ref: OptionalServerReferenceValue = ""
+    enabled: bool = True
+
+    @field_validator("match_values")
+    @classmethod
+    def validate_match_values(cls, values: list[str], info: ValidationInfo) -> list[str]:
+        kind = info.data.get("match", "all")
+        if kind == "all":
+            if values:
+                raise ValueError("Catch-all routes cannot include match values.")
+            return values
+        if not values:
+            raise ValueError(f"{kind} routes require at least one match value.")
+        normalized: list[str] = []
+        for value in values:
+            if kind == "country":
+                normalized.append(validate_country_code_value(value))
+            elif kind == "domain":
+                normalized.append(validate_hostname_value(value))
+            elif kind == "ip":
+                try:
+                    normalized.append(str(ipaddress.ip_network(value, strict=False)))
+                except ValueError as exc:
+                    raise ValueError(f"Enter a valid IP network instead of {value!r}.") from exc
+            elif kind == "network":
+                network = value.strip().lower()
+                if network not in {"tcp", "udp"}:
+                    raise ValueError("Network route values must be tcp or udp.")
+                normalized.append(network)
+        if len(normalized) != len(set(normalized)):
+            raise ValueError(f"{kind} route values must be unique.")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_action(self) -> Self:
+        if self.action == "route" and not self.target_ref:
+            raise ValueError("Routing rules require an exit or egress-pool target.")
+        if self.action == "block" and self.target_ref:
+            raise ValueError("Blocked routes cannot have an egress target.")
+        return self
+
+
+class AccessIntent(CoreModel):
+    """Meridian-owned access squad and human users."""
+
+    squad_name: ServerTitleValue = "Meridian Access"
+    users: list[RequiredNameValue] = Field(min_length=1)
+
+    @field_validator("users")
+    @classmethod
+    def reject_duplicate_users(cls, users: list[str]) -> list[str]:
+        if len(users) != len(set(users)):
+            raise ValueError("Access usernames must be unique.")
+        return users
+
+
+class DeliveryIntent(CoreModel):
+    """Canonical Remnawave subscription presentation settings."""
+
+    profile_title: ServerTitleValue = "Meridian"
+    template_name: RequiredNameValue = "meridian"
+    formats: list[DeliveryFormat] = Field(default_factory=_default_delivery_formats, min_length=1)
+
+    @field_validator("formats")
+    @classmethod
+    def reject_duplicate_formats(cls, formats: list[DeliveryFormat]) -> list[DeliveryFormat]:
+        if len(formats) != len(set(formats)):
+            raise ValueError("List each delivery format once.")
+        return formats
+
+
+class SetupIntent(CoreModel):
+    """Complete user intent consumed by the pure topology compiler."""
+
+    control: ControlPlaneIntent
+    exits: list[ExitIntent] = Field(min_length=1)
+    transparent_relays: list[TransparentRelayIntent] = Field(default_factory=list)
+    routing_gateways: list[RoutingGatewayIntent] = Field(default_factory=list)
+    egress_pools: list[EgressPoolIntent] = Field(default_factory=list)
+    routes: list[OrderedRouteIntent] = Field(default_factory=list)
+    default_egress_ref: RequiredNameValue
+    access: AccessIntent
+    delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
+
+    @model_validator(mode="after")
+    def validate_references(self) -> Self:
+        resources = [
+            *[exit_.id for exit_ in self.exits],
+            *[relay.id for relay in self.transparent_relays],
+            *[gateway.id for gateway in self.routing_gateways],
+            *[pool.id for pool in self.egress_pools],
+            *[route.id for route in self.routes],
+        ]
+        if len(resources) != len(set(resources)):
+            raise ValueError("Topology resource IDs must be globally unique.")
+
+        exits = {exit_.id: exit_ for exit_ in self.exits}
+        pools = {pool.id: pool for pool in self.egress_pools}
+        gateways = {gateway.id for gateway in self.routing_gateways}
+        valid_targets = set(exits) | set(pools)
+        if self.default_egress_ref not in valid_targets:
+            raise ValueError(f"Default egress {self.default_egress_ref!r} does not name an exit or pool.")
+
+        for pool in self.egress_pools:
+            missing = [exit_ref for exit_ref in pool.exit_refs if exit_ref not in exits]
+            if missing:
+                raise ValueError(f"Egress pool {pool.id} references unknown exits: {', '.join(missing)}.")
+
+        for relay in self.transparent_relays:
+            exit_ = exits.get(relay.exit_ref)
+            if exit_ is None:
+                raise ValueError(f"Relay {relay.id} references unknown exit {relay.exit_ref!r}.")
+            path = next((candidate for candidate in exit_.paths if candidate.id == relay.protocol_path_ref), None)
+            if path is None:
+                raise ValueError(
+                    f"Relay {relay.id} references unknown path {relay.protocol_path_ref!r} on exit {relay.exit_ref}."
+                )
+            if path.protocol == "hysteria2":
+                raise ValueError("Transparent Realm chains cannot relay Hysteria2 or other UDP paths.")
+
+        priorities: set[int] = set()
+        for route in self.routes:
+            if route.priority in priorities:
+                raise ValueError(f"Route priority {route.priority} is used more than once.")
+            priorities.add(route.priority)
+            if route.action == "route" and route.target_ref not in valid_targets:
+                raise ValueError(f"Route {route.id} references unknown egress target {route.target_ref!r}.")
+            if route.source_gateway_ref and route.source_gateway_ref not in gateways:
+                raise ValueError(f"Route {route.id} references unknown routing gateway {route.source_gateway_ref!r}.")
+        return self
 
 
 class TopologyServerShelfItem(CoreModel):

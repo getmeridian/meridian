@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "Meridian-owned access squad and human users.",
+  "properties": {
+    "squad_name": {
+      "default": "Meridian Access",
+      "maxLength": 80,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Squad Name",
+      "type": "string"
+    },
+    "users": {
+      "items": {
+        "minLength": 1,
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Users",
+      "type": "array"
+    }
+  },
+  "required": [
+    "users"
+  ],
+  "title": "AccessIntent",
+  "type": "object"
+}

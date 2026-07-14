@@ -1,0 +1,688 @@
+{
+  "$defs": {
+    "AccessIntent": {
+      "additionalProperties": false,
+      "description": "Meridian-owned access squad and human users.",
+      "properties": {
+        "squad_name": {
+          "default": "Meridian Access",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Squad Name",
+          "type": "string"
+        },
+        "users": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Users",
+          "type": "array"
+        }
+      },
+      "required": [
+        "users"
+      ],
+      "title": "AccessIntent",
+      "type": "object"
+    },
+    "ControlPlaneIntent": {
+      "additionalProperties": false,
+      "description": "One server that owns the Remnawave control-plane workload.",
+      "properties": {
+        "public_hostname": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Public Hostname"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "title": {
+          "default": "Meridian",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_ref"
+      ],
+      "title": "ControlPlaneIntent",
+      "type": "object"
+    },
+    "DeliveryIntent": {
+      "additionalProperties": false,
+      "description": "Canonical Remnawave subscription presentation settings.",
+      "properties": {
+        "formats": {
+          "items": {
+            "enum": [
+              "base64",
+              "xray_json",
+              "mihomo"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Formats",
+          "type": "array"
+        },
+        "profile_title": {
+          "default": "Meridian",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Profile Title",
+          "type": "string"
+        },
+        "template_name": {
+          "default": "meridian",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Template Name",
+          "type": "string"
+        }
+      },
+      "title": "DeliveryIntent",
+      "type": "object"
+    },
+    "EgressPoolIntent": {
+      "additionalProperties": false,
+      "description": "An ordered set of exits used for server-side failover.",
+      "properties": {
+        "exit_refs": {
+          "items": {
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Exit Refs",
+          "type": "array"
+        },
+        "fail_closed": {
+          "default": true,
+          "title": "Fail Closed",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "strategy": {
+          "default": "priority",
+          "enum": [
+            "priority",
+            "least_ping"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "exit_refs"
+      ],
+      "title": "EgressPoolIntent",
+      "type": "object"
+    },
+    "OrderedRouteIntent": {
+      "additionalProperties": false,
+      "description": "One explicit first-match routing rule.",
+      "properties": {
+        "action": {
+          "default": "route",
+          "enum": [
+            "route",
+            "block"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match": {
+          "default": "all",
+          "enum": [
+            "all",
+            "country",
+            "domain",
+            "ip",
+            "network"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "match_values": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Match Values",
+          "type": "array"
+        },
+        "priority": {
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "source_gateway_ref": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "title": "Source Gateway Ref",
+          "type": "string"
+        },
+        "target_ref": {
+          "default": "",
+          "maxLength": 120,
+          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "title": "Target Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "priority"
+      ],
+      "title": "OrderedRouteIntent",
+      "type": "object"
+    },
+    "ProtocolPathIntent": {
+      "additionalProperties": false,
+      "description": "One protocol-specific public path backed by an exit workload.",
+      "properties": {
+        "host": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Host"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "listen_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
+        "path": {
+          "default": "",
+          "maxLength": 200,
+          "pattern": "^$|^/?[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "public_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Public Port",
+          "type": "integer"
+        },
+        "reality_sni": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Reality Sni"
+        },
+        "tls_sni": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Tls Sni"
+        }
+      },
+      "required": [
+        "id",
+        "protocol"
+      ],
+      "title": "ProtocolPathIntent",
+      "type": "object"
+    },
+    "SetupAccessSelection": {
+      "additionalProperties": false,
+      "description": "Human access and canonical subscription delivery choices.",
+      "properties": {
+        "access": {
+          "$ref": "#/$defs/AccessIntent"
+        },
+        "delivery": {
+          "$ref": "#/$defs/DeliveryIntent"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "title": "SetupAccessSelection",
+      "type": "object"
+    },
+    "SetupExitPaths": {
+      "additionalProperties": false,
+      "description": "Protocol paths selected for one exit role.",
+      "properties": {
+        "exit_ref": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Exit Ref",
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "$ref": "#/$defs/ProtocolPathIntent"
+          },
+          "minItems": 1,
+          "title": "Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "exit_ref",
+        "paths"
+      ],
+      "title": "SetupExitPaths",
+      "type": "object"
+    },
+    "SetupExitRole": {
+      "additionalProperties": false,
+      "description": "One saved server assigned an exit workload ID.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "region": {
+          "default": "",
+          "maxLength": 2,
+          "pattern": "^$|^[A-Za-z]{2}$",
+          "title": "Region",
+          "type": "string"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "warp": {
+          "default": false,
+          "title": "Warp",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "server_ref"
+      ],
+      "title": "SetupExitRole",
+      "type": "object"
+    },
+    "SetupGatewayRole": {
+      "additionalProperties": false,
+      "description": "One saved server assigned an Xray routing-gateway workload.",
+      "properties": {
+        "bridge_path_ref": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Bridge Path Ref",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_ref",
+        "bridge_path_ref"
+      ],
+      "title": "SetupGatewayRole",
+      "type": "object"
+    },
+    "SetupPathSelection": {
+      "additionalProperties": false,
+      "description": "Complete protocol choices for all selected exits.",
+      "properties": {
+        "exits": {
+          "items": {
+            "$ref": "#/$defs/SetupExitPaths"
+          },
+          "minItems": 1,
+          "title": "Exits",
+          "type": "array"
+        }
+      },
+      "required": [
+        "exits"
+      ],
+      "title": "SetupPathSelection",
+      "type": "object"
+    },
+    "SetupRelayRole": {
+      "additionalProperties": false,
+      "description": "One ordered set of saved servers assigned a transparent relay path.",
+      "properties": {
+        "exit_ref": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Exit Ref",
+          "type": "string"
+        },
+        "hop_server_refs": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n\\t]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Hop Server Refs",
+          "type": "array"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "protocol_path_ref": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Protocol Path Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "hop_server_refs",
+        "exit_ref",
+        "protocol_path_ref"
+      ],
+      "title": "SetupRelayRole",
+      "type": "object"
+    },
+    "SetupRoleSelection": {
+      "additionalProperties": false,
+      "description": "Role assignments collected before protocol details.",
+      "properties": {
+        "control": {
+          "$ref": "#/$defs/ControlPlaneIntent"
+        },
+        "exits": {
+          "items": {
+            "$ref": "#/$defs/SetupExitRole"
+          },
+          "minItems": 1,
+          "title": "Exits",
+          "type": "array"
+        },
+        "routing_gateways": {
+          "items": {
+            "$ref": "#/$defs/SetupGatewayRole"
+          },
+          "title": "Routing Gateways",
+          "type": "array"
+        },
+        "transparent_relays": {
+          "items": {
+            "$ref": "#/$defs/SetupRelayRole"
+          },
+          "title": "Transparent Relays",
+          "type": "array"
+        }
+      },
+      "required": [
+        "control",
+        "exits"
+      ],
+      "title": "SetupRoleSelection",
+      "type": "object"
+    },
+    "SetupRoutingSelection": {
+      "additionalProperties": false,
+      "description": "Default egress, ordered routes, and optional failover pools.",
+      "properties": {
+        "default_egress_ref": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Default Egress Ref",
+          "type": "string"
+        },
+        "egress_pools": {
+          "items": {
+            "$ref": "#/$defs/EgressPoolIntent"
+          },
+          "title": "Egress Pools",
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/$defs/OrderedRouteIntent"
+          },
+          "title": "Routes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "default_egress_ref"
+      ],
+      "title": "SetupRoutingSelection",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Versioned, secret-free progress for the resumable setup journey.",
+  "properties": {
+    "access": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupAccessSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "applied_plan_hash": {
+      "default": "",
+      "title": "Applied Plan Hash",
+      "type": "string"
+    },
+    "completed_stages": {
+      "items": {
+        "enum": [
+          "servers",
+          "roles",
+          "paths",
+          "routing",
+          "access",
+          "review",
+          "apply",
+          "verify",
+          "handoff"
+        ],
+        "type": "string"
+      },
+      "title": "Completed Stages",
+      "type": "array"
+    },
+    "current_stage": {
+      "default": "servers",
+      "enum": [
+        "servers",
+        "roles",
+        "paths",
+        "routing",
+        "access",
+        "review",
+        "apply",
+        "verify",
+        "handoff"
+      ],
+      "title": "Current Stage",
+      "type": "string"
+    },
+    "paths": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupPathSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "review_hash": {
+      "default": "",
+      "title": "Review Hash",
+      "type": "string"
+    },
+    "revision": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "roles": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupRoleSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "routing": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SetupRoutingSelection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema": {
+      "const": "meridian.setup/v1",
+      "default": "meridian.setup/v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "server_refs": {
+      "items": {
+        "maxLength": 120,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n\\t]+$",
+        "type": "string"
+      },
+      "title": "Server Refs",
+      "type": "array"
+    },
+    "updated_at": {
+      "default": "",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "verified_at": {
+      "default": "",
+      "title": "Verified At",
+      "type": "string"
+    }
+  },
+  "title": "SetupDraft",
+  "type": "object"
+}

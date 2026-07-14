@@ -45,6 +45,7 @@ from meridian.core.operations import (
     OperationStart,
 )
 from meridian.core.plan import PlanActionResult, PlanCounts, PlanResult
+from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
     ServerBootstrapKeyResult,
@@ -52,15 +53,6 @@ from meridian.core.servers import (
     ServerProfile,
     ServerValidateRequest,
     ServerValidateResult,
-)
-from meridian.core.topology import (
-    RegionalTrafficDecision,
-    RouteCard,
-    RoutingPolicyDraft,
-    TopologyBuilderDraft,
-    TopologyServerCapabilities,
-    TopologyServerShelfItem,
-    TrafficRouteRule,
 )
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
@@ -437,13 +429,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "server-remove-request": ServerRemoveRequest,
     "server-validate-request": ServerValidateRequest,
     "server-validate-result": ServerValidateResult,
-    "routing-policy-draft": RoutingPolicyDraft,
-    "regional-traffic-decision": RegionalTrafficDecision,
-    "route-card": RouteCard,
-    "topology-builder-draft": TopologyBuilderDraft,
-    "topology-server-shelf-item": TopologyServerShelfItem,
-    "topology-server-capabilities": TopologyServerCapabilities,
-    "traffic-route-rule": TrafficRouteRule,
+    **TOPOLOGY_SCHEMAS,
     "node-add-request": NodeAddRequest,
     "node-target-request": NodeTargetRequest,
     "relay-deploy-request": RelayDeployRequest,

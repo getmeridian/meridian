@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "Canonical Remnawave subscription presentation settings.",
+  "properties": {
+    "formats": {
+      "items": {
+        "enum": [
+          "base64",
+          "xray_json",
+          "mihomo"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Formats",
+      "type": "array"
+    },
+    "profile_title": {
+      "default": "Meridian",
+      "maxLength": 80,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Profile Title",
+      "type": "string"
+    },
+    "template_name": {
+      "default": "meridian",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Template Name",
+      "type": "string"
+    }
+  },
+  "title": "DeliveryIntent",
+  "type": "object"
+}

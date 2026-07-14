@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "An Xray gateway that accepts service-user traffic for server-side routing.",
+  "properties": {
+    "bridge_path_ref": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Bridge Path Ref",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "server_ref",
+    "bridge_path_ref"
+  ],
+  "title": "RoutingGatewayIntent",
+  "type": "object"
+}

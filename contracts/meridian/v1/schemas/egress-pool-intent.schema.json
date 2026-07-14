@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "An ordered set of exits used for server-side failover.",
+  "properties": {
+    "exit_refs": {
+      "items": {
+        "minLength": 1,
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Exit Refs",
+      "type": "array"
+    },
+    "fail_closed": {
+      "default": true,
+      "title": "Fail Closed",
+      "type": "boolean"
+    },
+    "id": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "strategy": {
+      "default": "priority",
+      "enum": [
+        "priority",
+        "least_ping"
+      ],
+      "title": "Strategy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "exit_refs"
+  ],
+  "title": "EgressPoolIntent",
+  "type": "object"
+}

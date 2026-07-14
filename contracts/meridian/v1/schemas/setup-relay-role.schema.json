@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "description": "One ordered set of saved servers assigned a transparent relay path.",
+  "properties": {
+    "exit_ref": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Exit Ref",
+      "type": "string"
+    },
+    "hop_server_refs": {
+      "items": {
+        "maxLength": 120,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n\\t]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Hop Server Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "protocol_path_ref": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Protocol Path Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "hop_server_refs",
+    "exit_ref",
+    "protocol_path_ref"
+  ],
+  "title": "SetupRelayRole",
+  "type": "object"
+}

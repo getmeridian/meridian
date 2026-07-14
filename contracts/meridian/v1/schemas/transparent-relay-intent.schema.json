@@ -1,0 +1,50 @@
+{
+  "additionalProperties": false,
+  "description": "An ordered downstream-first Realm chain that advertises only its first hop.",
+  "properties": {
+    "exit_ref": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Exit Ref",
+      "type": "string"
+    },
+    "hop_server_refs": {
+      "items": {
+        "maxLength": 120,
+        "minLength": 1,
+        "pattern": "^[^\\r\\n\\t]+$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Hop Server Refs",
+      "type": "array"
+    },
+    "id": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "listen_port": {
+      "default": 443,
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Listen Port",
+      "type": "integer"
+    },
+    "protocol_path_ref": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Protocol Path Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "hop_server_refs",
+    "exit_ref",
+    "protocol_path_ref"
+  ],
+  "title": "TransparentRelayIntent",
+  "type": "object"
+}
