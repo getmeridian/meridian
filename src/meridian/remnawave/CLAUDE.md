@@ -3,9 +3,9 @@
 ## Design decisions
 
 - `__init__.py` is the compatibility facade consumed by Meridian; resource behavior stays in `client.py`.
-- `models.py` owns stable Meridian shapes and converts SDK DTOs immediately at the boundary.
+- `models.py` owns stable Meridian shapes and converts SDK/REST payloads immediately at the boundary.
 - `runtime.py` owns the per-thread async bridge and translates transport/SDK failures into typed errors.
-- Raw HTTP is allowed only for explicit SDK gaps and must return a stable typed model.
+- `control_plane.py` uses explicit REST wire shapes for V4-managed resources; the SDK remains for proven legacy operations.
 
 ## What's done well
 
@@ -16,4 +16,5 @@
 
 - Patch `meridian.remnawave.client.sdk_call` in adapter tests; patching the facade alias does not replace the client binding.
 - Never expose SDK DTOs or response dictionaries beyond this package.
+- Omit unmanaged subscription settings and response rules from PATCH payloads; `null` can erase panel-owned policy.
 - Keep component versions as one tested tuple; do not bump an image or SDK independently.

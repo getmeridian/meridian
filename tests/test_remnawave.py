@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 from remnawave.models.config_profiles import CreateConfigProfileRequestDto
-from remnawave.models.internal_squads import UpdateInternalSquadRequestDto
 from remnawave.models.nodes import CreateNodeRequestDto
 from remnawave.models.users import CreateUserRequestDto
 
@@ -795,29 +794,37 @@ class TestConfigProfiles:
 class TestInternalSquads:
     def test_list_internal_squads(self) -> None:
         panel = _make_panel()
-        panel._sdk.internal_squads.get_internal_squads = MagicMock(return_value="list-internal-squads-coro")
-        mock_squad = MagicMock()
-        mock_squad.model_dump.return_value = {"uuid": "sq-1", "name": "Default-Squad"}
-        with patch(
-            "meridian.remnawave.client.sdk_call",
-            return_value=_ns(internalSquads=[mock_squad]),
-        ):
-            squads = panel.list_internal_squads()
-        assert len(squads) == 1
-        assert squads[0]["name"] == "Default-Squad"
+        panel._request = MagicMock(
+            return_value={
+                "internalSquads": [
+                    {
+                        "uuid": "sq-1",
+                        "name": "Default-Squad",
+                        "inbounds": [{"uuid": "ib-1"}],
+                        "info": {"membersCount": 2},
+                    }
+                ]
+            }
+        )
 
-    def test_assign_inbounds_to_squad_uses_sdk(self) -> None:
+        squads = panel.list_internal_squads()
+
+        assert len(squads) == 1
+        assert squads[0].name == "Default-Squad"
+        assert squads[0].inbound_uuids == ["ib-1"]
+        assert squads[0].members_count == 2
+
+    def test_assign_inbounds_to_squad_uses_typed_rest_shape(self) -> None:
         panel = _make_panel()
-        panel._sdk.internal_squads.update_internal_squad = MagicMock(return_value="update-internal-squad-coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="sq-1")):
-            panel.assign_inbounds_to_squad(
-                "00000000-0000-0000-0000-0000000000f0",
-                ["00000000-0000-0000-0000-0000000000f1"],
-            )
-        body = panel._sdk.internal_squads.update_internal_squad.call_args[0][0]
-        assert isinstance(body, UpdateInternalSquadRequestDto)
-        assert str(body.uuid) == "00000000-0000-0000-0000-0000000000f0"
-        assert [str(uuid) for uuid in body.inbounds] == ["00000000-0000-0000-0000-0000000000f1"]
+        panel._request = MagicMock(return_value={"uuid": "sq-1", "name": "Default-Squad"})
+
+        panel.assign_inbounds_to_squad("sq-1", ["ib-1"])
+
+        panel._request.assert_called_once_with(
+            "PATCH",
+            "/api/internal-squads",
+            json={"uuid": "sq-1", "inbounds": ["ib-1"]},
+        )
 
     def test_select_default_squad_uuid(self) -> None:
         from meridian.panel_bootstrap import select_default_squad_uuid as _select_default_squad_uuid

@@ -146,17 +146,21 @@ def inbound_protocol_key(tag: str) -> ProtocolKey | None:
     }.get(tag)
 
 
-def select_default_squad_uuid(squads: list[dict[str, Any]]) -> str:
+def select_default_squad_uuid(squads: list[Any]) -> str:
     """Select the Default-Squad UUID from a list of squads.
 
     Policy: prefer the squad named "Default-Squad"; fall back to the first
     available squad. Panel v2.7+ may not auto-create "Default-Squad".
     """
-    for s in squads:
-        if isinstance(s, dict) and s.get("name") == "Default-Squad":
-            return str(s.get("uuid", ""))
-    if squads and isinstance(squads[0], dict):
-        return str(squads[0].get("uuid", ""))
+    for squad in squads:
+        name = squad.get("name") if isinstance(squad, dict) else getattr(squad, "name", "")
+        if name == "Default-Squad":
+            uuid = squad.get("uuid") if isinstance(squad, dict) else getattr(squad, "uuid", "")
+            return str(uuid or "")
+    if squads:
+        first = squads[0]
+        uuid = first.get("uuid") if isinstance(first, dict) else getattr(first, "uuid", "")
+        return str(uuid or "")
     return ""
 
 
@@ -186,8 +190,14 @@ def register_or_reuse_node(
     inbound_uuids = [ref.uuid for ref in cluster.inbounds.values() if isinstance(ref, InboundRef) and ref.uuid]
     existing = panel.find_node_by_address(node_address)
     if existing:
-        logger.info("Node at %s already registered, reusing", node_address)
+        logger.info("Node at %s already registered, reconciling profile binding", node_address)
+        panel.bind_node_profile(existing.uuid, cluster.config_profile_uuid, inbound_uuids)
         secret_key = panel.get_node_secret_key()
+        if not secret_key:
+            raise PanelSetupError(
+                f"Remnawave returned no node secret for {node_name}",
+                hint="The existing node binding was preserved; retry key generation before deploying the container.",
+            )
         return NodeCredentials(uuid=existing.uuid, secret_key=secret_key)
     creds = panel.create_node(
         name=node_name,
@@ -196,6 +206,11 @@ def register_or_reuse_node(
         config_profile_uuid=cluster.config_profile_uuid,
         inbound_uuids=inbound_uuids,
     )
+    if not creds.uuid or not creds.secret_key:
+        raise PanelSetupError(
+            f"Remnawave returned incomplete credentials for node {node_name}",
+            hint="The node container was not deployed. Inspect the panel node record, then retry.",
+        )
     logger.info("Node registered: %s", node_name)
     return creds
 

@@ -6,15 +6,16 @@ import logging
 import random
 import time
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
 from remnawave import RemnawaveSDK
 from remnawave.models.config_profiles import CreateConfigProfileRequestDto
-from remnawave.models.internal_squads import UpdateInternalSquadRequestDto
 from remnawave.models.nodes import CreateNodeRequestDto, NodeConfigProfileRequestDto
 from remnawave.models.users import CreateUserRequestDto
 
+from .control_plane import ControlPlaneMixin
 from .models import (
     ConfigProfile,
     Host,
@@ -42,7 +43,7 @@ from .runtime import (
 logger = logging.getLogger("meridian.api")
 
 
-class MeridianPanel:
+class MeridianPanel(ControlPlaneMixin):
     """Remnawave API client — sync facade over the official SDK.
 
     Uses the official ``remnawave`` SDK for panel operations and falls
@@ -498,20 +499,6 @@ class MeridianPanel:
         inbounds_list = getattr(resp, "inbounds", []) or []
         return [inbound_from_sdk(ib) for ib in inbounds_list]
 
-    # --- Internal Squads ---
-
-    def list_internal_squads(self) -> list[dict[str, Any]]:
-        """List internal squads. Returns raw dicts with uuid, name, info."""
-        resp = sdk_call(self._sdk.internal_squads.get_internal_squads())
-        # SDK uses snake_case: internal_squads (older panels returned internalSquads)
-        squads = getattr(resp, "internal_squads", None) or getattr(resp, "internalSquads", None) or []
-        return [sdk_to_dict(squad) for squad in squads]
-
-    def assign_inbounds_to_squad(self, squad_uuid: str, inbound_uuids: list[str]) -> None:
-        """Assign inbounds to an internal squad (PATCH)."""
-        body = UpdateInternalSquadRequestDto(uuid=UUID(squad_uuid), inbounds=[UUID(uuid) for uuid in inbound_uuids])
-        sdk_call(self._sdk.internal_squads.update_internal_squad(body))
-
     # --- Keygen ---
 
     def get_node_secret_key(self) -> str:
@@ -529,7 +516,7 @@ class MeridianPanel:
 
     def get_subscription_url(self, short_uuid: str) -> str:
         """Build the subscription URL for a user."""
-        return f"{self._base}/api/sub/{short_uuid}"
+        return f"{self._base}/api/sub/{quote(short_uuid, safe='')}"
 
     # --- Auth (for initial setup — raw httpx, no SDK instance yet) ---
 

@@ -20,6 +20,10 @@ class User:
     created_at: str = ""
     online_at: str = ""
     sub_revoked_at: str = ""
+    subscription_url: str = ""
+    active_internal_squad_uuids: list[str] = field(default_factory=list)
+    external_squad_uuid: str = ""
+    description: str = ""
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -35,6 +39,9 @@ class Node:
     is_disabled: bool = False
     xray_version: str = ""
     traffic_used: int = 0
+    country_code: str = ""
+    active_config_profile_uuid: str = ""
+    active_inbound_uuids: list[str] = field(default_factory=list)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -67,6 +74,8 @@ class Inbound:
     type: str = ""  # "vless", "trojan", "shadowsocks"
     network: str = ""  # "tcp", "ws", "xhttp"
     security: str = ""  # "reality", "tls", "none"
+    profile_uuid: str = ""
+    port: int = 0
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -76,6 +85,8 @@ class ConfigProfile:
 
     uuid: str = ""
     name: str = ""
+    config: dict[str, Any] = field(default_factory=dict)
+    inbounds: list[Inbound] = field(default_factory=list)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -86,6 +97,66 @@ class NodeCredentials:
     uuid: str = ""
     secret_key: str = ""  # base64 JSON with mTLS certs
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class InternalSquad:
+    """A Remnawave internal access squad."""
+
+    uuid: str = ""
+    name: str = ""
+    inbound_uuids: list[str] = field(default_factory=list)
+    members_count: int = 0
+    _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class ExternalSquad:
+    """A Remnawave external delivery policy group."""
+
+    uuid: str = ""
+    name: str = ""
+    templates: list[dict[str, str]] = field(default_factory=list)
+    subscription_settings: dict[str, Any] = field(default_factory=dict)
+    response_headers: dict[str, str] = field(default_factory=dict)
+    _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class SubscriptionTemplate:
+    """A client-specific Remnawave subscription template."""
+
+    uuid: str = ""
+    name: str = ""
+    template_type: str = ""
+    template_json: dict[str, Any] | None = None
+    encoded_template_yaml: str = ""
+    _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass
+class SubscriptionSettings:
+    """Panel-wide subscription delivery settings."""
+
+    uuid: str = ""
+    profile_title: str = ""
+    support_link: str = ""
+    profile_update_interval: int = 0
+    serve_json_at_base_subscription: bool = False
+    randomize_hosts: bool = False
+    response_rules: dict[str, Any] | None = None
+    custom_response_headers: dict[str, str] = field(default_factory=dict)
+    _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+
+@dataclass(frozen=True)
+class SubscriptionDocument:
+    """Canonical subscription content returned by Remnawave."""
+
+    url: str
+    content: str
+    client_type: str = ""
+    content_type: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +172,7 @@ def user_from_sdk(obj: Any) -> User:
     ``getattr`` returns the default and silently drops data.
     """
     traffic = getattr(obj, "user_traffic", None)
+    squads = getattr(obj, "active_internal_squads", None) or []
     return User(
         uuid=str(getattr(obj, "uuid", "")),
         short_uuid=str(getattr(obj, "short_uuid", "") or ""),
@@ -112,11 +184,17 @@ def user_from_sdk(obj: Any) -> User:
         created_at=str(getattr(obj, "created_at", "") or ""),
         online_at=str(getattr(traffic, "online_at", "") or ""),
         sub_revoked_at=str(getattr(obj, "sub_revoked_at", "") or ""),
+        subscription_url=str(getattr(obj, "subscription_url", "") or ""),
+        active_internal_squad_uuids=[str(getattr(squad, "uuid", squad)) for squad in squads],
+        external_squad_uuid=str(getattr(obj, "external_squad_uuid", "") or ""),
+        description=str(getattr(obj, "description", "") or ""),
     )
 
 
 def node_from_sdk(obj: Any) -> Node:
     """Convert SDK NodeResponseDto to our Node dataclass."""
+    profile = getattr(obj, "config_profile", None)
+    active_inbounds = getattr(profile, "active_inbounds", None) or []
     return Node(
         uuid=str(getattr(obj, "uuid", "")),
         name=getattr(obj, "name", "") or "",
@@ -126,6 +204,9 @@ def node_from_sdk(obj: Any) -> Node:
         is_disabled=bool(getattr(obj, "is_disabled", False)),
         xray_version=getattr(obj, "xray_version", "") or "",
         traffic_used=int(getattr(obj, "traffic_used_bytes", 0) or 0),
+        country_code=str(getattr(obj, "country_code", "") or ""),
+        active_config_profile_uuid=str(getattr(profile, "active_config_profile_uuid", "") or ""),
+        active_inbound_uuids=[str(getattr(inbound, "uuid", inbound)) for inbound in active_inbounds],
     )
 
 
@@ -162,6 +243,8 @@ def inbound_from_sdk(obj: Any) -> Inbound:
         type=getattr(obj, "type", ""),
         network=getattr(obj, "network", "") or "",
         security=getattr(obj, "security", "") or "",
+        profile_uuid=str(getattr(obj, "profile_uuid", "") or ""),
+        port=int(getattr(obj, "port", 0) or 0),
     )
 
 
@@ -170,6 +253,8 @@ def config_profile_from_sdk(obj: Any) -> ConfigProfile:
     return ConfigProfile(
         uuid=str(getattr(obj, "uuid", "")),
         name=getattr(obj, "name", ""),
+        config=sdk_to_dict(getattr(obj, "config", {}) or {}),
+        inbounds=[inbound_from_sdk(inbound) for inbound in (getattr(obj, "inbounds", None) or [])],
         _raw=sdk_to_dict(obj) if obj is not None else {},
     )
 
@@ -231,3 +316,166 @@ def parse_host(data: Any) -> Host:
         is_disabled=data.get("isDisabled", False),
         _raw=data,
     )
+
+
+def parse_user(data: Any) -> User:
+    """Parse a raw API user payload into the stable model."""
+    raw = data if isinstance(data, dict) else {}
+    traffic = raw.get("userTraffic")
+    traffic = traffic if isinstance(traffic, dict) else {}
+    squads = raw.get("activeInternalSquads")
+    squads = squads if isinstance(squads, list) else []
+    return User(
+        uuid=str(raw.get("uuid") or ""),
+        short_uuid=str(raw.get("shortUuid") or ""),
+        username=str(raw.get("username") or ""),
+        vless_uuid=str(raw.get("vlessUuid") or ""),
+        status=str(raw.get("status") or ""),
+        used_traffic_bytes=int(traffic.get("usedTrafficBytes") or 0),
+        traffic_limit_bytes=int(raw.get("trafficLimitBytes") or 0),
+        created_at=str(raw.get("createdAt") or ""),
+        online_at=str(traffic.get("onlineAt") or ""),
+        sub_revoked_at=str(raw.get("subRevokedAt") or ""),
+        subscription_url=str(raw.get("subscriptionUrl") or ""),
+        active_internal_squad_uuids=[str(item.get("uuid") if isinstance(item, dict) else item) for item in squads],
+        external_squad_uuid=str(raw.get("externalSquadUuid") or ""),
+        description=str(raw.get("description") or ""),
+        _raw=raw,
+    )
+
+
+def parse_node(data: Any) -> Node:
+    """Parse a raw node payload including its active profile binding."""
+    raw = data if isinstance(data, dict) else {}
+    profile = raw.get("configProfile")
+    profile = profile if isinstance(profile, dict) else {}
+    active_inbounds = profile.get("activeInbounds")
+    active_inbounds = active_inbounds if isinstance(active_inbounds, list) else []
+    return Node(
+        uuid=str(raw.get("uuid") or ""),
+        name=str(raw.get("name") or ""),
+        address=str(raw.get("address") or ""),
+        port=int(raw.get("port") or 0),
+        is_connected=bool(raw.get("isConnected", False)),
+        is_disabled=bool(raw.get("isDisabled", False)),
+        xray_version=str(raw.get("xrayVersion") or ""),
+        traffic_used=int(raw.get("trafficUsedBytes") or 0),
+        country_code=str(raw.get("countryCode") or ""),
+        active_config_profile_uuid=str(profile.get("activeConfigProfileUuid") or ""),
+        active_inbound_uuids=[str(item.get("uuid") if isinstance(item, dict) else item) for item in active_inbounds],
+        _raw=raw,
+    )
+
+
+def parse_config_profile(data: Any) -> ConfigProfile:
+    """Parse a raw config profile payload with derived inbounds."""
+    raw = data if isinstance(data, dict) else {}
+    raw_config = raw.get("config")
+    raw_inbounds = raw.get("inbounds")
+    raw_inbounds = raw_inbounds if isinstance(raw_inbounds, list) else []
+    return ConfigProfile(
+        uuid=str(raw.get("uuid") or ""),
+        name=str(raw.get("name") or ""),
+        config=raw_config if isinstance(raw_config, dict) else {},
+        inbounds=[
+            Inbound(
+                uuid=str(item.get("uuid") or ""),
+                tag=str(item.get("tag") or ""),
+                type=str(item.get("type") or ""),
+                network=str(item.get("network") or ""),
+                security=str(item.get("security") or ""),
+                profile_uuid=str(item.get("profileUuid") or ""),
+                port=int(item.get("port") or 0),
+                _raw=item,
+            )
+            for item in raw_inbounds
+            if isinstance(item, dict)
+        ],
+        _raw=raw,
+    )
+
+
+def parse_internal_squad(data: Any) -> InternalSquad:
+    """Parse a raw internal squad payload."""
+    raw = data if isinstance(data, dict) else {}
+    inbounds = raw.get("inbounds")
+    inbounds = inbounds if isinstance(inbounds, list) else []
+    info = raw.get("info")
+    info = info if isinstance(info, dict) else {}
+    return InternalSquad(
+        uuid=str(raw.get("uuid") or ""),
+        name=str(raw.get("name") or ""),
+        inbound_uuids=[str(item.get("uuid") if isinstance(item, dict) else item) for item in inbounds],
+        members_count=int(info.get("membersCount") or 0),
+        _raw=raw,
+    )
+
+
+def parse_external_squad(data: Any) -> ExternalSquad:
+    """Parse a raw external squad payload."""
+    raw = data if isinstance(data, dict) else {}
+    templates = raw.get("templates")
+    templates = templates if isinstance(templates, list) else []
+    settings = raw.get("subscriptionSettings")
+    headers = raw.get("responseHeaders")
+    return ExternalSquad(
+        uuid=str(raw.get("uuid") or ""),
+        name=str(raw.get("name") or ""),
+        templates=[
+            {
+                "template_uuid": str(item.get("templateUuid") or ""),
+                "template_type": str(item.get("templateType") or ""),
+            }
+            for item in templates
+            if isinstance(item, dict)
+        ],
+        subscription_settings=settings if isinstance(settings, dict) else {},
+        response_headers={str(key): str(value) for key, value in headers.items()} if isinstance(headers, dict) else {},
+        _raw=raw,
+    )
+
+
+def parse_subscription_template(data: Any) -> SubscriptionTemplate:
+    """Parse a raw subscription template payload."""
+    raw = data if isinstance(data, dict) else {}
+    template_json = raw.get("templateJson")
+    return SubscriptionTemplate(
+        uuid=str(raw.get("uuid") or ""),
+        name=str(raw.get("name") or ""),
+        template_type=str(raw.get("templateType") or ""),
+        template_json=template_json if isinstance(template_json, dict) else None,
+        encoded_template_yaml=str(raw.get("encodedTemplateYaml") or ""),
+        _raw=raw,
+    )
+
+
+def parse_subscription_settings(data: Any) -> SubscriptionSettings:
+    """Parse panel-wide subscription settings without discarding response rules."""
+    raw = data if isinstance(data, dict) else {}
+    response_rules = raw.get("responseRules")
+    headers = raw.get("customResponseHeaders")
+    return SubscriptionSettings(
+        uuid=str(raw.get("uuid") or ""),
+        profile_title=str(raw.get("profileTitle") or ""),
+        support_link=str(raw.get("supportLink") or ""),
+        profile_update_interval=int(raw.get("profileUpdateInterval") or 0),
+        serve_json_at_base_subscription=bool(raw.get("serveJsonAtBaseSubscription", False)),
+        randomize_hosts=bool(raw.get("randomizeHosts", False)),
+        response_rules=response_rules if isinstance(response_rules, dict) else None,
+        custom_response_headers={str(key): str(value) for key, value in headers.items()}
+        if isinstance(headers, dict)
+        else {},
+        _raw=raw,
+    )
+
+
+def response_items(data: Any, *keys: str) -> list[dict[str, Any]]:
+    """Extract a typed-object list from known Remnawave response wrappers."""
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        for key in keys:
+            value = data.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return []

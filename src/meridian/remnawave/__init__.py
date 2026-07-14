@@ -3,10 +3,15 @@
 from .client import MeridianPanel
 from .models import (
     ConfigProfile,
+    ExternalSquad,
     Host,
     Inbound,
+    InternalSquad,
     Node,
     NodeCredentials,
+    SubscriptionDocument,
+    SubscriptionSettings,
+    SubscriptionTemplate,
     User,
     host_from_sdk,
     inbound_from_sdk,
@@ -23,8 +28,10 @@ from .runtime import (
 
 __all__ = [
     "ConfigProfile",
+    "ExternalSquad",
     "Host",
     "Inbound",
+    "InternalSquad",
     "MeridianPanel",
     "Node",
     "NodeCredentials",
@@ -32,6 +39,9 @@ __all__ = [
     "RemnawaveError",
     "RemnawaveNetworkError",
     "RemnawaveNotFoundError",
+    "SubscriptionDocument",
+    "SubscriptionSettings",
+    "SubscriptionTemplate",
     "User",
     "host_from_sdk",
     "inbound_from_sdk",

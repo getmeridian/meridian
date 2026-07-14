@@ -13,8 +13,9 @@ import pytest
 
 from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey
 from meridian.core.errors import PanelSetupError
+from meridian.node_deploy import register_or_reuse_node
 from meridian.panel_bootstrap import cache_inbounds, create_hosts_for_node
-from meridian.remnawave import Host, MeridianPanel, RemnawaveError
+from meridian.remnawave import Host, MeridianPanel, Node, RemnawaveError
 
 # ---------------------------------------------------------------------------
 # Constants — RFC 5737 IPs only
@@ -480,6 +481,33 @@ class TestCacheInbounds:
             cache_inbounds(panel, cluster)
 
         assert len(cluster.inbounds) == 0
+
+
+class TestRegisterOrReuseNode:
+    def test_existing_node_profile_binding_is_reconciled(self) -> None:
+        panel = MagicMock()
+        panel.find_node_by_address.return_value = Node(uuid="node-1", address=_IP)
+        panel.get_node_secret_key.return_value = "secret"
+        cluster = _configured_cluster()
+
+        credentials = register_or_reuse_node(panel, cluster, _IP, "exit-a")
+
+        assert credentials.uuid == "node-1"
+        panel.bind_node_profile.assert_called_once_with(
+            "node-1",
+            "profile-uuid",
+            ["ib-reality-uuid", "ib-xhttp-uuid", "ib-wss-uuid"],
+        )
+        panel.create_node.assert_not_called()
+
+    def test_missing_node_secret_is_a_hard_failure(self) -> None:
+        panel = MagicMock()
+        panel.find_node_by_address.return_value = Node(uuid="node-1", address=_IP)
+        panel.get_node_secret_key.return_value = ""
+        cluster = _configured_cluster()
+
+        with pytest.raises(PanelSetupError, match="no node secret"):
+            register_or_reuse_node(panel, cluster, _IP, "exit-a")
 
 
 # ===========================================================================
