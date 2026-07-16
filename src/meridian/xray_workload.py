@@ -46,6 +46,7 @@ def render_workload_config(
         raise WorkloadConfigError(
             f"Service-route credentials do not match {profile.workload_id}: missing={missing}, extra={extra}."
         )
+    _validate_service_outbound_selectors(profile)
     outbounds: list[dict[str, Any]] = [
         _render_service_outbound(edge, credentials[edge.edge_id]) for edge in profile.service_outbounds
     ]
@@ -224,6 +225,7 @@ def _render_service_outbound(
                         {
                             "id": credential.vless_uuid,
                             "encryption": "none",
+                            "flow": "xtls-rprx-vision",
                         }
                     ],
                 }
@@ -245,9 +247,9 @@ def _render_service_outbound(
 def _render_route(rule: WorkloadRouteSpec) -> list[dict[str, Any]]:
     target_key = "balancerTag" if rule.target_type == "balancer" else "outboundTag"
     target = {target_key: rule.target_tag}
-    base: dict[str, Any] = {"type": "field", **target}
+    base: dict[str, Any] = {"type": "field", "ruleTag": rule.route_id, **target}
     if rule.match == "all":
-        return [base]
+        return [{**base, "network": "tcp,udp"}]
     if rule.match == "country":
         country_codes = [value.lower() for value in rule.match_values]
         return [{**base, "ip": [f"geoip:{country}" for country in country_codes]}]
@@ -256,6 +258,24 @@ def _render_route(rule: WorkloadRouteSpec) -> list[dict[str, Any]]:
     if rule.match == "ip":
         return [{**base, "ip": rule.match_values}]
     return [{**base, "network": ",".join(rule.match_values)}]
+
+
+def _validate_service_outbound_selectors(profile: ConfigProfilePayload) -> None:
+    tags = [outbound.tag for outbound in profile.service_outbounds]
+    for index, tag in enumerate(tags):
+        for other in tags[index + 1 :]:
+            if tag.startswith(other) or other.startswith(tag):
+                raise WorkloadConfigError(
+                    "Service Outbound tags must be prefix-free because Xray selectors use prefix matching: "
+                    f"{tag!r} overlaps {other!r}."
+                )
+    for balancer in profile.egress_balancers:
+        for selector in balancer.outbound_tags:
+            matches = [tag for tag in tags if tag.startswith(selector)]
+            if matches != [selector]:
+                raise WorkloadConfigError(
+                    f"Balancer {balancer.pool_id} selector {selector!r} must identify exactly one service Outbound."
+                )
 
 
 def _require_complete_reality_keys(

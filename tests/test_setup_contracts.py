@@ -53,6 +53,7 @@ def _roles() -> SetupRoleSelection:
                 hop_server_refs=["srv-relay"],
                 exit_ref="exit-a",
                 protocol_path_ref="reality-primary",
+                listen_port=8443,
                 reality_sni="relay.example.com",
             )
         ],
@@ -102,6 +103,16 @@ class TestProtocolPathIntent:
     def test_exit_requires_reality_and_unique_protocols(self) -> None:
         with pytest.raises(ValidationError, match="must keep a Reality path"):
             ExitIntent(id="exit-a", server_ref="srv-exit", paths=[_xhttp()])
+
+    @pytest.mark.parametrize("path_id", ["Reality", "x" * 49])
+    def test_topology_ids_are_lowercase_and_bounded(self, path_id: str) -> None:
+        with pytest.raises(ValidationError, match="topology ID|Topology IDs"):
+            _reality(path_id)
+
+    @pytest.mark.parametrize("username", ["ab", "user/name", "x" * 37])
+    def test_access_usernames_match_remnawave_limits(self, username: str) -> None:
+        with pytest.raises(ValidationError, match="Access usernames"):
+            AccessIntent(users=[username])
 
 
 class TestOrderedRoutes:
@@ -233,6 +244,7 @@ class TestSetupDraft:
         assert intent.control.server_ref == "srv-control"
         assert intent.exits[0].paths[1].protocol == "xhttp"
         assert intent.transparent_relays[0].hop_server_refs == ["srv-relay"]
+        assert intent.transparent_relays[0].listen_port == 8443
         assert intent.transparent_relays[0].reality_sni == "relay.example.com"
         assert intent.default_egress_ref == "primary"
 

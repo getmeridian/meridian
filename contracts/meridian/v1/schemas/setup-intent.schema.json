@@ -14,8 +14,9 @@
         },
         "users": {
           "items": {
-            "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "maxLength": 36,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_-]+$",
             "type": "string"
           },
           "minItems": 1,
@@ -98,8 +99,9 @@
         },
         "template_name": {
           "default": "meridian",
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Template Name",
           "type": "string"
         }
@@ -113,8 +115,9 @@
       "properties": {
         "exit_refs": {
           "items": {
+            "maxLength": 48,
             "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
             "type": "string"
           },
           "minItems": 1,
@@ -127,8 +130,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -159,8 +163,9 @@
       "description": "One independent Xray exit workload and its public protocol paths.",
       "properties": {
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -219,8 +224,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -250,15 +256,15 @@
         },
         "source_gateway_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Source Gateway Ref",
           "type": "string"
         },
         "target_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Target Ref",
           "type": "string"
         }
@@ -291,8 +297,9 @@
           "title": "Host"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -372,14 +379,16 @@
       "description": "A smart entry workload using a reviewed Reality path as its public blueprint.",
       "properties": {
         "bridge_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Bridge Path Ref",
           "type": "string"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -404,8 +413,9 @@
       "description": "A client-first Realm hop list whose first server is the advertised endpoint.",
       "properties": {
         "exit_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Exit Ref",
           "type": "string"
         },
@@ -421,8 +431,9 @@
           "type": "array"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -434,8 +445,9 @@
           "type": "integer"
         },
         "protocol_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Protocol Path Ref",
           "type": "string"
         },
@@ -476,8 +488,9 @@
       "$ref": "#/$defs/ControlPlaneIntent"
     },
     "default_egress_ref": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Default Egress Ref",
       "type": "string"
     },

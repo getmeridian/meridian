@@ -6,8 +6,9 @@
       "properties": {
         "exit_refs": {
           "items": {
+            "maxLength": 48,
             "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
             "type": "string"
           },
           "minItems": 1,
@@ -20,8 +21,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -66,8 +68,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -97,15 +100,15 @@
         },
         "source_gateway_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Source Gateway Ref",
           "type": "string"
         },
         "target_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Target Ref",
           "type": "string"
         }
@@ -122,8 +125,9 @@
   "description": "Default egress, ordered routes, and optional failover pools.",
   "properties": {
     "default_egress_ref": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Default Egress Ref",
       "type": "string"
     },

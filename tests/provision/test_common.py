@@ -7,8 +7,8 @@ needs-change returns "changed", and failures return "failed".
 from __future__ import annotations
 
 from meridian.provision.common import (
-    _AUTO_UPGRADES_CONF,
     _SSH_HARDENING_DROPIN,
+    AUTO_UPGRADES_CONF,
     REQUIRED_PACKAGES,
     ConfigureBBR,
     ConfigureFail2ban,
@@ -92,7 +92,7 @@ class TestInstallPackages:
 class TestEnableAutoUpgrades:
     def test_already_configured_returns_ok(self, mock_conn: MockConnection, base_ctx):
         """When config file already has expected content, nothing is written."""
-        mock_conn.when("cat", stdout=_AUTO_UPGRADES_CONF)
+        mock_conn.when("cat", stdout=AUTO_UPGRADES_CONF)
 
         result = EnableAutoUpgrades().run(mock_conn, base_ctx)
 

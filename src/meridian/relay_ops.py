@@ -11,7 +11,7 @@ import re
 import shlex
 
 from meridian.cluster import ClusterConfig, ProtocolKey, RelayEntry
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.remnawave import HostSecurityLayer, MeridianPanel, RemnawaveError
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -153,7 +153,7 @@ def create_relay_hosts(
     # WSS is excluded: CDN routing (Cloudflare) already provides geographic
     # flexibility and L4 TCP relaying does not help traffic that routes
     # through the CDN anyway.
-    _PROTO_CONFIG: list[tuple[ProtocolKey, str]] = [
+    _PROTO_CONFIG: list[tuple[ProtocolKey, HostSecurityLayer]] = [
         (ProtocolKey.REALITY, "DEFAULT"),
         (ProtocolKey.XHTTP, "TLS"),
     ]

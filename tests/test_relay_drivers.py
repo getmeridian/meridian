@@ -9,11 +9,13 @@ import pytest
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
+    COMPILER_VERSION,
     NginxArtifactPayload,
     NginxRouteSpec,
     RealmHopPayload,
     ResourcePlan,
     ResourcePostcondition,
+    compute_plan_hash,
     make_resource,
 )
 from meridian.provision.steps import StepResult
@@ -21,7 +23,7 @@ from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
     UnknownResourceOutcome,
-    resource_idempotency_key,
+    build_resource_actions,
 )
 from meridian.reconciler.server_drivers import RealmHopDriver, ServerDriverContext
 from meridian.reconciler.server_render import (
@@ -153,8 +155,29 @@ def test_stream_artifact_accepts_custom_sni_and_preserves_camouflage_fallback() 
     assert "server 127.0.0.1:10443;" in rendered
 
 
+def test_stream_artifact_routes_no_sni_to_local_control_https() -> None:
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=443,
+        layer="stream",
+        routes=[
+            NginxRouteSpec(
+                match="sni",
+                server_names=[""],
+                backend_server_ref="srv-exit",
+                backend_port=8443,
+            )
+        ],
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, ADDRESSES)
+
+    assert '    "" meridian_upstream_' in rendered
+    assert "server 127.0.0.1:8443;" in rendered
+
+
 def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.MonkeyPatch) -> None:
-    action = _realm_action()
+    plan, action = _realm_plan_and_action()
     config_path = realm_config_path(action.resource.logical_id)
     unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
     conn = StatefulConnection(
@@ -165,7 +188,7 @@ def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.Monke
         fail_first_restart=True,
     )
     context = ServerDriverContext(
-        plan=cast(ResourcePlan, object()),
+        plan=plan,
         cluster=ClusterConfig(),
         panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
@@ -195,7 +218,7 @@ def test_realm_services_are_isolated_by_logical_identity() -> None:
 def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    action = _realm_action()
+    plan, action = _realm_plan_and_action()
     config_path = realm_config_path(action.resource.logical_id)
     unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
     conn = StatefulConnection(
@@ -207,7 +230,7 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
         restart_returncode=124,
     )
     context = ServerDriverContext(
-        plan=cast(ResourcePlan, object()),
+        plan=plan,
         cluster=ClusterConfig(),
         panel=cast(MeridianPanel, object()),
         connection_for=lambda _server_ref: cast(ServerConnection, conn),
@@ -226,7 +249,7 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
     assert conn.restart_count == 1
 
 
-def _realm_action() -> ResourceAction:
+def _realm_plan_and_action() -> tuple[ResourcePlan, ResourceAction]:
     resource = make_resource(
         "realm:relay-a:1",
         RealmHopPayload(
@@ -246,18 +269,17 @@ def _realm_action() -> ResourceAction:
             )
         ],
     )
-    plan_hash = "a" * 64
-    return ResourceAction(
-        idempotency_key=resource_idempotency_key(
-            plan_hash=plan_hash,
-            generation=1,
-            resource=resource,
+    intent_hash = "a" * 64
+    plan = ResourcePlan(
+        intent_hash=intent_hash,
+        plan_hash=compute_plan_hash(
+            compiler_version=COMPILER_VERSION,
+            intent_hash=intent_hash,
+            resources=[resource],
         ),
-        generation=1,
-        plan_hash=plan_hash,
-        expected_hash=resource.desired_hash,
-        resource=resource,
+        resources=[resource],
     )
+    return plan, build_resource_actions(plan, 1)[0]
 
 
 def _result(

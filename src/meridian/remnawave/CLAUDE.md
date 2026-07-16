@@ -18,3 +18,4 @@
 - Never expose SDK DTOs or response dictionaries beyond this package.
 - Omit unmanaged subscription settings and response rules from PATCH payloads; `null` can erase panel-owned policy.
 - Keep component versions as one tested tuple; do not bump an image or SDK independently.
+- Reality Hosts use `securityLayer=DEFAULT`; `REALITY` is an Inbound transport security value, not a Host enum.

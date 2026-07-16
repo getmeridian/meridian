@@ -14,8 +14,9 @@
         },
         "users": {
           "items": {
-            "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "maxLength": 36,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_-]+$",
             "type": "string"
           },
           "minItems": 1,
@@ -98,8 +99,9 @@
         },
         "template_name": {
           "default": "meridian",
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Template Name",
           "type": "string"
         }
@@ -113,8 +115,9 @@
       "properties": {
         "exit_refs": {
           "items": {
+            "maxLength": 48,
             "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
             "type": "string"
           },
           "minItems": 1,
@@ -127,8 +130,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -173,8 +177,9 @@
           "type": "boolean"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -204,15 +209,15 @@
         },
         "source_gateway_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Source Gateway Ref",
           "type": "string"
         },
         "target_ref": {
           "default": "",
-          "maxLength": 120,
-          "pattern": "^$|^[^\\r\\n\\t]+$",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
           "title": "Target Ref",
           "type": "string"
         }
@@ -245,8 +250,9 @@
           "title": "Host"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -343,8 +349,9 @@
       "description": "Protocol paths selected for one exit role.",
       "properties": {
         "exit_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Exit Ref",
           "type": "string"
         },
@@ -369,8 +376,9 @@
       "description": "One saved server assigned an exit workload ID.",
       "properties": {
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -406,14 +414,16 @@
       "description": "One saved server assigned an Xray routing-gateway workload.",
       "properties": {
         "bridge_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Bridge Path Ref",
           "type": "string"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -457,8 +467,9 @@
       "description": "One ordered set of saved servers assigned a transparent relay path.",
       "properties": {
         "exit_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Exit Ref",
           "type": "string"
         },
@@ -474,14 +485,23 @@
           "type": "array"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
+        "listen_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
         "protocol_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Protocol Path Ref",
           "type": "string"
         },
@@ -553,8 +573,9 @@
       "description": "Default egress, ordered routes, and optional failover pools.",
       "properties": {
         "default_egress_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Default Egress Ref",
           "type": "string"
         },

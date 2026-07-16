@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
@@ -20,12 +23,29 @@ from meridian.reconciler.resources import (
     ResourceObservation,
     ResourceReconcileError,
     UnknownResourceOutcome,
+    UnsupportedResourceRetirementError,
     build_resource_actions,
     observation_converges,
 )
 
 PersistCluster = Callable[[ClusterConfig], None]
 Clock = Callable[[], datetime]
+AfterApply = Callable[[ResourceAction], None]
+
+
+def environment_after_apply_barrier(action: ResourceAction) -> None:
+    """Expose an opt-in process barrier for destructive crash-recovery labs."""
+    target = os.environ.get("MERIDIAN_TEST_AFTER_APPLY_RESOURCE", "")
+    if not target or action.resource.logical_id != target:
+        return
+    marker_value = os.environ.get("MERIDIAN_TEST_AFTER_APPLY_MARKER", "")
+    if not marker_value:
+        raise ResourceReconcileError("MERIDIAN_TEST_AFTER_APPLY_MARKER is required when the test barrier is enabled.")
+    marker = Path(marker_value)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(action.idempotency_key + "\n", encoding="utf-8")
+    while marker.exists():
+        time.sleep(0.1)
 
 
 def execute_resource_plan(
@@ -36,10 +56,12 @@ def execute_resource_plan(
     persist: PersistCluster | None = None,
     clock: Clock | None = None,
     max_unknown_attempts: int = 2,
+    after_apply: AfterApply | None = None,
 ) -> ResourceExecutionResult:
     """Apply a reviewed plan with durable checkpoints and mandatory observation."""
     if max_unknown_attempts < 1:
         raise ValueError("max_unknown_attempts must be at least 1")
+    validate_resource_plan_transition(plan, cluster)
     save = persist or (lambda state: state.save())
     now = clock or (lambda: datetime.now(UTC))
     generation = _begin_apply(plan, cluster, save)
@@ -69,6 +91,7 @@ def execute_resource_plan(
                     save,
                     now,
                     max_unknown_attempts=max_unknown_attempts,
+                    after_apply=after_apply,
                 )
         results.append(result)
         if result.succeeded:
@@ -82,6 +105,23 @@ def execute_resource_plan(
     if execution.all_succeeded:
         _commit_generation(plan, generation, cluster, save)
     return execution
+
+
+def validate_resource_plan_transition(
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+) -> None:
+    """Reject intent shrink until owned resources can be retired safely."""
+    desired_ids = {resource.logical_id for resource in plan.resources}
+    retired_ids = sorted(
+        {
+            binding.logical_id
+            for binding in cluster.managed_bindings.values()
+            if binding.active and binding.logical_id not in desired_ids
+        }
+    )
+    if retired_ids:
+        raise UnsupportedResourceRetirementError(retired_ids)
 
 
 def inspect_resource_plan(
@@ -179,6 +219,7 @@ def _execute_action(
     clock: Clock,
     *,
     max_unknown_attempts: int,
+    after_apply: AfterApply | None,
 ) -> ResourceActionResult:
     checkpoint = _checkpoint(action, cluster)
     binding = _binding(action, cluster)
@@ -223,6 +264,8 @@ def _execute_action(
         except Exception as exc:
             return _record_failure(action, cluster, persist, clock, f"apply failed: {exc}")
 
+        if after_apply is not None:
+            after_apply(action)
         observed_binding = _binding_from_receipt(action, binding, receipt)
         try:
             observation = driver.observe(action, observed_binding)

@@ -15,14 +15,16 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     RealmHopPayload,
     ResourcePlan,
+    ServerBaselinePayload,
     canonical_hash,
 )
-from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+from meridian.config import REALM_VERSION, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.node_deploy import deploy_node_container, render_node_compose
+from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule
 from meridian.provision.nginx import InstallNginx
 from meridian.provision.relay import InstallRealm, RelayContext
-from meridian.provision.steps import ProvisionContext
+from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.provision.tls import IssueTLSCert
 from meridian.provision.warp import InstallWarp
 from meridian.reconciler.resources import (
@@ -48,10 +50,6 @@ from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
 
 ConnectionFactory = Callable[[str], ServerConnection]
-NodePreparation = Callable[
-    [ServerConnection, NodeRuntimePayload, str],
-    None,
-]
 PayloadT = TypeVar(
     "PayloadT",
     FirewallRulePayload,
@@ -59,6 +57,7 @@ PayloadT = TypeVar(
     NginxArtifactPayload,
     RealmHopPayload,
     NodeRuntimePayload,
+    ServerBaselinePayload,
 )
 
 
@@ -70,7 +69,6 @@ class ServerDriverContext:
     connection_for: ConnectionFactory
     server_addresses: Mapping[str, str]
     node_secrets: dict[str, str] = field(default_factory=dict, repr=False)
-    prepare_node: NodePreparation | None = None
 
     def connection(self, server_ref: str) -> ServerConnection:
         return self.connection_for(server_ref)
@@ -93,12 +91,86 @@ class ServerDriverContext:
 def build_server_drivers(context: ServerDriverContext) -> ResourceDrivers:
     """Build SSH drivers shared by exits and transparent relay chains."""
     return {
+        "server_baseline": ServerBaselineDriver(context),
         "firewall_rule": FirewallRuleDriver(context),
         "certificate": CertificateDriver(context),
         "nginx_artifact": NginxArtifactDriver(context),
         "realm_hop": RealmHopDriver(context),
         "node_runtime": NodeRuntimeDriver(context),
     }
+
+
+class ServerBaselineDriver:
+    """Prepare packages, hardening, firewall, and optional Docker once per host."""
+
+    def __init__(self, context: ServerDriverContext) -> None:
+        self.context = context
+
+    def observe(
+        self,
+        action: ResourceAction,
+        binding: ManagedResourceBinding | None,
+    ) -> ResourceObservation:
+        payload = _payload(action, ServerBaselinePayload)
+        conn = self.context.connection(payload.server_ref)
+        context = _baseline_context(payload, conn, self.context.address(payload.server_ref))
+        checks = build_server_baseline_checks(
+            context,
+            install_docker=payload.install_docker,
+            manage_public_ports=False,
+        )
+        outcomes = {check.name: conn.run(check.command, timeout=15).returncode == 0 for check in checks}
+        marker = conn.get_text(_baseline_marker_path(action.resource.logical_id), timeout=15)
+        attestation = _resource_contract_attestation(action, self.context.plan)
+        marker_ok = marker.returncode == 0 and marker.stdout == f"{attestation}\n"
+        matches = marker_ok and all(outcomes.values())
+        return _observed(
+            action,
+            remote_id=payload.server_ref,
+            exists=marker.returncode == 0,
+            matches=matches,
+            projection={
+                "attestation": marker.stdout if marker.returncode == 0 else "",
+                "checks": outcomes,
+            },
+            satisfied={"exists"} if matches else set(),
+        )
+
+    def apply(
+        self,
+        action: ResourceAction,
+        binding: ManagedResourceBinding | None,
+    ) -> ResourceApplyReceipt:
+        from meridian.provision import Provisioner
+
+        payload = _payload(action, ServerBaselinePayload)
+        conn = self.context.connection(payload.server_ref)
+        context = _baseline_context(payload, conn, self.context.address(payload.server_ref))
+        results = Provisioner(
+            build_server_baseline_steps(
+                context,
+                install_docker=payload.install_docker,
+                manage_public_ports=False,
+            )
+        ).run(conn, context)
+        failures = [result for result in results if result.status == "failed"]
+        if failures:
+            failure = failures[0]
+            _raise_if_step_timeout(action, failure)
+            raise ResourceReconcileError(
+                f"Could not prepare server {payload.server_ref}: {failure.name}: {failure.detail}"
+            )
+        attestation = ensure_file_content(
+            conn,
+            _baseline_marker_path(action.resource.logical_id),
+            f"{_resource_contract_attestation(action, self.context.plan)}\n",
+            mode="600",
+            create_parent=True,
+        )
+        if not attestation.ok:
+            _raise_if_timeout(action, attestation.result)
+            raise ResourceReconcileError(f"Could not attest server baseline {payload.server_ref}: {attestation.detail}")
+        return ResourceApplyReceipt(remote_id=payload.server_ref)
 
 
 class FirewallRuleDriver:
@@ -238,6 +310,8 @@ class CertificateDriver:
 
 
 class NginxArtifactDriver:
+    _LEGACY_STREAM_PATH = "/etc/nginx/stream.d/meridian.conf"
+
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -255,12 +329,19 @@ class NginxArtifactDriver:
             self.context.server_addresses,
         )
         current = conn.get_text(path, timeout=15)
+        legacy_absent = True
+        if payload.layer == "stream" and payload.listener_port == 443:
+            legacy = conn.run(
+                f"test ! -e {shlex.quote(self._LEGACY_STREAM_PATH)}",
+                timeout=15,
+            )
+            legacy_absent = legacy.returncode == 0
         active = conn.run("systemctl is-active nginx", timeout=15)
         listening = conn.run("ss -H -lnt 2>/dev/null", timeout=15)
         file_matches = current.returncode == 0 and current.stdout == expected
         service_active = active.returncode == 0 and active.stdout.strip() == "active"
         port_listening = _port_in_ss(listening.stdout, payload.listener_port)
-        matches = file_matches and service_active and port_listening
+        matches = file_matches and service_active and port_listening and legacy_absent
         satisfied: set[str] = set()
         if current.returncode == 0:
             satisfied.add("exists")
@@ -275,6 +356,7 @@ class NginxArtifactDriver:
                 "content": current.stdout if current.returncode == 0 else "",
                 "active": service_active,
                 "listening": port_listening,
+                "legacy_absent": legacy_absent,
             },
             satisfied=satisfied,
         )
@@ -303,6 +385,11 @@ class NginxArtifactDriver:
         )
         previous = conn.get_text(path, timeout=15)
         previous_content = previous.stdout if previous.returncode == 0 else None
+        owns_legacy_stream = payload.layer == "stream" and payload.listener_port == 443
+        legacy_content: str | None = None
+        if owns_legacy_stream:
+            legacy = conn.get_text(self._LEGACY_STREAM_PATH, timeout=15)
+            legacy_content = legacy.stdout if legacy.returncode == 0 else None
         enabled = ""
         written = ensure_file_content(
             conn,
@@ -314,6 +401,16 @@ class NginxArtifactDriver:
         if not written.ok:
             _raise_if_timeout(action, written.result)
             raise ResourceReconcileError(f"Could not write nginx artifact {path}: {written.detail}")
+        if owns_legacy_stream:
+            removed = conn.run(
+                f"rm -f {shlex.quote(self._LEGACY_STREAM_PATH)}",
+                timeout=15,
+            )
+            if removed.returncode != 0:
+                _raise_if_timeout(action, removed)
+                self._restore_artifact(conn, path, previous_content, enabled)
+                self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
+                raise ResourceReconcileError("Could not retire the legacy nginx stream artifact.")
         if payload.layer == "http":
             enabled = f"/etc/nginx/sites-enabled/meridian-v4-{artifact_token(action.resource.logical_id)}.conf"
             linked = conn.run(
@@ -327,6 +424,8 @@ class NginxArtifactDriver:
         validation = conn.run("nginx -t 2>&1", timeout=15)
         if validation.returncode != 0:
             self._restore_artifact(conn, path, previous_content, enabled)
+            if owns_legacy_stream:
+                self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
             raise ResourceReconcileError(
                 f"nginx rejected {path}: {(validation.stderr or validation.stdout).strip()[:200]}"
             )
@@ -334,6 +433,8 @@ class NginxArtifactDriver:
         if reload_result.returncode != 0:
             _raise_if_timeout(action, reload_result)
             self._restore_artifact(conn, path, previous_content, enabled)
+            if owns_legacy_stream:
+                self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
             conn.run("systemctl reload nginx", timeout=15)
             raise ResourceReconcileError(f"nginx reload failed for {path}.")
         return ResourceApplyReceipt(remote_id=path)
@@ -393,8 +494,11 @@ class RealmHopDriver:
         service = realm_service_name(action.resource.logical_id)
         active = conn.run(f"systemctl is-active {shlex.quote(service)}", timeout=15)
         listening = conn.run("ss -H -lnt 2>/dev/null", timeout=15)
+        version = conn.run("realm --version 2>/dev/null", timeout=15)
+        expected_version = _runtime_pin(self.context.plan, "realm_version", REALM_VERSION)
         exists = current_config.returncode == 0 and current_unit.returncode == 0
         port_listening = _port_in_ss(listening.stdout, payload.listen_port)
+        version_ok = version.returncode == 0 and version.stdout.strip().split()[-1:] == [expected_version]
         matches = (
             exists
             and current_config.stdout == expected_config
@@ -402,6 +506,7 @@ class RealmHopDriver:
             and active.returncode == 0
             and active.stdout.strip() == "active"
             and port_listening
+            and version_ok
         )
         satisfied: set[str] = set()
         if exists:
@@ -418,6 +523,7 @@ class RealmHopDriver:
                 "unit": current_unit.stdout if current_unit.returncode == 0 else "",
                 "active": active.stdout.strip(),
                 "listening": port_listening,
+                "version": version.stdout.strip(),
             },
             satisfied=satisfied,
         )
@@ -434,9 +540,11 @@ class RealmHopDriver:
             exit_ip=self.context.address(payload.target_server_ref),
             exit_port=payload.target_port,
             listen_port=payload.listen_port,
+            realm_version=_runtime_pin(self.context.plan, "realm_version", REALM_VERSION),
         )
         installed = InstallRealm().run(conn, relay_context)
         if installed.status == "failed":
+            _raise_if_step_timeout(action, installed)
             raise ResourceReconcileError(f"Could not install Realm: {installed.detail}")
 
         config_path = realm_config_path(action.resource.logical_id)
@@ -512,7 +620,8 @@ class NodeRuntimeDriver:
         payload = _payload(action, NodeRuntimePayload)
         conn = self.context.connection(payload.server_ref)
         compose_path = f"{REMNAWAVE_NODE_DIR}/docker-compose.yml"
-        expected_compose = render_node_compose(REMNAWAVE_NODE_IMAGE, payload.api_port)
+        node_image = _runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE)
+        expected_compose = render_node_compose(node_image, payload.api_port)
         compose = conn.get_text(compose_path, timeout=15)
         running = conn.run(
             "docker inspect remnawave-node --format '{{.State.Running}}' 2>/dev/null",
@@ -560,12 +669,6 @@ class NodeRuntimeDriver:
     ) -> ResourceApplyReceipt:
         payload = _payload(action, NodeRuntimePayload)
         conn = self.context.connection(payload.server_ref)
-        if self.context.prepare_node is not None:
-            self.context.prepare_node(
-                conn,
-                payload,
-                self.context.address(payload.server_ref),
-            )
         if payload.warp:
             result = InstallWarp().run(
                 conn,
@@ -586,7 +689,7 @@ class NodeRuntimeDriver:
             conn,
             secret,
             node_api_port=payload.api_port,
-            image=REMNAWAVE_NODE_IMAGE,
+            image=_runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE),
         )
         if not deployed:
             raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
@@ -598,6 +701,36 @@ def _payload(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
     if not isinstance(payload, expected_type):
         raise ResourceReconcileError(f"Server driver received {payload.kind}, expected {expected_type.__name__}.")
     return payload
+
+
+def _baseline_context(
+    payload: ServerBaselinePayload,
+    conn: ServerConnection,
+    address: str,
+) -> ProvisionContext:
+    return ProvisionContext(
+        ip=address,
+        user=conn.user,
+        harden=payload.harden,
+        is_panel_host=False,
+    )
+
+
+def _baseline_marker_path(logical_id: str) -> str:
+    return f"/var/lib/meridian/baselines/{artifact_token(logical_id)}.attestation"
+
+
+def _resource_contract_attestation(action: ResourceAction, plan: ResourcePlan) -> str:
+    return canonical_hash(
+        {
+            "resource": action.expected_hash,
+            "deployment_contract": plan.deployment_contract.model_dump(mode="json"),
+        }
+    )
+
+
+def _runtime_pin(plan: ResourcePlan, name: str, fallback: str) -> str:
+    return plan.deployment_contract.runtime_pins.get(name, fallback)
 
 
 def _observed(
@@ -653,4 +786,11 @@ def _port_in_ss(output: str, port: int) -> bool:
 
 def _raise_if_timeout(action: ResourceAction, result: object | None) -> None:
     if result is not None and getattr(result, "returncode", None) == 124:
+        raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")
+
+
+def _raise_if_step_timeout(action: ResourceAction, result: StepResult) -> None:
+    for command in result.commands:
+        _raise_if_timeout(action, command)
+    if "timed out" in result.detail.casefold() or "timeout" in result.detail.casefold():
         raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")

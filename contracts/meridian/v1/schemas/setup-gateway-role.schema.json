@@ -3,14 +3,16 @@
   "description": "One saved server assigned an Xray routing-gateway workload.",
   "properties": {
     "bridge_path_ref": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Bridge Path Ref",
       "type": "string"
     },
     "id": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Id",
       "type": "string"
     },

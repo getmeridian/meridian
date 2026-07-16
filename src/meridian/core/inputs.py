@@ -20,13 +20,19 @@ _DEPLOY_IP_SCHEMA = {
 }
 _NAME_PATTERN = r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
 _OPTIONAL_NAME_PATTERN = rf"^$|{_NAME_PATTERN}"
+_TOPOLOGY_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
+_OPTIONAL_TOPOLOGY_ID_PATTERN = rf"^$|{_TOPOLOGY_ID_PATTERN}"
+_ACCESS_USERNAME_PATTERN = r"^[A-Za-z0-9_-]+$"
 _SSH_USER_PATTERN = r"^[a-zA-Z0-9._-]+$"
 _OPTIONAL_SSH_USER_PATTERN = rf"^$|{_SSH_USER_PATTERN}"
 _SELECTOR_PATTERN = r"^\S+$"
 _OPTIONAL_SELECTOR_PATTERN = r"^\S*$"
 _NAME_RE = re.compile(_NAME_PATTERN)
+_TOPOLOGY_ID_RE = re.compile(_TOPOLOGY_ID_PATTERN)
+_ACCESS_USERNAME_RE = re.compile(_ACCESS_USERNAME_PATTERN)
 _SSH_USER_RE = re.compile(_SSH_USER_PATTERN)
 _LOCAL_TARGETS = {"local", "locally"}
+TOPOLOGY_ID_MAX_LENGTH = 48
 _SERVER_TITLE_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 80, "pattern": r"^[^\r\n\t]+$"}
 _SERVER_REF_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 120, "pattern": r"^[^\r\n\t]+$"}
 _OPTIONAL_SERVER_REF_SCHEMA = {"type": "string", "maxLength": 120, "pattern": r"^$|^[^\r\n\t]+$"}
@@ -129,6 +135,33 @@ def validate_required_name_value(value: str) -> str:
     if not value:
         raise ValueError("Name is required.")
     return validate_name_value(value)
+
+
+def validate_topology_id_value(value: str) -> str:
+    """Validate one stable lowercase topology identifier."""
+    if not value:
+        raise ValueError("Topology ID is required.")
+    if len(value) > TOPOLOGY_ID_MAX_LENGTH:
+        raise ValueError(f"Topology IDs must be {TOPOLOGY_ID_MAX_LENGTH} characters or fewer.")
+    if _TOPOLOGY_ID_RE.fullmatch(value) is None:
+        raise ValueError("Use lowercase letters, numbers, hyphens, and underscores for topology IDs.")
+    return value
+
+
+def validate_optional_topology_id_value(value: str) -> str:
+    """Validate an optional topology identifier."""
+    if not value:
+        return value
+    return validate_topology_id_value(value)
+
+
+def validate_access_username_value(value: str) -> str:
+    """Validate a Remnawave access username at the public intent boundary."""
+    if len(value) < 3 or len(value) > 36:
+        raise ValueError("Access usernames must be between 3 and 36 characters.")
+    if _ACCESS_USERNAME_RE.fullmatch(value) is None:
+        raise ValueError("Access usernames can use only letters, numbers, hyphens, and underscores.")
+    return value
 
 
 def validate_server_title_value(value: str) -> str:
@@ -260,6 +293,41 @@ RequiredNameValue = Annotated[
     str,
     WithJsonSchema({"type": "string", "pattern": _NAME_PATTERN, "minLength": 1}),
     AfterValidator(validate_required_name_value),
+]
+TopologyIdValue = Annotated[
+    str,
+    WithJsonSchema(
+        {
+            "type": "string",
+            "pattern": _TOPOLOGY_ID_PATTERN,
+            "minLength": 1,
+            "maxLength": TOPOLOGY_ID_MAX_LENGTH,
+        }
+    ),
+    AfterValidator(validate_topology_id_value),
+]
+OptionalTopologyIdValue = Annotated[
+    str,
+    WithJsonSchema(
+        {
+            "type": "string",
+            "pattern": _OPTIONAL_TOPOLOGY_ID_PATTERN,
+            "maxLength": TOPOLOGY_ID_MAX_LENGTH,
+        }
+    ),
+    AfterValidator(validate_optional_topology_id_value),
+]
+AccessUsernameValue = Annotated[
+    str,
+    WithJsonSchema(
+        {
+            "type": "string",
+            "pattern": _ACCESS_USERNAME_PATTERN,
+            "minLength": 3,
+            "maxLength": 36,
+        }
+    ),
+    AfterValidator(validate_access_username_value),
 ]
 ServerTitleValue = Annotated[
     str,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 import pytest
@@ -9,23 +10,43 @@ from pydantic import ValidationError
 
 from meridian.compiler import TopologyCompileError, compile_topology
 from meridian.compiler.models import (
+    COMPILER_VERSION,
     AccessUserPayload,
+    CertificatePayload,
     ConfigProfilePayload,
+    ControlPlaneRuntimePayload,
+    DeploymentContract,
+    DeploymentTarget,
     EgressPoolPayload,
     ExternalSquadPayload,
     FirewallRulePayload,
     HostPayload,
     InboundPayload,
     InternalSquadPayload,
+    NginxArtifactPayload,
     NodeBindingPayload,
     NodeRuntimePayload,
     RealmHopPayload,
     ResourcePlan,
     RouteRulePayload,
+    ServerBaselinePayload,
     ServiceUserPayload,
     SubscriptionSettingsPayload,
     SubscriptionTemplatePayload,
 )
+from meridian.compiler.names import (
+    REMNAWAVE_DISPLAY_NAME_PATTERN,
+    REMNAWAVE_SHORT_NAME_MAX_LENGTH,
+    REMNAWAVE_TEMPLATE_NAME_MAX_LENGTH,
+    REMNAWAVE_USERNAME_MAX_LENGTH,
+    REMNAWAVE_USERNAME_PATTERN,
+    internal_squad_name,
+    node_name,
+    profile_name,
+    service_username,
+    subscription_template_name,
+)
+from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -131,6 +152,27 @@ def _intent(*, reverse_exits: bool = False) -> SetupIntent:
     )
 
 
+def _deployment_contract() -> DeploymentContract:
+    return DeploymentContract(
+        server_targets={
+            "srv-control": DeploymentTarget(host="198.51.100.10", user="root", port=22),
+            "srv-exit-a": DeploymentTarget(host="198.51.100.11", user="ubuntu", port=2222),
+            "srv-exit-b": DeploymentTarget(host="198.51.100.12", user="root", port=22),
+            "srv-gateway": DeploymentTarget(host="198.51.100.13", user="root", port=22),
+            "srv-relay-core": DeploymentTarget(host="198.51.100.14", user="root", port=22),
+            "srv-relay-edge": DeploymentTarget(host="198.51.100.15", user="root", port=22),
+        },
+        runtime_pins={
+            "meridian_version": "4.1.0",
+            "realm_version": "2.9.3",
+            "remnawave_backend_image": "remnawave/backend:2.8.0",
+            "remnawave_node_image": "remnawave/node:2.8.0",
+            "remnawave_subscription_page_image": "remnawave/subscription-page:7.2.6",
+        },
+        renderer_contract="meridian.renderers/v1@sha256:" + "a" * 64,
+    )
+
+
 class TestPureCompiler:
     def test_same_intent_produces_identical_reviewed_plan(self) -> None:
         first = compile_topology(_intent())
@@ -141,6 +183,64 @@ class TestPureCompiler:
         assert len(first.intent_hash) == 64
         assert len(first.plan_hash) == 64
 
+    def test_default_deployment_contract_is_explicit_empty_and_deterministic(self) -> None:
+        implicit = compile_topology(_intent())
+        explicit = compile_topology(_intent(), deployment_contract=DeploymentContract())
+
+        assert implicit == explicit
+        assert implicit.compiler_version == COMPILER_VERSION
+        assert implicit.deployment_contract == DeploymentContract()
+
+    def test_deployment_contract_is_inspectable_and_order_independent(self) -> None:
+        contract = _deployment_contract()
+        reordered = DeploymentContract(
+            server_targets=dict(reversed(contract.server_targets.items())),
+            runtime_pins=dict(reversed(contract.runtime_pins.items())),
+            renderer_contract=contract.renderer_contract,
+        )
+
+        plan = compile_topology(_intent(), deployment_contract=contract)
+        reordered_plan = compile_topology(_intent(), deployment_contract=reordered)
+
+        assert plan.deployment_contract == contract
+        assert plan.plan_hash == reordered_plan.plan_hash
+        assert plan.model_dump_json(by_alias=True) == reordered_plan.model_dump_json(by_alias=True)
+
+    def test_every_deployment_contract_component_changes_plan_hash(self) -> None:
+        contract = _deployment_contract()
+        original = compile_topology(_intent(), deployment_contract=contract)
+
+        def targets_with(**changes: object) -> dict[str, DeploymentTarget]:
+            targets = dict(contract.server_targets)
+            target = targets["srv-control"].model_dump(mode="python")
+            target.update(changes)
+            targets["srv-control"] = DeploymentTarget.model_validate(target)
+            return targets
+
+        variants = {
+            "host": contract.model_copy(update={"server_targets": targets_with(host="198.51.100.20")}),
+            "ssh user": contract.model_copy(update={"server_targets": targets_with(user="admin")}),
+            "ssh port": contract.model_copy(update={"server_targets": targets_with(port=2200)}),
+            "runtime image": contract.model_copy(
+                update={
+                    "runtime_pins": {
+                        **contract.runtime_pins,
+                        "remnawave_node_image": "remnawave/node:2.8.1",
+                    }
+                }
+            ),
+            "runtime version": contract.model_copy(
+                update={"runtime_pins": {**contract.runtime_pins, "realm_version": "2.9.4"}}
+            ),
+            "renderer contract": contract.model_copy(
+                update={"renderer_contract": "meridian.renderers/v2@sha256:" + "b" * 64}
+            ),
+        }
+
+        for component, changed_contract in variants.items():
+            changed = compile_topology(_intent(), deployment_contract=changed_contract)
+            assert changed.plan_hash != original.plan_hash, component
+
     def test_semantically_unordered_exit_input_is_normalized(self) -> None:
         first = compile_topology(_intent())
         reordered = compile_topology(_intent(reverse_exits=True))
@@ -149,11 +249,62 @@ class TestPureCompiler:
         assert reordered.plan_hash == first.plan_hash
         assert reordered.resources == first.resources
 
+    def test_generated_remnawave_names_respect_pinned_wire_contracts(self) -> None:
+        plan = compile_topology(_intent())
+        short_names = [
+            resource.payload.name
+            for resource in plan.resources
+            if isinstance(
+                resource.payload,
+                ConfigProfilePayload | NodeBindingPayload | InternalSquadPayload | ExternalSquadPayload,
+            )
+        ]
+        template_names = [
+            resource.payload.name
+            for resource in plan.resources
+            if isinstance(resource.payload, SubscriptionTemplatePayload)
+        ]
+        usernames = [
+            resource.payload.username
+            for resource in plan.resources
+            if isinstance(resource.payload, AccessUserPayload | ServiceUserPayload)
+        ]
+
+        assert short_names
+        assert all(2 <= len(name) <= REMNAWAVE_SHORT_NAME_MAX_LENGTH for name in short_names)
+        assert all(re.fullmatch(REMNAWAVE_DISPLAY_NAME_PATTERN, name) for name in short_names)
+        assert all("/" not in name for name in short_names)
+        assert all(2 <= len(name) <= REMNAWAVE_TEMPLATE_NAME_MAX_LENGTH for name in template_names)
+        assert all(re.fullmatch(REMNAWAVE_DISPLAY_NAME_PATTERN, name) for name in template_names)
+        assert all(3 <= len(name) <= REMNAWAVE_USERNAME_MAX_LENGTH for name in usernames)
+        assert all(re.fullmatch(REMNAWAVE_USERNAME_PATTERN, name) for name in usernames)
+
+    def test_truncated_generated_names_keep_a_stable_collision_suffix(self) -> None:
+        first_id = "exit-" + "a" * 41 + "x"
+        second_id = "exit-" + "a" * 41 + "y"
+
+        first_profile = profile_name(first_id)
+        second_profile = profile_name(second_id)
+
+        assert first_profile == profile_name(first_id)
+        assert first_profile == node_name(first_id)
+        assert first_profile != second_profile
+        assert len(first_profile) <= REMNAWAVE_SHORT_NAME_MAX_LENGTH
+        assert internal_squad_name(first_id, "Shared") != internal_squad_name(second_id, "Shared")
+        assert internal_squad_name(first_id, "Meridian " + "A" * 80) != internal_squad_name(
+            second_id,
+            "Meridian " + "A" * 80,
+        )
+        assert service_username(first_id) != service_username(second_id)
+        assert len(service_username(first_id)) <= REMNAWAVE_USERNAME_MAX_LENGTH
+        assert "/" not in subscription_template_name(first_id, "XRAY_JSON")
+
     def test_plan_uses_only_finite_v4_resource_kinds(self) -> None:
         plan = compile_topology(_intent())
         kinds = {resource.payload.kind for resource in plan.resources}
 
         assert {
+            "server_baseline",
             "control_plane_runtime",
             "config_profile",
             "inbound",
@@ -175,6 +326,83 @@ class TestPureCompiler:
             "route_rule",
             "probe",
         } <= kinds
+
+    def test_every_server_mutation_depends_on_one_server_baseline(self) -> None:
+        plan = compile_topology(_intent())
+        baselines = {
+            resource.payload.server_ref: resource
+            for resource in plan.resources
+            if isinstance(resource.payload, ServerBaselinePayload)
+        }
+        assert set(baselines) == {
+            "srv-control",
+            "srv-exit-a",
+            "srv-exit-b",
+            "srv-gateway",
+            "srv-relay-core",
+            "srv-relay-edge",
+        }
+        assert baselines["srv-relay-core"].payload.install_docker is False
+        assert baselines["srv-exit-a"].payload.install_docker is True
+
+        server_mutations = (
+            CertificatePayload,
+            ControlPlaneRuntimePayload,
+            FirewallRulePayload,
+            NginxArtifactPayload,
+            NodeRuntimePayload,
+            RealmHopPayload,
+        )
+        for resource in plan.resources:
+            if isinstance(resource.payload, server_mutations):
+                assert baselines[resource.payload.server_ref].logical_id in resource.dependencies
+
+    def test_every_exit_certificate_waits_for_its_reviewed_http_challenge_rule(self) -> None:
+        plan = compile_topology(_intent())
+        http_rules = {
+            resource.payload.server_ref: resource.logical_id
+            for resource in plan.resources
+            if isinstance(resource.payload, FirewallRulePayload)
+            and resource.payload.transport == "tcp"
+            and resource.payload.port == 80
+        }
+
+        certificates = [resource for resource in plan.resources if isinstance(resource.payload, CertificatePayload)]
+
+        assert certificates
+        assert all(http_rules[resource.payload.server_ref] in resource.dependencies for resource in certificates)
+
+    def test_control_and_exit_share_one_complete_port_443_stream_owner(self) -> None:
+        intent = SetupIntent(
+            control=ControlPlaneIntent(server_ref="srv-shared"),
+            exits=[
+                ExitIntent(
+                    id="exit-a",
+                    server_ref="srv-shared",
+                    paths=[_reality("exit-a-reality", "www.microsoft.com")],
+                )
+            ],
+            default_egress_ref="exit-a",
+            access=AccessIntent(users=["default"]),
+        )
+
+        plan = compile_topology(intent)
+        streams = [
+            resource.payload
+            for resource in plan.resources
+            if isinstance(resource.payload, NginxArtifactPayload)
+            and resource.payload.server_ref == "srv-shared"
+            and resource.payload.listener_port == 443
+            and resource.payload.layer == "stream"
+        ]
+
+        assert len(streams) == 1
+        panel_route = next(route for route in streams[0].routes if "" in route.server_names)
+        assert panel_route.backend_server_ref == "srv-shared"
+        assert panel_route.backend_port == 8443
+        assert any(
+            "www.microsoft.com" in route.server_names and route.backend_port != 8443 for route in streams[0].routes
+        )
 
     def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
         plan = compile_topology(_intent())
@@ -347,6 +575,11 @@ class TestPureCompiler:
             "exit-a",
             "exit-b",
         ]
+        assert [edge.tag for edge in profile.service_outbounds] == [
+            "meridian-edge-0dbff829e6d1bdd5",
+            "meridian-edge-c123917cc6e24846",
+        ]
+        assert profile.egress_balancers[0].outbound_tags == [edge.tag for edge in profile.service_outbounds]
         assert all(edge.target_port >= 40000 for edge in profile.service_outbounds)
         assert [rule.route_id for rule in profile.routing_rules] == ["regional", "default"]
         assert profile.routing_rules[-1].target_type == "balancer"
@@ -364,6 +597,24 @@ class TestPureCompiler:
             ("gateway-a", "exit-a"),
             ("gateway-a", "exit-b"),
         }
+
+    def test_gateway_edge_tags_are_deterministic_fixed_width_and_prefix_free(self) -> None:
+        first = edge_outbound_tag("gateway-a", "exit-a")
+        second = edge_outbound_tag("gateway-a", "exit-a-backup")
+
+        assert first == edge_outbound_tag("gateway-a", "exit-a")
+        assert len(first) == len(second)
+        assert not first.startswith(second)
+        assert not second.startswith(first)
+
+    def test_gateway_rejects_generated_service_outbound_tag_collisions(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def colliding_tag(_gateway_ref: str, _exit_ref: str) -> str:
+            return "meridian-edge-collision"
+
+        monkeypatch.setattr("meridian.compiler.routing.edge_outbound_tag", colliding_tag)
+
+        with pytest.raises(TopologyCompileError, match="colliding service Outbound tags"):
+            compile_topology(_intent())
 
     def test_control_plane_resources_do_not_claim_runtime_postconditions(self) -> None:
         plan = compile_topology(_intent())
@@ -466,6 +717,30 @@ class TestPureCompiler:
 
 
 class TestCompilerFailures:
+    def test_deployment_contract_must_cover_every_server_ref_exactly(self) -> None:
+        contract = _deployment_contract()
+        incomplete = contract.model_copy(
+            update={
+                "server_targets": {
+                    ref: target for ref, target in contract.server_targets.items() if ref != "srv-relay-core"
+                }
+            }
+        )
+
+        with pytest.raises(TopologyCompileError, match=r"missing srv-relay-core"):
+            compile_topology(_intent(), deployment_contract=incomplete)
+
+        extra = contract.model_copy(
+            update={
+                "server_targets": {
+                    **contract.server_targets,
+                    "srv-unused": DeploymentTarget(host="198.51.100.99", user="root", port=22),
+                }
+            }
+        )
+        with pytest.raises(TopologyCompileError, match=r"unexpected srv-unused"):
+            compile_topology(_intent(), deployment_contract=extra)
+
     def test_two_exit_workloads_cannot_share_one_node_runtime(self) -> None:
         original = _intent()
         shared = original.exits[1].model_copy(update={"server_ref": original.exits[0].server_ref})
@@ -512,6 +787,14 @@ class TestCompilerFailures:
         payload["resources"][0]["desired_hash"] = "0" * 64
 
         with pytest.raises(ValidationError, match="desired hash does not match"):
+            ResourcePlan.model_validate(payload)
+
+    def test_deployment_contract_tampering_is_rejected(self) -> None:
+        plan = compile_topology(_intent(), deployment_contract=_deployment_contract())
+        payload = plan.model_dump(mode="json", by_alias=True)
+        payload["deployment_contract"]["server_targets"]["srv-control"]["port"] = 2200
+
+        with pytest.raises(ValidationError, match="plan hash does not match"):
             ResourcePlan.model_validate(payload)
 
 

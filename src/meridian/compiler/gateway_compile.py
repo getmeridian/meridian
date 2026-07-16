@@ -5,7 +5,7 @@ from __future__ import annotations
 from meridian.compiler.allocations import PortAllocator
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.errors import TopologyCompileError
-from meridian.compiler.firewalls import add_firewall, stable_token
+from meridian.compiler.firewalls import add_firewall
 from meridian.compiler.models import (
     ConfigProfilePayload,
     EgressPoolPayload,
@@ -20,6 +20,7 @@ from meridian.compiler.models import (
     RoutingGatewayPayload,
     ServiceUserPayload,
 )
+from meridian.compiler.names import internal_squad_name, node_name, profile_name, service_username
 from meridian.compiler.routing import (
     GatewayRoutingPlan,
     bridge_inbound_id,
@@ -60,7 +61,10 @@ def compile_routing_gateways(
             builder.add(
                 squad_ref,
                 InternalSquadPayload(
-                    name=f"Meridian v4 / bridge / {gateway_ref} / {target_exit_ref}",
+                    name=internal_squad_name(
+                        f"bridge:{gateway_ref}:{target_exit_ref}",
+                        f"Meridian v4 bridge {gateway_ref} {target_exit_ref}",
+                    ),
                     inbound_refs=[inbound_ref],
                 ),
                 dependencies=[inbound_ref],
@@ -69,7 +73,7 @@ def compile_routing_gateways(
             builder.add(
                 user_ref,
                 ServiceUserPayload(
-                    username=("meridian_svc_" + stable_token(edge_id(gateway_ref, target_exit_ref))),
+                    username=service_username(edge_id(gateway_ref, target_exit_ref)),
                     edge_id=edge_id(gateway_ref, target_exit_ref),
                     squad_ref=squad_ref,
                     gateway_ref=gateway_ref,
@@ -106,7 +110,7 @@ def compile_routing_gateways(
             ConfigProfilePayload(
                 workload_id=gateway.id,
                 workload_kind="routing_gateway",
-                name=f"Meridian v4 / {gateway.id}",
+                name=profile_name(gateway.id),
                 inbound_refs=[inbound_id],
                 inbounds=[inbound],
                 outbound_tags=["direct"],
@@ -126,7 +130,7 @@ def compile_routing_gateways(
             NodeBindingPayload(
                 workload_ref=gateway.id,
                 server_ref=gateway.server_ref,
-                name=f"Meridian v4 / {gateway.id}",
+                name=node_name(gateway.id),
                 profile_ref=profile_id,
                 inbound_refs=[inbound_id],
             ),

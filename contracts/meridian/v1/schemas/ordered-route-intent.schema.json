@@ -17,8 +17,9 @@
       "type": "boolean"
     },
     "id": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Id",
       "type": "string"
     },
@@ -48,15 +49,15 @@
     },
     "source_gateway_ref": {
       "default": "",
-      "maxLength": 120,
-      "pattern": "^$|^[^\\r\\n\\t]+$",
+      "maxLength": 48,
+      "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
       "title": "Source Gateway Ref",
       "type": "string"
     },
     "target_ref": {
       "default": "",
-      "maxLength": 120,
-      "pattern": "^$|^[^\\r\\n\\t]+$",
+      "maxLength": 48,
+      "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
       "title": "Target Ref",
       "type": "string"
     }

@@ -8,15 +8,17 @@ from typing import Literal, Self
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
 from meridian.core.inputs import (
+    AccessUsernameValue,
     CountryCodeValue,
     OptionalCountryCodeValue,
     OptionalHostnameValue,
     OptionalServerReferenceValue,
+    OptionalTopologyIdValue,
     OptionalTransportPathValue,
     PortValue,
-    RequiredNameValue,
     ServerReferenceValue,
     ServerTitleValue,
+    TopologyIdValue,
     validate_country_code_value,
     validate_hostname_value,
 )
@@ -47,7 +49,7 @@ class ControlPlaneIntent(CoreModel):
 class ProtocolPathIntent(CoreModel):
     """One protocol-specific public path backed by an exit workload."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     protocol: ProtocolKind
     listen_port: int = Field(default=0, ge=0, le=65535)
     public_port: PortValue = 443
@@ -80,7 +82,7 @@ class ProtocolPathIntent(CoreModel):
 class ExitIntent(CoreModel):
     """One independent Xray exit workload and its public protocol paths."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     server_ref: ServerReferenceValue
     region: OptionalCountryCodeValue = ""
     paths: list[ProtocolPathIntent] = Field(min_length=1)
@@ -102,10 +104,10 @@ class ExitIntent(CoreModel):
 class TransparentRelayIntent(CoreModel):
     """A client-first Realm hop list whose first server is the advertised endpoint."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     hop_server_refs: list[ServerReferenceValue] = Field(min_length=1)
-    exit_ref: RequiredNameValue
-    protocol_path_ref: RequiredNameValue
+    exit_ref: TopologyIdValue
+    protocol_path_ref: TopologyIdValue
     listen_port: PortValue = 443
     reality_sni: OptionalHostnameValue = ""
 
@@ -120,16 +122,16 @@ class TransparentRelayIntent(CoreModel):
 class RoutingGatewayIntent(CoreModel):
     """A smart entry workload using a reviewed Reality path as its public blueprint."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     server_ref: ServerReferenceValue
-    bridge_path_ref: RequiredNameValue
+    bridge_path_ref: TopologyIdValue
 
 
 class EgressPoolIntent(CoreModel):
     """An ordered set of exits used for server-side failover."""
 
-    id: RequiredNameValue
-    exit_refs: list[RequiredNameValue] = Field(min_length=1)
+    id: TopologyIdValue
+    exit_refs: list[TopologyIdValue] = Field(min_length=1)
     strategy: EgressStrategy = "least_ping"
     fail_closed: bool = True
     probe_url: HttpUrl = HttpUrl("https://www.apple.com/library/test/success.html")
@@ -146,13 +148,13 @@ class EgressPoolIntent(CoreModel):
 class OrderedRouteIntent(CoreModel):
     """One explicit first-match routing rule."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     priority: int = Field(ge=0)
     match: RouteMatchKind = "all"
     match_values: list[str] = Field(default_factory=list)
     action: TrafficRouteAction = "route"
-    target_ref: OptionalServerReferenceValue = ""
-    source_gateway_ref: OptionalServerReferenceValue = ""
+    target_ref: OptionalTopologyIdValue = ""
+    source_gateway_ref: OptionalTopologyIdValue = ""
     enabled: bool = True
 
     @field_validator("match_values")
@@ -198,7 +200,7 @@ class AccessIntent(CoreModel):
     """Meridian-owned access squad and human users."""
 
     squad_name: ServerTitleValue = "Meridian Access"
-    users: list[RequiredNameValue] = Field(min_length=1)
+    users: list[AccessUsernameValue] = Field(min_length=1)
 
     @field_validator("users")
     @classmethod
@@ -212,7 +214,7 @@ class DeliveryIntent(CoreModel):
     """Canonical Remnawave subscription presentation settings."""
 
     profile_title: ServerTitleValue = "Meridian"
-    template_name: RequiredNameValue = "meridian"
+    template_name: TopologyIdValue = "meridian"
     formats: list[DeliveryFormat] = Field(default_factory=_default_delivery_formats, min_length=1)
 
     @field_validator("formats")
@@ -232,7 +234,7 @@ class SetupIntent(CoreModel):
     routing_gateways: list[RoutingGatewayIntent] = Field(default_factory=list)
     egress_pools: list[EgressPoolIntent] = Field(default_factory=list)
     routes: list[OrderedRouteIntent] = Field(default_factory=list)
-    default_egress_ref: RequiredNameValue
+    default_egress_ref: TopologyIdValue
     access: AccessIntent
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
 
@@ -352,7 +354,7 @@ class TopologyServerCapabilities(CoreModel):
 class TrafficRouteRule(CoreModel):
     """One routing rule that maps traffic to an exit, optionally through a relay entry."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     traffic: TrafficScope = "default"
     action: TrafficRouteAction = "route"
     country_codes: list[CountryCodeValue] = Field(default_factory=list)
@@ -379,7 +381,7 @@ class TrafficRouteRule(CoreModel):
 class RegionalTrafficDecision(CoreModel):
     """UX-shaped decision for a country or region before it becomes route rules."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     country_codes: list[CountryCodeValue] = Field(min_length=1)
     mode: RegionalTrafficMode = "block"
     entry_server_ref: OptionalServerReferenceValue = ""

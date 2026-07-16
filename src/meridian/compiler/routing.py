@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
+from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.models import (
     EgressBalancerSpec,
     ServiceOutboundSpec,
@@ -55,6 +57,7 @@ def compile_gateway_routing(intent: SetupIntent, gateway: RoutingGatewayIntent) 
         )
         for exit_ref in target_exits
     )
+    _validate_service_outbound_tags(gateway.id, service_outbounds)
     used_pool_ids = sorted(target_ref for target_ref in target_refs if target_ref in pools)
     balancers = tuple(_balancer(gateway.id, pools[pool_id]) for pool_id in used_pool_ids)
     rules = [
@@ -110,11 +113,25 @@ def service_user_id(gateway_ref: str, exit_ref: str) -> str:
 
 
 def edge_outbound_tag(gateway_ref: str, exit_ref: str) -> str:
-    return f"meridian-edge-{gateway_ref}-{exit_ref}"
+    digest = hashlib.sha256(edge_id(gateway_ref, exit_ref).encode("utf-8")).hexdigest()[:16]
+    return f"meridian-edge-{digest}"
 
 
 def pool_balancer_tag(gateway_ref: str, pool_ref: str) -> str:
     return f"meridian-pool-{gateway_ref}-{pool_ref}"
+
+
+def _validate_service_outbound_tags(
+    gateway_ref: str,
+    outbounds: tuple[ServiceOutboundSpec, ...],
+) -> None:
+    tags = [outbound.tag for outbound in outbounds]
+    for index, tag in enumerate(tags):
+        for other in tags[index + 1 :]:
+            if tag.startswith(other) or other.startswith(tag):
+                raise TopologyCompileError(
+                    f"Gateway {gateway_ref} produced colliding service Outbound tags {tag!r} and {other!r}."
+                )
 
 
 def _entry_path(intent: SetupIntent, gateway: RoutingGatewayIntent) -> ProtocolPathIntent:

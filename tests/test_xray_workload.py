@@ -18,6 +18,9 @@ from meridian.xray_workload import (
     render_workload_config,
 )
 
+_EDGE_A_TAG = "meridian-edge-0dbff829e6d1bdd5"
+_EDGE_B_TAG = "meridian-edge-c123917cc6e24846"
+
 
 def _profile(*, warp: bool = False) -> ConfigProfilePayload:
     inbounds = [
@@ -61,7 +64,7 @@ def _profile(*, warp: bool = False) -> ConfigProfilePayload:
     ]
     return ConfigProfilePayload(
         workload_id="exit-a",
-        name="Meridian v4 / exit-a",
+        name="Meridian v4 exit-a",
         inbound_refs=[
             "inbound:exit-a:reality",
             "inbound:exit-a:xhttp",
@@ -118,7 +121,7 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
     profile = ConfigProfilePayload(
         workload_id="gateway-a",
         workload_kind="routing_gateway",
-        name="Meridian v4 / gateway-a",
+        name="Meridian v4 gateway-a",
         inbound_refs=["inbound:gateway-a:entry"],
         inbounds=[
             InboundPayload(
@@ -134,7 +137,7 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
         service_outbounds=[
             ServiceOutboundSpec(
                 edge_id="gateway-a:exit-a",
-                tag="meridian-edge-gateway-a-exit-a",
+                tag=_EDGE_A_TAG,
                 service_user_ref="service-user:gateway-a:exit-a",
                 target_workload_ref="exit-a",
                 target_server_ref="srv-exit-a",
@@ -144,7 +147,7 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
             ),
             ServiceOutboundSpec(
                 edge_id="gateway-a:exit-b",
-                tag="meridian-edge-gateway-a-exit-b",
+                tag=_EDGE_B_TAG,
                 service_user_ref="service-user:gateway-a:exit-b",
                 target_workload_ref="exit-b",
                 target_server_ref="srv-exit-b",
@@ -157,10 +160,7 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
             EgressBalancerSpec(
                 pool_id="primary",
                 tag="meridian-pool-gateway-a-primary",
-                outbound_tags=[
-                    "meridian-edge-gateway-a-exit-a",
-                    "meridian-edge-gateway-a-exit-b",
-                ],
+                outbound_tags=[_EDGE_A_TAG, _EDGE_B_TAG],
                 strategy="least_ping",
                 probe_url="https://www.apple.com/library/test/success.html",
             )
@@ -172,7 +172,7 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
                 match="country",
                 match_values=["DE"],
                 target_type="outbound",
-                target_tag="meridian-edge-gateway-a-exit-a",
+                target_tag=_EDGE_A_TAG,
             ),
             WorkloadRouteSpec(
                 route_id="default",
@@ -206,22 +206,26 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
     )
 
     assert [outbound["tag"] for outbound in config["outbounds"]] == [
-        "meridian-edge-gateway-a-exit-a",
-        "meridian-edge-gateway-a-exit-b",
+        _EDGE_A_TAG,
+        _EDGE_B_TAG,
         "direct",
         "block",
     ]
+    assert config["outbounds"][0]["settings"]["vnext"][0]["users"][0]["flow"] == "xtls-rprx-vision"
     assert config["outbounds"][0]["streamSettings"]["realitySettings"]["publicKey"] == "public-a"
     assert config["routing"]["rules"][1]["ip"] == ["geoip:de"]
+    assert config["routing"]["rules"][1]["ruleTag"] == "regional"
     assert not any("domain" in rule and "geosite:category-de" in rule["domain"] for rule in config["routing"]["rules"])
     assert config["routing"]["rules"][-1] == {
         "type": "field",
+        "ruleTag": "default",
         "balancerTag": "meridian-pool-gateway-a-primary",
+        "network": "tcp,udp",
     }
     assert config["routing"]["balancers"][0]["fallbackTag"] == "block"
     assert config["observatory"]["subjectSelector"] == [
-        "meridian-edge-gateway-a-exit-a",
-        "meridian-edge-gateway-a-exit-b",
+        _EDGE_A_TAG,
+        _EDGE_B_TAG,
     ]
     assert config["observatory"]["probeUrl"] == ("https://www.apple.com/library/test/success.html")
 
@@ -246,6 +250,57 @@ def test_gateway_refuses_to_guess_missing_service_credentials() -> None:
 
     with pytest.raises(WorkloadConfigError, match="credentials do not match"):
         render_workload_config(profile, reality_keys=_keys())
+
+
+def test_gateway_rejects_prefix_colliding_service_outbound_tags() -> None:
+    first = ServiceOutboundSpec(
+        edge_id="gateway-a:exit-a",
+        tag="meridian-edge-exit-a",
+        service_user_ref="service-user:gateway-a:exit-a",
+        target_workload_ref="exit-a",
+        target_server_ref="srv-exit-a",
+        target_inbound_ref="inbound:exit-a:bridge:gateway-a",
+        target_port=41001,
+        target_sni="www.microsoft.com",
+    )
+    second = first.model_copy(
+        update={
+            "edge_id": "gateway-a:exit-a-backup",
+            "tag": "meridian-edge-exit-a-backup",
+            "service_user_ref": "service-user:gateway-a:exit-a-backup",
+            "target_workload_ref": "exit-a-backup",
+            "target_server_ref": "srv-exit-a-backup",
+            "target_inbound_ref": "inbound:exit-a-backup:bridge:gateway-a",
+            "target_port": 41002,
+        }
+    )
+    profile = _profile().model_copy(
+        update={
+            "service_outbounds": [first, second],
+            "egress_balancers": [
+                EgressBalancerSpec(
+                    pool_id="primary",
+                    tag="meridian-pool-gateway-a-primary",
+                    outbound_tags=[first.tag, second.tag],
+                    strategy="least_ping",
+                    probe_url="https://www.apple.com/library/test/success.html",
+                )
+            ],
+        }
+    )
+    credential = ServiceRouteCredential(
+        address="198.51.100.10",
+        vless_uuid="11111111-1111-4111-8111-111111111111",
+        public_key="public-a",
+        short_id="aaaaaaaaaaaaaaaa",
+    )
+
+    with pytest.raises(WorkloadConfigError, match="prefix-free"):
+        render_workload_config(
+            profile,
+            reality_keys=_keys(),
+            service_credentials={first.edge_id: credential, second.edge_id: credential},
+        )
 
 
 @pytest.mark.parametrize(

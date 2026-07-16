@@ -8,12 +8,14 @@ Uses the Remnawave panel/node architecture.
 
 from __future__ import annotations
 
+from meridian.provision.baseline import BaselineCheck, build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.progress import NoopStepRenderer, RichStepRenderer, StepRenderer
 from meridian.provision.recipe import Operation, Recipe, RecipeValidationError, Resource, op
 from meridian.provision.steps import ProvisionContext, Provisioner, Step, StepContext, StepResult
 
 __all__ = [
     "NoopStepRenderer",
+    "BaselineCheck",
     "Operation",
     "Provisioner",
     "ProvisionContext",
@@ -26,6 +28,8 @@ __all__ = [
     "StepRenderer",
     "StepResult",
     "build_node_steps",
+    "build_server_baseline_checks",
+    "build_server_baseline_steps",
     "build_setup_steps",
 ]
 
@@ -42,14 +46,6 @@ def _ip_web_mode(ctx: ProvisionContext) -> bool:
     return ctx.needs_web_server and not ctx.domain_mode
 
 
-def _harden(ctx: ProvisionContext) -> bool:
-    return ctx.harden
-
-
-def _not_harden(ctx: ProvisionContext) -> bool:
-    return not ctx.harden
-
-
 def _panel_host(ctx: ProvisionContext) -> bool:
     return ctx.is_panel_host
 
@@ -64,58 +60,9 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Operation]:
     Steps declare resource contracts and the recipe graph derives the
     execution order for the active operations in the current context.
     """
-    from meridian.provision.common import (
-        REQUIRED_PACKAGES,
-        CheckDiskSpace,
-        ConfigureBBR,
-        ConfigureFail2ban,
-        ConfigureFirewall,
-        EnableAutoUpgrades,
-        EnsurePort443,
-        HardenSSH,
-        InstallPackages,
-        SetTimezone,
-    )
-    from meridian.provision.docker import InstallDocker
     from meridian.provision.remnawave_panel import DeployRemnawavePanel
 
-    # Python operator precedence on `+` vs `if-else` is a trap here:
-    # `A + B if cond else None` parses as `(A + B) if cond else None`,
-    # which silently yields `InstallPackages(None)` when not hardening —
-    # meaning REQUIRED_PACKAGES never get installed at all. Explicit form:
-    extra_pkgs = ["fail2ban"] if ctx.harden else []
-
-    operations = [
-        # -- Pre-flight --
-        op(CheckDiskSpace(), provides=[Resource.DISK_SPACE_CHECKED]),
-        # -- Common (OS-level setup) --
-        op(
-            InstallPackages(REQUIRED_PACKAGES + extra_pkgs),
-            requires=[Resource.DISK_SPACE_CHECKED],
-            provides=[Resource.SYSTEM_PACKAGES],
-        ),
-        op(EnableAutoUpgrades(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.AUTO_UPGRADES]),
-        op(SetTimezone(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.TIMEZONE_UTC]),
-        # Server hardening (optional — skip for shared servers with existing services)
-        op(HardenSSH(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.SSH_HARDENED], when=_harden),
-        op(
-            ConfigureFail2ban(),
-            requires=[Resource.SYSTEM_PACKAGES, Resource.SSH_HARDENED],
-            provides=[Resource.FAIL2BAN_RUNNING],
-            when=_harden,
-        ),
-        op(ConfigureBBR(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.BBR_ENABLED]),
-        op(
-            ConfigureFirewall(),
-            requires=[Resource.SYSTEM_PACKAGES],
-            provides=[Resource.FIREWALL_CONFIGURED, Resource.HTTPS_ALLOWED],
-            when=_harden,
-        ),
-        # Even without --harden, ensure port 443 is allowed if ufw is active.
-        op(EnsurePort443(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.HTTPS_ALLOWED], when=_not_harden),
-        # -- Docker --
-        op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED]),
-    ]
+    operations = build_server_baseline_steps(ctx, install_docker=True)
 
     # -- Remnawave panel (node deployed after API setup, not here) --
     operations.append(
@@ -198,51 +145,10 @@ def build_node_steps(ctx: ProvisionContext) -> list[Operation]:
 
     Used by `meridian node add <IP>`.
     """
-    from meridian.provision.common import (
-        REQUIRED_PACKAGES,
-        CheckDiskSpace,
-        ConfigureBBR,
-        ConfigureFail2ban,
-        ConfigureFirewall,
-        EnableAutoUpgrades,
-        EnsurePort443,
-        HardenSSH,
-        InstallPackages,
-        SetTimezone,
-    )
-    from meridian.provision.docker import InstallDocker
     from meridian.provision.warp import InstallWarp
 
-    extra_pkgs = ["fail2ban"] if ctx.harden else []
-
     operations = [
-        op(CheckDiskSpace(), provides=[Resource.DISK_SPACE_CHECKED]),
-        op(
-            InstallPackages(REQUIRED_PACKAGES + extra_pkgs),
-            requires=[Resource.DISK_SPACE_CHECKED],
-            provides=[Resource.SYSTEM_PACKAGES],
-        ),
-        op(EnableAutoUpgrades(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.AUTO_UPGRADES]),
-        op(SetTimezone(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.TIMEZONE_UTC]),
-        op(HardenSSH(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.SSH_HARDENED], when=_harden),
-        # Mirror `build_setup_steps` — without this, redeploys (which take
-        # the node-only path because `is_panel_host=is_first_deploy`) never
-        # configure fail2ban even when the operator asked for hardening.
-        op(
-            ConfigureFail2ban(),
-            requires=[Resource.SYSTEM_PACKAGES, Resource.SSH_HARDENED],
-            provides=[Resource.FAIL2BAN_RUNNING],
-            when=_harden,
-        ),
-        op(ConfigureBBR(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.BBR_ENABLED]),
-        op(
-            ConfigureFirewall(),
-            requires=[Resource.SYSTEM_PACKAGES],
-            provides=[Resource.FIREWALL_CONFIGURED, Resource.HTTPS_ALLOWED],
-            when=_harden,
-        ),
-        op(EnsurePort443(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.HTTPS_ALLOWED], when=_not_harden),
-        op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED]),
+        *build_server_baseline_steps(ctx, install_docker=True),
         op(
             InstallWarp(),
             requires=[Resource.DOCKER_INSTALLED],

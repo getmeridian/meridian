@@ -19,6 +19,7 @@ from .control_plane import ControlPlaneMixin
 from .models import (
     ConfigProfile,
     Host,
+    HostSecurityLayer,
     Inbound,
     Node,
     NodeCredentials,
@@ -350,7 +351,7 @@ class MeridianPanel(ControlPlaneMixin):
         path: str = "",
         alpn: str | None = None,
         fingerprint: str | None = None,
-        security_layer: str = "DEFAULT",
+        security_layer: HostSecurityLayer = "DEFAULT",
         is_disabled: bool = False,
         tags: list[str] | None = None,
         is_hidden: bool = False,
@@ -359,9 +360,9 @@ class MeridianPanel(ControlPlaneMixin):
     ) -> Host:
         """Create a host entry (direct address or relay).
 
-        Uses raw httpx: SDK's CreateHostRequestDto enforces a strict enum
-        for security_layer (DEFAULT/TLS/NONE), but Meridian uses "REALITY"
-        for relay hosts which is accepted by the panel API directly.
+        Uses raw httpx so nullable and complete Host fields remain under
+        Meridian's explicit wire control. Reality inherits from the Inbound
+        when the Host security layer is DEFAULT.
         """
         body: dict[str, Any] = {
             "remark": remark,
@@ -417,7 +418,7 @@ class MeridianPanel(ControlPlaneMixin):
         path: str = "",
         alpn: str | None = None,
         fingerprint: str | None = None,
-        security_layer: str = "DEFAULT",
+        security_layer: HostSecurityLayer = "DEFAULT",
         is_disabled: bool = False,
         tags: list[str] | None = None,
         is_hidden: bool = False,

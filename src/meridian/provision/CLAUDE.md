@@ -1,10 +1,8 @@
 # provision — Pure-Python step pipeline
-
 ## Design decisions
-
 **Steps over monolithic script** — each step is a class with `run(conn, ctx) → StepResult` (ok/changed/skipped/failed). Composable, independently testable. Pipeline stops on first failure.
 
-**Two pipelines**: `build_setup_steps()` for panel+node deploy, `build_node_steps()` for node-only. Both share OS/Docker steps, differ on panel deployment.
+**Composable server baseline** — `build_server_baseline_steps()` owns OS setup and optional Docker; V4 disables legacy public-port ownership and pairs it with `build_server_baseline_checks()`.
 
 **Recipe graph** — builders wrap steps in `Operation` objects with explicit `requires`/`provides` resources. Add graph edges before relying on declaration order for new conditional chunks.
 
@@ -25,9 +23,7 @@
 **Executor bridge** — deploy provisioning enters through `RemoteExecutorConnection`; steps can keep `conn.run()` while transports move behind core executor contracts.
 
 **Relay pipeline is separate** — uses `RelayContext` and Realm TCP forwarding. Panel-agnostic.
-
 ## What's done well
-
 - **Idempotent containers** — panel/node steps check `docker inspect` before deploying.
 - **Health polling** — panel step waits for `/api/health`, node step waits for port binding.
 - **Secret generation** — PostgreSQL password, JWT secrets generated per deploy via `secrets.token_hex`.

@@ -101,7 +101,8 @@ def _render_stream(
     for route in payload.routes:
         upstream = target_names[(route.backend_server_ref, route.backend_port)]
         for server_name in route.server_names:
-            map_lines.append(f"    {server_name} {upstream};")
+            key = '""' if not server_name else server_name
+            map_lines.append(f"    {key} {upstream};")
 
     fallback_name = f"meridian_fallback_{token}"
     reject_name = f"meridian_reject_{token}"

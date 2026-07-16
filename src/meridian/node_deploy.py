@@ -19,7 +19,7 @@ from meridian.cluster import (
 )
 from meridian.config import REMNAWAVE_NODE_API_PORT
 from meridian.core.errors import PanelSetupError
-from meridian.remnawave import MeridianPanel, NodeCredentials, RemnawaveError
+from meridian.remnawave import HostSecurityLayer, MeridianPanel, NodeCredentials, RemnawaveError
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class _ManagedHost:
     path: str = ""
     alpn: str | None = None
     fingerprint: str | None = None
-    security_layer: str = "DEFAULT"
+    security_layer: HostSecurityLayer = "DEFAULT"
 
 
 # Panel API utilities

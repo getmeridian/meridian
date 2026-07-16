@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import cast
 from uuid import UUID
@@ -11,6 +12,7 @@ import pytest
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload
+from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -49,6 +51,19 @@ from meridian.remnawave import (
     User,
 )
 
+_REMNAWAVE_DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_ -]+$")
+_REMNAWAVE_USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _assert_short_display_name(name: str, *, min_length: int = 2) -> None:
+    assert min_length <= len(name) <= 30
+    assert _REMNAWAVE_DISPLAY_NAME_RE.fullmatch(name)
+
+
+def _assert_username(username: str) -> None:
+    assert 3 <= len(username) <= 36
+    assert _REMNAWAVE_USERNAME_RE.fullmatch(username)
+
 
 class StatefulPanel:
     def __init__(self) -> None:
@@ -72,6 +87,7 @@ class StatefulPanel:
         return value
 
     def create_config_profile(self, name: str, config: dict) -> ConfigProfile:
+        _assert_short_display_name(name)
         self.calls["create_profile"] += 1
         profile = ConfigProfile(uuid=self._uuid(), name=name, config=config)
         profile.inbounds = self._render_inbounds(profile)
@@ -85,6 +101,8 @@ class StatefulPanel:
         name: str | None = None,
         config: dict | None = None,
     ) -> ConfigProfile:
+        if name is not None:
+            _assert_short_display_name(name)
         self.calls["update_profile"] += 1
         profile = self.profiles[uuid]
         if name is not None:
@@ -133,6 +151,7 @@ class StatefulPanel:
         inbound_uuids: list[str] | None = None,
         country_code: str = "XX",
     ) -> NodeCredentials:
+        _assert_short_display_name(name, min_length=3)
         self.calls["create_node"] += 1
         uuid = self._uuid()
         self.nodes[uuid] = Node(
@@ -165,6 +184,7 @@ class StatefulPanel:
         return node
 
     def update_node_name(self, uuid: str, name: str) -> None:
+        _assert_short_display_name(name, min_length=3)
         self.calls["rename_node"] += 1
         self.nodes[uuid].name = name
 
@@ -212,6 +232,7 @@ class StatefulPanel:
         )
 
     def create_internal_squad(self, name: str, inbound_uuids: list[str]) -> InternalSquad:
+        _assert_short_display_name(name)
         self.calls["create_squad"] += 1
         squad = InternalSquad(uuid=self._uuid(), name=name, inbound_uuids=list(inbound_uuids))
         self.squads[squad.uuid] = squad
@@ -224,6 +245,8 @@ class StatefulPanel:
         name: str | None = None,
         inbound_uuids: list[str] | None = None,
     ) -> InternalSquad:
+        if name is not None:
+            _assert_short_display_name(name)
         self.calls["update_squad"] += 1
         squad = self.squads[uuid]
         if name is not None:
@@ -243,6 +266,8 @@ class StatefulPanel:
         name: str,
         template_type: str,
     ) -> SubscriptionTemplate:
+        assert 2 <= len(name) <= 255
+        assert _REMNAWAVE_DISPLAY_NAME_RE.fullmatch(name)
         self.calls["create_template"] += 1
         template = SubscriptionTemplate(
             uuid=self._uuid(),
@@ -260,6 +285,9 @@ class StatefulPanel:
         template_json: dict | None = None,
         encoded_template_yaml: str | None = None,
     ) -> SubscriptionTemplate:
+        if name is not None:
+            assert 2 <= len(name) <= 255
+            assert _REMNAWAVE_DISPLAY_NAME_RE.fullmatch(name)
         self.calls["update_template"] += 1
         template = self.templates[uuid]
         if name is not None:
@@ -277,6 +305,7 @@ class StatefulPanel:
         return list(self.templates.values())
 
     def create_external_squad(self, name: str) -> ExternalSquad:
+        _assert_short_display_name(name)
         self.calls["create_external_squad"] += 1
         squad = ExternalSquad(uuid=self._uuid(), name=name)
         self.external_squads[squad.uuid] = squad
@@ -291,6 +320,8 @@ class StatefulPanel:
         subscription_settings: dict | None = None,
         response_headers: dict[str, str] | None = None,
     ) -> ExternalSquad:
+        if name is not None:
+            _assert_short_display_name(name)
         self.calls["update_external_squad"] += 1
         squad = self.external_squads[uuid]
         if name is not None:
@@ -313,6 +344,7 @@ class StatefulPanel:
         external_squad_uuid: str = "",
         expire_at: str = "2099-12-31T23:59:59.000Z",
     ) -> User:
+        _assert_username(username)
         self.calls["create_access_user"] += 1
         user = User(
             uuid=self._uuid(),
@@ -367,6 +399,7 @@ class StatefulPanel:
         external_squad_uuid: str = "",
         expire_at: str = "2099-12-31T23:59:59.000Z",
     ) -> User:
+        _assert_username(username)
         self.calls["create_service_user"] += 1
         uuid = self._uuid()
         user = User(
@@ -522,8 +555,8 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     assert sorted(key_calls) == ["srv-exit-a", "srv-exit-b"]
     assert len(panel.profiles) == 2
     profiles = {profile.name: profile for profile in panel.profiles.values()}
-    exit_a_profile = profiles["Meridian v4 / exit-a"]
-    exit_b_profile = profiles["Meridian v4 / exit-b"]
+    exit_a_profile = profiles["Meridian v4 exit-a"]
+    exit_b_profile = profiles["Meridian v4 exit-b"]
     assert [item.tag for item in exit_a_profile.inbounds] == [
         "meridian-exit-a-reality",
         "meridian-exit-a-xhttp",
@@ -544,10 +577,10 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
 
     assert len(panel.nodes) == 2
     nodes = {node.name: node for node in panel.nodes.values()}
-    assert nodes["Meridian v4 / exit-a"].active_config_profile_uuid == exit_a_profile.uuid
-    assert nodes["Meridian v4 / exit-b"].active_config_profile_uuid == exit_b_profile.uuid
-    assert set(nodes["Meridian v4 / exit-a"].active_inbound_uuids) == {item.uuid for item in exit_a_profile.inbounds}
-    assert set(nodes["Meridian v4 / exit-b"].active_inbound_uuids) == {item.uuid for item in exit_b_profile.inbounds}
+    assert nodes["Meridian v4 exit-a"].active_config_profile_uuid == exit_a_profile.uuid
+    assert nodes["Meridian v4 exit-b"].active_config_profile_uuid == exit_b_profile.uuid
+    assert set(nodes["Meridian v4 exit-a"].active_inbound_uuids) == {item.uuid for item in exit_a_profile.inbounds}
+    assert set(nodes["Meridian v4 exit-b"].active_inbound_uuids) == {item.uuid for item in exit_b_profile.inbounds}
 
     assert len(panel.hosts) == 11
     hosts = list(panel.hosts.values())
@@ -663,17 +696,15 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
     assert any(user.description == "Managed by Meridian access" for user in panel.users.values())
     assert len(panel.profiles) == 3
     profiles = {profile.name: profile for profile in panel.profiles.values()}
-    gateway = profiles["Meridian v4 / gateway-a"]
-    assert [outbound["tag"] for outbound in gateway.config["outbounds"][:2]] == [
-        "meridian-edge-gateway-a-exit-a",
-        "meridian-edge-gateway-a-exit-b",
+    gateway = profiles["Meridian v4 gateway-a"]
+    service_outbound_tags = [
+        edge_outbound_tag("gateway-a", "exit-a"),
+        edge_outbound_tag("gateway-a", "exit-b"),
     ]
+    assert [outbound["tag"] for outbound in gateway.config["outbounds"][:2]] == service_outbound_tags
     assert gateway.config["routing"]["balancers"][0]["fallbackTag"] == "block"
     assert gateway.config["routing"]["rules"][-1]["balancerTag"] == ("meridian-pool-gateway-a-primary")
-    assert gateway.config["observatory"]["subjectSelector"] == [
-        "meridian-edge-gateway-a-exit-a",
-        "meridian-edge-gateway-a-exit-b",
-    ]
+    assert gateway.config["observatory"]["subjectSelector"] == service_outbound_tags
     assert {
         inbound.tag for profile in profiles.values() for inbound in profile.inbounds if "bridge" in inbound.tag
     } == {

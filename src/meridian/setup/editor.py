@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 
+from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
 from meridian.core.topology import (
     ExitIntent,
     ProtocolPathIntent,
@@ -132,9 +134,13 @@ def unique_resource_id(
     base = slug or prefix
     if not base.startswith(f"{prefix}-") and base != prefix:
         base = f"{prefix}-{base}"
+    if len(base) > TOPOLOGY_ID_MAX_LENGTH:
+        digest = hashlib.sha256(base.encode("utf-8")).hexdigest()[:8]
+        base = f"{base[: TOPOLOGY_ID_MAX_LENGTH - len(digest) - 1].rstrip('-_')}-{digest}"
     candidate = base
     suffix = 2
     while candidate in existing:
-        candidate = f"{base}-{suffix}"
+        ending = f"-{suffix}"
+        candidate = f"{base[: TOPOLOGY_ID_MAX_LENGTH - len(ending)].rstrip('-_')}{ending}"
         suffix += 1
     return candidate

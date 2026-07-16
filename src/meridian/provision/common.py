@@ -31,7 +31,7 @@ REQUIRED_PACKAGES = [
 ]
 
 # Auto-upgrades config content
-_AUTO_UPGRADES_CONF = """\
+AUTO_UPGRADES_CONF = """\
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 APT::Periodic::AutocleanInterval "7";
@@ -114,7 +114,7 @@ class EnableAutoUpgrades:
     name = "Enable automatic security updates"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        result = ensure_file_content(conn, "/etc/apt/apt.conf.d/20auto-upgrades", _AUTO_UPGRADES_CONF, mode="644")
+        result = ensure_file_content(conn, "/etc/apt/apt.conf.d/20auto-upgrades", AUTO_UPGRADES_CONF, mode="644")
         if not result.ok:
             return StepResult(
                 name=self.name,
@@ -370,6 +370,13 @@ class ConfigureFirewall:
 
     name = "Configure firewall"
 
+    def __init__(self, *, manage_public_ports: bool = True) -> None:
+        self._manage_public_ports = manage_public_ports
+
+    @property
+    def manage_public_ports(self) -> bool:
+        return self._manage_public_ports
+
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         commands: list = []
         facts = ServerFacts(conn)
@@ -412,47 +419,48 @@ class ConfigureFirewall:
             if result.changed:
                 changed = True
 
-        # Allow HTTPS (port 443)
-        result = ensure_ufw_rule(conn, "allow 443/tcp")
-        if not result.ok:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to allow HTTPS: {result.detail}",
-                commands=commands,
-            )
-        if result.changed:
-            changed = True
-
-        # Allow Hysteria2 UDP/443 (enabled by default — coexists with TCP/443)
-        result = ensure_ufw_rule(conn, "allow 443/udp")
-        if not result.ok:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to allow UDP/443: {result.detail}",
-                commands=commands,
-            )
-        if result.changed:
-            changed = True
-
-        # Domain mode or hosted page: allow port 80 for ACME challenges
-        if ctx.needs_web_server:
-            result = ensure_ufw_rule(conn, "allow 80/tcp")
+        if self._manage_public_ports:
+            # Legacy recipes own their standard public ports. Declarative V4
+            # baselines disable this and leave every public rule to the plan.
+            result = ensure_ufw_rule(conn, "allow 443/tcp")
             if not result.ok:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"failed to allow HTTP: {result.detail}",
+                    detail=f"failed to allow HTTPS: {result.detail}",
                     commands=commands,
                 )
             if result.changed:
                 changed = True
-        else:
-            # Cleanup stale port 80 rule if switching from domain/hosted mode
-            result = ensure_ufw_rule(conn, "delete allow 80/tcp 2>/dev/null")
-            if result.ok and result.result and "Could not" not in result.result.stdout and result.changed:
+
+            result = ensure_ufw_rule(conn, "allow 443/udp")
+            if not result.ok:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"failed to allow UDP/443: {result.detail}",
+                    commands=commands,
+                )
+            if result.changed:
                 changed = True
+
+            # Domain mode or hosted page: allow port 80 for ACME challenges.
+            if ctx.needs_web_server:
+                result = ensure_ufw_rule(conn, "allow 80/tcp")
+                if not result.ok:
+                    return StepResult(
+                        name=self.name,
+                        status="failed",
+                        detail=f"failed to allow HTTP: {result.detail}",
+                        commands=commands,
+                    )
+                if result.changed:
+                    changed = True
+            else:
+                # Cleanup stale port 80 rule if switching from domain/hosted mode.
+                result = ensure_ufw_rule(conn, "delete allow 80/tcp 2>/dev/null")
+                if result.ok and result.result and "Could not" not in result.result.stdout and result.changed:
+                    changed = True
 
         # Do not delete arbitrary user-managed rules. Meridian only owns the
         # standard public ports it opens itself (22/80/443), so cleanup is

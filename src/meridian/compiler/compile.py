@@ -3,20 +3,29 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
 
 from meridian.compiler.allocations import PortAllocator
+from meridian.compiler.baselines import (
+    attach_server_baselines,
+    compile_server_baselines,
+)
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import compile_xray_delivery_hosts
 from meridian.compiler.delivery import mihomo_template, xray_json_template
+from meridian.compiler.deployment import (
+    normalized_intent,
+    validate_deployment_contract,
+)
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall, stable_token
 from meridian.compiler.gateway_compile import compile_routing_gateways
 from meridian.compiler.models import (
+    COMPILER_VERSION,
     AccessUserPayload,
     CertificatePayload,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
+    DeploymentContract,
     ExternalSquadPayload,
     HostPayload,
     InboundPayload,
@@ -35,14 +44,28 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
+from meridian.compiler.names import (
+    external_squad_name,
+    internal_squad_name,
+    node_name,
+    profile_name,
+    subscription_template_name,
+)
 from meridian.compiler.routing import bridge_inbound_id, compile_gateway_routing
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
 
 
-def compile_topology(intent: SetupIntent) -> ResourcePlan:
+def compile_topology(
+    intent: SetupIntent,
+    *,
+    deployment_contract: DeploymentContract | None = None,
+) -> ResourcePlan:
     """Compile complete setup intent without network, filesystem, or randomness."""
+    reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
+    validate_deployment_contract(intent, reviewed_contract)
     builder = PlanBuilder()
     ports = PortAllocator()
+    baseline_ids = compile_server_baselines(builder, intent)
     control_id = builder.add(
         "control:runtime",
         ControlPlaneRuntimePayload(
@@ -64,6 +87,27 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     stream_dependencies: dict[tuple[str, int], set[str]] = defaultdict(set)
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
     stream_fallbacks: dict[tuple[str, int], str] = {}
+    control_names = [""]
+    if intent.control.public_hostname:
+        control_names.append(intent.control.public_hostname)
+    control_stream_key = (intent.control.server_ref, 443)
+    for server_name in control_names:
+        _reserve_stream_name(
+            stream_targets,
+            server_ref=intent.control.server_ref,
+            public_port=443,
+            server_name=server_name,
+            target=(intent.control.server_ref, 8443),
+        )
+    stream_routes[control_stream_key].append(
+        NginxRouteSpec(
+            match="sni",
+            server_names=control_names,
+            backend_server_ref=intent.control.server_ref,
+            backend_port=8443,
+        )
+    )
+    stream_dependencies[control_stream_key].add(control_id)
     direct_host_ids: list[str] = []
     reality_names_by_path = _reality_names_by_path(intent)
     gateway_plans = {
@@ -150,7 +194,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             profile_id,
             ConfigProfilePayload(
                 workload_id=exit_.id,
-                name=f"Meridian v4 / {exit_.id}",
+                name=profile_name(exit_.id),
                 inbound_refs=path_refs,
                 inbounds=inbound_specs,
                 outbound_tags=["warp"] if exit_.warp else ["direct"],
@@ -180,7 +224,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             NodeBindingPayload(
                 workload_ref=exit_.id,
                 server_ref=exit_.server_ref,
-                name=f"Meridian v4 / {exit_.id}",
+                name=node_name(exit_.id),
                 profile_ref=profile_id,
                 inbound_refs=path_refs,
             ),
@@ -264,7 +308,10 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
     all_inbounds = sorted(inbound_by_path.values())
     squad_id = builder.add(
         "squad:access",
-        InternalSquadPayload(name=intent.access.squad_name, inbound_refs=all_inbounds),
+        InternalSquadPayload(
+            name=internal_squad_name("access", intent.access.squad_name),
+            inbound_refs=all_inbounds,
+        ),
         dependencies=all_inbounds,
     )
     template_ids: list[str] = []
@@ -273,7 +320,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
         xray_template_id = builder.add(
             f"template:{intent.delivery.template_name}:xray-json",
             SubscriptionTemplatePayload(
-                name=f"Meridian v4 / {intent.delivery.template_name} / Xray JSON",
+                name=subscription_template_name(intent.delivery.template_name, "XRAY_JSON"),
                 profile_title=intent.delivery.profile_title,
                 template_type="XRAY_JSON",
                 template_json=xray_json_template(),
@@ -286,7 +333,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
             builder.add(
                 f"template:{intent.delivery.template_name}:mihomo",
                 SubscriptionTemplatePayload(
-                    name=f"Meridian v4 / {intent.delivery.template_name} / Mihomo",
+                    name=subscription_template_name(intent.delivery.template_name, "MIHOMO"),
                     profile_title=intent.delivery.profile_title,
                     template_type="MIHOMO",
                     template_yaml=mihomo_template(),
@@ -304,7 +351,7 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
         external_squad_id = builder.add(
             "external-squad:access",
             ExternalSquadPayload(
-                name="Meridian v4 / delivery",
+                name=external_squad_name("delivery"),
                 template_refs=template_ids,
             ),
             dependencies=template_ids,
@@ -339,10 +386,21 @@ def compile_topology(intent: SetupIntent) -> ResourcePlan:
         gateway_ids=gateway_ids,
     )
 
+    attach_server_baselines(builder, baseline_ids)
     ordered = builder.ordered()
-    intent_hash = canonical_hash(_normalized_intent(intent))
-    plan_hash = compute_plan_hash(compiler_version="v4", intent_hash=intent_hash, resources=ordered)
-    return ResourcePlan(intent_hash=intent_hash, plan_hash=plan_hash, resources=ordered)
+    intent_hash = canonical_hash(normalized_intent(intent))
+    plan_hash = compute_plan_hash(
+        compiler_version=COMPILER_VERSION,
+        deployment_contract=reviewed_contract,
+        intent_hash=intent_hash,
+        resources=ordered,
+    )
+    return ResourcePlan(
+        deployment_contract=reviewed_contract,
+        intent_hash=intent_hash,
+        plan_hash=plan_hash,
+        resources=ordered,
+    )
 
 
 def _compile_exit_endpoints(
@@ -699,10 +757,11 @@ def _ensure_certificate(
     logical_id = f"certificate:{exit_id}:{stable_token(hostname)}"
     if logical_id in builder.resources:
         return logical_id
+    challenge_firewall_id = add_firewall(builder, server_ref, "tcp", 80)
     return builder.add(
         logical_id,
         CertificatePayload(server_ref=server_ref, hostname=hostname),
-        dependencies=[runtime_id],
+        dependencies=[runtime_id, challenge_firewall_id],
     )
 
 
@@ -729,17 +788,3 @@ def _stream_id(server_ref: str, port: int) -> str:
 
 def _exists(target_ref: str) -> ResourcePostcondition:
     return ResourcePostcondition(kind="exists", target_ref=target_ref)
-
-
-def _normalized_intent(intent: SetupIntent) -> dict[str, Any]:
-    payload = intent.model_dump(mode="json")
-    payload["exits"] = sorted(payload["exits"], key=lambda value: value["id"])
-    for exit_ in payload["exits"]:
-        exit_["paths"] = sorted(exit_["paths"], key=lambda value: value["id"])
-    payload["transparent_relays"] = sorted(payload["transparent_relays"], key=lambda value: value["id"])
-    payload["routing_gateways"] = sorted(payload["routing_gateways"], key=lambda value: value["id"])
-    payload["egress_pools"] = sorted(payload["egress_pools"], key=lambda value: value["id"])
-    payload["routes"] = sorted(payload["routes"], key=lambda value: (value["priority"], value["id"]))
-    payload["access"]["users"] = sorted(payload["access"]["users"])
-    payload["delivery"]["formats"] = sorted(payload["delivery"]["formats"])
-    return payload

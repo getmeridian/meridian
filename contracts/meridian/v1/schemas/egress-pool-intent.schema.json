@@ -4,8 +4,9 @@
   "properties": {
     "exit_refs": {
       "items": {
+        "maxLength": 48,
         "minLength": 1,
-        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
         "type": "string"
       },
       "minItems": 1,
@@ -18,8 +19,9 @@
       "type": "boolean"
     },
     "id": {
+      "maxLength": 48,
       "minLength": 1,
-      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "title": "Id",
       "type": "string"
     },

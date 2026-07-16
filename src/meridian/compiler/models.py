@@ -7,14 +7,32 @@ import json
 import re
 from typing import Annotated, Any, Literal, Self, TypeAlias
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
+from meridian.compiler.names import (
+    RemnawaveConfigProfileName,
+    RemnawaveNodeName,
+    RemnawaveSquadName,
+    RemnawaveTemplateName,
+    RemnawaveUsername,
+)
+from meridian.core.inputs import IPAddressValue, PortValue, ServerReferenceValue, SshUserValue
 from meridian.core.models import CoreModel
 from meridian.core.topology import EgressStrategy, ProtocolKind, RouteMatchKind, TrafficRouteAction
 
+COMPILER_VERSION: Literal["v4.1"] = "v4.1"
 OwnershipMarker = Literal["meridian/v4"]
 SubscriptionType = Literal["XRAY_JSON", "XRAY_BASE64", "MIHOMO"]
+RuntimePinName = Annotated[
+    str,
+    Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9_.-]*$"),
+]
+RuntimePinValue = Annotated[
+    str,
+    Field(min_length=1, max_length=512, pattern=r"^\S+$"),
+]
 ResourceKind = Literal[
+    "server_baseline",
     "control_plane_runtime",
     "config_profile",
     "inbound",
@@ -46,10 +64,63 @@ PostconditionKind = Literal[
 ]
 
 
+class DeploymentTarget(CoreModel):
+    """One resolved, secret-free SSH destination reviewed before apply."""
+
+    host: IPAddressValue
+    user: SshUserValue
+    port: PortValue
+
+
+class DeploymentContract(CoreModel):
+    """Resolved deployment inputs that can change rendered or applied output."""
+
+    server_targets: dict[ServerReferenceValue, DeploymentTarget] = Field(default_factory=dict)
+    runtime_pins: dict[RuntimePinName, RuntimePinValue] = Field(default_factory=dict)
+    renderer_contract: str = Field(default="", max_length=512, pattern=r"^\S*$")
+
+    @field_validator("server_targets")
+    @classmethod
+    def sort_server_targets(cls, targets: dict[str, DeploymentTarget]) -> dict[str, DeploymentTarget]:
+        return dict(sorted(targets.items()))
+
+    @field_validator("runtime_pins")
+    @classmethod
+    def sort_runtime_pins(cls, pins: dict[str, str]) -> dict[str, str]:
+        return dict(sorted(pins.items()))
+
+    @model_validator(mode="after")
+    def validate_complete_or_empty(self) -> Self:
+        if not self.server_targets and not self.runtime_pins and not self.renderer_contract:
+            return self
+        missing = [
+            name
+            for name, present in (
+                ("server targets", bool(self.server_targets)),
+                ("runtime pins", bool(self.runtime_pins)),
+                ("renderer contract", bool(self.renderer_contract)),
+            )
+            if not present
+        ]
+        if missing:
+            raise ValueError("A deployment contract must be empty or include " + ", ".join(missing) + ".")
+        return self
+
+
+class ServerBaselinePayload(CoreModel):
+    """Common host preparation required before any server-side mutation."""
+
+    kind: Literal["server_baseline"] = "server_baseline"
+    server_ref: str
+    install_docker: bool = False
+    harden: bool = True
+
+
 class ControlPlaneRuntimePayload(CoreModel):
     kind: Literal["control_plane_runtime"] = "control_plane_runtime"
     server_ref: str
     public_hostname: str = ""
+    internal_https_port: int = Field(default=8443, ge=1, le=65535)
 
 
 class InboundPayload(CoreModel):
@@ -122,7 +193,7 @@ class ConfigProfilePayload(CoreModel):
     kind: Literal["config_profile"] = "config_profile"
     workload_id: str
     workload_kind: Literal["exit", "routing_gateway"] = "exit"
-    name: str
+    name: RemnawaveConfigProfileName
     inbound_refs: list[str]
     inbounds: list[InboundPayload]
     outbound_tags: list[str] = Field(default_factory=list)
@@ -152,7 +223,7 @@ class NodeBindingPayload(CoreModel):
     kind: Literal["node_binding"] = "node_binding"
     workload_ref: str
     server_ref: str
-    name: str
+    name: RemnawaveNodeName
     profile_ref: str
     inbound_refs: list[str]
 
@@ -181,7 +252,7 @@ class HostPayload(CoreModel):
     path: str = ""
     alpn: str = ""
     fingerprint: str = ""
-    security_layer: Literal["DEFAULT", "TLS", "NONE", "REALITY"] = "DEFAULT"
+    security_layer: Literal["DEFAULT", "TLS", "NONE"] = "DEFAULT"
     advertised: bool = True
     tags: list[str] = Field(default_factory=list)
     is_hidden: bool = False
@@ -191,26 +262,26 @@ class HostPayload(CoreModel):
 
 class InternalSquadPayload(CoreModel):
     kind: Literal["internal_squad"] = "internal_squad"
-    name: str
+    name: RemnawaveSquadName
     inbound_refs: list[str]
 
 
 class ExternalSquadPayload(CoreModel):
     kind: Literal["external_squad"] = "external_squad"
-    name: str
+    name: RemnawaveSquadName
     template_refs: list[str]
 
 
 class AccessUserPayload(CoreModel):
     kind: Literal["access_user"] = "access_user"
-    username: str
+    username: RemnawaveUsername
     squad_ref: str
     external_squad_ref: str = ""
 
 
 class ServiceUserPayload(CoreModel):
     kind: Literal["service_user"] = "service_user"
-    username: str
+    username: RemnawaveUsername
     edge_id: str
     squad_ref: str
     gateway_ref: str
@@ -219,7 +290,7 @@ class ServiceUserPayload(CoreModel):
 
 class SubscriptionTemplatePayload(CoreModel):
     kind: Literal["subscription_template"] = "subscription_template"
-    name: str
+    name: RemnawaveTemplateName
     profile_title: str
     template_type: Literal["XRAY_JSON", "MIHOMO"]
     template_json: dict[str, Any] | None = None
@@ -324,7 +395,8 @@ class ProbePayload(CoreModel):
 
 
 ResourcePayload: TypeAlias = Annotated[
-    ControlPlaneRuntimePayload
+    ServerBaselinePayload
+    | ControlPlaneRuntimePayload
     | ConfigProfilePayload
     | InboundPayload
     | NodeBindingPayload
@@ -392,7 +464,8 @@ class ResourcePlan(CoreModel):
         default="meridian.resource-plan/v1",
         alias="schema",
     )
-    compiler_version: Literal["v4"] = "v4"
+    compiler_version: Literal["v4.1"] = COMPILER_VERSION
+    deployment_contract: DeploymentContract = Field(default_factory=DeploymentContract)
     intent_hash: str
     plan_hash: str
     resources: list[CompiledResource]
@@ -410,6 +483,7 @@ class ResourcePlan(CoreModel):
             seen.add(resource.logical_id)
         expected = compute_plan_hash(
             compiler_version=self.compiler_version,
+            deployment_contract=self.deployment_contract,
             intent_hash=self.intent_hash,
             resources=self.resources,
         )
@@ -446,12 +520,15 @@ def compute_resource_hash(
 def compute_plan_hash(
     *,
     compiler_version: str,
+    deployment_contract: DeploymentContract | None = None,
     intent_hash: str,
     resources: list[CompiledResource],
 ) -> str:
+    reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
     return canonical_hash(
         {
             "compiler_version": compiler_version,
+            "deployment_contract": reviewed_contract.model_dump(mode="json"),
             "intent_hash": intent_hash,
             "resources": [
                 {"logical_id": resource.logical_id, "desired_hash": resource.desired_hash} for resource in resources

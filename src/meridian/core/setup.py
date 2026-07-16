@@ -9,8 +9,9 @@ from pydantic import Field, field_validator, model_validator
 from meridian.core.inputs import (
     OptionalCountryCodeValue,
     OptionalHostnameValue,
-    RequiredNameValue,
+    PortValue,
     ServerReferenceValue,
+    TopologyIdValue,
 )
 from meridian.core.models import CoreModel
 from meridian.core.topology import (
@@ -44,7 +45,7 @@ SETUP_STAGE_ORDER: tuple[SetupStage, ...] = (
 class SetupExitRole(CoreModel):
     """One saved server assigned an exit workload ID."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     server_ref: ServerReferenceValue
     region: OptionalCountryCodeValue = ""
     warp: bool = False
@@ -53,10 +54,11 @@ class SetupExitRole(CoreModel):
 class SetupRelayRole(CoreModel):
     """One ordered set of saved servers assigned a transparent relay path."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     hop_server_refs: list[ServerReferenceValue] = Field(min_length=1)
-    exit_ref: RequiredNameValue
-    protocol_path_ref: RequiredNameValue
+    exit_ref: TopologyIdValue
+    protocol_path_ref: TopologyIdValue
+    listen_port: PortValue = 443
     reality_sni: OptionalHostnameValue = ""
 
     @field_validator("hop_server_refs")
@@ -70,9 +72,9 @@ class SetupRelayRole(CoreModel):
 class SetupGatewayRole(CoreModel):
     """One saved server assigned an Xray routing-gateway workload."""
 
-    id: RequiredNameValue
+    id: TopologyIdValue
     server_ref: ServerReferenceValue
-    bridge_path_ref: RequiredNameValue
+    bridge_path_ref: TopologyIdValue
 
 
 class SetupRoleSelection(CoreModel):
@@ -102,7 +104,7 @@ class SetupRoleSelection(CoreModel):
 class SetupExitPaths(CoreModel):
     """Protocol paths selected for one exit role."""
 
-    exit_ref: RequiredNameValue
+    exit_ref: TopologyIdValue
     paths: list[ProtocolPathIntent] = Field(min_length=1)
 
 
@@ -122,7 +124,7 @@ class SetupPathSelection(CoreModel):
 class SetupRoutingSelection(CoreModel):
     """Default egress, ordered routes, and optional failover pools."""
 
-    default_egress_ref: RequiredNameValue
+    default_egress_ref: TopologyIdValue
     egress_pools: list[EgressPoolIntent] = Field(default_factory=list)
     routes: list[OrderedRouteIntent] = Field(default_factory=list)
 
@@ -181,6 +183,7 @@ class SetupDraft(CoreModel):
                     hop_server_refs=relay.hop_server_refs,
                     exit_ref=relay.exit_ref,
                     protocol_path_ref=relay.protocol_path_ref,
+                    listen_port=relay.listen_port,
                     reality_sni=relay.reality_sni,
                 )
                 for relay in intent.transparent_relays
@@ -311,6 +314,7 @@ class SetupDraft(CoreModel):
                 hop_server_refs=relay.hop_server_refs,
                 exit_ref=relay.exit_ref,
                 protocol_path_ref=relay.protocol_path_ref,
+                listen_port=relay.listen_port,
                 reality_sni=relay.reality_sni,
             )
             for relay in self.roles.transparent_relays

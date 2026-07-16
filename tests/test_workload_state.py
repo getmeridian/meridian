@@ -6,6 +6,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, RealityKeyBinding, WorkloadBinding
 from meridian.compiler.models import ConfigProfilePayload, InboundPayload
+from meridian.compiler.names import profile_name
 from meridian.reconciler.workloads import WorkloadStateError, WorkloadStateManager
 
 _HASH_A = "a" * 64
@@ -15,7 +16,7 @@ _HASH_B = "b" * 64
 def _profile(workload_id: str = "exit-a") -> ConfigProfilePayload:
     return ConfigProfilePayload(
         workload_id=workload_id,
-        name=f"Meridian v4 / {workload_id}",
+        name=profile_name(workload_id),
         inbound_refs=[
             f"inbound:{workload_id}:reality",
             f"inbound:{workload_id}:xhttp",

@@ -7,8 +7,9 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 
 - **`compute_plan` is a pure function** — no I/O, no network, no side effects. Takes `(desired, actual, applied_*)` dataclasses, returns `Plan[PlanAction]`. Fully unit-testable; covers every diff case.
 - **Compiled-resource apply is checkpointed** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
-- **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic `Meridian v4 / …` names recover unknown creates, mismatched collisions fail, and global settings updates preserve unmanaged Response Rules.
+- **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic wire-safe names recover unknown creates, mismatched collisions fail, and global settings updates preserve unmanaged Response Rules.
 - **Server artifacts are per-resource and rollback-safe** — Realm services and nginx files use hashed logical IDs; failed reloads restore previous files before the action fails.
+- **Server preparation is graph-owned** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; compiled rules alone open public ports.
 - **Typed `PlanAction.kind`** — `ADD_NODE / UPDATE_NODE / REMOVE_NODE / ADD_RELAY / UPDATE_RELAY / REMOVE_RELAY / ADD_CLIENT / REMOVE_CLIENT / ADD_SUBSCRIPTION_PAGE / REMOVE_SUBSCRIPTION_PAGE`. Executor dispatches by kind.
 - **Applied-state snapshot** — `cluster.applied_state` (typed `AppliedState` dataclass) recorded after every successful apply. Distinguishes intentional removal (in applied -> from_extras=False -> executes under `--yes`) from drift (not in applied -> from_extras=True -> requires `--prune-extras=yes`).
 - **Parallel executor** — `ADD_NODE` actions run via `ThreadPoolExecutor`. Per-worker `MeridianPanel` clone (`_make_worker_panel`); `threading.local()` event loop keeps async SDK calls isolated. Destructive kinds stay serial.
@@ -22,6 +23,8 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 - **Typed handlers** — `ActionHandler = Callable[[PlanAction, MeridianPanel, ClusterConfig], None]` enforces handler signatures at compile time.
 - **Shared plan computation** — `prepare.py::compute_reconciliation_plan()` is the single entry point for both `plan` and `apply` commands.
 - **Unknown outcomes are fail-closed** — a timed-out mutation remains `unknown` if observation fails; retries happen only after a successful non-converged observation using the same idempotency key.
+- **Intent shrink is fail-closed** — compiled apply rejects removal of any active binding until reverse-dependency, ownership-checked retirement is implemented.
+- **Reviewed render contract** — setup hashes resolved SSH targets, runtime pins, and `render_contract.py`; bump its manifest whenever deployed bytes or commands change.
 
 ## Pitfalls
 
@@ -32,13 +35,5 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 - **Never catch an uncertain driver mutation as an ordinary failure** — raise `UnknownResourceOutcome` so the executor observes before any retry.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
-
-## Links
-
-- Pure diff: `diff.py::compute_plan`
-- Shared entry point: `prepare.py::compute_reconciliation_plan`
-- Applied-state snapshots + hybrid sync: `snapshots.py`
-- Executor: `executor.py`
-- Dataclasses: `state.py` / `diff.py`
-- Display: `display.py::print_plan`
-- Tests: `tests/test_reconciler.py`, `tests/test_apply_command.py`
+- **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
+- **Do not mark old bindings inactive as a substitute for deletion** — retirement must remove owned remote resources in reverse dependency order.

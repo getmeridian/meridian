@@ -47,8 +47,9 @@
       "description": "One saved server assigned an exit workload ID.",
       "properties": {
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -84,14 +85,16 @@
       "description": "One saved server assigned an Xray routing-gateway workload.",
       "properties": {
         "bridge_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Bridge Path Ref",
           "type": "string"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
@@ -116,8 +119,9 @@
       "description": "One ordered set of saved servers assigned a transparent relay path.",
       "properties": {
         "exit_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Exit Ref",
           "type": "string"
         },
@@ -133,14 +137,23 @@
           "type": "array"
         },
         "id": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Id",
           "type": "string"
         },
+        "listen_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
         "protocol_path_ref": {
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Protocol Path Ref",
           "type": "string"
         },

@@ -9,6 +9,7 @@ import pytest
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
+    COMPILER_VERSION,
     FirewallRulePayload,
     ProbePayload,
     ResourcePlan,
@@ -16,6 +17,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.reconciler.resource_executor import (
+    environment_after_apply_barrier,
     execute_resource_plan,
     inspect_resource_plan,
 )
@@ -25,6 +27,7 @@ from meridian.reconciler.resources import (
     ResourceApplyReceipt,
     ResourceObservation,
     UnknownResourceOutcome,
+    UnsupportedResourceRetirementError,
     build_resource_actions,
     postcondition_key,
 )
@@ -99,7 +102,7 @@ def _plan(*, with_probe: bool = False, public_port: int = 443) -> ResourcePlan:
     return ResourcePlan(
         intent_hash=intent_hash,
         plan_hash=compute_plan_hash(
-            compiler_version="v4",
+            compiler_version=COMPILER_VERSION,
             intent_hash=intent_hash,
             resources=resources,
         ),
@@ -145,6 +148,33 @@ class TestResourceActions:
         one = build_resource_actions(plan, generation=1)[0]
         two = build_resource_actions(plan, generation=2)[0]
         assert one.idempotency_key != two.idempotency_key
+
+    def test_environment_barrier_publishes_action_before_waiting(
+        self,
+        tmp_path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        action = build_resource_actions(_plan(), generation=1)[0]
+        marker = tmp_path / "after-apply.ready"
+        observed: list[str] = []
+        monkeypatch.setenv(
+            "MERIDIAN_TEST_AFTER_APPLY_RESOURCE",
+            action.resource.logical_id,
+        )
+        monkeypatch.setenv("MERIDIAN_TEST_AFTER_APPLY_MARKER", str(marker))
+
+        def release(_seconds: float) -> None:
+            observed.append(marker.read_text(encoding="utf-8").strip())
+            marker.unlink()
+
+        monkeypatch.setattr(
+            "meridian.reconciler.resource_executor.time.sleep",
+            release,
+        )
+
+        environment_after_apply_barrier(action)
+
+        assert observed == [action.idempotency_key]
 
 
 class TestResourceInspection:
@@ -193,6 +223,42 @@ class TestResourceInspection:
 
 
 class TestCheckpointedExecution:
+    def test_rejects_intent_shrink_before_state_or_remote_mutation(self) -> None:
+        plan = _plan()
+        retired = ManagedResourceBinding(
+            logical_id="host:retired",
+            resource_kind="host",
+            generation=1,
+            remote_id="host-1",
+            desired_hash=_HASH_A,
+            observed_hash=_HASH_A,
+            active=True,
+        )
+        cluster = ClusterConfig(
+            managed_bindings={"host:retired@1": retired},
+            active_generation=1,
+            active_plan_hash=_HASH_B,
+        )
+        driver = ScriptedDriver([])
+        saves: list[ClusterConfig] = []
+
+        with pytest.raises(
+            UnsupportedResourceRetirementError,
+            match="host:retired",
+        ):
+            execute_resource_plan(
+                plan,
+                cluster,
+                {"firewall_rule": driver},
+                persist=saves.append,
+                clock=_clock,
+            )
+
+        assert driver.observe_calls == 0
+        assert driver.apply_calls == []
+        assert saves == []
+        assert cluster.pending_plan_hash == ""
+
     def test_applies_in_dependency_order_and_commits_generation(self) -> None:
         plan = _plan(with_probe=True)
         actions = build_resource_actions(plan, generation=1)
@@ -233,6 +299,33 @@ class TestCheckpointedExecution:
         assert all(binding.active for binding in cluster.managed_bindings.values())
         assert all(checkpoint.status == "succeeded" for checkpoint in cluster.action_checkpoints.values())
         assert saves
+
+    def test_after_apply_barrier_runs_between_mutation_and_observation(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=1)[0]
+        events: list[str] = []
+        driver = ScriptedDriver(
+            [_missing(), _converged(action)],
+            [ResourceApplyReceipt(remote_id="firewall-1")],
+            events=events,
+        )
+
+        result = execute_resource_plan(
+            plan,
+            ClusterConfig(),
+            {"firewall_rule": driver},
+            persist=lambda _state: None,
+            clock=_clock,
+            after_apply=lambda current: events.append(f"barrier:{current.resource.logical_id}"),
+        )
+
+        assert result.all_succeeded
+        assert events == [
+            "observe:firewall:srv-exit:tcp:443",
+            "apply:firewall:srv-exit:tcp:443",
+            "barrier:firewall:srv-exit:tcp:443",
+            "observe:firewall:srv-exit:tcp:443",
+        ]
 
     def test_matching_observation_is_a_noop_but_is_still_reobserved(self) -> None:
         plan = _plan()

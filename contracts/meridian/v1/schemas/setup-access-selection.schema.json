@@ -14,8 +14,9 @@
         },
         "users": {
           "items": {
-            "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "maxLength": 36,
+            "minLength": 3,
+            "pattern": "^[A-Za-z0-9_-]+$",
             "type": "string"
           },
           "minItems": 1,
@@ -56,8 +57,9 @@
         },
         "template_name": {
           "default": "meridian",
+          "maxLength": 48,
           "minLength": 1,
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
           "title": "Template Name",
           "type": "string"
         }

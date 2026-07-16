@@ -651,7 +651,7 @@ class TestCreateHost:
             inbound_uuid="00000000-0000-0000-0000-0000000000e1",
             sni="www.google.com",
             fingerprint="chrome",
-            security_layer="REALITY",
+            security_layer="TLS",
             is_disabled=True,
             tags=["MERIDIAN_V4_XRAY_EDGE"],
             is_hidden=True,
@@ -661,7 +661,7 @@ class TestCreateHost:
         call_json = panel._post.call_args[1]["json"]
         assert call_json["sni"] == "www.google.com"
         assert call_json["fingerprint"] == "chrome"
-        assert call_json["securityLayer"] == "REALITY"
+        assert call_json["securityLayer"] == "TLS"
         assert call_json["isDisabled"] is True
         assert call_json["tags"] == ["MERIDIAN_V4_XRAY_EDGE"]
         assert call_json["isHidden"] is True

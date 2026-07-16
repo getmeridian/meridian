@@ -5,16 +5,35 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import Any, cast
+from urllib.parse import urlparse
 
 from meridian import __version__
 from meridian.cluster import ClusterConfig
-from meridian.compiler import compile_topology
+from meridian.compiler import (
+    DeploymentContract,
+    DeploymentTarget,
+    compile_topology,
+    deployment_server_refs,
+)
 from meridian.compiler.models import (
     AccessUserPayload,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
-    NodeRuntimePayload,
     ResourcePlan,
+    canonical_hash,
+)
+from meridian.config import (
+    ACME_SERVER,
+    REALM_SHA256,
+    REALM_VERSION,
+    REMNAWAVE_BACKEND_IMAGE,
+    REMNAWAVE_NODE_API_PORT,
+    REMNAWAVE_NODE_IMAGE,
+    REMNAWAVE_PANEL_PORT,
+    REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+    REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
+    XRAY_VERSION,
 )
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
@@ -23,20 +42,33 @@ from meridian.panel_bootstrap import (
     ensure_control_plane_access,
     run_provisioner,
 )
-from meridian.reconciler.contract_drivers import ContractResourceDriver
+from meridian.provision.ensure import ensure_file_content
 from meridian.reconciler.remnawave_drivers import (
     RemnawaveDriverContext,
     build_remnawave_drivers,
 )
+from meridian.reconciler.render_contract import RENDERER_CONTRACT
 from meridian.reconciler.resource_executor import (
+    environment_after_apply_barrier,
     execute_resource_plan,
     inspect_resource_plan,
+    validate_resource_plan_transition,
 )
 from meridian.reconciler.resources import (
+    ResourceAction,
     ResourceDrivers,
     ResourceExecutionResult,
     ResourceInspectionResult,
     ResourceReconcileError,
+    UnknownResourceOutcome,
+    assert_complete_driver_registry,
+)
+from meridian.reconciler.runtime_drivers import (
+    ControlPlaneDriverContext,
+    ControlPlaneRuntimeDriver,
+    ProbeDriver,
+    ProbeDriverContext,
+    xray_subscription_is_valid,
 )
 from meridian.reconciler.server_drivers import (
     ServerDriverContext,
@@ -58,6 +90,7 @@ ControlBootstrap = Callable[
     [ControlPlaneRuntimePayload, ResourcePlan, ClusterConfig, ServerEntry, ServerConnection],
     None,
 ]
+_CONTROL_ATTESTATION_PATH = "/var/lib/meridian/control-runtime.attestation"
 
 
 @dataclass(frozen=True)
@@ -75,6 +108,40 @@ class SetupVerification:
     plan_hash: str
     node_count: int
     subscription_urls: Mapping[str, str]
+
+
+class LazyPanel:
+    """Open the panel adapter only after checkpointed control bootstrap."""
+
+    def __init__(
+        self,
+        factory: PanelFactory,
+        cluster: ClusterConfig,
+    ) -> None:
+        self._factory = factory
+        self._cluster = cluster
+        self._panel: MeridianPanel | None = None
+
+    def close(self) -> None:
+        if self._panel is not None:
+            self._panel.close()
+
+    def reset(self) -> None:
+        self.close()
+        self._panel = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get(), name)
+
+    def _get(self) -> MeridianPanel:
+        if self._panel is None:
+            if not self._cluster.panel.url or not self._cluster.panel.api_token:
+                raise ResourceReconcileError("Control-plane credentials are unavailable before bootstrap.")
+            self._panel = self._factory(
+                self._cluster.panel.url,
+                self._cluster.panel.api_token,
+            )
+        return self._panel
 
 
 class SetupRuntime:
@@ -99,7 +166,35 @@ class SetupRuntime:
 
     def review(self, draft: SetupDraft) -> SetupReview:
         intent = _draft_intent(draft)
-        return SetupReview(intent=intent, plan=compile_topology(intent))
+        entries = self._entries(sorted(deployment_server_refs(intent)))
+        contract = DeploymentContract(
+            server_targets={
+                server_ref: DeploymentTarget(
+                    host=entry.host,
+                    user=entry.user,
+                    port=entry.port,
+                )
+                for server_ref, entry in entries.items()
+            },
+            runtime_pins={
+                "acme_server": ACME_SERVER,
+                "meridian_version": __version__,
+                "realm_sha256_manifest": canonical_hash(REALM_SHA256),
+                "realm_version": REALM_VERSION,
+                "remnawave_backend_image": REMNAWAVE_BACKEND_IMAGE,
+                "remnawave_node_image": REMNAWAVE_NODE_IMAGE,
+                "remnawave_node_api_port": str(REMNAWAVE_NODE_API_PORT),
+                "remnawave_panel_port": str(REMNAWAVE_PANEL_PORT),
+                "remnawave_subscription_page_image": REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+                "remnawave_subscription_page_port": str(REMNAWAVE_SUBSCRIPTION_PAGE_PORT),
+                "xray_version": XRAY_VERSION,
+            },
+            renderer_contract=RENDERER_CONTRACT,
+        )
+        return SetupReview(
+            intent=intent,
+            plan=compile_topology(intent, deployment_contract=contract),
+        )
 
     def apply_intent(
         self,
@@ -122,13 +217,16 @@ class SetupRuntime:
                 "Saved panel credentials are missing.",
                 hint="Resume setup before checking topology drift.",
             )
-        entries = self._entries(draft.server_refs)
+        entries = self._entries(sorted(review.plan.deployment_contract.server_targets))
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
         panel = self._panel_factory(
             cluster.panel.url,
             cluster.panel.api_token,
         )
+        control = _control_payload(review.plan)
+        control_entry = entries[control.server_ref]
+        control_connection = connections[control.server_ref]
         try:
             shadow = cluster.clone()
             drivers = self._build_drivers(
@@ -138,7 +236,17 @@ class SetupRuntime:
                 connections,
                 addresses,
                 persist=lambda _state: None,
-                prepare_node=None,
+                control_context=ControlPlaneDriverContext(
+                    ready=lambda action: _control_runtime_ready(
+                        action,
+                        review.plan,
+                        cluster,
+                        control_entry,
+                        control_connection,
+                        panel,
+                    ),
+                    bootstrap=lambda _action: _inspection_bootstrap_error(),
+                ),
             )
             return inspect_resource_plan(
                 review.plan,
@@ -157,15 +265,18 @@ class SetupRuntime:
             )
 
         cluster = self._cluster_loader()
+        validate_resource_plan_transition(review.plan, cluster)
         cluster.topology_intent = review.intent
         self._persist(cluster)
-        entries = self._entries(draft.server_refs)
+        entries = self._entries(sorted(review.plan.deployment_contract.server_targets))
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
 
         control = _control_payload(review.plan)
         control_entry = entries[control.server_ref]
-        if not self._control_is_ready(cluster, control_entry):
+        panel = LazyPanel(self._panel_factory, cluster)
+
+        def bootstrap_control(action: ResourceAction) -> None:
             self._control_bootstrap(
                 control,
                 review.plan,
@@ -173,28 +284,35 @@ class SetupRuntime:
                 control_entry,
                 connections[control.server_ref],
             )
-        if not cluster.panel.url or not cluster.panel.api_token:
-            raise ResourceReconcileError("Control-plane bootstrap did not produce panel credentials.")
+            _write_control_runtime_attestation(action, review.plan, connections[control.server_ref])
+            panel.reset()
 
-        panel = self._panel_factory(
-            cluster.panel.url,
-            cluster.panel.api_token,
-        )
         try:
             drivers = self._build_drivers(
                 review.plan,
                 cluster,
-                panel=panel,
+                panel=cast(MeridianPanel, panel),
                 connections=connections,
                 addresses=addresses,
                 persist=self._persist,
-                prepare_node=_prepare_node_runtime,
+                control_context=ControlPlaneDriverContext(
+                    ready=lambda action: _control_runtime_ready(
+                        action,
+                        review.plan,
+                        cluster,
+                        control_entry,
+                        connections[control.server_ref],
+                        cast(MeridianPanel, panel),
+                    ),
+                    bootstrap=bootstrap_control,
+                ),
             )
             result = execute_resource_plan(
                 review.plan,
                 cluster,
                 drivers,
                 persist=self._persist,
+                after_apply=environment_after_apply_barrier,
             )
         finally:
             panel.close()
@@ -209,11 +327,7 @@ class SetupRuntime:
         addresses: Mapping[str, str],
         *,
         persist: PersistCluster,
-        prepare_node: Callable[
-            [ServerConnection, NodeRuntimePayload, str],
-            None,
-        ]
-        | None,
+        control_context: ControlPlaneDriverContext,
     ) -> ResourceDrivers:
         shared_node_secrets: dict[str, str] = {}
         workloads = WorkloadStateManager(
@@ -236,14 +350,21 @@ class SetupRuntime:
             connection_for=connections.__getitem__,
             server_addresses=addresses,
             node_secrets=shared_node_secrets,
-            prepare_node=prepare_node,
         )
         drivers: ResourceDrivers = {}
         drivers.update(build_remnawave_drivers(remnawave))
         drivers.update(build_server_drivers(servers))
-        contract_driver = ContractResourceDriver()
-        drivers["control_plane_runtime"] = contract_driver
-        drivers["probe"] = contract_driver
+        drivers["control_plane_runtime"] = ControlPlaneRuntimeDriver(control_context)
+        drivers["probe"] = ProbeDriver(
+            ProbeDriverContext(
+                plan=plan,
+                cluster=cluster,
+                panel=panel,
+                connection_for=connections.__getitem__,
+                server_addresses=addresses,
+            )
+        )
+        assert_complete_driver_registry(drivers)
         return drivers
 
     def verify(self, draft: SetupDraft) -> SetupVerification:
@@ -295,9 +416,9 @@ class SetupRuntime:
                 user = panel.get_user(payload.username)
                 if user is None or not user.short_uuid:
                     raise ResourceReconcileError(f"Managed access user {payload.username!r} is missing.")
-                document = panel.fetch_subscription(user.short_uuid)
-                if not document.content.strip():
-                    raise ResourceReconcileError(f"Canonical subscription for {payload.username!r} is empty.")
+                document = panel.fetch_subscription(user.short_uuid, client_type="xray-json")
+                if not xray_subscription_is_valid(document):
+                    raise ResourceReconcileError(f"Canonical subscription for {payload.username!r} is invalid.")
                 subscription_urls[payload.username] = document.url
         finally:
             panel.close()
@@ -323,22 +444,6 @@ class SetupRuntime:
             entries[server_ref] = entry
         return entries
 
-    def _control_is_ready(
-        self,
-        cluster: ClusterConfig,
-        entry: ServerEntry,
-    ) -> bool:
-        if not cluster.panel.url or not cluster.panel.api_token or cluster.panel.server_ip != entry.host:
-            return False
-        panel = self._panel_factory(
-            cluster.panel.url,
-            cluster.panel.api_token,
-        )
-        try:
-            return panel.ping()
-        finally:
-            panel.close()
-
 
 def _draft_intent(draft: SetupDraft) -> SetupIntent:
     try:
@@ -348,6 +453,77 @@ def _draft_intent(draft: SetupDraft) -> SetupIntent:
             str(exc),
             hint="Complete every setup choice before review.",
         ) from exc
+
+
+def _inspection_bootstrap_error() -> None:
+    raise ResourceReconcileError("Read-only inspection cannot bootstrap the control plane.")
+
+
+def _control_runtime_ready(
+    action: ResourceAction,
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+    entry: ServerEntry,
+    connection: ServerConnection,
+    panel: MeridianPanel,
+) -> bool:
+    payload = action.resource.payload
+    if not isinstance(payload, ControlPlaneRuntimePayload):
+        raise ResourceReconcileError(f"Control runtime observer received {payload.kind}.")
+    expected_hostname = payload.public_hostname.rstrip(".").casefold()
+    actual_hostname = (urlparse(cluster.panel.url).hostname or "").rstrip(".").casefold()
+    identity_matches = (
+        bool(cluster.panel.api_token)
+        and cluster.panel.server_ip == entry.host
+        and cluster.panel.ssh_user == entry.user
+        and cluster.panel.ssh_port == entry.port
+        and (not expected_hostname or actual_hostname == expected_hostname)
+    )
+    if not identity_matches:
+        return False
+    attestation = connection.get_text(_CONTROL_ATTESTATION_PATH, timeout=15)
+    expected_attestation = _control_runtime_attestation(action, plan)
+    if attestation.returncode != 0 or attestation.stdout != f"{expected_attestation}\n":
+        return False
+    sockets = connection.run("ss -H -lnt 2>/dev/null", timeout=15)
+    if sockets.returncode != 0 or not _socket_table_has_port(sockets.stdout, payload.internal_https_port):
+        return False
+    return panel.ping()
+
+
+def _write_control_runtime_attestation(
+    action: ResourceAction,
+    plan: ResourcePlan,
+    connection: ServerConnection,
+) -> None:
+    result = ensure_file_content(
+        connection,
+        _CONTROL_ATTESTATION_PATH,
+        f"{_control_runtime_attestation(action, plan)}\n",
+        mode="600",
+        create_parent=True,
+    )
+    if result.ok:
+        return
+    if result.result is not None and result.result.returncode == 124:
+        raise UnknownResourceOutcome(
+            f"Timed out while attesting {action.resource.logical_id}; observation is required."
+        )
+    raise ResourceReconcileError(f"Could not attest {action.resource.logical_id}: {result.detail}")
+
+
+def _control_runtime_attestation(action: ResourceAction, plan: ResourcePlan) -> str:
+    return canonical_hash(
+        {
+            "resource": action.expected_hash,
+            "deployment_contract": plan.deployment_contract.model_dump(mode="json"),
+        }
+    )
+
+
+def _socket_table_has_port(output: str, port: int) -> bool:
+    suffix = f":{port}"
+    return any(field.endswith(suffix) for line in output.splitlines() for field in line.split())
 
 
 def _control_payload(
@@ -447,30 +623,3 @@ def _bootstrap_profile_values(
         if payload.workload_kind == "exit":
             break
     return ports, reality_sni
-
-
-def _prepare_node_runtime(
-    connection: ServerConnection,
-    payload: NodeRuntimePayload,
-    address: str,
-) -> None:
-    from meridian.provision import (
-        ProvisionContext,
-        Provisioner,
-        build_node_steps,
-    )
-
-    context = ProvisionContext(
-        ip=address,
-        user=connection.user,
-        warp=payload.warp,
-        harden=True,
-        is_panel_host=False,
-    )
-    results = Provisioner(build_node_steps(context)).run(
-        connection,
-        context,
-    )
-    failures = [result for result in results if result.status == "failed"]
-    if failures:
-        raise ResourceReconcileError(f"Could not prepare node host {address}: {failures[0].name}: {failures[0].detail}")

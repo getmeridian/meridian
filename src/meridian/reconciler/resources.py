@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Literal, Protocol, get_args
 
 from pydantic import Field, model_validator
 
@@ -25,6 +25,24 @@ class PendingPlanConflictError(ResourceReconcileError):
         super().__init__(
             message,
             hint="Resume the pending plan until every unknown action is observed, then review the replacement plan.",
+            category="user",
+        )
+
+
+class UnsupportedResourceRetirementError(ResourceReconcileError):
+    """A plan would orphan resources because retirement is not implemented."""
+
+    def __init__(self, resource_ids: list[str]) -> None:
+        preview = ", ".join(resource_ids[:5])
+        if len(resource_ids) > 5:
+            preview += f", and {len(resource_ids) - 5} more"
+        super().__init__(
+            f"This topology change would retire managed resources: {preview}.",
+            hint=(
+                "Restore the previous topology. Meridian V4 currently permits additive and "
+                "in-place changes only; ownership-safe resource retirement must land before "
+                "intent can shrink."
+            ),
             category="user",
         )
 
@@ -158,6 +176,21 @@ class ResourceDriver(Protocol):
 
 
 ResourceDrivers = dict[ResourceKind, ResourceDriver]
+
+
+def assert_complete_driver_registry(drivers: ResourceDrivers) -> None:
+    """Require exactly one production driver for every finite resource kind."""
+    expected = set(get_args(ResourceKind))
+    actual = set(drivers)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        details: list[str] = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if extra:
+            details.append("unexpected " + ", ".join(extra))
+        raise ResourceReconcileError("Invalid production resource-driver registry: " + "; ".join(details))
 
 
 def resource_idempotency_key(
