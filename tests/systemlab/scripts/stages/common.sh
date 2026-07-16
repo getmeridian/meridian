@@ -52,3 +52,23 @@ restart_node() {
   ssh root@"$host" docker start remnawave-node >/dev/null
   wait_for_node_api "$host"
 }
+
+wait_for_command() {
+  local description=$1
+  local timeout=$2
+  shift 2
+  local deadline=$((SECONDS + timeout))
+  local attempt=1
+  while true; do
+    echo "    waiting for $description (attempt $attempt)"
+    if "$@"; then
+      return 0
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "Timed out waiting for $description" >&2
+      return 1
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}

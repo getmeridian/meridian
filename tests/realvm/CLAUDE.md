@@ -7,18 +7,15 @@ Costs real money (~€0.01 per full single-topology run).
 ## Design decisions
 
 - **Never in CI** — `HCLOUD_TOKEN` is not a GitHub secret; harness files live outside `.github/workflows/`; `pyproject.toml` `norecursedirs = ["realvm"]` keeps `pytest` from collecting. Runs only via `make real-lab` locally.
-- **Topology per YAML file** — `topologies/<name>.yml` declares provider / region / size / node list. `orchestrator.py` is the driver, verify scripts live in `verify/`. Easy to add new topologies (`chain-3hop`, `dual-ip`, `dual-stack-v6` land with their feature PRs).
-- **Three-tier test structure** —
-  - **Tier α**: fully automated (LE cert, UFW nmap, SSH pubkey-only, fail2ban, fleet status, client CRUD, plan cycle, subscription URL 200). Hard-pass required.
-  - **Tier β**: env-gated semi-auto (`MERIDIAN_TEST_DOMAIN` + Cloudflare API). Skipped cleanly when unconfigured. Partially scaffolded; full wire-up tracked in #36.
-  - **Tier γ**: interactive QR scan from phone. Gated on `MERIDIAN_TEST_INTERACTIVE=1`. Scaffold only today; tracked in #36.
+- **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access.
+- **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP; planned domain/interactive tiers stay out of manifests until implemented.
 - **Per-cloud SDK, no Terraform/Pulumi** — see `src/meridian/infra/CLAUDE.md` for rationale.
 - **MERIDIAN_HOME isolation per fleet** — orchestrator sets `MERIDIAN_HOME=<fleet-id>/` before invoking `meridian deploy`, so the harness's cluster.yml doesn't clobber the developer's real `~/.meridian/`.
 
 ## What's done well
 
-- **Safety rails**: `HCLOUD_TOKEN` env gate, cost estimate + `y/n` prompt, soft cap at 5 VMs, `try/finally` teardown in orchestrator, label-based orphan sweep via `make real-lab-orphans`.
-- **Live-validated on Hetzner** — topology=single passes 13/0 (see PR #28 description).
+- **Safety rails**: pre-provider verifier gate, `HCLOUD_TOKEN` gate, cost prompt, 5-VM cap, `try/finally` teardown, and label-based orphan sweep.
+- **Live-validated on Hetzner** — topology `single` is the sole supported automated definition.
 - **Unbuffered output** via `PYTHONUNBUFFERED=1` in Makefile targets — real-time progress visible during long deploys.
 
 ## Pitfalls
@@ -28,7 +25,8 @@ Costs real money (~€0.01 per full single-topology run).
 - **Hetzner server types deprecate** — CX22 was deprecated in 2025; harness defaults to `cx23`. Refresh topology YAMLs and `providers/hetzner.py::_HOURLY_EUR` when upstream sunsets a generation.
 - **Rich console ANSI in captured output** — `meridian fleet status` renders colors; prefer `meridian --json fleet status` in verify scripts for stable field access.
 - **JSON command output is enveloped** — read command fields below `data`; there are no legacy top-level payloads in v4.
-- **Let's Encrypt IP-cert rate limit** — the shortlived profile used for bare-IP certs caps at ~5 issuances per /32 IPv4 per 7 days. Iterating `make real-lab` >5 times on the same IP (Hetzner sometimes re-issues the same pool address within ~24h) trips the limit; `acme.sh` falls back to self-signed and the `cert chain issued by Let's Encrypt` assertion fails. Destroy + recreate the VM and the API will allocate a fresh Primary IPv4. For sustained iteration, prefer tier β (domain mode) — LE's domain profile is 50/week per registered domain.
+- **Never return success for an unsupported topology** — add its verifier and manifest contract before allowing provisioning.
+- **Let's Encrypt IP-cert rate limit** — repeated bare-IP runs can trigger self-signed fallback and fail the issuer assertion; recreate the VM for a fresh IP.
 
 ## Links
 
@@ -36,5 +34,3 @@ Costs real money (~€0.01 per full single-topology run).
 - Topology specs: `topologies/<name>.yml`
 - Tier α verify: `verify/single.sh`
 - README (user-facing): `README.md`
-- Provider base: `src/meridian/infra/providers/base.py`
-- Hetzner impl: `src/meridian/infra/providers/hetzner.py`

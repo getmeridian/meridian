@@ -79,11 +79,11 @@ def build_systemlab_intent(
         ],
         routes=[
             OrderedRouteIntent(
-                id="route-echo-via-b",
+                id="route-probe-via-pool",
                 priority=10,
                 match="domain",
                 match_values=["ifconfig.me"],
-                target_ref="exit-b",
+                target_ref="pool-a",
                 source_gateway_ref="gateway-a",
             ),
             OrderedRouteIntent(

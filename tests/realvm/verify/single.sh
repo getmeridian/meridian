@@ -36,18 +36,20 @@ else
   exit 2
 fi
 
-# ── 3. Let's Encrypt cert (real, not Pebble) ─────────────────
-echo ">>> Checking Let's Encrypt cert chain..."
+# VERIFY: le_certificate_issuer
+# ── 3. Let's Encrypt certificate issuer (real, not Pebble) ─────────────────
+echo ">>> Checking Let's Encrypt certificate issuer..."
 CERT_INFO=$(ssh -o StrictHostKeyChecking=no root@"$TARGET_IP" \
   "openssl s_client -connect 127.0.0.1:443 -servername $TARGET_IP </dev/null 2>/dev/null | openssl x509 -noout -issuer -dates" 2>/dev/null || true)
 if echo "$CERT_INFO" | grep -qiE "Let's Encrypt|R10|R11|ISRG Root"; then
-  pass "cert chain issued by Let's Encrypt"
+  pass "certificate issuer is Let's Encrypt"
 elif echo "$CERT_INFO" | grep -qiE "self.?signed|localhost|CN ?= ?$TARGET_IP"; then
-  fail_test "self-signed fallback — likely LE IP-cert rate limit (5/7d per /32). Destroy fleet, wait or re-run (fresh Primary IPv4); or switch to domain mode via MERIDIAN_TEST_DOMAIN."
+  fail_test "self-signed fallback — likely LE IP-cert rate limit (5/7d per /32). Destroy and re-run for a fresh Primary IPv4."
 else
-  fail_test "cert chain does not mention Let's Encrypt: $CERT_INFO"
+  fail_test "certificate issuer does not mention Let's Encrypt: $CERT_INFO"
 fi
 
+# VERIFY: ufw_external_ports_if_nmap_available
 # ── 4. External port filter (nmap from dev machine) ─────────────────
 echo ">>> nmap external ports ..."
 if ! command -v nmap >/dev/null; then
@@ -55,10 +57,10 @@ if ! command -v nmap >/dev/null; then
 else
   OPEN=$(nmap -p 22,80,443,3000,3010,3020,8080 -Pn -T4 "$TARGET_IP" 2>/dev/null | awk '/^[0-9]+\/tcp/ && /open/ {print $1}' | tr '\n' ' ')
   echo "    open from outside: $OPEN"
-  # Only 22/tcp 80/tcp 443/tcp should be open; anything else = UFW hole
+  # Only 22/tcp 80/tcp 443/tcp are allowed among the tested ports.
   UNEXPECTED=$(echo "$OPEN" | tr ' ' '\n' | grep -vE '^(22|80|443)/tcp$' | grep -v '^$' || true)
   if [ -z "$UNEXPECTED" ]; then
-    pass "UFW blocks all but 22/80/443"
+    pass "nmap found no unexpected open ports in the tested set"
   else
     fail_test "unexpected open ports: $UNEXPECTED"
   fi
@@ -72,18 +74,18 @@ else
   fail_test "hardened redeploy failed"
 fi
 
-echo ">>> Verifying password auth is refused ..."
-# Must fail — we try to auth by password, no key. Should get 'Permission denied'.
-PWD_RESULT=$(ssh -o StrictHostKeyChecking=no -o PasswordAuthentication=yes \
-  -o PubkeyAuthentication=no -o PreferredAuthentications=password \
-  -o ConnectTimeout=5 -o NumberOfPasswordPrompts=1 -o BatchMode=yes \
-  root@"$TARGET_IP" 'echo ok' 2>&1 || true)
-if echo "$PWD_RESULT" | grep -qiE 'permission denied|publickey'; then
-  pass "sshd refuses password auth after hardening"
+echo ">>> Verifying effective sshd authentication settings ..."
+# VERIFY: sshd_pubkey_only
+SSHD_SETTINGS=$(ssh -o StrictHostKeyChecking=no root@"$TARGET_IP" \
+  "sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication) '" 2>/dev/null || true)
+if echo "$SSHD_SETTINGS" | grep -qx 'passwordauthentication no' && \
+   echo "$SSHD_SETTINGS" | grep -qx 'kbdinteractiveauthentication no'; then
+  pass "effective sshd settings disable password and keyboard-interactive auth"
 else
-  fail_test "sshd did not refuse password auth: $PWD_RESULT"
+  fail_test "effective sshd authentication settings are not hardened: $SSHD_SETTINGS"
 fi
 
+# VERIFY: fail2ban_active
 echo ">>> Checking fail2ban is active (hard assertion — regression guard for build_node_steps/setup_steps fix)..."
 F2B_STATE=$(ssh -o StrictHostKeyChecking=no root@"$TARGET_IP" "systemctl is-active fail2ban 2>/dev/null || echo missing" 2>/dev/null)
 echo "    systemctl is-active fail2ban: $F2B_STATE"
@@ -93,6 +95,7 @@ else
   fail_test "fail2ban is not active — did ConfigureFail2ban run during hardened redeploy?"
 fi
 
+# VERIFY: fleet_status_connected
 # ── 6. Fleet status (via JSON to avoid Rich color-code capture issues) ─────────────────
 # Node re-registration after a redeploy can take ~10-30 seconds. Retry a few times.
 echo ">>> meridian --json fleet status (with retry for re-registration)..."
@@ -102,9 +105,10 @@ for attempt in 1 2 3 4 5 6 7 8; do
   NODE_STATUS=$(echo "$FLEET_JSON" | python3 -c "
 import sys, json
 try:
-    data = json.loads(sys.stdin.read() or '{}')
+    payload = json.loads(sys.stdin.read() or '{}')
 except Exception:
     print('PARSE_ERROR'); sys.exit(0)
+data = payload.get('data', {}) if isinstance(payload, dict) else {}
 nodes = data.get('nodes', []) if isinstance(data, dict) else []
 if not nodes:
     print('NO_NODES'); sys.exit(0)
@@ -123,7 +127,8 @@ else
   fail_test "fleet status never reported connected (last status: $NODE_STATUS)"
 fi
 
-# ── 7. Client add/remove roundtrip via --json ─────────────────
+# VERIFY: client_add_list_remove_roundtrip
+# ── 7. Client add/list/remove roundtrip ─────────────────
 echo ">>> meridian client add testuser ..."
 ADD_OUT=$(uv run meridian client add realvm-testuser 2>&1 || true)
 echo "    last 5 lines: $(echo "$ADD_OUT" | tail -5)"
@@ -155,7 +160,8 @@ else
   fail_test "client remove failed"
 fi
 
-# ── 8. Declarative plan/apply cycle ─────────────────
+# VERIFY: declarative_plan
+# ── 8. Declarative plan ─────────────────
 echo ">>> meridian plan ..."
 uv run meridian plan >/dev/null 2>&1
 PLAN_CODE=$?
@@ -166,13 +172,15 @@ else
   fail_test "plan failed with exit $PLAN_CODE"
 fi
 
-# ── 9. Subscription URL returns valid config ─────────────────
+# VERIFY: subscription_url_200
+# ── 9. Subscription URL returns HTTP 200 ─────────────────
 echo ">>> curl subscription URL (via --json client show) ..."
 # Prefer --json for stable field access; fallback to grep on text output.
 SHOW_JSON=$(uv run meridian --json client show default 2>/dev/null || true)
 SUB_URL=$(echo "$SHOW_JSON" | python3 -c "
 import sys, json
-data = json.loads(sys.stdin.read() or '{}')
+payload = json.loads(sys.stdin.read() or '{}')
+data = payload.get('data', {}) if isinstance(payload, dict) else {}
 url = data.get('subscription_url') or data.get('sub_url') or ''
 print(url)
 " 2>/dev/null || true)

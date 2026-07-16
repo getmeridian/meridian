@@ -3,7 +3,9 @@ FROM python:3.12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN printf 'Acquire::Retries "3";\nAPT::Update::Error-Mode "any";\n' \
+      > /etc/apt/apt.conf.d/80-meridian-network \
+    && apt-get update && apt-get install -y --no-install-recommends \
     openssh-client curl openssl jq ca-certificates git bash procps iproute2 \
     && rm -rf /var/lib/apt/lists/*
 

@@ -4,7 +4,6 @@
 # - Real Let's Encrypt certificate (not Pebble)
 # - Real UFW packet filtering (Docker bridge reaches all ports regardless)
 # - Real SSH hardening (pubkey-only, fail2ban)
-# - Real xray egress IP visible to destination sites
 #
 # Provider: Hetzner Cloud. Change `provider:` to switch (once other providers are implemented).
 
@@ -23,20 +22,11 @@ nodes:
 
 verify:
   tier_alpha:
-    - le_cert_valid                   # dig + openssl: chain from LE, notBefore/notAfter sane
-    - ufw_external_ports              # nmap from developer machine: 22/80/443 only
+    - le_certificate_issuer           # openssl: certificate issuer is Let's Encrypt
+    - ufw_external_ports_if_nmap_available  # optional nmap: no unexpected tested TCP ports
     - sshd_pubkey_only                # ssh -o PasswordAuthentication=yes nobody@IP → fail
     - fail2ban_active                 # systemctl is-active fail2ban
-    - fleet_status_green              # meridian fleet status
-    - client_add_remove_roundtrip     # meridian client add testuser → verify in panel → remove
-    - declarative_apply               # meridian plan + apply cycle
-    - subscription_url_200            # curl -sk https://IP/<sub_path>/<short_uuid>/ → 200 + valid JSON
-    - reality_xray_handshake          # xray client via SOCKS → ifconfig.me shows exit IP
-    - bogus_uuid_rejected             # xray with random UUID → TLS reject
-  tier_beta:
-    # Only runs if MERIDIAN_TEST_DOMAIN and CLOUDFLARE_API_TOKEN are set.
-    - domain_mode_cert_issue          # deploy --domain <env>; LE issues cert for that domain
-    - cloudflare_cdn_path             # WSS through Cloudflare proxy mode reaches xray
-  tier_gamma:
-    # Interactive — requires MERIDIAN_TEST_INTERACTIVE=1 or TIER=interactive on make target.
-    - qr_scan_mobile                  # harness prints QR, waits for user y/n after mobile verify
+    - fleet_status_connected          # enveloped JSON reports a connected node
+    - client_add_list_remove_roundtrip # add, list, then remove a real panel client
+    - declarative_plan                # meridian plan exits 0 or 2
+    - subscription_url_200            # canonical subscription URL returns HTTP 200

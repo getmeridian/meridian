@@ -31,6 +31,18 @@ from meridian.infra.providers import CloudProvider, ProviderError, VMInstance, V
 HARNESS_LABEL = "meridian-realvm-test"  # marker label — always "1" on harness VMs
 FLEET_ID_LABEL = "meridian-fleet-id"  # per-run uuid, groups VMs of one run
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_ed25519.pub"
+SUPPORTED_TOPOLOGIES = {
+    "single": (
+        "le_certificate_issuer",
+        "ufw_external_ports_if_nmap_available",
+        "sshd_pubkey_only",
+        "fail2ban_active",
+        "fleet_status_connected",
+        "client_add_list_remove_roundtrip",
+        "declarative_plan",
+        "subscription_url_200",
+    )
+}
 
 
 @dataclass
@@ -126,6 +138,8 @@ def load_topology(name: str) -> Topology:
         available = sorted(p.stem for p in topologies_dir.glob("*.yml"))
         _fail(f"Topology {name!r} not found. Available: {', '.join(available) or '(none)'}")
     data = yaml.safe_load(path.read_text())
+    if data.get("name") != name:
+        _fail(f"Topology file {path.name!r} must declare name: {name}")
     return Topology(
         name=data["name"],
         provider=data["provider"],
@@ -135,6 +149,24 @@ def load_topology(name: str) -> Topology:
         nodes=data.get("nodes", []),
         verify=data.get("verify", {}),
     )
+
+
+def require_supported_topology(topology: Topology) -> None:
+    """Reject unimplemented or drifted definitions before provider access."""
+    expected_checks = SUPPORTED_TOPOLOGIES.get(topology.name)
+    if expected_checks is None:
+        _fail(
+            f"Topology {topology.name!r} has no automated verifier; refusing to provision. "
+            f"Supported: {', '.join(sorted(SUPPORTED_TOPOLOGIES))}"
+        )
+    roles = [str(node.get("role", "")) for node in topology.nodes]
+    if topology.name == "single" and roles != ["exit"]:
+        _fail("Topology 'single' must define exactly one exit node; refusing to provision.")
+    if set(topology.verify) != {"tier_alpha"}:
+        _fail("Topology 'single' may declare only the implemented tier_alpha verifier; refusing to provision.")
+    configured_checks = tuple(topology.verify.get("tier_alpha", []))
+    if configured_checks != expected_checks:
+        _fail("Topology 'single' verification manifest does not match the implemented verifier; refusing to provision.")
 
 
 # --------------------------------------------------------------------------
@@ -266,8 +298,8 @@ def run_verification(topology: Topology, instances: list[VMInstance]) -> int:
     # For single-node topology, verification runs against instance[0].
     # Multi-node topologies override this.
     if topology.name != "single":
-        print(f"  → Verification for {topology.name} not implemented yet — run manual tests.")
-        return 0
+        print(f"  ✗ Verification for {topology.name} is not implemented; refusing to report success.")
+        return 2
 
     ip = instances[0].public_ipv4
     if not ip:
@@ -311,6 +343,7 @@ def _fail(msg: str) -> None:
 
 def cmd_up(args: argparse.Namespace) -> int:
     topology = load_topology(args.topology)
+    require_supported_topology(topology)
     provider = make_provider(topology.provider)
     confirm_cost(provider, topology, hours=0.5)
 

@@ -3,10 +3,10 @@
 **Local-only.** Provisions actual cloud VMs (Hetzner today), runs Meridian
 deploy + verification against them, then tears down. Complements the Docker
 system-lab by covering things Docker cannot — real Let's Encrypt certs, real
-UFW packet filtering, real SSH hardening, real xray egress behaviour.
+UFW packet filtering, and real SSH hardening.
 
 **Costs real money.** A full single-node run takes ~5-10 minutes, which at
-Hetzner CX22 pricing is about €0.001 — essentially free for an occasional
+Hetzner CX23 pricing is about €0.001 — essentially free for an occasional
 validation, but it IS money leaving your account, and a bug (or forgotten
 `--keep`) could leave a VM running. The harness has safety rails but no
 substitute for paying attention.
@@ -32,6 +32,8 @@ make real-lab
 ```
 
 That's it. On success you'll see `PASS: N  FAIL: 0` and the VM will be gone.
+Set `MERIDIAN_TEST_SSH_KEY=/path/to/custom.pub` to override the default
+`~/.ssh/id_ed25519.pub` upload.
 
 ## Topologies
 
@@ -39,7 +41,7 @@ Topology files live in `tests/realvm/topologies/*.yml`.
 
 | Name | VMs | What it validates |
 |---|---|---|
-| `single` | 1 | Baseline — LE cert, UFW, SSH, fleet status, client CRUD, declarative apply, subscription URL |
+| `single` | 1 | Baseline — LE issuer, optional nmap, SSH, fleet status, client CRUD, declarative plan, subscription HTTP 200 |
 | (future) `chain-2hop` | 2 | Domestic relay → foreign exit (tests chain correctness) |
 | (future) `chain-3hop` | 3 | Full chain — client → ingress → middle → exit |
 | (future) `dual-ip` | 1 | Node with 2 Primary IPs (ingress IP ≠ egress IP) |
@@ -51,44 +53,24 @@ Run a non-default topology:
 make real-lab TOPO=single
 ```
 
-## Test tiers
+Only `single` has an automated verifier today. Definitions without one are
+rejected before provider access, so they cannot create paid resources.
 
-**Tier α — fully automated.** Runs by default. No user involvement.
+## Verification
 
-- LE cert chain validates against real CA
-- External port scan: only 22/80/443 open
+Tier alpha runs by default with no user involvement.
+
+- Certificate issuer reports Let's Encrypt
+- Optional nmap scan finds no unexpected open ports in the tested set
 - SSH password auth refused after hardened redeploy
 - fail2ban active
-- `meridian fleet status` reports green
+- `meridian fleet status` reports the node connected
 - Client add/list/remove round-trip via real panel API
 - `meridian plan` exits 0 or 2 (converged or changes pending — both OK)
-- Subscription URL returns HTTP 200 with xray-shaped body
+- Subscription URL returns HTTP 200
 
-**Tier β — semi-automated.** Runs if you provide extra env vars. Skipped
-otherwise with a clear log line.
-
-| Env var | Enables |
-|---|---|
-| `MERIDIAN_TEST_DOMAIN=vpn.example.com` | Domain mode + real LE cert for the domain |
-| `CLOUDFLARE_API_TOKEN=...` + `CLOUDFLARE_ZONE_ID=...` | Cloudflare DNS automation + CDN path tests |
-| `MERIDIAN_TEST_SSH_KEY=/path/to/custom.pub` | Use your own SSH key (otherwise `~/.ssh/id_ed25519.pub`) |
-
-**Tier γ — interactive.** Triggered by `TIER=interactive` or
-`MERIDIAN_TEST_INTERACTIVE=1`. Harness keeps VMs alive and prompts you to
-verify from a second device (phone, browser in another region) before
-destroying.
-
-```bash
-MERIDIAN_TEST_INTERACTIVE=1 make real-lab-keep TOPO=single
-# ... harness provisions, prints QR code + subscription URL ...
-# ... you scan from phone, confirm connection works ...
-# ... press y in terminal ...
-# ... VM destroyed
-```
-
-Required for fully validating things the harness cannot automate: actual
-client-app compatibility (v2rayNG, Streisand), real CDN behaviour, behaviour
-under real network conditions.
+Domain/CDN and interactive mobile checks remain planned. Environment variables
+do not enable those tiers until their orchestrator paths and verifiers exist.
 
 ## Orphan cleanup
 
@@ -113,7 +95,7 @@ Per run, for topology=single:
 
 - 1 SSH key: `meridian-realvm-<fleet-id>` (public-key material from your
   `~/.ssh/id_ed25519.pub` or `MERIDIAN_TEST_SSH_KEY`)
-- 1 server: `meridian-realvm-single-exit-1-<fleet-id>` (CX22, Ubuntu 24.04, Nuremberg)
+- 1 server: `meridian-realvm-single-exit-1-<fleet-id>` (CX23, Ubuntu 24.04, Nuremberg)
 
 All tagged with `meridian-realvm-test=1`, `meridian-fleet-id=<uuid>`,
 `meridian-topology=single`.
@@ -133,16 +115,14 @@ it Read & Write permission. Export it in the shell session.
 is still running. Rare, but can happen on first-ever image pull. Try again.
 
 **"subscription URL returned HTTP 503"** — Remnawave panel didn't fully come
-up. CX22 is the minimum viable size; if testing on smaller (not recommended),
-bump to CX32.
+up. CX23 is the minimum viable size; if testing on smaller (not recommended),
+bump to CX33.
 
-**"cert chain does not mention Let's Encrypt"** after several rapid runs —
+**"certificate issuer does not mention Let's Encrypt"** after several rapid runs —
 you've likely tripped LE's IP-cert rate limit (~5 shortlived issuances per
 /32 IPv4 per 7 days) because Hetzner re-assigned the same Primary IPv4 from
 its pool. `acme.sh` falls back to self-signed, the assertion fails. Fix:
-destroy the fleet and re-run — a fresh VM usually gets a different IP. For
-sustained iteration, run with `MERIDIAN_TEST_DOMAIN=vpn.example.com` (tier β):
-LE's domain profile allows 50 certs/week per registered domain.
+destroy the fleet and re-run — a fresh VM usually gets a different IP.
 
 **Stuck with orphan VMs after a crash** — `make real-lab-orphans` to list,
 `make real-lab-down` to destroy.

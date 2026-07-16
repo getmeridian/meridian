@@ -93,8 +93,9 @@ select = ["E", "F", "I", "W"]
 testpaths = ["tests"]
 # tests/realvm/ provisions real cloud VMs — opt-in, never auto-collected.
 # Invoke manually via `make real-lab` (see tests/realvm/README.md).
-# tests/systemlab/ uses Docker, orchestrated via `make system-lab`.
-norecursedirs = ["realvm", "systemlab"]
+# Pure tests under tests/systemlab/ are safe for normal collection; Docker is
+# still orchestrated only via `make system-lab`.
+norecursedirs = ["realvm"]
 
 [tool.mypy]
 python_version = "3.11"

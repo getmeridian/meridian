@@ -2,6 +2,7 @@
 
 ```bash
 make system-lab
+uv run pytest tests/systemlab/ -q
 ```
 
 ## Design decisions
@@ -12,26 +13,24 @@ make system-lab
 
 **Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
 
-**Small fail-fast stages** — `scripts/controller-run.sh` runs bootstrap, deploy, canonical-subscription, and resilience scripts; Make always tears Compose down.
+**Small fail-fast stages** — the controller runs bootstrap, deploy, canonical-subscription, and resilience scripts; Make always tears Compose down. Pure contract tests run in normal pytest.
 
 ## What's done well
 
-- Fresh deploy verifies all Remnawave containers, node `NET_ADMIN`, nginx, port 443, `cluster.yml`, and fleet connectivity.
-- Client create/show/list/remove checks panel-backed isolation.
-- PWA checks cover page/config delivery, shared assets, and security headers.
-- Remnawave's canonical Xray document is executed directly, per endpoint and under automatic failover; no client config is rebuilt from local state.
-- Redeploy must preserve Reality keys and live connectivity.
-- Plan/apply covers no-op convergence, managed Host drift repair, unmanaged resource preservation, and unknown-checkpoint resume.
-- Hardened redeploy verifies UFW, SSH password auth, fail2ban, teardown, and port release.
+- Fresh deploy verifies the Remnawave containers, both exits, the routing gateway, and both Realm hops.
+- Remnawave's canonical Xray document is executed directly; Base64 and Mihomo documents are parsed and endpoint-checked instead of treated as opaque strings.
+- The `ifconfig.me` probe explicitly targets the `leastPing` pool; resilience proves both one-exit-down directions and fail-closed all-down behavior.
+- Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real managed Host mutation but before observation.
 
 ## Pitfalls
 
 - Node API port 3010 becomes ready before Reality inbounds; keep the post-readiness grace period.
-- Docker bridge addresses are private, so Xray routing can block lab-only echo targets.
+- Keep the external connectivity probe explicitly routed to the pool; a fixed exit route makes failover assertions meaningless, while private bridge targets are blocked.
 - Intermediate Realm hops must never appear as canonical subscription endpoints.
 - Pebble is installed for domain-mode work, but current coverage uses IP mode.
-- Nested image pulls make cold runs slow; preserve BuildKit apt caches.
+- Run the Docker/container-DNS preflight before cold builds; Colima profiles with broken DNS need explicit resolvers.
 - `systemd` may report `degraded` inside privileged containers; this is accepted when required services are healthy.
 - The controller image must copy the custom Hatch build hook before `pip install .`.
 - JSON CLI assertions must read the standard envelope under `data`, not obsolete top-level command fields.
 - Hysteria2 is enabled by default, so hardened exits must allow both TCP and UDP on port 443.
+- Keep interruption markers bounded and tied to an exact logical resource; never simulate recovery by editing `cluster.yml` checkpoints.

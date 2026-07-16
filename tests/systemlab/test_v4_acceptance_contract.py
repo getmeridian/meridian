@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -16,6 +17,8 @@ from meridian.compiler.models import (
 from tests.systemlab.topology import build_systemlab_intent
 
 _COMPOSE_PATH = Path(__file__).parent / "compose.yml"
+_RESILIENCE_PATH = Path(__file__).parent / "scripts/stages/30-resilience.sh"
+_INTERRUPTED_HOST_RESOURCE = "host:exit-a:exit-a-reality:direct"
 
 
 def _server_refs() -> dict[str, str]:
@@ -64,6 +67,11 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
         "srv-gateway",
     }
     assert all(host.address_server_ref != "srv-relay-b" for host in visible_hosts)
+    interrupted_host = next(
+        resource.payload for resource in plan.resources if resource.logical_id == _INTERRUPTED_HOST_RESOURCE
+    )
+    assert isinstance(interrupted_host, HostPayload)
+    assert interrupted_host.address_server_ref == "srv-exit-a"
 
     pools = [resource.payload for resource in plan.resources if isinstance(resource.payload, EgressPoolPayload)]
     assert len(pools) == 1
@@ -71,7 +79,11 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
     assert pools[0].fail_closed is True
 
     routes = [resource.payload for resource in plan.resources if isinstance(resource.payload, RouteRulePayload)]
-    assert sorted((route.priority, route.target_type) for route in routes) == [(10, "outbound"), (100, "balancer")]
+    assert sorted((route.priority, route.target_type) for route in routes) == [(10, "balancer"), (100, "balancer")]
+    probe_route = next(route for route in routes if route.route_id == "route-probe-via-pool")
+    assert probe_route.match_values == ["ifconfig.me"]
+    assert probe_route.target_ref == "pool-a"
+    assert probe_route.target_tag == pools[0].balancer_tag
 
     templates = [
         resource.payload.template_type
@@ -99,3 +111,23 @@ def test_compose_provides_every_isolated_topology_server() -> None:
     addresses = [services[name]["networks"]["labnet"]["ipv4_address"] for name in server_names]
     assert len(addresses) == len(set(addresses))
     assert set(services["controller"]["depends_on"]) >= server_names
+
+
+def test_resilience_kills_a_real_apply_after_the_exact_host_mutation() -> None:
+    script = _RESILIENCE_PATH.read_text(encoding="utf-8")
+
+    assert f"INTERRUPTED_HOST_RESOURCE={_INTERRUPTED_HOST_RESOURCE}" in script
+    assert "MERIDIAN_TEST_AFTER_APPLY_RESOURCE" in script
+    assert "MERIDIAN_TEST_AFTER_APPLY_MARKER" in script
+    assert "for _ in $(seq 1 90)" in script
+    assert "2>&1 &" in script
+    assert 'kill -9 "$INTERRUPTED_APPLY_PID"' in script
+    assert 'wait "$INTERRUPTED_APPLY_PID"' in script
+    assert 'if [ "$INTERRUPTED_APPLY_STATUS" -eq 0 ]' in script
+    assert 'assert checkpoint.status == "running"' in script
+    assert "assert not cluster.pending_plan_hash" in script
+    assert 'python3 "$SUBSCRIPTION_TEST" --automatic' in script
+    assert 'checkpoint.status = "unknown"' not in script
+    assert re.search(r"cluster\.pending_generation\s*=(?!=)", script) is None
+    assert re.search(r"cluster\.pending_plan_hash\s*=(?!=)", script) is None
+    assert "cluster.save()" not in script

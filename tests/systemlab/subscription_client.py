@@ -1,12 +1,18 @@
-"""Helpers for executing canonical Remnawave Xray subscriptions."""
+"""Helpers for validating and executing canonical Remnawave subscriptions."""
 
 from __future__ import annotations
 
+import base64
+import binascii
 import copy
 import json
 import socket
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlsplit
+from uuid import UUID
+
+import yaml
 
 from meridian.remnawave import MeridianPanel, SubscriptionDocument
 
@@ -43,6 +49,128 @@ def parse_xray_subscription(content: str) -> dict[str, Any]:
     return parsed
 
 
+def parse_base64_subscription(content: str) -> list[str]:
+    """Decode a canonical Base64 subscription into validated proxy URLs."""
+    encoded = "".join(content.split())
+    if not encoded:
+        raise ValueError("Canonical Base64 subscription is empty")
+    encoded += "=" * (-len(encoded) % 4)
+    try:
+        decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError) as exc:
+        raise ValueError("Canonical Base64 subscription is not valid Base64 UTF-8") from exc
+    urls = [line.strip() for line in decoded.splitlines() if line.strip()]
+    if not urls:
+        raise ValueError("Canonical Base64 subscription contains no proxy URLs")
+    for url in urls:
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"vless", "hysteria2"}:
+            raise ValueError(f"Canonical Base64 subscription contains unsupported URL scheme {parsed.scheme!r}")
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Canonical Base64 subscription contains an invalid endpoint port") from exc
+        if not parsed.hostname or port is None or not 1 <= port <= 65535:
+            raise ValueError("Canonical Base64 subscription contains an incomplete endpoint")
+        if parsed.scheme == "vless":
+            try:
+                UUID(parsed.username or "")
+            except ValueError as exc:
+                raise ValueError("Canonical Base64 subscription contains an invalid VLESS UUID") from exc
+    return urls
+
+
+def base64_endpoint_addresses(urls: Iterable[str]) -> set[str]:
+    """Return endpoint addresses from validated Base64 subscription URLs."""
+    return {address for url in urls if (address := urlsplit(url).hostname)}
+
+
+def base64_vless_user_ids(urls: Iterable[str]) -> set[str]:
+    """Return normalized VLESS UUIDs from validated Base64 URLs."""
+    return {str(UUID(parsed.username or "")) for url in urls if (parsed := urlsplit(url)).scheme == "vless"}
+
+
+def parse_mihomo_subscription(content: str) -> dict[str, Any]:
+    """Parse a canonical Mihomo document and validate its fallback graph."""
+    try:
+        parsed = yaml.safe_load(content)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Canonical Mihomo subscription is not YAML: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("Canonical Mihomo subscription must be an object")
+    proxies = parsed.get("proxies")
+    if not isinstance(proxies, list) or not proxies:
+        raise ValueError("Canonical Mihomo subscription has no proxies")
+
+    proxy_names: set[str] = set()
+    for proxy in proxies:
+        if not isinstance(proxy, dict):
+            raise ValueError("Canonical Mihomo subscription contains a malformed proxy")
+        name = proxy.get("name")
+        proxy_type = proxy.get("type")
+        server = proxy.get("server")
+        try:
+            port = int(proxy.get("port"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Canonical Mihomo subscription contains an invalid proxy port") from exc
+        if not isinstance(name, str) or not name or name in proxy_names:
+            raise ValueError("Canonical Mihomo subscription proxy names must be nonempty and unique")
+        if not isinstance(proxy_type, str) or not proxy_type or not isinstance(server, str) or not server:
+            raise ValueError("Canonical Mihomo subscription contains an incomplete proxy")
+        if not 1 <= port <= 65535:
+            raise ValueError("Canonical Mihomo subscription contains an invalid proxy port")
+        if proxy_type == "vless":
+            try:
+                UUID(str(proxy.get("uuid", "")))
+            except ValueError as exc:
+                raise ValueError("Canonical Mihomo subscription contains an invalid VLESS UUID") from exc
+        proxy_names.add(name)
+
+    groups = parsed.get("proxy-groups")
+    if not isinstance(groups, list) or not groups:
+        raise ValueError("Canonical Mihomo subscription has no proxy groups")
+    fallback_names: set[str] = set()
+    for group in groups:
+        if not isinstance(group, dict) or group.get("type") != "fallback":
+            continue
+        name = group.get("name")
+        members = group.get("proxies")
+        if not isinstance(name, str) or not name or not isinstance(members, list) or not members:
+            continue
+        if not all(isinstance(member, str) and member in proxy_names for member in members):
+            raise ValueError("Canonical Mihomo fallback references an unknown proxy")
+        fallback_names.add(name)
+    if not fallback_names:
+        raise ValueError("Canonical Mihomo subscription has no populated fallback group")
+
+    rules = parsed.get("rules")
+    if not isinstance(rules, list) or not any(
+        isinstance(rule, str) and rule.startswith("MATCH,") and rule.removeprefix("MATCH,") in fallback_names
+        for rule in rules
+    ):
+        raise ValueError("Canonical Mihomo subscription does not route through its fallback group")
+    return parsed
+
+
+def mihomo_endpoint_addresses(config: dict[str, Any]) -> set[str]:
+    """Return endpoint addresses from a validated Mihomo document."""
+    proxies = config.get("proxies", [])
+    return {
+        str(proxy["server"])
+        for proxy in proxies
+        if isinstance(proxy, dict) and isinstance(proxy.get("server"), str) and proxy["server"]
+    }
+
+
+def mihomo_vless_user_ids(config: dict[str, Any]) -> set[str]:
+    """Return normalized VLESS UUIDs from a validated Mihomo document."""
+    return {
+        str(UUID(str(proxy["uuid"])))
+        for proxy in config.get("proxies", [])
+        if isinstance(proxy, dict) and proxy.get("type") == "vless"
+    }
+
+
 def proxy_outbounds(
     config: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -55,6 +183,19 @@ def proxy_outbounds(
         for outbound in outbounds
         if isinstance(outbound, dict) and str(outbound.get("tag", "")).startswith(_PROXY_TAG_PREFIX)
     ]
+
+
+def xray_vless_user_ids(config: dict[str, Any]) -> set[str]:
+    """Return normalized VLESS UUIDs from canonical Xray proxy outbounds."""
+    return {
+        str(UUID(str(user["id"])))
+        for outbound in proxy_outbounds(config)
+        if outbound.get("protocol") == "vless"
+        for destination in outbound.get("settings", {}).get("vnext", [])
+        if isinstance(destination, dict)
+        for user in destination.get("users", [])
+        if isinstance(user, dict) and user.get("id")
+    }
 
 
 def outbound_address(outbound: dict[str, Any]) -> str:
