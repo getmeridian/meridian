@@ -17,16 +17,20 @@ python3 "$SUBSCRIPTION_TEST" --automatic
 pass "canonical Xray client fallback connects"
 
 python3 "$SUBSCRIPTION_TEST" \
+  --address "$EXIT_A_IP" \
+  --address "$EXIT_B_IP" \
+  --address "$RELAY_A_IP" \
+  --address "$GATEWAY_IP" \
   --automatic \
   --bogus-credentials \
   --expect-failure
-pass "canonical endpoints reject invalid credentials"
+pass "every canonical endpoint rejects invalid credentials"
 
 python3 <<'PYEOF'
 import os
 
 from meridian.cluster import ClusterConfig
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import MeridianPanel, XRAY_JSON_CLIENT_TYPE
 from tests.systemlab.subscription_client import (
     base64_endpoint_addresses,
     base64_vless_user_ids,
@@ -47,7 +51,7 @@ with MeridianPanel(
     user = panel.get_user("acceptance")
     assert user is not None and user.short_uuid
     base64_document = panel.fetch_subscription(user.short_uuid)
-    xray_document = panel.fetch_subscription(user.short_uuid, client_type="xray-json")
+    xray_document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
     mihomo_document = panel.fetch_subscription(user.short_uuid, client_type="mihomo")
 
 base64_urls = parse_base64_subscription(base64_document.content)

@@ -8,7 +8,7 @@ import sys
 
 from meridian.cluster import ClusterConfig
 from meridian.remnawave import MeridianPanel
-from meridian.xray_client import ensure_xray_binary, test_connection
+from meridian.xray_client import XrayStartupError, ensure_xray_binary, test_connection
 from tests.systemlab.subscription_client import (
     endpoint_addresses,
     fetch_canonical_xray,
@@ -121,14 +121,19 @@ def main() -> int:
             )
             label += " with bogus credentials"
         runnable, socks_port = use_free_local_ports(selected)
-        connected, detail = test_connection(
-            xray_bin,
-            runnable,
-            "",
-            socks_port,
-            label,
-            expect_ip_match=False,
-        )
+        try:
+            connected, detail = test_connection(
+                xray_bin,
+                runnable,
+                "",
+                socks_port,
+                label,
+                expect_ip_match=False,
+            )
+        except XrayStartupError as exc:
+            print(f"    FAIL {label}: {exc}")
+            failures += 1
+            continue
         accepted = not connected if args.expect_failure else connected
         status = "PASS" if accepted else "FAIL"
         expectation = "blocked" if args.expect_failure else "connected"

@@ -14,7 +14,7 @@ from uuid import UUID
 
 import yaml
 
-from meridian.remnawave import MeridianPanel, SubscriptionDocument
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel, SubscriptionDocument
 
 _PROXY_TAG_PREFIX = "MERIDIAN_PROXY"
 
@@ -29,7 +29,7 @@ def fetch_canonical_xray(
         raise ValueError(f"Remnawave user {username!r} has no subscription")
     return panel.fetch_subscription(
         user.short_uuid,
-        client_type="xray-json",
+        client_type=XRAY_JSON_CLIENT_TYPE,
     )
 
 
@@ -39,6 +39,10 @@ def parse_xray_subscription(content: str) -> dict[str, Any]:
         parsed = json.loads(content)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Canonical Xray subscription is not JSON: {exc}") from exc
+    if isinstance(parsed, list):
+        if len(parsed) != 1:
+            raise ValueError("Canonical Xray subscription must contain exactly one config")
+        parsed = parsed[0]
     if not isinstance(parsed, dict):
         raise ValueError("Canonical Xray subscription must be an object")
     outbounds = parsed.get("outbounds")
@@ -269,10 +273,14 @@ def use_free_local_ports(
     if not isinstance(inbounds, list):
         raise ValueError("Canonical Xray subscription has no inbounds")
     socks_port = 0
+    used_ports: set[int] = set()
     for inbound in inbounds:
         if not isinstance(inbound, dict):
             continue
         port = _free_port()
+        while port in used_ports:
+            port = _free_port()
+        used_ports.add(port)
         inbound["port"] = port
         if inbound.get("protocol") == "socks":
             socks_port = port

@@ -26,15 +26,45 @@ from meridian.config import (
     XRAY_GITHUB_URL,
     XRAY_VERSION,
 )
-from meridian.health import poll_until_ready
+from meridian.core.errors import MeridianError
+from meridian.health import ReadinessTimeout, poll_until_ready
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
+
+_XRAY_RUNTIME_ASSETS = ("geoip.dat", "geosite.dat")
+_CONNECTION_ATTEMPTS = 3
+_CONNECTION_RETRY_DELAY = 1.0
+
+
+class XrayStartupError(MeridianError):
+    """The local Xray process exited or never opened its client listener."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, category="system", retryable=True)
 
 
 def _xray_bin_path() -> Path:
     """Return the cached xray binary path."""
     return MERIDIAN_HOME / "bin" / f"xray-{XRAY_VERSION}"
+
+
+def _xray_asset_version_path(bin_path: Path) -> Path:
+    return bin_path.parent / ".xray-assets-version"
+
+
+def _xray_cache_is_complete(bin_path: Path) -> bool:
+    try:
+        if not bin_path.is_file() or not os.access(bin_path, os.X_OK) or bin_path.stat().st_size == 0:
+            return False
+        if _xray_asset_version_path(bin_path).read_text(encoding="utf-8").strip() != XRAY_VERSION:
+            return False
+        return all(
+            (bin_path.parent / name).is_file() and (bin_path.parent / name).stat().st_size > 0
+            for name in _XRAY_RUNTIME_ASSETS
+        )
+    except OSError:
+        return False
 
 
 def _resolve_asset_name() -> str | None:
@@ -47,7 +77,7 @@ def _resolve_asset_name() -> str | None:
 def ensure_xray_binary() -> Path | None:
     """Download xray binary if not cached. Returns path or None on failure."""
     bin_path = _xray_bin_path()
-    if bin_path.exists() and os.access(bin_path, os.X_OK):
+    if _xray_cache_is_complete(bin_path):
         return bin_path
 
     asset_name = _resolve_asset_name()
@@ -92,17 +122,40 @@ def ensure_xray_binary() -> Path | None:
                 Path(tmp_zip).unlink(missing_ok=True)
                 return None
 
-        # Extract xray binary from zip
+        # Xray's geoip:/geosite: routing rules load data files beside the binary.
+        # Publish the complete set only after every archive member is staged.
         bin_path.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(tmp_zip) as zf:
-            # Find the xray executable in the archive
-            xray_name = next((n for n in zf.namelist() if n.lower() in ("xray", "xray.exe")), None)
-            if not xray_name:
+        with tempfile.TemporaryDirectory(prefix=".xray-stage-", dir=bin_path.parent) as stage_dir:
+            stage = Path(stage_dir)
+            staged_bin = stage / bin_path.name
+            with zipfile.ZipFile(tmp_zip) as zf:
+                archive_files = {Path(name).name.lower(): name for name in zf.namelist() if Path(name).name}
+                xray_name = archive_files.get("xray") or archive_files.get("xray.exe")
+                if not xray_name:
+                    return None
+                asset_names = {name: archive_files.get(name) for name in _XRAY_RUNTIME_ASSETS}
+                if any(name is None for name in asset_names.values()):
+                    return None
+                with zf.open(xray_name) as src, staged_bin.open("wb") as dst:
+                    dst.write(src.read())
+                for runtime_asset, archive_name in asset_names.items():
+                    if archive_name is None:
+                        return None
+                    with zf.open(archive_name) as src, (stage / runtime_asset).open("wb") as dst:
+                        dst.write(src.read())
+            staged_paths = [staged_bin, *(stage / name for name in _XRAY_RUNTIME_ASSETS)]
+            if any(path.stat().st_size == 0 for path in staged_paths):
                 return None
-            with zf.open(xray_name) as src, open(bin_path, "wb") as dst:
-                dst.write(src.read())
+            staged_bin.chmod(0o755)
+            staged_marker = stage / ".xray-assets-version"
+            staged_marker.write_text(XRAY_VERSION + "\n", encoding="utf-8")
 
-        bin_path.chmod(0o755)
+            marker_path = _xray_asset_version_path(bin_path)
+            marker_path.unlink(missing_ok=True)
+            for runtime_asset in _XRAY_RUNTIME_ASSETS:
+                os.replace(stage / runtime_asset, bin_path.parent / runtime_asset)
+            os.replace(staged_bin, bin_path)
+            os.replace(staged_marker, marker_path)
         return bin_path
 
     except (subprocess.TimeoutExpired, FileNotFoundError, zipfile.BadZipFile, OSError):
@@ -288,9 +341,12 @@ def test_connection(
 
     Returns:
         (success, detail_message) tuple.
+
+    Raises:
+        XrayStartupError: If Xray or a required local test command cannot run.
     """
-    config_file = None
-    proc = None
+    config_file: str | None = None
+    proc: subprocess.Popen[str] | None = None
     try:
         # Write config to temp file
         with tempfile.NamedTemporaryFile(
@@ -305,9 +361,10 @@ def test_connection(
         # Start xray client
         proc = subprocess.Popen(
             [str(xray_bin), "run", "-c", config_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL,
+            text=True,
         )
 
         # Wait for SOCKS5 to be ready
@@ -322,43 +379,60 @@ def test_connection(
             description=f"localhost:{socks_port}",
         )
 
-        # Test connectivity
+        # Test connectivity. A node can report connected just before its active
+        # profile accepts the first Reality handshake, so require a sustained
+        # failure without restarting the local Xray process.
         start = time.monotonic()
-        result = subprocess.run(
-            [
-                "curl",
-                "-sS",
-                "--socks5-hostname",
-                f"127.0.0.1:{socks_port}",
-                "--connect-timeout",
-                "10",
-                "--max-time",
-                "15",
-                CONNECT_TEST_URL,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=20,
-            stdin=subprocess.DEVNULL,
-        )
-        elapsed = time.monotonic() - start
+        last_detail = "no response"
+        for attempt in range(1, _CONNECTION_ATTEMPTS + 1):
+            try:
+                result = subprocess.run(
+                    [
+                        "curl",
+                        "-sS",
+                        "--socks5-hostname",
+                        f"127.0.0.1:{socks_port}",
+                        "--connect-timeout",
+                        "10",
+                        "--max-time",
+                        "15",
+                        CONNECT_TEST_URL,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                    stdin=subprocess.DEVNULL,
+                )
+                exit_ip = result.stdout.strip()
+                if result.returncode == 0 and exit_ip:
+                    if expect_ip_match and exit_ip != server_ip:
+                        return False, f"exit IP {exit_ip} does not match server {server_ip}"
+                    elapsed = time.monotonic() - start
+                    return True, f"exit IP {exit_ip} ({elapsed:.1f}s, attempt {attempt})"
+                stderr_hint = result.stderr.strip()[:100] if result.stderr else ""
+                last_detail = f"no response{f' ({stderr_hint})' if stderr_hint else ''}"
+            except subprocess.TimeoutExpired:
+                last_detail = "timeout"
 
-        exit_ip = result.stdout.strip()
-        if result.returncode != 0 or not exit_ip:
-            stderr_hint = result.stderr.strip()[:100] if result.stderr else ""
-            return False, f"no response{f' ({stderr_hint})' if stderr_hint else ''}"
+            if proc.poll() is not None:
+                output_hint = " ".join(proc.stdout.read().split())[-300:] if proc.stdout is not None else ""
+                suffix = f": {output_hint}" if output_hint else ""
+                raise XrayStartupError(f"xray exited during connection test{suffix}")
+            if attempt < _CONNECTION_ATTEMPTS:
+                time.sleep(_CONNECTION_RETRY_DELAY)
+        return False, f"{last_detail} after {_CONNECTION_ATTEMPTS} attempts"
 
-        if expect_ip_match and exit_ip != server_ip:
-            return False, f"exit IP {exit_ip} does not match server {server_ip}"
-
-        return True, f"exit IP {exit_ip} ({elapsed:.1f}s)"
-
-    except subprocess.TimeoutExpired:
-        return False, "timeout"
-    except FileNotFoundError:
-        return False, "curl not found"
-    except OSError as e:
-        return False, str(e)
+    except ReadinessTimeout as exc:
+        output_hint = ""
+        if proc is not None and proc.poll() is not None and proc.stdout is not None:
+            output_hint = " ".join(proc.stdout.read().split())[-300:]
+        if output_hint:
+            raise XrayStartupError(f"xray failed to start: {output_hint}") from exc
+        raise XrayStartupError(f"xray failed to start: {exc}") from exc
+    except FileNotFoundError as exc:
+        raise XrayStartupError(f"connection test command not found: {exc.filename or exc}") from exc
+    except OSError as exc:
+        raise XrayStartupError(f"connection test could not run: {exc}") from exc
     finally:
         if proc is not None:
             proc.terminate()

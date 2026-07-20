@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -155,7 +156,7 @@ def test_validates_mihomo_fallback_graph_and_proxy_endpoints() -> None:
 
 
 def test_parses_only_rendered_canonical_xray_documents() -> None:
-    parsed = parse_xray_subscription(json.dumps(_canonical_config()))
+    parsed = parse_xray_subscription(json.dumps([_canonical_config()]))
 
     assert endpoint_addresses(parsed) == {
         "198.51.100.10",
@@ -171,6 +172,10 @@ def test_parses_only_rendered_canonical_xray_documents() -> None:
         parse_xray_subscription("dmxlc3M6Ly8=")
     with pytest.raises(ValueError, match="no Meridian"):
         parse_xray_subscription('{"outbounds": [{"tag": "DIRECT"}]}')
+    with pytest.raises(ValueError, match="exactly one config"):
+        parse_xray_subscription(json.dumps([_canonical_config(), _canonical_config()]))
+
+    assert parse_xray_subscription(json.dumps(_canonical_config()))["routing"]
 
 
 def test_selects_delivered_path_without_rebuilding_credentials() -> None:
@@ -203,3 +208,14 @@ def test_changes_only_test_credentials_and_local_listener_ports() -> None:
         for user in destination["users"]
     } == {"00000000-0000-0000-0000-000000000000"}
     assert canonical["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"].startswith("1111")
+
+
+def test_assigns_distinct_local_ports_to_every_inbound() -> None:
+    with patch(
+        "tests.systemlab.subscription_client._free_port",
+        side_effect=[12000, 12000, 12001],
+    ):
+        runnable, socks_port = use_free_local_ports(_canonical_config())
+
+    assert socks_port == 12000
+    assert [inbound["port"] for inbound in runnable["inbounds"]] == [12000, 12001]

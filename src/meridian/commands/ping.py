@@ -203,7 +203,12 @@ def run(
 
 def _run_connection_tests(cluster: ClusterConfig, server_ip: str) -> None:
     """Test actual proxy connections using a local xray client."""
-    from meridian.xray_client import build_test_configs_from_cluster, ensure_xray_binary, test_connection
+    from meridian.xray_client import (
+        XrayStartupError,
+        build_test_configs_from_cluster,
+        ensure_xray_binary,
+        test_connection,
+    )
 
     err_console.print()
     err_console.print("  [bold]Connection[/bold]")
@@ -243,7 +248,10 @@ def _run_connection_tests(cluster: ClusterConfig, server_ip: str) -> None:
     for label, config, expect_ip_match in configs:
         socks_port = config["inbounds"][0]["port"]
         info(f"Testing {label}...")
-        success, detail = test_connection(xray_bin, config, server_ip, socks_port, label, expect_ip_match)
+        try:
+            success, detail = test_connection(xray_bin, config, server_ip, socks_port, label, expect_ip_match)
+        except XrayStartupError as exc:
+            success, detail = False, str(exc)
         if success:
             ok(f"{label} OK — {detail}")
             passed += 1
