@@ -46,7 +46,7 @@ def build_systemlab_intent(
                     ProtocolPathIntent(
                         id="exit-b-reality",
                         protocol="reality",
-                        reality_sni="www.microsoft.com",
+                        reality_sni="www.google.com",
                     )
                 ],
             ),

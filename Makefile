@@ -41,19 +41,35 @@ templates: ## Validate Jinja2 template rendering
 
 ci: check templates ## Run full CI locally
 
-system-lab-preflight: ## Check Docker Compose, daemon access, and container DNS
+system-lab-preflight: ## Check Compose, daemon access, BuildKit, and container DNS
 	bash tests/systemlab/scripts/preflight.sh
 
 system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10min)
 	bash tests/systemlab/scripts/setup-fixtures.sh
-	@cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
-		trap cleanup EXIT; \
+	@set -eu; \
+		cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
+		cleanup_on_exit() { \
+			status=$$?; trap - EXIT; cleanup_status=0; \
+			cleanup || cleanup_status=$$?; \
+			if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+			exit "$$cleanup_status"; \
+		}; \
+		trap cleanup_on_exit EXIT; \
+		cleanup; \
 		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
 system-lab-fast: system-lab-preflight ## Re-run system lab preserving cached images (~3-4min after first run)
 	bash tests/systemlab/scripts/setup-fixtures.sh
-	@cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \
-		trap cleanup EXIT; \
+	@set -eu; \
+		cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \
+		cleanup_on_exit() { \
+			status=$$?; trap - EXIT; cleanup_status=0; \
+			cleanup || cleanup_status=$$?; \
+			if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+			exit "$$cleanup_status"; \
+		}; \
+		trap cleanup_on_exit EXIT; \
+		cleanup; \
 		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
 ## —— Real-VM harness (LOCAL ONLY, costs real money) ————————————————

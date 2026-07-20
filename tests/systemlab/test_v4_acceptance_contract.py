@@ -32,7 +32,9 @@ def _server_refs() -> dict[str, str]:
 
 
 def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
-    plan = compile_topology(build_systemlab_intent(_server_refs()))
+    intent = build_systemlab_intent(_server_refs())
+    assert {path.reality_sni for exit_ in intent.exits for path in exit_.paths} == {"www.google.com"}
+    plan = compile_topology(intent)
 
     profiles = [
         resource.payload

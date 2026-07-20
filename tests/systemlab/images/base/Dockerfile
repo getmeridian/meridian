@@ -36,6 +36,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-transport-https gnupg software-properties-common \
     procps psmisc less vim-tiny
 
+# Trust the local Pebble endpoint used for short-lived IP certificates.
+COPY tests/systemlab/fixtures/pebble-ca.pem /usr/local/share/ca-certificates/pebble-ca.crt
+RUN update-ca-certificates
+
 # ---------- nginx from official repo (1.27+, http2 on; directive) ----------
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -76,9 +80,9 @@ RUN mkdir -p /run/sshd /root/.ssh \
 COPY tests/systemlab/fixtures/controller_authorized_keys /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# ---------- Docker daemon config (nested: vfs driver, no iptables) ----------
+# ---------- Docker daemon config (nested: vfs driver, default bridge NAT) ----------
 RUN mkdir -p /etc/docker \
-    && printf '{"storage-driver":"vfs","iptables":false}\n' \
+    && printf '{"storage-driver":"vfs"}\n' \
        > /etc/docker/daemon.json
 
 # ---------- systemd wiring ----------

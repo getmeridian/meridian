@@ -6,7 +6,7 @@
 #                             ├─SSH──► relay-a   (172.30.0.13)
 #                             ├─SSH──► relay-b   (172.30.0.14)
 #                             └─SSH──► gateway-a (172.30.0.15)
-#   pebble (172.30.0.30) — local ACME CA (phase 2: domain-mode cert issuance)
+#   pebble (172.30.0.30) — local ACME CA for short-lived IP certificates
 #
 # Usage:
 #   make system-lab
@@ -156,7 +156,7 @@ services:
       GATEWAY_IP: "172.30.0.15"
       MERIDIAN_HOME: /tmp/meridian-home
       MERIDIAN_DISABLE_UPDATE_CHECK: "1"
-      MERIDIAN_ACME_SERVER: "https://172.30.0.30:14000/dir"
+      MERIDIAN_ACME_SERVER: "https://pebble:14000/dir"
       PYTHONUNBUFFERED: "1"
     command: ["bash", "/workspace/tests/systemlab/scripts/controller-run.sh"]
 
