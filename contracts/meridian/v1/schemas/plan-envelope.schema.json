@@ -1,5 +1,124 @@
 {
   "$defs": {
+    "CompiledPlanDriftResult": {
+      "additionalProperties": false,
+      "description": "One V4 compiler resource that does not match remote state.",
+      "properties": {
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id"
+      ],
+      "title": "CompiledPlanDriftResult",
+      "type": "object"
+    },
+    "CompiledPlanResourceResult": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for one reviewed V4 compiler resource.",
+      "properties": {
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "desired_hash": {
+          "title": "Desired Hash",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "server_baseline",
+            "control_plane_runtime",
+            "config_profile",
+            "inbound",
+            "node_binding",
+            "node_runtime",
+            "host",
+            "internal_squad",
+            "external_squad",
+            "access_user",
+            "service_user",
+            "subscription_template",
+            "subscription_settings",
+            "nginx_artifact",
+            "realm_hop",
+            "firewall_rule",
+            "certificate",
+            "routing_gateway",
+            "egress_pool",
+            "route_rule",
+            "probe"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id",
+        "kind",
+        "desired_hash"
+      ],
+      "title": "CompiledPlanResourceResult",
+      "type": "object"
+    },
+    "CompiledPlanResult": {
+      "additionalProperties": false,
+      "description": "Read-only drift result for a V4 compiler plan.",
+      "properties": {
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "drifted_resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Drifted Resources",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanResourceResult"
+          },
+          "title": "Resources",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "converged",
+        "summary",
+        "exit_code"
+      ],
+      "title": "CompiledPlanResult",
+      "type": "object"
+    },
     "EmptyData": {
       "additionalProperties": false,
       "description": "Empty data object used by failed or cancelled envelopes.",
@@ -227,6 +346,18 @@
       "title": "PlanChange",
       "type": "object"
     },
+    "PlanCommandData": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlanResult"
+        },
+        {
+          "$ref": "#/$defs/CompiledPlanResult"
+        }
+      ],
+      "description": "Success data returned by legacy and V4 plan execution.",
+      "title": "PlanCommandData"
+    },
     "PlanCounts": {
       "additionalProperties": false,
       "properties": {
@@ -342,7 +473,7 @@
           "type": "string"
         },
         "data": {
-          "$ref": "#/$defs/PlanResult"
+          "$ref": "#/$defs/PlanCommandData"
         },
         "duration_ms": {
           "title": "Duration Ms",

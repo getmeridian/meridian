@@ -6,8 +6,10 @@ import typer
 
 from meridian.cluster import ClusterConfig
 from meridian.console import confirm, err_console, fail, ok, warn
+from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
 from meridian.renderers import emit_json
 
 
@@ -46,10 +48,10 @@ def run_v4_apply(
             emit_json(
                 command_envelope(
                     command="apply",
-                    data={
-                        "plan_hash": review.plan.plan_hash,
-                        "resource_count": len(review.plan.resources),
-                    },
+                    data=CompiledApplyPreview(
+                        plan_hash=review.plan.plan_hash,
+                        resource_count=len(review.plan.resources),
+                    ).to_data(),
                     summary=Summary(
                         text=error.message,
                         changed=False,
@@ -69,40 +71,46 @@ def run_v4_apply(
         if not confirm("Apply this reviewed topology?"):
             raise typer.Exit(1)
 
-    result = runtime.apply_intent(intent)
-    status: OutputStatus = "changed" if result.changed else "no_changes" if result.all_succeeded else "failed"
+    result = runtime.apply_intent(
+        intent,
+        expected_plan_hash=review.plan.plan_hash,
+    )
+    status: OutputStatus = "failed" if not result.all_succeeded else "changed" if result.changed else "no_changes"
+    exit_code = 0 if result.all_succeeded else 3
+    summary_text = "V4 topology converged." if result.all_succeeded else "V4 topology apply failed."
+    result_data = build_compiled_apply_result(
+        result,
+        exit_code=exit_code,
+        summary=summary_text,
+    )
+    apply_error: MeridianError | None = None
+    if not result.all_succeeded:
+        apply_error = MeridianError(
+            code="MERIDIAN_APPLY_FAILED",
+            category="system",
+            message=summary_text,
+            hint="Review failed resources and rerun apply after fixing the underlying issue.",
+            retryable=True,
+            exit_code=3,
+        )
     if json_output:
         emit_json(
             command_envelope(
                 command="apply",
-                data={
-                    "plan_hash": result.plan_hash,
-                    "generation": result.generation,
-                    "all_succeeded": result.all_succeeded,
-                    "changed": result.changed,
-                    "actions": [
-                        {
-                            "resource_id": item.action.resource.logical_id,
-                            "status": item.status,
-                            "changed": item.changed,
-                            "error": item.error,
-                        }
-                        for item in result.results
-                    ],
-                },
+                data=result_data.to_data(),
                 summary=Summary(
-                    text=("V4 topology converged." if result.all_succeeded else "V4 topology apply failed."),
+                    text=summary_text,
                     changed=result.changed,
-                    counts={
-                        "actions": len(result.results),
-                        "failed": len(result.failed),
-                    },
+                    counts=result_data.counts.model_dump(),
                 ),
                 status=status,
-                exit_code=0 if result.all_succeeded else 3,
+                exit_code=exit_code,
+                errors=[apply_error] if apply_error else None,
                 timer=operation.timer,
             )
         )
+        if apply_error:
+            raise typer.Exit(3)
     if not result.all_succeeded:
         for item in result.failed:
             warn(f"Failed: {item.action.resource.logical_id} — {item.error}")
@@ -145,35 +153,39 @@ def run_v4_plan(
         resource_kind = resource.payload.kind
         counts[resource_kind] = counts.get(resource_kind, 0) + 1
     if json_output:
+        summary_text = (
+            "V4 topology is converged."
+            if converged
+            else (f"{len(inspection.drifted)} of {len(resources)} V4 resources require repair.")
+        )
+        result_data = CompiledPlanResult(
+            plan_hash=inspection.plan_hash,
+            converged=converged,
+            summary=summary_text,
+            exit_code=exit_code,
+            drifted_resources=[
+                CompiledPlanDriftResult(
+                    logical_id=item.action.resource.logical_id,
+                    error=item.error,
+                )
+                for item in inspection.drifted
+            ],
+            resources=[
+                CompiledPlanResourceResult(
+                    logical_id=resource.logical_id,
+                    kind=resource.payload.kind,
+                    desired_hash=resource.desired_hash,
+                    dependencies=resource.dependencies,
+                )
+                for resource in resources
+            ],
+        )
         emit_json(
             command_envelope(
                 command="plan",
-                data={
-                    "plan_hash": inspection.plan_hash,
-                    "converged": converged,
-                    "drifted_resources": [
-                        {
-                            "logical_id": item.action.resource.logical_id,
-                            "error": item.error,
-                        }
-                        for item in inspection.drifted
-                    ],
-                    "resources": [
-                        {
-                            "logical_id": resource.logical_id,
-                            "kind": resource.payload.kind,
-                            "desired_hash": resource.desired_hash,
-                            "dependencies": resource.dependencies,
-                        }
-                        for resource in resources
-                    ],
-                },
+                data=result_data.to_data(),
                 summary=Summary(
-                    text=(
-                        "V4 topology is converged."
-                        if converged
-                        else (f"{len(inspection.drifted)} of {len(resources)} V4 resources require repair.")
-                    ),
+                    text=summary_text,
                     changed=not converged,
                     counts=counts,
                 ),

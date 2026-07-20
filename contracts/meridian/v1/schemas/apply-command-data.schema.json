@@ -146,27 +146,6 @@
       "title": "CompiledApplyActionResult",
       "type": "object"
     },
-    "CompiledApplyPreview": {
-      "additionalProperties": false,
-      "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
-      "properties": {
-        "plan_hash": {
-          "title": "Plan Hash",
-          "type": "string"
-        },
-        "resource_count": {
-          "minimum": 0,
-          "title": "Resource Count",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "plan_hash",
-        "resource_count"
-      ],
-      "title": "CompiledApplyPreview",
-      "type": "object"
-    },
     "CompiledApplyResult": {
       "additionalProperties": false,
       "description": "Apply result for one generation-scoped V4 compiler plan.",
@@ -217,13 +196,6 @@
         "counts"
       ],
       "title": "CompiledApplyResult",
-      "type": "object"
-    },
-    "EmptyData": {
-      "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
-      "properties": {},
-      "title": "EmptyData",
       "type": "object"
     },
     "PlanActionResult": {
@@ -476,14 +448,8 @@
     },
     {
       "$ref": "#/$defs/CompiledApplyResult"
-    },
-    {
-      "$ref": "#/$defs/CompiledApplyPreview"
-    },
-    {
-      "$ref": "#/$defs/EmptyData"
     }
   ],
-  "description": "Failure data schema for `meridian apply --json`.",
-  "title": "ApplyFailureData"
+  "description": "Success data returned by legacy and V4 apply execution.",
+  "title": "ApplyCommandData"
 }

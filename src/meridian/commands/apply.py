@@ -15,6 +15,7 @@ from meridian.cluster import ClusterConfig
 from meridian.commands.v4_topology import run_v4_apply as _run_v4_topology
 from meridian.console import confirm, err_console, error_context, fail, info, ok, warn
 from meridian.core.apply import build_apply_result
+from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.reconciler import PlanActionKind
@@ -534,12 +535,15 @@ def _run(
     """
     cluster = ClusterConfig.load()
     if cluster.topology_intent is not None:
-        _run_v4_topology(
-            cluster,
-            yes=yes,
-            json_output=json_output,
-            operation=operation,
-        )
+        try:
+            _run_v4_topology(
+                cluster,
+                yes=yes,
+                json_output=json_output,
+                operation=operation,
+            )
+        except MeridianException as exc:
+            fail(exc)
         return
     validate_cluster_for_reconciliation(cluster, "apply")
 

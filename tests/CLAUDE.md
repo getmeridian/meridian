@@ -34,7 +34,7 @@ Top-level `conftest.py` provides:
 - **Idempotency dual-path** — provisioner tests verify both "needs change" and "already done" paths.
 
 ## Pitfalls
-
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes.
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
+- **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.

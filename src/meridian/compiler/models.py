@@ -18,6 +18,7 @@ from meridian.compiler.names import (
 )
 from meridian.core.inputs import IPAddressValue, PortValue, ServerReferenceValue, SshUserValue
 from meridian.core.models import CoreModel
+from meridian.core.resources import ResourceKind as ResourceKind
 from meridian.core.topology import EgressStrategy, ProtocolKind, RouteMatchKind, TrafficRouteAction
 
 COMPILER_VERSION: Literal["v4.1"] = "v4.1"
@@ -30,29 +31,6 @@ RuntimePinName = Annotated[
 RuntimePinValue = Annotated[
     str,
     Field(min_length=1, max_length=512, pattern=r"^\S+$"),
-]
-ResourceKind = Literal[
-    "server_baseline",
-    "control_plane_runtime",
-    "config_profile",
-    "inbound",
-    "node_binding",
-    "node_runtime",
-    "host",
-    "internal_squad",
-    "external_squad",
-    "access_user",
-    "service_user",
-    "subscription_template",
-    "subscription_settings",
-    "nginx_artifact",
-    "realm_hop",
-    "firewall_rule",
-    "certificate",
-    "routing_gateway",
-    "egress_pool",
-    "route_rule",
-    "probe",
 ]
 PostconditionKind = Literal[
     "exists",

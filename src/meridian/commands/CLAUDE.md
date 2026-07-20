@@ -29,3 +29,4 @@
 - **`confirm()` returns bool** — returns True on accept, False on reject. Callers must check `if not confirm(...): raise typer.Exit(1)`.
 - **Panel node cannot be removed** — `node remove` blocks removal of the panel host server.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
+- V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.

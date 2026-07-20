@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, RootModel
 
 from meridian.core.models import CoreModel
 from meridian.core.plan import PlanActionResult, PlanResult, build_plan_action_result, build_plan_result
 
 ApplyActionStatus = Literal["succeeded", "failed", "skipped"]
+CompiledApplyActionStatus = Literal["converged", "applied", "failed", "unknown", "skipped"]
 
 
 class ApplyActionResult(CoreModel):
@@ -39,6 +40,50 @@ class ApplyResult(CoreModel):
     plan: PlanResult
     counts: ApplyCounts
     actions: list[ApplyActionResult] = Field(default_factory=list)
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
+class CompiledApplyActionResult(CoreModel):
+    """Execution result for one V4 compiler resource."""
+
+    resource_id: str
+    status: CompiledApplyActionStatus
+    success: bool
+    changed: bool
+    error: str = ""
+
+
+class CompiledApplyResult(CoreModel):
+    """Apply result for one generation-scoped V4 compiler plan."""
+
+    plan_hash: str
+    generation: int = Field(ge=0)
+    all_succeeded: bool
+    changed: bool
+    summary: str
+    exit_code: int
+    counts: ApplyCounts
+    actions: list[CompiledApplyActionResult] = Field(default_factory=list)
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
+class ApplyCommandData(RootModel[ApplyResult | CompiledApplyResult]):
+    """Success data returned by legacy and V4 apply execution."""
+
+
+class CompiledApplyPreview(CoreModel):
+    """Reviewed V4 compiler-plan metadata returned before confirmation."""
+
+    plan_hash: str
+    resource_count: int = Field(ge=0)
 
     def to_data(self) -> dict[str, Any]:
         from meridian.core.serde import to_plain
@@ -94,6 +139,41 @@ def build_apply_result(
         summary=execution_result.summary() if summary is None else summary,
         exit_code=exit_code,
         plan=plan_result,
+        counts=counts,
+        actions=actions,
+    )
+
+
+def build_compiled_apply_result(
+    execution_result: Any,
+    *,
+    exit_code: int,
+    summary: str,
+) -> CompiledApplyResult:
+    """Build a typed result from V4 compiler-resource executor output."""
+    actions = [
+        CompiledApplyActionResult(
+            resource_id=item.action.resource.logical_id,
+            status=item.status,
+            success=item.succeeded,
+            changed=item.changed,
+            error=item.error,
+        )
+        for item in execution_result.results
+    ]
+    counts = ApplyCounts(
+        actions=len(actions),
+        succeeded=sum(1 for action in actions if action.success),
+        failed=sum(1 for action in actions if not action.success and action.status != "skipped"),
+        skipped=sum(1 for action in actions if action.status == "skipped"),
+    )
+    return CompiledApplyResult(
+        plan_hash=execution_result.plan_hash,
+        generation=execution_result.generation,
+        all_succeeded=execution_result.all_succeeded,
+        changed=execution_result.changed,
+        summary=summary,
+        exit_code=exit_code,
         counts=counts,
         actions=actions,
     )

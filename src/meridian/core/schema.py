@@ -6,7 +6,15 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, Field, RootModel, create_model
 
-from meridian.core.apply import ApplyActionResult, ApplyCounts, ApplyResult
+from meridian.core.apply import (
+    ApplyActionResult,
+    ApplyCommandData,
+    ApplyCounts,
+    ApplyResult,
+    CompiledApplyActionResult,
+    CompiledApplyPreview,
+    CompiledApplyResult,
+)
 from meridian.core.clients import ClientListResult, ClientShowResult
 from meridian.core.command_inputs import (
     ClientNameRequest,
@@ -44,7 +52,15 @@ from meridian.core.operations import (
     OperationSnapshot,
     OperationStart,
 )
-from meridian.core.plan import PlanActionResult, PlanCounts, PlanResult
+from meridian.core.plan import (
+    CompiledPlanDriftResult,
+    CompiledPlanResourceResult,
+    CompiledPlanResult,
+    PlanActionResult,
+    PlanCommandData,
+    PlanCounts,
+    PlanResult,
+)
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -187,7 +203,7 @@ def _make_command_envelope(
 _PlanSuccessEnvelope, _PlanTerminalEnvelope, PlanOutputEnvelope = _make_command_envelope(
     "Plan",
     "plan",
-    PlanResult,
+    PlanCommandData,
     success_statuses=Literal["changed", "no_changes"],
     doc="Envelope schema for `meridian plan --json`.",
 )
@@ -196,14 +212,14 @@ _PlanSuccessEnvelope, _PlanTerminalEnvelope, PlanOutputEnvelope = _make_command_
 _ApplySuccessEnvelope, _ApplyTerminalEnvelope, ApplyOutputEnvelope = _make_command_envelope(
     "Apply",
     "apply",
-    ApplyResult,
+    ApplyCommandData,
     success_statuses=Literal["changed", "no_changes"],
-    failure_data_type=ApplyResult | EmptyData,
+    failure_data_type=ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData,
     doc="Envelope schema for `meridian apply --json`.",
 )
 
 
-class ApplyFailureData(RootModel[ApplyResult | EmptyData]):
+class ApplyFailureData(RootModel[ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData]):
     """Failure data schema for `meridian apply --json`."""
 
 
@@ -388,10 +404,14 @@ def _deploy_outcomes() -> list[CommandOutcome]:
 _SCHEMAS: dict[str, type[BaseModel]] = {
     "output-envelope": OutputEnvelope,
     "apply": ApplyResult,
+    "apply-command-data": ApplyCommandData,
     "apply-action": ApplyActionResult,
     "apply-counts": ApplyCounts,
     "apply-envelope": ApplyOutputEnvelope,
     "apply-failure": ApplyFailureData,
+    "compiled-apply-action": CompiledApplyActionResult,
+    "compiled-apply-preview": CompiledApplyPreview,
+    "compiled-apply-result": CompiledApplyResult,
     "api-commands": ApiCommandsResult,
     "api-commands-envelope": ApiCommandsOutputEnvelope,
     "api-schema": ApiSchemaResult,
@@ -457,8 +477,12 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "schema-catalog-entry": SchemaCatalogEntry,
     "empty-data": EmptyData,
     "plan-result": PlanResult,
+    "plan-command-data": PlanCommandData,
     "plan-action": PlanActionResult,
     "plan-counts": PlanCounts,
+    "compiled-plan-drift": CompiledPlanDriftResult,
+    "compiled-plan-resource": CompiledPlanResourceResult,
+    "compiled-plan-result": CompiledPlanResult,
     "fleet-status": FleetStatus,
     "fleet-inventory": FleetInventory,
     "command-contract": CommandContract,
@@ -471,7 +495,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         command="apply",
         argv=["apply"],
         envelope_schema="apply-envelope",
-        data_schema="apply",
+        data_schema="apply-command-data",
         failure_data_schema="apply-failure",
         error_schema="error",
         statuses=["no_changes", "changed", "failed", "cancelled"],
@@ -633,7 +657,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         command="plan",
         argv=["plan"],
         envelope_schema="plan-envelope",
-        data_schema="plan-result",
+        data_schema="plan-command-data",
         failure_data_schema="empty-data",
         error_schema="error",
         statuses=["no_changes", "changed", "failed", "cancelled"],
@@ -646,7 +670,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
             "130": "cancelled by the user",
         },
         machine_flags=["--json"],
-        stability="stable",
+        stability="preview",
         description="Compute the desired-state reconciliation plan without applying it.",
     ),
     "fleet.status": CommandContract(

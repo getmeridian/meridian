@@ -29,6 +29,10 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "apply" in names
     assert "apply-envelope" in names
     assert "apply-failure" in names
+    assert "compiled-apply-result" in names
+    assert "compiled-plan-result" in names
+    assert "apply-command-data" in names
+    assert "plan-command-data" in names
     assert "api-commands-envelope" in names
     assert "api-schema-envelope" in names
     assert "api-schemas-envelope" in names
@@ -232,7 +236,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     by_command = {item["command"]: item for item in catalog}
 
     assert by_command["plan"]["envelope_schema"] == "plan-envelope"
-    assert by_command["plan"]["data_schema"] == "plan-result"
+    assert by_command["plan"]["data_schema"] == "plan-command-data"
     assert by_command["plan"]["failure_data_schema"] == "empty-data"
     assert by_command["plan"]["error_schema"] == "error"
     assert by_command["plan"]["machine_flags"] == ["--json"]
@@ -248,7 +252,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
         "meaning": "user or configuration error",
     } in by_command["plan"]["outcomes"]
     assert by_command["client.list"]["data_schema"] == "client-list"
-    assert by_command["apply"]["data_schema"] == "apply"
+    assert by_command["apply"]["data_schema"] == "apply-command-data"
     assert by_command["apply"]["failure_data_schema"] == "apply-failure"
     assert by_command["apply"]["machine_flags"] == ["--json"]
     assert by_command["apply"]["stability"] == "preview"
@@ -275,7 +279,15 @@ def test_command_catalog_can_embed_command_schemas() -> None:
     )
     success = plan["envelope"]["$defs"][success_ref.rsplit("/", 1)[-1]]
     assert success["properties"]["command"]["const"] == "plan"
-    assert plan["data"]["title"] == "PlanResult"
+    assert plan["data"]["title"] == "PlanCommandData"
+    assert len(plan["data"]["anyOf"]) == 2
+    compiled_plan_ref = next(
+        item["$ref"] for item in plan["data"]["anyOf"] if item["$ref"].endswith("CompiledPlanResult")
+    )
+    compiled_plan = plan["data"]["$defs"][compiled_plan_ref.rsplit("/", 1)[-1]]
+    resource_ref = compiled_plan["properties"]["resources"]["items"]["$ref"]
+    resource = plan["data"]["$defs"][resource_ref.rsplit("/", 1)[-1]]
+    assert set(resource["properties"]["kind"]["enum"]) >= {"node_runtime", "probe"}
     assert plan["failure_data"]["title"] == "EmptyData"
     assert plan["error"]["title"] == "MeridianError"
     assert next(item for item in parsed.commands if item.command == "plan").data is not None

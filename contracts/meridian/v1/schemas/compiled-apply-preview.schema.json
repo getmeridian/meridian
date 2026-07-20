@@ -1,0 +1,21 @@
+{
+  "additionalProperties": false,
+  "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
+  "properties": {
+    "plan_hash": {
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "resource_count": {
+      "minimum": 0,
+      "title": "Resource Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "plan_hash",
+    "resource_count"
+  ],
+  "title": "CompiledApplyPreview",
+  "type": "object"
+}

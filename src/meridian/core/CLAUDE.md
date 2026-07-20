@@ -33,3 +33,4 @@
 - Generated JSON Schemas are public data; redact values without destroying schema `properties`.
 - Do not put SSH passwords or private keys into public server contracts; Engine must handle them through short-lived secret channels.
 - Keep topology IDs lowercase and bounded, and validate access usernames against the pinned panel contract before compilation.
+- Plan/apply envelopes use distinct typed legacy and compiled results; preserve legacy schema names and add a separate command-data union.

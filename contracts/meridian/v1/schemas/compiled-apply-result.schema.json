@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "ApplyCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate counts for apply execution.",
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "skipped": {
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "title": "ApplyCounts",
+      "type": "object"
+    },
+    "CompiledApplyActionResult": {
+      "additionalProperties": false,
+      "description": "Execution result for one V4 compiler resource.",
+      "properties": {
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "converged",
+            "applied",
+            "failed",
+            "unknown",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource_id",
+        "status",
+        "success",
+        "changed"
+      ],
+      "title": "CompiledApplyActionResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Apply result for one generation-scoped V4 compiler plan.",
+  "properties": {
+    "actions": {
+      "items": {
+        "$ref": "#/$defs/CompiledApplyActionResult"
+      },
+      "title": "Actions",
+      "type": "array"
+    },
+    "all_succeeded": {
+      "title": "All Succeeded",
+      "type": "boolean"
+    },
+    "changed": {
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "counts": {
+      "$ref": "#/$defs/ApplyCounts"
+    },
+    "exit_code": {
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "generation": {
+      "minimum": 0,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "plan_hash": {
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_hash",
+    "generation",
+    "all_succeeded",
+    "changed",
+    "summary",
+    "exit_code",
+    "counts"
+  ],
+  "title": "CompiledApplyResult",
+  "type": "object"
+}

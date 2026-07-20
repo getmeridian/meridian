@@ -1,206 +1,109 @@
 {
   "$defs": {
-    "ApplyActionResult": {
+    "CompiledPlanDriftResult": {
       "additionalProperties": false,
-      "description": "Execution result for one plan action.",
+      "description": "One V4 compiler resource that does not match remote state.",
       "properties": {
-        "action": {
-          "$ref": "#/$defs/PlanActionResult"
-        },
         "error": {
           "default": "",
           "title": "Error",
           "type": "string"
         },
-        "status": {
-          "enum": [
-            "succeeded",
-            "failed",
-            "skipped"
-          ],
-          "title": "Status",
+        "logical_id": {
+          "title": "Logical Id",
           "type": "string"
-        },
-        "success": {
-          "title": "Success",
-          "type": "boolean"
         }
       },
       "required": [
-        "action",
-        "status",
-        "success"
+        "logical_id"
       ],
-      "title": "ApplyActionResult",
+      "title": "CompiledPlanDriftResult",
       "type": "object"
     },
-    "ApplyCounts": {
+    "CompiledPlanResourceResult": {
       "additionalProperties": false,
-      "description": "Aggregate counts for apply execution.",
+      "description": "Secret-free identity for one reviewed V4 compiler resource.",
       "properties": {
-        "actions": {
-          "title": "Actions",
-          "type": "integer"
-        },
-        "failed": {
-          "title": "Failed",
-          "type": "integer"
-        },
-        "skipped": {
-          "title": "Skipped",
-          "type": "integer"
-        },
-        "succeeded": {
-          "title": "Succeeded",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "actions",
-        "succeeded",
-        "failed",
-        "skipped"
-      ],
-      "title": "ApplyCounts",
-      "type": "object"
-    },
-    "ApplyResult": {
-      "additionalProperties": false,
-      "description": "Final apply result for process/API clients.",
-      "properties": {
-        "actions": {
+        "dependencies": {
           "items": {
-            "$ref": "#/$defs/ApplyActionResult"
+            "type": "string"
           },
-          "title": "Actions",
+          "title": "Dependencies",
           "type": "array"
         },
-        "all_succeeded": {
-          "title": "All Succeeded",
+        "desired_hash": {
+          "title": "Desired Hash",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "server_baseline",
+            "control_plane_runtime",
+            "config_profile",
+            "inbound",
+            "node_binding",
+            "node_runtime",
+            "host",
+            "internal_squad",
+            "external_squad",
+            "access_user",
+            "service_user",
+            "subscription_template",
+            "subscription_settings",
+            "nginx_artifact",
+            "realm_hop",
+            "firewall_rule",
+            "certificate",
+            "routing_gateway",
+            "egress_pool",
+            "route_rule",
+            "probe"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id",
+        "kind",
+        "desired_hash"
+      ],
+      "title": "CompiledPlanResourceResult",
+      "type": "object"
+    },
+    "CompiledPlanResult": {
+      "additionalProperties": false,
+      "description": "Read-only drift result for a V4 compiler plan.",
+      "properties": {
+        "converged": {
+          "title": "Converged",
           "type": "boolean"
         },
-        "counts": {
-          "$ref": "#/$defs/ApplyCounts"
+        "drifted_resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Drifted Resources",
+          "type": "array"
         },
         "exit_code": {
           "title": "Exit Code",
           "type": "integer"
         },
-        "plan": {
-          "$ref": "#/$defs/PlanResult"
-        },
-        "summary": {
-          "title": "Summary",
-          "type": "string"
-        }
-      },
-      "required": [
-        "all_succeeded",
-        "summary",
-        "exit_code",
-        "plan",
-        "counts"
-      ],
-      "title": "ApplyResult",
-      "type": "object"
-    },
-    "CompiledApplyActionResult": {
-      "additionalProperties": false,
-      "description": "Execution result for one V4 compiler resource.",
-      "properties": {
-        "changed": {
-          "title": "Changed",
-          "type": "boolean"
-        },
-        "error": {
-          "default": "",
-          "title": "Error",
-          "type": "string"
-        },
-        "resource_id": {
-          "title": "Resource Id",
-          "type": "string"
-        },
-        "status": {
-          "enum": [
-            "converged",
-            "applied",
-            "failed",
-            "unknown",
-            "skipped"
-          ],
-          "title": "Status",
-          "type": "string"
-        },
-        "success": {
-          "title": "Success",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "resource_id",
-        "status",
-        "success",
-        "changed"
-      ],
-      "title": "CompiledApplyActionResult",
-      "type": "object"
-    },
-    "CompiledApplyPreview": {
-      "additionalProperties": false,
-      "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
-      "properties": {
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
         },
-        "resource_count": {
-          "minimum": 0,
-          "title": "Resource Count",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "plan_hash",
-        "resource_count"
-      ],
-      "title": "CompiledApplyPreview",
-      "type": "object"
-    },
-    "CompiledApplyResult": {
-      "additionalProperties": false,
-      "description": "Apply result for one generation-scoped V4 compiler plan.",
-      "properties": {
-        "actions": {
+        "resources": {
           "items": {
-            "$ref": "#/$defs/CompiledApplyActionResult"
+            "$ref": "#/$defs/CompiledPlanResourceResult"
           },
-          "title": "Actions",
+          "title": "Resources",
           "type": "array"
-        },
-        "all_succeeded": {
-          "title": "All Succeeded",
-          "type": "boolean"
-        },
-        "changed": {
-          "title": "Changed",
-          "type": "boolean"
-        },
-        "counts": {
-          "$ref": "#/$defs/ApplyCounts"
-        },
-        "exit_code": {
-          "title": "Exit Code",
-          "type": "integer"
-        },
-        "generation": {
-          "minimum": 0,
-          "title": "Generation",
-          "type": "integer"
-        },
-        "plan_hash": {
-          "title": "Plan Hash",
-          "type": "string"
         },
         "summary": {
           "title": "Summary",
@@ -209,21 +112,11 @@
       },
       "required": [
         "plan_hash",
-        "generation",
-        "all_succeeded",
-        "changed",
+        "converged",
         "summary",
-        "exit_code",
-        "counts"
+        "exit_code"
       ],
-      "title": "CompiledApplyResult",
-      "type": "object"
-    },
-    "EmptyData": {
-      "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
-      "properties": {},
-      "title": "EmptyData",
+      "title": "CompiledPlanResult",
       "type": "object"
     },
     "PlanActionResult": {
@@ -472,18 +365,12 @@
   },
   "anyOf": [
     {
-      "$ref": "#/$defs/ApplyResult"
+      "$ref": "#/$defs/PlanResult"
     },
     {
-      "$ref": "#/$defs/CompiledApplyResult"
-    },
-    {
-      "$ref": "#/$defs/CompiledApplyPreview"
-    },
-    {
-      "$ref": "#/$defs/EmptyData"
+      "$ref": "#/$defs/CompiledPlanResult"
     }
   ],
-  "description": "Failure data schema for `meridian apply --json`.",
-  "title": "ApplyFailureData"
+  "description": "Success data returned by legacy and V4 plan execution.",
+  "title": "PlanCommandData"
 }
