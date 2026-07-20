@@ -17,7 +17,10 @@ export type RegionalTraffic = RegionalTrafficDecision[];
 /**
  * @minItems 1
  */
-export type Capabilities = ["panel" | "exit" | "relay", ...("panel" | "exit" | "relay")[]];
+export type Capabilities = [
+  "panel" | "exit" | "relay" | "routing_gateway",
+  ...("panel" | "exit" | "relay" | "routing_gateway")[]
+];
 export type Region = string;
 export type ServerRef = string;
 export type Servers = TopologyServerCapabilities[];

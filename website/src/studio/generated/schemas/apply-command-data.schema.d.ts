@@ -6,11 +6,6 @@
  */
 
 /**
- * Envelope schema for `meridian apply --json`.
- */
-export type ApplyOutputEnvelope = _ApplySuccessEnvelope | _ApplyTerminalEnvelope;
-export type Command = "apply";
-/**
  * Success data returned by legacy and V4 apply execution.
  */
 export type ApplyCommandData = ApplyResult | CompiledApplyResult;
@@ -79,57 +74,7 @@ export type ExitCode2 = number;
 export type Generation = number;
 export type PlanHash = string;
 export type Summary2 = string;
-export type DurationMs = number;
-/**
- * @maxItems 0
- */
-export type Errors = [];
-export type ExitCode3 = number;
-export type MeridianVersion = string;
-export type OperationId = string;
-export type Schema = "meridian.output/v1";
-export type StartedAt = string;
-export type Status2 = "changed" | "no_changes";
-export type Changed2 = boolean;
-export type Text = string;
-export type Category = "user" | "system" | "bug" | "cancelled";
-export type Code = string;
-export type ExitCode4 = number;
-export type Hint = string;
-export type Message = string;
-export type Retryable = boolean;
-export type Warnings = MeridianError[];
-export type Command1 = "apply";
-export type Data = ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData;
-export type PlanHash1 = string;
-export type ResourceCount = number;
-export type DurationMs1 = number;
-/**
- * @minItems 1
- */
-export type Errors1 = [MeridianError, ...MeridianError[]];
-export type ExitCode5 = number;
-export type MeridianVersion1 = string;
-export type OperationId1 = string;
-export type Schema1 = "meridian.output/v1";
-export type StartedAt1 = string;
-export type Status3 = "failed" | "cancelled";
-export type Warnings1 = MeridianError[];
 
-export interface _ApplySuccessEnvelope {
-  command: Command;
-  data: ApplyCommandData;
-  duration_ms: DurationMs;
-  errors: Errors;
-  exit_code: ExitCode3;
-  meridian_version: MeridianVersion;
-  operation_id: OperationId;
-  schema: Schema;
-  started_at: StartedAt;
-  status: Status2;
-  summary: Summary3;
-  warnings: Warnings;
-}
 /**
  * Final apply result for process/API clients.
  */
@@ -223,58 +168,3 @@ export interface CompiledApplyActionResult {
   status: Status1;
   success: Success1;
 }
-/**
- * Structured summary shown in JSON envelopes and UI dashboards.
- */
-export interface Summary3 {
-  changed?: Changed2;
-  counts?: Counts;
-  text: Text;
-}
-export interface Counts {
-  [k: string]: number;
-}
-/**
- * Structured error safe for JSON/API clients.
- */
-export interface MeridianError {
-  category: Category;
-  cause?: Cause;
-  code: Code;
-  details?: Details;
-  exit_code?: ExitCode4;
-  hint?: Hint;
-  message: Message;
-  retryable?: Retryable;
-}
-export interface Cause {
-  [k: string]: unknown;
-}
-export interface Details {
-  [k: string]: unknown;
-}
-export interface _ApplyTerminalEnvelope {
-  command: Command1;
-  data: Data;
-  duration_ms: DurationMs1;
-  errors: Errors1;
-  exit_code: ExitCode5;
-  meridian_version: MeridianVersion1;
-  operation_id: OperationId1;
-  schema: Schema1;
-  started_at: StartedAt1;
-  status: Status3;
-  summary: Summary3;
-  warnings: Warnings1;
-}
-/**
- * Reviewed V4 compiler-plan metadata returned before confirmation.
- */
-export interface CompiledApplyPreview {
-  plan_hash: PlanHash1;
-  resource_count: ResourceCount;
-}
-/**
- * Empty data object used by failed or cancelled envelopes.
- */
-export interface EmptyData {}

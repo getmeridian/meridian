@@ -8,7 +8,7 @@
 /**
  * Failure data schema for `meridian apply --json`.
  */
-export type ApplyFailureData = ApplyResult | EmptyData;
+export type ApplyFailureData = ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData;
 export type CanRunParallel = boolean;
 export type After = string;
 export type Before = string;
@@ -62,6 +62,20 @@ export type Updates = number;
 export type ExitCode1 = number;
 export type Summary = string;
 export type Summary1 = string;
+export type Changed = boolean;
+export type Error1 = string;
+export type ResourceId1 = string;
+export type Status1 = "converged" | "applied" | "failed" | "unknown" | "skipped";
+export type Success1 = boolean;
+export type Actions4 = CompiledApplyActionResult[];
+export type AllSucceeded1 = boolean;
+export type Changed1 = boolean;
+export type ExitCode2 = number;
+export type Generation = number;
+export type PlanHash = string;
+export type Summary2 = string;
+export type PlanHash1 = string;
+export type ResourceCount = number;
 
 /**
  * Final apply result for process/API clients.
@@ -132,6 +146,36 @@ export interface PlanCounts {
   removes: Removes;
   replacements: Replacements;
   updates: Updates;
+}
+/**
+ * Apply result for one generation-scoped V4 compiler plan.
+ */
+export interface CompiledApplyResult {
+  actions?: Actions4;
+  all_succeeded: AllSucceeded1;
+  changed: Changed1;
+  counts: ApplyCounts;
+  exit_code: ExitCode2;
+  generation: Generation;
+  plan_hash: PlanHash;
+  summary: Summary2;
+}
+/**
+ * Execution result for one V4 compiler resource.
+ */
+export interface CompiledApplyActionResult {
+  changed: Changed;
+  error?: Error1;
+  resource_id: ResourceId1;
+  status: Status1;
+  success: Success1;
+}
+/**
+ * Reviewed V4 compiler-plan metadata returned before confirmation.
+ */
+export interface CompiledApplyPreview {
+  plan_hash: PlanHash1;
+  resource_count: ResourceCount;
 }
 /**
  * Empty data object used by failed or cancelled envelopes.

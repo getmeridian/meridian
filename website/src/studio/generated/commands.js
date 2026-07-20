@@ -252,7 +252,7 @@ export const commandCatalog = {
         "apply"
       ],
       "command": "apply",
-      "data_schema": "apply",
+      "data_schema": "apply-command-data",
       "description": "Converge desired state and emit typed action execution results.",
       "envelope_schema": "apply-envelope",
       "error_schema": "error",
@@ -628,7 +628,7 @@ export const commandCatalog = {
         "plan"
       ],
       "command": "plan",
-      "data_schema": "plan-result",
+      "data_schema": "plan-command-data",
       "description": "Compute the desired-state reconciliation plan without applying it.",
       "envelope_schema": "plan-envelope",
       "error_schema": "error",
@@ -681,7 +681,7 @@ export const commandCatalog = {
           "status": "cancelled"
         }
       ],
-      "stability": "stable",
+      "stability": "preview",
       "statuses": [
         "no_changes",
         "changed",

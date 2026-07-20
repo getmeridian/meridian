@@ -16,9 +16,20 @@ export const deployRequestSchema = {
       "type": "string"
     },
     "domain": {
+      "anyOf": [
+        {
+          "const": "",
+          "type": "string"
+        },
+        {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+          "type": "string"
+        }
+      ],
       "default": "",
-      "title": "Domain",
-      "type": "string"
+      "title": "Domain"
     },
     "geo_block": {
       "default": true,
@@ -66,9 +77,20 @@ export const deployRequestSchema = {
       "type": "string"
     },
     "sni": {
+      "anyOf": [
+        {
+          "const": "",
+          "type": "string"
+        },
+        {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+          "type": "string"
+        }
+      ],
       "default": "",
-      "title": "Sni",
-      "type": "string"
+      "title": "Sni"
     },
     "ssh_port": {
       "default": 22,

@@ -8,13 +8,13 @@
 export type ClientName = string;
 export type Color = string;
 export type Confirm = boolean;
-export type Domain = string;
+export type Domain = "" | string;
 export type GeoBlock = boolean;
 export type Harden = boolean;
 export type Icon = string;
 export type Ip = string;
 export type ServerName = string;
-export type Sni = string;
+export type Sni = "" | string;
 export type User = string;
 export type Warp = boolean;
 

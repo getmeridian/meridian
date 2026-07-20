@@ -5,21 +5,17 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-/**
- * @minItems 1
- */
-export type Capabilities = [
-  "panel" | "exit" | "relay" | "routing_gateway",
-  ...("panel" | "exit" | "relay" | "routing_gateway")[]
-];
+export type Id = string;
 export type Region = string;
 export type ServerRef = string;
+export type Warp = boolean;
 
 /**
- * Capabilities a saved server can provide to topology and routing plans.
+ * One saved server assigned an exit workload ID.
  */
-export interface TopologyServerCapabilities {
-  capabilities: Capabilities;
+export interface SetupExitRole {
+  id: Id;
   region?: Region;
   server_ref: ServerRef;
+  warp?: Warp;
 }

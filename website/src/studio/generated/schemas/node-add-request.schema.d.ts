@@ -5,11 +5,11 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Domain = string;
+export type Domain = "" | string;
 export type Harden = boolean;
 export type Ip = string;
 export type Name = string;
-export type Sni = string;
+export type Sni = "" | string;
 export type SshPort = number;
 export type User = string;
 export type Yes = boolean;

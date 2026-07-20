@@ -28,6 +28,15 @@ function stableTs(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function schemaNamespace(filename) {
+  return filename
+    .replace(/\.d\.ts$/, "")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join("");
+}
+
 async function writeManifest(outputDir, filename, exportName, value) {
   await writeFile(
     path.join(outputDir, filename),
@@ -56,7 +65,10 @@ async function copyGeneratedTypes(outputDir) {
   await writeFile(
     path.join(typesDir, "index.d.ts"),
     `${header}${files
-      .map((file) => `export * from "./${file.replace(/\.d\.ts$/, "")}";`)
+      .map(
+        (file) =>
+          `export * as ${schemaNamespace(file)} from "./${file.replace(/\.d\.ts$/, "")}";`,
+      )
       .join("\n")}\n`,
     "utf8",
   );

@@ -5,7 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Capabilities = ("panel" | "exit" | "relay")[];
+export type Capabilities = ("panel" | "exit" | "relay" | "routing_gateway")[];
 export type Host = string;
 export type LastCheckedAt = string;
 export type Region = string;

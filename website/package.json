@@ -8,7 +8,8 @@
     "dev": "uv run --project .. meridian dev preview --output public/demo 2>/dev/null; astro dev",
     "build": "node scripts/validate-mermaid.mjs && pnpm run studio:test && astro build && node scripts/check-runtime-assets.mjs && pagefind --site dist",
     "contracts:generate": "node scripts/generate-contract-types.mjs",
-    "contracts:check": "node scripts/generate-contract-types.mjs --check",
+    "contracts:check": "node scripts/generate-contract-types.mjs --check && pnpm run contracts:typecheck",
+    "contracts:typecheck": "tsc --noEmit --skipLibCheck false --moduleResolution bundler --module esnext --target es2022 src/studio/generated/schemas/index.d.ts",
     "studio:test": "node --test src/studio/*.test.mjs",
     "preview": "astro preview",
     "astro": "astro"

@@ -6,11 +6,6 @@
  */
 
 /**
- * Envelope schema for `meridian plan --json`.
- */
-export type PlanOutputEnvelope = _PlanSuccessEnvelope | _PlanTerminalEnvelope;
-export type Command = "plan";
-/**
  * Success data returned by legacy and V4 plan execution.
  */
 export type PlanCommandData = PlanResult | CompiledPlanResult;
@@ -89,54 +84,7 @@ export type Kind1 =
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
 export type Summary1 = string;
-export type DurationMs = number;
-/**
- * @maxItems 0
- */
-export type Errors = [];
-export type ExitCode2 = number;
-export type MeridianVersion = string;
-export type OperationId = string;
-export type Schema = "meridian.output/v1";
-export type StartedAt = string;
-export type Status = "changed" | "no_changes";
-export type Changed = boolean;
-export type Text = string;
-export type Category = "user" | "system" | "bug" | "cancelled";
-export type Code = string;
-export type ExitCode3 = number;
-export type Hint = string;
-export type Message = string;
-export type Retryable = boolean;
-export type Warnings = MeridianError[];
-export type Command1 = "plan";
-export type DurationMs1 = number;
-/**
- * @minItems 1
- */
-export type Errors1 = [MeridianError, ...MeridianError[]];
-export type ExitCode4 = number;
-export type MeridianVersion1 = string;
-export type OperationId1 = string;
-export type Schema1 = "meridian.output/v1";
-export type StartedAt1 = string;
-export type Status1 = "failed" | "cancelled";
-export type Warnings1 = MeridianError[];
 
-export interface _PlanSuccessEnvelope {
-  command: Command;
-  data: PlanCommandData;
-  duration_ms: DurationMs;
-  errors: Errors;
-  exit_code: ExitCode2;
-  meridian_version: MeridianVersion;
-  operation_id: OperationId;
-  schema: Schema;
-  started_at: StartedAt;
-  status: Status;
-  summary: Summary2;
-  warnings: Warnings;
-}
 export interface PlanResult {
   actions?: Actions;
   converged: Converged;
@@ -205,51 +153,3 @@ export interface CompiledPlanResourceResult {
   kind: Kind1;
   logical_id: LogicalId1;
 }
-/**
- * Structured summary shown in JSON envelopes and UI dashboards.
- */
-export interface Summary2 {
-  changed?: Changed;
-  counts?: Counts;
-  text: Text;
-}
-export interface Counts {
-  [k: string]: number;
-}
-/**
- * Structured error safe for JSON/API clients.
- */
-export interface MeridianError {
-  category: Category;
-  cause?: Cause;
-  code: Code;
-  details?: Details;
-  exit_code?: ExitCode3;
-  hint?: Hint;
-  message: Message;
-  retryable?: Retryable;
-}
-export interface Cause {
-  [k: string]: unknown;
-}
-export interface Details {
-  [k: string]: unknown;
-}
-export interface _PlanTerminalEnvelope {
-  command: Command1;
-  data: EmptyData;
-  duration_ms: DurationMs1;
-  errors: Errors1;
-  exit_code: ExitCode4;
-  meridian_version: MeridianVersion1;
-  operation_id: OperationId1;
-  schema: Schema1;
-  started_at: StartedAt1;
-  status: Status1;
-  summary: Summary2;
-  warnings: Warnings1;
-}
-/**
- * Empty data object used by failed or cancelled envelopes.
- */
-export interface EmptyData {}

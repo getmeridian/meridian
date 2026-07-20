@@ -4,6 +4,8 @@
 
 **Generated contracts first** — `generated/` is built from `contracts/meridian/v1` with `pnpm run contracts:generate`.
 
+**Schema barrel namespaces** — export each generated schema under its filename-derived namespace; flat wildcard exports collide on shared `$defs` types.
+
 **Static plus local Engine** — Static Studio remains the safe fallback; executable Studio talks to `meridian studio` for localhost-only SSH, files, secrets, operations, and dry-runs.
 
 **Adapters over contracts** — Static, LocalEngine, Mock, Desktop, and Mobile adapters consume generated contracts rather than command modules.
