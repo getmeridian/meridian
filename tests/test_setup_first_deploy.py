@@ -578,6 +578,52 @@ class TestSetupFirstDeployNodeEvidence:
 
         mock_hosts.assert_not_called()
 
+    def test_panel_handshake_failure_stops_deploy(self) -> None:
+        from meridian.core.errors import ProvisioningError
+        from meridian.panel_bootstrap import setup_first_deploy
+
+        cluster = ClusterConfig()
+        panel = _make_panel_mock()
+
+        with (
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch("meridian.panel_bootstrap.create_api_token", return_value=_API_TOKEN),
+            patch(
+                "meridian.panel_bootstrap.build_xray_config",
+                return_value=XrayConfigResult(
+                    config={},
+                    reality_public_key="PUB",
+                    reality_short_id="abcd1234",
+                    reality_private_key="PRIV",
+                ),
+            ),
+            patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
+            patch("meridian.panel_bootstrap.deploy_node_container", return_value=True),
+            patch("meridian.panel_bootstrap.wait_for_node_connected", return_value=False),
+            patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
+            patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
+            patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
+            patch.object(cluster, "save"),
+            patch.object(cluster, "backup"),
+            pytest.raises(ProvisioningError, match="did not connect to the panel"),
+        ):
+            setup_first_deploy(
+                resolved=_make_resolved(),
+                cluster=cluster,
+                domain="",
+                sni=_SNI,
+                client_name=_CLIENT,
+                secret_path=_SECRET_PATH,
+                reality_port=_REALITY_PORT,
+                xhttp_port=_XHTTP_PORT,
+                wss_port=_WSS_PORT,
+                geo_block=True,
+                version=_VERSION,
+            )
+
+        mock_hosts.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Config profile

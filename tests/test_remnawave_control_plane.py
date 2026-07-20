@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
 from meridian.remnawave.models import (
     parse_config_profile,
     parse_host,
@@ -255,17 +255,17 @@ def test_fetch_subscription_returns_canonical_content_and_type() -> None:
     panel = _panel()
     response = MagicMock()
     response.status_code = 200
-    response.text = "dmxlc3M6Ly8="
-    response.headers = {"content-type": "text/plain; charset=utf-8"}
+    response.text = '[{"outbounds": []}]'
+    response.headers = {"content-type": "application/json; charset=utf-8"}
     panel._client.request.return_value = response
 
-    document = panel.fetch_subscription("short id", client_type="xray-json")
+    document = panel.fetch_subscription("short id", client_type=XRAY_JSON_CLIENT_TYPE)
 
     panel._client.request.assert_called_once_with(
         "GET",
-        "api/sub/short%20id/xray-json",
+        "api/sub/short%20id/json",
     )
-    assert document.url == ("https://panel.example.com/secret/api/sub/short%20id/xray-json")
-    assert document.content == "dmxlc3M6Ly8="
-    assert document.client_type == "xray-json"
-    assert document.content_type.startswith("text/plain")
+    assert document.url == ("https://panel.example.com/secret/api/sub/short%20id/json")
+    assert document.content == '[{"outbounds": []}]'
+    assert document.client_type == "json"
+    assert document.content_type.startswith("application/json")

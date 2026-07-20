@@ -39,6 +39,7 @@ from meridian.node_deploy import (
     panel_base_url,
     register_or_reuse_node,
     select_default_squad_uuid,
+    wait_for_node_connected,
 )
 from meridian.provision.progress import StepRenderer
 from meridian.remnawave import MeridianPanel, RemnawaveError
@@ -359,6 +360,11 @@ def setup_first_deploy(
                 "Node container did not become healthy",
                 hint=(f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} docker logs remnawave-node --tail 50"),
             )
+        if not wait_for_node_connected(panel, node_creds.uuid):
+            raise ProvisioningError(
+                "Node container did not connect to the panel",
+                hint="Check the node container logs and panel-to-node network path.",
+            )
 
         # Save node entry to cluster
         node_entry = NodeEntry(
@@ -640,6 +646,11 @@ def setup_redeploy(
                                 "docker logs remnawave-node --tail 50"
                             ),
                         )
+                if not wait_for_node_connected(panel, node.uuid):
+                    raise ProvisioningError(
+                        "Node container did not connect to the panel",
+                        hint="Check the node container logs and panel-to-node network path.",
+                    )
 
             # Recreate hosts (idempotent)
             # Use provided values; only fall back to stored values if caller passed ""
@@ -707,7 +718,18 @@ def setup_new_node(
             node_creds = register_or_reuse_node(panel, cluster, resolved.ip, node_name)
 
             # Deploy the node container with the secret key
-            deploy_node_container(resolved.conn, node_creds.secret_key)
+            if not deploy_node_container(resolved.conn, node_creds.secret_key):
+                raise ProvisioningError(
+                    "Node container did not become healthy",
+                    hint=(
+                        f"Check: ssh {shlex.quote(resolved.user)}@{resolved.ip} docker logs remnawave-node --tail 50"
+                    ),
+                )
+            if not wait_for_node_connected(panel, node_creds.uuid):
+                raise ProvisioningError(
+                    "Node container did not connect to the panel",
+                    hint="Check the node container logs and panel-to-node network path.",
+                )
 
             # Save node entry
             # Reuse Reality keys from existing node (shared config profile)

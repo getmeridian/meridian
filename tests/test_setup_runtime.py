@@ -69,7 +69,7 @@ class _Panel:
     ) -> SimpleNamespace:
         return SimpleNamespace(
             url=f"https://panel.example/api/sub/{short_uuid}/{client_type}",
-            content='{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}',
+            content='[{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}]',
         )
 
 
@@ -284,7 +284,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     applied = draft.model_copy(update={"applied_plan_hash": plan_hash})
     verification = runtime.verify(applied)
     assert verification.node_count == 1
-    assert verification.subscription_urls == {"default": "https://panel.example/api/sub/short-default/xray-json"}
+    assert verification.subscription_urls == {"default": "https://panel.example/api/sub/short-default/json"}
     assert persists
 
     cluster.panel.server_ip = "198.51.100.99"
@@ -328,3 +328,25 @@ def test_review_hash_changes_when_a_saved_server_target_changes(tmp_path) -> Non
     assert changed.plan_hash != original.plan_hash
     assert changed.deployment_contract.server_targets["srv-exit"].user == "ubuntu"
     assert changed.deployment_contract.server_targets["srv-exit"].port == 2222
+
+
+def test_apply_intent_rejects_a_plan_changed_after_review(tmp_path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    runtime = SetupRuntime(registry)
+    intent = _intent()
+    reviewed_hash = runtime.review(SetupDraft.from_intent(intent)).plan.plan_hash
+
+    registry.add(
+        ServerEntry(
+            host="198.51.100.20",
+            user="ubuntu",
+            port=2222,
+            name="exit",
+            id="srv-exit",
+            auth_state="validated",
+        )
+    )
+
+    with pytest.raises(LocalStateError, match="changed after it was reviewed"):
+        runtime.apply_intent(intent, expected_plan_hash=reviewed_hash)

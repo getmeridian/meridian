@@ -135,6 +135,7 @@ def _run_redeploy(
         patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel_mock),
         patch("meridian.panel_bootstrap.build_xray_config", return_value=xray_result) as mock_build,
         patch("meridian.panel_bootstrap.deploy_node_container", return_value=True) as mock_deploy,
+        patch("meridian.panel_bootstrap.wait_for_node_connected", return_value=True) as mock_connected,
         patch("meridian.panel_bootstrap.create_hosts_for_node") as mock_hosts,
         patch("meridian.panel_bootstrap.cache_inbounds") as mock_cache,
         patch.object(cluster, "save") as mock_save,
@@ -142,6 +143,7 @@ def _run_redeploy(
     ):
         mocks["build_xray_config"] = mock_build
         mocks["deploy_node_container"] = mock_deploy
+        mocks["wait_for_node_connected"] = mock_connected
         mocks["create_hosts"] = mock_hosts
         mocks["cache_inbounds"] = mock_cache
         mocks["save"] = mock_save
@@ -214,6 +216,11 @@ class TestSetupRedeployHappyPath:
         """Container redeployed with new secret key from keygen."""
         result = _run_redeploy()
         result["deploy_node_container"].assert_called()
+
+    def test_redeploy_waits_for_panel_handshake(self) -> None:
+        result = _run_redeploy()
+
+        result["wait_for_node_connected"].assert_called_once_with(result["panel"], "node-uuid-1")
 
     def test_redeploy_updates_xhttp_path(self) -> None:
         result = _run_redeploy(xhttp_path="new_xhttp")

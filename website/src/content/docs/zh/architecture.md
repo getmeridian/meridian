@@ -106,7 +106,7 @@ Remnawave 自己的状态（用户、主机、配置文件、内部小组）位�
 
 ## 面板 API 表面 Meridian 使用
 
-Meridian 主要通过官方 SDK（`remnawave` v2.7.1）与 Remnawave 对话。一些引导和回退路径 — 初始管理员注册、API 令牌创建以及 SDK 尚未覆盖的端点 — 使用原始 `httpx` 针对面板 URL。使用的表面：
+Meridian 主要通过官方 SDK（`remnawave` v2.8.0）与 Remnawave 对话。一些引导和回退路径 — 初始管理员注册、API 令牌创建以及 SDK 尚未覆盖的端点 — 使用原始 `httpx` 针对面板 URL。使用的表面：
 
 - **用户** — `create_user`、`get_user`、`delete_user`、`list_users`、`enable_user`、`disable_user`（客户端 CRUD）
 - **主机** — `create_host`、`list_hosts`、`enable_host`、`disable_host`、`delete_host`（每个入站端点在订阅 URL 中显示）

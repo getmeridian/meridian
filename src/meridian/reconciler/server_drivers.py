@@ -19,11 +19,11 @@ from meridian.compiler.models import (
     canonical_hash,
 )
 from meridian.config import REALM_VERSION, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
-from meridian.node_deploy import deploy_node_container, render_node_compose
+from meridian.node_deploy import deploy_node_container, render_node_compose, wait_for_node_connected
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
-from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule
+from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
-from meridian.provision.relay import InstallRealm, RelayContext
+from meridian.provision.relay import InstallRealm, RelayContext, parse_realm_version
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.provision.tls import IssueTLSCert
 from meridian.provision.warp import InstallWarp
@@ -186,7 +186,7 @@ class FirewallRuleDriver:
         conn = self.context.connection(payload.server_ref)
         result = conn.run("ufw show added 2>/dev/null", timeout=15)
         rules = _firewall_rules(action.resource.logical_id, payload, self.context.server_addresses)
-        matches = result.returncode == 0 and all(rule in result.stdout for rule in rules)
+        matches = result.returncode == 0 and all(ufw_rule_present(result.stdout, rule) for rule in rules)
         return _observed(
             action,
             remote_id=_firewall_marker(action.resource.logical_id),
@@ -498,7 +498,7 @@ class RealmHopDriver:
         expected_version = _runtime_pin(self.context.plan, "realm_version", REALM_VERSION)
         exists = current_config.returncode == 0 and current_unit.returncode == 0
         port_listening = _port_in_ss(listening.stdout, payload.listen_port)
-        version_ok = version.returncode == 0 and version.stdout.strip().split()[-1:] == [expected_version]
+        version_ok = version.returncode == 0 and parse_realm_version(version.stdout) == expected_version
         matches = (
             exists
             and current_config.stdout == expected_config
@@ -693,6 +693,9 @@ class NodeRuntimeDriver:
         )
         if not deployed:
             raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
+        node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
+        if not node_uuid or not wait_for_node_connected(self.context.panel, node_uuid):
+            raise ResourceReconcileError(f"Node runtime {payload.workload_ref!r} did not connect to the panel.")
         return ResourceApplyReceipt(remote_id=REMNAWAVE_NODE_DIR)
 
 

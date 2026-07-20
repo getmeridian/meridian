@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -33,6 +34,7 @@ from meridian.reconciler.runtime_drivers import (
     ControlPlaneRuntimeDriver,
     ProbeDriver,
     ProbeDriverContext,
+    xray_subscription_is_valid,
 )
 
 
@@ -164,7 +166,7 @@ def test_subscription_probe_fetches_the_canonical_document() -> None:
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
     panel.fetch_subscription.return_value = SimpleNamespace(
         url="https://panel.example/sub/short-access",
-        content='{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}',
+        content='[{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}]',
     )
     driver = ProbeDriver(
         ProbeDriverContext(
@@ -177,7 +179,7 @@ def test_subscription_probe_fetches_the_canonical_document() -> None:
     )
 
     assert observation_converges(action, driver.observe(action, None))
-    panel.fetch_subscription.assert_called_once_with("short-access", client_type="xray-json")
+    panel.fetch_subscription.assert_called_once_with("short-access", client_type="json")
 
 
 def test_subscription_probe_rejects_noncanonical_html() -> None:
@@ -194,7 +196,7 @@ def test_subscription_probe_rejects_noncanonical_html() -> None:
     panel = MagicMock()
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
     panel.fetch_subscription.return_value = SimpleNamespace(
-        url="https://panel.example/sub/short-access/xray-json",
+        url="https://panel.example/sub/short-access/json",
         content="<html>stale proxy page</html>",
     )
     driver = ProbeDriver(
@@ -209,6 +211,55 @@ def test_subscription_probe_rejects_noncanonical_html() -> None:
 
     action = build_resource_actions(plan, 1)[1]
     assert not observation_converges(action, driver.observe(action, None))
+
+
+def test_subscription_probe_rejects_multiple_xray_configs() -> None:
+    user = make_resource(
+        "user:access",
+        AccessUserPayload(username="access", squad_ref="squad:access"),
+    )
+    probe = make_resource(
+        "probe:subscription:access",
+        ProbePayload(probe="subscription", target_ref=user.logical_id),
+        dependencies=[user.logical_id],
+    )
+    plan = _plan(user, probe)
+    config = '{"outbounds": [{"tag": "MERIDIAN_PROXY", "protocol": "vless"}]}'
+    panel = MagicMock()
+    panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
+    panel.fetch_subscription.return_value = SimpleNamespace(
+        url="https://panel.example/sub/short-access/json",
+        content=f"[{config},{config}]",
+    )
+    driver = ProbeDriver(
+        ProbeDriverContext(
+            plan=plan,
+            cluster=ClusterConfig(),
+            panel=panel,
+            connection_for=MagicMock(),
+            server_addresses={},
+        )
+    )
+
+    action = build_resource_actions(plan, 1)[1]
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize(
+    ("outbound", "expected"),
+    [
+        ({"tag": "MERIDIAN_PROXY_HY2", "protocol": "hysteria", "settings": {"version": 2}}, True),
+        ({"tag": "MERIDIAN_PROXY_HY2", "protocol": "hysteria", "settings": {"version": 1}}, False),
+        ({"tag": "MERIDIAN_PROXY_HY2", "protocol": "hysteria2", "settings": {"version": 2}}, False),
+    ],
+)
+def test_subscription_probe_requires_remnawave_hysteria_v2_shape(outbound: dict, expected: bool) -> None:
+    document = SimpleNamespace(
+        url="https://panel.example/sub/short-access/json",
+        content=json.dumps([{"outbounds": [outbound]}]),
+    )
+
+    assert xray_subscription_is_valid(document) is expected
 
 
 def test_gateway_probe_requires_connected_node_on_reviewed_profile() -> None:

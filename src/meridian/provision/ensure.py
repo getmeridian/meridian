@@ -142,3 +142,18 @@ def ensure_ufw_rule(conn: ServerConnection, rule: str, *, timeout: int = 15) -> 
     if result.returncode != 0:
         return EnsureResult(ok=False, detail=result.stderr.strip()[:200], result=result)
     return EnsureResult(changed="Skipping" not in result.stdout, result=result)
+
+
+def ufw_rule_present(output: str, rule: str) -> bool:
+    """Match a rule against UFW's shell-normalized ``show added`` output."""
+    expected = shlex.split(rule)
+    for line in output.splitlines():
+        try:
+            actual = shlex.split(line)
+        except ValueError:
+            continue
+        if actual[:1] == ["ufw"]:
+            actual = actual[1:]
+        if actual == expected:
+            return True
+    return False

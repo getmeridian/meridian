@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
     COMPILER_VERSION,
+    FirewallRulePayload,
     NginxArtifactPayload,
     NginxRouteSpec,
+    NodeBindingPayload,
+    NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
     canonical_hash,
@@ -19,13 +22,21 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.provision.steps import StepResult
-from meridian.reconciler.resources import UnknownResourceOutcome, build_resource_actions, observation_converges
+from meridian.reconciler.resources import (
+    ResourceAction,
+    ResourceReconcileError,
+    UnknownResourceOutcome,
+    build_resource_actions,
+    observation_converges,
+)
 from meridian.reconciler.server_drivers import (
+    FirewallRuleDriver,
     NginxArtifactDriver,
+    NodeRuntimeDriver,
     ServerBaselineDriver,
     ServerDriverContext,
 )
-from meridian.reconciler.server_render import nginx_artifact_path
+from meridian.reconciler.server_render import artifact_token, nginx_artifact_path
 from meridian.ssh import ServerConnection
 
 
@@ -136,6 +147,123 @@ def test_server_baseline_preserves_unknown_outcome_on_step_timeout(monkeypatch) 
     )
 
     with pytest.raises(UnknownResourceOutcome, match="observation is required"):
+        driver.apply(action, None)
+
+
+def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
+    resource = make_resource(
+        "firewall:srv-exit:tcp:443",
+        FirewallRulePayload(
+            server_ref="srv-exit",
+            transport="tcp",
+            port=443,
+        ),
+    )
+    intent_hash = "1" * 64
+    plan = ResourcePlan(
+        intent_hash=intent_hash,
+        plan_hash=compute_plan_hash(
+            compiler_version=COMPILER_VERSION,
+            intent_hash=intent_hash,
+            resources=[resource],
+        ),
+        resources=[resource],
+    )
+    action = build_resource_actions(plan, 1)[0]
+    marker = f"meridian-v4-{artifact_token(resource.logical_id)}"
+    connection = MagicMock(spec=ServerConnection)
+    connection.run.return_value = SimpleNamespace(
+        returncode=0,
+        stdout=(f"Added user rules (see 'ufw status' for running firewall):\nufw allow 443/tcp comment '{marker}'\n"),
+    )
+    driver = FirewallRuleDriver(
+        ServerDriverContext(
+            plan=plan,
+            cluster=ClusterConfig(),
+            panel=MagicMock(),
+            connection_for=lambda _ref: connection,
+            server_addresses={"srv-exit": "198.51.100.10"},
+        )
+    )
+
+    assert observation_converges(action, driver.observe(action, None))
+
+
+def _node_runtime_case() -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
+    binding = make_resource(
+        "binding:exit-a",
+        NodeBindingPayload(
+            workload_ref="exit-a",
+            server_ref="srv-exit",
+            name="Meridian v4 exit-a",
+            profile_ref="profile:exit-a",
+            inbound_refs=["inbound:exit-a"],
+        ),
+    )
+    runtime = make_resource(
+        "node:exit-a",
+        NodeRuntimePayload(
+            workload_ref="exit-a",
+            server_ref="srv-exit",
+            binding_ref=binding.logical_id,
+        ),
+        dependencies=[binding.logical_id],
+    )
+    intent_hash = "1" * 64
+    plan = ResourcePlan(
+        intent_hash=intent_hash,
+        plan_hash=compute_plan_hash(
+            compiler_version=COMPILER_VERSION,
+            intent_hash=intent_hash,
+            resources=[binding, runtime],
+        ),
+        resources=[binding, runtime],
+    )
+    action = build_resource_actions(plan, 1)[1]
+    cluster = ClusterConfig(
+        managed_bindings={
+            f"{binding.logical_id}@1": ManagedResourceBinding(
+                logical_id=binding.logical_id,
+                resource_kind="node_binding",
+                generation=1,
+                remote_id="node-uuid",
+            )
+        }
+    )
+    panel = MagicMock()
+    driver = NodeRuntimeDriver(
+        ServerDriverContext(
+            plan=plan,
+            cluster=cluster,
+            panel=panel,
+            connection_for=lambda _ref: MagicMock(spec=ServerConnection),
+            server_addresses={"srv-exit": "198.51.100.10"},
+            node_secrets={"exit-a": "node-secret"},
+        )
+    )
+    return driver, action, panel
+
+
+def test_node_runtime_waits_for_bound_node_to_connect() -> None:
+    driver, action, panel = _node_runtime_case()
+
+    with (
+        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True),
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True) as wait,
+    ):
+        driver.apply(action, None)
+
+    wait.assert_called_once_with(panel, "node-uuid")
+
+
+def test_node_runtime_fails_when_bound_node_does_not_connect() -> None:
+    driver, action, _panel = _node_runtime_case()
+
+    with (
+        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True),
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=False),
+        pytest.raises(ResourceReconcileError, match="did not connect to the panel"),
+    ):
         driver.apply(action, None)
 
 

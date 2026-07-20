@@ -14,6 +14,7 @@ from meridian.provision.relay import (
     RelayContext,
     VerifyRelay,
     build_relay_steps,
+    parse_realm_version,
 )
 from tests.support.mock_connection import MockConnection
 
@@ -194,7 +195,10 @@ class TestConfigureRelayFirewall:
 class TestInstallRealm:
     def test_correct_version_already_installed(self):
         conn = MockConnection()
-        conn.when("realm --version", stdout=f"realm {REALM_VERSION}")
+        conn.when(
+            "realm --version",
+            stdout=f"Realm {REALM_VERSION} [brutal][batched-udp][proxy][balance][transport][multi-thread]",
+        )
         result = InstallRealm().run(conn, _make_ctx())
         assert result.status == "ok"
         assert REALM_VERSION in result.detail
@@ -204,7 +208,7 @@ class TestInstallRealm:
         # Initial check includes "2>/dev/null"; verify after install does not.
         # First-match: the specific pattern wins for the initial probe.
         conn.when("realm --version 2>/dev/null", rc=1, stderr="command not found")
-        conn.when("realm --version", stdout=f"realm {REALM_VERSION}")
+        conn.when("realm --version", stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]")
         conn.when("uname -m", stdout="x86_64")
         conn.when("curl", stdout="")
         conn.when("sha256sum", stdout=REALM_SHA256["x86_64-unknown-linux-gnu"])
@@ -212,6 +216,19 @@ class TestInstallRealm:
         result = InstallRealm().run(conn, _make_ctx())
         assert result.status == "changed"
         conn.assert_called_with_pattern("curl")
+
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            ("Realm 2.9.3 [brutal][multi-thread]\n", "2.9.3"),
+            ("realm 2.9.3-rc.1+build.4\n", "2.9.3-rc.1+build.4"),
+            ("other 2.9.3\n", ""),
+            ("Realm [brutal] 2.9.3\n", ""),
+            ("", ""),
+        ],
+    )
+    def test_parse_realm_version(self, output: str, expected: str):
+        assert parse_realm_version(output) == expected
 
 
 # ---------------------------------------------------------------------------

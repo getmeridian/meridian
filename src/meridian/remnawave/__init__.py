@@ -1,6 +1,7 @@
 """Remnawave control-plane adapter facade."""
 
 from .client import MeridianPanel
+from .control_plane import XRAY_JSON_CLIENT_TYPE
 from .models import (
     ConfigProfile,
     ExternalSquad,
@@ -45,6 +46,7 @@ __all__ = [
     "SubscriptionSettings",
     "SubscriptionTemplate",
     "User",
+    "XRAY_JSON_CLIENT_TYPE",
     "host_from_sdk",
     "inbound_from_sdk",
     "node_from_sdk",

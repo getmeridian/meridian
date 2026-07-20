@@ -106,7 +106,7 @@ Static Studio قرارداد تولید‌شده را مصرف می‌کند و 
 
 ## سطح API پنل استفاده‌شده توسط Meridian
 
-Meridian بیشتر با Remnawave از طریق SDK رسمی (`remnawave` v2.7.1) صحبت می‌کند. چند مسیر bootstrap و fallback — ثبت مدیر اولیه، ایجاد API-token و endpoints ابھی توسط SDK پوشش‌داده نشده — raw `httpx` بر مقابل URL پنل استفاده می‌کند. سطوح استفاده‌شده:
+Meridian بیشتر با Remnawave از طریق SDK رسمی (`remnawave` v2.8.0) صحبت می‌کند. چند مسیر bootstrap و fallback — ثبت مدیر اولیه، ایجاد API-token و endpoints ابھی توسط SDK پوشش‌داده نشده — raw `httpx` بر مقابل URL پنل استفاده می‌کند. سطوح استفاده‌شده:
 
 - **کاربران** — `create_user`، `get_user`، `delete_user`، `list_users`، `enable_user`، `disable_user` (CRUD کلاینت)
 - **Hosts** — `create_host`، `list_hosts`، `enable_host`، `disable_host`، `delete_host` (endpoints هر inbound در URL‌های اشتراک)

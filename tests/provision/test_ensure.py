@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from meridian.provision.ensure import ensure_service_running
+import pytest
+
+from meridian.provision.ensure import ensure_service_running, ufw_rule_present
 from tests.support.mock_connection import MockConnection
 
 
@@ -35,3 +37,23 @@ def test_ensure_service_running_skips_enabled_active_service() -> None:
     assert result.changed is False
     assert not any("systemctl enable docker" in call for call in conn.calls)
     assert not any("systemctl start docker" in call for call in conn.calls)
+
+
+@pytest.mark.parametrize(
+    ("rule", "rendered"),
+    [
+        (
+            "allow 443/tcp comment meridian-v4-public",
+            "ufw allow 443/tcp comment 'meridian-v4-public'",
+        ),
+        (
+            "allow from 198.51.100.15 to any port 49684 proto tcp comment meridian-v4-private",
+            "ufw allow from 198.51.100.15 to any port 49684 proto tcp comment 'meridian-v4-private'",
+        ),
+    ],
+)
+def test_ufw_rule_present_normalizes_quoted_comments(rule: str, rendered: str) -> None:
+    output = f"Added user rules (see 'ufw status' for running firewall):\n{rendered}\n"
+
+    assert ufw_rule_present(output, rule)
+    assert not ufw_rule_present(output, rule.replace("meridian-v4-", "other-"))

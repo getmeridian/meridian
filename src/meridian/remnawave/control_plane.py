@@ -34,6 +34,8 @@ from .runtime import (
     RemnawaveNotFoundError,
 )
 
+XRAY_JSON_CLIENT_TYPE = "json"
+
 
 class ControlPlaneMixin:
     """Resource methods shared by the synchronous panel facade."""

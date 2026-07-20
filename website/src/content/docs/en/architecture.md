@@ -115,7 +115,7 @@ All panel + subscription images are pinned in `src/meridian/config.py` and kept 
 
 ## Panel API surface used by Meridian
 
-Meridian talks to Remnawave mostly through the official SDK (`remnawave` v2.7.1). A few bootstrap and fallback paths — initial admin registration, API-token creation, and endpoints not yet covered by the SDK — use raw `httpx` against the panel URL. Surfaces used:
+Meridian talks to Remnawave mostly through the official SDK (`remnawave` v2.8.0). A few bootstrap and fallback paths — initial admin registration, API-token creation, and endpoints not yet covered by the SDK — use raw `httpx` against the panel URL. Surfaces used:
 
 - **Users** — `create_user`, `get_user`, `delete_user`, `list_users`, `enable_user`, `disable_user` (client CRUD)
 - **Hosts** — `create_host`, `list_hosts`, `enable_host`, `disable_host`, `delete_host` (per-inbound endpoints shown in subscription URLs)

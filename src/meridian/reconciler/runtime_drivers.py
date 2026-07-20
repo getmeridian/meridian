@@ -27,6 +27,7 @@ from meridian.reconciler.resources import (
     UnknownResourceOutcome,
     postcondition_key,
 )
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE
 from meridian.ssh import ServerConnection
 
 
@@ -165,7 +166,7 @@ class ProbeDriver:
         user = self.context.panel.get_user(user_payload.username)
         if user is None or not user.short_uuid:
             return False
-        document = self.context.panel.fetch_subscription(user.short_uuid, client_type="xray-json")
+        document = self.context.panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
         return xray_subscription_is_valid(document)
 
     def _gateway_active(self, target_ref: str, generation: int) -> bool:
@@ -212,16 +213,27 @@ def xray_subscription_is_valid(document: Any) -> bool:
     if not document.url or not document.content.strip():
         return False
     try:
-        config = json.loads(document.content)
+        parsed = json.loads(document.content)
     except (TypeError, json.JSONDecodeError):
         return False
-    if not isinstance(config, dict) or not isinstance(config.get("outbounds"), list):
+    if isinstance(parsed, list):
+        if len(parsed) != 1:
+            return False
+        parsed = parsed[0]
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("outbounds"), list):
         return False
     return any(
         isinstance(outbound, dict)
         and str(outbound.get("tag", "")).startswith("MERIDIAN_PROXY")
-        and outbound.get("protocol") in {"vless", "hysteria2"}
-        for outbound in config["outbounds"]
+        and (
+            outbound.get("protocol") == "vless"
+            or (
+                outbound.get("protocol") == "hysteria"
+                and isinstance(outbound.get("settings"), dict)
+                and outbound["settings"].get("version") == 2
+            )
+        )
+        for outbound in parsed["outbounds"]
     )
 
 

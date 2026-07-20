@@ -12,11 +12,11 @@ without the rest is not supported — move the whole set together.
 
 | Component | Pinned version |
 |---|---|
-| `remnawave/backend` | `2.7.4` |
-| `remnawave/node` | `2.7.0` |
-| `remnawave/subscription-page` | `7.2.1` |
-| `remnawave` Python SDK | `2.7.1` |
-| Xray-core client (test binary) | `26.3.27` |
+| `remnawave/backend` | `2.8.0` |
+| `remnawave/node` | `2.8.0` |
+| `remnawave/subscription-page` | `7.2.6` |
+| `remnawave` Python SDK | `2.8.0` |
+| Xray-core client (test binary) | `26.6.27` |
 | Realm (relay forwarder) | `2.9.3` |
 | Pebble (system-lab ACME CA) | `2.10.0` |
 
@@ -33,7 +33,7 @@ without the rest is not supported — move the whole set together.
 - **`meridian api schemas` / `meridian api schema NAME`** — discover and export JSON Schemas for the public meridian-core contracts used by CLI JSON output and future UI clients
 - **`meridian node add/list/remove/check`** — multi-node fleet management
 - **`meridian fleet status/recover`** — panel health, node connectivity, relay status, user count, and reconstruct-from-panel when local state is lost
-- **`MeridianPanel` REST client** — wraps the official `remnawave` Python SDK (v2.7.1) with retries, credential redaction, and thread-local event loops for parallel workers
+- **`MeridianPanel` REST client** — wraps the official `remnawave` Python SDK (v2.8.0) with retries, credential redaction, and thread-local event loops for parallel workers
 - **Config reliability** — corrupt YAML handling, version check, backup before mutations, disk-full error messages, external-edit guard (`cluster.save()` refuses to clobber if the file mtime advanced during a long-running apply), snapshot type validation
 - **Reality keys persisted** — public_key and short_id saved in cluster.yml for connection testing
 - **Declarative plan/apply workflow** — `cluster.yml` becomes desired state (`desired_nodes`, `desired_relays`, `desired_clients`, `subscription_page`); `meridian plan` prints a Terraform-style diff; `meridian apply` converges. Imperative commands (`deploy`, `node add`, `client add`) mirror their effect into `desired_*` when the list is non-null — hybrid sync, mixing the two modes is safe

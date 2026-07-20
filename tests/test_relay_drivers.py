@@ -18,12 +18,14 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
+from meridian.config import REALM_VERSION
 from meridian.provision.steps import StepResult
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
     UnknownResourceOutcome,
     build_resource_actions,
+    observation_converges,
 )
 from meridian.reconciler.server_drivers import RealmHopDriver, ServerDriverContext
 from meridian.reconciler.server_render import (
@@ -31,6 +33,7 @@ from meridian.reconciler.server_render import (
     realm_service_name,
     render_nginx_artifact,
     render_realm_config,
+    render_realm_unit,
 )
 from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
@@ -49,12 +52,14 @@ class StatefulConnection:
         files: dict[str, str] | None = None,
         fail_first_restart: bool = False,
         restart_returncode: int = 1,
+        realm_ready: bool = False,
     ) -> None:
         self.files = dict(files or {})
         self.calls: list[str] = []
         self.fail_first_restart = fail_first_restart
         self.restart_returncode = restart_returncode
         self.restart_count = 0
+        self.realm_ready = realm_ready
         self.ip = "198.51.100.30"
         self.user = "root"
         self.local_mode = False
@@ -71,6 +76,12 @@ class StatefulConnection:
             self.restart_count += 1
             if self.fail_first_restart and self.restart_count == 1:
                 return _result(returncode=self.restart_returncode, stderr="restart failed")
+        if self.realm_ready and command.startswith("systemctl is-active "):
+            return _result(stdout="active\n")
+        if self.realm_ready and command.startswith("ss -H -lnt"):
+            return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
+        if self.realm_ready and command.startswith("realm --version"):
+            return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
         return _result()
 
     def get_text(
@@ -213,6 +224,29 @@ def test_realm_services_are_isolated_by_logical_identity() -> None:
 
     assert realm_service_name(first) != realm_service_name(second)
     assert realm_config_path(first) != realm_config_path(second)
+
+
+def test_realm_observation_reads_version_before_feature_suffixes() -> None:
+    plan, action = _realm_plan_and_action()
+    payload = action.resource.payload
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    conn = StatefulConnection(
+        files={
+            config_path: render_realm_config(payload, ADDRESSES),
+            unit_path: render_realm_unit(action.resource.logical_id),
+        },
+        realm_ready=True,
+    )
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+
+    assert observation_converges(action, RealmHopDriver(context).observe(action, None))
 
 
 def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(

@@ -7,6 +7,7 @@ VLESS+Reality encryption between the client and the exit.
 
 from __future__ import annotations
 
+import re
 import shlex
 import time
 from dataclasses import dataclass, field
@@ -25,6 +26,10 @@ from meridian.ssh import ServerConnection
 
 # Minimal packages needed on a relay node
 _RELAY_PACKAGES = ["curl", "wget", "ufw", "ca-certificates"]
+_REALM_VERSION_RE = re.compile(
+    r"^\s*Realm\s+(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?=\s|$)",
+    re.IGNORECASE,
+)
 
 # Realm systemd service template
 _SYSTEMD_UNIT = """\
@@ -72,6 +77,12 @@ class RelayContext:
         for field_name, port in [("exit_port", self.exit_port), ("listen_port", self.listen_port)]:
             if not isinstance(port, int) or not (1 <= port <= 65535):
                 raise ValueError(f"Invalid port for {field_name}: {port!r} (must be 1-65535)")
+
+
+def parse_realm_version(output: str) -> str:
+    """Extract Realm's semver without mistaking feature suffixes for it."""
+    match = _REALM_VERSION_RE.match(output)
+    return match.group(1) if match is not None else ""
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +163,7 @@ class InstallRealm:
         # Check if Realm is already installed at the right version
         check = conn.run("realm --version 2>/dev/null", timeout=15)
         if check.returncode == 0:
-            # Parse version from output like "realm 2.9.3"
-            installed_version = check.stdout.strip().split()[-1] if check.stdout.strip() else ""
+            installed_version = parse_realm_version(check.stdout)
             if installed_version == ctx.realm_version:
                 return StepResult(name=self.name, status="ok", detail=f"v{ctx.realm_version} already installed")
 
@@ -214,8 +224,8 @@ class InstallRealm:
 
         # Verify
         verify = conn.run("realm --version", timeout=15)
-        if verify.returncode != 0:
-            return StepResult(name=self.name, status="failed", detail="realm binary not working after install")
+        if verify.returncode != 0 or parse_realm_version(verify.stdout) != ctx.realm_version:
+            return StepResult(name=self.name, status="failed", detail="realm binary version mismatch after install")
 
         return StepResult(name=self.name, status="changed", detail=f"installed v{ctx.realm_version}")
 

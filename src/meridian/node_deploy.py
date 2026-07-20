@@ -24,6 +24,7 @@ from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
 _PUBLIC_PROXY_PORT = 443
+_API_TOKEN_EXPIRES_IN_DAYS = 100_000
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,11 @@ def create_api_token(base_url: str, auth_token: str) -> str:
 
     resp = httpx.post(
         f"{base_url.rstrip('/')}/api/tokens",
-        json={"tokenName": "meridian-provisioner"},
+        json={
+            "name": "meridian-provisioner",
+            "expiresInDays": _API_TOKEN_EXPIRES_IN_DAYS,
+            "scopes": ["*"],
+        },
         headers={
             "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
@@ -130,6 +135,32 @@ def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) 
             timeout=retries * delay,
             interval=delay,
             description="panel API",
+        )
+        return True
+    except ReadinessTimeout:
+        return False
+
+
+def wait_for_node_connected(
+    panel: MeridianPanel,
+    node_uuid: str,
+    *,
+    timeout: float = 60,
+    interval: float = 3.0,
+) -> bool:
+    """Wait until the panel has completed its asynchronous node handshake."""
+    from meridian.health import ReadinessTimeout, poll_until_ready
+
+    def _connected() -> bool:
+        node = panel.get_node(node_uuid)
+        return bool(node is not None and node.is_connected)
+
+    try:
+        poll_until_ready(
+            _connected,
+            timeout=timeout,
+            interval=interval,
+            description=f"Remnawave node {node_uuid}",
         )
         return True
     except ReadinessTimeout:

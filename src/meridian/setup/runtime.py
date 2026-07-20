@@ -78,7 +78,7 @@ from meridian.reconciler.workloads import (
     SSHRealityKeyFactory,
     WorkloadStateManager,
 )
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
 from meridian.resolve import ResolvedServer
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection
@@ -199,9 +199,16 @@ class SetupRuntime:
     def apply_intent(
         self,
         intent: SetupIntent,
+        *,
+        expected_plan_hash: str | None = None,
     ) -> ResourceExecutionResult:
         draft = SetupDraft.from_intent(intent)
         plan_hash = self.review(draft).plan.plan_hash
+        if expected_plan_hash is not None and plan_hash != expected_plan_hash:
+            raise LocalStateError(
+                "The compiled topology changed after it was reviewed.",
+                hint="Review the current plan before applying it.",
+            )
         return self.apply(draft.model_copy(update={"review_hash": plan_hash}))
 
     def inspect_intent(
@@ -416,7 +423,7 @@ class SetupRuntime:
                 user = panel.get_user(payload.username)
                 if user is None or not user.short_uuid:
                     raise ResourceReconcileError(f"Managed access user {payload.username!r} is missing.")
-                document = panel.fetch_subscription(user.short_uuid, client_type="xray-json")
+                document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
                 if not xray_subscription_is_valid(document):
                     raise ResourceReconcileError(f"Canonical subscription for {payload.username!r} is invalid.")
                 subscription_urls[payload.username] = document.url
