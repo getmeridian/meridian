@@ -41,7 +41,7 @@ templates: ## Validate Jinja2 template rendering
 
 ci: check templates ## Run full CI locally
 
-system-lab-preflight: ## Check Compose, daemon access, BuildKit, and container DNS
+system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
 	bash tests/systemlab/scripts/preflight.sh
 
 system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10min)

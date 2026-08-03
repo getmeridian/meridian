@@ -212,7 +212,7 @@ def test_changes_only_test_credentials_and_local_listener_ports() -> None:
 
 def test_assigns_distinct_local_ports_to_every_inbound() -> None:
     with patch(
-        "tests.systemlab.subscription_client._free_port",
+        "meridian.xray_client._find_free_port",
         side_effect=[12000, 12000, 12001],
     ):
         runnable, socks_port = use_free_local_ports(_canonical_config())

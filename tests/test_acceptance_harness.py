@@ -25,9 +25,8 @@ def _run_fake_systemlab_preflight(
 set -euo pipefail
 printf '%s\\n' "$*" >> "$FAKE_DOCKER_LOG"
 
-if [[ "${1-}" == "buildx" && "${2-}" == "build" ]]; then
-  cat >/dev/null
-  if [[ "${FAKE_DOCKER_FAILURE-}" == "buildkit" ]]; then
+if [[ "${1-}" == "pull" ]]; then
+  if [[ "${FAKE_DOCKER_FAILURE-}" == "daemon" ]]; then
     echo 'lookup registry-1.docker.io on [::1]:53: connection refused' >&2
     exit 1
   fi
@@ -43,6 +42,7 @@ fi
     env = {
         **os.environ,
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "DOCKER_HOST": "",
         "FAKE_DOCKER_FAILURE": failure,
         "FAKE_DOCKER_LOG": str(docker_log),
     }
@@ -137,13 +137,13 @@ def test_systemlab_fails_fast_on_missing_compose_daemon_or_build_dns() -> None:
     assert "docker buildx version" in preflight
     assert "docker info" in preflight
     assert "docker compose -f tests/systemlab/compose.yml config" in preflight
-    assert "docker buildx build" in preflight
-    assert "# syntax=docker/dockerfile:1" in preflight
-    assert "FROM scratch" in preflight
+    assert "docker pull --quiet ubuntu:24.04" in preflight
+    assert "# syntax=docker/dockerfile:1" not in base_image
+    assert "# syntax=docker/dockerfile:1" not in controller_image
     assert "getent ahosts" in preflight
     assert "registry-1.docker.io" in preflight
     assert "colima start meridian --dns 192.168.5.2 --dns 1.1.1.1" in preflight
-    assert "colima ssh -p meridian" in preflight
+    assert 'colima ssh -p "$profile"' in preflight
     assert "rm -f /etc/resolv.conf" in preflight
     assert "ARG TARGETARCH" in base_image
     assert 'if [ "$TARGETARCH" = "amd64" ]' in base_image
@@ -151,23 +151,21 @@ def test_systemlab_fails_fast_on_missing_compose_daemon_or_build_dns() -> None:
     assert "APT::Update::Error-Mode" in controller_image
 
 
-def test_systemlab_preflight_exercises_buildkit_before_container_dns(tmp_path: Path) -> None:
+def test_systemlab_preflight_exercises_daemon_registry_before_container_dns(tmp_path: Path) -> None:
     result, docker_calls = _run_fake_systemlab_preflight(tmp_path)
 
     assert result.returncode == 0, result.stderr
-    assert "BuildKit, and container DNS" in result.stdout
-    build_call = next(index for index, call in enumerate(docker_calls) if call.startswith("buildx build"))
+    assert "daemon registry access, and container DNS" in result.stdout
+    pull_call = next(index for index, call in enumerate(docker_calls) if call.startswith("pull "))
     run_call = next(index for index, call in enumerate(docker_calls) if call.startswith("run "))
-    assert build_call < run_call
+    assert pull_call < run_call
 
 
-def test_systemlab_preflight_reports_buildkit_dns_before_container_probe(tmp_path: Path) -> None:
-    result, docker_calls = _run_fake_systemlab_preflight(tmp_path, failure="buildkit")
+def test_systemlab_preflight_reports_daemon_dns_before_container_probe(tmp_path: Path) -> None:
+    result, docker_calls = _run_fake_systemlab_preflight(tmp_path, failure="daemon")
 
     assert result.returncode == 2
-    assert "lookup registry-1.docker.io on [::1]:53" in result.stderr
-    assert "Docker BuildKit cannot load the external Dockerfile frontend" in result.stderr
-    assert "dangling /etc/resolv.conf" in result.stderr
+    assert "Docker daemon cannot reach Docker Hub" in result.stderr
     assert not any(call.startswith("run ") for call in docker_calls)
 
 
@@ -176,8 +174,7 @@ def test_systemlab_preflight_distinguishes_container_dns_failure(tmp_path: Path)
 
     assert result.returncode == 2
     assert "Docker containers cannot resolve the package mirrors" in result.stderr
-    assert "Docker BuildKit cannot load" not in result.stderr
-    assert any(call.startswith("buildx build") for call in docker_calls)
+    assert any(call.startswith("pull ") for call in docker_calls)
     assert any(call.startswith("run ") for call in docker_calls)
 
 

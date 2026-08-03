@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate SSH keypair and Pebble CA for system lab.
+# Generate the SSH keypair and Pebble endpoint CA for System Lab.
 # Run before `docker compose build` if fixtures don't exist.
 set -euo pipefail
 
@@ -18,7 +18,8 @@ printf '%s\n' "$PUBLIC_KEY" > "$DIR/id_ed25519.pub"
 cp "$DIR/id_ed25519.pub" "$DIR/controller_authorized_keys"
 chmod 0644 "$DIR/id_ed25519.pub" "$DIR/controller_authorized_keys"
 
-# Pebble root CA must match the pinned image used by Compose.
+# This static CA authenticates Pebble's HTTPS endpoint. Pebble 2.10 generates
+# its certificate-issuance root at runtime; 00-bootstrap installs that root.
 PEBBLE_IMAGE=ghcr.io/letsencrypt/pebble:2.10.0
 PEBBLE_CA="$DIR/pebble-ca.pem"
 PEBBLE_TMP=$(mktemp -d "$DIR/.pebble-ca.XXXXXX")

@@ -134,7 +134,7 @@ def main() -> int:
             print(f"    FAIL {label}: {exc}")
             failures += 1
             continue
-        accepted = not connected if args.expect_failure else connected
+        accepted = connected is not None and (not connected if args.expect_failure else connected)
         status = "PASS" if accepted else "FAIL"
         expectation = "blocked" if args.expect_failure else "connected"
         print(f"    {status} {label}: expected {expectation}; {detail}")

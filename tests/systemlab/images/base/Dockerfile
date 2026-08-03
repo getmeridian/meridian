@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
 
 ARG TARGETARCH
@@ -6,7 +5,7 @@ ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive \
     container=docker
 
-# Preserve apt cache across builds (BuildKit cache mount)
+# Preserve downloaded packages within the image layer cache.
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
       > /etc/apt/apt.conf.d/keep-cache; \
@@ -23,9 +22,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     fi
 
 # ---------- OS packages (everything Meridian expects on a VPS) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd systemd-sysv dbus \
     openssh-server openssh-client sudo \
     curl wget openssl ca-certificates \
@@ -41,9 +38,7 @@ COPY tests/systemlab/fixtures/pebble-ca.pem /usr/local/share/ca-certificates/peb
 RUN update-ca-certificates
 
 # ---------- nginx from official repo (1.27+, http2 on; directive) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    curl -fsSL https://nginx.org/keys/nginx_signing.key \
+RUN curl -fsSL https://nginx.org/keys/nginx_signing.key \
       -o /etc/apt/keyrings/nginx.asc \
     && chmod 644 /etc/apt/keyrings/nginx.asc \
     && . /etc/os-release \
@@ -54,9 +49,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get install -y --no-install-recommends nginx
 
 # ---------- Docker CE (Meridian checks dpkg-query -s docker-ce) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    install -m 0755 -d /etc/apt/keyrings \
+RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
        -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \

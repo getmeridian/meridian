@@ -17,6 +17,8 @@ from meridian.compiler.models import (
 from tests.systemlab.topology import build_systemlab_intent
 
 _COMPOSE_PATH = Path(__file__).parent / "compose.yml"
+_CONTROLLER_DOCKERFILE = Path(__file__).parent / "images/controller/Dockerfile"
+_BOOTSTRAP_PATH = Path(__file__).parent / "scripts/stages/00-bootstrap.sh"
 _RESILIENCE_PATH = Path(__file__).parent / "scripts/stages/30-resilience.sh"
 _INTERRUPTED_HOST_RESOURCE = "host:exit-a:exit-a-reality:direct"
 
@@ -113,6 +115,20 @@ def test_compose_provides_every_isolated_topology_server() -> None:
     addresses = [services[name]["networks"]["labnet"]["ipv4_address"] for name in server_names]
     assert len(addresses) == len(set(addresses))
     assert set(services["controller"]["depends_on"]) >= server_names
+
+
+def test_controller_trusts_the_local_acme_certificate_chain() -> None:
+    dockerfile = _CONTROLLER_DOCKERFILE.read_text(encoding="utf-8")
+    bootstrap = _BOOTSTRAP_PATH.read_text(encoding="utf-8")
+
+    assert "fixtures/pebble-ca.pem /usr/local/share/ca-certificates/pebble-ca.crt" in dockerfile
+    assert "RUN update-ca-certificates" in dockerfile
+    assert "ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" in dockerfile
+    assert "https://pebble:15000/roots/0" in bootstrap
+    assert '--cacert "$PEBBLE_ENDPOINT_CA"' in bootstrap
+    assert 'openssl x509 -in "$PEBBLE_ISSUER_TMP" -noout' in bootstrap
+    assert 'install -m 0644 "$PEBBLE_ISSUER_TMP" "$PEBBLE_ISSUER_CA"' in bootstrap
+    assert "update-ca-certificates" in bootstrap
 
 
 def test_resilience_kills_a_real_apply_after_the_exact_host_mutation() -> None:

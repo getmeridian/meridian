@@ -27,8 +27,8 @@ uv run pytest tests/systemlab/ -q
 - Keep the external connectivity probe explicitly routed to the pool; a fixed exit route makes failover assertions meaningless, while private bridge targets are blocked.
 - Intermediate Realm hops must never appear as canonical subscription endpoints.
 - V4 Realm units use hashed `meridian-realm-*` names; never assert the retired `meridian-relay` unit.
-- IP mode uses Pebble short-lived certificates; base images must trust its fixture CA and use the certificate-covered `pebble` hostname.
-- Bridge-container DNS can pass while BuildKit fails; keep the scratch probe, repair dangling guest DNS, and exclude local Docker state from build contexts.
+- IP mode uses Pebble short-lived certificates. Images trust the fixture CA for Pebble's HTTPS endpoint; the controller must also fetch and install Pebble's runtime issuance root before verified panel access.
+- Bridge-container DNS can pass while the daemon resolver fails. Preflight must verify a real base-image pull, repair dangling DNS only for the dedicated Meridian Colima profile, and exclude local Docker state from build contexts.
 - Nested Docker must retain bridge NAT; disabling iptables removes the panel container's return path to sibling lab nodes.
 - `systemd` may report `degraded` inside privileged containers; this is accepted when required services are healthy.
 - The controller image must copy the custom Hatch build hook before `pip install .`.

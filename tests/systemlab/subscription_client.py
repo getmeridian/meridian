@@ -5,8 +5,6 @@ from __future__ import annotations
 import base64
 import binascii
 import copy
-import json
-import socket
 from collections.abc import Iterable
 from typing import Any
 from urllib.parse import urlsplit
@@ -15,8 +13,35 @@ from uuid import UUID
 import yaml
 
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel, SubscriptionDocument
+from meridian.xray_client import (
+    endpoint_addresses,
+    outbound_address,
+    parse_xray_subscription,
+    proxy_outbounds,
+    route_only,
+    select_outbound,
+    use_free_local_ports,
+)
 
-_PROXY_TAG_PREFIX = "MERIDIAN_PROXY"
+__all__ = [
+    "base64_endpoint_addresses",
+    "base64_vless_user_ids",
+    "endpoint_addresses",
+    "fetch_canonical_xray",
+    "mihomo_endpoint_addresses",
+    "mihomo_vless_user_ids",
+    "missing_addresses",
+    "outbound_address",
+    "parse_base64_subscription",
+    "parse_mihomo_subscription",
+    "parse_xray_subscription",
+    "proxy_outbounds",
+    "replace_user_ids",
+    "route_only",
+    "select_outbound",
+    "use_free_local_ports",
+    "xray_vless_user_ids",
+]
 
 
 def fetch_canonical_xray(
@@ -31,26 +56,6 @@ def fetch_canonical_xray(
         user.short_uuid,
         client_type=XRAY_JSON_CLIENT_TYPE,
     )
-
-
-def parse_xray_subscription(content: str) -> dict[str, Any]:
-    """Validate and decode a rendered canonical Xray document."""
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Canonical Xray subscription is not JSON: {exc}") from exc
-    if isinstance(parsed, list):
-        if len(parsed) != 1:
-            raise ValueError("Canonical Xray subscription must contain exactly one config")
-        parsed = parsed[0]
-    if not isinstance(parsed, dict):
-        raise ValueError("Canonical Xray subscription must be an object")
-    outbounds = parsed.get("outbounds")
-    if not isinstance(outbounds, list):
-        raise ValueError("Canonical Xray subscription has no outbounds")
-    if not proxy_outbounds(parsed):
-        raise ValueError("Canonical Xray subscription has no Meridian proxy outbounds")
-    return parsed
 
 
 def parse_base64_subscription(content: str) -> list[str]:
@@ -175,20 +180,6 @@ def mihomo_vless_user_ids(config: dict[str, Any]) -> set[str]:
     }
 
 
-def proxy_outbounds(
-    config: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Return only Remnawave-injected Meridian proxy outbounds."""
-    outbounds = config.get("outbounds")
-    if not isinstance(outbounds, list):
-        return []
-    return [
-        outbound
-        for outbound in outbounds
-        if isinstance(outbound, dict) and str(outbound.get("tag", "")).startswith(_PROXY_TAG_PREFIX)
-    ]
-
-
 def xray_vless_user_ids(config: dict[str, Any]) -> set[str]:
     """Return normalized VLESS UUIDs from canonical Xray proxy outbounds."""
     return {
@@ -200,93 +191,6 @@ def xray_vless_user_ids(config: dict[str, Any]) -> set[str]:
         for user in destination.get("users", [])
         if isinstance(user, dict) and user.get("id")
     }
-
-
-def outbound_address(outbound: dict[str, Any]) -> str:
-    """Read the first VLESS endpoint without inventing missing values."""
-    settings = outbound.get("settings")
-    if not isinstance(settings, dict):
-        return ""
-    destinations = settings.get("vnext")
-    if not isinstance(destinations, list) or not destinations:
-        return ""
-    destination = destinations[0]
-    if not isinstance(destination, dict):
-        return ""
-    return str(destination.get("address", ""))
-
-
-def endpoint_addresses(config: dict[str, Any]) -> set[str]:
-    """Return every concrete proxy address delivered by Remnawave."""
-    return {address for outbound in proxy_outbounds(config) if (address := outbound_address(outbound))}
-
-
-def select_outbound(
-    config: dict[str, Any],
-    address: str,
-) -> str:
-    """Select one canonical outbound by its delivered endpoint."""
-    for outbound in proxy_outbounds(config):
-        if outbound_address(outbound) == address:
-            tag = outbound.get("tag")
-            if isinstance(tag, str) and tag:
-                return tag
-    raise ValueError(f"Canonical subscription has no endpoint for {address}")
-
-
-def route_only(
-    config: dict[str, Any],
-    outbound_tag: str,
-) -> dict[str, Any]:
-    """Pin traffic to one delivered outbound for path acceptance."""
-    known_tags = {str(outbound.get("tag", "")) for outbound in proxy_outbounds(config)}
-    if outbound_tag not in known_tags:
-        raise ValueError(f"Canonical subscription has no outbound {outbound_tag!r}")
-    selected = copy.deepcopy(config)
-    routing = selected.setdefault("routing", {})
-    if not isinstance(routing, dict):
-        raise ValueError("Canonical Xray routing must be an object")
-    routing["rules"] = [
-        {
-            "type": "field",
-            "ip": ["geoip:private"],
-            "outboundTag": "BLOCK",
-        },
-        {
-            "type": "field",
-            "network": "tcp,udp",
-            "outboundTag": outbound_tag,
-        },
-    ]
-    routing.pop("balancers", None)
-    selected.pop("burstObservatory", None)
-    selected.pop("observatory", None)
-    return selected
-
-
-def use_free_local_ports(
-    config: dict[str, Any],
-) -> tuple[dict[str, Any], int]:
-    """Move canonical local listeners to free ports for repeatable tests."""
-    selected = copy.deepcopy(config)
-    inbounds = selected.get("inbounds")
-    if not isinstance(inbounds, list):
-        raise ValueError("Canonical Xray subscription has no inbounds")
-    socks_port = 0
-    used_ports: set[int] = set()
-    for inbound in inbounds:
-        if not isinstance(inbound, dict):
-            continue
-        port = _free_port()
-        while port in used_ports:
-            port = _free_port()
-        used_ports.add(port)
-        inbound["port"] = port
-        if inbound.get("protocol") == "socks":
-            socks_port = port
-    if not socks_port:
-        raise ValueError("Canonical Xray subscription has no SOCKS inbound")
-    return selected, socks_port
 
 
 def replace_user_ids(
@@ -324,9 +228,3 @@ def missing_addresses(
 ) -> set[str]:
     """Compare expected lab endpoints with canonical delivery."""
     return set(expected) - endpoint_addresses(config)
-
-
-def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return int(listener.getsockname()[1])
