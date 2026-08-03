@@ -14,12 +14,17 @@ BEFORE INSTALL           → meridian preflight IP
 
 AFTER INSTALL, CAN'T CONNECT → meridian test IP
   "Is the proxy reachable from where I am right now?"
-  Tests: TCP port 443, TLS handshake (Reality), domain HTTPS.
+  Tests: configured listeners, TLS/SNI, canonical subscription and proxy traffic.
+  No SSH needed — runs from the client device.
+
+AFTER INSTALL, CHECK EXPOSURE → meridian probe IP
+  "Does this deployment reveal a proxy or management surface?"
+  Tests: public ports, TLS/HTTP behavior, paths, SNI, DNS and topology policy.
   No SSH needed — runs from the client device.
 
 AFTER INSTALL, SOMETHING BROKE → meridian doctor IP
   "Collect everything for debugging."
-  Collects: server OS, Docker, Remnawave panel + node logs, ports, firewall, SNI, DNS.
+  Collects: server OS, Docker, Remnawave node and nginx logs, ports, firewall, SNI, DNS.
 ```
 
 Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
@@ -94,7 +99,7 @@ Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `
 
 Check the container: `docker logs remnawave-node --tail 50`. Common causes are a port collision on the host (node runs in `network_mode: host`, so ports from `cluster.yml` must be free), an unreachable panel (node registration needs the panel's `node_secret_key` at boot), or a missing `NET_ADMIN` capability.
 
-**Fix:** `meridian teardown IP && meridian deploy IP` rebuilds the node cleanly. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
+**Fix:** run `meridian node check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
 
 ### XHTTP inbound creation fails (port conflict)
 
@@ -110,7 +115,7 @@ Domain doesn't resolve to server IP yet. Update the DNS A record. Propagation is
 
 ## Was working, now stopped
 
-**Most common cause:** Server IP got blocked. Run `meridian test IP` — if TCP fails, the IP is likely blocked.
+**Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and proxy execution failures. A TCP failure can also mean a cloud firewall or an offline server.
 
 See the [IP Blocked Recovery guide](/docs/en/recovery/) for step-by-step recovery options (new server, relay swap, CDN fallback).
 
@@ -150,12 +155,12 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 | Check | What It Tests | If It Fails |
 |-------|--------------|-------------|
 | SNI target reachability | Can the server reach the camouflage site? | Server's outbound is restricted. Try a different SNI with `--sni` |
-| SNI ASN match | Does the SNI target share a CDN/ASN with the server? | Use a global CDN domain. Avoid apple.com (Apple-owned ASN) |
 | Port 443 availability | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
 | Port 443 external reachability | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
 | Domain DNS | Does the domain resolve to server IP? | Update DNS A record |
 | Server OS | Is it Ubuntu/Debian? | Other distros may work but are untested |
 | Disk space | At least 2GB free? | Free up space |
+| Clock sync | Is client/server drift under 30 seconds? | Enable NTP and automatic time on both devices |
 
 ## Interpreting doctor output
 
@@ -164,7 +169,7 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
 | Docker | Are the `remnawave` and `remnawave-node` containers running? Status should be "Up" |
-| Remnawave Logs | Error messages from panel backend or node, "failed to start" entries, certificate issues |
+| Remnawave Node Logs | Node startup errors, "failed to start" entries, certificate issues |
 | Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |
 | SNI Target | Should show CONNECTED with a certificate chain |
@@ -172,10 +177,17 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 
 ## Interpreting test output
 
-| Check | Pass | Fail |
-|-------|------|------|
-| TCP port 443 | Server is network-reachable | Firewall, ISP block, or server down |
-| TLS handshake | Reality protocol is working | Xray not running, port conflict, or SNI issue |
-| Domain HTTPS | nginx working | DNS or nginx issue |
+| Check | Pass | Fail or skipped |
+|-------|------|-----------------|
+| TCP reachability | Every configured public TCP listener is reachable | Firewall, ISP block, server down, or wrong topology |
+| TLS/SNI camouflage | The target presents the expected camouflage identity | TLS routing, certificate, DNS, or SNI mismatch |
+| Domain root | Hardened `403`/`404` response is reachable | DNS/nginx failure or unintended public content |
+| Canonical subscription | Remnawave delivered valid Xray JSON for an active client | Missing/inactive client, panel failure, or broken template |
+| Automatic fallback | The delivered policy carried real traffic | Balancer, routing, credential, or endpoint failure |
+| Protocol checks | Each target outbound carried real traffic | Protocol-specific listener, firewall, or delivered config failure |
+
+The full test rotates independent public IP observers and checks the same observers directly. If neither the proxy nor control path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
+
+The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot certify UDP-only Hysteria traffic.
 
 If all checks pass but the VPN client still can't connect: re-scan the QR code, check device clock is accurate (within 30 seconds), or try a different app (v2rayNG, Hiddify).

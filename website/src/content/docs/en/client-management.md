@@ -11,10 +11,7 @@ section: guides
 meridian client add alice
 ```
 
-This creates a unique connection key for "alice" and displays:
-- A **QR code** in the terminal — scan it to open the connection page or import the subscription
-- A **subscription URL** — one link for compatible VPN apps
-- A **shareable PWA URL** — hosted on your server, ready to send via any messenger
+This creates a unique connection key for "alice" and displays the canonical subscription URL. Legacy deployments also show a QR code and self-hosted connection-page URL when the page upload has been verified. V4 access is managed through `topology_intent`, so no legacy PWA is fabricated.
 
 Pass multiple names to add several clients at once:
 
@@ -22,11 +19,11 @@ Pass multiple names to add several clients at once:
 meridian client add alice bob charlie
 ```
 
-Each client gets their own key and connection page. Failures are reported per-client — successfully created clients are kept even if some fail.
+Each client gets their own key. Legacy batch failures are reported per client and successful creations are kept.
 
 ### What the recipient sees
 
-The shareable URL opens a connection page with:
+When a legacy connection page is available, its shareable URL opens a page with:
 - Step-by-step instructions for installing a VPN app (v2RayTun, v2rayNG, Hiddify, or v2rayN)
 - QR codes for each connection protocol
 - One-tap "Open in App" deep links
@@ -42,7 +39,13 @@ To re-display connection info for an existing client at any time:
 meridian client show alice
 ```
 
-This outputs the same QR code, subscription URL, and shareable page link — without creating a new key. Use this when:
+This shows the usable subscription and any evidenced legacy share-page link without creating a new key. If a legacy page is missing, repair it explicitly:
+
+```bash
+meridian client show alice --repair-page
+```
+
+Use `client show` when:
 - You need to re-share the connection page with someone
 - You lost the original QR code or URL
 - You want to verify what a client's connection looks like
@@ -53,7 +56,7 @@ This outputs the same QR code, subscription URL, and shareable page link — wit
 meridian client list
 ```
 
-Shows all clients with their protocol connections (Reality, XHTTP, WSS).
+Shows managed clients with status, traffic, creation time, and last-seen metadata. On V4, the list is restricted to `topology_intent.access.users`; internal routing accounts never appear.
 
 ## Remove a client
 
@@ -61,7 +64,7 @@ Shows all clients with their protocol connections (Reality, XHTTP, WSS).
 meridian client remove alice
 ```
 
-Revokes access immediately. The client's UUID is removed from all inbounds on the server.
+Legacy deployments revoke access immediately. V4 refuses direct removal with exit `2` because safe managed-user retirement is not implemented yet. Use `client disable` for immediate temporary revocation, which lasts until the next `meridian apply`.
 
 ## Suspend a client
 
@@ -69,7 +72,7 @@ Revokes access immediately. The client's UUID is removed from all inbounds on th
 meridian client disable alice
 ```
 
-Temporarily blocks the client from connecting. Their configuration stays intact — no keys are deleted, and their subscription URL remains valid. Use this to pause access without losing the client's setup.
+Temporarily blocks the client without deleting keys. On V4, the next topology apply restores every declared access user, so `disable` is an operational pause rather than durable desired state.
 
 To re-enable: `meridian client enable alice`
 
@@ -89,9 +92,9 @@ Meridian stores fleet topology locally in `~/.meridian/cluster.yml` — panel UR
 ~/.meridian/cluster.yml                 # fleet topology + panel access
 ```
 
-Client commands talk directly to the panel's REST API using the stored API token. No SSH is needed for client operations.
+Routine client state uses the panel REST API. Legacy connection-page upload and explicit `--repair-page` also require SSH to the panel host; subscription-only V4 operations do not.
 
-If you need to recover after losing the local file, `meridian fleet recover` rebuilds `cluster.yml` from the live panel API.
+`meridian fleet recover` can import one legacy shared profile after local state is lost. It cannot reconstruct V4 topology intent; restore a backup or rerun `meridian setup` for V4 deployments.
 
 ## Web panel
 
@@ -115,7 +118,7 @@ panel:
 
 Open `url` in a browser and log in with `admin_user` / `admin_pass`.
 
-Panel-side edits (e.g. renaming a user, disabling a host) surface in Meridian as drift — the next `meridian plan` shows the diff between the panel's actual state and your `cluster.yml` desired state. Use `meridian apply` to converge either way.
+Panel-side edits surface as drift. V4 converges against compiled `topology_intent`; legacy deployments may use the optional `desired_*` fields. Review `meridian plan` before applying.
 
 ## How it works
 
@@ -125,7 +128,9 @@ Client apps (v2rayNG, Streisand, Hiddify, sing-box) treat the subscription URL a
 
 ## Declarative client list
 
-For fleet-wide setups you can manage clients declaratively instead of imperatively. Add a `desired_clients` list to `~/.meridian/cluster.yml`:
+V4 stores managed users in `topology_intent.access.users`. Use `client add` to expand that intent and apply it. Direct V4 removal is intentionally unavailable until safe managed-user retirement is implemented; do not delete the panel user directly.
+
+Legacy clusters can opt into the older `desired_clients` list in `~/.meridian/cluster.yml`:
 
 ```yaml
 desired_clients:
@@ -134,4 +139,4 @@ desired_clients:
   - charlie
 ```
 
-Then `meridian plan` shows the diff against the panel's actual user list, and `meridian apply` converges — adds any missing clients, removes any extra ones. `meridian client add/remove` still works alongside this; the two approaches coexist. See the [declarative workflow](/docs/en/getting-started/#declarative-workflow) for the full story.
+Then `meridian plan` shows the legacy diff against the panel and `meridian apply` converges it. This field is not the authority for V4 topology.

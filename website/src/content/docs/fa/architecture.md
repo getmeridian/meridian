@@ -33,7 +33,7 @@ flowchart TD
 
 nginx stream TLS را خاتمه نمی‌دهد. آن نام میزبان SNI را از TLS Client Hello می‌خواند و جریان TCP خام را به backend مناسب منتقل می‌کند.
 
-acme.sh گواهینامه IP Let's Encrypt را درخواست می‌کند (پروفایل shortlived 6 روزه، خودتجدید). اگر صدور گواهینامه IP پشتیبانی نشود، به self-signed بازمی‌گردد.
+acme.sh گواهی IP از Let's Encrypt درخواست می‌کند (پروفایل کوتاه‌عمر ۶روزه با تمدید خودکار). اگر گواهی مورداعتماد صادر نشود، استقرار متوقف می‌شود؛ Meridian هرگز اعتبارنامه‌های پنل را از طریق گواهی موقت خودامضا ارسال نمی‌کند.
 
 XHTTP روی پورت localhost-only اجرا می‌شود و توسط nginx پروکسی معکوس می‌شود — هیچ پورت خارجی اضافی نمایش داده نمی‌شود.
 
@@ -66,7 +66,7 @@ flowchart LR
 
 یک نود relay یک دستگاه ارسال TCP سطح ۴ سبک است که [Realm](https://github.com/zhboner/realm) را اجرا می‌کند. کلاینت به IP داخلی relay متصل می‌شود، که TCP خام را به سرور خروجی در خارج منتقل می‌کند. تمامی رمزنگاری انتها به انتها بین کلاینت و خروجی است — relay هرگز plaintext را نمی‌بیند.
 
-جهت قرارداد core توانایی‌های به‌علاوه سیاست مسیریابی است. یک سرور واحد می‌تواند هم relay و هم توانایی خروجی داشته باشد؛ برای مثال، یک سرور منطقه‌ای RU می‌تواند entry relay و همچنین خروجی برای ترافیک RU-destination باشد.
+V4 سرورها را به‌شکل توانایی‌ها به‌علاوه سیاست مسیریابی مدل می‌کند. یک سرور می‌تواند هم‌زمان relay hop، exit یا routing gateway باشد. هر hop زنجیره در server inventory دیده می‌شود؛ فقط entry hop منتشر می‌شود و سلامت hopهای داخلی تا آزمون end-to-end ناشناخته می‌ماند.
 
 ## نحوه کار پروتکل Reality
 
@@ -81,10 +81,10 @@ flowchart LR
 
 Meridian هر جزئیات فلیت را در یک `cluster.yml` تک در `~/.meridian/cluster.yml` ذخیره می‌کند:
 
-- **وضعیت واقعی** — `panel` (URL، توکن API، اعتبارات مدیر، secret_path، sub_path)، `nodes[]`، `relays[]`، `inbounds{}`، `branding` — پر شده توسط `meridian deploy`، `meridian node add` و غیره. کاربران به‌طور کلی این را دستی ویرایش نمی‌کند.
-- **وضعیت مطلوب** — `desired_nodes[]`، `desired_relays[]`، `desired_clients[]`، `subscription_page` — اختیاری نوشته شده توسط اپراتور. `meridian plan` تفاوت Terraform-style را بین مطلوب و واقعی نشان می‌دهد؛ `meridian apply` همگرا می‌کند.
+- **Legacy** — `panel`، `nodes[]`، `relays[]`، `inbounds{}` و `branding` وضعیت پیگیری‌شده را توصیف می‌کنند؛ `desired_nodes[]`، `desired_relays[]`، `desired_clients[]` و `subscription_page` اختیاری، وضعیت مطلوب‌اند.
+- **V4** — `topology_intent` گراف مطلوب و معتبر control plane، exitها، routing gatewayها، relay chainها و access userهاست؛ فیلدهای legacy `desired_*`، V4 را مدیریت نمی‌کنند.
 
-وضعیت Remnawave خود (کاربران، میزبان‌ها، پروفایل پیکربندی، internal squads) در پایگاه داده PostgreSQL روی میزبان پنل زندگی می‌کند. Meridian آن وضعیت را از طریق API REST رسمی با استفاده از SDK Python Remnawave pinned می‌خواند و می‌نویسد. پایگاه داده پنل منبع حقیقت برای کلاینت‌هاست؛ `cluster.yml` منبع حقیقت برای توپولوژی فلیت است.
+وضعیت واقعی Remnawave (کاربران، Hostها، profileها و Squadها) در PostgreSQL پنل است و از API خوانده می‌شود. در legacy پنل منبع کاربران واقعی و `desired_*` لایه مطلوب اختیاری است. در V4، `topology_intent` مالکیت و گراف مطلوب را تعیین می‌کند؛ وجود یک منبع فقط در پنل آن را خودکار تحت مدیریت Meridian نمی‌برد.
 
 ## Meridian Studio و local Engine
 
@@ -182,17 +182,17 @@ nginx مدیریت می‌کند:
 
 ## Provisioning موازی
 
-`meridian apply` می‌تواند نودهای مستقل را به‌طور همزمان از طریق `ThreadPoolExecutor` تجهیز کند (`--parallel N`، پیش‌فرض 4). هر کارگر SDK Remnawave خود را می‌گیرد؛ httpx client زیرین و per-thread asyncio event loop از طریق `threading.local()` جدا می‌شوند. `cluster.save()` توسط `RLock` محافظت می‌شود بنابراین عکس‌ها موازی به‌صورت تمیزی سریال می‌شوند.
+در legacy، `meridian apply` می‌تواند نودهای مستقل را به‌طور همزمان از طریق `ThreadPoolExecutor` تجهیز کند (`--parallel N`، بازه 1 تا 32، پیش‌فرض 4). هر کارگر SDK Remnawave خود را می‌گیرد؛ httpx client زیرین و per-thread asyncio event loop از طریق `threading.local()` جدا می‌شوند. `cluster.save()` توسط `RLock` محافظت می‌شود، بنابراین snapshotهای موازی به‌ترتیب ذخیره می‌شوند. V4 گراف resource کامپایل‌شده را apply می‌کند و مقدار غیرپیش‌فرض `--parallel` را نمی‌پذیرد.
 
 ## چرخه حیات اعتبار
 
 1. **تولید**: اعتبارات تصادفی (رمز پنل، اسرار JWT، رمز PostgreSQL، کلید مخفی نود، keypairs Reality x25519 هر نود، UUID کلاینت)
 2. **ذخیره محلی**: `~/.meridian/cluster.yml` — بلافاصله قبل از عملیات API/SSH ذخیره‌شده تا روی deploy سقوط فرایند را از سر شروع می‌توانید
 3. **اعمال**: پنل + کانتینرهای نود بالا آمده، inbounds و میزبان‌ها از طریق REST API ایجاد شده
-4. **تزامن**: پایگاه داده پنل Remnawave (Postgres) و `cluster.yml` هر دو wضعیت قانونی را نگه می‌داری؛ drift توسط `meridian plan` گزارش می‌شود
+4. **همگام‌سازی**: پنل منابع واقعی را نگه می‌دارد؛ `desired_*` در legacy یا `topology_intent` در V4 وضعیت مطلوب را تعیین می‌کند و `meridian plan` drift را گزارش می‌دهد
 5. **اجرای دوباره**: کلیدهای Reality و UUID کلاینت‌ها در استقرار مجدد حفظ می‌شوند (پنل در صورت وجود آن‌ها اجازه تولید دوباره نمی‌دهد)
-6. **بازیابی**: `meridian fleet recover --panel-url URL --api-token TOKEN` فایل `cluster.yml` را از API پنل زنده بازسازی می‌کند وقتی کپی محلی گم شود
-7. **حذف**: `meridian teardown <IP>` تمام کانتینرهای Remnawave، پیکربندی nginx و ورودی `cluster.yml` پنل محلی (اختیاری تمام فایل) را متوقف و حذف می‌کند
+6. **بازیابی legacy**: `meridian fleet recover --legacy --panel-url https://HOST/SECRET_PATH` یک profile بدون ابهام را import، `sub_path` و Reality key را با SSH بازیابی و نودها را در `servers.json` ثبت می‌کند. URL دامنه به `--panel-server PUBLIC_IP` نیاز دارد؛ ابهام WSS node-to-domain مانع نوشتن state می‌شود. V4 intent از پنل قابل بازسازی نیست
+7. **حذف**: `meridian teardown <IP>` ابتدا مالکیت و وابستگی را بررسی می‌کند. نقش‌های V4 باید با setup/apply حذف شوند و میزبان پنل تا وقتی نود یا relay دیگری باقی است حذف نمی‌شود
 
 ## مکان فایل‌ها
 
@@ -207,7 +207,7 @@ nginx مدیریت می‌کند:
 - `/opt/remnanode/` — فایل compose نود + `.env`
 
 ### روی ماشین محلی (deployer)
-- `~/.meridian/cluster.yml` — وضعیت فلیت (اعتبارات پنل، نودها، relay‌ها، وضعیت مطلوب)
+- `~/.meridian/cluster.yml` — وضعیت فلیت و desired state قدیمی یا `topology_intent` معتبر V4
 - `~/.meridian/cluster.yml.bak` — پشتیبان خودکار قبل از عملیات مخرب
 - `~/.meridian/cache/` — کش throttle check به‌روزرسانی
 - `~/.local/bin/meridian` — نقطه ورود CLI (نصب‌شده از طریق uv/pipx)

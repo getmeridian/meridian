@@ -54,7 +54,7 @@ These settings are stored in `cluster.yml` and apply to all client connection pa
 
 The SNI (Server Name Indication) target is the domain your server impersonates. This is **not** a domain you own — it's any popular website with TLS. When a censor probes your server, they see that real site's certificate, making your server indistinguishable from normal traffic.
 
-The default (`www.microsoft.com`) works well for most cases. For optimal stealth, scan your server's network for same-ASN targets — these are harder to detect because the IP range matches:
+The default (`www.microsoft.com`) works well for most cases. To discover alternatives near the server, scan its IPv4 subnet with the pinned, checksum-verified RealiTLScanner build:
 
 ```
 meridian scan 198.51.100.10
@@ -66,7 +66,7 @@ meridian scan 198.51.100.10
 - `dl.google.com` — Google CDN, global
 - `github.com` — Fastly CDN, global
 
-**Avoid** `apple.com` and `icloud.com` — Apple controls its own ASN ranges, making the IP/ASN mismatch instantly detectable.
+Use a stable hostname that resolves and completes a TLS handshake from the server. `meridian scan` validates observed certificate domains; `meridian preflight --sni HOST` checks a manual choice without sending the server address to an ASN service.
 
 ### Camouflage target vs. domain
 
@@ -85,7 +85,7 @@ Not sure if your server is compatible?
 meridian preflight 198.51.100.10
 ```
 
-Tests SNI target reachability, ASN match, port availability, DNS, OS compatibility, and disk space — without installing anything.
+Tests SNI reachability and DNS, port availability and external reachability, optional domain DNS, OS compatibility, disk space, and clock skew — without installing anything. Exit `0` means ready, `4` means actionable findings, and `3` means required evidence was unavailable.
 
 ## Re-running deploy
 

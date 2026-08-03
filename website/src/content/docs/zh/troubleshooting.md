@@ -14,12 +14,17 @@ section: guides
 
 安装后，无法连接 → meridian test IP
   "从我所在的位置代理是否可达？"
-  测试：TCP 端口 443、TLS 握手（Reality）和域名 HTTPS。
+  测试：已配置的监听器、TLS/SNI、规范订阅和实际代理流量。
+  无需 SSH — 在客户端设备上运行。
+
+安装后，检查暴露面 → meridian probe IP
+  "此部署是否暴露代理或管理界面？"
+  测试：公网端口、TLS/HTTP 行为、路径、SNI、DNS 和拓扑策略。
   无需 SSH — 在客户端设备上运行。
 
 安装后，出现问题 → meridian doctor IP
   "收集所有内容用于调试。"
-  收集：服务器操作系统、Docker、Remnawave 面板和节点日志、端口、防火墙、SNI 与 DNS。
+  收集：服务器操作系统、Docker、Remnawave 节点与 nginx 日志、端口、防火墙、SNI 与 DNS。
 ```
 
 添加 `--ai` 到 preflight 或 doctor 以获得 AI 就绪的诊断提示。
@@ -94,7 +99,7 @@ section: guides
 
 检查容器日志：`docker logs remnawave-node --tail 50`。常见原因包括主机端口冲突（节点使用 `network_mode: host`，因此 `cluster.yml` 中的端口必须空闲）、面板不可达（节点启动时需要面板的 `node_secret_key`）或缺少 `NET_ADMIN` 能力。
 
-**修复：** `meridian teardown IP && meridian deploy IP` 会重新构建节点。要验证 Remnawave 面板状态，请登录 `https://<IP>/<secret_path>/` 的管理 UI 并查看 **Nodes**；节点应显示为 `connected`。`meridian fleet status` 可在 CLI 中显示相同信息。
+**修复：** 先运行 `meridian node check IP` 并按其修复建议操作。要验证 Remnawave 面板状态，请登录 `https://<IP>/<secret_path>/` 的管理 UI 并查看 **Nodes**；节点应显示为 `connected`。`meridian fleet status` 可在 CLI 中显示相同信息。
 
 ### XHTTP 入站创建失败（端口冲突）
 
@@ -110,7 +115,7 @@ section: guides
 
 ## 曾经可以工作，现在停止了
 
-**最常见的原因：** 服务器 IP 被阻止。运行 `meridian test IP`；如果 TCP 检查失败，IP 很可能已被阻止。
+**最常见的原因：** 服务器 IP 被阻止。运行 `meridian test IP`；其发现会区分网络可达性、TLS、订阅和代理执行问题。TCP 失败也可能表示云防火墙阻断或服务器离线。
 
 有关分步恢复选项（更换服务器、切换中继、CDN 回退），请参阅 [IP 被阻止恢复指南](/docs/zh/recovery/)。
 
@@ -145,17 +150,19 @@ meridian doctor
 
 有关中继特定的问题，请参阅[中继指南 — 故障排除](/docs/zh/relay/#troubleshooting)部分。
 
+V4 链路会明确拒绝 `relay check`；请用 `meridian test` 验证客户端路由。在 `fleet status` 中，中继可达只表示公网 TCP listener 连接成功；内部 hop 保持 `unknown`，并可能使整体退出码为 `3`。
+
 ## 解读 preflight 输出
 
 | 检查 | 测试内容 | 如果失败 |
 |------|---------|---------|
 | SNI 目标可达性 | 服务器能否访问伪装站点？ | 服务器出站受限。用 `--sni` 尝试其他 SNI |
-| SNI ASN 匹配 | SNI 目标是否与服务器共享 CDN/ASN？ | 使用全球 CDN 域名。避免 apple.com（Apple 专有 ASN） |
 | 端口 443 可用性 | 端口 443 是否空闲或由 Meridian 使用？ | 其他服务占用 443。停止它或使用干净的服务器 |
 | 端口 443 外部可达性 | 外部能否访问端口 443？ | 云防火墙阻止。开放入站 443/TCP |
 | 域名 DNS | 域名是否解析到服务器 IP？ | 更新 DNS A 记录 |
 | 服务器系统 | 是否为 Ubuntu/Debian？ | 其他发行版可能可用但未经测试 |
 | 磁盘空间 | 至少 2GB 可用？ | 释放空间 |
+| 时钟同步 | 客户端与服务器时差是否小于 30 秒？ | 在两台设备上启用 NTP 和自动时间 |
 
 ## 解读 doctor 输出
 
@@ -164,7 +171,7 @@ meridian doctor
 | 本地机器 | 系统兼容性 |
 | 服务器 | 系统版本、运行时间（最近重启？）、磁盘/内存使用 |
 | Docker | `remnawave` 和 `remnawave-node` 容器是否运行？状态应为 "Up" |
-| Remnawave 日志 | 面板后端或节点的错误消息、"failed to start" 条目、证书问题 |
+| Remnawave 节点日志 | 节点启动错误、"failed to start" 条目、证书问题 |
 | 监听端口 | 端口 443 应显示 nginx。如缺失，代理未运行 |
 | 防火墙 (UFW) | 端口 443/tcp 应为 ALLOW。如未列出，已被阻止 |
 | SNI 目标 | 应显示 CONNECTED 及证书链 |
@@ -174,8 +181,21 @@ meridian doctor
 
 | 检查 | 通过 | 失败 |
 |------|------|------|
-| TCP 端口 443 | 服务器网络可达 | 防火墙、ISP 封锁或服务器宕机 |
-| TLS 握手 | Reality 协议正常工作 | Xray 未运行、端口冲突或 SNI 问题 |
-| Domain HTTPS | nginx 正常工作 | DNS 或 nginx 问题 |
+| TCP 可达性 | 每个已配置的公网 TCP 监听器均可达 | 防火墙、ISP 封锁、服务器离线或拓扑错误 |
+| TLS/SNI 伪装 | 目标呈现预期伪装身份 | TLS 路由、证书、DNS 或 SNI 不匹配 |
+| 域名根路径 | 可访问加固后的 `403`/`404` 响应 | DNS/nginx 故障或意外公开内容 |
+| 规范订阅 | Remnawave 为活跃客户端下发有效 Xray JSON | 缺少活跃客户端、面板故障或模板损坏 |
+| 自动 fallback | 下发策略承载了真实流量 | 负载均衡、路由、凭据或端点故障 |
+| 协议检查 | 每个目标 outbound 都承载了真实流量 | 协议监听器、防火墙或下发配置故障 |
+
+最终退出码：`0` 通过，`4` 完成但有负面发现，`3` 因缺少必需证据而无法判定。`--timeout` 范围为 1–30 秒，限制每个网络操作或协议运行，并非整个命令的总时长。首次完整测试可能最多用 120 秒从 GitHub 下载固定 Xray 并验证发布的 checksum，之后使用本地缓存。
+
+真实流量测试会轮换多个外部 IP observer。若代理请求失败但 observer 可直连，则是负面结果；若 observer 通过代理和直连都不可用，Meridian 不会误判代理故障，而返回无法判定（`3`）。`--basic` 无法验证 Hysteria UDP 流量。TARGET 与 `--server` 不能同时传入。
+
+## 解读 probe 输出
+
+`probe` 使用相同的 `0`/`4`/`3` 退出码以及每操作 1–30 秒的 `--timeout`。对托管路由，TLS trust、hostname 或确定性 SNI 失败会成为负面发现。重复观测不完整，或独立 CDN edge 返回不同但都可信的证书时，会报告无法判定而不是误报失败。跳过的检查绝不计为通过。
+
+`meridian scan` 需要 IPv4：RealiTLScanner 不会在仅 IPv6 的服务器上运行，命令返回 `3`。在 V4 中，选出的 SNI 只会显示；请通过 `meridian setup` 修改已审核 intent。
 
 如果所有检查通过但 VPN 客户端仍无法连接：重新扫描 QR 码、检查设备时钟准确性（30 秒内）、或尝试其他应用（v2rayNG、Hiddify）。

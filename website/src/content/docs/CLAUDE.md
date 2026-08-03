@@ -14,4 +14,4 @@
 - **AI reference is English-only** — `make ai-docs` reads only from `en/`. Translations don't affect the AI-facing docs.
 - **Order + section drive sidebar** — changing `order` or `section` in frontmatter reshuffles the sidebar for that locale. Keep values consistent across locales to avoid navigation mismatches.
 - **This CLAUDE.md lives inside a content collection** — `content.config.ts` uses `**/[a-z]*.md` glob to exclude it. All doc filenames must stay lowercase.
-- **CLI validation is section-scoped** — document every command flag under its matching `### meridian …` heading.
+- **CLI validation is live-tree and section-scoped** — every public leaf and root option must appear in its matching section in all four locales; hidden developer commands are excluded.

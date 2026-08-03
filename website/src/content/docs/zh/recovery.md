@@ -13,11 +13,11 @@ section: guides
 meridian test IP
 ```
 
-如果 TCP 端口 443 检查失败，IP 可能被您的 ISP 或政府封锁。这是受审查地区最常见的问题。
+TCP/443 的负面结果只表示当前观察点无法访问该地址，并不能单独证明封锁；防火墙、停止的 listener 或运营商路由也可能导致该结果。请从另一网络对比，并运行 `meridian probe IP`。观察证据不可用返回 `3`，已确认的负面发现返回 `4`。
 
 ## 紧急缓解
 
-如果您使用**域名模式**（`--domain`）部署，您的 WSS/CDN 连接仍然有效——它通过 Cloudflare 的 CDN 路由，完全绕过 IP 封锁。告诉用户切换到其连接页面上的 WSS 连接链接。
+如果已部署**域名模式**（`--domain`），WSS/CDN 路由可能继续通过 Cloudflare 工作。让用户刷新规范订阅并选择可用路线；独立 PWA 页面只存在于旧版，且必须有已部署的正面证据。
 
 如果您已部署**中继**，通过中继连接的客户端不受影响——他们连接到中继的本地 IP，而不是被封锁的出站 IP。
 
@@ -37,7 +37,7 @@ meridian node add NEW_IP --name replacement
 
 ### 选项 B：新出站服务器 + 现有中继
 
-如果您已部署中继，这是最佳方案——您的客户端保留中继连接，同时交换其后的出站服务器：
+以下命令式流程仅适用于旧版 Realm 中继：
 
 ```bash
 # 1. 将新出站节点添加到现有集群
@@ -49,6 +49,8 @@ meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
 
 # 客户端刷新订阅后自动获得新路径——中继 IP 不变
 ```
+
+V4 会拒绝对托管资源执行 `relay remove` 和 `node remove`。请在 `meridian setup` 中修改 intent 的 exit/relay chain，审核并应用计划，然后用 `meridian test` 验证规范端到端路由，而不是只看 listener 是否可达。
 
 ### 选项 C：添加域名模式以实现 CDN 回退
 
@@ -86,9 +88,19 @@ meridian node add NEW_IP --domain proxy.example.com
 
 1. 部署新服务器
 2. 为每个客户端运行 `meridian client add NAME`
-3. 与用户共享新的连接页面（二维码、可共享 PWA URL 或订阅 URL）
+3. 与用户共享新的规范订阅 URL 或二维码
 
-连接页面会自动提供所有可用的连接选项（直接、中继、CDN），可共享的 PWA URL 会随订阅状态更新。
+旧版只有在页面成功部署后才会显示 PWA URL；V4 不创建独立 PWA 页面。需要临时撤销 V4 用户时可用 `client disable`，但下一次 `meridian apply` 会按 intent 重新激活；安全删除托管用户目前会被拒绝。
+
+## 恢复本地状态
+
+`meridian fleet recover` 不是通用 V4 恢复。它只在明确确认旧版 shared-profile deployment 时运行：
+
+```bash
+meridian fleet recover --legacy --panel-url https://PANEL_HOST/SECRET_PATH
+```
+
+URL 必须包含完整秘密路径。Recovery 不会猜测 profile、squad、panel node 或有歧义的 WSS node-to-domain 映射；它通过 SSH 恢复 `sub_path`/Reality key，并将节点注册到 `servers.json`。V4 intent 必须从备份恢复，或通过 `meridian setup` 重建。
 
 ## 保留旧服务器
 

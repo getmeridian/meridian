@@ -11,10 +11,7 @@ section: guides
 meridian client add alice
 ```
 
-这会为"alice"创建一个唯一的连接密钥并显示：
-- **终端中的二维码** — 扫描即可打开连接页面或导入订阅
-- **订阅 URL** — 供兼容的 VPN 应用导入
-- **可共享的 PWA URL** — 托管在您的服务器上，可通过任何通信应用发送
+该命令为 `alice` 创建唯一访问，并显示订阅 URL 和二维码。在旧版部署中，Meridian 还会尝试在面板主机上部署独立 PWA 页面。在 V4 中，用户被加入 `topology_intent.access.users`，更新后的 intent 会立即应用，只提供 Remnawave 的规范订阅，不创建独立 PWA 页面。
 
 一次传递多个名称以同时添加多个客户端：
 
@@ -22,17 +19,17 @@ meridian client add alice
 meridian client add alice bob charlie
 ```
 
-每个客户端获得自己的密钥和连接页面。失败按客户端报告 — 成功创建的客户端即使某些失败也会被保留。
+旧版模式会逐个报告错误：成功创建的客户端会保留，部分成功或页面上传失败以退出码 `3` 结束。V4 会先把全部名称加入 access intent，再应用生成的计划。
 
 ### 收件人看到的内容
 
-可共享的 URL 打开一个连接页面，包括：
+在旧版模式中，成功部署的连接页面包括：
 - 安装 VPN 应用（v2RayTun、v2rayNG、Hiddify 或 v2rayN）的分步说明
 - 每个连接协议的二维码
 - 一键"在应用中打开"的深度链接
 - 连接状态和使用统计
 
-通过电子邮件、iMessage、Telegram 或任何信使发送该 URL。收件人打开它、安装应用、扫描二维码并连接。无需任何技术知识。
+页面不可用或使用 V4 时，请分享订阅 URL 或其二维码；规范订阅始终是连接配置的权威来源。
 
 ## 显示连接详情
 
@@ -42,10 +39,18 @@ meridian client add alice bob charlie
 meridian client show alice
 ```
 
-这会输出相同的二维码、订阅 URL 和可共享的页面链接——不会创建新密钥。在以下情况下使用：
+该命令会重新显示二维码和订阅 URL，不创建新密钥。只有存在页面已部署的正面证据时才显示 PWA 链接。要明确修复缺失的旧版页面，请运行：
+
+```
+meridian client show alice --repair-page
+```
+
+以下情况可使用 `show`：
 - 您需要与某人重新分享连接页面
 - 您丢失了原始二维码或订阅 URL
-- 您想验证客户端的连接看起来如何
+- 您需要重新取得规范订阅
+
+在 V4 中，`show` 和 `list` 只显示 access intent 中声明的用户；直接在面板创建的用户不会自动归 Meridian 所有。`--repair-page` 仅适用于旧版页面。
 
 ## 列出客户端
 
@@ -53,7 +58,7 @@ meridian client show alice
 meridian client list
 ```
 
-显示所有客户端及其协议连接（Reality、XHTTP、WSS）。
+显示客户端状态和统计。在 V4 中，列表仅包含 access intent 用户。
 
 ## 删除客户端
 
@@ -61,7 +66,7 @@ meridian client list
 meridian client remove alice
 ```
 
-立即撤销访问权限。客户端的 UUID 将从服务器上的所有入站中删除。
+旧版模式会删除面板用户及其已确认的本地页面。V4 会明确拒绝该命令，因为尚未实现安全的托管 access 用户退役。需要立即临时撤销时请使用 `client disable`，不要直接在面板删除用户。
 
 ## 暂停客户端
 
@@ -69,7 +74,7 @@ meridian client remove alice
 meridian client disable alice
 ```
 
-临时阻止客户端连接。他们的配置保持完整 — 没有删除密钥，他们的订阅 URL 保持有效。使用此功能可以在不失去客户端设置的情况下暂停访问。
+临时阻止客户端连接，密钥和订阅仍保留。在 V4 中只能操作已声明用户，并且 disable 只持续到下一次 `meridian apply`；apply 会让 intent 中声明的访问重新回到 active。
 
 要重新启用：`meridian client enable alice`
 
@@ -89,9 +94,9 @@ Meridian 在本地将舰队拓扑存储在 `~/.meridian/cluster.yml` — 面板 
 ~/.meridian/cluster.yml                 # 舰队拓扑 + 面板访问
 ```
 
-客户端命令直接使用存储的 API 令牌与面板的 REST API 对话。客户端操作无需 SSH。
+客户端命令使用保存的令牌访问面板 REST API。一般操作不需要 SSH；例外是旧版 PWA 页面在面板主机上的部署、探测、修复和删除。
 
-如果您需要在丢失本地文件后恢复，`meridian fleet recover` 从实时面板 API 重建 `cluster.yml`。
+本地状态丢失后，`meridian fleet recover --legacy --panel-url https://HOST/SECRET_PATH` 可以导入一个无歧义的旧版共享配置文件。它无法重建 V4 topology intent；V4 部署应恢复备份或重新运行 `meridian setup`。
 
 ## Web 面板
 
@@ -115,17 +120,17 @@ panel:
 
 在浏览器中打开 `url` 并使用 `admin_user` / `admin_pass` 登录。
 
-面板端编辑（例如重命名用户、禁用主机）会在 Meridian 中浮现为漂移 — 下次 `meridian plan` 显示面板实际状态与您的 `cluster.yml` 所需状态之间的差异。使用 `meridian apply` 以任何方式收敛。
+面板端对托管资源的编辑会表现为漂移。旧版的所需用户来自 `desired_clients`；V4 的权威来源是 `topology_intent.access.users`。执行 `apply` 前务必审核计划，尤其是对额外资源的删除。
 
 ## 工作原理
 
-每个 Meridian 客户端是一个单一的 Remnawave 用户（`users` 表中的一个 UUID）。该用户被分配给 Meridian 的默认内部小组，这授予对面板知道的每个入站的可见性（`vless-reality`、`vless-xhttp` 和域名模式下的 `vless-xhttp-ws`）。订阅 URL — `https://<ip>/<sub_path>/<short_uuid>` — 由 Remnawave 订阅页容器提供，包含客户端可以使用的所有入站端点。
+每个 Meridian 客户端都是一个带 UUID 的 Remnawave 用户。旧版把用户加入共享 Internal Squad；V4 从 access intent 编译权限并通过资源驱动管理。Remnawave 订阅 URL 只包含该用户获准使用的 endpoints，是客户端应用的规范来源。
 
 客户端应用（v2rayNG、Streisand、Hiddify、sing-box）将订阅 URL 视为单个事实来源：刷新它会在您部署新出口、添加中继或轮换 Reality 密钥时拉取新入站。
 
-## 声明性客户端列表
+## 声明式访问
 
-对于舰队范围的设置，您可以以声明的方式而不是命令方式管理客户端。将 `desired_clients` 列表添加到 `~/.meridian/cluster.yml`：
+旧版部署可以在 `~/.meridian/cluster.yml` 中配置 `desired_clients`：
 
 ```yaml
 desired_clients:
@@ -134,4 +139,4 @@ desired_clients:
   - charlie
 ```
 
-然后 `meridian plan` 显示与面板实际用户列表的差异，`meridian apply` 收敛 — 添加任何缺失的客户端，删除任何额外的。`meridian client add/remove` 仍然与此并排工作；两种方法共存。参见[声明性工作流](/docs/zh/getting-started/#declarative-workflow)了解完整故事。
+随后 `meridian plan` 会与面板用户比较，`meridian apply` 使状态收敛。V4 的对应来源是 `topology_intent.access.users`：通过 `meridian client add` 添加，或在 `meridian setup` 中审核 intent；`desired_clients` 不是 V4 的权威来源。

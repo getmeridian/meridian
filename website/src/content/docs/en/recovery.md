@@ -37,7 +37,7 @@ Existing clients receive the replacement exit on their next subscription refresh
 
 ### Option B: New exit server + existing relay
 
-Best if you have a relay deployed — your clients keep their relay connection while you swap the exit server behind it:
+On a legacy deployment, an existing relay can be removed and redeployed against the new exit:
 
 ```bash
 # 1. Deploy new exit server
@@ -49,6 +49,8 @@ meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
 
 # Clients reconnect automatically — relay IP unchanged
 ```
+
+V4 relay chains cannot be mutated with `relay remove`. Open `meridian setup`, replace the exit/chain references, review the plan, and apply it. Use `meridian test` to verify the resulting route.
 
 ### Option C: Add domain mode for CDN fallback
 
@@ -82,7 +84,7 @@ Set up resilience **before** your IP gets blocked:
 
 Clients belong to the Remnawave panel, not to an individual exit node. `meridian node add` and `meridian relay deploy` add hosts to existing subscriptions, so clients do not need to be recreated.
 
-Ask users to refresh their subscription. Run `meridian client show NAME` if you need to resend the PWA page, subscription URL, or QR code.
+Ask users to refresh their subscription. Run `meridian client show NAME` for the canonical subscription. A legacy page is shown only when its deployment is evidenced; repair a missing one with `--repair-page`.
 
 If the panel database itself is lost and cannot be restored from backup, you must create a new cluster and recreate each client; automatic cross-panel migration is not available.
 

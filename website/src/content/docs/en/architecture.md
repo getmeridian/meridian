@@ -33,7 +33,7 @@ flowchart TD
 
 nginx stream **does not** terminate TLS. It reads the SNI hostname from the TLS Client Hello and forwards the raw TCP stream to the appropriate backend.
 
-acme.sh requests a Let's Encrypt IP certificate (6-day shortlived profile, auto-renewed). Falls back to self-signed if IP cert issuance is not supported.
+acme.sh requests a Let's Encrypt IP certificate (6-day shortlived profile, auto-renewed). Provisioning stops if a trusted certificate cannot be issued; Meridian never sends panel credentials over the temporary self-signed bootstrap certificate.
 
 XHTTP runs on a localhost-only port and is reverse-proxied by nginx — no extra external port exposed.
 
@@ -84,8 +84,8 @@ entry and also the exit for RU-destination traffic.
 
 Meridian stores every fleet detail in a single `cluster.yml` at `~/.meridian/cluster.yml`:
 
-- **Actual state** — `panel` (URL, API token, admin creds, secret_path, sub_path), `nodes[]`, `relays[]`, `inbounds{}`, `branding` — populated by `meridian deploy`, `meridian node add`, etc. Users generally do not edit these by hand.
-- **Desired state** — `desired_nodes[]`, `desired_relays[]`, `desired_clients[]`, `subscription_page` — optionally written by the operator. `meridian plan` shows a Terraform-style diff between desired and actual; `meridian apply` converges.
+- **V4 desired state** — `topology_intent` records control, exits, routing chains, protocol paths, and access users. `meridian setup` edits it; the compiler produces the resources that `plan` and `apply` reconcile.
+- **Observed/legacy state** — `panel`, `nodes[]`, `relays[]`, `inbounds{}`, and branding retain deployed metadata. Legacy clusters may also opt into `desired_nodes[]`, `desired_relays[]`, `desired_clients[]`, and `subscription_page`; those fields are not V4 authority.
 
 Remnawave's own state (users, hosts, config profile, internal squads) lives in its PostgreSQL database on the panel host. Meridian reads and writes that state through the official REST API using the pinned `remnawave` Python SDK. The panel database is the source of truth for clients; `cluster.yml` is the source of truth for fleet topology.
 
@@ -191,7 +191,7 @@ After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.p
 
 ## Parallel provisioning
 
-`meridian apply` can provision independent nodes concurrently via `ThreadPoolExecutor` (`--parallel N`, default 4). Each worker gets its own `MeridianPanel` SDK instance; the underlying httpx client and the per-thread asyncio event loop are isolated via `threading.local()`. `cluster.save()` is protected by an `RLock` so parallel snapshots serialize cleanly.
+Legacy `meridian apply` can provision independent nodes concurrently via `ThreadPoolExecutor` (`--parallel N`, range 1–32, default 4). Each worker gets its own `MeridianPanel` SDK instance; the underlying httpx client and the per-thread asyncio event loop are isolated via `threading.local()`. `cluster.save()` is protected by an `RLock` so parallel snapshots serialize cleanly. V4 applies the compiled resource graph and rejects a non-default `--parallel` value.
 
 ## Credential lifecycle
 
@@ -200,8 +200,8 @@ After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.p
 3. **Apply**: panel + node containers brought up, inbounds and hosts created via REST API
 4. **Sync**: Remnawave panel database (Postgres) and `cluster.yml` both hold the canonical state; drift is reported by `meridian plan`
 5. **Re-runs**: Reality keys and client UUIDs are preserved across redeploys (the panel refuses to regenerate when they exist)
-6. **Recovery**: `meridian fleet recover --panel-url URL --api-token TOKEN` rebuilds `cluster.yml` from the live panel API when the local copy is lost
-7. **Uninstall**: `meridian teardown <IP>` stops and removes all Remnawave containers, nginx config, and local `cluster.yml` panel entry (optionally the whole file)
+6. **Legacy recovery**: `meridian fleet recover --legacy --panel-url URL` imports one unambiguous legacy profile; domain panel URLs also require `--panel-server PUBLIC_IP`. The token comes from a secure prompt, environment, or mode-600 file. V4 topology intent cannot be reconstructed from the panel — restore a backup or rerun `meridian setup`
+7. **Uninstall**: `meridian teardown <IP>` first rejects V4 references and panel-host dependencies, then removes owned remote artifacts. Successful panel-host teardown unlinks the local cluster configuration; non-panel targets retain the remaining fleet state.
 
 ## File locations
 

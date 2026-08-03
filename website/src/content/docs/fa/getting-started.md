@@ -23,6 +23,8 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 ## استقرار
 
+برای توپولوژی مدیریت‌شده جدید V4 از `meridian setup` استفاده کنید؛ intent گراف معتبر سرورها، مسیرها و access userها می‌شود. `meridian deploy` در ادامه مسیر سریع legacy تک‌میزبان را نگه می‌دارد.
+
 ```
 meridian deploy
 ```
@@ -48,7 +50,7 @@ meridian deploy local
 3. **سرور را سخت‌تر می‌کند** — دیوار آتش UFW، احراز هویت کلید SSH تنها، کنترل ترافیک BBR
 4. **VLESS+Reality را پیکربندی می‌کند** در پورت 443 — شخصیت‌سازی سرور TLS واقعی
 5. **XHTTP transport را فعال می‌کند** — لایه پنهان‌کاری اضافی، هدایت‌شده از طریق nginx
-6. **یک PWA قابل اشتراک مستقر می‌کند** که کدهای QR و وارد کردن اشتراک را در اختیار کاربران می‌گذارد
+6. **در legacy یک PWA قابل اشتراک مستقر می‌کند**؛ V4 بدون صفحه جداگانه URL اشتراک رسمی را تحویل می‌دهد
 
 ## فایل‌ها و سرویس‌ها کجا هستند
 
@@ -60,13 +62,11 @@ Meridian از طریق SSH به VPS وصل می‌شود (یا با `deploy loca
 | پروفایل‌های SSH سرورها | `~/.meridian/servers.json` روی رایانه شما |
 | سرویس‌های پروکسی | Docker، Xray و nginx روی VPS |
 
-وقتی `meridian client add alice` را اجرا می‌کنید، Meridian از API پنل Remnawave ثبت‌شده در `cluster.yml` استفاده می‌کند؛ مدیریت کلاینت‌ها به SSH نیاز ندارد. در استقرارهای چندسروری، `--server NAME` را فقط برای فرمان‌هایی به‌کار ببرید که با میزبان سرور کار می‌کنند.
+در legacy، `meridian client add alice` کاربر پنل می‌سازد؛ در V4 کاربر را به access intent اضافه و plan را apply می‌کند. بیشتر عملیات فقط API Remnawave را به‌کار می‌برند؛ SSH تنها برای صفحه‌های PWA قدیمی لازم است. در استقرار چندسروری `--server NAME` را فقط برای فرمان‌های میزبان به‌کار ببرید.
 
 ## اتصال
 
-دستور deploy خروجی می‌دهد:
-- یک **URL قابل اشتراک PWA** با کدهای QR و پیوندهای برنامه‌ها
-- یک **URL اشتراک** برای کلاینت‌های سازگار
+Legacy deploy یک URL اشتراک و پس از بارگذاری موفق صفحه، URL PWA می‌دهد. V4 setup همیشه URL رسمی اشتراک را تحویل می‌دهد و ادعای وجود صفحه PWA قدیمی را ندارد.
 
 یکی از این برنامه‌ها را نصب کنید، سپس کد QR را اسکن کنید یا روی "باز کردن در برنامه" ضربه بزنید:
 
@@ -83,7 +83,7 @@ Meridian از طریق SSH به VPS وصل می‌شود (یا با `deploy loca
 meridian client add alice
 ```
 
-هر کلاینت کلید و صفحه اتصال خود را دارد. با `meridian client list` کلاینت‌ها را فهرست کنید، با `meridian client remove alice` لغو کنید.
+هر کلاینت دسترسی و اشتراک مستقل دارد. در V4، `client list` فقط access userهای اعلام‌شده را نشان می‌دهد. `client remove alice` در legacy پشتیبانی می‌شود؛ V4 هنوز بازنشستگی امن کاربر مدیریت‌شده را نمی‌پذیرد، پس برای لغو فوری و موقت از `client disable alice` استفاده کنید (تا `meridian apply` بعدی).
 
 ## مدیریت سرورها
 
@@ -96,6 +96,19 @@ meridian server remove finland     # حذف از رجیستری
 ```
 
 فلگ `--server` در فرمان‌هایی که با سرور کار می‌کنند، یک میزبان مشخص را هدف می‌گیرد؛ برای مثال `meridian doctor --server finland`. فرمان‌های `client` مستقیماً با پنل کلاستر کار می‌کنند و این فلگ را نمی‌پذیرند.
+
+## گردش‌کار اعلانی
+
+V4 مدل بازبینی‌شده فلیت را به‌عنوان `topology_intent` در `cluster.yml` ذخیره می‌کند. آن را با `meridian setup` بسازید یا ویرایش کنید؛ intent شامل control plane، exitها، زنجیره‌های مسیریابی، مسیرهای protocol و access userها است. با `plan` تغییرات resourceهای کامپایل‌شده را پیش‌نمایش دهید و با `apply` آن‌ها را همگرا کنید.
+
+```
+meridian plan                      # پیش‌نمایش تغییرات resourceهای کامپایل‌شده
+meridian apply --yes               # همگرا کردن topology بازبینی‌شده
+```
+
+`meridian plan` در حالت همگرا با کد `0` و هنگامی که تغییری در انتظار است با کد `2` خارج می‌شود، پس می‌توانید CI را بر اساس آن کنترل کنید. برای بررسی plan نوع‌دار از `meridian plan --json` و برای دریافت نتیجه نهایی اجرا در process یا UI از `meridian apply --json --yes` استفاده کنید. هر دو از envelope نوع‌دار `meridian.output/v1` استفاده می‌کنند. گزینه‌های کامل را در [مرجع CLI](/docs/fa/cli-reference/#meridian-plan) ببینید.
+
+کلاسترهای legacy همچنان از همگرایی اختیاری `desired_nodes`، `desired_relays` و `desired_clients` پشتیبانی می‌کنند. این فیلدها مرجع V4 نیستند. برای نمونه حالت توضیح‌داده‌شده، [`cluster.example.yml`](https://github.com/getmeridian/meridian/blob/v4/cluster.example.yml) را ببینید.
 
 ## مراحل بعدی
 

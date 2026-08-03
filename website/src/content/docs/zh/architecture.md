@@ -33,7 +33,7 @@ flowchart TD
 
 nginx stream **不**终止 TLS。它从 TLS Client Hello 中读取 SNI 主机名，并将原始 TCP 流转发到相应的后端。
 
-acme.sh 通过 ACME `shortlived` 配置文件从 Let's Encrypt 请求 IP 证书（有效期 6 天，自动续期）。如果不支持 IP 证书颁发，将回退到自签证书。
+acme.sh 通过 ACME `shortlived` 配置文件从 Let's Encrypt 请求 IP 证书（有效期 6 天，自动续期）。如果无法签发受信任证书，部署会停止；Meridian 绝不会通过临时自签名引导证书发送面板凭据。
 
 XHTTP 运行在仅限本地的端口上，由 nginx 反向代理 — 无需暴露额外的外部端口。
 
@@ -66,7 +66,7 @@ flowchart LR
 
 中继节点是一个轻量级 TCP 转发器，运行[Realm](https://github.com/zhboner/realm)。客户端连接到中继的国内 IP，中继将原始 TCP 转发到国外的出口服务器。所有加密都是端到端的，在客户端和出口之间 — 中继永远看不到明文。
 
-当前 CLI 分别存储节点和中继，但核心合约方向是能力加路由策略。单个服务器可以同时具有中继和出口能力；例如，一个区域 RU 服务器可以是 RU 目的地流量的中继入口和出口。
+V4 将服务器建模为能力加路由策略。单台服务器可同时作为 relay hop、exit 或 routing gateway。每个链路 hop 都出现在服务器 inventory 中；只有入口 hop 向客户端发布，内部 hop 在端到端验证前保持健康未知。
 
 ## Reality 协议如何工作
 
@@ -81,10 +81,10 @@ flowchart LR
 
 Meridian 在单个 `cluster.yml` 中的 `~/.meridian/cluster.yml` 存储每个舰队详情：
 
-- **实际状态** — `panel`（URL、API 令牌、管理凭证、secret_path、sub_path）、`nodes[]`、`relays[]`、`inbounds{}`、`branding` — 由 `meridian deploy`、`meridian node add` 等填充。用户通常不手动编辑这些。
-- **所需状态** — `desired_nodes[]`、`desired_relays[]`、`desired_clients[]`、`subscription_page` — 由操作者可选写入。`meridian plan` 显示所需和实际之间的 Terraform 风格差异；`meridian apply` 收敛。
+- **旧版** — `panel`、`nodes[]`、`relays[]`、`inbounds{}` 和 `branding` 描述跟踪状态；可选的 `desired_nodes[]`、`desired_relays[]`、`desired_clients[]` 和 `subscription_page` 描述所需状态。
+- **V4** — `topology_intent` 是 control plane、exits、routing gateways、relay chains 和 access users 的权威所需图；旧版 `desired_*` 字段不管理 V4。
 
-Remnawave 自己的状态（用户、主机、配置文件、内部小组）位于面板主机上的 PostgreSQL 数据库中。Meridian 通过官方 REST API 使用固定的 `remnawave` Python SDK 读写该状态。面板数据库是客户端的事实来源；`cluster.yml` 是舰队拓扑的事实来源。
+Remnawave 的实际状态（用户、Host、配置文件、Squad）位于面板 PostgreSQL 中，并通过 API 读取。旧版中，面板是实际用户来源，`desired_*` 是可选所需层；V4 中，`topology_intent` 定义所有权和所需图，仅存在于面板的资源不会自动成为 Meridian 托管资源。
 
 ## Meridian Studio 和本地 Engine
 
@@ -182,17 +182,17 @@ XHTTP、WSS 和 Reality 后端端口使用 host network，但 UFW 阻止公网�
 
 ## 并行配置
 
-`meridian apply` 可以通过 `ThreadPoolExecutor`（`--parallel N`，默认 4）并发配置独立节点。每个工作线程获得自己的 `MeridianPanel` SDK 实例；基础 httpx 客户端和每个线程的 asyncio 事件循环通过 `threading.local()` 隔离。`cluster.save()` 受 `RLock` 保护，以便并行快照干净地序列化。
+在旧版中，`meridian apply` 可以通过 `ThreadPoolExecutor` 并行配置独立节点（`--parallel N`，范围 1–32，默认 4）。每个工作线程获得独立的 `MeridianPanel` SDK 实例；基础 httpx 客户端和每线程 asyncio 事件循环通过 `threading.local()` 隔离。`cluster.save()` 受 `RLock` 保护，因此并行快照会顺序保存。V4 应用编译后的资源图，并拒绝非默认的 `--parallel` 值。
 
 ## 凭证生命周期
 
 1. **生成**：随机凭证（面板密码、JWT 秘密、PostgreSQL 密码、节点秘密密钥、每个节点 Reality x25519 密钥对、客户端 UUID）
 2. **本地保存**：`~/.meridian/cluster.yml` — 在 API/SSH 操作之前立即保存，以便崩溃的部署可以恢复
 3. **应用**：面板 + 节点容器启动，通过 REST API 创建入站和主机
-4. **同步**：Remnawave 面板数据库（Postgres）和 `cluster.yml` 都保有规范状态；漂移由 `meridian plan` 报告
+4. **同步**：面板保存实际资源；旧版 `desired_*` 或 V4 `topology_intent` 保存所需状态，漂移由 `meridian plan` 报告
 5. **重新运行**：Reality 密钥和客户端 UUID 在重新部署中保留（当存在时面板拒绝重新生成）
-6. **恢复**：`meridian fleet recover --panel-url URL --api-token TOKEN` 在本地副本丢失时从实时面板 API 重建 `cluster.yml`
-7. **卸载**：`meridian teardown <IP>` 停止并删除所有 Remnawave 容器、nginx 配置和本地 `cluster.yml` 面板条目（可选整个文件）
+6. **旧版恢复**：`meridian fleet recover --legacy --panel-url https://HOST/SECRET_PATH` 导入无歧义的旧版配置，通过 SSH 恢复 `sub_path` 和 Reality key，并把节点注册到 `servers.json`。域名 URL 需要 `--panel-server PUBLIC_IP`；WSS node-to-domain 无法唯一证明时拒绝写入。V4 intent 不能从面板重建
+7. **卸载**：`meridian teardown <IP>` 会先检查所有权和依赖。V4 角色必须经 setup/apply 移除；仍有其他节点或中继时不能删除面板主机
 
 ## 文件位置
 
@@ -207,7 +207,7 @@ XHTTP、WSS 和 Reality 后端端口使用 host network，但 UFW 阻止公网�
 - `/opt/remnanode/` — 节点 compose 文件 + `.env`
 
 ### 在本地（部署者）机器上
-- `~/.meridian/cluster.yml` — 舰队状态（面板凭证、节点、中继、所需状态）
+- `~/.meridian/cluster.yml` — 舰队状态，以及旧版 desired state 或权威 V4 `topology_intent`
 - `~/.meridian/cluster.yml.bak` — 破坏性操作之前的自动备份
 - `~/.meridian/cache/` — 更新检查限流缓存
 - `~/.local/bin/meridian` — CLI 入口点（通过 uv/pipx 安装）

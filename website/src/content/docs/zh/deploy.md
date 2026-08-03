@@ -7,6 +7,8 @@ section: guides
 
 ## 基本部署
 
+本页描述直接的旧版 `meridian deploy` 路径。新的托管 V4 拓扑请使用 `meridian setup`；后续变更以其 `topology_intent` 为权威来源。
+
 ```
 meridian deploy 198.51.100.10
 ```
@@ -46,17 +48,19 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 - **`--icon`** — 连接页面顶部显示的表情符号或图片 URL。
 - **`--color`** — 设置强调色方案。选项：`ocean`（默认）、`sunset`、`forest`、`lavender`、`rose`、`slate`。
 
-这些设置保存在 `cluster.yml` 中，并应用于所有客户端连接页面。
+这些设置只用于旧版 PWA 页面，并保存在 `cluster.yml` 中。V4 提供规范 Remnawave 订阅，不创建独立自定义 PWA 页面。
 
 ## 选择 SNI 目标
 
 SNI（服务器名称指示）目标是 Reality 伪装的域。默认值（`www.microsoft.com`）对大多数情况都适用。
 
-为了获得最佳隐身效果，扫描服务器网络以寻找相同 ASN 的目标：
+如需发现服务器附近的备选目标，请使用固定版本且经过校验和验证的 RealiTLScanner 扫描其 IPv4 子网：
 
 ```
 meridian scan 198.51.100.10
 ```
+
+RealiTLScanner 仅支持 IPv4；仅 IPv6 的服务器应明确传入 `--sni`，否则 `scan` 返回 `3`。选择只会保存到已跟踪的旧版节点；V4 只显示结果，intent 必须通过 `meridian setup` 修改。
 
 **良好的目标**（全球 CDN）：
 - `www.microsoft.com` — Azure CDN，全球
@@ -64,7 +68,7 @@ meridian scan 198.51.100.10
 - `dl.google.com` — Google CDN，全球
 - `github.com` — Fastly CDN，全球
 
-**避免** `apple.com` 和 `icloud.com` — Apple 控制自己的 ASN 范围，使 IP/ASN 不匹配立即可被检测。
+请选择能够从服务器解析并完成 TLS 握手的稳定主机名。`meridian scan` 会验证实际证书中观察到的域名；`meridian preflight --sni HOST` 可检查手动选择，且不会把服务器地址发送给 ASN 服务。
 
 ## 部署前检查
 
@@ -74,7 +78,7 @@ meridian scan 198.51.100.10
 meridian preflight 198.51.100.10
 ```
 
-测试 SNI 目标可达性、ASN 匹配、端口可用性、DNS、操作系统兼容性和磁盘空间 — 无需安装任何内容。
+无需安装即可测试 SNI 可达性与 DNS、端口本地和外部可达性、可选域名 DNS、操作系统兼容性、磁盘空间和时钟偏差。退出码 `0` 表示就绪，`4` 表示有可处理发现，`3` 表示所需证据不可用。
 
 ## 重新运行部署
 
