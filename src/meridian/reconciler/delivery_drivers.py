@@ -105,6 +105,11 @@ class AccessUserDriver:
                     hint="Rename the unmanaged User or explicitly recover its Meridian binding.",
                     category="user",
                 )
+            if existing.status != "ACTIVE":
+                _mutation(
+                    lambda: self.context.panel.enable_user(existing.uuid),
+                    f"enable access User {payload.username}",
+                )
             user = _mutation(
                 lambda: self.context.panel.update_access_user(
                     existing.uuid,

@@ -31,6 +31,9 @@ class Uninstall:
             # Remnawave node
             "cd /opt/remnanode && docker compose down --rmi all -v 2>/dev/null; true",
             "rm -rf /opt/remnanode",
+            # Realm transparent relay
+            "systemctl stop meridian-relay 2>/dev/null; systemctl disable meridian-relay 2>/dev/null; true",
+            "rm -f /etc/systemd/system/meridian-relay.service /usr/local/bin/realm /etc/meridian/realm.toml",
             # Docker volumes (may remain after compose down)
             "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
             # nginx (+ systemd restart override)
@@ -63,7 +66,7 @@ class Uninstall:
             "rm -rf /etc/meridian /root/meridian",
             # CLI symlink
             "rm -f /usr/local/bin/meridian",
-            # Systemd daemon-reload after removing overrides
+            # Systemd daemon-reload after removing units and overrides
             "systemctl daemon-reload 2>/dev/null; true",
             # UFW rules
             "ufw delete allow 443/tcp 2>/dev/null; true",

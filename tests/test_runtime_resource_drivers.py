@@ -23,6 +23,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.reconciler.resources import (
+    ResourceAction,
     ResourceReconcileError,
     UnknownResourceOutcome,
     assert_complete_driver_registry,
@@ -107,7 +108,11 @@ def test_production_driver_registry_requires_every_finite_kind() -> None:
         raise AssertionError("an incomplete driver registry was accepted")
 
 
-def test_listener_probe_reads_the_target_server_socket_table() -> None:
+def _listener_probe_driver(
+    *,
+    returncode: int,
+    stdout: str,
+) -> tuple[ResourceAction, ProbeDriver, MagicMock]:
     host = make_resource(
         "host:exit-a:reality:direct",
         HostPayload(
@@ -133,8 +138,8 @@ def test_listener_probe_reads_the_target_server_socket_table() -> None:
     action = build_resource_actions(plan, 1)[1]
     connection = MagicMock()
     connection.run.return_value = SimpleNamespace(
-        returncode=0,
-        stdout="LISTEN 0 4096 0.0.0.0:443 0.0.0.0:*\n",
+        returncode=returncode,
+        stdout=stdout,
     )
     driver = ProbeDriver(
         ProbeDriverContext(
@@ -145,9 +150,31 @@ def test_listener_probe_reads_the_target_server_socket_table() -> None:
             server_addresses={"srv-exit": "198.51.100.10"},
         )
     )
+    return action, driver, connection
+
+
+def test_listener_probe_reads_the_target_server_socket_table() -> None:
+    action, driver, connection = _listener_probe_driver(
+        returncode=0,
+        stdout="LISTEN 0 4096 0.0.0.0:443 0.0.0.0:*\n",
+    )
 
     assert observation_converges(action, driver.observe(action, None))
     connection.run.assert_called_once_with("ss -H -lnt 2>/dev/null", timeout=15)
+
+
+def test_listener_probe_accepts_successful_socket_table_as_absence_evidence() -> None:
+    action, driver, _connection = _listener_probe_driver(returncode=0, stdout="")
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize("returncode", [1, 124, 127, 255])
+def test_listener_probe_rejects_unavailable_socket_table(returncode: int) -> None:
+    action, driver, _connection = _listener_probe_driver(returncode=returncode, stdout="")
+
+    with pytest.raises(ResourceReconcileError, match="Listener evidence is unavailable"):
+        driver.observe(action, None)
 
 
 def test_subscription_probe_fetches_the_canonical_document() -> None:
@@ -166,7 +193,21 @@ def test_subscription_probe_fetches_the_canonical_document() -> None:
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
     panel.fetch_subscription.return_value = SimpleNamespace(
         url="https://panel.example/sub/short-access",
-        content='[{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}]',
+        content=json.dumps(
+            [
+                {
+                    "inbounds": [
+                        {
+                            "tag": "SOCKS",
+                            "listen": "127.0.0.1",
+                            "port": 1080,
+                            "protocol": "socks",
+                        }
+                    ],
+                    "outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}],
+                }
+            ]
+        ),
     )
     driver = ProbeDriver(
         ProbeDriverContext(
@@ -256,7 +297,21 @@ def test_subscription_probe_rejects_multiple_xray_configs() -> None:
 def test_subscription_probe_requires_remnawave_hysteria_v2_shape(outbound: dict, expected: bool) -> None:
     document = SimpleNamespace(
         url="https://panel.example/sub/short-access/json",
-        content=json.dumps([{"outbounds": [outbound]}]),
+        content=json.dumps(
+            [
+                {
+                    "inbounds": [
+                        {
+                            "tag": "SOCKS",
+                            "listen": "127.0.0.1",
+                            "port": 1080,
+                            "protocol": "socks",
+                        }
+                    ],
+                    "outbounds": [outbound],
+                }
+            ]
+        ),
     )
 
     assert xray_subscription_is_valid(document) is expected

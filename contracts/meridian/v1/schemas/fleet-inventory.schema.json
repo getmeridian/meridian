@@ -242,7 +242,9 @@
           "enum": [
             "panel+node",
             "node",
-            "relay"
+            "relay",
+            "panel+routing_gateway",
+            "routing_gateway"
           ],
           "title": "Role",
           "type": "string"
@@ -328,6 +330,41 @@
       "title": "PanelInventory",
       "type": "object"
     },
+    "RelayHopMembership": {
+      "additionalProperties": false,
+      "properties": {
+        "advertised": {
+          "title": "Advertised",
+          "type": "boolean"
+        },
+        "chain": {
+          "title": "Chain",
+          "type": "string"
+        },
+        "health": {
+          "default": "unknown",
+          "enum": [
+            "healthy",
+            "unhealthy",
+            "unknown"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "position": {
+          "minimum": 1,
+          "title": "Position",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain",
+        "position",
+        "advertised"
+      ],
+      "title": "RelayHopMembership",
+      "type": "object"
+    },
     "RelayHostRef": {
       "additionalProperties": false,
       "properties": {
@@ -396,7 +433,9 @@
           "enum": [
             "panel+node",
             "node",
-            "relay"
+            "relay",
+            "panel+routing_gateway",
+            "routing_gateway"
           ],
           "title": "Role",
           "type": "string"
@@ -445,12 +484,20 @@
           "title": "Name",
           "type": "string"
         },
+        "relay_hops": {
+          "items": {
+            "$ref": "#/$defs/RelayHopMembership"
+          },
+          "title": "Relay Hops",
+          "type": "array"
+        },
         "roles": {
           "items": {
             "enum": [
               "panel",
               "exit",
-              "relay"
+              "relay",
+              "routing_gateway"
             ],
             "type": "string"
           },

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import shlex
 from collections.abc import Mapping
 
-from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec, RealmHopPayload
+from meridian.compiler.models import FirewallRulePayload, NginxArtifactPayload, NginxRouteSpec, RealmHopPayload
 from meridian.core.errors import MeridianError
 
 
@@ -15,6 +16,31 @@ class ServerArtifactError(MeridianError):
 
 def artifact_token(logical_id: str) -> str:
     return hashlib.sha256(logical_id.encode("utf-8")).hexdigest()[:16]
+
+
+def baseline_marker_path(logical_id: str) -> str:
+    return f"/var/lib/meridian/baselines/{artifact_token(logical_id)}.attestation"
+
+
+def firewall_marker(logical_id: str) -> str:
+    return f"meridian-v4-{artifact_token(logical_id)}"
+
+
+def render_firewall_rules(
+    logical_id: str,
+    payload: FirewallRulePayload,
+    addresses: Mapping[str, str],
+) -> list[str]:
+    marker = shlex.quote(firewall_marker(logical_id))
+    port = shlex.quote(str(payload.port))
+    transport = shlex.quote(payload.transport)
+    if not payload.source_server_refs:
+        return [f"allow {port}/{transport} comment {marker}"]
+    return [
+        f"allow from {shlex.quote(_address(addresses, source_ref))} "
+        f"to any port {port} proto {transport} comment {marker}"
+        for source_ref in payload.source_server_refs
+    ]
 
 
 def realm_config_path(logical_id: str) -> str:

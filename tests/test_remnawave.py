@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -58,6 +58,57 @@ def _make_panel(mock_client: MagicMock | None = None) -> MeridianPanel:
 def _ns(**kwargs: object) -> SimpleNamespace:
     """Create a SimpleNamespace for mocking SDK response objects."""
     return SimpleNamespace(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Client construction
+# ---------------------------------------------------------------------------
+
+
+class TestClientConstruction:
+    def test_enables_tls_verification_and_applies_timeout_to_both_clients(self) -> None:
+        sdk_http = MagicMock()
+        raw_http = MagicMock()
+        sdk = MagicMock()
+
+        with (
+            patch("meridian.remnawave.client.httpx.AsyncClient", return_value=sdk_http) as async_client,
+            patch("meridian.remnawave.client.httpx.Client", return_value=raw_http) as raw_client,
+            patch("meridian.remnawave.client.RemnawaveSDK", return_value=sdk) as sdk_factory,
+        ):
+            panel = MeridianPanel("https://panel.example/secret/", "test-token", timeout=7.5)
+
+        async_client.assert_called_once_with(
+            base_url="https://panel.example/secret/api",
+            headers={"Authorization": "Bearer test-token"},
+            timeout=7.5,
+            verify=True,
+        )
+        sdk_factory.assert_called_once_with(client=sdk_http)
+        raw_client.assert_called_once_with(
+            base_url="https://panel.example/secret/",
+            headers={
+                "Authorization": "Bearer test-token",
+                "Content-Type": "application/json",
+            },
+            timeout=7.5,
+            verify=True,
+        )
+        assert panel._sdk is sdk
+        assert panel._client is raw_http
+
+    def test_explicit_tls_override_is_shared_by_both_clients(self) -> None:
+        with (
+            patch("meridian.remnawave.client.httpx.AsyncClient") as async_client,
+            patch("meridian.remnawave.client.httpx.Client") as raw_client,
+            patch("meridian.remnawave.client.RemnawaveSDK"),
+        ):
+            MeridianPanel("https://panel.example", "Bearer test-token", verify=False)
+
+        assert async_client.call_args.kwargs["verify"] is False
+        assert raw_client.call_args.kwargs["verify"] is False
+        assert async_client.call_args.kwargs["headers"]["Authorization"] == "Bearer test-token"
+        assert raw_client.call_args.kwargs["headers"]["Authorization"] == "Bearer test-token"
 
 
 # ---------------------------------------------------------------------------
@@ -470,6 +521,18 @@ class TestContextManager:
         with panel:
             assert panel.ping() is True
 
+    def test_closes_sdk_and_raw_clients(self) -> None:
+        raw_client = MagicMock()
+        sdk_client = MagicMock()
+        sdk_client.aclose = AsyncMock()
+        panel = _make_panel(raw_client)
+        panel._sdk_client = sdk_client
+
+        panel.close()
+
+        raw_client.close.assert_called_once_with()
+        sdk_client.aclose.assert_awaited_once_with()
+
 
 # ---------------------------------------------------------------------------
 # Auth Methods
@@ -482,10 +545,28 @@ class TestAuth:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"response": {"accessToken": "jwt-123"}}
 
-        with patch("httpx.post", return_value=mock_resp):
+        with patch("httpx.post", return_value=mock_resp) as post:
             token = MeridianPanel.login("https://198.51.100.1", "admin", "pass")
 
         assert token == "jwt-123"
+        assert post.call_args.kwargs["verify"] is True
+
+    def test_login_propagates_timeout_and_explicit_tls_override(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"response": {"accessToken": "jwt-123"}}
+
+        with patch("httpx.post", return_value=mock_resp) as post:
+            MeridianPanel.login(
+                "https://198.51.100.1",
+                "admin",
+                "pass",
+                timeout=2.5,
+                verify=False,
+            )
+
+        assert post.call_args.kwargs["timeout"] == 2.5
+        assert post.call_args.kwargs["verify"] is False
 
     def test_login_fails_on_non_200(self) -> None:
         mock_resp = MagicMock()

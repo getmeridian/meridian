@@ -11,9 +11,10 @@ from typing import Any
 
 import typer
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
+from meridian.commands._helpers import load_cluster
 from meridian.commands.v4_topology import run_v4_apply as _run_v4_topology
-from meridian.console import confirm, err_console, error_context, fail, info, ok, warn
+from meridian.console import confirm, err_console, error_context, fail, info, is_json_mode, ok, set_json_mode, warn
 from meridian.core.apply import build_apply_result
 from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.models import MeridianError, OutputStatus, Summary
@@ -337,8 +338,9 @@ def _handle_add_subscription_page(action: PlanAction, panel: MeridianPanel, clus
             f"        }}\\n"
             f"        # --- END Subscription Page ---\\n"
         )
+        sed_script = shlex.quote(f"/# Root:/i\\{location_block}")
         conn.run(
-            f"sed -i '/# Root:/i\\{location_block}' /etc/nginx/conf.d/meridian-http.conf",
+            f"sed -i {sed_script} /etc/nginx/conf.d/meridian-http.conf",
             timeout=15,
         )
         result = conn.run("nginx -t 2>&1", timeout=15)
@@ -509,8 +511,14 @@ def run(
 ) -> None:
     """Converge actual state to desired state declared in cluster.yml."""
     operation = OperationContext()
-    with error_context("apply", timer=operation.timer):
-        _run(yes=yes, parallel=parallel, prune_extras=prune_extras, json_output=json_output, operation=operation)
+    previous_json_mode = is_json_mode()
+    if json_output:
+        set_json_mode(True)
+    try:
+        with error_context("apply", timer=operation.timer):
+            _run(yes=yes, parallel=parallel, prune_extras=prune_extras, json_output=json_output, operation=operation)
+    finally:
+        set_json_mode(previous_json_mode)
 
 
 def _run(
@@ -533,8 +541,14 @@ def _run(
     - ``"yes"``: auto-remove (current behaviour).
     - ``"no"``: skip extras (filtered out of the plan before execute).
     """
-    cluster = ClusterConfig.load()
+    cluster = load_cluster(require_configured=False)
     if cluster.topology_intent is not None:
+        if parallel != 4 or prune_extras != "ask":
+            fail(
+                "--parallel and --prune-extras are legacy apply options",
+                hint="For V4 topology, use `meridian apply --yes` without legacy reconciliation flags.",
+                hint_type="user",
+            )
         try:
             _run_v4_topology(
                 cluster,
@@ -671,7 +685,7 @@ def _run(
 
             try:
                 cluster.save()
-            except OSError as exc:
+            except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
                 error = MeridianError(
                     code="MERIDIAN_STATE_SAVE_FAILED",
                     category="system",
@@ -729,3 +743,5 @@ def _run(
 
     except RemnawaveError as e:
         fail(f"Panel API error: {e}", hint_type="system")
+    except MeridianException as e:
+        fail(e)

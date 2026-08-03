@@ -39,6 +39,31 @@ def test_contract_export_is_deterministic_and_checkable(tmp_path: Path) -> None:
     assert "changed: commands.json" in check_contracts(output)
 
 
+def test_verification_contracts_and_commands_are_exported(tmp_path: Path) -> None:
+    output = tmp_path / "contracts"
+
+    write_contracts(output)
+
+    for name in (
+        "probe-envelope",
+        "probe-result",
+        "test-envelope",
+        "test-result",
+        "verification-check",
+        "verification-finding",
+    ):
+        assert (output / "schemas" / f"{name}.schema.json").is_file()
+
+    commands = json.loads((output / "commands.json").read_text(encoding="utf-8"))
+    by_command = {item["command"]: item for item in commands["commands"]}
+
+    assert by_command["probe"]["failure_data_schema"] == "probe-failure"
+    assert by_command["probe"]["exit_codes"]["4"] == "probe completed with negative findings"
+    assert by_command["test"]["failure_data_schema"] == "test-failure"
+    assert by_command["test"]["statuses"] == ["ok", "failed"]
+    assert by_command["test"]["interrupt_behavior"] == "exit_130_without_envelope"
+
+
 def test_checked_in_contracts_are_current() -> None:
     assert check_contracts(CONTRACTS) == []
 

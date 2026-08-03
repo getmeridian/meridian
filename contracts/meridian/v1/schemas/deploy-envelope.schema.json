@@ -194,7 +194,7 @@
     },
     "EmptyData": {
       "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
+      "description": "Empty data object used by envelopes without command-specific failure data.",
       "properties": {},
       "title": "EmptyData",
       "type": "object"
@@ -481,10 +481,7 @@
           "type": "string"
         },
         "status": {
-          "enum": [
-            "failed",
-            "cancelled"
-          ],
+          "const": "failed",
           "title": "Status",
           "type": "string"
         },
@@ -520,7 +517,6 @@
   "description": "Envelope schema for `meridian deploy --json`.",
   "discriminator": {
     "mapping": {
-      "cancelled": "#/$defs/_DeployTerminalEnvelope",
       "changed": "#/$defs/_DeployChangedEnvelope",
       "failed": "#/$defs/_DeployTerminalEnvelope",
       "ok": "#/$defs/_DeployPlanEnvelope"

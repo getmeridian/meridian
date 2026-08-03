@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import ssl
 import time
 from typing import Any
 from urllib.parse import quote
@@ -68,32 +69,46 @@ class MeridianPanel(ControlPlaneMixin):
         nodes = panel.list_nodes()
     """
 
-    def __init__(self, base_url: str, api_token: str, *, timeout: int = 30, max_retries: int = 5):
-        import httpx
-
+    def __init__(
+        self,
+        base_url: str,
+        api_token: str,
+        *,
+        timeout: float = 30,
+        max_retries: int = 5,
+        verify: bool | str | ssl.SSLContext = True,
+    ):
         self._base = base_url.rstrip("/")
         self._token = api_token
         self._timeout = timeout
         self._max_retries = max_retries
 
-        # SDK client for supported endpoints — ssl_ignore for self-signed certs
-        # (panel is reverse-proxied by nginx with a self-signed cert in IP mode)
-        self._sdk = RemnawaveSDK(base_url=self._base, token=api_token, ssl_ignore=True)
+        authorization = api_token if api_token.startswith("Bearer ") else f"Bearer {api_token}"
+        self._sdk_client = httpx.AsyncClient(
+            base_url=f"{self._base}/api",
+            headers={"Authorization": authorization},
+            timeout=timeout,
+            verify=verify,
+        )
+        self._sdk = RemnawaveSDK(client=self._sdk_client)
 
         # Raw httpx client for endpoints the SDK doesn't cover
         self._client = httpx.Client(
             base_url=self._base + "/",
             headers={
-                "Authorization": f"Bearer {api_token}",
+                "Authorization": authorization,
                 "Content-Type": "application/json",
             },
             timeout=timeout,
-            verify=False,
+            verify=verify,
         )
 
     def close(self) -> None:
         """Close the underlying HTTP clients."""
         self._client.close()
+        sdk_client = getattr(self, "_sdk_client", None)
+        if sdk_client is not None:
+            sdk_call(sdk_client.aclose())
 
     def __enter__(self) -> MeridianPanel:
         return self
@@ -551,7 +566,8 @@ class MeridianPanel(ControlPlaneMixin):
         *,
         accepted_codes: tuple[int, ...] = (200,),
         error_label: str = "auth",
-        timeout: int = 30,
+        timeout: float = 30,
+        verify: bool | str | ssl.SSLContext = True,
     ) -> str:
         """Shared auth helper — POST credentials, extract token.
 
@@ -565,7 +581,7 @@ class MeridianPanel(ControlPlaneMixin):
                 url,
                 json={"username": username, "password": password},
                 timeout=timeout,
-                verify=False,
+                verify=verify,
             )
         except httpx.ConnectError as e:
             raise RemnawaveNetworkError(
@@ -600,7 +616,15 @@ class MeridianPanel(ControlPlaneMixin):
         return token
 
     @classmethod
-    def login(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
+    def login(
+        cls,
+        base_url: str,
+        username: str,
+        password: str,
+        *,
+        timeout: float = 30,
+        verify: bool | str | ssl.SSLContext = True,
+    ) -> str:
         """Authenticate and return an auth token."""
         return cls._auth_request(
             base_url,
@@ -610,10 +634,19 @@ class MeridianPanel(ControlPlaneMixin):
             accepted_codes=(200,),
             error_label="login",
             timeout=timeout,
+            verify=verify,
         )
 
     @classmethod
-    def register_admin(cls, base_url: str, username: str, password: str, *, timeout: int = 30) -> str:
+    def register_admin(
+        cls,
+        base_url: str,
+        username: str,
+        password: str,
+        *,
+        timeout: float = 30,
+        verify: bool | str | ssl.SSLContext = True,
+    ) -> str:
         """Register the initial admin user during setup."""
         return cls._auth_request(
             base_url,
@@ -623,4 +656,5 @@ class MeridianPanel(ControlPlaneMixin):
             accepted_codes=(200, 201),
             error_label="registration",
             timeout=timeout,
+            verify=verify,
         )

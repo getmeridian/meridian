@@ -5,13 +5,21 @@ Uses MagicMock for panel API and cluster config mutations.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from meridian.cluster import ClusterConfig, NodeEntry, PanelConfig, RelayEntry
-from meridian.operations import add_client, load_applied_snapshot, remove_client, remove_node, update_node
+from meridian.operations import (
+    add_client,
+    load_applied_snapshot,
+    remove_client,
+    remove_node,
+    stop_node_containers,
+    update_node,
+)
 from meridian.remnawave import MeridianPanel
 
 
@@ -27,6 +35,16 @@ def _make_cluster(**kwargs) -> ClusterConfig:
 def _mock_panel() -> MagicMock:
     panel = MagicMock(spec=MeridianPanel)
     return panel
+
+
+@pytest.fixture(autouse=True)
+def _successful_node_cleanup() -> Iterator[None]:
+    """Keep operation tests focused unless they explicitly exercise cleanup."""
+    with (
+        patch("meridian.operations.stop_node_containers", return_value=True),
+        patch.object(ClusterConfig, "backup"),
+    ):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +93,18 @@ class TestRemoveClient:
 
 
 class TestRemoveNode:
+    def test_container_cleanup_uses_deployed_path_and_allows_absent_compose(self) -> None:
+        node = NodeEntry(ip="198.51.100.2", ssh_user="ubuntu", ssh_port=2222)
+        connection = MagicMock()
+        connection.run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        assert stop_node_containers(node, connection=connection) is True
+
+        command = connection.run.call_args.args[0]
+        assert "/opt/remnanode/docker-compose.yml" in command
+        assert "/opt/remnawave-node" not in command
+        assert "if [ ! -f" in command
+
     def test_removes_cluster_tracked_node(self) -> None:
         node = NodeEntry(ip="198.51.100.2", uuid="uuid-2", name="node-2")
         cluster = _make_cluster(nodes=[node])
@@ -150,37 +180,62 @@ class TestUpdateNode:
 
 
 class TestRemoveNodeErrorPaths:
-    """Codex review: panel-side failures during remove_node should not leave
-    cluster.yml in an inconsistent state, and remove_node should still finish
-    its local cleanup so a retry can proceed.
-    """
+    """Panel deletion must succeed before local retry state is discarded."""
 
-    def test_panel_disable_failure_does_not_block_local_remove(self) -> None:
+    def test_container_cleanup_failure_retains_node_and_panel_registration(self) -> None:
+        node = NodeEntry(ip="198.51.100.2", uuid="uuid-2", name="x")
+        cluster = _make_cluster(nodes=[node])
+        panel = _mock_panel()
+
+        with (
+            patch("meridian.operations.stop_node_containers", return_value=False),
+            pytest.raises(RuntimeError, match="Could not stop containers"),
+        ):
+            remove_node(cluster, panel, node_ip=node.ip)
+
+        assert cluster.nodes == [node]
+        panel.disable_node.assert_not_called()
+        panel.delete_node.assert_not_called()
+
+    def test_panel_disable_failure_does_not_block_successful_delete(self) -> None:
         from meridian.remnawave import RemnawaveError
 
         node = NodeEntry(ip="198.51.100.2", uuid="uuid-2", name="x")
         cluster = _make_cluster(nodes=[node])
         panel = _mock_panel()
         panel.disable_node.side_effect = RemnawaveError("panel down")
-        # delete_node still attempted — also failing here exercises the warn path
-        panel.delete_node.side_effect = RemnawaveError("panel down")
 
-        # remove_node must NOT raise — it logs and proceeds with local cleanup
-        # so the operator can retry without manual cluster.yml surgery.
         remove_node(cluster, panel, node_ip="198.51.100.2")
         assert cluster.nodes == []
 
-    def test_force_overrides_dependent_relay_check(self) -> None:
+    def test_panel_delete_failure_retains_node_for_retry(self) -> None:
+        from meridian.remnawave import RemnawaveError
+
+        node = NodeEntry(ip="198.51.100.2", uuid="uuid-2", name="x")
+        cluster = _make_cluster(nodes=[node])
+        panel = _mock_panel()
+        panel.delete_node.side_effect = RemnawaveError("panel down")
+
+        with pytest.raises(RemnawaveError, match="panel down"):
+            remove_node(cluster, panel, node_ip="198.51.100.2")
+
+        assert cluster.nodes == [node]
+
+    def test_force_removes_dependent_relays_before_node(self) -> None:
         node = NodeEntry(ip="198.51.100.2", uuid="uuid-2")
         relay = RelayEntry(ip="198.51.100.10", exit_node_ip="198.51.100.2")
         cluster = _make_cluster(nodes=[node], relays=[relay])
         panel = _mock_panel()
-        # Without force, the dependent-relays check refuses the remove.
-        # With force=True, the operator accepts the orphan and we proceed.
-        remove_node(cluster, panel, node_ip="198.51.100.2", force=True)
+
+        def remove_dependent(target_cluster: ClusterConfig, _panel: MagicMock, *, relay_ip: str) -> None:
+            target_cluster.relays = [item for item in target_cluster.relays if item.ip != relay_ip]
+
+        with patch("meridian.operations.remove_relay", side_effect=remove_dependent) as remove_relay:
+            remove_node(cluster, panel, node_ip="198.51.100.2", force=True)
+
+        remove_relay.assert_called_once_with(cluster, panel, relay_ip=relay.ip)
         assert cluster.nodes == []
-        # Relay is intentionally not auto-removed — operator can clean separately
-        assert len(cluster.relays) == 1
+        assert cluster.relays == []
 
 
 class TestUpdateNodeMetadataConsistency:
@@ -382,6 +437,68 @@ class TestHybridDesiredNodesSync:
 
 
 class TestHybridDesiredRelaysSync:
+    def test_remove_relay_service_failure_retains_local_state(self) -> None:
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="r1")
+        cluster = _make_cluster(relays=[relay])
+        panel = _mock_panel()
+
+        with (
+            patch("meridian.relay_ops.stop_relay_service", return_value=False),
+            patch("meridian.relay_ops.delete_relay_hosts") as delete_hosts,
+            patch("meridian.ssh.ServerConnection"),
+            pytest.raises(RuntimeError, match="Could not stop relay service"),
+        ):
+            from meridian.operations import remove_relay
+
+            remove_relay(cluster, panel, relay_ip=relay.ip)
+
+        assert cluster.relays == [relay]
+        delete_hosts.assert_not_called()
+
+    def test_remove_relay_nginx_failure_retains_local_state(self) -> None:
+        exit_node = NodeEntry(ip="198.51.100.1", sni="exit.example")
+        relay = RelayEntry(
+            ip="198.51.100.20",
+            exit_node_ip=exit_node.ip,
+            name="r1",
+            sni="relay.example",
+        )
+        cluster = _make_cluster(nodes=[exit_node], relays=[relay])
+        panel = _mock_panel()
+
+        with (
+            patch("meridian.relay_ops.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
+            patch("meridian.relay_ops.remove_relay_nginx", return_value=False),
+            patch("meridian.relay_ops.delete_relay_hosts") as delete_hosts,
+            patch("meridian.ssh.ServerConnection"),
+            pytest.raises(RuntimeError, match="Could not clean up nginx"),
+        ):
+            from meridian.operations import remove_relay
+
+            remove_relay(cluster, panel, relay_ip=relay.ip)
+
+        assert cluster.relays == [relay]
+        delete_hosts.assert_not_called()
+
+    def test_remove_relay_panel_failure_retains_local_state(self) -> None:
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="r1")
+        cluster = _make_cluster(relays=[relay])
+        panel = _mock_panel()
+
+        with (
+            patch("meridian.relay_ops.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
+            patch("meridian.relay_ops.delete_relay_hosts", return_value=False),
+            patch("meridian.ssh.ServerConnection"),
+            pytest.raises(RuntimeError, match="Could not delete all panel hosts"),
+        ):
+            from meridian.operations import remove_relay
+
+            remove_relay(cluster, panel, relay_ip=relay.ip)
+
+        assert cluster.relays == [relay]
+
     def test_remove_relay_managed_drops_and_saves(self) -> None:
         from meridian.cluster import DesiredRelay
 
@@ -393,8 +510,10 @@ class TestHybridDesiredRelaysSync:
         panel = _mock_panel()
 
         with (
-            patch("meridian.relay_ops.delete_relay_hosts"),
-            patch("meridian.relay_ops.remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts", return_value=True),
+            patch("meridian.relay_ops.remove_relay_nginx", return_value=True),
+            patch("meridian.relay_ops.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):
@@ -411,8 +530,10 @@ class TestHybridDesiredRelaysSync:
         panel = _mock_panel()
 
         with (
-            patch("meridian.relay_ops.delete_relay_hosts"),
-            patch("meridian.relay_ops.remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts", return_value=True),
+            patch("meridian.relay_ops.remove_relay_nginx", return_value=True),
+            patch("meridian.relay_ops.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):
@@ -521,8 +642,10 @@ class TestHybridSyncAppliedSnapshot:
         cluster.applied_state.relays = ["198.51.100.20"]
         panel = _mock_panel()
         with (
-            patch("meridian.relay_ops.delete_relay_hosts"),
-            patch("meridian.relay_ops.remove_relay_nginx"),
+            patch("meridian.relay_ops.delete_relay_hosts", return_value=True),
+            patch("meridian.relay_ops.remove_relay_nginx", return_value=True),
+            patch("meridian.relay_ops.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
             patch("meridian.ssh.ServerConnection"),
             patch.object(ClusterConfig, "save"),
         ):

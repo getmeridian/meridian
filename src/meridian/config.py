@@ -29,7 +29,18 @@ REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to 
 REMNAWAVE_PANEL_DIR = "/opt/remnawave"
 REMNAWAVE_NODE_DIR = "/opt/remnanode"
 
-CONNECT_TEST_URL = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "https://ifconfig.me").strip() or "https://ifconfig.me"
+_CONNECT_TEST_URL_OVERRIDE = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "").strip()
+CONNECT_TEST_URLS = (
+    (_CONNECT_TEST_URL_OVERRIDE,)
+    if _CONNECT_TEST_URL_OVERRIDE
+    else (
+        "https://ifconfig.me/ip",
+        "https://api.ipify.org",
+        "https://icanhazip.com",
+    )
+)
+# Singular alias retained for callers that expose the configured primary observer.
+CONNECT_TEST_URL = CONNECT_TEST_URLS[0]
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
     "true",
@@ -64,6 +75,20 @@ XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
     ("Darwin", "x86_64"): "Xray-macos-64.zip",
     ("Linux", "x86_64"): "Xray-linux-64.zip",
     ("Linux", "aarch64"): "Xray-linux-arm64-v8a.zip",
+}
+
+# RealiTLScanner (remote SNI discovery helper)
+REALITL_SCANNER_VERSION = "0.2.3"
+REALITL_SCANNER_GITHUB_URL = "https://github.com/XTLS/RealiTLScanner/releases/download"
+REALITL_SCANNER_ASSETS: dict[str, tuple[str, str]] = {
+    "x86_64": (
+        "RealiTLScanner-linux-amd64",
+        "a55595446de9f1c2e6c5c3cd766a7320a11115947df48f101749bb62c8055592",
+    ),
+    "aarch64": (
+        "RealiTLScanner-linux-arm64",
+        "27bdd3e53d4391c66c8df3391d3c3fb5eb2dc356125f2fb33ac58fcaaf8f88b3",
+    ),
 }
 
 

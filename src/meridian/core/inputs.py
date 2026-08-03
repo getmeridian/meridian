@@ -171,8 +171,8 @@ def validate_server_title_value(value: str) -> str:
         raise ValueError("Server title is required.")
     if len(value) > 80:
         raise ValueError("Server title must be 80 characters or fewer.")
-    if any(char in value for char in "\r\n\t"):
-        raise ValueError("Server title cannot contain tabs or line breaks.")
+    if not all(char.isprintable() for char in value):
+        raise ValueError("Server title can contain only printable characters.")
     return value
 
 
@@ -181,8 +181,8 @@ def validate_server_reference_value(value: str) -> str:
     value = value.strip()
     if not value:
         raise ValueError("Choose a saved server or enter a server reference.")
-    if len(value) > 120 or any(char in value for char in "\r\n\t"):
-        raise ValueError("Server references cannot contain tabs or line breaks.")
+    if len(value) > 120 or not all(char.isprintable() for char in value):
+        raise ValueError("Server references can contain only printable characters.")
     return value
 
 

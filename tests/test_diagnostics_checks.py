@@ -7,6 +7,8 @@ for all checks.
 
 from __future__ import annotations
 
+import pytest
+
 from meridian.diagnostics import (
     CheckResult,
     check_container_running,
@@ -84,6 +86,15 @@ class TestCheckContainerRunning:
         assert result.status == "failed"
         assert "not found" in result.detail
 
+    @pytest.mark.parametrize("returncode", [124, 127, 255])
+    def test_skipped_when_container_evidence_is_unavailable(self, returncode: int) -> None:
+        conn = MockConnection()
+        conn.when("docker inspect", rc=returncode)
+
+        result = check_container_running(conn, "remnawave-node")
+
+        assert result.status == "skipped"
+
 
 # ---------------------------------------------------------------------------
 # check_port_listening
@@ -112,6 +123,24 @@ class TestCheckPortListening:
         assert result.status == "failed"
         assert result.name == "port:8080"
 
+    @pytest.mark.parametrize("returncode", [124, 127, 255])
+    def test_skipped_when_listener_evidence_is_unavailable(self, returncode: int) -> None:
+        conn = MockConnection()
+        conn.when("ss -tlnp", rc=returncode)
+
+        result = check_port_listening(conn, 8080)
+
+        assert result.status == "skipped"
+
+    def test_udp_listener_uses_udp_socket_evidence(self) -> None:
+        conn = MockConnection()
+        conn.when("ss -ulnp", stdout="1\n")
+
+        result = check_port_listening(conn, 8443, transport="udp")
+
+        assert result.status == "passed"
+        assert any("ss -ulnp" in command for command in conn.calls)
+
 
 # ---------------------------------------------------------------------------
 # check_tls_certificate
@@ -137,6 +166,15 @@ class TestCheckTlsCertificate:
         conn.when("openssl", stdout="")
         result = check_tls_certificate(conn, "198.51.100.1")
         assert result.status == "warning"
+
+    @pytest.mark.parametrize("returncode", [124, 127, 255])
+    def test_skipped_when_tls_evidence_is_unavailable(self, returncode: int) -> None:
+        conn = MockConnection()
+        conn.when("openssl", rc=returncode)
+
+        result = check_tls_certificate(conn, "198.51.100.1")
+
+        assert result.status == "skipped"
 
     def test_failed_when_cert_expired(self) -> None:
         conn = MockConnection()
@@ -166,6 +204,14 @@ class TestCheckTlsCertificate:
         check_tls_certificate(conn, "evil; rm -rf /")
         # Verify the command was called with a quoted host
         assert any("'evil; rm -rf /'" in c for c in conn.calls)
+
+    def test_uses_requested_local_tls_port(self) -> None:
+        conn = MockConnection()
+        conn.when("openssl", rc=1)
+
+        check_tls_certificate(conn, "edge.example.com", port=7443)
+
+        assert any("127.0.0.1:7443" in command for command in conn.calls)
 
 
 # ---------------------------------------------------------------------------

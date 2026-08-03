@@ -13,6 +13,7 @@ export type Command = "fleet.status";
 export type Ip = string;
 export type IsPanelHost = boolean;
 export type Name = string;
+export type Role = "exit" | "routing_gateway";
 export type Status = "connected" | "disconnected" | "disabled" | "unknown";
 export type TrafficBytes = number;
 export type Uuid = string;
@@ -20,6 +21,7 @@ export type XrayVersion = string;
 export type Nodes = FleetStatusNode[];
 export type Healthy = boolean;
 export type Url = string;
+export type Evidence = "tcp_listener";
 export type ExitNodeIp = string;
 export type ExitNodeName = string;
 export type Health = "healthy" | "unhealthy" | "unknown";
@@ -31,7 +33,12 @@ export type Relays = FleetStatusRelay[];
 export type Id = string;
 export type Ip2 = string;
 export type Name2 = string;
-export type Roles = ("panel" | "exit" | "relay")[];
+export type Advertised = boolean;
+export type Chain = string;
+export type Health1 = "healthy" | "unhealthy" | "unknown";
+export type Position = number;
+export type RelayHops = RelayHopMembership[];
+export type Roles = ("panel" | "exit" | "relay" | "routing_gateway")[];
 export type SshPort = number;
 export type SshUser = string;
 export type Servers = ServerInventory[];
@@ -44,13 +51,17 @@ export type ConnectedNodes = number;
 export type DisabledNodes = number;
 export type DisabledUsers = number;
 export type DisconnectedNodes = number;
-export type Health1 = "healthy" | "degraded" | "unknown";
+export type Health2 = "healthy" | "degraded" | "unknown";
+export type MissingAccessUsers = number;
 export type NeedsAttention = boolean;
 export type Nodes2 = number;
+export type NonactiveAccessUsers = number;
 export type OtherUsers = number;
 export type Relays2 = number;
 export type UnhealthyRelays = number;
 export type UnknownNodes = number;
+export type UnknownRelayHops = number;
+export type UnknownRelays = number;
 export type Users1 = number;
 export type DurationMs = number;
 /**
@@ -83,7 +94,7 @@ export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status2 = "failed" | "cancelled";
+export type Status2 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _FleetStatusSuccessEnvelope {
@@ -112,6 +123,7 @@ export interface FleetStatusNode {
   ip: Ip;
   is_panel_host: IsPanelHost;
   name: Name;
+  role?: Role;
   status: Status;
   traffic_bytes: TrafficBytes;
   uuid: Uuid;
@@ -122,6 +134,7 @@ export interface PanelStatus {
   url: Url;
 }
 export interface FleetStatusRelay {
+  evidence?: Evidence;
   exit_node_ip: ExitNodeIp;
   exit_node_name: ExitNodeName;
   health: Health;
@@ -134,9 +147,16 @@ export interface ServerInventory {
   id: Id;
   ip: Ip2;
   name: Name2;
+  relay_hops?: RelayHops;
   roles: Roles;
   ssh_port: SshPort;
   ssh_user: SshUser;
+}
+export interface RelayHopMembership {
+  advertised: Advertised;
+  chain: Chain;
+  health?: Health1;
+  position: Position;
 }
 export interface FleetSources {
   nodes?: Nodes1;
@@ -150,13 +170,17 @@ export interface FleetStatusSummary {
   disabled_nodes: DisabledNodes;
   disabled_users: DisabledUsers;
   disconnected_nodes: DisconnectedNodes;
-  health: Health1;
+  health: Health2;
+  missing_access_users: MissingAccessUsers;
   needs_attention: NeedsAttention;
   nodes: Nodes2;
+  nonactive_access_users: NonactiveAccessUsers;
   other_users: OtherUsers;
   relays: Relays2;
   unhealthy_relays: UnhealthyRelays;
   unknown_nodes: UnknownNodes;
+  unknown_relay_hops?: UnknownRelayHops;
+  unknown_relays: UnknownRelays;
   users: Users1;
 }
 /**
@@ -204,6 +228,6 @@ export interface _FleetStatusTerminalEnvelope {
   warnings: Warnings1;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

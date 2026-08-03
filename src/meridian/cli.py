@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import typer
 
@@ -146,6 +147,8 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
         "--parallel",
         "--request",
         "--events",
+        "--timeout",
+        "--client",
     }
     for arg in args:
         if skip_next:
@@ -175,7 +178,7 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
     positionals = _argv_positionals(args)
     if not positionals:
         return False
-    if positionals[0] in {"plan", "apply"}:
+    if positionals[0] in {"plan", "apply", "probe", "test"}:
         return True
     if positionals[0] == "deploy":
         return True
@@ -202,7 +205,13 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
 
 @app.command("studio")
 def studio_cmd(
-    port: int = typer.Option(0, "--port", help="Localhost port; 0 picks an available high port"),
+    port: int = typer.Option(
+        0,
+        "--port",
+        min=0,
+        max=65535,
+        help="Localhost port; 0 picks an available high port",
+    ),
     assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
     no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),
 ) -> None:
@@ -223,12 +232,13 @@ def plan_cmd(
 ) -> None:
     """Show what would change — compare desired state with actual.
 
-    Reads desired_nodes, desired_clients, and desired_relays from cluster.yml
-    and compares with the live panel state.
+    V4 inspects compiled resources and saved generation state. Legacy mode
+    compares desired_* fields with live panel state.
 
     [dim]Exit codes:[/dim]
       [green]0[/green] = already converged
       [yellow]2[/yellow] = changes pending
+      [yellow]3[/yellow] = required observation evidence unavailable
     """
     from meridian.commands.plan import run
     from meridian.console import is_json_mode
@@ -244,14 +254,16 @@ def apply_cmd(
     prune_extras: str = typer.Option(
         "ask",
         "--prune-extras",
-        help="How to handle extras (panel-side resources not in cluster.yml): "
+        help="Legacy only. How to handle extras (panel-side resources not in cluster.yml): "
         "ask (interactive prompt), yes (auto-remove), no (skip removal). "
         "Defaults to 'ask' interactively or 'no' under --yes for safety",
     ),
     parallel: int = typer.Option(
         4,
         "--parallel",
-        help="Max parallel node provisioning threads",
+        min=1,
+        max=32,
+        help="Legacy only. Max parallel node provisioning threads",
     ),
     json_output: bool = typer.Option(False, "--json", help="Emit final apply result as JSON"),
 ) -> None:
@@ -262,7 +274,7 @@ def apply_cmd(
     [dim]Examples:[/dim]
       [cyan]meridian apply[/cyan]              Show plan and confirm
       [cyan]meridian apply --yes[/cyan]        Apply without confirmation
-      [cyan]meridian apply --prune-extras=yes[/cyan]   Auto-remove panel resources missing from cluster.yml
+      [cyan]meridian apply --prune-extras=yes[/cyan]   Legacy: remove panel-only resources
     """
     from meridian.commands.apply import run
     from meridian.console import is_json_mode
@@ -434,7 +446,7 @@ def client_add(
     names: list[str] = typer.Argument(..., help="Client name(s) to add"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Add one or more clients.
+    """Add one or more clients through the active topology model.
 
     [dim]Examples:[/dim]
       [cyan]meridian client add alice[/cyan]
@@ -451,8 +463,9 @@ def client_add(
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    repair_page: bool = typer.Option(False, "--repair-page", help="Regenerate a missing legacy connection page"),
 ) -> None:
-    """Show connection info for a client.
+    """Show connection info for a managed access client.
 
     [dim]Examples:[/dim]
       [cyan]meridian client show alice[/cyan]
@@ -461,14 +474,14 @@ def client_show_cmd(
 
     if json_mode:
         _enable_json_output()
-    run_show(name)
+    run_show(name, repair_page=repair_page)
 
 
 @client_app.command("list")
 def client_list_cmd(
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """List all clients with status and traffic"""
+    """List managed access clients with status and traffic"""
     from meridian.commands.client import run_list
 
     if json_mode:
@@ -482,7 +495,7 @@ def client_remove(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Remove a client"""
+    """Remove a legacy client (V4 removal is managed through setup)"""
     from meridian.commands.client import run_remove
 
     if json_mode:
@@ -508,7 +521,7 @@ def client_disable_cmd(
     name: str = typer.Argument(..., help="Client name"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Temporarily suspend a client"""
+    """Temporarily suspend a client (V4 apply restores declared users)"""
     from meridian.commands.client import run_disable
 
     if json_mode:
@@ -545,11 +558,12 @@ def server_list_cmd() -> None:
 @server_app.command("remove")
 def server_remove_cmd(
     server: str = typer.Argument(..., help="Server name or IP"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Remove a known server"""
     from meridian.commands.server import run_remove
 
-    run_remove(server)
+    run_remove(server, yes=yes)
 
 
 # =============================================================================
@@ -559,7 +573,7 @@ def server_remove_cmd(
 
 @app.command("preflight")
 def preflight_cmd(
-    ip: str = typer.Argument("", help="Server IP address"),
+    ip: str = typer.Argument("", help="Server IP address or hostname"),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to check"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to verify"),
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
@@ -578,7 +592,7 @@ def scan_cmd(
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
     server: str = typer.Option("", "--server", help="Target server name or IP"),
 ) -> None:
-    """Find optimal SNI targets via RealiTLScanner"""
+    """Find optimal SNI targets on an IPv4 server via RealiTLScanner"""
     from meridian.commands.scan import run
 
     run(ip, user, server)
@@ -586,26 +600,40 @@ def scan_cmd(
 
 @app.command("test")
 def test_cmd(
-    ip: str = typer.Argument("", help="Server IP to test connectivity to"),
+    ip: str = typer.Argument("", help="Server IP or domain to test"),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to test"),
     server: str = typer.Option("", "--server", help="Target server name or IP"),
+    client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
+    basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
+    timeout: str = typer.Option("5", "--timeout", help="Per-network-operation timeout in seconds (1-30)"),
+    json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
-    """Test proxy reachability from client device (no SSH required)"""
-    from meridian.commands.ping import run
+    """Test delivered proxy traffic from this device (no SSH required).
 
-    run(ip, domain, sni, server)
+    `--basic` skips client traffic and cannot be combined with `--client`.
+    """
+    from meridian.commands.test import run
+
+    if json_output:
+        _enable_json_output()
+    run(ip, domain, sni, server, client, basic, timeout)
 
 
 @app.command("probe")
 def probe_cmd(
     ip: str = typer.Argument("", help="Server IP or domain"),
     server: str = typer.Option("", "--server", help="Target server name or IP"),
+    sni: str = typer.Option("", "--sni", "-s", help="SNI to use for generic probes"),
+    timeout: str = typer.Option("5", "--timeout", help="Per-network-operation timeout in seconds (1-30)"),
+    json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
     """Probe your server as a censor would"""
     from meridian.commands.probe import run
 
-    run(ip, server)
+    if json_output:
+        _enable_json_output()
+    run(ip, server, sni, timeout)
 
 
 # =============================================================================
@@ -649,7 +677,7 @@ def teardown_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     server: str = typer.Option("", "--server", help="Target server name or IP"),
 ) -> None:
-    """Remove proxy deployment from a server"""
+    """Remove an unreferenced proxy deployment from a server"""
     from meridian.commands.uninstall import run
 
     run(ip, user, yes, server)
@@ -660,7 +688,9 @@ def update_cmd() -> None:
     """Update meridian to the latest version"""
     from meridian.update import run_self_update
 
-    run_self_update()
+    exit_code = run_self_update()
+    if exit_code:
+        raise typer.Exit(exit_code)
 
 
 # =============================================================================
@@ -675,7 +705,11 @@ def relay_deploy_cmd(
     user: str = typer.Option("root", "--user", "-u", help="SSH user"),
     name: str = typer.Option("", "--name", help="Friendly name for the relay (e.g. ru-moscow)"),
     port: int = typer.Option(443, "--port", "-p", help="Relay listen port"),
-    sni: str = typer.Option("", "--sni", help="Reality SNI target for relay (auto-scanned if omitted)"),
+    sni: str = typer.Option(
+        "",
+        "--sni",
+        help="Reality SNI (legacy auto-scans; V4 inherits the exit path when omitted)",
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port on the relay server"),
 ) -> None:
@@ -694,12 +728,14 @@ def relay_deploy_cmd(
 @relay_app.command("list")
 def relay_list_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Filter by exit server IP or name"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
     """List all relay nodes"""
     from meridian.commands.relay import run_list
 
-    run_list(exit, user)
+    if json_mode:
+        _enable_json_output()
+    run_list(exit)
 
 
 @relay_app.command("remove")
@@ -709,7 +745,7 @@ def relay_remove_cmd(
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Remove a relay node"""
+    """Remove a legacy relay node (edit V4 chains with setup)"""
     from meridian.commands.relay import run_remove
 
     run_remove(relay_ip, exit, user, yes)
@@ -721,7 +757,7 @@ def relay_check_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Exit server IP or name"),
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
 ) -> None:
-    """Run health checks on a relay"""
+    """Check a legacy relay (use test for a V4 chain)"""
     from meridian.commands.relay import run_check
 
     run_check(relay_ip, exit, user)
@@ -740,10 +776,10 @@ def node_add_cmd(
     sni: str = typer.Option("", "--sni", help="Reality SNI target"),
     domain: str = typer.Option("", "--domain", help="Domain for WSS/XHTTP (Cloudflare CDN)"),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port"),
-    harden: bool = typer.Option(True, help="Apply OS hardening (firewall, SSH)"),
+    harden: bool = typer.Option(True, help="Apply OS hardening; V4 rejects --no-harden"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Provision and add a new node to the fleet.
+    """Provision a legacy node or add a reviewed V4 exit.
 
     Connects via SSH, hardens the server, installs Docker and Xray,
     registers with the panel, and creates host entries.
@@ -759,10 +795,14 @@ def node_add_cmd(
 
 
 @node_app.command("list")
-def node_list_cmd() -> None:
+def node_list_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+) -> None:
     """List all nodes with live status"""
     from meridian.commands.node import run_list
 
+    if json_mode:
+        _enable_json_output()
     run_list()
 
 
@@ -783,7 +823,7 @@ def node_remove_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     force: bool = typer.Option(False, "--force", help="Remove even if relays depend on this node"),
 ) -> None:
-    """Remove a node from the fleet"""
+    """Remove a legacy node (edit V4 exits with setup)"""
     from meridian.commands.node import run_remove
 
     run_remove(node, yes=yes, force=force)
@@ -803,7 +843,9 @@ def fleet_status_cmd(
 
     if json_mode:
         _enable_json_output()
-    run_status()
+    exit_code = run_status()
+    if exit_code:
+        raise typer.Exit(exit_code)
 
 
 @fleet_app.command("inventory")
@@ -821,18 +863,45 @@ def fleet_inventory_cmd(
 @fleet_app.command("recover")
 def fleet_recover_cmd(
     panel_url: str = typer.Option(..., "--panel-url", help="Panel HTTPS URL"),
-    api_token: str = typer.Option(..., "--api-token", help="Remnawave API token (JWT)"),
+    api_token_file: str = typer.Option(
+        "",
+        "--api-token-file",
+        help="Mode-600 file containing the token; defaults to MERIDIAN_API_TOKEN or a secure prompt",
+    ),
+    profile: str = typer.Option("", "--profile", help="Legacy config profile name or UUID when ambiguous"),
+    squad: str = typer.Option("", "--squad", help="Legacy client access squad name or UUID when ambiguous"),
+    panel_node: str = typer.Option("", "--panel-node", help="Panel-host node name, UUID, or address when ambiguous"),
+    panel_server: str = typer.Option("", "--panel-server", help="Public SSH IP of the Remnawave host for domain URLs"),
+    user: str = typer.Option("root", "--user", "-u", help="SSH user for the panel server"),
+    ssh_port: int = typer.Option(22, "--ssh-port", min=1, max=65535, help="SSH port for the panel server"),
+    legacy: bool = typer.Option(False, "--legacy", help="Confirm this is a legacy shared-profile deployment"),
+    force: bool = typer.Option(False, "--force", help="Back up and replace an existing cluster.yml"),
 ) -> None:
-    """Reconstruct cluster.yml from the panel API.
+    """Recover legacy-compatible cluster state from the panel API.
 
-    Use when ~/.meridian/ is lost but the panel is still running.
+    V4 topology intent cannot be reconstructed from Remnawave alone. Restore a
+    cluster.yml backup or rerun setup for V4 deployments.
 
     [dim]Examples:[/dim]
-      [cyan]meridian fleet recover --panel-url https://198.51.100.10/panel --api-token eyJ...[/cyan]
+      [cyan]meridian fleet recover --legacy --panel-url https://198.51.100.10/panel[/cyan]
     """
-    from meridian.commands.recover import run_recover
+    from meridian.commands.recover import load_api_token, require_legacy_recovery, run_recover
 
-    run_recover(panel_url, api_token)
+    require_legacy_recovery(legacy)
+    token_path = Path(api_token_file).expanduser() if api_token_file else None
+    api_token = load_api_token(token_path)
+    run_recover(
+        panel_url,
+        api_token,
+        profile=profile,
+        squad=squad,
+        panel_node=panel_node,
+        panel_server=panel_server,
+        user=user,
+        ssh_port=ssh_port,
+        legacy=legacy,
+        force=force,
+    )
 
 
 # =============================================================================
@@ -848,9 +917,9 @@ def api_schemas_cmd(
     """List meridian-core JSON schemas"""
     from meridian.commands.api import run_schemas
 
-    if json_mode:
+    if json_mode or include_schemas:
         _enable_json_output()
-    run_schemas(json_output=json_mode, include_schemas=include_schemas)
+    run_schemas(json_output=json_mode or include_schemas, include_schemas=include_schemas)
 
 
 @api_app.command("commands")
@@ -861,9 +930,9 @@ def api_commands_cmd(
     """List migrated meridian-core command contracts"""
     from meridian.commands.api import run_commands
 
-    if json_mode:
+    if json_mode or include_schemas:
         _enable_json_output()
-    run_commands(json_output=json_mode, include_schemas=include_schemas)
+    run_commands(json_output=json_mode or include_schemas, include_schemas=include_schemas)
 
 
 @api_app.command("schema")

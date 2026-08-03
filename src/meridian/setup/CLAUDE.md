@@ -22,3 +22,4 @@
 - Do not skip stages; presentation adapters must call `SetupDraftService`.
 - Keep remote action checkpoints in typed cluster state, not `setup.json`.
 - Inspect a cloned cluster through read-only drivers; cached plan hashes cannot detect managed remote drift.
+- Control readiness reports confirmed identity/artifact drift separately from unavailable SSH, socket-table, or panel evidence.

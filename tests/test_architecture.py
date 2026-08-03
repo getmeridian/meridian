@@ -114,6 +114,11 @@ class TestLayerBoundaries:
         violations = _scan_violations(SRC / "core", CORE_FORBIDDEN)
         assert violations == [], "core/ has forbidden imports:\n" + "\n".join(violations)
 
+    def test_command_catalog_does_not_import_schema_registry(self) -> None:
+        imports = _imports(SRC / "core" / "command_catalog.py")
+
+        assert "meridian.core.schema" not in imports
+
     def test_engine_never_imports_commands_or_runtime(self) -> None:
         violations = _scan_violations(SRC / "engine", ENGINE_FORBIDDEN)
         assert violations == [], "engine/ has forbidden imports:\n" + "\n".join(violations)
@@ -283,7 +288,6 @@ FILE_SIZE_BUDGET = 800
 FILE_SIZE_ALLOWLIST: dict[str, str] = {
     "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
     "cli.py": "Typer registration for all subcommands — structural, not complex",
-    "commands/probe.py": "15 probe checks (9 external + 3 deployment + 3 cluster) — all return CheckResult",
 }
 
 

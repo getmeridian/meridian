@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from meridian.node_deploy import create_api_token, wait_for_node_connected
+from meridian.node_deploy import create_api_token, panel_base_url, wait_for_node_connected
 
 
 def test_create_api_token_uses_remnawave_v28_request_schema() -> None:
@@ -30,8 +30,12 @@ def test_create_api_token_uses_remnawave_v28_request_schema() -> None:
             "X-Remnawave-Client-Type": "browser",
         },
         timeout=30,
-        verify=False,
+        verify=True,
     )
+
+
+def test_panel_base_url_brackets_ipv6_literals() -> None:
+    assert panel_base_url("2001:0DB8:0:0:0:0:0:11", "", "secret") == ("https://[2001:0DB8:0:0:0:0:0:11]/secret/")
 
 
 @patch("meridian.health.time.sleep")

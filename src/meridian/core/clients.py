@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol, Sequence
+from typing import Any, Literal, Protocol, Sequence
 
 from pydantic import Field
 
@@ -102,6 +102,63 @@ class ClientShowResult(CoreModel):
         return to_plain(self)
 
 
+class ClientCreated(CoreModel):
+    """Client metadata returned after creation."""
+
+    username: str
+    uuid: str
+    status: str
+
+
+class ClientAddResult(CoreModel):
+    """Result for adding one or more clients."""
+
+    clients: list[ClientCreated] = Field(default_factory=list)
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
+class ClientReference(CoreModel):
+    """Public identity of a client mutation target."""
+
+    username: str
+
+
+class ClientRemoveResult(CoreModel):
+    """Result for removing one client."""
+
+    client: ClientReference
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
+ClientMutationStatus = Literal["active", "disabled"]
+
+
+class ClientStatus(CoreModel):
+    """Client identity and status returned after a status mutation."""
+
+    username: str
+    status: ClientMutationStatus
+
+
+class ClientStatusResult(CoreModel):
+    """Result for enabling or disabling one client."""
+
+    client: ClientStatus
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
 def build_client_record(user: PanelUserLike) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
@@ -157,3 +214,22 @@ def build_client_show_result(
             subscription_available=bool(subscription_url),
         ),
     )
+
+
+def build_client_add_result(users: Sequence[tuple[str, PanelUserLike]]) -> ClientAddResult:
+    """Build the stable result returned for a successful client add batch."""
+    return ClientAddResult(
+        clients=[
+            ClientCreated(username=username, uuid=user.uuid, status=user.status.lower()) for username, user in users
+        ]
+    )
+
+
+def build_client_remove_result(username: str) -> ClientRemoveResult:
+    """Build the stable result returned after removing one client."""
+    return ClientRemoveResult(client=ClientReference(username=username))
+
+
+def build_client_status_result(username: str, status: ClientMutationStatus) -> ClientStatusResult:
+    """Build the stable result returned after changing one client status."""
+    return ClientStatusResult(client=ClientStatus(username=username, status=status))

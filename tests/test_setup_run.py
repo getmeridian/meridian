@@ -425,6 +425,37 @@ class TestRunModeDetection:
         assert call_kwargs.kwargs["is_first_deploy"] is False
         assert call_kwargs.kwargs["is_redeploy"] is True
 
+    def test_post_mutation_cluster_save_failure_is_typed_json(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from meridian.console import set_json_mode
+
+        cluster = _empty_cluster()
+        resolved = _make_resolved(_IP_A)
+        registry = MagicMock()
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands.setup.ServerRegistry", return_value=registry),
+                patch("meridian.commands.setup.resolve_server", return_value=resolved),
+                patch("meridian.commands.setup.ensure_server_connection", side_effect=lambda item: item),
+                patch("meridian.commands.setup._check_ports"),
+                patch("meridian.commands.setup.ClusterConfig.load", return_value=cluster),
+                patch("meridian.commands.setup.run_provisioner"),
+                patch("meridian.commands.setup.configure_panel_and_node"),
+                patch.object(cluster, "save", side_effect=OSError("disk full")),
+                pytest.raises(typer.Exit) as exc_info,
+            ):
+                run(ip=_IP_A, yes=True, json_output=True)
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert exc_info.value.exit_code == 3
+        assert payload["command"] == "deploy"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "system"
+        assert "remote state" in payload["summary"]["text"].lower()
+        registry.add.assert_not_called()
+
     def test_new_ip_on_configured_cluster_fails_with_node_add_hint(self) -> None:
         cluster = _configured_cluster(_IP_A)
         resolved = _make_resolved(_IP_B)

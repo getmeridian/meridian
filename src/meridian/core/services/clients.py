@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from typing import Protocol, Self
 
 from pydantic import Field
@@ -56,10 +56,17 @@ class ClientShowServiceResult(CoreModel):
     subscription_url: str = Field(default="", exclude=True)
 
 
-def collect_client_list(panel_client: ClientPanelClient) -> ClientListServiceResult:
+def collect_client_list(
+    panel_client: ClientPanelClient,
+    *,
+    allowed_usernames: Collection[str] | None = None,
+) -> ClientListServiceResult:
     """Collect redacted client list data from the panel."""
     with panel_client as panel:
         users = panel.list_users()
+    if allowed_usernames is not None:
+        allowed = set(allowed_usernames)
+        users = [user for user in users if user.username in allowed]
     return ClientListServiceResult(clients=build_client_list_result(users))
 
 
@@ -68,8 +75,11 @@ def collect_client_show(
     username: str,
     *,
     build_share_url: ShareUrlBuilder | None = None,
+    allowed_usernames: Collection[str] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
+    if allowed_usernames is not None and username not in allowed_usernames:
+        raise ClientNotFoundError(username)
     with panel_client as panel:
         user = panel.get_user(username)
         if user is None:

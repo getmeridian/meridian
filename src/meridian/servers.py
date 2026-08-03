@@ -93,12 +93,9 @@ class ServerRegistry:
         return None
 
     def add(self, entry: ServerEntry) -> None:
-        """Add a server, deduplicating by host IP."""
-        existing_profile = (
-            (self._store.find(entry.id) if entry.id else None)
-            or self._store.find(entry.host)
-            or (self._store.find(entry.name) if entry.name else None)
-        )
+        """Add or update a server without merging distinct saved identities."""
+        self.assert_can_add(entry)
+        existing_profile = (self._store.find(entry.id) if entry.id else None) or self._store.find(entry.host)
         draft = ServerConnectionDraft(
             title=entry.name or entry.host,
             host=entry.host,
@@ -125,6 +122,37 @@ class ServerRegistry:
             }
         )
         self._store.upsert(profile)
+
+    def assert_can_add(self, entry: ServerEntry) -> None:
+        """Reject host/title collisions that could retarget a stable V4 reference."""
+        profiles = self._store.list()
+        id_profile = next((profile for profile in profiles if entry.id and profile.id == entry.id), None)
+        host_profile = next((profile for profile in profiles if profile.host == entry.host), None)
+        if entry.id and id_profile is None and host_profile is not None:
+            raise LocalStateError(
+                f"Saved server host {entry.host!r} belongs to '{host_profile.title}', not ID {entry.id!r}.",
+                hint="Use the existing stable server ID or choose a different host.",
+            )
+        if id_profile is not None and host_profile is not None and id_profile.id != host_profile.id:
+            raise LocalStateError(
+                f"Saved server host {entry.host!r} belongs to '{host_profile.title}', not '{id_profile.title}'.",
+                hint="Use a unique server name and host. Change V4 role assignments through `meridian setup`.",
+            )
+        intended = id_profile or host_profile
+        requested_tokens = {entry.host}
+        if entry.name:
+            requested_tokens.add(entry.name)
+        if entry.id:
+            requested_tokens.add(entry.id)
+        for profile in profiles:
+            if intended is not None and profile.id == intended.id:
+                continue
+            existing_tokens = {profile.id, profile.host, profile.title}
+            if requested_tokens & existing_tokens:
+                raise LocalStateError(
+                    f"Saved server identity conflicts with existing server '{profile.title}' at {profile.host}.",
+                    hint="Choose a unique name and host. Existing server identities cannot be retargeted or ambiguous.",
+                )
 
     def remove(self, query: str, *, cluster: ClusterConfig | None = None) -> bool:
         """Remove an unreferenced server by ID, IP, or name."""
@@ -160,22 +188,22 @@ class ServerProfileStore:
         return None
 
     def upsert(self, profile: ServerProfile) -> None:
-        """Insert or replace a profile by stable ID, title, or host."""
-        existing = next(
-            (
-                candidate
-                for candidate in self.list()
-                if candidate.id == profile.id or candidate.title == profile.title or candidate.host == profile.host
-            ),
-            None,
-        )
-        if existing is not None and existing.id != profile.id:
-            profile = profile.model_copy(update={"id": existing.id})
-        profiles = [
-            existing
-            for existing in self.list()
-            if existing.id != profile.id and existing.title != profile.title and existing.host != profile.host
+        """Insert or replace one stable profile, rejecting cross-profile collisions."""
+        profiles = self.list()
+        profile_tokens = {profile.id, profile.title, profile.host}
+        collisions = [
+            candidate
+            for candidate in profiles
+            if candidate.id != profile.id
+            and profile_tokens.intersection({candidate.id, candidate.title, candidate.host})
         ]
+        if collisions:
+            collision = collisions[0]
+            raise LocalStateError(
+                f"Saved server '{profile.title}' conflicts with existing server '{collision.title}'.",
+                hint="Use a unique server name and host; stable server identities cannot be merged.",
+            )
+        profiles = [existing for existing in profiles if existing.id != profile.id]
         profiles.append(profile)
         self._write_profiles(profiles)
 
@@ -304,8 +332,52 @@ def _stronger_auth_state(current: ServerAuthState, requested: ServerAuthState) -
 
 def _cluster_references(profile: ServerProfile, cluster: ClusterConfig) -> list[str]:
     references: list[str] = []
+    identities = {profile.id, profile.title, profile.host}
+
+    def add(label: str) -> None:
+        if label not in references:
+            references.append(label)
+
     if cluster.panel.server_ip == profile.host:
-        references.append("the control plane")
-    references.extend(f"node '{node.name or node.ip}'" for node in cluster.nodes if node.ip == profile.host)
-    references.extend(f"relay '{relay.name or relay.ip}'" for relay in cluster.relays if relay.ip == profile.host)
+        add("the control plane")
+    for node in cluster.nodes:
+        if node.ip == profile.host:
+            add(f"node '{node.name or node.ip}'")
+    for relay in cluster.relays:
+        if relay.ip == profile.host:
+            add(f"relay '{relay.name or relay.ip}'")
+    for desired_node in cluster.desired_nodes or []:
+        if desired_node.host == profile.host:
+            add(f"desired node '{desired_node.name or desired_node.host}'")
+    for desired_relay in cluster.desired_relays or []:
+        if desired_relay.host == profile.host:
+            add(f"desired relay '{desired_relay.name or desired_relay.host}'")
+    if profile.host in (cluster.applied_state.nodes or []):
+        add("the applied node snapshot")
+    if profile.host in (cluster.applied_state.relays or []):
+        add("the applied relay snapshot")
+
+    intent = cluster.topology_intent
+    if intent is not None:
+        if intent.control.server_ref in identities:
+            add("the V4 control plane")
+        for exit_intent in intent.exits:
+            if exit_intent.server_ref in identities:
+                add(f"V4 exit '{exit_intent.id}'")
+        for relay_intent in intent.transparent_relays:
+            if identities.intersection(relay_intent.hop_server_refs):
+                add(f"V4 relay '{relay_intent.id}'")
+        for gateway in intent.routing_gateways:
+            if gateway.server_ref in identities:
+                add(f"V4 routing gateway '{gateway.id}'")
+
+    active_workloads = [workload for workload in cluster.workloads if workload.active]
+    for workload in active_workloads:
+        workload_refs = set(workload.server_refs) | set(workload.node_uuids) | set(workload.reality_keys)
+        if identities.intersection(workload_refs):
+            add(f"V4 workload '{workload.id}'")
+    active_allocation_ids = {inbound_ref for workload in active_workloads for inbound_ref in workload.inbound_uuids}
+    for allocation in cluster.allocations.values():
+        if allocation.logical_id in active_allocation_ids and allocation.server_ref in identities:
+            add(f"V4 allocation '{allocation.logical_id}'")
     return references

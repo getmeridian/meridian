@@ -81,6 +81,13 @@ class PanelSetupError(MeridianError):
         super().__init__(message, hint=hint, category=category)
 
 
+class InfrastructureEvidenceUnavailableError(MeridianError):
+    """Required infrastructure evidence could not be collected reliably."""
+
+    def __init__(self, message: str, *, hint: str = "") -> None:
+        super().__init__(message, hint=hint, category="system", retryable=True)
+
+
 class LocalStateError(MeridianError):
     """A machine-owned Meridian state file cannot be loaded safely."""
 

@@ -1,859 +1,210 @@
-"""Censor probe — test what a censor sees when they investigate your server."""
+"""External active-probe workflow and CLI presentation."""
 
 from __future__ import annotations
 
-import hashlib
-import http.client
-import shlex
-import socket
-import ssl
-import subprocess
-from dataclasses import dataclass, field
+from dataclasses import replace
 
-from meridian.commands.resolve import resolve_server
-from meridian.config import SERVER_PROFILES_FILE, is_ip
-from meridian.console import err_console, info, line, ok, warn
-from meridian.health import tcp_connect
-from meridian.resolve import is_local_keyword
+import typer
+from rich.markup import escape
+
+from meridian.cluster import ClusterConfig
+from meridian.config import SERVER_PROFILES_FILE
+from meridian.console import err_console, error_context, fail, is_json_mode
+from meridian.core.errors import MeridianError as MeridianException
+from meridian.core.inputs import validate_hostname_value
+from meridian.core.models import MeridianError, OutputStatus, Summary
+from meridian.core.output import OperationContext, command_envelope
+from meridian.core.redaction import redact_string
+from meridian.core.verification import (
+    ProbeResult,
+    VerificationTarget,
+)
+from meridian.diagnostics.probe import run_probe_checks
+from meridian.renderers import emit_json
 from meridian.servers import ServerRegistry
-
-# Ports that suggest VPN/proxy infrastructure
-_SUSPICIOUS_PORTS: dict[int, str] = {
-    8080: "often used for proxy fallback",
-    8443: "often used for proxy fallback",
-    2053: "often used by VPN panels (3x-ui / x-ui)",
-    2083: "often used by VPN panels",
-    2087: "often used by VPN panels",
-    2096: "often used by VPN panels",
-    10000: "often used by Webmin / proxy management",
-    3000: "Remnawave panel (should be localhost-only)",
-    3010: "Remnawave node API (should be localhost-only)",
-    3020: "Remnawave subscription page (should be localhost-only)",
-}
-
-# Paths commonly used by V2Ray/Xray/Trojan proxy transports
-_PROXY_PATHS = ["/ws", "/ray", "/v2ray", "/vmess", "/vless", "/trojan", "/grpc"]
-
-# Control path unlikely to match any real route
-_CONTROL_PATH = "/qz8mf72k"
-
-# Stock nginx error page body length (server_tokens off)
-_NGINX_STOCK_LENGTH = 146
-
-
-# Finding = (is_ok, message) — True means pass, False means warning
-Finding = tuple[bool, str]
-
-
-@dataclass
-class CheckResult:
-    """Result from a single probe check."""
-
-    name: str
-    passed: bool
-    findings: list[Finding] = field(default_factory=list)
-
-
-def _ssl_context() -> ssl.SSLContext:
-    """Create an SSL context that accepts any certificate (censor doesn't validate)."""
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
-
-
-def _https_get(
-    ip: str,
-    path: str,
-    timeout: int = 5,
-    extra_headers: dict[str, str] | None = None,
-    port: int = 443,
-) -> tuple[int, dict[str, str], bytes]:
-    """HTTPS GET to an IP. Returns (status, headers_dict, body).
-
-    Returns (0, {}, b"") on connection failure.
-    """
-    try:
-        conn = http.client.HTTPSConnection(ip, port=port, timeout=timeout, context=_ssl_context())
-        headers = {"Host": ip, "User-Agent": "Mozilla/5.0"}
-        if extra_headers:
-            headers.update(extra_headers)
-        conn.request("GET", path, headers=headers)
-        resp = conn.getresponse()
-        body = resp.read(4096)
-        resp_headers = {k.lower(): v for k, v in resp.getheaders()}
-        status = resp.status
-        conn.close()
-        return status, resp_headers, body
-    except (OSError, http.client.HTTPException):  # Socket, SSL, and HTTP protocol errors
-        return 0, {}, b""
-
-
-def _get_cert_der(ip: str, sni: str, timeout: int = 5) -> bytes:
-    """Connect to ip:443 with given SNI and return the DER-encoded certificate.
-
-    Returns empty bytes on failure.
-    """
-    try:
-        ctx = _ssl_context()
-        with socket.create_connection((ip, 443), timeout=timeout) as sock:
-            with ctx.wrap_socket(sock, server_hostname=sni) as ssock:
-                der = ssock.getpeercert(binary_form=True)
-                return der or b""
-    except (OSError, ssl.SSLError):  # Socket and TLS handshake errors
-        return b""
-
-
-# ---------------------------------------------------------------------------
-# Check 1: Port surface
-# ---------------------------------------------------------------------------
-
-
-def check_ports(ip: str) -> CheckResult:
-    """Scan for ports that reveal proxy infrastructure."""
-    result = CheckResult(name="Port surface", passed=True)
-
-    # Port 443
-    if tcp_connect(ip, 443, timeout=3):
-        result.findings.append((True, "Port 443 is open"))
-    else:
-        result.passed = False
-        result.findings.append((False, "Port 443 is not reachable"))
-
-    # Port 80 — acceptable either way
-    if tcp_connect(ip, 80, timeout=3):
-        result.findings.append((True, "Port 80 is open (normal for web servers)"))
-
-    # Suspicious ports
-    for port, description in _SUSPICIOUS_PORTS.items():
-        if tcp_connect(ip, port, timeout=3):
-            # Verify with HTTPS — middleboxes complete TCP but don't serve real content
-            status, _, _ = _https_get(ip, "/", timeout=3, port=port)
-            if status > 0:
-                result.passed = False
-                result.findings.append((False, f"Port {port} is open ({description})"))
-            else:
-                result.findings.append(
-                    (True, f"Port {port} TCP-reachable but no service detected (network infrastructure)")
-                )
-
-    if result.passed:
-        result.findings.append((True, "No unexpected ports open"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 2: HTTP response
-# ---------------------------------------------------------------------------
-
-
-def check_http_response(ip: str) -> CheckResult:
-    """Check if HTTP responses look like stock nginx."""
-    result = CheckResult(name="HTTP response", passed=True)
-
-    # Root request
-    status, headers, body = _https_get(ip, "/")
-    if status == 0:
-        result.findings.append((True, "Could not connect to HTTPS (skipped)"))
-        return result
-
-    # Check status code
-    if status in (403, 404):
-        result.findings.append((True, f"Root returns {status}"))
-    else:
-        result.passed = False
-        result.findings.append((False, f"Root returns {status} — expected 403 or 404"))
-
-    # Check body length
-    content_length = len(body)
-    if content_length == _NGINX_STOCK_LENGTH:
-        result.findings.append((True, f"Stock nginx error page ({_NGINX_STOCK_LENGTH} bytes)"))
-    elif content_length > 0:
-        body_hash = hashlib.sha256(body).hexdigest()[:12]
-        result.passed = False
-        result.findings.append(
-            (
-                False,
-                f"Custom error page ({content_length} bytes, hash:{body_hash}) — same hash scannable across IPs",
-            )
-        )
-
-    # Check Server header
-    server_header = headers.get("server", "")
-    if server_header == "nginx":
-        result.findings.append((True, "Server: nginx (no version leak)"))
-    elif "/" in server_header:
-        result.passed = False
-        result.findings.append((False, f"Server header leaks version: {server_header}"))
-    elif server_header:
-        result.findings.append((True, f"Server: {server_header}"))
-
-    # Random path — should also return stock response
-    r_status, _, r_body = _https_get(ip, _CONTROL_PATH)
-    if r_status == 404 and len(r_body) == _NGINX_STOCK_LENGTH:
-        result.findings.append((True, "Random path returns stock 404"))
-    elif r_status != 0:
-        result.passed = False
-        if r_status == 404:
-            result.findings.append(
-                (False, f"Random path body is non-standard ({len(r_body)} bytes, expected {_NGINX_STOCK_LENGTH})")
-            )
-        else:
-            result.findings.append((False, f"Random path returns {r_status} — expected 404"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 3: TLS certificate
-# ---------------------------------------------------------------------------
-
-
-def check_tls_certificate(ip: str) -> CheckResult:
-    """Inspect the TLS certificate for information leaks."""
-    result = CheckResult(name="TLS certificate", passed=True)
-
-    # Try openssl for detailed cert inspection
-    cert_text = _get_cert_text_via_openssl(ip)
-    if not cert_text:
-        # Fallback: just check if TLS handshake works
-        der = _get_cert_der(ip, ip)
-        if der:
-            result.findings.append((True, "TLS handshake OK (install openssl for detailed cert analysis)"))
-        else:
-            result.findings.append((True, "TLS handshake failed (skipped)"))
-        return result
-
-    # Parse cert details
-    # Check for domain names in Subject/SAN
-    domain_names: list[str] = []
-    for cert_line in cert_text.splitlines():
-        stripped = cert_line.strip()
-        if stripped.startswith("DNS:"):
-            for part in stripped.split(","):
-                part = part.strip()
-                if part.startswith("DNS:"):
-                    domain_names.append(part[4:])
-        elif "DNS:" in stripped and "Subject Alternative Name" not in stripped:
-            for part in stripped.split(","):
-                part = part.strip()
-                if part.startswith("DNS:"):
-                    domain_names.append(part[4:])
-
-    if domain_names:
-        result.passed = False
-        names = ", ".join(domain_names[:3])
-        result.findings.append(
-            (False, f"Certificate reveals domain(s): {names} — associates this IP with a known domain")
-        )
-    else:
-        result.findings.append((True, "Certificate has no domain names"))
-
-    # Check issuer
-    for cert_line in cert_text.splitlines():
-        if "Issuer:" in cert_line:
-            issuer = cert_line.split("Issuer:", 1)[1].strip()
-            if "Let's Encrypt" in issuer:
-                result.findings.append((True, "Issuer: Let's Encrypt"))
-            elif issuer:
-                result.findings.append((True, f"Issuer: {issuer}"))
-            break
-
-    return result
-
-
-def _get_cert_text_via_openssl(ip: str) -> str:
-    """Get certificate text using openssl subprocess. Returns empty string on failure."""
-    q_ip = shlex.quote(ip)
-    # openssl -connect requires brackets for IPv6: [2001:db8::1]:443
-    connect_host = f"[{ip}]" if ":" in ip else ip
-    q_connect = shlex.quote(f"{connect_host}:443")
-    try:
-        proc = subprocess.run(
-            [
-                "bash",
-                "-c",
-                f"echo | openssl s_client -connect {q_connect} -servername {q_ip} 2>/dev/null"
-                " | openssl x509 -text -noout 2>/dev/null",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            stdin=subprocess.DEVNULL,
-        )
-        return proc.stdout.strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return ""
-
-
-# ---------------------------------------------------------------------------
-# Check 4: SNI consistency
-# ---------------------------------------------------------------------------
-
-
-def _cert_identity(der: bytes) -> str:
-    """Extract subject+issuer identity from DER cert bytes.
-
-    Uses openssl for semantic comparison (handles CDN cert rotation).
-    Falls back to sha256 hex if openssl is unavailable.
-    """
-    try:
-        proc = subprocess.run(
-            ["openssl", "x509", "-inform", "DER", "-noout", "-subject", "-issuer"],
-            input=der,
-            capture_output=True,
-            timeout=5,
-        )
-        if proc.returncode == 0 and proc.stdout.strip():
-            return proc.stdout.strip().decode(errors="replace")
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return hashlib.sha256(der).hexdigest()
-
-
-def check_sni_consistency(ip: str) -> CheckResult:
-    """Test if repeated connections with the same unknown SNI are consistent.
-
-    A Meridian server TCP-proxies unknown SNIs to the Reality dest site.
-    We test consistency by connecting multiple times with the SAME SNI
-    and verifying we get the same certificate each time. Different SNIs
-    may legitimately produce different certs (the dest CDN routes by SNI),
-    so we don't compare across different SNI values.
-    """
-    result = CheckResult(name="SNI consistency", passed=True)
-
-    # Use a single plausible SNI for consistency testing
-    test_sni = "example.com"
-    certs: list[bytes] = []
-
-    for _ in range(3):
-        der = _get_cert_der(ip, test_sni)
-        if der:
-            certs.append(der)
-
-    if len(certs) < 2:
-        result.findings.append((True, "Could not complete SNI probes (skipped)"))
-        return result
-
-    # Compare all certs by identity (subject+issuer), not raw DER bytes.
-    # CDNs return different cert instances from different edge nodes;
-    # same subject+issuer means the routing destination is consistent.
-    identities = [_cert_identity(c) for c in certs]
-    if len(set(identities)) == 1:
-        result.findings.append((True, "SNI routing is consistent (same cert on repeated probes)"))
-    else:
-        result.passed = False
-        unique = len(set(identities))
-        result.findings.append(
-            (
-                False,
-                f"{unique} different certificates across {len(certs)} probes with same SNI — "
-                "routing is inconsistent (expected for relay nodes, investigate for exit servers)",
-            )
-        )
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 5: Proxy path probing
-# ---------------------------------------------------------------------------
-
-
-def check_proxy_paths(ip: str) -> CheckResult:
-    """Probe common proxy transport paths for differential behavior."""
-    result = CheckResult(name="Proxy paths", passed=True)
-
-    # Get baseline from control path
-    ctrl_status, _, ctrl_body = _https_get(ip, _CONTROL_PATH)
-    if ctrl_status == 0:
-        result.findings.append((True, "Could not connect (skipped)"))
-        return result
-
-    anomalies: list[str] = []
-    for path in _PROXY_PATHS:
-        status, _, body = _https_get(ip, path)
-        if status == 101:
-            anomalies.append(f"{path} → 101 Switching Protocols (proxy endpoint)")
-        elif status != ctrl_status:
-            anomalies.append(f"{path} → {status} (other paths return {ctrl_status})")
-        elif len(body) != len(ctrl_body):
-            anomalies.append(f"{path} → responds differently than a random path")
-
-    if anomalies:
-        result.passed = False
-        for a in anomalies:
-            result.findings.append((False, a))
-    else:
-        result.findings.append((True, "All proxy paths behave identically"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 6: WebSocket upgrade
-# ---------------------------------------------------------------------------
-
-
-def check_websocket_upgrade(ip: str) -> CheckResult:
-    """Test if the server accepts WebSocket upgrades (proxy indicator)."""
-    result = CheckResult(name="WebSocket upgrade", passed=True)
-
-    status, _, _ = _https_get(
-        ip,
-        "/",
-        extra_headers={
-            "Upgrade": "websocket",
-            "Connection": "Upgrade",
-            "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==",
-            "Sec-WebSocket-Version": "13",
-        },
-    )
-
-    if status == 0:
-        result.findings.append((True, "Could not connect (skipped)"))
-        return result
-
-    if status == 101:
-        result.passed = False
-        result.findings.append((False, "Server accepts WebSocket upgrade — indicates proxy transport"))
-    else:
-        result.findings.append((True, "WebSocket upgrade rejected"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 7: Reverse DNS
-# ---------------------------------------------------------------------------
-
-
-def check_reverse_dns(ip: str) -> CheckResult:
-    """Check if reverse DNS reveals hosting provider or suspicious PTR records."""
-    result = CheckResult(name="Reverse DNS", passed=True)
-
-    try:
-        hostname, _, _ = socket.gethostbyaddr(ip)
-    except (socket.herror, socket.gaierror, OSError):
-        result.findings.append((True, "No reverse DNS record"))
-        return result
-
-    result.findings.append((True, f"PTR: {hostname}"))
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 8: HTTP/2 support (ALPN)
-# ---------------------------------------------------------------------------
-
-
-def check_http2_support(ip: str) -> CheckResult:
-    """Check if the server negotiates HTTP/2 via ALPN — missing h2 is unusual for modern nginx."""
-    result = CheckResult(name="HTTP/2 support", passed=True)
-
-    try:
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        ctx.set_alpn_protocols(["h2", "http/1.1"])
-        sock = socket.create_connection((ip, 443), timeout=5)
-        ssock = ctx.wrap_socket(sock, server_hostname=ip)
-        alpn = ssock.selected_alpn_protocol()
-        ssock.close()
-    except (OSError, ssl.SSLError):  # Socket and TLS handshake errors
-        result.findings.append((True, "Could not check ALPN (connection failed)"))
-        return result
-
-    if alpn == "h2":
-        result.findings.append((True, "HTTP/2 negotiated"))
-    elif alpn == "http/1.1":
-        result.passed = False
-        result.findings.append((False, "Only HTTP/1.1 — missing h2 is unusual for modern servers"))
-    elif alpn:
-        result.findings.append((True, f"ALPN: {alpn}"))
-    else:
-        result.findings.append((True, "No ALPN negotiated"))
-
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Check 9: Legacy TLS versions
-# ---------------------------------------------------------------------------
-
-
-def check_legacy_tls(ip: str) -> CheckResult:
-    """Check if the server accepts legacy TLS 1.0/1.1 — modern servers should reject them."""
-    result = CheckResult(name="Legacy TLS", passed=True)
-
-    accepted: list[str] = []
-    for proto_name, proto_const in [
-        ("TLS 1.0", ssl.TLSVersion.TLSv1),
-        ("TLS 1.1", ssl.TLSVersion.TLSv1_1),
-    ]:
-        if _tls_version_accepted(ip, proto_const):
-            accepted.append(proto_name)
-
-    if accepted:
-        result.passed = False
-        versions = " + ".join(accepted)
-        result.findings.append((False, f"Accepts {versions} — modern servers reject deprecated TLS versions"))
-    else:
-        result.findings.append((True, "Only TLS 1.2+ accepted"))
-
-    return result
-
-
-def _tls_version_accepted(ip: str, version: ssl.TLSVersion) -> bool:
-    """Test if the server accepts a specific TLS version."""
-    try:
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        ctx.minimum_version = version
-        ctx.maximum_version = version
-        sock = socket.create_connection((ip, 443), timeout=3)
-        ssock = ctx.wrap_socket(sock, server_hostname=ip)
-        ssock.close()
-        return True
-    except (OSError, ssl.SSLError):  # Socket and TLS errors (expected when version rejected)
-        return False
-
-
-def _resolve_domain(domain: str) -> str:
-    """Resolve a domain name to an IP address. Prefers IPv4, falls back to IPv6."""
-    # Try IPv4 first
-    try:
-        results = socket.getaddrinfo(domain, 443, socket.AF_INET, socket.SOCK_STREAM)
-        if results:
-            return str(results[0][4][0])
-    except (socket.gaierror, OSError):
-        pass
-    # Fall back to IPv6
-    try:
-        results = socket.getaddrinfo(domain, 443, socket.AF_INET6, socket.SOCK_STREAM)
-        if results:
-            return str(results[0][4][0])
-    except (socket.gaierror, OSError):
-        pass
-    return ""
-
-
-# ---------------------------------------------------------------------------
-# Deployment-aware checks (tier 2)
-# ---------------------------------------------------------------------------
-
-
-def _compute_internal_ports(ip: str, has_domain: bool) -> dict[str, int]:
-    """Compute Xray internal ports from IP — reuses core port layout."""
-    from meridian.core.deploy_planning import compute_deploy_ports
-
-    dp = compute_deploy_ports(ip)
-    ports: dict[str, int] = {"xhttp": dp.xhttp_port, "wss": dp.wss_port}
-    if has_domain:  # domain mode: Reality moves to localhost port
-        ports["reality"] = dp.reality_port
-    return ports
-
-
-def check_internal_ports(ip: str, has_domain: bool) -> CheckResult:
-    """Verify Xray internal ports are not publicly reachable."""
-    result = CheckResult(name="Internal ports", passed=True)
-    exposed = [f"{n}={p}" for n, p in _compute_internal_ports(ip, has_domain).items() if tcp_connect(ip, p, timeout=3)]
-    if exposed:
-        result.passed = False
-        result.findings.append((False, f"Internal port(s) reachable from outside: {', '.join(exposed)}"))
-    else:
-        result.findings.append((True, "All internal Xray ports are closed externally"))
-    return result
-
-
-def check_root_indistinguishable(ip: str) -> CheckResult:
-    """Verify common paths return stock nginx responses (no service leak)."""
-    result = CheckResult(name="Root indistinguishable", passed=True)
-    probes: list[tuple[str, list[int], str]] = [
-        ("/favicon.ico", [404], "Custom favicon reveals identity"),
-        ("/.env", [403, 404], "Config file path not blocked"),
-        ("/api", [403, 404], "API path proxied to backend"),
-    ]
-    for path, ok_codes, fail_msg in probes:
-        status, _, _ = _https_get(ip, path)
-        if status == 0:
-            continue
-        if status in ok_codes:
-            result.findings.append((True, f"GET {path} → {status}"))
-        else:
-            result.passed = False
-            result.findings.append((False, f"GET {path} → {status} — {fail_msg}"))
-    if not result.findings:
-        result.findings.append((True, "Could not connect (skipped)"))
-    return result
-
-
-def check_domain_root(ip: str, domain: str) -> CheckResult:
-    """Domain-mode: verify Host header and ACME path don't leak."""
-    result = CheckResult(name="Domain root", passed=True)
-    status, _, _ = _https_get(ip, "/", extra_headers={"Host": domain})
-    if status == 0:
-        result.findings.append((True, "Could not connect (skipped)"))
-        return result
-    if status in (403, 404):
-        result.findings.append((True, f"Host: {domain} root → {status}"))
-    else:
-        result.passed = False
-        result.findings.append((False, f"Host: {domain} root → {status} — expected 403/404"))
-    # ACME challenge path should not list directory
-    acme_status, _, acme_body = _https_get(ip, "/.well-known/acme-challenge/", extra_headers={"Host": domain})
-    if acme_status != 0:
-        if b"Index of" in acme_body or b"<pre>" in acme_body:
-            result.passed = False
-            result.findings.append((False, "ACME challenge path exposes directory listing"))
-        else:
-            result.findings.append((True, "ACME challenge path is not listable"))
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Tier 3: Cluster-aware checks (secret path isolation, SNI camouflage)
-# ---------------------------------------------------------------------------
-
-_PANEL_PATHS = ["/admin", "/panel", "/dashboard", "/login", "/api"]
-
-
-def check_secret_paths(ip: str, panel_path: str) -> CheckResult:
-    """Verify secret panel path is not discoverable via differential probing."""
-    result = CheckResult(name="Secret path isolation", passed=True)
-    for probe_path in _PANEL_PATHS:
-        status, _, _ = _https_get(ip, probe_path)
-        if status not in (0, 403, 404):
-            result.passed = False
-            result.findings.append((False, f"GET {probe_path} → {status} (expected 403/404)"))
-    status, _, _ = _https_get(ip, f"/{panel_path}/")
-    if status == 0:
-        result.findings.append((True, "Could not connect (skipped)"))
-    elif status in (200, 301, 302):
-        result.findings.append((True, "Panel accessible via secret path"))
-    else:
-        result.passed = False
-        result.findings.append((False, f"Panel secret path → {status} (expected 200/301/302)"))
-    if not result.findings:
-        result.findings.append((True, "All paths behave correctly"))
-    return result
-
-
-def check_sni_camouflage(ip: str, expected_sni: str) -> CheckResult:
-    """Verify configured SNI returns the camouflage target's certificate."""
-    result = CheckResult(name="SNI camouflage", passed=True)
-    server_cert = _get_cert_der(ip, expected_sni)
-    if not server_cert:
-        result.findings.append((True, f"Could not connect with SNI={expected_sni} (skipped)"))
-        return result
-    direct_cert = _get_cert_der(expected_sni, expected_sni)
-    if not direct_cert:
-        result.findings.append((True, f"Could not connect to {expected_sni} directly (skipped)"))
-        return result
-    if _cert_identity(server_cert) == _cert_identity(direct_cert):
-        result.findings.append((True, f"SNI={expected_sni} returns matching certificate"))
-    else:
-        result.passed = False
-        result.findings.append((False, f"SNI={expected_sni} cert does NOT match direct connection"))
-    return result
-
-
-# ---------------------------------------------------------------------------
-# run()
-# ---------------------------------------------------------------------------
+from meridian.verification import (
+    VerificationHttpsRoute,
+    VerificationTargetError,
+    core_verification_context,
+    normalize_verification_timeout,
+    resolve_deployment_verification_context,
+    resolve_verification_target,
+)
 
 
 def run(
-    ip: str = "",
+    target_value: str = "",
     requested_server: str = "",
+    sni: str = "",
+    timeout: float | str = 5,
 ) -> None:
-    """Probe a server as a censor would — check if the deployment is detectable."""
-    target = ip or requested_server
-    domain = ""
+    """Inspect a public target from the same perspective as an active prober."""
+    operation = OperationContext()
+    with error_context("probe", timer=operation.timer):
+        try:
+            result = collect_probe_result(
+                target_value,
+                requested_server,
+                sni=sni,
+                timeout=timeout,
+            )
+        except MeridianException as exc:
+            fail(exc)
+        except OSError as exc:
+            fail(
+                f"Probe could not access local state or the network: {exc}",
+                hint="Check local file permissions and network access, then retry.",
+                hint_type="system",
+            )
+        except Exception as exc:  # Command boundary: unexpected errors are bugs.
+            fail(f"Probe failed unexpectedly: {exc}", hint_type="bug")
 
-    # Resolve domain to IP if needed
-    if target and not is_ip(target) and not is_local_keyword(target):
-        resolved_ip = _resolve_domain(target)
-        if resolved_ip:
-            domain = target
-            ip = resolved_ip
-        # else: let resolve_server handle it (might be a registry name)
-
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip)
-
-    # Header
-    if domain:
-        label = f"{domain} ({resolved.ip})"
+    if is_json_mode():
+        _emit_json_result(result, operation=operation)
     else:
-        label = resolved.ip
+        _render_result(result)
+    if result.exit_code:
+        raise typer.Exit(result.exit_code)
 
-    err_console.print()
-    err_console.print("  [bold]Censor Probe[/bold]")
-    err_console.print(f"  [dim]Testing what a censor sees when they investigate {label}[/dim]")
-    err_console.print()
 
-    issues = 0
-    checks_run = 0
-
-    # -- Check 1: Port surface --
-    info("Scanning port surface...")
-    port_result = check_ports(resolved.ip)
-    checks_run += 1
-
-    _print_result(port_result)
-    if not port_result.passed:
-        issues += 1
-
-    # -- Check 2: HTTP response --
-    info("Checking HTTP response (IP-based access)...")
-    http_result = check_http_response(resolved.ip)
-    checks_run += 1
-    _print_result(http_result)
-    if not http_result.passed:
-        issues += 1
-
-    # -- Check 3: TLS certificate --
-    info("Inspecting TLS certificate...")
-    cert_result = check_tls_certificate(resolved.ip)
-    checks_run += 1
-    _print_result(cert_result)
-    if not cert_result.passed:
-        issues += 1
-
-    # -- Check 4: SNI consistency --
-    info("Testing SNI consistency...")
-    sni_result = check_sni_consistency(resolved.ip)
-    checks_run += 1
-    _print_result(sni_result)
-    if not sni_result.passed:
-        issues += 1
-
-    # -- Check 5: Proxy paths --
-    info("Probing common proxy paths...")
-    path_result = check_proxy_paths(resolved.ip)
-    checks_run += 1
-    _print_result(path_result)
-    if not path_result.passed:
-        issues += 1
-
-    # -- Check 6: WebSocket upgrade --
-    info("Testing WebSocket upgrade...")
-    ws_result = check_websocket_upgrade(resolved.ip)
-    checks_run += 1
-    _print_result(ws_result)
-    if not ws_result.passed:
-        issues += 1
-
-    # -- Check 7: Reverse DNS --
-    info("Checking reverse DNS...")
-    rdns_result = check_reverse_dns(resolved.ip)
-    checks_run += 1
-    _print_result(rdns_result)
-    if not rdns_result.passed:
-        issues += 1
-
-    # -- Check 8: HTTP/2 support --
-    info("Checking HTTP/2 support...")
-    h2_result = check_http2_support(resolved.ip)
-    checks_run += 1
-    _print_result(h2_result)
-    if not h2_result.passed:
-        issues += 1
-
-    # -- Check 9: Legacy TLS --
-    info("Checking legacy TLS versions...")
-    tls_result = check_legacy_tls(resolved.ip)
-    checks_run += 1
-    _print_result(tls_result)
-    if not tls_result.passed:
-        issues += 1
-
-    # -- Deployment-aware checks (when probed IP matches a configured node) --
-    try:
-        from meridian.cluster import ClusterConfig
-
-        cluster = ClusterConfig.load()
-        node = next((n for n in cluster.nodes if n.ip == resolved.ip), None)
-    except (FileNotFoundError, ValueError):
-        node = None
-        cluster = None  # type: ignore[assignment]
-    except Exception:
-        node = None
-        cluster = None  # type: ignore[assignment]
-
-    if node:
-        err_console.print()
-        err_console.print("  [bold]Deployment checks[/bold]")
-        err_console.print(f"  [dim]Server {resolved.ip} found in cluster config[/dim]")
-        err_console.print()
-
-        has_domain = bool(node.domain)
-
-        # -- Check 10: Internal ports --
-        info("Scanning internal Xray ports...")
-        internal_result = check_internal_ports(resolved.ip, has_domain)
-        checks_run += 1
-        _print_result(internal_result)
-        if not internal_result.passed:
-            issues += 1
-
-        # -- Check 11: Root indistinguishable --
-        info("Checking root path indistinguishability...")
-        root_result = check_root_indistinguishable(resolved.ip)
-        checks_run += 1
-        _print_result(root_result)
-        if not root_result.passed:
-            issues += 1
-
-        # -- Check 12: Domain root (domain mode only) --
-        if has_domain:
-            info(f"Checking domain-mode root ({node.domain})...")
-            domain_result = check_domain_root(resolved.ip, node.domain)
-            checks_run += 1
-            _print_result(domain_result)
-            if not domain_result.passed:
-                issues += 1
-
-        # -- Check 13: Secret path isolation --
-        if cluster and cluster.panel.secret_path:
-            info("Checking secret path isolation...")
-            sp_result = check_secret_paths(resolved.ip, cluster.panel.secret_path)
-            checks_run += 1
-            _print_result(sp_result)
-            if not sp_result.passed:
-                issues += 1
-
-        # -- Check 14: SNI camouflage --
-        if node.sni:
-            info("Checking SNI camouflage...")
-            sc_result = check_sni_camouflage(resolved.ip, node.sni)
-            checks_run += 1
-            _print_result(sc_result)
-            if not sc_result.passed:
-                issues += 1
-
-    # -- Verdict --
-    err_console.print()
-    line()
-    err_console.print()
-
-    if issues == 0:
-        err_console.print(f"  [ok][bold]All {checks_run} checks passed.[/bold][/ok] No obvious proxy indicators found.")
-    else:
-        err_console.print(
-            f"  [warn][bold]{issues} issue(s) found.[/bold][/warn]"
-            " These patterns can help a censor distinguish this server from a regular web server."
+def collect_probe_result(
+    target_value: str,
+    requested_server: str,
+    *,
+    sni: str = "",
+    timeout: float | str = 5,
+    registry: ServerRegistry | None = None,
+    cluster: ClusterConfig | None = None,
+) -> ProbeResult:
+    """Run probe checks and return a reusable typed result."""
+    timeout = normalize_verification_timeout(timeout)
+    registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
+    if sni:
+        try:
+            sni = validate_hostname_value(sni)
+        except ValueError as exc:
+            raise VerificationTargetError(str(exc)) from exc
+    target = resolve_verification_target(
+        target_value,
+        requested_server,
+        registry,
+        allow_domain=True,
+        timeout=timeout,
+    )
+    _cluster, deployment, context_check = resolve_deployment_verification_context(
+        registry,
+        target.ip,
+        cluster=cluster,
+        allow_external_fallback=bool(target_value and not target.local),
+    )
+    if target.domain and target.domain not in deployment.domains:
+        port = deployment.public_tls_ports[0] if deployment.public_tls_ports else 443
+        deployment = replace(
+            deployment,
+            domains=(*deployment.domains, target.domain),
+            domain_ports={**deployment.domain_ports, target.domain: port},
+            https_routes=(
+                *deployment.https_routes,
+                VerificationHttpsRoute(
+                    kind="generic" if deployment.kind == "external" else "managed",
+                    port=port,
+                    tls_sni=target.domain,
+                    host_header=target.domain,
+                ),
+            ),
+            endpoint_addresses=(*deployment.endpoint_addresses, target.domain),
         )
+    checks = run_probe_checks(
+        target.ip,
+        deployment,
+        requested_sni=sni,
+        timeout=timeout,
+    )
+    if context_check is not None:
+        checks.insert(0, context_check)
+    return ProbeResult.from_checks(
+        target=VerificationTarget(
+            requested=target_value or requested_server or target.label,
+            resolved_ip=target.ip,
+            server_ref=requested_server,
+        ),
+        context=core_verification_context(deployment, domain=target.domain, sni=sni),
+        checks=checks,
+    )
+
+
+def _summary_text(result: ProbeResult) -> str:
+    if result.verdict == "passed":
+        return f"All {result.counts.checks} probe checks passed."
+    if result.verdict == "findings":
+        return f"Probe completed with {result.counts.failed} failed and {result.counts.warnings} warning check(s)."
+    return f"Probe was inconclusive: {result.counts.skipped} check(s) could not complete."
+
+
+def _emit_json_result(result: ProbeResult, *, operation: OperationContext) -> None:
+    summary = _summary_text(result)
+    errors = None
+    status: OutputStatus = "ok"
+    if result.verdict == "inconclusive":
+        status = "failed"
+        errors = [
+            MeridianError(
+                code="MERIDIAN_PROBE_INCONCLUSIVE",
+                category="system",
+                message=summary,
+                hint="Retry from a network that can reach every required target.",
+                retryable=True,
+                exit_code=3,
+            )
+        ]
+    emit_json(
+        command_envelope(
+            command="probe",
+            data=result.to_data(),
+            summary=Summary(
+                text=summary,
+                changed=False,
+                counts=result.counts.model_dump(),
+            ),
+            status=status,
+            exit_code=result.exit_code,
+            errors=errors,
+            timer=operation.timer,
+        )
+    )
+
+
+def _render_result(result: ProbeResult) -> None:
+    target = result.target.requested
+    if result.target.resolved_ip and result.target.resolved_ip not in target:
+        target = f"{target} ({result.target.resolved_ip})"
     err_console.print()
-
-
-def _print_result(result: CheckResult) -> None:
-    """Print check result findings using console helpers."""
-    for is_ok, message in result.findings:
-        if is_ok:
-            ok(message)
-        else:
-            warn(message)
+    err_console.print("  [bold]Censor probe[/bold]")
+    mode = "Meridian deployment policy" if result.context.mode == "meridian" else "generic observations"
+    err_console.print(f"  [dim]{escape(redact_string(target))} - {mode}[/dim]")
+    err_console.print()
+    for check in result.checks:
+        marker, style = {
+            "passed": ("+", "green"),
+            "failed": ("x", "red"),
+            "warning": ("!", "yellow"),
+            "skipped": ("-", "dim"),
+        }[check.status]
+        err_console.print(f"  [{style}]{marker}[/{style}] [bold]{escape(check.name)}[/bold]")
+        for finding in check.findings:
+            finding_style = {
+                "passed": "dim",
+                "failed": "red",
+                "warning": "yellow",
+                "skipped": "dim",
+            }[finding.status]
+            message = escape(redact_string(finding.message))
+            err_console.print(f"      [{finding_style}]{message}[/{finding_style}]")
+            if finding.remediation and finding.status in {"failed", "warning", "skipped"}:
+                remediation = escape(redact_string(finding.remediation))
+                err_console.print(f"      [dim]Fix: {remediation}[/dim]")
+    err_console.print()
+    summary = _summary_text(result)
+    style = "green" if result.verdict == "passed" else "red" if result.verdict == "findings" else "yellow"
+    err_console.print(f"  [{style}][bold]{summary}[/bold][/{style}]")
+    err_console.print()

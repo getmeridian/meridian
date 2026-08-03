@@ -378,7 +378,7 @@ class ControlPlaneMixin:
         if response.status_code >= 400:
             raise RemnawaveError(
                 f"Subscription fetch failed ({response.status_code}): {response.text[:200]}",
-                category="system",
+                category="system" if response.status_code == 429 or response.status_code >= 500 else "user",
             )
         url = f"{self._base}{path}"
         return SubscriptionDocument(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -247,6 +248,123 @@ def test_realm_observation_reads_version_before_feature_suffixes() -> None:
     )
 
     assert observation_converges(action, RealmHopDriver(context).observe(action, None))
+
+
+def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock]:
+    plan, action = _realm_plan_and_action()
+    payload = action.resource.payload
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    conn = MagicMock(spec=ServerConnection)
+
+    def get_text(path: str, **_kwargs: object):
+        if path == config_path:
+            return _result(stdout=render_realm_config(payload, ADDRESSES))
+        if path == unit_path:
+            return _result(stdout=render_realm_unit(action.resource.logical_id))
+        raise AssertionError(path)
+
+    def run(command: str, **_kwargs: object):
+        if command.startswith("systemctl is-active"):
+            return _result(stdout="active\n")
+        if command.startswith("ss -H -lnt"):
+            return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
+        if command.startswith("realm --version"):
+            return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
+        raise AssertionError(command)
+
+    conn.get_text.side_effect = get_text
+    conn.run.side_effect = run
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: conn,
+        server_addresses=ADDRESSES,
+    )
+    return RealmHopDriver(context), action, conn
+
+
+def test_realm_missing_configuration_is_confirmed_absent() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.get_text.side_effect = [
+        _result(returncode=1, stderr="cat: config: No such file or directory"),
+        _result(stdout=render_realm_unit(action.resource.logical_id)),
+    ]
+
+    observation = driver.observe(action, None)
+
+    assert observation.exists is False
+
+
+def test_realm_unreadable_configuration_is_unavailable_evidence() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.get_text.side_effect = [
+        _result(returncode=1, stderr="cat: config: Permission denied"),
+        _result(stdout=render_realm_unit(action.resource.logical_id)),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm configuration evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_inactive_service_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(returncode=3, stdout="inactive\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+def test_realm_rejects_systemd_daemon_failure() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(returncode=1, stderr="System has not been booted with systemd"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm service evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_rejects_failed_listener_inspection() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(returncode=127, stderr="ss: command not found"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="TCP listener inspection evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_missing_managed_binary_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(returncode=127, stderr="realm: command not found"),
+    ]
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize("returncode", [124, 255])
+def test_realm_rejects_unavailable_version_evidence(returncode: int) -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(returncode=returncode, stderr="version inspection unavailable"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm version evidence is unavailable"):
+        driver.observe(action, None)
 
 
 def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(

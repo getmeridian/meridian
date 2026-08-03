@@ -8,11 +8,18 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from meridian.cluster import ClusterConfig, NodeEntry
-from meridian.commands.server import run_add
+from meridian.cluster import ClusterConfig, NodeEntry, ResourceAllocation, WorkloadBinding
+from meridian.commands.server import run_add, run_list, run_remove
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
+from meridian.core.topology import (
+    AccessIntent,
+    ControlPlaneIntent,
+    ExitIntent,
+    ProtocolPathIntent,
+    SetupIntent,
+)
 from meridian.servers import SERVER_REGISTRY_SCHEMA, ServerEntry, ServerProfileStore, ServerRegistry
 
 
@@ -52,6 +59,27 @@ class TestServerRegistry:
         assert len(entries) == 1
         assert entries[0].user == "ubuntu"
         assert entries[0].name == "new-name"
+
+    def test_add_rejects_name_collision_on_different_host(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+        original = registry.find("edge")
+
+        with pytest.raises(LocalStateError, match="identity conflicts"):
+            registry.add(ServerEntry("198.51.100.20", "root", "edge"))
+
+        assert registry.find("edge") == original
+        assert registry.find("198.51.100.20") is None
+
+    def test_add_rejects_host_that_matches_another_profile_title(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "198.51.100.20"))
+
+        with pytest.raises(LocalStateError, match="identity conflicts"):
+            registry.add(ServerEntry("198.51.100.20", "root"))
+
+        assert registry.count() == 1
+        assert registry.find("198.51.100.10") is not None
 
     def test_add_persists_custom_ssh_port(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
@@ -157,6 +185,65 @@ class TestServerRegistry:
 
         assert registry.find("edge") is not None
 
+    def test_registry_remove_rejects_v4_topology_reference(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "control"))
+        entry = registry.find("control")
+        assert entry is not None
+        cluster = ClusterConfig(
+            topology_intent=SetupIntent(
+                control=ControlPlaneIntent(server_ref=entry.id),
+                exits=[
+                    ExitIntent(
+                        id="exit-a",
+                        server_ref="srv-exit",
+                        paths=[
+                            ProtocolPathIntent(
+                                id="reality-a",
+                                protocol="reality",
+                                reality_sni="www.example.com",
+                            )
+                        ],
+                    )
+                ],
+                default_egress_ref="exit-a",
+                access=AccessIntent(users=["alice"]),
+            )
+        )
+
+        with pytest.raises(LocalStateError, match="V4 control plane"):
+            registry.remove(entry.id, cluster=cluster)
+
+        assert registry.find(entry.id) is not None
+
+    def test_registry_remove_ignores_inactive_v4_generation_state(self, servers_file: Path) -> None:
+        registry = ServerRegistry(servers_file)
+        registry.add(ServerEntry("198.51.100.10", "root", "retired-edge"))
+        entry = registry.find("retired-edge")
+        assert entry is not None
+        cluster = ClusterConfig(
+            workloads=[
+                WorkloadBinding(
+                    id="exit-a",
+                    generation=1,
+                    active=False,
+                    server_refs=[entry.id],
+                    inbound_uuids={"inbound:exit-a:reality": "inbound-uuid"},
+                )
+            ],
+            allocations={
+                "inbound:exit-a:reality": ResourceAllocation(
+                    logical_id="inbound:exit-a:reality",
+                    server_ref=entry.id,
+                    transport="tcp",
+                    port=10443,
+                )
+            },
+        )
+
+        assert registry.remove(entry.id, cluster=cluster) is True
+        assert registry.find(entry.id) is None
+
     def test_remove_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "s1"))
@@ -228,6 +315,78 @@ def test_server_add_persists_custom_port(servers_file: Path) -> None:
     assert entry.port == 2222
     assert entry.auth_state == "validated"
     assert entry.last_validated_at
+
+
+def test_server_add_rejects_name_retarget_before_ssh(servers_file: Path) -> None:
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.commands.server.ServerConnection") as connection,
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_add("198.51.100.20", name="edge")
+
+    assert exc_info.value.exit_code == 2
+    connection.assert_not_called()
+    assert registry.find("edge").host == "198.51.100.10"
+
+
+def test_server_add_reports_registry_save_failure_after_ssh(servers_file: Path) -> None:
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.commands.server.ServerConnection"),
+        patch("meridian.commands.server.ServerRegistry.add", side_effect=OSError("disk full")),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_add("198.51.100.10", name="edge")
+
+    assert exc_info.value.exit_code == 3
+
+
+def test_server_list_reports_malformed_registry(servers_file: Path) -> None:
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch(
+            "meridian.commands.server.ServerRegistry.list",
+            side_effect=LocalStateCorruptedError("Malformed servers.json"),
+        ),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_list()
+
+    assert exc_info.value.exit_code == 2
+
+
+def test_server_remove_requires_confirmation(servers_file: Path) -> None:
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.commands.server.confirm", return_value=False),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_remove("edge")
+
+    assert exc_info.value.exit_code == 1
+    assert registry.find("edge") is not None
+
+
+def test_server_remove_yes_skips_confirmation(servers_file: Path) -> None:
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry("198.51.100.10", "root", "edge"))
+
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.commands.server.confirm") as mock_confirm,
+        patch("meridian.commands.server.ClusterConfig.load", return_value=ClusterConfig()),
+    ):
+        run_remove("edge", yes=True)
+
+    mock_confirm.assert_not_called()
+    assert registry.find("edge") is None
 
 
 class TestServerProfileStore:

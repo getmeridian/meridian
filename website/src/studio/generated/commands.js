@@ -17,9 +17,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
         "--include-schemas"
@@ -48,19 +49,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -79,9 +73,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "schema name is unknown",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--envelope",
         "--json"
@@ -110,19 +105,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -140,9 +128,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
         "--include-schemas"
@@ -171,19 +160,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -202,9 +184,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "workflow name is unknown",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -232,19 +215,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "preview",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -261,9 +237,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "apply-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -297,20 +274,184 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "preview",
       "statuses": [
         "no_changes",
         "changed",
-        "failed",
-        "cancelled"
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "add",
+        "NAME..."
+      ],
+      "command": "client.add",
+      "data_schema": "client-add",
+      "description": "Add one or more panel clients and return their public identities.",
+      "envelope_schema": "client-add-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "all requested clients were added",
+        "1": "unexpected Meridian bug",
+        "2": "invalid input or client already exists",
+        "3": "partial batch or incomplete page/local-state follow-up, or system/panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "all requested clients were added",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "clients were added with failed requests or incomplete page/local-state follow-up",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "invalid input or client conflict",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "disable",
+        "NAME"
+      ],
+      "command": "client.disable",
+      "data_schema": "client-status",
+      "description": "Disable one managed client; V4 suspension remains temporary until the next apply.",
+      "envelope_schema": "client-disable-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client was disabled",
+        "1": "unexpected Meridian bug",
+        "2": "client not found or input/config error",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client was disabled",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "enable",
+        "NAME"
+      ],
+      "command": "client.enable",
+      "data_schema": "client-status",
+      "description": "Enable one panel client and return its resulting status.",
+      "envelope_schema": "client-enable-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client was enabled",
+        "1": "unexpected Meridian bug",
+        "2": "client not found or input/config error",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client was enabled",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
       ]
     },
     {
@@ -320,7 +461,7 @@ export const commandCatalog = {
       ],
       "command": "client.list",
       "data_schema": "client-list",
-      "description": "List panel clients as redacted metadata plus aggregate status counts.",
+      "description": "List managed access clients as redacted metadata plus aggregate status counts.",
       "envelope_schema": "client-list-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -328,9 +469,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -358,19 +500,74 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
+        "remove",
+        "NAME"
+      ],
+      "command": "client.remove",
+      "data_schema": "client-remove",
+      "description": "Remove one legacy client; V4 managed-user retirement is not yet supported.",
+      "envelope_schema": "client-remove-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client was removed",
+        "1": "unexpected Meridian bug",
+        "2": "client not found or input/config error",
+        "3": "client removed with incomplete local/page cleanup, or system/panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--yes"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client was removed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "client was removed but local state or legacy page cleanup is incomplete",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found or input error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
       ]
     },
     {
@@ -381,37 +578,45 @@ export const commandCatalog = {
       ],
       "command": "client.show",
       "data_schema": "client-show",
-      "description": "Return one panel client and redacted handoff links.",
+      "description": "Return one managed access client and evidenced, redacted handoff links.",
       "envelope_schema": "client-show-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client was found",
         "1": "unexpected Meridian bug",
         "2": "client not found or input/config error",
-        "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "3": "requested page repair or its local evidence save was incomplete, or a system/infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--repair-page"
       ],
       "outcomes": [
         {
           "category": "none",
           "exit_code": 0,
-          "meaning": "client was found",
+          "meaning": "client and available handoff were returned",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "client was returned but page repair or its local evidence save was incomplete",
           "status": "ok"
         },
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "client not found or input error",
           "status": "failed"
         },
         {
           "category": "system",
           "exit_code": 3,
-          "meaning": "system or infrastructure failure",
+          "meaning": "system or panel failure",
           "status": "failed"
         },
         {
@@ -419,19 +624,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -448,9 +646,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
         "--events=jsonl",
@@ -487,20 +686,13 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "preview",
       "statuses": [
         "changed",
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -517,10 +709,11 @@ export const commandCatalog = {
         "0": "inventory was collected; plan --json is the drift/apply authority",
         "1": "unexpected Meridian bug",
         "2": "user/config error",
-        "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "3": "live panel evidence unavailable, or a system/infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -528,13 +721,19 @@ export const commandCatalog = {
         {
           "category": "none",
           "exit_code": 0,
-          "meaning": "inventory was collected",
+          "meaning": "inventory and live status were collected",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "configured inventory was returned but live panel status was unavailable",
           "status": "ok"
         },
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "configuration error",
           "status": "failed"
         },
         {
@@ -548,19 +747,12 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
       ]
     },
     {
@@ -574,13 +766,15 @@ export const commandCatalog = {
       "envelope_schema": "fleet-status-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "fleet status was collected; inspect data.summary.health and warnings for degraded state",
+        "0": "fleet status was collected and health is healthy",
         "1": "unexpected Meridian bug",
         "2": "user/config error",
-        "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "3": "health is unknown, or a system/infrastructure failure prevented collection",
+        "4": "fleet status was collected and health is degraded",
+        "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -588,7 +782,19 @@ export const commandCatalog = {
         {
           "category": "none",
           "exit_code": 0,
-          "meaning": "fleet status was collected",
+          "meaning": "fleet health is healthy",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "fleet health is degraded",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "fleet health is unknown",
           "status": "ok"
         },
         {
@@ -608,19 +814,72 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "stable",
       "statuses": [
         "ok",
-        "failed",
-        "cancelled"
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "node",
+        "list"
+      ],
+      "command": "node.list",
+      "data_schema": "node-list",
+      "description": "List configured nodes with live panel status when available.",
+      "envelope_schema": "node-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "node list was collected",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or panel failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "node list and panel status were collected",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "configured nodes were listed but live panel status was unavailable",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
       ]
     },
     {
@@ -637,9 +896,10 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "changes pending; user/config errors also use category=user in the error envelope",
         "3": "system or infrastructure failure",
-        "130": "cancelled by the user"
+        "130": "process interrupted; no JSON envelope is emitted"
       },
-      "failure_data_schema": "empty-data",
+      "failure_data_schema": "plan-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json"
       ],
@@ -673,20 +933,205 @@ export const commandCatalog = {
           "exit_code": 1,
           "meaning": "unexpected Meridian bug",
           "status": "failed"
-        },
-        {
-          "category": "cancelled",
-          "exit_code": 130,
-          "meaning": "cancelled by the user",
-          "status": "cancelled"
         }
       ],
       "stability": "preview",
       "statuses": [
         "no_changes",
         "changed",
-        "failed",
-        "cancelled"
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "probe",
+        "TARGET"
+      ],
+      "command": "probe",
+      "data_schema": "probe-result",
+      "description": "Inspect a target and return typed fingerprint, exposure, and policy findings.",
+      "envelope_schema": "probe-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "probe completed and every check passed",
+        "1": "unexpected Meridian bug",
+        "2": "user/config error",
+        "3": "system or infrastructure failure, or verification was inconclusive",
+        "4": "probe completed with negative findings",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "probe-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--server",
+        "--sni",
+        "--timeout"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "probe completed and passed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "probe completed with negative findings",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "probe failed or was inconclusive",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "relay",
+        "list"
+      ],
+      "command": "relay.list",
+      "data_schema": "relay-list",
+      "description": "List configured relays with live panel host status when available.",
+      "envelope_schema": "relay-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "relay list was collected",
+        "1": "unexpected Meridian bug",
+        "2": "exit filter or configuration error",
+        "3": "panel host status was unavailable, or a system/panel failure occurred",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--exit"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "relay list and host status were collected",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "relay topology was listed but panel host status was unavailable",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "exit filter or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "test",
+        "TARGET"
+      ],
+      "command": "test",
+      "data_schema": "test-result",
+      "description": "Verify delivered proxy traffic end to end and return evidence-aware protocol findings.",
+      "envelope_schema": "test-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "test completed and every check passed",
+        "1": "unexpected Meridian bug",
+        "2": "user/config error",
+        "3": "system or infrastructure failure, or verification was inconclusive",
+        "4": "test completed with negative findings",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "test-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--server",
+        "--domain",
+        "--sni",
+        "--client",
+        "--basic",
+        "--timeout"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "test completed and passed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "test completed with negative findings",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "test failed or was inconclusive",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
       ]
     }
   ],

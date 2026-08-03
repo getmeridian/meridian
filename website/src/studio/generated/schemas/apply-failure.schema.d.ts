@@ -178,6 +178,6 @@ export interface CompiledApplyPreview {
   resource_count: ResourceCount;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

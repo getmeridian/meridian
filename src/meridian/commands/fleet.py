@@ -10,9 +10,13 @@ import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Literal
 
-from meridian.adapters.cluster import topology_from_cluster
+import typer
+from rich.markup import escape
+
+from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import format_traffic, load_cluster, make_panel
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
+from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetStatus, TopologyRelay
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -77,7 +81,10 @@ def run_inventory() -> None:
 def _run_inventory(*, operation: OperationContext) -> None:
     """Implementation for inventory with command metadata already attached."""
     cluster = load_cluster()
-    topology = topology_from_cluster(cluster)
+    try:
+        topology = topology_from_local_cluster(cluster)
+    except LocalStateError as exc:
+        fail(exc)
     try:
         result = collect_fleet_inventory(
             topology,
@@ -93,6 +100,7 @@ def _run_inventory(*, operation: OperationContext) -> None:
     warnings = result.warnings
     _render_warnings(warnings)
     data = inventory.to_data()
+    exit_code = 3 if warnings else 0
 
     if is_json_mode():
         emit_json(
@@ -109,19 +117,33 @@ def _run_inventory(*, operation: OperationContext) -> None:
                     },
                 ),
                 status="ok",
+                exit_code=exit_code,
                 warnings=warnings,
                 timer=operation.timer,
             )
         )
+        if exit_code:
+            raise typer.Exit(exit_code)
         return
 
     err_console.print()
     status = "[green]healthy[/green]" if inventory.panel.healthy else "[red]UNREACHABLE[/red]"
-    err_console.print(f"  [bold]Panel[/bold]   {inventory.panel.url}  {status}")
+    err_console.print(f"  [bold]Panel[/bold]   {escape(inventory.panel.url)}  {status}")
     if cluster.panel.server_ip:
         err_console.print(
             f"            SSH {cluster.panel.ssh_user}@{cluster.panel.server_ip}:{cluster.panel.ssh_port}"
         )
+
+    err_console.print()
+    err_console.print("  [bold]Servers[/bold]")
+    for server in inventory.servers:
+        roles = ",".join(server.roles)
+        hops = ", ".join(
+            f"{escape(hop.chain)} hop {hop.position}{' (entry)' if hop.advertised else ''}: {hop.health}"
+            for hop in server.relay_hops
+        )
+        suffix = f"  {hops}" if hops else ""
+        err_console.print(f"    {escape(server.ip)}  {escape(server.name) if server.name else '-'}  {roles}{suffix}")
 
     err_console.print()
     err_console.print("  [bold]Nodes[/bold]")
@@ -131,9 +153,10 @@ def _run_inventory(*, operation: OperationContext) -> None:
         desired = (
             "" if display_node.desired is None else "  desired" if display_node.desired else "  [yellow]extra[/yellow]"
         )
-        domain = f"  domain={display_node.domain}" if display_node.domain else ""
+        domain = f"  domain={escape(display_node.domain)}" if display_node.domain else ""
         err_console.print(
-            f"    {display_node.ip}  {display_node.name or '-'}  {display_node.role}  "
+            f"    {escape(display_node.ip)}  {escape(display_node.name) if display_node.name else '-'}  "
+            f"{display_node.role}  "
             f"{display_node.panel_status}{domain}{desired}"
         )
 
@@ -151,7 +174,8 @@ def _run_inventory(*, operation: OperationContext) -> None:
             else "  [yellow]extra[/yellow]"
         )
         err_console.print(
-            f"    {display_relay.ip}  {display_relay.name or '-'}  :{display_relay.port} -> {target}{desired}"
+            f"    {escape(display_relay.ip)}  {escape(display_relay.name) if display_relay.name else '-'}  "
+            f":{display_relay.port} -> {escape(target)}{desired}"
         )
 
     if inventory.summary.desired_nodes or inventory.summary.desired_relays:
@@ -162,6 +186,8 @@ def _run_inventory(*, operation: OperationContext) -> None:
             f"{inventory.summary.pending} pending"
         )
     err_console.print()
+    if exit_code:
+        raise typer.Exit(exit_code)
 
 
 # -- Fleet Status --
@@ -171,66 +197,86 @@ def _render_status(status: FleetStatus) -> None:
     """Render fleet status for humans from the typed core result."""
     err_console.print()
     panel_state = "[green]healthy[/green]" if status.panel.healthy else "[red]UNREACHABLE[/red]"
-    err_console.print(f"  [bold]Panel[/bold]   {status.panel.url} {panel_state}")
+    err_console.print(f"  [bold]Panel[/bold]   {escape(status.panel.url)} {panel_state}")
 
     if status.nodes:
         err_console.print()
         err_console.print("  [bold]Nodes[/bold]")
 
         for node in status.nodes:
-            label = node.name or node.ip
+            label = escape(node.name or node.ip)
             role = "  [dim](panel)[/dim]" if node.is_panel_host else ""
+            if node.role == "routing_gateway":
+                role += "  [dim](routing gateway)[/dim]"
 
             if node.status == "connected":
-                xray = f"  Xray {node.xray_version}" if node.xray_version else ""
+                xray = f"  Xray {escape(node.xray_version)}" if node.xray_version else ""
                 traffic = f"  {format_traffic(node.traffic_bytes)}" if node.traffic_bytes else ""
-                err_console.print(f"    {node.ip}  {label}{role}  [green]connected[/green]{xray}{traffic}")
+                err_console.print(f"    {escape(node.ip)}  {label}{role}  [green]connected[/green]{xray}{traffic}")
             elif node.status == "disabled":
-                err_console.print(f"    {node.ip}  {label}{role}  [dim]disabled[/dim]")
+                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]disabled[/dim]")
             elif node.status == "disconnected":
-                err_console.print(f"    {node.ip}  {label}{role}  [red]DISCONNECTED[/red]")
+                err_console.print(f"    {escape(node.ip)}  {label}{role}  [red]DISCONNECTED[/red]")
             else:
-                err_console.print(f"    {node.ip}  {label}{role}  [dim]unknown[/dim]")
+                err_console.print(f"    {escape(node.ip)}  {label}{role}  [dim]unknown[/dim]")
 
     if status.relays:
         err_console.print()
         err_console.print("  [bold]Relays[/bold]")
 
         for relay in status.relays:
-            label = relay.name or relay.ip
-            target_label = relay.exit_node_name or relay.exit_node_ip
-            if relay.health == "healthy":
-                relay_state = "[green]healthy[/green]"
-            elif relay.health == "unhealthy":
+            label = escape(relay.name or relay.ip)
+            target_label = escape(relay.exit_node_name or relay.exit_node_ip)
+            if relay.healthy is True:
+                relay_state = "[green]reachable[/green] [dim](route unverified)[/dim]"
+            elif relay.healthy is False:
                 relay_state = "[red]UNREACHABLE[/red]"
             else:
                 relay_state = "[dim]unknown[/dim]"
 
-            err_console.print(f"    {relay.ip}  {label} -> {target_label}  relay: {relay_state}")
+            err_console.print(f"    {escape(relay.ip)}  {label} -> {target_label}  listener: {relay_state}")
 
-    if status.summary.users:
+    internal_hops = [(server, hop) for server in status.servers for hop in server.relay_hops if not hop.advertised]
+    if internal_hops:
+        err_console.print()
+        err_console.print("  [bold]Internal relay hops[/bold]")
+        for server, hop in internal_hops:
+            err_console.print(
+                f"    {escape(server.ip)}  {escape(server.name) if server.name else '-'}  "
+                f"{escape(hop.chain)} hop {hop.position}  "
+                "[dim]not externally probed[/dim]"
+            )
+
+    if status.summary.users or status.summary.missing_access_users or status.summary.nonactive_access_users:
         err_console.print()
         parts = [f"{status.summary.active_users} active"]
         if status.summary.disabled_users:
             parts.append(f"{status.summary.disabled_users} disabled")
         if status.summary.other_users:
             parts.append(f"{status.summary.other_users} other")
+        if status.summary.missing_access_users:
+            parts.append(f"{status.summary.missing_access_users} missing")
+        if status.summary.nonactive_access_users:
+            parts.append(f"{status.summary.nonactive_access_users} declared non-active")
         err_console.print(f"  [bold]Users[/bold]   {', '.join(parts)}")
 
     err_console.print()
 
 
-def run_status() -> None:
+def run_status() -> int:
     """Show fleet health overview: panel, nodes, relays, users."""
     operation = OperationContext()
     with error_context("fleet.status", timer=operation.timer):
-        _run_status(operation=operation)
+        return _run_status(operation=operation)
 
 
-def _run_status(*, operation: OperationContext) -> None:
+def _run_status(*, operation: OperationContext) -> int:
     """Implementation for status with command metadata already attached."""
     cluster = load_cluster()
-    topology = topology_from_cluster(cluster)
+    try:
+        topology = topology_from_local_cluster(cluster)
+    except LocalStateError as exc:
+        fail(exc)
     try:
         result = collect_fleet_status(
             topology,
@@ -246,6 +292,7 @@ def _run_status(*, operation: OperationContext) -> None:
     status = result.status
     warnings = result.warnings
     _render_warnings(warnings)
+    exit_code = {"healthy": 0, "degraded": 4, "unknown": 3}[status.summary.health]
 
     if is_json_mode():
         emit_json(
@@ -259,16 +306,22 @@ def _run_status(*, operation: OperationContext) -> None:
                         "nodes": status.summary.nodes,
                         "relays": status.summary.relays,
                         "users": status.summary.users,
+                        "missing_access_users": status.summary.missing_access_users,
+                        "nonactive_access_users": status.summary.nonactive_access_users,
                         "unhealthy_relays": status.summary.unhealthy_relays,
+                        "unknown_relays": status.summary.unknown_relays,
+                        "unknown_relay_hops": status.summary.unknown_relay_hops,
                         "disconnected_nodes": status.summary.disconnected_nodes,
                         "disabled_nodes": status.summary.disabled_nodes,
                         "unknown_nodes": status.summary.unknown_nodes,
                     },
                 ),
+                exit_code=exit_code,
                 warnings=warnings,
                 timer=operation.timer,
             )
         )
-        return
+        return exit_code
 
     _render_status(status)
+    return exit_code

@@ -18,6 +18,7 @@ import typer
 from meridian.cluster import ClusterConfig, NodeEntry, PanelConfig
 from meridian.commands.plan import run as plan_run
 from meridian.console import set_json_mode, set_quiet_mode
+from meridian.core.errors import InfrastructureEvidenceUnavailableError, LocalStateCorruptedError
 from meridian.reconciler.diff import ActionChange, Plan, PlanAction, PlanActionKind
 from meridian.remnawave import RemnawaveAuthError
 
@@ -92,6 +93,24 @@ def _capture_plan_json(plan: Plan) -> tuple[dict, int]:
 
 
 class TestPlanJsonOutput:
+    def test_malformed_cluster_emits_one_typed_envelope(self) -> None:
+        buf = io.StringIO()
+        error = LocalStateCorruptedError("Cannot safely load cluster.yml", hint="Restore a backup.")
+
+        with (
+            patch.object(ClusterConfig, "load", side_effect=error),
+            redirect_stdout(buf),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            plan_run(json_output=True)
+
+        assert exc_info.value.exit_code == 2
+        payload, end = json.JSONDecoder().raw_decode(buf.getvalue())
+        assert not buf.getvalue()[end:].strip()
+        assert payload["command"] == "plan"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "user"
+
     def test_empty_plan_emits_converged_true_and_exit_zero(self) -> None:
         payload, exit_code = _capture_plan_json(Plan(actions=[]))
         assert payload["schema"] == "meridian.output/v1"
@@ -266,3 +285,28 @@ class TestPlanJsonOutput:
         assert payload["status"] == "failed"
         assert payload["errors"][0]["category"] == "user"
         assert "secret-panel" not in json.dumps(payload)
+
+    def test_subscription_observation_failure_is_system_error_json(self) -> None:
+        cluster = _configured_cluster_with_desired()
+        buf = io.StringIO()
+        with (
+            patch.object(ClusterConfig, "load", return_value=cluster),
+            patch("meridian.ssh.ServerConnection"),
+            patch("meridian.remnawave.MeridianPanel"),
+            patch(
+                "meridian.commands.plan.compute_reconciliation_plan",
+                side_effect=InfrastructureEvidenceUnavailableError(
+                    "Could not determine whether the subscription page is running",
+                    hint="Restore SSH access and rerun plan.",
+                ),
+            ),
+            redirect_stdout(buf),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            plan_run(json_output=True)
+
+        payload = json.loads(buf.getvalue())
+        assert exc_info.value.exit_code == 3
+        assert payload["command"] == "plan"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "system"

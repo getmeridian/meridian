@@ -63,9 +63,8 @@ def _stale_shortlived_policy(domain_info: str) -> bool:
 class IssueTLSCert:
     """Issue a real TLS certificate via acme.sh and install it.
 
-    Uses the webroot method against the running nginx. On failure, nginx
-    continues running with a self-signed bootstrap cert — Reality VPN
-    works regardless since it uses its own encryption.
+    Uses the webroot method against the running nginx. The temporary
+    self-signed certificate is never accepted for panel credentials.
     """
 
     name = "Issue TLS certificate"
@@ -86,12 +85,26 @@ class IssueTLSCert:
         server_ip = resolve_ctx(self.server_ip, ctx.ip)
         cert_host = server_ip if self.ip_mode else self.domain
         q_cert_host = shlex.quote(cert_host)
-        profile_flag = " --certificate-profile shortlived" if self.ip_mode else ""
-        renew_days_flag = ""
-        force_flag = ""
+        issue_args = [
+            "/root/.acme.sh/acme.sh",
+            "--issue",
+            "-d",
+            cert_host,
+            "--webroot",
+            "/var/www/acme",
+            "--server",
+            ACME_SERVER,
+        ]
 
         if self.ip_mode:
-            renew_days_flag = f" --days {_SHORTLIVED_IP_CERT_RENEWAL_DAYS}"
+            issue_args.extend(
+                [
+                    "--certificate-profile",
+                    "shortlived",
+                    "--days",
+                    str(_SHORTLIVED_IP_CERT_RENEWAL_DAYS),
+                ]
+            )
             domain_info = _load_acme_domain_info(conn, cert_host)
             if domain_info:
                 # acme.sh defaults to a 30-day renew window, which is wrong
@@ -101,12 +114,10 @@ class IssueTLSCert:
                 # re-run --install-cert so teardown/redeploy can reuse the
                 # existing cached cert without creating a new order.
                 if _stale_shortlived_policy(domain_info):
-                    force_flag = " --force"
+                    issue_args.append("--force")
 
         result = conn.run(
-            f"/root/.acme.sh/acme.sh --issue -d {q_cert_host} "
-            f"--webroot /var/www/acme --server {shlex.quote(ACME_SERVER)}"
-            f"{profile_flag}{renew_days_flag}{force_flag} 2>&1",
+            " ".join(shlex.quote(argument) for argument in issue_args) + " 2>&1",
             timeout=180,
         )
         # acme.sh returns 0 on success, 2 if cert already valid (skip renewal)
@@ -158,15 +169,12 @@ class IssueTLSCert:
                 detail=f"TLS cert issued for {cert_host}",
             )
 
-        # ACME failed — server runs with self-signed cert.
-        # Reality VPN works regardless (own encryption), but connection
-        # pages will show browser cert warnings until resolved.
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown ACME error"
         return StepResult(
             name=self.name,
-            status="changed",
+            status="failed",
             detail=(
-                f"WARNING: TLS cert failed for {cert_host} — using self-signed. "
-                "Connection pages will show cert warnings. "
-                "Check port 80 is open and domain resolves correctly"
+                f"Failed to issue a trusted TLS certificate for {cert_host}: {detail[:200]}. "
+                "Check port 80, DNS, and ACME reachability; panel credentials are not sent over self-signed TLS."
             ),
         )

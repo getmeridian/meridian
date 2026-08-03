@@ -7,11 +7,26 @@ import re
 
 from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
 from meridian.core.topology import (
+    AccessIntent,
     ExitIntent,
     ProtocolPathIntent,
     SetupIntent,
     TransparentRelayIntent,
 )
+
+
+def add_access_users_to_intent(intent: SetupIntent, usernames: list[str]) -> SetupIntent:
+    """Return validated intent with new access users in stable request order."""
+    existing = set(intent.access.users)
+    duplicates = [username for username in usernames if username in existing]
+    if duplicates:
+        raise ValueError("Access users already exist in V4 topology: " + ", ".join(duplicates))
+    payload = intent.model_dump(mode="json")
+    payload["access"] = AccessIntent(
+        squad_name=intent.access.squad_name,
+        users=[*intent.access.users, *usernames],
+    ).model_dump(mode="json")
+    return SetupIntent.model_validate(payload)
 
 
 def add_exit_to_intent(

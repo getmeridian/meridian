@@ -10,6 +10,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind, _node_changes, compute_plan
 from meridian.reconciler.display import print_plan
 from meridian.reconciler.executor import ActionResult, ExecutionResult, execute_plan
@@ -863,8 +865,9 @@ class TestBuildActualState:
         actual = build_actual_state(cluster, panel, panel_conn=conn)
         assert actual.subscription_page_running is True
 
-    def test_subscription_page_ssh_failure_fallback(self) -> None:
+    def test_subscription_page_ssh_failure_is_unavailable_evidence(self) -> None:
         from meridian.cluster import SubscriptionPageConfig
+        from meridian.core.errors import InfrastructureEvidenceUnavailableError
         from meridian.ssh import ServerConnection
 
         cluster = _make_cluster(
@@ -873,6 +876,54 @@ class TestBuildActualState:
         panel = _mock_panel()
         conn = MagicMock(spec=ServerConnection)
         conn.run.side_effect = OSError("SSH connection refused")
-        actual = build_actual_state(cluster, panel, panel_conn=conn)
-        # Fallback to deployed flag
-        assert actual.subscription_page_running is True
+
+        with pytest.raises(InfrastructureEvidenceUnavailableError):
+            build_actual_state(cluster, panel, panel_conn=conn)
+
+    @pytest.mark.parametrize("returncode", [124, 127, 255])
+    def test_subscription_page_execution_failure_is_unavailable_evidence(self, returncode: int) -> None:
+        from meridian.cluster import SubscriptionPageConfig
+        from meridian.core.errors import InfrastructureEvidenceUnavailableError
+        from meridian.ssh import ServerConnection
+
+        cluster = _make_cluster(
+            subscription_page=SubscriptionPageConfig(enabled=True, deployed=False),
+        )
+        panel = _mock_panel()
+        conn = MagicMock(spec=ServerConnection)
+        conn.run.return_value = _ns(returncode=returncode, stdout="", stderr="inspection unavailable")
+
+        with pytest.raises(InfrastructureEvidenceUnavailableError):
+            build_actual_state(cluster, panel, panel_conn=conn)
+
+    def test_subscription_page_missing_object_is_confirmed_absent(self) -> None:
+        from meridian.cluster import SubscriptionPageConfig
+        from meridian.ssh import ServerConnection
+
+        cluster = _make_cluster(subscription_page=SubscriptionPageConfig(enabled=True, deployed=True))
+        conn = MagicMock(spec=ServerConnection)
+        conn.run.return_value = _ns(
+            returncode=1,
+            stdout="Error: No such object: remnawave-subscription-page\n",
+            stderr="",
+        )
+
+        actual = build_actual_state(cluster, _mock_panel(), panel_conn=conn)
+
+        assert actual.subscription_page_running is False
+
+    def test_subscription_page_ambiguous_docker_error_is_unavailable_evidence(self) -> None:
+        from meridian.cluster import SubscriptionPageConfig
+        from meridian.core.errors import InfrastructureEvidenceUnavailableError
+        from meridian.ssh import ServerConnection
+
+        cluster = _make_cluster(subscription_page=SubscriptionPageConfig(enabled=True, deployed=True))
+        conn = MagicMock(spec=ServerConnection)
+        conn.run.return_value = _ns(
+            returncode=1,
+            stdout="permission denied while connecting to the Docker daemon socket\n",
+            stderr="",
+        )
+
+        with pytest.raises(InfrastructureEvidenceUnavailableError):
+            build_actual_state(cluster, _mock_panel(), panel_conn=conn)

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from meridian.core.errors import InfrastructureEvidenceUnavailableError
+
 
 @dataclass
 class DesiredNodeState:
@@ -237,8 +239,8 @@ def build_actual_state(
         for r in cluster.relays
     ]
 
-    # Subscription page: check live container status via SSH when possible,
-    # fall back to the deployment flag when SSH is not available or fails.
+    # Subscription page: use live SSH evidence when a connection is available;
+    # only fall back to saved state when no live observation was attempted.
     sub_running = False
     ssh_checked = False
     if panel_conn is not None:
@@ -247,14 +249,23 @@ def build_actual_state(
         if isinstance(panel_conn, ServerConnection):
             try:
                 result = panel_conn.run(
-                    "docker inspect -f '{{.State.Running}}' remnawave-subscription-page 2>/dev/null",
+                    "docker inspect -f '{{.State.Running}}' remnawave-subscription-page 2>&1",
                     timeout=15,
                 )
+                output = f"{result.stdout}\n{result.stderr}".lower()
+                confirmed_absent = result.returncode == 1 and "no such object" in output
+                if result.returncode != 0 and not confirmed_absent:
+                    raise InfrastructureEvidenceUnavailableError(
+                        "Could not determine whether the subscription page is running",
+                        hint="Restore SSH and Docker inspection access to the panel server, then rerun plan.",
+                    )
                 sub_running = result.returncode == 0 and result.stdout.strip() == "true"
                 ssh_checked = True
-            except (OSError, RuntimeError):
-                # SSH failure (auth, connectivity, timeout) — fall back to flag
-                pass
+            except (OSError, RuntimeError) as exc:
+                raise InfrastructureEvidenceUnavailableError(
+                    "Could not determine whether the subscription page is running",
+                    hint="Restore SSH and Docker inspection access to the panel server, then rerun plan.",
+                ) from exc
     if not ssh_checked:
         # Fallback: trust the deployment flag from cluster.yml
         sub_page = cluster.subscription_page

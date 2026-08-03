@@ -29,6 +29,7 @@ export type FailureData = {
   [k: string]: unknown;
 } | null;
 export type FailureDataSchema = string;
+export type InterruptBehavior = "exit_130_without_envelope";
 export type MachineFlags = string[];
 export type Category = ("user" | "system" | "bug" | "cancelled") | "none";
 export type ExitCode = number;
@@ -69,7 +70,7 @@ export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status2 = "failed" | "cancelled";
+export type Status2 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _ApiCommandsSuccessEnvelope {
@@ -108,6 +109,7 @@ export interface CommandCatalogEntry {
   exit_codes: ExitCodes;
   failure_data?: FailureData;
   failure_data_schema: FailureDataSchema;
+  interrupt_behavior?: InterruptBehavior;
   machine_flags: MachineFlags;
   outcomes: Outcomes;
   stability: Stability;
@@ -170,6 +172,6 @@ export interface _ApiCommandsTerminalEnvelope {
   warnings: Warnings1;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

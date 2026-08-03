@@ -7,6 +7,7 @@ No CLI interaction (prompts, Rich tables) — those stay in commands/.
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import shlex
 from dataclasses import dataclass
@@ -51,6 +52,11 @@ def panel_base_url(ip: str, domain: str, secret_path: str) -> str:
     Once nginx is up, we use https://<host>/<secret_path>.
     """
     host = domain or ip
+    try:
+        if ipaddress.ip_address(host).version == 6:
+            host = f"[{host}]"
+    except ValueError:
+        pass
     return f"https://{host}/{secret_path}/"
 
 
@@ -77,7 +83,7 @@ def create_api_token(base_url: str, auth_token: str) -> str:
             "X-Remnawave-Client-Type": "browser",
         },
         timeout=30,
-        verify=False,
+        verify=True,
     )
     if resp.status_code not in (200, 201):
         raise PanelSetupError(
@@ -124,7 +130,7 @@ def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) 
         resp = httpx.get(
             f"{base_url.rstrip('/')}/api/auth/login",
             timeout=10,
-            verify=False,  # Self-signed cert during bootstrap
+            verify=True,
         )
         # Any response (even 405 Method Not Allowed) means the API is up
         return resp.status_code < 500

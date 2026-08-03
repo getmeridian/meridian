@@ -141,13 +141,11 @@ class ConfigProfileDriver:
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
         payload = _payload(action, ConfigProfilePayload)
+        profile = _bound_or_named_profile(self.context, payload, binding)
+        if profile is None:
+            return ResourceObservation(exists=False)
         server_ref = _profile_server_ref(self.context, payload)
-        workload = self.context.workloads.ensure(
-            payload,
-            generation=action.generation,
-            desired_hash=action.expected_hash,
-            server_ref=server_ref,
-        )
+        workload = self.context.workloads.require(payload.workload_id, action.generation)
         expected_config = render_workload_config(
             payload,
             reality_keys=workload.reality_keys.get(server_ref),
@@ -157,9 +155,6 @@ class ConfigProfileDriver:
                 action.generation,
             ),
         )
-        profile = _bound_or_named_profile(self.context, payload, binding)
-        if profile is None:
-            return ResourceObservation(exists=False)
         matches = profile.name == payload.name and profile.config == expected_config
         owned = binding is not None or self.context.was_managed(action.resource.logical_id, profile.uuid)
         if profile.uuid and (matches or owned):
@@ -177,7 +172,12 @@ class ConfigProfileDriver:
     ) -> ResourceApplyReceipt:
         payload = _payload(action, ConfigProfilePayload)
         server_ref = _profile_server_ref(self.context, payload)
-        workload = self.context.workloads.require(payload.workload_id, action.generation)
+        workload = self.context.workloads.ensure(
+            payload,
+            generation=action.generation,
+            desired_hash=action.expected_hash,
+            server_ref=server_ref,
+        )
         expected_config = render_workload_config(
             payload,
             reality_keys=workload.reality_keys.get(server_ref),

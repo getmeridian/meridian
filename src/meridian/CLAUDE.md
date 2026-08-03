@@ -17,11 +17,12 @@
 - **Forward-compatible YAML** — `_extra` dict in ClusterConfig preserves unknown YAML keys for forward-compat only. Reconciler state lives in typed `applied_state`; v4.0 top-level `desired_*_applied` keys migrate into it on load. Never store load-bearing runtime state in `_extra`.
 - **Single source of state** — No split-brain. Remnawave DB is authoritative for users. cluster.yml is authoritative for deployment topology. No sync needed.
 - **Relay = Host** — Relays map to Remnawave Host entries. Enable/disable host → subscriptions auto-adapt.
-- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup orchestration (first deploy, redeploy, new node workflows). `node_deploy.py` owns node container deployment, host creation, panel API helpers, and inbound caching. `relay_ops.py` owns relay infrastructure. `resolve.py` owns `ResolvedServer`, `ensure_server_connection`, and pure resolution helpers; `commands/resolve.py` adds CLI prompts and rendering. Library modules import from `meridian.resolve`, never from `commands/`. Applied-state snapshots and hybrid imperative-declarative sync live in `reconciler/snapshots.py`. `cluster_persistence.py` owns YAML serialization/deserialization; `cluster.py` keeps the data model, validation, and query methods. `diagnostics/` owns reusable server health checks (disk, container, port, TLS, firewall) returning `CheckResult`; commands own rendering.
+- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup orchestration (first deploy, redeploy, new node workflows). `node_deploy.py` owns node container deployment, host creation, panel API helpers, and inbound caching. `relay_ops.py` owns relay infrastructure. `resolve.py` owns `ResolvedServer`, `ensure_server_connection`, and pure resolution helpers; `commands/resolve.py` adds CLI prompts and rendering. Library modules import from `meridian.resolve`, never from `commands/`. Applied-state snapshots and hybrid imperative-declarative sync live in `reconciler/snapshots.py`. `cluster_persistence.py` owns YAML serialization/deserialization; `cluster.py` keeps the data model, validation, and query methods. `diagnostics/` owns reusable SSH health and client-side verification checks; commands own rendering.
 - **Architecture tests** — `tests/test_architecture.py` enforces layer boundaries, file size budget, private import bans, commands/resolve import ban for library modules, and contract drift checks at CI time.
-
+- **Read-only V4 fleet projection** — `adapters/cluster.py` resolves saved server IDs into control, exit, and advertised relay endpoint views without mutating persisted state.
 ## Pitfalls
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files require recovery, and generated `srv-*` IDs survive connection edits.
+- **Topology deletion is last** — node, relay, and teardown operations retain registry/topology state until every required API and SSH cleanup succeeds or is confirmed already absent.
 - **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path values before nginx, Xray, or Remnawave serialization.
 - **Published Hosts are assertions** — reconcile complete protocol fields against public listeners; observation or mutation failure must stop apply.
 - **Shell injection**: ALL `conn.run()` interpolated values MUST use `shlex.quote()`.
@@ -34,4 +35,6 @@
 - **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients.
 - **Hysteria2 naming boundary** — external keys and URLs use `hysteria2`; Remnawave profiles require protocol/network `hysteria` plus version `2`.
 - **Remnawave 2.8 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token.
-- **Xray client cache is a unit** — stage the executable, `geoip.dat`, and `geosite.dat` together, then publish the version marker last.
+- **Xray runtime and config failures differ** — keep the executable/assets atomic and validate canonical configs with `run -test`; malformed delivery fails, while local runtime absence is inconclusive.
+- **Xray downloads are checksum-verified** — a missing, malformed, or mismatched release SHA2-256 sidecar makes connection verification inconclusive; never execute that archive.
+- **Fleet role contracts are finite** — do not project routing gateways as exits or source-restricted internal relay hops as public endpoints.

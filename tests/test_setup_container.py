@@ -602,10 +602,10 @@ class TestCheckPanelApiReady:
     @patch("meridian.health.time.sleep")
     @patch("meridian.health.time.monotonic")
     @patch("httpx.get")
-    def test_passes_verify_false_and_timeout(
+    def test_requires_verified_tls_and_passes_timeout(
         self, mock_get: MagicMock, mock_mono: MagicMock, mock_sleep: MagicMock
     ) -> None:
-        """Ensure httpx.get is called with verify=False and timeout=10."""
+        """Ensure readiness never accepts the self-signed bootstrap certificate."""
         mock_mono.return_value = 0.0
         resp = MagicMock()
         resp.status_code = 200
@@ -614,7 +614,7 @@ class TestCheckPanelApiReady:
         mock_get.assert_called_once_with(
             "https://198.51.100.3/api/auth/login",
             timeout=10,
-            verify=False,
+            verify=True,
         )
 
 

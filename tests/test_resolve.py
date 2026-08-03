@@ -8,10 +8,14 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, NodeEntry, RelayEntry
-from meridian.commands.resolve import resolve_server
+from meridian.commands.resolve import resolve_server, try_resolve_server
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
 from meridian.resolve import is_local_keyword
 from meridian.servers import ServerEntry, ServerProfileStore, ServerRegistry
+
+
+def test_try_resolve_returns_none_for_cli_exit(servers_file: Path) -> None:
+    assert try_resolve_server(ServerRegistry(servers_file)) is None
 
 
 class TestExplicitIP:

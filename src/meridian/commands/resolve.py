@@ -7,9 +7,13 @@ prompts, or ``console.fail()``.
 
 from __future__ import annotations
 
+import typer
+from rich.markup import escape
+
 from meridian import resolve as _resolve_lib
 from meridian.config import is_ip
 from meridian.console import err_console, fail, info
+from meridian.core.errors import LocalStateError
 from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
@@ -25,7 +29,7 @@ __all__ = [
 ]
 
 
-def resolve_server(
+def _resolve_server(
     registry: ServerRegistry,
     requested_server: str = "",
     explicit_ip: str = "",
@@ -123,7 +127,9 @@ def resolve_server(
                 err_console.print("\n  Multiple servers. Use [bold]--server NAME[/bold]:\n")
                 for entry in selectable_entries:
                     label = entry.name or entry.host
-                    err_console.print(f"    [info]{label:<15s}[/info]  {entry.host}  ({entry.user})")
+                    err_console.print(
+                        f"    [info]{escape(label):<15s}[/info]  {escape(entry.host)}  ({escape(entry.user)})"
+                    )
                 err_console.print()
                 fail(
                     "Specify a server with --server",
@@ -165,6 +171,26 @@ def resolve_server(
     )
 
 
+def resolve_server(
+    registry: ServerRegistry,
+    requested_server: str = "",
+    explicit_ip: str = "",
+    user: str = "",
+    port: int = 0,
+) -> ResolvedServer:
+    """Resolve a target and render unsafe local-state failures consistently."""
+    try:
+        return _resolve_server(
+            registry,
+            requested_server=requested_server,
+            explicit_ip=explicit_ip,
+            user=user,
+            port=port,
+        )
+    except LocalStateError as exc:
+        fail(exc)
+
+
 def try_resolve_server(
     registry: ServerRegistry,
     requested_server: str = "",
@@ -173,8 +199,10 @@ def try_resolve_server(
 ) -> ResolvedServer | None:
     """Like resolve_server but returns None instead of exiting on failure."""
     try:
-        return resolve_server(registry, requested_server=requested_server, explicit_ip=explicit_ip, user=user)
-    except SystemExit:
+        return _resolve_server(registry, requested_server=requested_server, explicit_ip=explicit_ip, user=user)
+    except LocalStateError as exc:
+        fail(exc)
+    except (SystemExit, typer.Exit):
         return None
 
 

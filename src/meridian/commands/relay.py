@@ -11,21 +11,35 @@ import re
 import shlex
 
 import typer
+from rich.markup import escape
 
+from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.cluster import ClusterConfig, RelayEntry
-from meridian.commands._helpers import load_cluster, make_panel
+from meridian.commands._helpers import (
+    load_cluster,
+    make_panel,
+    persist_reviewed_apply,
+    remote_mutation_persistence,
+    reviewed_apply_persistence,
+)
 from meridian.commands._validation import validate_command_input
+from meridian.commands.relay_rendering import render_relay_deployment_plan, render_relay_deployment_success
 from meridian.config import RELAY_SERVICE_NAME
-from meridian.console import confirm, err_console, fail, info, line, ok, warn
+from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
-from meridian.core.models import Summary
+from meridian.core.errors import LocalStateError
+from meridian.core.errors import MeridianError as MeridianException
+from meridian.core.fleet import build_relay_list_result
+from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.diagnostics import command_evidence_unavailable
 from meridian.relay_ops import (
     create_relay_hosts,
     delete_relay_hosts,
     deploy_relay_nginx,
     find_exit_node,
     remove_relay_nginx,
+    stop_relay_service,
 )
 from meridian.remnawave import RemnawaveError
 from meridian.ssh import ServerConnection, SSHError
@@ -104,7 +118,9 @@ def run_deploy(
     ok("SSH OK")
 
     # Check if relay port is already in use
-    port_check = relay_conn.run(f"ss -tlnp sport = :{request.listen_port} 2>/dev/null", timeout=10)
+    q_listen_port = shlex.quote(str(request.listen_port))
+    port_check = relay_conn.run(f"ss -tlnp sport = :{q_listen_port} 2>/dev/null", timeout=10)
+    replace_existing_realm = False
     if port_check.returncode == 0 and f":{request.listen_port}" in port_check.stdout:
         # Extract process name
         process_name = process_info = ""
@@ -115,10 +131,8 @@ def run_deploy(
                 process_name = m.group(1) if m else ""
                 break
         if process_name == "realm":
-            warn(f"Previous relay service found on port {request.listen_port} -- stopping it")
-            relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
-            relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
-            ok("Previous relay service stopped")
+            replace_existing_realm = True
+            warn(f"Previous relay service found on port {request.listen_port}; this deploy will replace it")
         else:
             msg = f"Port {request.listen_port} is already in use"
             if process_info:
@@ -161,24 +175,20 @@ def run_deploy(
             fail("Could not find a relay-local SNI target", hint="Pass --sni explicitly.", hint_type="system")
         err_console.print()
 
-    # Deployment summary
-    from rich.panel import Panel
-
-    from meridian.config import REALM_VERSION
-
-    summary = (
-        f"Relay:  {request.user}@{request.relay_ip}:{request.listen_port}  |  Exit: {exit_ip}:443\n"
-        f"Engine: Realm v{REALM_VERSION}  |  Name: {request.relay_name or '(auto)'}  |  SNI: {relay_sni}\n\n"
-        f"  Client -> {request.relay_ip}:{request.listen_port} -> {exit_ip}:443 -> Internet\n"
-        f"  Encryption: end-to-end (relay cannot read content)"
-    )
-    err_console.print()
-    err_console.print(Panel(summary, title="[bold]Relay deployment plan[/bold]", border_style="cyan", padding=(0, 2)))
-    err_console.print()
+    render_relay_deployment_plan(request, exit_ip=exit_ip, relay_sni=relay_sni)
 
     if not request.yes:
         if not confirm(f"Deploy relay to {request.user}@{request.relay_ip}?"):
             raise typer.Exit(1)
+
+    if replace_existing_realm:
+        if not stop_relay_service(relay_conn):
+            fail(
+                "Could not stop the previous relay service",
+                hint="The existing relay was left in place. Fix systemd access and retry.",
+                hint_type="system",
+            )
+        ok("Previous relay service stopped")
 
     # Run relay provisioner (Realm install -- panel-agnostic)
     from meridian.provision.progress import RichStepRenderer
@@ -207,14 +217,21 @@ def run_deploy(
     panel = make_panel(cluster)
     with panel:
         info("Creating relay host entries in panel...")
-        host_uuids = create_relay_hosts(
-            panel,
-            cluster,
-            request.relay_ip,
-            request.listen_port,
-            relay_sni,
-            request.relay_name,
-        )
+        try:
+            host_uuids = create_relay_hosts(
+                panel,
+                cluster,
+                request.relay_ip,
+                request.listen_port,
+                relay_sni,
+                request.relay_name,
+            )
+        except RemnawaveError as exc:
+            fail(
+                "Relay host reconciliation failed after Realm was deployed remotely",
+                hint=f"{exc} Remote relay state changed; repair panel hosts, then retry deployment.",
+                hint_type="system",
+            )
 
         # Enforce safest-first ordering after adding relay hosts
         from meridian.node_deploy import enforce_host_ordering
@@ -253,34 +270,21 @@ def run_deploy(
         ssh_user=request.user,
         ssh_port=request.ssh_port,
     )
-    cluster.backup()
-    cluster.relays.append(relay_entry)
-    cluster.save()
+    with remote_mutation_persistence(f"Relay {request.relay_ip} was deployed remotely"):
+        cluster.backup()
+        cluster.relays.append(relay_entry)
+        cluster.save()
 
-    # Hybrid sync — mirror the relay into desired_relays when the user manages
-    # relays declaratively. Use the exit node's name when available so the
-    # desired entry stays human-readable; fall back to the IP otherwise.
-    from meridian.reconciler.snapshots import hybrid_sync_desired_relays_add
+        # Mirror into desired_relays when that legacy list is managed.
+        from meridian.reconciler.snapshots import hybrid_sync_desired_relays_add
 
-    exit_node_for_sync = cluster.find_node(exit_ip)
-    exit_ref = exit_node_for_sync.name if exit_node_for_sync and exit_node_for_sync.name else exit_ip
-    hybrid_sync_desired_relays_add(cluster, relay_entry, exit_node_ref=exit_ref)
+        exit_node_for_sync = cluster.find_node(exit_ip)
+        exit_ref = exit_node_for_sync.name if exit_node_for_sync and exit_node_for_sync.name else exit_ip
+        hybrid_sync_desired_relays_add(cluster, relay_entry, exit_node_ref=exit_ref)
 
     ok("Relay saved to cluster")
 
-    # Success output
-    err_console.print()
-    ok(f"Relay {request.relay_ip} forwarding to exit {exit_ip}")
-    relay_route = f"Client -> {request.relay_ip}:{request.listen_port} (domestic) -> {exit_ip}:443 (abroad) -> Internet"
-    err_console.print(f"  [dim]{relay_route}[/dim]")
-    err_console.print("  [dim]Subscriptions auto-update -- clients get relay URLs on next sync.[/dim]")
-    err_console.print()
-    err_console.print("  [bold]Next steps:[/bold]")
-    err_console.print("    meridian client add alice          [dim]# relay URLs included[/dim]")
-    err_console.print(f"    meridian relay check {request.relay_ip}    [dim]# verify relay health[/dim]")
-    err_console.print("    meridian relay list                [dim]# list all relays[/dim]")
-    err_console.print()
-    line()
+    render_relay_deployment_success(request, exit_ip=exit_ip)
 
 
 def _run_deploy_v4(
@@ -298,16 +302,19 @@ def _run_deploy_v4(
         raise RuntimeError("V4 topology intent is missing")
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     exit_ref = ""
-    for exit_ in intent.exits:
-        entry = registry.find(exit_.server_ref)
-        selectors = {
-            exit_.id,
-            exit_.server_ref,
-            *({entry.host, entry.name} if entry is not None else set()),
-        }
-        if request.exit_arg in selectors:
-            exit_ref = exit_.id
-            break
+    try:
+        for exit_ in intent.exits:
+            entry = registry.find(exit_.server_ref)
+            selectors = {
+                exit_.id,
+                exit_.server_ref,
+                *({entry.host, entry.name} if entry is not None else set()),
+            }
+            if request.exit_arg in selectors:
+                exit_ref = exit_.id
+                break
+    except LocalStateError as exc:
+        fail(exc)
     if not exit_ref:
         fail(
             f"Exit {request.exit_arg!r} was not found in V4 topology.",
@@ -326,16 +333,28 @@ def _run_deploy_v4(
         connection.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
         fail(str(exc), hint=exc.hint, hint_type=exc.category)
-    registry.add(
-        ServerEntry(
-            host=request.relay_ip,
-            user=request.user,
-            name=request.relay_name or request.relay_ip,
-            port=request.ssh_port,
-            auth_state="validated",
+    try:
+        registry.add(
+            ServerEntry(
+                host=request.relay_ip,
+                user=request.user,
+                name=request.relay_name or request.relay_ip,
+                port=request.ssh_port,
+                auth_state="validated",
+            )
         )
-    )
-    entry = registry.find(request.relay_ip)
+    except LocalStateError as exc:
+        fail(exc)
+    except OSError as exc:
+        fail(
+            f"Could not save the V4 relay server profile: {exc}",
+            hint="Check ~/.meridian permissions and disk space, then retry.",
+            hint_type="system",
+        )
+    try:
+        entry = registry.find(request.relay_ip)
+    except LocalStateError as exc:
+        fail(exc)
     if entry is None:
         raise RuntimeError("Validated relay server was not saved")
     updated = add_relay_to_intent(
@@ -346,10 +365,15 @@ def _run_deploy_v4(
         listen_port=request.listen_port,
         reality_sni=request.sni,
     )
-    result = SetupRuntime(
-        registry,
-        cluster_loader=lambda: cluster,
-    ).apply_intent(updated)
+    try:
+        with reviewed_apply_persistence("V4 relay apply"):
+            result = SetupRuntime(
+                registry,
+                cluster_loader=lambda: cluster,
+                persist=persist_reviewed_apply,
+            ).apply_intent(updated)
+    except MeridianException as exc:
+        fail(exc)
     if not result.all_succeeded:
         failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
         fail(
@@ -362,20 +386,18 @@ def _run_deploy_v4(
 
 def run_list(
     exit_arg: str = "",
-    user: str = "",
 ) -> None:
     """List relay nodes from cluster configuration."""
     from meridian.console import error_context
 
     operation = OperationContext()
     with error_context("relay.list", timer=operation.timer):
-        _run_list(exit_arg=exit_arg, user=user, operation=operation)
+        _run_list(exit_arg=exit_arg, operation=operation)
 
 
 def _run_list(
     *,
     exit_arg: str = "",
-    user: str = "",
     operation: OperationContext,
 ) -> None:
     """Implementation for relay list with command metadata attached."""
@@ -383,65 +405,83 @@ def _run_list(
     from rich.table import Table
 
     cluster = load_cluster()
+    try:
+        topology = topology_from_local_cluster(cluster)
+    except LocalStateError as exc:
+        fail(exc)
 
-    relays = cluster.relays
+    relays = topology.relays
     if exit_arg:
-        try:
-            exit_ip = find_exit_node(cluster, exit_arg)
-        except ValueError as exc:
-            fail(str(exc), hint="List nodes: meridian node list", hint_type="user")
+        exit_node = next(
+            (node for node in topology.nodes if node.ip == exit_arg or node.name == exit_arg),
+            None,
+        )
+        if exit_node is None:
+            fail(
+                f"Exit node '{exit_arg}' not found in cluster",
+                hint="List nodes: meridian node list",
+                hint_type="user",
+            )
+        exit_ip = exit_node.ip
         relays = [r for r in relays if r.exit_node_ip == exit_ip]
 
-    if not relays:
+    from meridian.console import is_json_mode
+
+    if not relays and not is_json_mode():
         info(f"No relays {'attached to exit ' + exit_arg if exit_arg else 'configured'}")
         err_console.print("\n  [dim]Deploy one: meridian relay deploy RELAY_IP --exit EXIT_IP[/dim]\n")
         return
 
     # Optionally check host status from panel
-    host_status: dict[str, bool | None] = {}
-    try:
-        with make_panel(cluster) as panel:
-            host_map = {h.uuid: h for h in panel.list_hosts()}
-            for relay in relays:
-                for _, host_uuid in relay.host_uuids.items():
-                    h = host_map.get(host_uuid)
-                    if h and (relay.ip not in host_status or not host_status[relay.ip]):
-                        host_status[relay.ip] = not h.is_disabled
-    except RemnawaveError:
-        pass
+    host_status: dict[tuple[str, int], bool | None] = {}
+    warnings: list[MeridianError] = []
+    if relays:
+        try:
+            with make_panel(cluster) as panel:
+                host_map = {h.uuid: h for h in panel.list_hosts()}
+                for relay in relays:
+                    endpoint = (relay.ip, relay.port)
+                    for host_ref in relay.host_refs:
+                        h = host_map.get(host_ref.uuid)
+                        if h and (endpoint not in host_status or not host_status[endpoint]):
+                            host_status[endpoint] = not h.is_disabled
+        except RemnawaveError as exc:
+            warnings.append(
+                MeridianError(
+                    code="MERIDIAN_RELAY_HOST_STATUS_UNAVAILABLE",
+                    category="system",
+                    message="Relay topology is available, but panel host status could not be collected.",
+                    hint=exc.hint or "Check panel connectivity and retry.",
+                    retryable=True,
+                    exit_code=3,
+                )
+            )
+            if not is_json_mode():
+                warn("Panel host status is unavailable; relay rows are shown as unknown")
 
     # JSON output
-    from meridian.console import is_json_mode
-
     if is_json_mode():
         from meridian.renderers import emit_json
 
-        relays_data = []
-        for relay in relays:
-            enabled = host_status.get(relay.ip)
-            relays_data.append(
-                {
-                    "ip": relay.ip,
-                    "name": relay.name,
-                    "exit_node_ip": relay.exit_node_ip,
-                    "port": relay.port,
-                    "sni": relay.sni,
-                    "enabled": enabled,
-                }
-            )
-        count = len(relays_data)
+        result = build_relay_list_result(relays, host_status)
+        count = len(result.relays)
+        exit_code = 3 if warnings else 0
         emit_json(
             command_envelope(
                 command="relay.list",
-                data={"relays": relays_data},
+                data=result.to_data(),
                 summary=Summary(
                     text=f"{count} relay(s) configured",
                     changed=False,
                     counts={"relays": count},
                 ),
+                exit_code=exit_code,
+                warnings=warnings,
                 timer=operation.timer,
             )
         )
+        if exit_code:
+            raise typer.Exit(exit_code)
         return
 
     title = f"Relays for {exit_arg}" if exit_arg else "All Relay Nodes"
@@ -457,7 +497,7 @@ def _run_list(
         table.add_column(col, **kw)  # type: ignore[arg-type]
 
     for relay in relays:
-        enabled = host_status.get(relay.ip)
+        enabled = host_status.get((relay.ip, relay.port))
         if enabled:
             status_str = "[green]enabled[/green]"
         elif enabled is False:
@@ -465,11 +505,11 @@ def _run_list(
         else:
             status_str = "[dim]-[/dim]"
         table.add_row(
-            relay.ip,
-            relay.name or "-",
-            relay.exit_node_ip,
+            escape(relay.ip),
+            escape(relay.name) if relay.name else "-",
+            escape(relay.exit_node_ip),
             str(relay.port),
-            relay.sni or "-",
+            escape(relay.sni) if relay.sni else "-",
             status_str,
         )
 
@@ -477,6 +517,8 @@ def _run_list(
     err_console.print(table)
     err_console.print()
     err_console.print(f"  [dim]Total: {len(relays)} relay(s)[/dim]\n")
+    if warnings:
+        raise typer.Exit(3)
 
 
 def run_remove(
@@ -496,6 +538,19 @@ def run_remove(
     )
 
     cluster = load_cluster()
+
+    if cluster.topology_intent is not None:
+        try:
+            topology = topology_from_local_cluster(cluster)
+        except LocalStateError as exc:
+            fail(exc)
+        projected = next((relay for relay in topology.relays if relay.ip == request.relay_ip), None)
+        if projected is not None:
+            fail(
+                f"Relay {request.relay_ip} is managed by V4 topology",
+                hint="Remove the relay chain in `meridian setup`, then apply the reviewed plan.",
+                hint_type="user",
+            )
 
     # Find relay entry
     relay_entry = cluster.find_relay(request.relay_ip)
@@ -521,43 +576,80 @@ def run_remove(
 
     relay_user = request.user or relay_entry.ssh_user or "root"
 
-    # Delete Remnawave hosts
-    with make_panel(cluster) as panel:
-        info("Removing relay host entries from panel...")
-        delete_relay_hosts(panel, relay_entry)
+    # Stop Realm first. Until this succeeds the panel and exit routing are
+    # left untouched, and cluster.yml remains the retry record.
+    info(f"Stopping relay service on {request.relay_ip}...")
+    try:
+        relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
+        relay_conn.check_ssh(ui=RichSSHUI())
+        if not stop_relay_service(relay_conn):
+            fail(
+                f"Could not stop relay service on {request.relay_ip}",
+                hint="Fix the remote service and retry; cluster state was retained.",
+                hint_type="system",
+            )
+        from meridian.relay_ops import remove_relay_artifacts
+
+        if not remove_relay_artifacts(relay_conn, listen_port=relay_entry.port):
+            fail(
+                f"Could not remove relay artifacts from {request.relay_ip}",
+                hint="Fix remote filesystem/systemd access and retry; cluster state was retained.",
+                hint_type="system",
+            )
+        ok("Relay service stopped")
+    except (OSError, SSHError) as exc:
+        fail(
+            f"Could not connect to relay {request.relay_ip}",
+            hint=f"{exc} Cluster state was retained; retry when SSH is available.",
+            hint_type="system",
+        )
 
     # Remove nginx config from exit server
     exit_node = cluster.find_node(relay_entry.exit_node_ip)
-    if relay_entry.sni and exit_node:
+    if relay_entry.sni and exit_node is None:
+        fail(
+            f"Cannot clean up relay routing: exit node {relay_entry.exit_node_ip} is missing",
+            hint="Restore the exit node entry and retry; cluster state was retained.",
+            hint_type="system",
+        )
+    if relay_entry.sni and exit_node and relay_entry.sni != (exit_node.sni or ""):
         info("Removing relay nginx config from exit server...")
         try:
             exit_conn = ServerConnection(ip=exit_node.ip, user=exit_node.ssh_user, port=exit_node.ssh_port)
             exit_conn.check_ssh(ui=RichSSHUI())
             if not remove_relay_nginx(exit_conn, relay_entry):
-                warn("Relay nginx cleanup failed -- manual cleanup may be needed")
-        except SSHError:
-            warn(f"Could not connect to exit node {exit_node.ip} -- nginx not cleaned up")
+                fail(
+                    "Relay nginx cleanup failed on the exit server",
+                    hint="Fix nginx and retry; cluster state was retained.",
+                    hint_type="system",
+                )
+        except (OSError, SSHError) as exc:
+            fail(
+                f"Could not connect to exit node {exit_node.ip}",
+                hint=f"{exc} Cluster state was retained; retry when SSH is available.",
+                hint_type="system",
+            )
 
-    # Stop service on relay
-    info(f"Stopping relay service on {request.relay_ip}...")
-    try:
-        relay_conn = ServerConnection(ip=request.relay_ip, user=relay_user, port=relay_entry.ssh_port)
-        relay_conn.check_ssh(ui=RichSSHUI())
-        relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
-        relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
-        ok("Relay service stopped")
-    except (SSHError, OSError):
-        warn(f"Could not connect to relay {request.relay_ip} -- service may still be running")
+    # Delete panel hosts last. Missing hosts are idempotent success; an API
+    # failure leaves the relay entry available for another attempt.
+    with make_panel(cluster) as panel:
+        info("Removing relay host entries from panel...")
+        if not delete_relay_hosts(panel, relay_entry):
+            fail(
+                "Could not remove all relay host entries from the panel",
+                hint="Retry when the panel is available; cluster state was retained.",
+                hint_type="system",
+            )
 
-    # Remove from cluster.yml and local state
-    cluster.relays = [r for r in cluster.relays if r.ip != request.relay_ip]
-    cluster.backup()
-    cluster.save()
+    # Remove from cluster.yml only after every required remote cleanup passed.
+    with remote_mutation_persistence(f"Relay {request.relay_ip} was removed remotely"):
+        cluster.relays = [r for r in cluster.relays if r.ip != request.relay_ip]
+        cluster.backup()
+        cluster.save()
 
-    # Hybrid sync — drop from desired_relays (only if managed declaratively).
-    from meridian.reconciler.snapshots import hybrid_sync_desired_relays_remove
+        from meridian.reconciler.snapshots import hybrid_sync_desired_relays_remove
 
-    hybrid_sync_desired_relays_remove(cluster, request.relay_ip)
+        hybrid_sync_desired_relays_remove(cluster, request.relay_ip)
 
     ok(f"Relay {request.relay_ip} removed")
     err_console.print()
@@ -578,14 +670,43 @@ def run_check(
     )
 
     cluster = load_cluster()
-
-    relay_entry = cluster.find_relay(request.relay_ip)
+    try:
+        topology = topology_from_local_cluster(cluster)
+    except LocalStateError as exc:
+        fail(exc)
+    relay_entry = next((relay for relay in topology.relays if relay.ip == request.relay_ip), None)
     if relay_entry is None:
         fail(f"Relay {request.relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
+    if cluster.topology_intent is not None:
+        fail(
+            f"Relay {request.relay_ip} is a V4 managed chain",
+            hint=(
+                "Per-hop V4 relay checking is not available yet. Use `meridian test` for end-to-end route health "
+                "and `meridian setup` to review the chain."
+            ),
+            hint_type="user",
+        )
+
+    if request.exit_arg:
+        exit_node = next(
+            (node for node in topology.nodes if request.exit_arg in {node.ip, node.name}),
+            None,
+        )
+        if exit_node is None:
+            fail(
+                f"Exit node '{request.exit_arg}' not found in cluster",
+                hint="List nodes: meridian node list",
+                hint_type="user",
+            )
+        if relay_entry.exit_node_ip != exit_node.ip:
+            fail(
+                f"Relay {request.relay_ip} is attached to exit {relay_entry.exit_node_ip}, not {request.exit_arg}",
+                hint_type="user",
+            )
 
     info(f"Checking relay: {relay_entry.name or request.relay_ip} -> exit: {relay_entry.exit_node_ip}")
     err_console.print()
-    all_ok = True
+    exit_code = 0
     relay_user = request.user or relay_entry.ssh_user or "root"
 
     # 1. SSH connectivity to relay
@@ -594,26 +715,45 @@ def run_check(
         relay_conn.check_ssh(ui=RichSSHUI())
         ok("SSH to relay: connected")
     except (SSHError, OSError):
-        err_console.print(f"  [red bold]x[/red bold] SSH to relay: failed ({request.relay_ip})")
+        err_console.print(f"  [yellow]![/yellow] SSH to relay: unavailable ({request.relay_ip})")
         warn("Cannot proceed without SSH -- check SSH key and user")
-        return
+        raise typer.Exit(3)
 
     # 2. Realm service status
-    status = relay_conn.run(f"systemctl is-active {RELAY_SERVICE_NAME}", timeout=10)
-    if status.returncode == 0 and status.stdout.strip() == "active":
+    q_service = shlex.quote(RELAY_SERVICE_NAME)
+    try:
+        status = relay_conn.run(f"systemctl is-active {q_service}", timeout=10)
+    except (OSError, SSHError):
+        status = None
+    if status is None:
+        warn("Realm service: status evidence unavailable")
+        exit_code = max(exit_code, 3)
+    elif status.returncode == 0 and status.stdout.strip() == "active":
         ok("Realm service: active")
+    elif command_evidence_unavailable(status.returncode):
+        warn("Realm service: status evidence unavailable")
+        exit_code = max(exit_code, 3)
     else:
-        err_console.print(f"  [red bold]x[/red bold] Realm service: {status.stdout.strip() or 'not found'}")
-        all_ok = False
+        err_console.print(f"  [red bold]x[/red bold] Realm service: {escape(status.stdout.strip() or 'not found')}")
+        exit_code = 4
 
     # 3. Relay -> exit TCP connectivity
     q_exit = shlex.quote(relay_entry.exit_node_ip)
-    tcp_test = relay_conn.run(f"nc -z -w 5 {q_exit} 443 2>/dev/null", timeout=10)
-    if tcp_test.returncode == 0:
+    try:
+        tcp_test = relay_conn.run(f"nc -z -w 5 {q_exit} 443 2>/dev/null", timeout=10)
+    except (OSError, SSHError):
+        tcp_test = None
+    if tcp_test is None:
+        warn("Relay -> exit TCP: connectivity evidence unavailable")
+        exit_code = max(exit_code, 3)
+    elif tcp_test.returncode == 0:
         ok(f"Relay -> exit TCP: reachable ({relay_entry.exit_node_ip}:443)")
+    elif command_evidence_unavailable(tcp_test.returncode):
+        warn("Relay -> exit TCP: connectivity evidence unavailable")
+        exit_code = max(exit_code, 3)
     else:
         err_console.print("  [red bold]x[/red bold] Relay -> exit TCP: unreachable")
-        all_ok = False
+        exit_code = 4
 
     # 4. Local -> relay TCP connectivity
     from meridian.health import tcp_connect
@@ -622,25 +762,36 @@ def run_check(
         ok(f"Local -> relay TCP: reachable ({request.relay_ip}:{relay_entry.port})")
     else:
         err_console.print("  [red bold]x[/red bold] Local -> relay TCP: unreachable")
-        all_ok = False
+        exit_code = 4
 
     # 5. Panel host status
     try:
         with make_panel(cluster) as panel:
             host_map = {h.uuid: h for h in panel.list_hosts()}
-            for proto_key, host_uuid in relay_entry.host_uuids.items():
-                host = host_map.get(host_uuid)
+            if not relay_entry.host_refs:
+                warn("Panel host bindings are unavailable for this relay")
+                exit_code = max(exit_code, 3)
+            for host_ref in relay_entry.host_refs:
+                host = host_map.get(host_ref.uuid)
                 if host and not host.is_disabled:
-                    ok(f"Panel host ({proto_key}): enabled")
+                    ok(f"Panel host ({host_ref.protocol}): enabled")
                 elif host:
-                    err_console.print(f"  [yellow]![/yellow] Panel host ({proto_key}): disabled")
-                    all_ok = False
+                    err_console.print(f"  [yellow]![/yellow] Panel host ({escape(host_ref.protocol)}): disabled")
+                    exit_code = 4
                 else:
-                    err_console.print(f"  [red bold]x[/red bold] Panel host ({proto_key}): not found")
-                    all_ok = False
+                    err_console.print(f"  [red bold]x[/red bold] Panel host ({escape(host_ref.protocol)}): not found")
+                    exit_code = 4
     except RemnawaveError:
         warn("Could not check panel host status -- panel unreachable")
+        exit_code = max(exit_code, 3)
 
     err_console.print()
-    ok("All checks passed") if all_ok else warn("Some checks failed -- see above")
+    if exit_code == 0:
+        ok("All checks passed")
+    elif exit_code == 3:
+        warn("Checks were inconclusive -- required evidence was unavailable")
+    else:
+        warn("Some checks failed -- see above")
     err_console.print()
+    if exit_code:
+        raise typer.Exit(exit_code)

@@ -94,6 +94,12 @@
           "title": "Failure Data Schema",
           "type": "string"
         },
+        "interrupt_behavior": {
+          "const": "exit_130_without_envelope",
+          "default": "exit_130_without_envelope",
+          "title": "Interrupt Behavior",
+          "type": "string"
+        },
         "machine_flags": {
           "items": {
             "type": "string"

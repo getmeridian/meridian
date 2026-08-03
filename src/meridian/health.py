@@ -59,7 +59,7 @@ def poll_until_ready(
         time.sleep(min(interval, remaining))
 
 
-def tcp_connect(host: str, port: int, timeout: int = 5) -> bool:
+def tcp_connect(host: str, port: int, timeout: float = 5) -> bool:
     """Test TCP connectivity to host:port using a Python socket."""
     import socket as _socket
 

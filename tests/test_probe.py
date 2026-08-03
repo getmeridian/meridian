@@ -1,709 +1,665 @@
-"""Tests for the censor probe command."""
+"""Typed external probe checks and command orchestration."""
 
 from __future__ import annotations
 
-import re
-import socket
-import ssl
-from unittest.mock import MagicMock, patch
+import json
+import subprocess
+import sys
+import textwrap
+from types import SimpleNamespace
+from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
+import meridian.cli as cli
 from meridian.cli import app
-from meridian.commands.probe import (
-    _NGINX_STOCK_LENGTH,
-    _cert_identity,
-    check_http2_support,
+from meridian.commands.probe import collect_probe_result
+from meridian.core.verification import (
+    ProbeResult,
+    VerificationCheck,
+    VerificationContext,
+    VerificationFinding,
+    VerificationStatus,
+    VerificationTarget,
+)
+from meridian.diagnostics.external import (
+    check_domain_root,
     check_http_response,
+    check_internal_ports,
     check_legacy_tls,
-    check_ports,
+    check_port_surface,
     check_proxy_paths,
-    check_reverse_dns,
     check_secret_paths,
     check_sni_camouflage,
     check_sni_consistency,
     check_tls_certificate,
-    check_websocket_upgrade,
 )
+from meridian.diagnostics.network import https_get
+from meridian.diagnostics.probe import run_probe_checks
+from meridian.verification import DeploymentVerificationContext, VerificationHttpsRoute
 
+_IP = "198.51.100.20"
 runner = CliRunner()
 
-# RFC 5737 test IP
-_TEST_IP = "198.51.100.1"
-
-
-def _finding_messages(result) -> list[str]:  # noqa: ANN001
-    """Extract just the message strings from findings."""
-    return [msg for _, msg in result.findings]
-
-
-def _strip_ansi(text: str) -> str:
-    return re.sub(r"\x1b\[[0-9;]*m", "", text)
-
-
-# ---------------------------------------------------------------------------
-# Check 1: Port surface
-# ---------------------------------------------------------------------------
-
-
-class TestCheckPorts:
-    def test_only_443_open_passes(self) -> None:
-        with patch("meridian.commands.probe.tcp_connect") as mock_tcp:
-            mock_tcp.side_effect = lambda ip, port, timeout=3: port == 443
-            result = check_ports(_TEST_IP)
-        assert result.passed
-        assert any("443" in msg for msg in _finding_messages(result))
-
-    def test_suspicious_port_open_warns(self) -> None:
-        with (
-            patch("meridian.commands.probe.tcp_connect") as mock_tcp,
-            patch("meridian.commands.probe._https_get", return_value=(200, {}, b"panel")),
-        ):
-            mock_tcp.side_effect = lambda ip, port, timeout=3: port in (443, 2053)
-            result = check_ports(_TEST_IP)
-        assert not result.passed
-        assert any("2053" in msg for msg in _finding_messages(result))
-
-    def test_port_443_closed_fails_immediately(self) -> None:
-        with patch("meridian.commands.probe.tcp_connect", return_value=False):
-            result = check_ports(_TEST_IP)
-        assert not result.passed
-        assert any("not reachable" in msg for msg in _finding_messages(result))
-
-    def test_port_80_open_is_acceptable(self) -> None:
-        with patch("meridian.commands.probe.tcp_connect") as mock_tcp:
-            mock_tcp.side_effect = lambda ip, port, timeout=3: port in (443, 80)
-            result = check_ports(_TEST_IP)
-        assert result.passed
-        assert any("80" in msg for msg in _finding_messages(result))
-
-    def test_findings_carry_correct_status(self) -> None:
-        with (
-            patch("meridian.commands.probe.tcp_connect") as mock_tcp,
-            patch("meridian.commands.probe._https_get", return_value=(200, {}, b"panel")),
-        ):
-            mock_tcp.side_effect = lambda ip, port, timeout=3: port in (443, 2053)
-            result = check_ports(_TEST_IP)
-        # Port 443 finding should be ok=True, port 2053 should be ok=False
-        for is_ok, msg in result.findings:
-            if "443" in msg:
-                assert is_ok
-            if "2053" in msg:
-                assert not is_ok
-
-    def test_suspicious_port_middlebox_passes(self) -> None:
-        """TCP handshake completes but no real service — middlebox, not a real issue."""
-        with (
-            patch("meridian.commands.probe.tcp_connect") as mock_tcp,
-            patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")),
-        ):
-            mock_tcp.side_effect = lambda ip, port, timeout=3: port in (443, 8080)
-            result = check_ports(_TEST_IP)
-        assert result.passed
-        assert any("no service" in msg for msg in _finding_messages(result))
-
-    def test_multiple_middlebox_ports_still_passes(self) -> None:
-        """All suspicious ports TCP-reachable but none serve real content."""
-        with (
-            patch("meridian.commands.probe.tcp_connect", return_value=True),
-            patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")),
-        ):
-            result = check_ports(_TEST_IP)
-        assert result.passed
-
-
-# ---------------------------------------------------------------------------
-# Check 2: HTTP response
-# ---------------------------------------------------------------------------
-
-
-class TestCheckHttpResponse:
-    def test_stock_nginx_403_passes(self) -> None:
-        stock_body = b"x" * _NGINX_STOCK_LENGTH
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (403, {"server": "nginx"}, stock_body),
-                (404, {"server": "nginx"}, stock_body),
-            ]
-            result = check_http_response(_TEST_IP)
-        assert result.passed
-
-    def test_custom_error_page_warns(self) -> None:
-        custom_body = b"<html><body>Custom VPN Panel</body></html>"
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (403, {"server": "nginx"}, custom_body),
-                (404, {"server": "nginx"}, b"x" * _NGINX_STOCK_LENGTH),
-            ]
-            result = check_http_response(_TEST_IP)
-        assert not result.passed
-        assert any("Custom error page" in msg for msg in _finding_messages(result))
-
-    def test_server_version_leak_warns(self) -> None:
-        stock_body = b"x" * _NGINX_STOCK_LENGTH
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (403, {"server": "nginx/1.24.0"}, stock_body),
-                (404, {"server": "nginx/1.24.0"}, stock_body),
-            ]
-            result = check_http_response(_TEST_IP)
-        assert not result.passed
-        assert any("version" in msg.lower() for msg in _finding_messages(result))
-
-    def test_non_403_status_warns(self) -> None:
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (200, {"server": "nginx"}, b"<html>Welcome</html>"),
-                (200, {"server": "nginx"}, b"<html>Not Found</html>"),
-            ]
-            result = check_http_response(_TEST_IP)
-        assert not result.passed
-
-    def test_connection_failure_skips(self) -> None:
-        with patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")):
-            result = check_http_response(_TEST_IP)
-        assert result.passed
-        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 3: TLS certificate
-# ---------------------------------------------------------------------------
-
-
-class TestCheckTlsCertificate:
-    def test_no_domain_leak_passes(self) -> None:
-        cert_text = """Certificate:
-    Issuer: C=US, O=Let's Encrypt, CN=R3
-    Subject:
-    X509v3 Subject Alternative Name: critical
-        IP Address:198.51.100.1"""
-        with patch("meridian.commands.probe._get_cert_text_via_openssl", return_value=cert_text):
-            result = check_tls_certificate(_TEST_IP)
-        assert result.passed
-        assert any("no domain" in msg.lower() for msg in _finding_messages(result))
-
-    def test_domain_in_san_warns(self) -> None:
-        cert_text = """Certificate:
-    Issuer: C=US, O=Let's Encrypt, CN=R3
-    Subject: CN=my-vpn.example.com
-    X509v3 Subject Alternative Name:
-        DNS:my-vpn.example.com, DNS:vpn.example.com"""
-        with patch("meridian.commands.probe._get_cert_text_via_openssl", return_value=cert_text):
-            result = check_tls_certificate(_TEST_IP)
-        assert not result.passed
-        assert any("my-vpn.example.com" in msg for msg in _finding_messages(result))
-
-    def test_openssl_not_available_degrades_gracefully(self) -> None:
-        with (
-            patch("meridian.commands.probe._get_cert_text_via_openssl", return_value=""),
-            patch("meridian.commands.probe._get_cert_der", return_value=b"\x30\x82"),
-        ):
-            result = check_tls_certificate(_TEST_IP)
-        assert result.passed
-        assert any("install openssl" in msg for msg in _finding_messages(result))
-
-    def test_tls_handshake_fails_skips(self) -> None:
-        with (
-            patch("meridian.commands.probe._get_cert_text_via_openssl", return_value=""),
-            patch("meridian.commands.probe._get_cert_der", return_value=b""),
-        ):
-            result = check_tls_certificate(_TEST_IP)
-        assert result.passed
-        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 4: SNI consistency
-# ---------------------------------------------------------------------------
-
-
-class TestCheckSniConsistency:
-    def test_identical_certs_passes(self) -> None:
-        same_cert = b"\x30\x82\x01\x00" + b"\x00" * 256
-        with (
-            patch("meridian.commands.probe._get_cert_der", return_value=same_cert),
-            patch("meridian.commands.probe._cert_identity", return_value="same-identity"),
-        ):
-            result = check_sni_consistency(_TEST_IP)
-        assert result.passed
-        assert any("consistent" in msg for msg in _finding_messages(result))
-
-    def test_different_certs_warns(self) -> None:
-        call_count = 0
-
-        def varying_cert(ip: str, sni: str, timeout: int = 5) -> bytes:
-            nonlocal call_count
-            call_count += 1
-            return b"\x30\x82" + call_count.to_bytes(2, "big") + b"\x00" * 256
-
-        identity_count = 0
-
-        def varying_identity(der: bytes) -> str:
-            nonlocal identity_count
-            identity_count += 1
-            return f"identity-{identity_count}"
-
-        with (
-            patch("meridian.commands.probe._get_cert_der", side_effect=varying_cert),
-            patch("meridian.commands.probe._cert_identity", side_effect=varying_identity),
-        ):
-            result = check_sni_consistency(_TEST_IP)
-        assert not result.passed
-        assert any("inconsistent" in msg for msg in _finding_messages(result))
-
-    def test_same_identity_different_der_passes(self) -> None:
-        """CDN scenario: different cert bytes but same subject+issuer."""
-        call_count = 0
-
-        def varying_cert(ip: str, sni: str, timeout: int = 5) -> bytes:
-            nonlocal call_count
-            call_count += 1
-            return b"\x30\x82" + call_count.to_bytes(2, "big") + b"\x00" * 256
-
-        with (
-            patch("meridian.commands.probe._get_cert_der", side_effect=varying_cert),
-            patch(
-                "meridian.commands.probe._cert_identity",
-                return_value="subject=CN=cdn.example.com|issuer=O=DigiCert",
-            ),
-        ):
-            result = check_sni_consistency(_TEST_IP)
-        assert result.passed
-        assert any("consistent" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 5: Proxy paths
-# ---------------------------------------------------------------------------
-
-
-class TestCheckProxyPaths:
-    def test_all_paths_identical_passes(self) -> None:
-        stock = b"x" * _NGINX_STOCK_LENGTH
-        with patch("meridian.commands.probe._https_get", return_value=(404, {}, stock)):
-            result = check_proxy_paths(_TEST_IP)
-        assert result.passed
-
-    def test_websocket_101_on_path_warns(self) -> None:
-        stock = b"x" * _NGINX_STOCK_LENGTH
-
-        def path_response(
-            ip: str,
-            path: str,
-            timeout: int = 5,
-            extra_headers: dict | None = None,
-        ) -> tuple:
-            if path == "/ws":
-                return (101, {}, b"")
-            return (404, {}, stock)
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_proxy_paths(_TEST_IP)
-        assert not result.passed
-        assert any("101" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 6: WebSocket upgrade
-# ---------------------------------------------------------------------------
-
-
-class TestCheckWebsocketUpgrade:
-    def test_upgrade_rejected_passes(self) -> None:
-        with patch("meridian.commands.probe._https_get", return_value=(403, {}, b"")):
-            result = check_websocket_upgrade(_TEST_IP)
-        assert result.passed
-
-    def test_upgrade_accepted_warns(self) -> None:
-        with patch("meridian.commands.probe._https_get", return_value=(101, {}, b"")):
-            result = check_websocket_upgrade(_TEST_IP)
-        assert not result.passed
-        assert any("accepts" in msg.lower() for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 7: Reverse DNS
-# ---------------------------------------------------------------------------
-
-
-class TestCheckReverseDns:
-    def test_no_ptr_record_passes(self) -> None:
-        with patch("meridian.commands.probe.socket.gethostbyaddr", side_effect=socket.herror):
-            result = check_reverse_dns(_TEST_IP)
-        assert result.passed
-        assert any("No reverse DNS" in msg for msg in _finding_messages(result))
-
-    def test_hosting_ptr_passes(self) -> None:
-        with patch(
-            "meridian.commands.probe.socket.gethostbyaddr",
-            return_value=("v12345.hosted-by-vdsina.com", [], []),
-        ):
-            result = check_reverse_dns(_TEST_IP)
-        assert result.passed
-        assert any("vdsina" in msg for msg in _finding_messages(result))
-
-    def test_normal_ptr_passes(self) -> None:
-        with patch(
-            "meridian.commands.probe.socket.gethostbyaddr",
-            return_value=("mail.example.com", [], []),
-        ):
-            result = check_reverse_dns(_TEST_IP)
-        assert result.passed
-        assert any("mail.example.com" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 8: HTTP/2 support
-# ---------------------------------------------------------------------------
-
-
-class TestCheckHttp2Support:
-    def test_h2_supported_passes(self) -> None:
-        mock_ssock = MagicMock()
-        mock_ssock.selected_alpn_protocol.return_value = "h2"
-
-        with (
-            patch("meridian.commands.probe.socket.create_connection"),
-            patch("meridian.commands.probe.ssl.SSLContext") as mock_ctx_cls,
-        ):
-            mock_ctx_cls.return_value.wrap_socket.return_value = mock_ssock
-            result = check_http2_support(_TEST_IP)
-        assert result.passed
-        assert any("HTTP/2" in msg for msg in _finding_messages(result))
-
-    def test_h1_only_warns(self) -> None:
-        mock_ssock = MagicMock()
-        mock_ssock.selected_alpn_protocol.return_value = "http/1.1"
-
-        with (
-            patch("meridian.commands.probe.socket.create_connection"),
-            patch("meridian.commands.probe.ssl.SSLContext") as mock_ctx_cls,
-        ):
-            mock_ctx_cls.return_value.wrap_socket.return_value = mock_ssock
-            result = check_http2_support(_TEST_IP)
-        assert not result.passed
-        assert any("HTTP/1.1" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 9: Legacy TLS
-# ---------------------------------------------------------------------------
-
-
-class TestCheckLegacyTls:
-    def test_no_legacy_passes(self) -> None:
-        with patch("meridian.commands.probe._tls_version_accepted", return_value=False):
-            result = check_legacy_tls(_TEST_IP)
-        assert result.passed
-        assert any("TLS 1.2+" in msg for msg in _finding_messages(result))
-
-    def test_tls10_accepted_warns(self) -> None:
-        def accept_tls10(ip: str, version: ssl.TLSVersion) -> bool:
-            return version == ssl.TLSVersion.TLSv1
-
-        with patch("meridian.commands.probe._tls_version_accepted", side_effect=accept_tls10):
-            result = check_legacy_tls(_TEST_IP)
-        assert not result.passed
-        assert any("TLS 1.0" in msg for msg in _finding_messages(result))
-
-    def test_both_legacy_accepted_warns(self) -> None:
-        with patch("meridian.commands.probe._tls_version_accepted", return_value=True):
-            result = check_legacy_tls(_TEST_IP)
-        assert not result.passed
-        assert any("TLS 1.0 + TLS 1.1" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# _cert_identity helper
-# ---------------------------------------------------------------------------
-
-
-class TestCertIdentity:
-    def test_openssl_extracts_subject_issuer(self) -> None:
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = b"subject=CN=example.com\nissuer=O=DigiCert"
-        with patch("meridian.commands.probe.subprocess.run", return_value=mock_result):
-            identity = _cert_identity(b"\x30\x82\x00")
-        assert "example.com" in identity
-        assert "DigiCert" in identity
-
-    def test_fallback_without_openssl(self) -> None:
-        with patch("meridian.commands.probe.subprocess.run", side_effect=FileNotFoundError):
-            identity = _cert_identity(b"\x30\x82\x00")
-        assert len(identity) == 64  # sha256 hex
-
-    def test_openssl_failure_falls_back(self) -> None:
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stdout = b""
-        with patch("meridian.commands.probe.subprocess.run", return_value=mock_result):
-            identity = _cert_identity(b"\x30\x82\x00")
-        assert len(identity) == 64  # sha256 hex
-
-
-# ---------------------------------------------------------------------------
-# Check 10: Internal ports (deployment-aware)
-# ---------------------------------------------------------------------------
-
-
-class TestCheckInternalPorts:
-    def test_all_closed_passes(self) -> None:
-        from meridian.commands.probe import check_internal_ports
-
-        with patch("meridian.commands.probe.tcp_connect", return_value=False):
-            result = check_internal_ports(_TEST_IP, has_domain=False)
-        assert result.passed
-        assert any("closed externally" in msg for msg in _finding_messages(result))
-
-    def test_exposed_xhttp_port_fails(self) -> None:
-        from meridian.commands.probe import _compute_internal_ports, check_internal_ports
-
-        ports = _compute_internal_ports(_TEST_IP, has_domain=False)
-        xhttp_port = ports["xhttp"]
-
-        def selective_connect(ip: str, port: int, timeout: int = 3) -> bool:
-            return port == xhttp_port
-
-        with patch("meridian.commands.probe.tcp_connect", side_effect=selective_connect):
-            result = check_internal_ports(_TEST_IP, has_domain=False)
-        assert not result.passed
-        assert any("xhttp" in msg for msg in _finding_messages(result))
-
-    def test_domain_mode_includes_reality_port(self) -> None:
-        from meridian.commands.probe import _compute_internal_ports
-
-        ports = _compute_internal_ports(_TEST_IP, has_domain=True)
-        assert "reality" in ports
-        assert ports["reality"] != 443
-
-    def test_standalone_mode_omits_reality_port(self) -> None:
-        from meridian.commands.probe import _compute_internal_ports
-
-        ports = _compute_internal_ports(_TEST_IP, has_domain=False)
-        assert "reality" not in ports
-
-    def test_port_computation_is_deterministic(self) -> None:
-        from meridian.commands.probe import _compute_internal_ports
-
-        ports1 = _compute_internal_ports(_TEST_IP, has_domain=True)
-        ports2 = _compute_internal_ports(_TEST_IP, has_domain=True)
-        assert ports1 == ports2
-
-    def test_port_computation_matches_setup_algorithm(self) -> None:
-        """Port derivation must match the hashlib-based algorithm in setup.py."""
-        import hashlib as hl
-
-        from meridian.commands.probe import _compute_internal_ports
-
-        ip_hash = int(hl.sha256(_TEST_IP.encode()).hexdigest()[:8], 16)
-        ports = _compute_internal_ports(_TEST_IP, has_domain=True)
-        assert ports["xhttp"] == 30000 + (ip_hash % 10000)
-        assert ports["wss"] == 20000 + (ip_hash % 10000)
-        assert ports["reality"] == 10000 + (ip_hash % 1000)
-
-
-# ---------------------------------------------------------------------------
-# Check 11: Root indistinguishable (deployment-aware)
-# ---------------------------------------------------------------------------
-
-
-class TestCheckRootIndistinguishable:
-    def test_all_stock_responses_passes(self) -> None:
-        from meridian.commands.probe import check_root_indistinguishable
-
-        with patch("meridian.commands.probe._https_get", return_value=(404, {}, b"")):
-            result = check_root_indistinguishable(_TEST_IP)
-        assert result.passed
-
-    def test_favicon_returns_200_fails(self) -> None:
-        from meridian.commands.probe import check_root_indistinguishable
-
-        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict[str, str], bytes]:
-            if path == "/favicon.ico":
-                return 200, {}, b"icon-data"
-            return 404, {}, b""
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_root_indistinguishable(_TEST_IP)
-        assert not result.passed
-        assert any("favicon" in msg for msg in _finding_messages(result))
-
-    def test_api_returns_200_fails(self) -> None:
-        from meridian.commands.probe import check_root_indistinguishable
-
-        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict[str, str], bytes]:
-            if path == "/api":
-                return 200, {}, b'{"status":"ok"}'
-            return 404, {}, b""
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_root_indistinguishable(_TEST_IP)
-        assert not result.passed
-        assert any("API" in msg for msg in _finding_messages(result))
-
-    def test_connection_failure_skips(self) -> None:
-        from meridian.commands.probe import check_root_indistinguishable
-
-        with patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")):
-            result = check_root_indistinguishable(_TEST_IP)
-        assert result.passed
-        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check 12: Domain root (deployment-aware)
-# ---------------------------------------------------------------------------
-
-
-class TestCheckDomainRoot:
-    def test_403_root_passes(self) -> None:
-        from meridian.commands.probe import check_domain_root
-
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (403, {}, b""),  # Host: domain root
-                (404, {}, b"Not Found"),  # ACME path
-            ]
-            result = check_domain_root(_TEST_IP, "vpn.example.com")
-        assert result.passed
-        assert any("vpn.example.com" in msg for msg in _finding_messages(result))
-
-    def test_root_returns_200_fails(self) -> None:
-        from meridian.commands.probe import check_domain_root
-
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (200, {}, b"<html>Welcome</html>"),  # bad
-                (404, {}, b""),  # ACME
-            ]
-            result = check_domain_root(_TEST_IP, "vpn.example.com")
-        assert not result.passed
-        assert any("expected 403/404" in msg for msg in _finding_messages(result))
-
-    def test_acme_directory_listing_fails(self) -> None:
-        from meridian.commands.probe import check_domain_root
-
-        with patch("meridian.commands.probe._https_get") as mock:
-            mock.side_effect = [
-                (403, {}, b""),  # root OK
-                (200, {}, b"<html><pre>Index of /.well-known/</pre></html>"),  # directory listing
-            ]
-            result = check_domain_root(_TEST_IP, "vpn.example.com")
-        assert not result.passed
-        assert any("directory listing" in msg for msg in _finding_messages(result))
-
-    def test_connection_failure_skips(self) -> None:
-        from meridian.commands.probe import check_domain_root
-
-        with patch("meridian.commands.probe._https_get", return_value=(0, {}, b"")):
-            result = check_domain_root(_TEST_IP, "vpn.example.com")
-        assert result.passed
-        assert any("skipped" in msg.lower() for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check: Secret path isolation
-# ---------------------------------------------------------------------------
-
-
-class TestCheckSecretPaths:
-    def test_common_panel_paths_return_403_passes(self) -> None:
-        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
-            if path.startswith("/secret-panel"):
-                return (200, {}, b"panel")
-            return (403, {}, b"")
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_secret_paths(_TEST_IP, "secret-panel")
-        assert result.passed
-        assert any("accessible" in msg for msg in _finding_messages(result))
-
-    def test_panel_path_returning_200_fails(self) -> None:
-        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
-            if path == "/admin":
-                return (200, {}, b"<html>Admin</html>")
-            if path.startswith("/secret"):
-                return (200, {}, b"panel")
-            return (403, {}, b"")
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_secret_paths(_TEST_IP, "secret")
-        assert not result.passed
-        assert any("/admin" in msg for msg in _finding_messages(result))
-
-    def test_secret_path_accessible_passes(self) -> None:
-        def path_response(ip: str, path: str, **kwargs: object) -> tuple[int, dict, bytes]:
-            if path == "/my-secret/":
-                return (301, {}, b"")
-            return (404, {}, b"")
-
-        with patch("meridian.commands.probe._https_get", side_effect=path_response):
-            result = check_secret_paths(_TEST_IP, "my-secret")
-        assert result.passed
-        assert any("accessible" in msg.lower() or "Panel" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# Check: SNI camouflage
-# ---------------------------------------------------------------------------
-
-
-class TestCheckSniCamouflage:
-    def test_matching_certs_passes(self) -> None:
-        same_cert = b"\x30\x82\x01\x00" + b"\x00" * 256
-        with (
-            patch("meridian.commands.probe._get_cert_der", return_value=same_cert),
-            patch("meridian.commands.probe._cert_identity", return_value="same-identity"),
-        ):
-            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
-        assert result.passed
-        assert any("matching" in msg for msg in _finding_messages(result))
-
-    def test_mismatched_certs_fails(self) -> None:
-        call_count = 0
-
-        def varying_cert(ip: str, sni: str, timeout: int = 5) -> bytes:
-            nonlocal call_count
-            call_count += 1
-            return b"\x30\x82" + call_count.to_bytes(2, "big") + b"\x00" * 256
-
-        identity_count = 0
-
-        def varying_identity(der: bytes) -> str:
-            nonlocal identity_count
-            identity_count += 1
-            return f"identity-{identity_count}"
-
-        with (
-            patch("meridian.commands.probe._get_cert_der", side_effect=varying_cert),
-            patch("meridian.commands.probe._cert_identity", side_effect=varying_identity),
-        ):
-            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
-        assert not result.passed
-        assert any("NOT match" in msg for msg in _finding_messages(result))
-
-    def test_connection_failure_skips(self) -> None:
-        with patch("meridian.commands.probe._get_cert_der", return_value=b""):
-            result = check_sni_camouflage(_TEST_IP, "www.microsoft.com")
-        assert result.passed
-        assert any("skipped" in msg.lower() or "Could not" in msg for msg in _finding_messages(result))
-
-
-# ---------------------------------------------------------------------------
-# CLI integration
-# ---------------------------------------------------------------------------
-
-
-class TestProbeCLI:
-    def test_probe_help(self) -> None:
-        result = runner.invoke(app, ["probe", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "censor" in output.lower()
-
-    def test_probe_shows_in_main_help(self) -> None:
-        result = runner.invoke(app, ["--help"])
-        assert result.exit_code == 0
-        assert "probe" in _strip_ansi(result.output)
+
+def test_probe_cancellation_does_not_wait_for_worker_timeouts() -> None:
+    script = textwrap.dedent(
+        """
+        import os
+        import signal
+        import threading
+
+        from meridian.diagnostics.probe import _run_interruptible_jobs
+
+        release = threading.Event()
+
+        def blocked_check():
+            release.wait(10)
+
+        timer = threading.Timer(0.1, lambda: os.kill(os.getpid(), signal.SIGINT))
+        timer.start()
+        try:
+            _run_interruptible_jobs([blocked_check, blocked_check])
+        except KeyboardInterrupt:
+            print("interrupted")
+        else:
+            raise SystemExit("SIGINT did not interrupt probe workers")
+        finally:
+            release.set()
+            timer.cancel()
+        """
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        text=True,
+        capture_output=True,
+        timeout=3,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "interrupted"
+
+
+def test_https_get_keeps_request_details_off_argv_and_bounds_wall_clock() -> None:
+    completed = SimpleNamespace(
+        returncode=0,
+        stdout=json.dumps({"status": 200, "headers": {"server": "nginx"}, "body": "b2s="}),
+    )
+    with patch("meridian.diagnostics.network.subprocess.run", return_value=completed) as run:
+        status, headers, body = https_get(
+            _IP,
+            "/secret-path",
+            timeout=1.25,
+            server_name="example.test",
+            extra_headers={"Authorization": "Bearer secret"},
+        )
+
+    assert (status, headers, body) == (200, {"server": "nginx"}, b"ok")
+    argv = run.call_args.args[0]
+    assert "/secret-path" not in argv
+    assert "Bearer secret" not in argv
+    request = json.loads(run.call_args.kwargs["input"])
+    assert request["path"] == "/secret-path"
+    assert request["extra_headers"] == {"Authorization": "Bearer secret"}
+    assert run.call_args.kwargs["timeout"] == 1.25
+
+
+def test_https_get_timeout_is_unavailable_evidence() -> None:
+    with patch(
+        "meridian.diagnostics.network.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd="python", timeout=0.1),
+    ):
+        assert https_get(_IP, "/", timeout=0.1) == (0, {}, b"")
+
+
+def test_tls_handshake_timeout_is_killable() -> None:
+    from meridian.diagnostics.network import get_certificate_der, negotiate_alpn, probe_tls_version
+
+    timeout = subprocess.TimeoutExpired(cmd="python", timeout=0.1)
+    with patch("meridian.diagnostics.network.subprocess.run", side_effect=timeout):
+        assert get_certificate_der(_IP, "www.example.com", timeout=0.1) == b""
+        assert negotiate_alpn(_IP, "www.example.com", ["h2"], timeout=0.1) is None
+        assert probe_tls_version(_IP, "www.example.com", "TLSv1", timeout=0.1) == "unavailable"
+
+
+def _check(status: VerificationStatus) -> VerificationCheck:
+    return VerificationCheck(
+        id="sample",
+        name="Sample",
+        status=status,
+        findings=[
+            VerificationFinding(
+                code="SAMPLE",
+                status=status,
+                message=f"Sample {status}",
+            )
+        ],
+    )
+
+
+def _result(status: VerificationStatus) -> ProbeResult:
+    return ProbeResult.from_checks(
+        target=VerificationTarget(requested=_IP, resolved_ip=_IP),
+        context=VerificationContext(mode="generic"),
+        checks=[_check(status)],
+    )
+
+
+def test_open_plaintext_management_port_is_a_failure() -> None:
+    def connect(_ip: str, port: int, timeout: float = 3) -> bool:
+        return port in {443, 3000}
+
+    with patch("meridian.diagnostics.external.tcp_connect", side_effect=connect):
+        result = check_port_surface(_IP)
+
+    assert result.status == "failed"
+    assert any(finding.code == "UNEXPECTED_PORT_3000" for finding in result.findings)
+    assert not any(finding.code == "NO_UNEXPECTED_PORTS" for finding in result.findings)
+
+
+def test_closed_required_port_is_a_failure() -> None:
+    with patch("meridian.diagnostics.external.tcp_connect", return_value=False):
+        result = check_port_surface(_IP, expected_tcp_ports=(443, 8443))
+
+    assert result.status == "failed"
+    assert {finding.code for finding in result.findings} >= {"PORT_443_CLOSED", "PORT_8443_CLOSED"}
+
+
+def test_unavailable_https_is_skipped_not_passed() -> None:
+    with patch("meridian.diagnostics.external.https_get", return_value=(0, {}, b"")):
+        result = check_http_response(_IP, meridian_mode=False)
+
+    assert result.status == "skipped"
+    assert result.findings[0].code == "HTTPS_UNAVAILABLE"
+
+
+def test_generic_site_content_is_observed_without_meridian_policy_failure() -> None:
+    with patch(
+        "meridian.diagnostics.external.https_get",
+        side_effect=[(200, {"server": "example"}, b"website"), (404, {}, b"")],
+    ):
+        result = check_http_response(_IP, meridian_mode=False)
+
+    assert result.status == "passed"
+
+
+def test_meridian_root_content_is_a_failure() -> None:
+    with patch(
+        "meridian.diagnostics.external.https_get",
+        side_effect=[(200, {"server": "nginx"}, b"Meridian"), (404, {}, b"")],
+    ):
+        result = check_http_response(_IP, meridian_mode=True)
+
+    assert result.status == "failed"
+    assert {finding.code for finding in result.findings} >= {"UNEXPECTED_ROOT_STATUS", "ROOT_PRODUCT_LEAK"}
+
+
+def test_tls_requires_a_peer_certificate() -> None:
+    with patch("meridian.diagnostics.external.get_certificate_der", return_value=b""):
+        result = check_tls_certificate(_IP)
+
+    assert result.status == "failed"
+    assert result.findings[0].code == "TLS_HANDSHAKE_FAILED"
+
+
+def test_tls_rejects_untrusted_or_wrong_identity_certificate() -> None:
+    with (
+        patch("meridian.diagnostics.external.get_certificate_der", return_value=b"certificate"),
+        patch(
+            "meridian.diagnostics.external.certificate_validation_error",
+            return_value="hostname mismatch",
+        ),
+        patch("meridian.diagnostics.external.certificate_text", return_value=""),
+    ):
+        result = check_tls_certificate(_IP, server_name="edge.example.com")
+
+    assert result.status == "failed"
+    assert any(finding.code == "TLS_CERTIFICATE_INVALID" for finding in result.findings)
+
+
+def test_tls_network_validation_error_is_inconclusive() -> None:
+    with (
+        patch("meridian.diagnostics.external.get_certificate_der", return_value=b"certificate"),
+        patch("meridian.diagnostics.external.certificate_validation_error", return_value=None),
+        patch("meridian.diagnostics.external.certificate_text", return_value=""),
+    ):
+        result = check_tls_certificate(_IP, server_name="edge.example.com")
+
+    assert result.status == "skipped"
+    assert any(finding.code == "TLS_VALIDATION_UNAVAILABLE" for finding in result.findings)
+
+
+def test_tls_does_not_require_openssl_details_for_valid_certificate() -> None:
+    with (
+        patch("meridian.diagnostics.external.get_certificate_der", return_value=b"certificate"),
+        patch("meridian.diagnostics.external.certificate_validation_error", return_value=""),
+        patch("meridian.diagnostics.external.certificate_text", return_value=""),
+    ):
+        result = check_tls_certificate(_IP, server_name="edge.example.com")
+
+    assert result.status == "passed"
+
+
+def test_incomplete_sni_evidence_is_skipped() -> None:
+    with patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"cert", b"", b""]):
+        result = check_sni_consistency(_IP, "www.example.com", meridian_mode=True)
+
+    assert result.status == "skipped"
+
+
+def test_sni_edge_variation_is_inconclusive_for_unmanaged_origin() -> None:
+    with (
+        patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"one", b"two", b"three"]),
+        patch("meridian.diagnostics.external.certificate_identity", side_effect=["one", "two", "three"]),
+    ):
+        result = check_sni_consistency(_IP, "www.example.com", meridian_mode=False)
+
+    assert result.status == "skipped"
+    assert result.findings[0].code == "SNI_EDGE_VARIATION"
+
+
+def test_sni_variation_fails_for_meridian_managed_certificate_route() -> None:
+    with (
+        patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"one", b"two", b"three"]),
+        patch("meridian.diagnostics.external.certificate_identity", side_effect=["one", "two", "three"]),
+    ):
+        result = check_sni_consistency(_IP, "edge.example.com", meridian_mode=True)
+
+    assert result.status == "failed"
+    assert result.findings[0].code == "SNI_INCONSISTENT"
+
+
+def test_camouflage_origin_uses_bounded_resolution_before_tls() -> None:
+    with (
+        patch("meridian.diagnostics.external.resolve_hostname", return_value="203.0.113.20") as resolve,
+        patch("meridian.diagnostics.external.get_certificate_der", return_value=b"certificate") as certificate,
+        patch("meridian.diagnostics.external.certificate_validation_error", return_value=""),
+        patch("meridian.diagnostics.external.certificate_identity", return_value="identity"),
+    ):
+        result = check_sni_camouflage(_IP, "www.example.com", timeout=2)
+
+    assert result.status == "passed"
+    resolve.assert_called_once_with("www.example.com", timeout=2)
+    assert certificate.call_args_list[1].args == ("203.0.113.20", "www.example.com")
+
+
+def test_camouflage_certificate_variation_is_inconclusive_across_valid_edges() -> None:
+    with (
+        patch("meridian.diagnostics.external.resolve_hostname", return_value="203.0.113.20"),
+        patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"server", b"origin"]),
+        patch("meridian.diagnostics.external.certificate_validation_error", return_value=""),
+        patch("meridian.diagnostics.external.certificate_identity", side_effect=["server", "origin"]),
+    ):
+        result = check_sni_camouflage(_IP, "www.example.com", timeout=2)
+
+    assert result.status == "skipped"
+    assert result.findings[0].code == "CAMOUFLAGE_EDGE_VARIATION"
+
+
+def test_camouflage_rejects_untrusted_or_wrong_hostname_certificate() -> None:
+    with (
+        patch("meridian.diagnostics.external.resolve_hostname", return_value="203.0.113.20"),
+        patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"server", b"origin"]),
+        patch(
+            "meridian.diagnostics.external.certificate_validation_error",
+            side_effect=["hostname mismatch", ""],
+        ),
+    ):
+        result = check_sni_camouflage(_IP, "www.example.com", timeout=2)
+
+    assert result.status == "failed"
+    assert result.findings[0].code == "CAMOUFLAGE_CERTIFICATE_INVALID"
+
+
+def test_legacy_tls_is_inconclusive_when_local_stack_cannot_probe() -> None:
+    with patch(
+        "meridian.diagnostics.external._tls_version_result",
+        side_effect=["rejected", "unavailable"],
+    ):
+        result = check_legacy_tls(_IP, "www.example.com")
+
+    assert result.status == "skipped"
+    assert result.findings[0].code == "LEGACY_TLS_INCONCLUSIVE"
+
+
+@pytest.mark.parametrize(
+    ("route_kind", "expected"),
+    [("managed", "failed"), ("camouflage", "skipped"), ("generic", "warning")],
+)
+def test_legacy_tls_policy_is_route_aware(route_kind: str, expected: str) -> None:
+    with patch("meridian.diagnostics.external._tls_version_result", side_effect=["accepted", "rejected"]):
+        result = check_legacy_tls(_IP, "www.example.com", route_kind=route_kind)  # type: ignore[arg-type]
+
+    assert result.status == expected
+
+
+@pytest.mark.parametrize(("meridian_mode", "expected"), [(False, "warning"), (True, "failed")])
+def test_proxy_path_differential_respects_probe_mode(meridian_mode: bool, expected: str) -> None:
+    responses: list[tuple[int, dict[str, str], bytes]] = [
+        (404, {}, b"base"),
+        (200, {}, b"different"),
+        *[(404, {}, b"base")] * 6,
+    ]
+    with patch("meridian.diagnostics.external.https_get", side_effect=responses):
+        result = check_proxy_paths(_IP, meridian_mode=meridian_mode)
+
+    assert result.status == expected
+
+
+def test_proxy_path_detects_equal_length_body_differential() -> None:
+    responses: list[tuple[int, dict[str, str], bytes]] = [
+        (404, {}, b"base"),
+        (404, {}, b"leak"),
+        *[(404, {}, b"base")] * 6,
+    ]
+    with patch("meridian.diagnostics.external.https_get", side_effect=responses):
+        result = check_proxy_paths(_IP, meridian_mode=True)
+
+    assert result.status == "failed"
+    assert result.findings[0].code == "PROXY_PATH_DIFFERENTIAL"
+
+
+def test_domain_root_uses_domain_for_sni_and_accepts_hardened_status() -> None:
+    calls: list[dict[str, object]] = []
+
+    def request(_ip: str, _path: str, **kwargs: object) -> tuple[int, dict[str, str], bytes]:
+        calls.append(kwargs)
+        return (403, {}, b"") if len(calls) == 1 else (404, {}, b"")
+
+    with patch("meridian.diagnostics.external.https_get", side_effect=request):
+        result = check_domain_root(_IP, "edge.example.com")
+
+    assert result.status == "passed"
+    assert all(call["server_name"] == "edge.example.com" for call in calls)
+    assert all(call["host_header"] == "edge.example.com" for call in calls)
+
+
+def test_unavailable_common_panel_paths_make_isolation_inconclusive() -> None:
+    with patch(
+        "meridian.diagnostics.external.https_get",
+        side_effect=[*[(0, {}, b"")] * 5, (200, {}, b"")],
+    ):
+        result = check_secret_paths(_IP, "secret", server_name="edge.example.com")
+
+    assert result.status == "skipped"
+    assert any(finding.code == "COMMON_PANEL_PATH_UNAVAILABLE" for finding in result.findings)
+
+
+def test_exposed_v4_allocation_fails_internal_port_check() -> None:
+    with patch("meridian.diagnostics.external.tcp_connect", side_effect=lambda _ip, port, timeout=3: port == 39001):
+        result = check_internal_ports(_IP, {"exit-a/reality": 39001, "exit-a/xhttp": 39002})
+
+    assert result.status == "failed"
+    assert "exit-a/reality=39001" in result.findings[0].message
+
+
+def test_hysteria_only_probe_does_not_assume_tcp_https() -> None:
+    context = DeploymentVerificationContext(
+        kind="v4",
+        roles=("exit:exit-a",),
+        protocols=("hysteria2",),
+        public_tcp_ports=(),
+        public_udp_ports=(443,),
+        endpoint_addresses=(_IP,),
+    )
+    with (
+        patch("meridian.diagnostics.external.tcp_connect", return_value=False),
+        patch("meridian.diagnostics.external.reverse_hostname", return_value=""),
+        patch("meridian.diagnostics.probe.check_tls_certificate") as tls_check,
+    ):
+        checks = run_probe_checks(_IP, context, timeout=1)
+
+    assert [check.id for check in checks] == ["port_surface", "reverse_dns", "udp_surface"]
+    assert checks[-1].status == "skipped"
+    tls_check.assert_not_called()
+
+
+def test_reality_camouflage_uses_custom_port_without_managed_web_policy() -> None:
+    context = DeploymentVerificationContext(
+        kind="v4",
+        roles=("exit:exit-a",),
+        protocols=("reality",),
+        reality_snis=("www.example.com",),
+        public_tcp_ports=(8443,),
+        public_tls_ports=(8443,),
+        endpoint_addresses=(_IP,),
+    )
+    passed = _check("passed")
+    with (
+        patch("meridian.diagnostics.probe.check_port_surface", return_value=passed),
+        patch("meridian.diagnostics.probe.check_reverse_dns", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http_response", return_value=passed) as http,
+        patch("meridian.diagnostics.probe.check_tls_certificate", return_value=passed) as tls,
+        patch("meridian.diagnostics.probe.check_sni_consistency", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http2_support", return_value=passed),
+        patch("meridian.diagnostics.probe.check_legacy_tls", return_value=passed),
+        patch("meridian.diagnostics.probe.check_sni_camouflage", return_value=passed),
+        patch("meridian.diagnostics.probe.check_proxy_paths") as proxy_paths,
+        patch("meridian.diagnostics.probe.check_websocket_upgrade") as websocket,
+    ):
+        checks = run_probe_checks(_IP, context, timeout=1)
+
+    assert checks
+    assert http.call_args.kwargs == {
+        "meridian_mode": False,
+        "camouflage_origin": True,
+        "server_name": "www.example.com",
+        "host_header": "",
+        "port": 8443,
+        "timeout": 1,
+    }
+    assert tls.call_args.kwargs["port"] == 8443
+    proxy_paths.assert_not_called()
+    websocket.assert_not_called()
+
+
+def test_generic_domain_does_not_receive_meridian_web_policy() -> None:
+    context = DeploymentVerificationContext(
+        domains=("ordinary.example.com",),
+        domain_ports={"ordinary.example.com": 443},
+    )
+    passed = _check("passed")
+    with (
+        patch("meridian.diagnostics.probe.check_port_surface", return_value=passed),
+        patch("meridian.diagnostics.probe.check_reverse_dns", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http_response", return_value=passed) as http,
+        patch("meridian.diagnostics.probe.check_tls_certificate", return_value=passed),
+        patch("meridian.diagnostics.probe.check_sni_consistency", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http2_support", return_value=passed),
+        patch("meridian.diagnostics.probe.check_legacy_tls", return_value=passed),
+        patch("meridian.diagnostics.probe.check_proxy_paths") as proxy_paths,
+        patch("meridian.diagnostics.probe.check_domain_root") as domain_root,
+    ):
+        run_probe_checks(_IP, context, timeout=1)
+
+    assert http.call_args.kwargs["meridian_mode"] is False
+    proxy_paths.assert_not_called()
+    domain_root.assert_not_called()
+
+
+def test_probe_preserves_split_sni_and_host_for_every_managed_route() -> None:
+    routes = (
+        VerificationHttpsRoute(
+            kind="managed",
+            port=443,
+            tls_sni="tls-a.example.com",
+            host_header="host-a.example.com",
+        ),
+        VerificationHttpsRoute(
+            kind="managed",
+            port=8443,
+            tls_sni="tls-b.example.com",
+            host_header="host-b.example.com",
+        ),
+    )
+    context = DeploymentVerificationContext(
+        kind="v4",
+        protocols=("xhttp", "wss"),
+        public_tcp_ports=(443, 8443),
+        public_tls_ports=(443, 8443),
+        https_routes=routes,
+    )
+    passed = _check("passed")
+    with (
+        patch("meridian.diagnostics.probe.check_port_surface", return_value=passed),
+        patch("meridian.diagnostics.probe.check_reverse_dns", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http_response", return_value=passed),
+        patch("meridian.diagnostics.probe.check_tls_certificate", return_value=passed) as certificate,
+        patch("meridian.diagnostics.probe.check_sni_consistency", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http2_support", return_value=passed),
+        patch("meridian.diagnostics.probe.check_legacy_tls", return_value=passed),
+        patch("meridian.diagnostics.probe.check_proxy_paths", return_value=passed),
+        patch("meridian.diagnostics.probe.check_websocket_upgrade", return_value=passed),
+        patch("meridian.diagnostics.probe.check_root_indistinguishable", return_value=passed),
+        patch("meridian.diagnostics.probe.check_domain_root", return_value=passed) as domain_root,
+    ):
+        run_probe_checks(_IP, context, timeout=1)
+
+    assert len(certificate.call_args_list) == 2
+    assert {(call.kwargs["server_name"], call.kwargs["port"]) for call in certificate.call_args_list} == {
+        ("tls-a.example.com", 443),
+        ("tls-b.example.com", 8443),
+    }
+    assert {(call.args[1], call.kwargs["server_name"], call.kwargs["port"]) for call in domain_root.call_args_list} == {
+        ("host-a.example.com", "tls-a.example.com", 443),
+        ("host-b.example.com", "tls-b.example.com", 8443),
+    }
+
+
+def test_managed_ip_route_runs_root_and_panel_checks() -> None:
+    context = DeploymentVerificationContext(
+        kind="v4",
+        roles=("control",),
+        public_tcp_ports=(443,),
+        public_tls_ports=(443,),
+        https_routes=(VerificationHttpsRoute(kind="managed", port=443, panel=True),),
+        panel_secret_path="secret",
+    )
+    passed = _check("passed")
+    with (
+        patch("meridian.diagnostics.probe.check_port_surface", return_value=passed),
+        patch("meridian.diagnostics.probe.check_reverse_dns", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http_response", return_value=passed),
+        patch("meridian.diagnostics.probe.check_tls_certificate", return_value=passed),
+        patch("meridian.diagnostics.probe.check_sni_consistency", return_value=passed),
+        patch("meridian.diagnostics.probe.check_http2_support", return_value=passed),
+        patch("meridian.diagnostics.probe.check_legacy_tls", return_value=passed),
+        patch("meridian.diagnostics.probe.check_proxy_paths", return_value=passed),
+        patch("meridian.diagnostics.probe.check_websocket_upgrade", return_value=passed),
+        patch("meridian.diagnostics.probe.check_root_indistinguishable", return_value=passed) as root,
+        patch("meridian.diagnostics.probe.check_domain_root", return_value=passed),
+        patch("meridian.diagnostics.probe.check_secret_paths", return_value=passed) as secret,
+    ):
+        run_probe_checks(_IP, context, timeout=1)
+
+    root.assert_called_once()
+    secret.assert_called_once()
+
+
+def test_collect_probe_result_uses_typed_aggregate(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from meridian.cluster import ClusterConfig
+    from meridian.servers import ServerRegistry
+
+    monkeypatch.setattr("meridian.commands.probe.run_probe_checks", lambda *_args, **_kwargs: [_check("failed")])
+
+    result = collect_probe_result(
+        _IP,
+        "",
+        registry=ServerRegistry(tmp_path / "servers.json"),
+        cluster=ClusterConfig(),
+    )
+
+    assert result.verdict == "findings"
+    assert result.exit_code == 4
+    assert result.context.mode == "generic"
+
+
+def test_explicit_external_probe_reports_corrupt_v4_registry_as_inconclusive(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meridian.cluster import ClusterConfig
+    from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+    from meridian.servers import ServerRegistry
+
+    registry_path = tmp_path / "servers.json"
+    registry_path.write_text("broken", encoding="utf-8")
+    cluster = ClusterConfig(
+        topology_intent=SetupIntent(
+            control=ControlPlaneIntent(server_ref="control"),
+            exits=[
+                ExitIntent(
+                    id="exit-a",
+                    server_ref="exit",
+                    paths=[
+                        ProtocolPathIntent(
+                            id="reality-a",
+                            protocol="reality",
+                            reality_sni="www.example.com",
+                        )
+                    ],
+                )
+            ],
+            default_egress_ref="exit-a",
+            access=AccessIntent(users=["default"]),
+        )
+    )
+    monkeypatch.setattr("meridian.commands.probe.run_probe_checks", lambda *_args, **_kwargs: [_check("passed")])
+
+    result = collect_probe_result(
+        _IP,
+        "",
+        registry=ServerRegistry(registry_path),
+        cluster=cluster,
+    )
+
+    assert result.verdict == "inconclusive"
+    assert result.exit_code == 3
+    assert result.checks[0].findings[0].code == "LOCAL_CONTEXT_UNAVAILABLE"
+
+
+def test_probe_json_findings_emit_one_envelope_and_exit_four(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr("meridian.commands.probe.collect_probe_result", lambda *_args, **_kwargs: _result("failed"))
+
+    result = runner.invoke(app, ["probe", _IP, "--json"])
+
+    from meridian.console import set_json_mode, set_quiet_mode
+
+    set_json_mode(False)
+    set_quiet_mode(False)
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert payload["command"] == "probe"
+    assert payload["status"] == "ok"
+    assert payload["exit_code"] == 4
+    assert payload["data"]["verdict"] == "findings"
+
+
+def test_probe_json_inconclusive_is_a_typed_system_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr("meridian.commands.probe.collect_probe_result", lambda *_args, **_kwargs: _result("skipped"))
+
+    result = runner.invoke(app, ["probe", _IP, "--json"])
+
+    from meridian.console import set_json_mode, set_quiet_mode
+
+    set_json_mode(False)
+    set_quiet_mode(False)
+    assert result.exit_code == 3
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "failed"
+    assert payload["errors"][0]["code"] == "MERIDIAN_PROBE_INCONCLUSIVE"
+    assert payload["data"]["verdict"] == "inconclusive"
+
+
+def test_probe_help_documents_automation_controls() -> None:
+    result = runner.invoke(app, ["probe", "--help"])
+
+    assert result.exit_code == 0
+    assert "--json" in result.output
+    assert "--timeout" in result.output
+    assert "--sni" in result.output

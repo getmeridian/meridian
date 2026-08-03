@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
+import pytest
+
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel, RemnawaveError
 from meridian.remnawave.models import (
     parse_config_profile,
     parse_host,
@@ -269,3 +271,21 @@ def test_fetch_subscription_returns_canonical_content_and_type() -> None:
     assert document.content == '[{"outbounds": []}]'
     assert document.client_type == "json"
     assert document.content_type.startswith("application/json")
+
+
+@pytest.mark.parametrize(
+    ("status_code", "category"),
+    [(422, "user"), (429, "system"), (503, "system")],
+)
+def test_fetch_subscription_classifies_request_rejection_and_unavailability(
+    status_code: int,
+    category: str,
+) -> None:
+    panel = _panel()
+    response = MagicMock(status_code=status_code, text="request failed", headers={})
+    panel._client.request.return_value = response
+
+    with pytest.raises(RemnawaveError) as exc_info:
+        panel.fetch_subscription("short-id", client_type=XRAY_JSON_CLIENT_TYPE)
+
+    assert exc_info.value.category == category

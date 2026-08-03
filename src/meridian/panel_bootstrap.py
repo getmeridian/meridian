@@ -11,11 +11,13 @@ from __future__ import annotations
 import logging
 import secrets
 import shlex
+from dataclasses import dataclass
 
 from meridian import pwa
 from meridian.adapters import RemoteExecutorConnection, SSHRemoteExecutor
 from meridian.cluster import (
     ClusterConfig,
+    ClusterConfigExternallyModifiedError,
     InboundRef,
     NodeEntry,
     PanelConfig,
@@ -48,6 +50,30 @@ from meridian.ssh import ServerConnection
 from meridian.xray_config import build_xray_config
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PanelHandoff:
+    """Transient first-client links returned to the deploy command."""
+
+    connection_page_url: str = ""
+    subscription_url: str = ""
+
+
+def _persist_remote_state_checkpoint(cluster: ClusterConfig, *, backup: bool = False) -> None:
+    """Save local state after a panel or node mutation without losing provenance."""
+    try:
+        if backup:
+            cluster.backup()
+        cluster.save()
+    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+        raise PanelSetupError(
+            "Remote panel or node state changed, but Meridian could not save cluster.yml",
+            hint=(
+                f"{exc} Repair local state permissions or disk space, inspect the panel and server, then "
+                "recover or save matching cluster state before retrying."
+            ),
+        ) from exc
 
 
 # Provisioner pipeline
@@ -169,7 +195,7 @@ def _update_subscription_page(
         if cluster.subscription_page is None:
             cluster.subscription_page = SubscriptionPageConfig()
         cluster.subscription_page.deployed = True
-        cluster.save()
+        _persist_remote_state_checkpoint(cluster)
 
 
 def _ensure_config_profile(
@@ -243,7 +269,7 @@ def configure_panel_and_node(
     xhttp_path: str = "",
     ws_path: str = "",
     info_page_path: str = "",
-) -> None:
+) -> PanelHandoff:
     """Configure the Remnawave panel via REST API after containers are running.
 
     For first deploy: register admin, create config profile, register node,
@@ -256,7 +282,7 @@ def configure_panel_and_node(
     logger.info("Configuring panel via API...")
 
     if is_first_deploy:
-        setup_first_deploy(
+        return setup_first_deploy(
             resolved=resolved,
             cluster=cluster,
             domain=domain,
@@ -292,6 +318,7 @@ def configure_panel_and_node(
         )
     # Note: new-node path removed — deploy refuses new IPs when cluster
     # is configured. Use `meridian node add` instead.
+    return PanelHandoff()
 
 
 def setup_first_deploy(
@@ -312,7 +339,7 @@ def setup_first_deploy(
     xhttp_path: str = "",
     ws_path: str = "",
     info_page_path: str = "",
-) -> None:
+) -> PanelHandoff:
     """First deploy: full panel bootstrap from scratch."""
     ensure_control_plane_access(
         resolved=resolved,
@@ -324,6 +351,7 @@ def setup_first_deploy(
     )
     base_url = cluster.panel.url
     api_token = cluster.panel.api_token
+    handoff = PanelHandoff()
 
     with MeridianPanel(base_url, api_token) as panel:
         # Create config profile (Xray inbound definitions)
@@ -387,8 +415,7 @@ def setup_first_deploy(
         # Deduplicate: update existing entry or append new
         cluster.remove_node(resolved.ip)
         cluster.nodes.append(node_entry)
-        cluster.backup()
-        cluster.save()
+        _persist_remote_state_checkpoint(cluster, backup=True)
 
         # Create direct hosts for this node's protocols
         create_hosts_for_node(panel, cluster, resolved.ip, domain, sni)
@@ -409,20 +436,20 @@ def setup_first_deploy(
             if user and isinstance(getattr(user, "vless_uuid", None), str) and user.vless_uuid:
                 try:
                     sub_url = panel.get_subscription_url(user.short_uuid) if user.short_uuid else ""
+                    handoff = PanelHandoff(subscription_url=sub_url)
                     page_url = pwa.deploy_client_page(
                         resolved.conn, cluster, node_entry, user.vless_uuid, client_name, sub_url
                     )
                     if page_url:
                         logger.info("Connection page deployed")
-                        cluster._extra["_page_url"] = page_url
-                    if sub_url:
-                        cluster._extra["_subscription_url"] = sub_url
+                        handoff = PanelHandoff(connection_page_url=page_url, subscription_url=sub_url)
                 except (OSError, RuntimeError):
                     pass  # Non-fatal — subscription URL still works
         except RemnawaveError as e:
             logger.warning("Could not create client '%s': %s", client_name, e)
 
     logger.info("Panel configuration complete")
+    return handoff
 
 
 def ensure_control_plane_access(
@@ -490,10 +517,9 @@ def ensure_control_plane_access(
         sub_path=info_page_path or cluster.panel.sub_path or secrets.token_hex(8),
         deployed_with=version,
     )
-    cluster.backup()
-    cluster.save()
+    _persist_remote_state_checkpoint(cluster, backup=True)
     cluster.panel.api_token = create_api_token(base_url, auth_token)
-    cluster.save()
+    _persist_remote_state_checkpoint(cluster)
     _update_subscription_page(
         resolved.conn,
         cluster,
@@ -674,8 +700,7 @@ def setup_redeploy(
             node.reality_private_key = reality_private_key
             node.xhttp_path = xhttp_path or node.xhttp_path
             node.ws_path = ws_path or node.ws_path
-            cluster.backup()
-            cluster.save()
+            _persist_remote_state_checkpoint(cluster, backup=True)
             logger.info("Node configuration updated")
 
             # Ensure subscription page has a valid token (upgrade from pre-subscription deploys)
@@ -751,8 +776,7 @@ def setup_new_node(
             )
             cluster.remove_node(resolved.ip)
             cluster.nodes.append(node_entry)
-            cluster.backup()
-            cluster.save()
+            _persist_remote_state_checkpoint(cluster, backup=True)
 
             # Create hosts for the new node
             create_hosts_for_node(panel, cluster, resolved.ip, domain, sni)

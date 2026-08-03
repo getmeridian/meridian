@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -140,6 +141,13 @@ class TestSubcommandHelp:
         assert result.exit_code == 0
         assert called == {"port": 9876, "assets_dir": "website/dist", "no_open": True}
 
+    def test_studio_rejects_out_of_range_port(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        result = runner.invoke(app, ["studio", "--port", "65536"])
+
+        assert result.exit_code == 2
+
     def test_client_help(self) -> None:
         result = runner.invoke(app, ["client", "--help"])
         assert result.exit_code == 0
@@ -176,6 +184,14 @@ class TestSubcommandHelp:
         result = runner.invoke(app, ["fleet", "status", "--help"])
         assert result.exit_code == 0
         assert "--json" in _strip_ansi(result.output)
+
+    def test_fleet_recover_rejects_before_reading_token_without_legacy(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        with patch("meridian.commands.recover.load_api_token") as load_token:
+            result = runner.invoke(app, ["fleet", "recover", "--panel-url", "https://198.51.100.10/panel"])
+
+        assert result.exit_code == 2
+        load_token.assert_not_called()
 
     def test_fleet_inventory_accepts_command_json(self, monkeypatch) -> None:
         called: dict[str, bool] = {}
@@ -294,6 +310,21 @@ class TestSubcommandHelp:
         result = runner.invoke(app, ["update", "--help"])
         assert result.exit_code == 0
 
+    def test_update_propagates_system_failure_exit(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr("meridian.update.run_self_update", lambda: 3)
+
+        result = runner.invoke(app, ["update"])
+
+        assert result.exit_code == 3
+
+    def test_apply_rejects_unsafe_parallel_count(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        result = runner.invoke(app, ["apply", "--parallel", "0"])
+
+        assert result.exit_code == 2
+
 
 class TestApiContractCLI:
     def test_api_schemas_json_is_parseable_machine_output(self, monkeypatch) -> None:
@@ -309,6 +340,18 @@ class TestApiContractCLI:
         assert payload["command"] == "api.schemas"
         assert payload["data"]["schemas"]
         assert "Meridian v" not in result.output
+
+    def test_include_schemas_implies_json_envelope(self, monkeypatch) -> None:
+        _reset_output_modes()
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        result = runner.invoke(app, ["api", "schemas", "--include-schemas"])
+
+        _reset_output_modes()
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["command"] == "api.schemas"
+        assert payload["data"]["schemas"][0]["schema"]
 
     def test_api_commands_json_lists_command_contracts(self, monkeypatch) -> None:
         set_json_mode(False)

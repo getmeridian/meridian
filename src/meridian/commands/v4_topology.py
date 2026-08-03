@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import typer
+from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
+from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
@@ -32,6 +35,7 @@ def run_v4_apply(
     runtime = SetupRuntime(
         ServerRegistry(SERVER_PROFILES_FILE),
         cluster_loader=lambda: cluster,
+        persist=persist_reviewed_apply,
     )
     draft = SetupDraft.from_intent(intent)
     review = runtime.review(draft)
@@ -71,10 +75,18 @@ def run_v4_apply(
         if not confirm("Apply this reviewed topology?"):
             raise typer.Exit(1)
 
-    result = runtime.apply_intent(
-        intent,
-        expected_plan_hash=review.plan.plan_hash,
-    )
+    try:
+        result = runtime.apply_intent(
+            intent,
+            expected_plan_hash=review.plan.plan_hash,
+        )
+    except ReviewedApplyPersistenceError as exc:
+        raise MeridianException(
+            "V4 apply could not save local convergence state; remote state may have changed.",
+            hint=str(exc),
+            category="system",
+            retryable=True,
+        ) from exc
     status: OutputStatus = "failed" if not result.all_succeeded else "changed" if result.changed else "no_changes"
     exit_code = 0 if result.all_succeeded else 3
     summary_text = "V4 topology converged." if result.all_succeeded else "V4 topology apply failed."
@@ -144,31 +156,59 @@ def run_v4_plan(
         cluster_loader=lambda: cluster,
     ).inspect_intent(intent)
     resources = [item.action.resource for item in inspection.inspections]
+    observation_errors = [item for item in inspection.inspections if item.error]
+    drifted = [item for item in inspection.inspections if not item.error and not item.converged]
     converged = (
         inspection.converged and cluster.active_plan_hash == inspection.plan_hash and not cluster.pending_plan_hash
     )
+    state_changes: list[str] = []
+    if cluster.pending_plan_hash:
+        if cluster.pending_plan_hash == inspection.plan_hash:
+            state_changes.append(f"activate pending generation {cluster.pending_generation}")
+        else:
+            state_changes.append("resolve a different pending plan before activating this review")
+    elif cluster.active_plan_hash != inspection.plan_hash:
+        state_changes.append("activate this reviewed plan as the current generation")
     exit_code = 0 if converged else 2
     counts: dict[str, int] = {}
     for resource in resources:
         resource_kind = resource.payload.kind
         counts[resource_kind] = counts.get(resource_kind, 0) + 1
     if json_output:
-        summary_text = (
-            "V4 topology is converged."
-            if converged
-            else (f"{len(inspection.drifted)} of {len(resources)} V4 resources require repair.")
-        )
+        if observation_errors:
+            summary_text = (
+                f"Could not observe {len(observation_errors)} of {len(resources)} V4 resources; plan is inconclusive."
+            )
+        elif converged:
+            summary_text = "V4 topology is converged."
+        elif drifted and state_changes:
+            summary_text = (
+                f"{len(drifted)} of {len(resources)} V4 resources require repair; "
+                "saved generation state also requires activation."
+            )
+        elif drifted:
+            summary_text = f"{len(drifted)} of {len(resources)} V4 resources require repair."
+        else:
+            summary_text = "V4 resources match; saved generation state requires activation."
         result_data = CompiledPlanResult(
             plan_hash=inspection.plan_hash,
             converged=converged,
             summary=summary_text,
-            exit_code=exit_code,
+            exit_code=3 if observation_errors else exit_code,
+            state_changes=state_changes,
+            observation_errors=[
+                CompiledPlanDriftResult(
+                    logical_id=item.action.resource.logical_id,
+                    error=item.error,
+                )
+                for item in observation_errors
+            ],
             drifted_resources=[
                 CompiledPlanDriftResult(
                     logical_id=item.action.resource.logical_id,
                     error=item.error,
                 )
-                for item in inspection.drifted
+                for item in drifted
             ],
             resources=[
                 CompiledPlanResourceResult(
@@ -180,6 +220,18 @@ def run_v4_plan(
                 for resource in resources
             ],
         )
+        evidence_error = (
+            MeridianError(
+                code="MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE",
+                category="system",
+                message=summary_text,
+                hint="Restore panel, SSH, and local-state access, then rerun plan.",
+                retryable=True,
+                exit_code=3,
+            )
+            if observation_errors
+            else None
+        )
         emit_json(
             command_envelope(
                 command="plan",
@@ -189,18 +241,25 @@ def run_v4_plan(
                     changed=not converged,
                     counts=counts,
                 ),
-                status="no_changes" if converged else "changed",
-                exit_code=exit_code,
+                status="failed" if evidence_error else "no_changes" if converged else "changed",
+                exit_code=3 if evidence_error else exit_code,
+                errors=[evidence_error] if evidence_error else None,
                 timer=operation.timer,
             )
         )
     else:
-        state = "[green]converged[/green]" if converged else "[yellow]repair required[/yellow]"
+        state = "[green]converged[/green]" if converged else "[yellow]changes pending[/yellow]"
         err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{inspection.plan_hash}[/dim]\n")
         for kind_name, count in sorted(counts.items()):
             err_console.print(f"  {kind_name}: {count}")
-        for item in inspection.drifted:
+        for item in drifted:
             detail = f" — {item.error}" if item.error else ""
-            err_console.print(f"  [yellow]repair[/yellow] {item.action.resource.logical_id}{detail}")
+            err_console.print(f"  [yellow]repair[/yellow] {escape(item.action.resource.logical_id)}{escape(detail)}")
+        for item in observation_errors:
+            err_console.print(
+                f"  [yellow]unavailable[/yellow] {escape(item.action.resource.logical_id)} — {escape(item.error)}"
+            )
+        for change in state_changes:
+            err_console.print(f"  [yellow]state[/yellow] {escape(change)}")
         err_console.print()
-    raise typer.Exit(exit_code)
+    raise typer.Exit(3 if observation_errors else exit_code)

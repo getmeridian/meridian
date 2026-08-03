@@ -21,6 +21,7 @@ from meridian.adapters import JsonlReporter
 from meridian.cluster import (
     BrandingConfig,
     ClusterConfig,
+    ClusterConfigExternallyModifiedError,
 )
 from meridian.commands.resolve import (
     ensure_server_connection,
@@ -55,7 +56,7 @@ from meridian.core.deploy_planning import (
     DeployPlan,
 )
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
-from meridian.core.errors import EngineError, MeridianError
+from meridian.core.errors import EngineError, LocalStateError, MeridianError
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -63,7 +64,7 @@ from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.services.deploy import deploy_server
 from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import dry_run_deploy_request, plan_deploy_request, resolve_deploy_target
-from meridian.panel_bootstrap import configure_panel_and_node, run_provisioner
+from meridian.panel_bootstrap import PanelHandoff, configure_panel_and_node, run_provisioner
 from meridian.provision.progress import RichStepRenderer
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.renderers import emit_json
@@ -384,7 +385,7 @@ def _execute_deploy_request(
         )
 
         # Post-provisioner: configure panel via REST API
-        configure_panel_and_node(
+        handoff = configure_panel_and_node(
             resolved=resolved,
             cluster=cluster,
             domain=domain,
@@ -402,6 +403,8 @@ def _execute_deploy_request(
             ws_path=ws_path,
             info_page_path=info_page_path,
         )
+        if not isinstance(handoff, PanelHandoff):
+            handoff = PanelHandoff()
     except MeridianError as exc:
         fail(exc)
 
@@ -413,8 +416,18 @@ def _execute_deploy_request(
             color=color,
         )
 
-    # Save cluster config
-    cluster.save()
+    # Save cluster config after every remote mutation and local presentation update.
+    try:
+        cluster.save()
+    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+        fail(
+            "Deployment changed remote state, but Meridian could not save cluster.yml",
+            hint=(
+                f"{exc} Repair local state permissions or disk space, inspect the panel and server, then recover "
+                "or save matching cluster state before retrying."
+            ),
+            hint_type="system",
+        )
     ok("Cluster configuration saved")
 
     # Persist sub_path on server for fleet recovery (not stored in panel API)
@@ -431,7 +444,14 @@ def _execute_deploy_request(
             pass  # Non-fatal
 
     # Register server for --server flag resolution
-    registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=getattr(resolved.conn, "port", 22)))
+    try:
+        registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=getattr(resolved.conn, "port", 22)))
+    except (LocalStateError, OSError) as exc:
+        fail(
+            "Deployment completed remotely, but the saved server profile could not be updated",
+            hint=f"{exc} Repair ~/.meridian persistence, then add the server profile before retrying deployment.",
+            hint_type="system",
+        )
 
     # Success output
     redeploy_cmd = _build_redeploy_command(
@@ -471,8 +491,8 @@ def _execute_deploy_request(
         panel_url=cluster.panel.url,
         panel_secret_path=cluster.panel.secret_path,
         connection_page_path=cluster.panel.sub_path,
-        connection_page_url=str(cluster._extra.get("_page_url", "")),
-        subscription_url=str(cluster._extra.get("_subscription_url", "")),
+        connection_page_url=handoff.connection_page_url,
+        subscription_url=handoff.subscription_url,
         test_command=f"meridian test {resolved.ip}",
         node_count=len(cluster.nodes),
         relay_count=len(cluster.relays),
@@ -495,7 +515,8 @@ def _check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
 
     for port in (443, 80):
         while True:
-            result = conn.run(f"ss -tlnp sport = :{port} 2>/dev/null | grep LISTEN", timeout=10)
+            q_port = shlex.quote(str(port))
+            result = conn.run(f"ss -tlnp sport = :{q_port} 2>/dev/null | grep LISTEN", timeout=10)
             if not result.stdout.strip():
                 break  # port free
 

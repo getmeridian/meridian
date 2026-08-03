@@ -907,8 +907,7 @@ class TestIssueTLSCert:
         assert "--force" not in acme_calls[0]
         conn.assert_called_with_pattern("acme.sh --install-cert")
 
-    def test_acme_failure_returns_warning(self):
-        """ACME failure returns changed with warning, not failed."""
+    def test_acme_failure_blocks_panel_credential_exchange(self):
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=1)
@@ -916,9 +915,9 @@ class TestIssueTLSCert:
         ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
-        assert result.status == "changed"
-        assert "WARNING" in result.detail
-        assert "self-signed" in result.detail
+        assert result.status == "failed"
+        assert "trusted TLS certificate" in result.detail
+        assert "not sent over self-signed TLS" in result.detail
         # nginx should NOT be reloaded on ACME failure
         conn.assert_not_called_with_pattern("systemctl reload")
 

@@ -9,7 +9,7 @@ from uuid import UUID
 
 import pytest
 
-from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding
+from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding, WorkloadBinding
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.compiler.routing import edge_outbound_tag
@@ -36,7 +36,7 @@ from meridian.reconciler.resources import (
     build_resource_actions,
     postcondition_key,
 )
-from meridian.reconciler.workloads import WorkloadStateManager
+from meridian.reconciler.workloads import WorkloadStateError, WorkloadStateManager
 from meridian.remnawave import (
     ConfigProfile,
     ExternalSquad,
@@ -50,6 +50,7 @@ from meridian.remnawave import (
     SubscriptionTemplate,
     User,
 )
+from meridian.xray_workload import WorkloadConfigError
 
 _REMNAWAVE_DISPLAY_NAME_RE = re.compile(r"^[A-Za-z0-9_ -]+$")
 _REMNAWAVE_USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -370,6 +371,10 @@ class StatefulPanel:
         self.users[uuid].external_squad_uuid = external_squad_uuid
         return self.users[uuid]
 
+    def enable_user(self, uuid: str) -> None:
+        self.calls["enable_user"] += 1
+        self.users[uuid].status = "ACTIVE"
+
     def get_subscription_settings(self) -> SubscriptionSettings:
         return self.subscription_settings
 
@@ -516,6 +521,93 @@ def _keys(server_ref: str) -> RealityKeyBinding:
         private_key=f"private-{suffix}",
         short_id=f"short-{suffix}",
     )
+
+
+def test_missing_profile_observation_does_not_allocate_workload_secrets() -> None:
+    plan = compile_topology(_intent())
+    action = next(
+        action
+        for action in build_resource_actions(plan, generation=1)
+        if isinstance(action.resource.payload, ConfigProfilePayload) and action.resource.payload.workload_id == "exit-a"
+    )
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    key_calls: list[str] = []
+    persist_calls = 0
+
+    def persist(_state: ClusterConfig) -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+
+    workloads = WorkloadStateManager(
+        cluster,
+        persist=persist,
+        key_factory=lambda server_ref: (key_calls.append(server_ref), _keys(server_ref))[1],
+    )
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=workloads,
+        server_addresses={"srv-exit-a": "198.51.100.20"},
+    )
+
+    observed = build_remnawave_drivers(context)["config_profile"].observe(action, None)
+
+    assert not observed.exists
+    assert key_calls == []
+    assert persist_calls == 0
+    assert cluster.workloads == []
+    assert panel.calls["create_profile"] == 0
+
+
+def test_existing_profile_with_incomplete_reality_keys_is_an_observation_error() -> None:
+    plan = compile_topology(_intent())
+    action = next(
+        action
+        for action in build_resource_actions(plan, generation=1)
+        if isinstance(action.resource.payload, ConfigProfilePayload) and action.resource.payload.workload_id == "exit-a"
+    )
+    payload = cast(ConfigProfilePayload, action.resource.payload)
+    panel = StatefulPanel()
+    profile = panel.create_config_profile(payload.name, {"inbounds": []})
+    cluster = ClusterConfig(
+        workloads=[
+            WorkloadBinding(
+                id="exit-a",
+                generation=1,
+                config_profile_uuid=profile.uuid,
+                desired_hash=action.expected_hash,
+                reality_keys={
+                    "srv-exit-a": RealityKeyBinding(
+                        public_key="public-exit-a",
+                        private_key="",
+                        short_id="short-exit-a",
+                    )
+                },
+            )
+        ]
+    )
+    key_calls: list[str] = []
+    workloads = WorkloadStateManager(
+        cluster,
+        persist=lambda _state: None,
+        key_factory=lambda server_ref: (key_calls.append(server_ref), _keys(server_ref))[1],
+    )
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=workloads,
+        server_addresses={"srv-exit-a": "198.51.100.20"},
+    )
+    mutation_counts = panel.calls.copy()
+
+    with pytest.raises(WorkloadConfigError, match="Reality key material is incomplete"):
+        build_remnawave_drivers(context)["config_profile"].observe(action, None)
+
+    assert key_calls == []
+    assert panel.calls == mutation_counts
 
 
 def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
@@ -712,6 +804,19 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
         "meridian-exit-b-bridge-gateway-a",
     }
 
+    access_user = next(user for user in panel.users.values() if user.description == "Managed by Meridian access")
+    access_user.status = "DISABLED"
+    restored = execute_resource_plan(
+        plan,
+        cluster,
+        drivers,
+        persist=lambda _state: None,
+    )
+    assert restored.all_succeeded
+    assert restored.changed
+    assert access_user.status == "ACTIVE"
+    assert panel.calls["enable_user"] == 1
+
     mutation_counts = panel.calls.copy()
     second = execute_resource_plan(
         plan,
@@ -753,8 +858,8 @@ def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:
     )
     driver = build_remnawave_drivers(context)["config_profile"]
 
-    observed = driver.observe(action, None)
-    assert observed.observed_hash != action.expected_hash
+    with pytest.raises(WorkloadStateError, match="Workload state exit-a@1 is missing"):
+        driver.observe(action, None)
 
     with pytest.raises(ResourceReconcileError, match="Unmanaged"):
         driver.apply(action, None)

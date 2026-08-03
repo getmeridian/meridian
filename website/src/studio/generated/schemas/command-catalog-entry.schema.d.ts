@@ -24,6 +24,7 @@ export type FailureData = {
   [k: string]: unknown;
 } | null;
 export type FailureDataSchema = string;
+export type InterruptBehavior = "exit_130_without_envelope";
 export type MachineFlags = string[];
 export type Category = ("user" | "system" | "bug" | "cancelled") | "none";
 export type ExitCode = number;
@@ -49,6 +50,7 @@ export interface CommandCatalogEntry {
   exit_codes: ExitCodes;
   failure_data?: FailureData;
   failure_data_schema: FailureDataSchema;
+  interrupt_behavior?: InterruptBehavior;
   machine_flags: MachineFlags;
   outcomes: Outcomes;
   stability: Stability;

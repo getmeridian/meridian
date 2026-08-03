@@ -15,7 +15,22 @@ from meridian.core.apply import (
     CompiledApplyPreview,
     CompiledApplyResult,
 )
-from meridian.core.clients import ClientListResult, ClientShowResult
+from meridian.core.clients import (
+    ClientAddResult,
+    ClientListResult,
+    ClientRemoveResult,
+    ClientShowResult,
+    ClientStatusResult,
+)
+from meridian.core.command_catalog import (
+    CommandCatalogEntry,
+    CommandContract,
+    CommandOutcome,
+    OutcomeCategory,
+    command_contract,
+    command_contracts,
+    command_schema_bindings,
+)
 from meridian.core.command_inputs import (
     ClientNameRequest,
     NodeAddRequest,
@@ -29,10 +44,9 @@ from meridian.core.deploy import DeployRequest, DeployResult, DeployWorkflowAnsw
 from meridian.core.deploy_planning import DeployClusterState, DeployNodeState, DeployPlan, DeployPorts
 from meridian.core.events import EVENT_TYPES
 from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, RemoteCommandResult, RemoteTarget
-from meridian.core.fleet import FleetInventory, FleetStatus
+from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
 from meridian.core.models import (
     CoreModel,
-    ErrorCategory,
     Event,
     MeridianError,
     OutputEnvelope,
@@ -70,11 +84,22 @@ from meridian.core.servers import (
     ServerValidateRequest,
     ServerValidateResult,
 )
+from meridian.core.verification import (
+    ProbeResult,
+    TestResult,
+    VerificationAggregate,
+    VerificationCheck,
+    VerificationContext,
+    VerificationCounts,
+    VerificationFinding,
+    VerificationResult,
+    VerificationTarget,
+)
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowCatalogEntry, WorkflowPlan
 
 
 class EmptyData(CoreModel):
-    """Empty data object used by failed or cancelled envelopes."""
+    """Empty data object used by envelopes without command-specific failure data."""
 
 
 class SchemaCatalogEntry(CoreModel):
@@ -188,7 +213,7 @@ def _make_command_envelope(
         f"_{prefix}TerminalEnvelope",
         __base__=_ContractEnvelope,
         command=(cmd_literal, ...),
-        status=(Literal["failed", "cancelled"], ...),
+        status=(Literal["failed"], ...),
         data=(failure_data_type, ...),
         errors=(list[MeridianError], Field(min_length=1)),
     )
@@ -205,8 +230,14 @@ _PlanSuccessEnvelope, _PlanTerminalEnvelope, PlanOutputEnvelope = _make_command_
     "plan",
     PlanCommandData,
     success_statuses=Literal["changed", "no_changes"],
+    failure_data_type=PlanResult | CompiledPlanResult | EmptyData,
     doc="Envelope schema for `meridian plan --json`.",
 )
+
+
+class PlanFailureData(RootModel[PlanResult | CompiledPlanResult | EmptyData]):
+    """Failure data schema for `meridian plan --json`."""
+
 
 # --- Apply ---
 _ApplySuccessEnvelope, _ApplyTerminalEnvelope, ApplyOutputEnvelope = _make_command_envelope(
@@ -221,6 +252,31 @@ _ApplySuccessEnvelope, _ApplyTerminalEnvelope, ApplyOutputEnvelope = _make_comma
 
 class ApplyFailureData(RootModel[ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData]):
     """Failure data schema for `meridian apply --json`."""
+
+
+_, _, ProbeOutputEnvelope = _make_command_envelope(
+    "Probe",
+    "probe",
+    ProbeResult,
+    failure_data_type=ProbeResult | EmptyData,
+    doc="Envelope schema for probe JSON output.",
+)
+
+_, _, TestOutputEnvelope = _make_command_envelope(
+    "Test",
+    "test",
+    TestResult,
+    failure_data_type=TestResult | EmptyData,
+    doc="Envelope schema for test JSON output.",
+)
+
+
+class ProbeFailureData(RootModel[ProbeResult | EmptyData]):
+    """Failure data schema for probe JSON output."""
+
+
+class TestFailureData(RootModel[TestResult | EmptyData]):
+    """Failure data schema for test JSON output."""
 
 
 class DeployCommandData(RootModel[DeployResult | DeployPlan]):
@@ -249,7 +305,7 @@ class _DeployPlanEnvelope(_ContractEnvelope):
 
 class _DeployTerminalEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
-    status: Literal["failed", "cancelled"]
+    status: Literal["failed"]
     data: EmptyData
     errors: list[MeridianError] = Field(min_length=1)
 
@@ -291,6 +347,48 @@ _, _, ClientShowOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client show --json`.",
 )
 
+_, _, ClientAddOutputEnvelope = _make_command_envelope(
+    "ClientAdd",
+    "client.add",
+    ClientAddResult,
+    doc="Envelope schema for `meridian client add --json`.",
+)
+
+_, _, ClientRemoveOutputEnvelope = _make_command_envelope(
+    "ClientRemove",
+    "client.remove",
+    ClientRemoveResult,
+    doc="Envelope schema for `meridian client remove --json`.",
+)
+
+_, _, ClientEnableOutputEnvelope = _make_command_envelope(
+    "ClientEnable",
+    "client.enable",
+    ClientStatusResult,
+    doc="Envelope schema for `meridian client enable --json`.",
+)
+
+_, _, ClientDisableOutputEnvelope = _make_command_envelope(
+    "ClientDisable",
+    "client.disable",
+    ClientStatusResult,
+    doc="Envelope schema for `meridian client disable --json`.",
+)
+
+_, _, NodeListOutputEnvelope = _make_command_envelope(
+    "NodeList",
+    "node.list",
+    NodeListResult,
+    doc="Envelope schema for `meridian --json node list`.",
+)
+
+_, _, RelayListOutputEnvelope = _make_command_envelope(
+    "RelayList",
+    "relay.list",
+    RelayListResult,
+    doc="Envelope schema for `meridian --json relay list`.",
+)
+
 _, _, ApiSchemasOutputEnvelope = _make_command_envelope(
     "ApiSchemas",
     "api.schemas",
@@ -320,87 +418,6 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 )
 
 
-OutcomeCategory = ErrorCategory | Literal["none"]
-
-
-class CommandOutcome(CoreModel):
-    """Structured command outcome for process clients."""
-
-    status: OutputStatus
-    exit_code: int
-    category: OutcomeCategory
-    meaning: str
-
-
-class CommandContract(CoreModel):
-    """Discoverable command-to-schema contract for process API clients."""
-
-    command: str
-    argv: list[str]
-    envelope_schema: str
-    data_schema: str
-    failure_data_schema: str
-    error_schema: str
-    statuses: list[OutputStatus]
-    outcomes: list[CommandOutcome]
-    exit_codes: dict[str, str]
-    machine_flags: list[str]
-    stability: Literal["stable", "preview"]
-    description: str
-
-
-class CommandCatalogEntry(CommandContract):
-    """Command contract entry with optional embedded schemas."""
-
-    envelope: dict[str, Any] | None = None
-    data: dict[str, Any] | None = None
-    failure_data: dict[str, Any] | None = None
-    error: dict[str, Any] | None = None
-
-
-def _standard_outcomes(success_status: Literal["ok"], success_meaning: str) -> list[CommandOutcome]:
-    return [
-        CommandOutcome(status=success_status, exit_code=0, category="none", meaning=success_meaning),
-        CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
-        CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
-        CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
-        CommandOutcome(status="cancelled", exit_code=130, category="cancelled", meaning="cancelled by the user"),
-    ]
-
-
-def _plan_outcomes() -> list[CommandOutcome]:
-    return [
-        CommandOutcome(status="no_changes", exit_code=0, category="none", meaning="desired state already matches"),
-        CommandOutcome(status="changed", exit_code=2, category="none", meaning="changes pending"),
-        CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
-        CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
-        CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
-        CommandOutcome(status="cancelled", exit_code=130, category="cancelled", meaning="cancelled by the user"),
-    ]
-
-
-def _apply_outcomes() -> list[CommandOutcome]:
-    return [
-        CommandOutcome(status="no_changes", exit_code=0, category="none", meaning="desired state already matches"),
-        CommandOutcome(status="changed", exit_code=0, category="none", meaning="changes were applied"),
-        CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
-        CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
-        CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
-        CommandOutcome(status="cancelled", exit_code=130, category="cancelled", meaning="cancelled by the user"),
-    ]
-
-
-def _deploy_outcomes() -> list[CommandOutcome]:
-    return [
-        CommandOutcome(status="changed", exit_code=0, category="none", meaning="server was deployed"),
-        CommandOutcome(status="ok", exit_code=0, category="none", meaning="deploy request was validated or planned"),
-        CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
-        CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
-        CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
-        CommandOutcome(status="cancelled", exit_code=130, category="cancelled", meaning="cancelled by the user"),
-    ]
-
-
 _SCHEMAS: dict[str, type[BaseModel]] = {
     "output-envelope": OutputEnvelope,
     "apply": ApplyResult,
@@ -422,7 +439,27 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "api-workflow-envelope": ApiWorkflowOutputEnvelope,
     "client-list-envelope": ClientListOutputEnvelope,
     "client-show-envelope": ClientShowOutputEnvelope,
+    "client-add-envelope": ClientAddOutputEnvelope,
+    "client-remove-envelope": ClientRemoveOutputEnvelope,
+    "client-enable-envelope": ClientEnableOutputEnvelope,
+    "client-disable-envelope": ClientDisableOutputEnvelope,
+    "node-list-envelope": NodeListOutputEnvelope,
+    "relay-list-envelope": RelayListOutputEnvelope,
     "plan-envelope": PlanOutputEnvelope,
+    "plan-failure": PlanFailureData,
+    "probe-envelope": ProbeOutputEnvelope,
+    "probe-failure": ProbeFailureData,
+    "probe-result": ProbeResult,
+    "test-envelope": TestOutputEnvelope,
+    "test-failure": TestFailureData,
+    "test-result": TestResult,
+    "verification-aggregate": VerificationAggregate,
+    "verification-check": VerificationCheck,
+    "verification-context": VerificationContext,
+    "verification-counts": VerificationCounts,
+    "verification-finding": VerificationFinding,
+    "verification-result": VerificationResult,
+    "verification-target": VerificationTarget,
     "fleet-status-envelope": FleetStatusOutputEnvelope,
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "event": Event,
@@ -440,6 +477,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "summary": Summary,
     "client-list": ClientListResult,
     "client-show": ClientShowResult,
+    "client-add": ClientAddResult,
+    "client-remove": ClientRemoveResult,
+    "client-status": ClientStatusResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,
     "server-bootstrap-key-request": ServerBootstrapKeyRequest,
@@ -485,239 +525,15 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "compiled-plan-result": CompiledPlanResult,
     "fleet-status": FleetStatus,
     "fleet-inventory": FleetInventory,
+    "node-list": NodeListResult,
+    "relay-list": RelayListResult,
     "command-contract": CommandContract,
     "command-catalog-entry": CommandCatalogEntry,
     "command-outcome": CommandOutcome,
 }
 
-_COMMAND_CONTRACTS: dict[str, CommandContract] = {
-    "apply": CommandContract(
-        command="apply",
-        argv=["apply"],
-        envelope_schema="apply-envelope",
-        data_schema="apply-command-data",
-        failure_data_schema="apply-failure",
-        error_schema="error",
-        statuses=["no_changes", "changed", "failed", "cancelled"],
-        outcomes=_apply_outcomes(),
-        exit_codes={
-            "0": "desired state was already converged or changes were applied",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="preview",
-        description="Converge desired state and emit typed action execution results.",
-    ),
-    "deploy": CommandContract(
-        command="deploy",
-        argv=["deploy"],
-        envelope_schema="deploy-envelope",
-        data_schema="deploy-command-data",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["changed", "ok", "failed", "cancelled"],
-        outcomes=_deploy_outcomes(),
-        exit_codes={
-            "0": "server was deployed or deploy request was validated/planned",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json", "--events=jsonl", "--request", "--dry-run"],
-        stability="preview",
-        description="Deploy or validate a Meridian server from a typed deploy request.",
-    ),
-    "api.commands": CommandContract(
-        command="api.commands",
-        argv=["api", "commands"],
-        envelope_schema="api-commands-envelope",
-        data_schema="api-commands",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "command contracts were listed"),
-        exit_codes={
-            "0": "command contracts were listed",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json", "--include-schemas"],
-        stability="stable",
-        description=(
-            "List migrated command contracts; with --include-schemas, embed envelope, data, error, and failure schemas."
-        ),
-    ),
-    "api.schema": CommandContract(
-        command="api.schema",
-        argv=["api", "schema", "NAME"],
-        envelope_schema="api-schema-envelope",
-        data_schema="api-schema",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "schema was found"),
-        exit_codes={
-            "0": "schema was found",
-            "1": "unexpected Meridian bug",
-            "2": "schema name is unknown",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--envelope", "--json"],
-        stability="stable",
-        description="Return one JSON Schema. Without --envelope/global --json, success remains raw schema JSON.",
-    ),
-    "api.schemas": CommandContract(
-        command="api.schemas",
-        argv=["api", "schemas"],
-        envelope_schema="api-schemas-envelope",
-        data_schema="api-schemas",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "schema catalog was listed"),
-        exit_codes={
-            "0": "schema catalog was listed",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json", "--include-schemas"],
-        stability="stable",
-        description="List meridian-core JSON Schema names; with --include-schemas, embed full schemas.",
-    ),
-    "api.workflow": CommandContract(
-        command="api.workflow",
-        argv=["api", "workflow", "NAME"],
-        envelope_schema="api-workflow-envelope",
-        data_schema="api-workflow",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "workflow contract was returned"),
-        exit_codes={
-            "0": "workflow contract was returned",
-            "1": "unexpected Meridian bug",
-            "2": "workflow name is unknown",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="preview",
-        description="Return a UI-renderable workflow plan such as the deploy wizard field layout.",
-    ),
-    "client.list": CommandContract(
-        command="client.list",
-        argv=["client", "list"],
-        envelope_schema="client-list-envelope",
-        data_schema="client-list",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "client list was collected"),
-        exit_codes={
-            "0": "client list was collected",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="stable",
-        description="List panel clients as redacted metadata plus aggregate status counts.",
-    ),
-    "client.show": CommandContract(
-        command="client.show",
-        argv=["client", "show", "NAME"],
-        envelope_schema="client-show-envelope",
-        data_schema="client-show",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "client was found"),
-        exit_codes={
-            "0": "client was found",
-            "1": "unexpected Meridian bug",
-            "2": "client not found or input/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="stable",
-        description="Return one panel client and redacted handoff links.",
-    ),
-    "plan": CommandContract(
-        command="plan",
-        argv=["plan"],
-        envelope_schema="plan-envelope",
-        data_schema="plan-command-data",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["no_changes", "changed", "failed", "cancelled"],
-        outcomes=_plan_outcomes(),
-        exit_codes={
-            "0": "desired state already matches actual state",
-            "1": "unexpected Meridian bug",
-            "2": "changes pending; user/config errors also use category=user in the error envelope",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="preview",
-        description="Compute the desired-state reconciliation plan without applying it.",
-    ),
-    "fleet.status": CommandContract(
-        command="fleet.status",
-        argv=["fleet", "status"],
-        envelope_schema="fleet-status-envelope",
-        data_schema="fleet-status",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "fleet status was collected"),
-        exit_codes={
-            "0": "fleet status was collected; inspect data.summary.health and warnings for degraded state",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="stable",
-        description="Collect panel, node, relay, and user health observations for the configured fleet.",
-    ),
-    "fleet.inventory": CommandContract(
-        command="fleet.inventory",
-        argv=["fleet", "inventory"],
-        envelope_schema="fleet-inventory-envelope",
-        data_schema="fleet-inventory",
-        failure_data_schema="empty-data",
-        error_schema="error",
-        statuses=["ok", "failed", "cancelled"],
-        outcomes=_standard_outcomes("ok", "inventory was collected"),
-        exit_codes={
-            "0": "inventory was collected; plan --json is the drift/apply authority",
-            "1": "unexpected Meridian bug",
-            "2": "user/config error",
-            "3": "system or infrastructure failure",
-            "130": "cancelled by the user",
-        },
-        machine_flags=["--json"],
-        stability="stable",
-        description="Return the configured fleet topology plus live panel observations when available.",
-    ),
-}
 
-_COMMAND_SCHEMAS: dict[str, str] = {
-    command: contract.envelope_schema for command, contract in _COMMAND_CONTRACTS.items()
-}
+_COMMAND_SCHEMAS = command_schema_bindings()
 
 
 def schema_names() -> list[str]:
@@ -741,7 +557,7 @@ def schema_for(name: str) -> dict[str, Any]:
 
 def validate_command_envelope(payload: OutputEnvelope) -> OutputEnvelope:
     """Validate a produced envelope against its advertised command contract."""
-    contract = _COMMAND_CONTRACTS.get(payload.command)
+    contract = command_contract(payload.command)
     if contract is None:
         return payload
     schema_model(contract.envelope_schema).model_validate(payload.model_dump(mode="json", by_alias=True))
@@ -775,11 +591,6 @@ def schema_catalog(*, include_schemas: bool = False) -> list[dict[str, Any]]:
         )
         catalog.append(entry.model_dump(mode="json", by_alias=True, exclude_none=True))
     return catalog
-
-
-def command_contracts() -> list[CommandContract]:
-    """Return stable command contracts for migrated process API commands."""
-    return [_COMMAND_CONTRACTS[name] for name in sorted(_COMMAND_CONTRACTS)]
 
 
 def command_catalog(*, include_schemas: bool = False) -> list[dict[str, Any]]:

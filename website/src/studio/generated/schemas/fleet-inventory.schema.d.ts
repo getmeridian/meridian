@@ -28,7 +28,7 @@ export type Ip = string;
 export type Name2 = string;
 export type PanelStatus = "connected" | "disconnected" | "disabled" | "unknown";
 export type Protocols = string[];
-export type Role = "panel+node" | "node" | "relay";
+export type Role = "panel+node" | "node" | "relay" | "panel+routing_gateway" | "routing_gateway";
 export type Sni2 = string;
 export type SshPort2 = number;
 export type SshUser2 = string;
@@ -53,7 +53,7 @@ export type HostRefs = RelayHostRef[];
 export type Ip1 = string;
 export type Name3 = string;
 export type Port = number;
-export type Role1 = "panel+node" | "node" | "relay";
+export type Role1 = "panel+node" | "node" | "relay" | "panel+routing_gateway" | "routing_gateway";
 export type Sni3 = string;
 export type SshPort4 = number;
 export type SshUser4 = string;
@@ -61,7 +61,12 @@ export type Relays = RelayInventory[];
 export type Id = string;
 export type Ip2 = string;
 export type Name4 = string;
-export type Roles = ("panel" | "exit" | "relay")[];
+export type Advertised = boolean;
+export type Chain = string;
+export type Health = "healthy" | "unhealthy" | "unknown";
+export type Position = number;
+export type RelayHops = RelayHopMembership[];
+export type Roles = ("panel" | "exit" | "relay" | "routing_gateway")[];
 export type SshPort5 = number;
 export type SshUser5 = string;
 export type Servers = ServerInventory[];
@@ -155,9 +160,16 @@ export interface ServerInventory {
   id: Id;
   ip: Ip2;
   name: Name4;
+  relay_hops?: RelayHops;
   roles: Roles;
   ssh_port: SshPort5;
   ssh_user: SshUser5;
+}
+export interface RelayHopMembership {
+  advertised: Advertised;
+  chain: Chain;
+  health?: Health;
+  position: Position;
 }
 export interface FleetSources {
   nodes?: Nodes1;

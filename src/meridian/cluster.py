@@ -332,6 +332,8 @@ class ClusterConfig:
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
+    connection_page_markers: list[str] = field(default_factory=list)
+    connection_page_failures: list[str] = field(default_factory=list)
     active_generation: int = 0
     active_plan_hash: str = ""
     pending_generation: int = 0
@@ -564,6 +566,20 @@ class ClusterConfig:
                 errors.append(f"action_checkpoints[{key}].observed_hash is not a SHA-256 hash")
             if checkpoint.attempts < 0:
                 errors.append(f"action_checkpoints[{key}].attempts cannot be negative")
+
+        page_marker_fields = (
+            ("connection_page_markers", self.connection_page_markers),
+            ("connection_page_failures", self.connection_page_failures),
+        )
+        for field_name, markers in page_marker_fields:
+            if len(markers) != len(set(markers)):
+                errors.append(f"{field_name} contains duplicate markers")
+            for marker in markers:
+                if re.fullmatch(r"[0-9a-f]{64}", marker) is None:
+                    errors.append(f"{field_name} contains an invalid SHA-256 marker")
+                    break
+        if set(self.connection_page_markers) & set(self.connection_page_failures):
+            errors.append("connection page markers cannot be both deployed and failed")
 
         for field_name, value in (
             ("active_plan_hash", self.active_plan_hash),

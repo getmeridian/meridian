@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from meridian.ssh import ServerConnection
+    from meridian.core.execution import ServerConnection
 
 
 @dataclass(frozen=True)

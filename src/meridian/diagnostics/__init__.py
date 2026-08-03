@@ -10,6 +10,7 @@ Public API:
         check_firewall_port,
         check_port_listening,
         check_tls_certificate,
+        command_evidence_unavailable,
     )
 """
 
@@ -23,6 +24,7 @@ from meridian.diagnostics.checks import (
     check_firewall_port,
     check_port_listening,
     check_tls_certificate,
+    command_evidence_unavailable,
 )
 
 __all__ = [
@@ -33,4 +35,5 @@ __all__ = [
     "check_firewall_port",
     "check_port_listening",
     "check_tls_certificate",
+    "command_evidence_unavailable",
 ]

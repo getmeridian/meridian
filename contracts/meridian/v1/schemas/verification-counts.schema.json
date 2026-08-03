@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "Aggregate check counts by terminal status.",
+  "properties": {
+    "checks": {
+      "minimum": 0,
+      "title": "Checks",
+      "type": "integer"
+    },
+    "failed": {
+      "minimum": 0,
+      "title": "Failed",
+      "type": "integer"
+    },
+    "passed": {
+      "minimum": 0,
+      "title": "Passed",
+      "type": "integer"
+    },
+    "skipped": {
+      "minimum": 0,
+      "title": "Skipped",
+      "type": "integer"
+    },
+    "warnings": {
+      "minimum": 0,
+      "title": "Warnings",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "checks",
+    "passed",
+    "failed",
+    "warnings",
+    "skipped"
+  ],
+  "title": "VerificationCounts",
+  "type": "object"
+}

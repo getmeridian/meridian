@@ -11,7 +11,12 @@ import re
 import shlex
 
 from meridian.cluster import ClusterConfig, ProtocolKey, RelayEntry
-from meridian.remnawave import HostSecurityLayer, MeridianPanel, RemnawaveError
+from meridian.remnawave import (
+    HostSecurityLayer,
+    MeridianPanel,
+    RemnawaveError,
+    RemnawaveNotFoundError,
+)
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -118,10 +123,13 @@ def deploy_relay_nginx(
 def remove_relay_nginx(exit_conn: ServerConnection, relay: RelayEntry) -> bool:
     """Remove per-relay nginx config files from the exit server and reload."""
     q = shlex.quote(relay_label(relay))
-    exit_conn.run(
+    remove_result = exit_conn.run(
         f"rm -f /etc/nginx/stream.d/relay-maps/{q}.conf /etc/nginx/stream.d/meridian-relay-{q}.conf",
         timeout=15,
     )
+    if remove_result.returncode != 0:
+        logger.warning("could not remove relay nginx config")
+        return False
     if exit_conn.run("nginx -t 2>&1", timeout=15).returncode != 0:
         logger.warning("nginx config validation failed after relay removal")
         return False
@@ -148,14 +156,10 @@ def create_relay_hosts(
     host_uuids: dict[str, str] = {}
     label = relay_label(RelayEntry(ip=relay_ip, name=relay_name))
 
-    # Panel v2.7+ only accepts DEFAULT/TLS/NONE for securityLayer.
-    # Reality hosts use "DEFAULT" (panel infers reality from inbound type).
-    # WSS is excluded: CDN routing (Cloudflare) already provides geographic
-    # flexibility and L4 TCP relaying does not help traffic that routes
-    # through the CDN anyway.
+    # The relay's SNI map terminates at a dedicated Reality inbound. HTTP
+    # transports cannot share that L4 route and must not be advertised.
     _PROTO_CONFIG: list[tuple[ProtocolKey, HostSecurityLayer]] = [
         (ProtocolKey.REALITY, "DEFAULT"),
-        (ProtocolKey.XHTTP, "TLS"),
     ]
     for proto_key, security in _PROTO_CONFIG:
         ref = cluster.get_inbound(proto_key)
@@ -182,16 +186,75 @@ def create_relay_hosts(
             logger.info("Host created: %s", remark)
         except RemnawaveError as e:
             logger.warning("Could not create %s host: %s", proto_key, e)
+
+    deprecated_remark = f"Relay-{label}-{ProtocolKey.XHTTP}"
+    deprecated_host = panel.find_host_by_remark(deprecated_remark)
+    if deprecated_host is not None:
+        try:
+            panel.delete_host(deprecated_host.uuid)
+            logger.info("Removed unsupported relay XHTTP host: %s", deprecated_remark)
+        except RemnawaveError as exc:
+            logger.warning("Could not remove unsupported relay XHTTP host: %s", exc)
+            raise RemnawaveError(
+                "Could not remove the deprecated relay XHTTP host.",
+                hint=exc.hint or "Restore panel connectivity and retry the relay deployment.",
+                category=exc.category,
+                retryable=True,
+            ) from exc
     return host_uuids
 
 
-def delete_relay_hosts(panel: MeridianPanel, relay: RelayEntry) -> None:
-    """Delete all Remnawave Host entries for a relay."""
+def delete_relay_hosts(panel: MeridianPanel, relay: RelayEntry) -> bool:
+    """Delete all Remnawave Host entries for a relay.
+
+    Missing hosts are already clean. Other API failures return ``False`` so
+    callers can retain local state and retry the removal safely.
+    """
+    all_deleted = True
     for proto_key, host_uuid in relay.host_uuids.items():
         if not host_uuid:
             continue
         try:
             panel.delete_host(host_uuid)
             logger.info("Host deleted: %s (%s...)", proto_key, host_uuid[:8])
+        except RemnawaveNotFoundError:
+            logger.info("Host already deleted: %s (%s...)", proto_key, host_uuid[:8])
         except RemnawaveError as e:
             logger.warning("Could not delete %s host %s...: %s", proto_key, host_uuid[:8], e)
+            all_deleted = False
+    return all_deleted
+
+
+def stop_relay_service(relay_conn: ServerConnection) -> bool:
+    """Stop and disable Realm; an absent unit is already clean."""
+    from meridian.config import RELAY_SERVICE_NAME
+
+    service = shlex.quote(RELAY_SERVICE_NAME)
+    result = relay_conn.run(
+        f'load_state="$(systemctl show -p LoadState --value {service} 2>/dev/null)" || exit $?; '
+        f'[ "$load_state" = "not-found" ] && exit 0; systemctl stop {service} && systemctl disable {service}',
+        timeout=30,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+        logger.warning("could not stop and disable relay service: %s", detail)
+        return False
+    return True
+
+
+def remove_relay_artifacts(relay_conn: ServerConnection, *, listen_port: int) -> bool:
+    """Remove Realm's unit, binary, and Meridian-owned relay configuration."""
+    from meridian.config import RELAY_SERVICE_NAME
+
+    service_path = shlex.quote(f"/etc/systemd/system/{RELAY_SERVICE_NAME}.service")
+    firewall_rule = shlex.quote(f"{listen_port}/tcp")
+    result = relay_conn.run(
+        f"rm -f {service_path} /usr/local/bin/realm /etc/meridian/realm.toml && "
+        f"systemctl daemon-reload && (ufw delete allow {firewall_rule} >/dev/null 2>&1 || true)",
+        timeout=30,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+        logger.warning("could not remove relay artifacts: %s", detail)
+        return False
+    return True

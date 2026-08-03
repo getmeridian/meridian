@@ -1,7 +1,6 @@
 # reconciler — Declarative plan / apply engine
 
-Terraform-style reconciliation of `cluster.yml` desired state against actual
-Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
+Legacy state diffs plus checkpointed compiled-resource reconciliation.
 
 ## Design decisions
 
@@ -33,6 +32,7 @@ Remnawave panel state. Pure `compute_plan()` + `execute_plan()` executor.
 - **`compute_plan` takes `applied_*` as `set[str] | None`** — `None` means "no history, treat every actual-not-desired as drift". Preserve the None vs empty-set distinction.
 - **Duplicate node names silently misroute** relay `exit_node` — the validator in `cluster.py` rejects duplicates at load time.
 - **Never catch an uncertain driver mutation as an ordinary failure** — raise `UnknownResourceOutcome` so the executor observes before any retry.
+- **Unavailable observation evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.

@@ -61,6 +61,7 @@ export type Error = string;
 export type LogicalId = string;
 export type DriftedResources = CompiledPlanDriftResult[];
 export type ExitCode1 = number;
+export type ObservationErrors = CompiledPlanDriftResult[];
 export type PlanHash = string;
 export type Dependencies = string[];
 export type DesiredHash = string;
@@ -88,6 +89,7 @@ export type Kind1 =
   | "probe";
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
+export type StateChanges = string[];
 export type Summary1 = string;
 export type DurationMs = number;
 /**
@@ -110,6 +112,7 @@ export type Message = string;
 export type Retryable = boolean;
 export type Warnings = MeridianError[];
 export type Command1 = "plan";
+export type Data = PlanResult | CompiledPlanResult | EmptyData;
 export type DurationMs1 = number;
 /**
  * @minItems 1
@@ -120,7 +123,7 @@ export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status1 = "failed" | "cancelled";
+export type Status1 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _PlanSuccessEnvelope {
@@ -185,8 +188,10 @@ export interface CompiledPlanResult {
   converged: Converged1;
   drifted_resources?: DriftedResources;
   exit_code: ExitCode1;
+  observation_errors?: ObservationErrors;
   plan_hash: PlanHash;
   resources?: Resources;
+  state_changes?: StateChanges;
   summary: Summary1;
 }
 /**
@@ -237,7 +242,7 @@ export interface Details {
 }
 export interface _PlanTerminalEnvelope {
   command: Command1;
-  data: EmptyData;
+  data: Data;
   duration_ms: DurationMs1;
   errors: Errors1;
   exit_code: ExitCode4;
@@ -250,6 +255,6 @@ export interface _PlanTerminalEnvelope {
   warnings: Warnings1;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

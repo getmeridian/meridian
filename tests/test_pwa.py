@@ -9,6 +9,7 @@ import pytest
 from meridian.cluster import BrandingConfig, ClusterConfig, NodeEntry, PanelConfig
 from meridian.models import ProtocolURL, RelayURLSet
 from meridian.pwa import (
+    connection_page_deployed,
     deploy_client_page,
     generate_client_files,
     load_pwa_static_assets,
@@ -104,8 +105,28 @@ class TestDeployClientPage:
         config_path = "/var/www/private/550e8400-e29b-41d4-a716-446655440000/config.json"
         config = json.loads(conn.write_map[config_path])
         assert page_url == "https://198.51.100.1/connections/550e8400-e29b-41d4-a716-446655440000/"
+        assert connection_page_deployed(cluster, "550e8400-e29b-41d4-a716-446655440000") is True
         assert config["subscription_url"] == canonical_url
         assert not any(path.endswith("/sub.txt") for path in conn.write_map)
+
+    def test_page_marker_survives_cluster_reload(self, tmp_path) -> None:
+        conn = MockConnection()
+        node = NodeEntry(
+            ip="198.51.100.1",
+            sni="www.example.com",
+            reality_public_key="public-key",
+        )
+        cluster = ClusterConfig(panel=PanelConfig(sub_path="connections"), nodes=[node])
+        user_uuid = "550e8400-e29b-41d4-a716-446655440000"
+
+        assert deploy_client_page(conn, cluster, node, user_uuid, "alice", "https://example.com/sub")
+        path = tmp_path / "cluster.yml"
+        cluster.save(path)
+
+        loaded = ClusterConfig.load(path)
+        assert connection_page_deployed(loaded, user_uuid) is True
+        assert loaded.connection_page_markers
+        assert "connection_page_markers" not in loaded._extra
 
     def test_refuses_page_without_canonical_subscription(self) -> None:
         conn = MockConnection()

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.console import confirm, fail, prompt, set_json_mode, set_quiet_mode
+from meridian.console import confirm, fail, info, prompt, set_json_mode, set_quiet_mode, warn
 
 
 class TestFail:
@@ -85,6 +85,14 @@ class TestFail:
         captured = capsys.readouterr()
         assert "github.com/getmeridian/meridian/issues" in captured.err
 
+    def test_fail_renders_message_and_hint_as_plain_text(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(typer.Exit):
+            fail("[red]message[/red]", hint="[bold]hint[/bold]", hint_type="user")
+
+        captured = capsys.readouterr().err
+        assert "[red]message[/red]" in captured
+        assert "[bold]hint[/bold]" in captured
+
     def test_fail_json_mode_emits_structured_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         set_json_mode(True)
         set_quiet_mode(True)
@@ -156,6 +164,15 @@ class TestConfirm:
     def test_confirm_n_returns_false(self) -> None:
         with patch("builtins.open", return_value=_make_tty_mock("n")):
             assert confirm("Deploy?") is False
+
+
+def test_status_helpers_render_dynamic_text_without_markup(capsys: pytest.CaptureFixture[str]) -> None:
+    info("[red]saved name[/red]")
+    warn("[bold]remote output[/bold]")
+
+    captured = capsys.readouterr().err
+    assert "[red]saved name[/red]" in captured
+    assert "[bold]remote output[/bold]" in captured
 
     def test_confirm_N_returns_false(self) -> None:
         with patch("builtins.open", return_value=_make_tty_mock("N")):

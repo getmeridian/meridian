@@ -84,7 +84,7 @@ export type MeridianVersion2 = string;
 export type OperationId2 = string;
 export type Schema2 = "meridian.output/v1";
 export type StartedAt2 = string;
-export type Status2 = "failed" | "cancelled";
+export type Status2 = "failed";
 export type Warnings2 = MeridianError[];
 
 export interface _DeployChangedEnvelope {
@@ -206,6 +206,6 @@ export interface _DeployTerminalEnvelope {
   warnings: Warnings2;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

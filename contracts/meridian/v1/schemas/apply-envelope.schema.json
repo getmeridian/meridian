@@ -233,7 +233,7 @@
     },
     "EmptyData": {
       "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
+      "description": "Empty data object used by envelopes without command-specific failure data.",
       "properties": {},
       "title": "EmptyData",
       "type": "object"
@@ -703,10 +703,7 @@
           "type": "string"
         },
         "status": {
-          "enum": [
-            "failed",
-            "cancelled"
-          ],
+          "const": "failed",
           "title": "Status",
           "type": "string"
         },
@@ -742,7 +739,6 @@
   "description": "Envelope schema for `meridian apply --json`.",
   "discriminator": {
     "mapping": {
-      "cancelled": "#/$defs/_ApplyTerminalEnvelope",
       "changed": "#/$defs/_ApplySuccessEnvelope",
       "failed": "#/$defs/_ApplyTerminalEnvelope",
       "no_changes": "#/$defs/_ApplySuccessEnvelope"

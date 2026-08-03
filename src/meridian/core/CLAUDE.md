@@ -7,6 +7,7 @@
 - **Event names are a public set** - add event names in `core.events` before emitting them so schemas and Studio timelines stay typed.
 - **Workflows are renderable data** - wizard-style interactions expose typed fields/sections; CLI and UI decide how to render them.
 - **Contract export is direct** - scripts generate public schemas/catalogs from core imports, never by shelling out to the CLI.
+- **Command metadata is schema-neutral** - command outcomes and bindings never import schema registration; schema embedding depends on them in one direction.
 - **Pydantic at API boundaries** - public request/result/event/error/service contracts validate, serialize, and export JSON Schema from Pydantic v2 models.
 - **Deploy planning is pure** - mode, ports, reusable paths, and request validation are computed before adapters perform SSH or panel I/O.
 - **Input models fail early** - CLI and Engine adapters should validate typed core request models at the boundary, then pass trusted objects inward.
@@ -14,6 +15,7 @@
 - **Topology uses capabilities plus policy** - a server may be both relay and exit; routing rules decide where traffic exits.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
+- **Verification is four-state** - probe and test share typed passed, failed, warning, and skipped checks; skipped evidence is inconclusive, never a pass.
 - **Panel interfaces are narrow** — services depend on service-specific protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave implementation.
 
 ## What's done well
@@ -22,6 +24,7 @@
 - Redaction is centralized so expanding JSON/API surfaces does not multiply secret-leak risk.
 - Fleet inventory is built as a redacted result object before any CLI rendering happens.
 - Client list/show use the same service/result/envelope pattern as fleet reads.
+- Advertised client mutations and node/relay lists build typed results before command envelopes validate their wire shape.
 - Reporter primitives let provision/apply/deploy flows emit typed events without choosing a renderer.
 
 ## Pitfalls
@@ -34,3 +37,4 @@
 - Do not put SSH passwords or private keys into public server contracts; Engine must handle them through short-lived secret channels.
 - Keep topology IDs lowercase and bounded, and validate access usernames against the pinned panel contract before compilation.
 - Plan/apply envelopes use distinct typed legacy and compiled results; preserve legacy schema names and add a separate command-data union.
+- Command catalogs list only completed JSON outcomes; process interruption exits 130 without promising a terminal envelope.

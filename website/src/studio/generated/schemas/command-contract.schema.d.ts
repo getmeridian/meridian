@@ -12,6 +12,7 @@ export type Description = string;
 export type EnvelopeSchema = string;
 export type ErrorSchema = string;
 export type FailureDataSchema = string;
+export type InterruptBehavior = "exit_130_without_envelope";
 export type MachineFlags = string[];
 export type Category = ("user" | "system" | "bug" | "cancelled") | "none";
 export type ExitCode = number;
@@ -33,6 +34,7 @@ export interface CommandContract {
   error_schema: ErrorSchema;
   exit_codes: ExitCodes;
   failure_data_schema: FailureDataSchema;
+  interrupt_behavior?: InterruptBehavior;
   machine_flags: MachineFlags;
   outcomes: Outcomes;
   stability: Stability;

@@ -22,6 +22,7 @@
 
 ## Pitfalls
 - Never import SSH, HTTP, commands, console, config, Remnawave, or randomness here.
+- Raise `TopologyCompileError` for unsupported intent so CLI and Engine adapters preserve a typed user failure.
 - Do not put generated credentials or private Reality keys in a resource plan.
 - Deployment contracts are either empty for pure compiler use or cover every topology server ref exactly.
 - Build every Remnawave-facing name through `names.py`; short resources cap at 30 characters and users at 36.

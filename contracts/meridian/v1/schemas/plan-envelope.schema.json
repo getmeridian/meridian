@@ -94,6 +94,13 @@
           "title": "Exit Code",
           "type": "integer"
         },
+        "observation_errors": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Observation Errors",
+          "type": "array"
+        },
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
@@ -103,6 +110,13 @@
             "$ref": "#/$defs/CompiledPlanResourceResult"
           },
           "title": "Resources",
+          "type": "array"
+        },
+        "state_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "State Changes",
           "type": "array"
         },
         "summary": {
@@ -121,7 +135,7 @@
     },
     "EmptyData": {
       "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
+      "description": "Empty data object used by envelopes without command-specific failure data.",
       "properties": {},
       "title": "EmptyData",
       "type": "object"
@@ -553,7 +567,18 @@
           "type": "string"
         },
         "data": {
-          "$ref": "#/$defs/EmptyData"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlanResult"
+            },
+            {
+              "$ref": "#/$defs/CompiledPlanResult"
+            },
+            {
+              "$ref": "#/$defs/EmptyData"
+            }
+          ],
+          "title": "Data"
         },
         "duration_ms": {
           "title": "Duration Ms",
@@ -589,10 +614,7 @@
           "type": "string"
         },
         "status": {
-          "enum": [
-            "failed",
-            "cancelled"
-          ],
+          "const": "failed",
           "title": "Status",
           "type": "string"
         },
@@ -628,7 +650,6 @@
   "description": "Envelope schema for `meridian plan --json`.",
   "discriminator": {
     "mapping": {
-      "cancelled": "#/$defs/_PlanTerminalEnvelope",
       "changed": "#/$defs/_PlanSuccessEnvelope",
       "failed": "#/$defs/_PlanTerminalEnvelope",
       "no_changes": "#/$defs/_PlanSuccessEnvelope"

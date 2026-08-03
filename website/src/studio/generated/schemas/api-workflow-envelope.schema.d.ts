@@ -63,7 +63,7 @@ export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status1 = "failed" | "cancelled";
+export type Status1 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _ApiWorkflowSuccessEnvelope {
@@ -177,6 +177,6 @@ export interface _ApiWorkflowTerminalEnvelope {
   warnings: Warnings1;
 }
 /**
- * Empty data object used by failed or cancelled envelopes.
+ * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}

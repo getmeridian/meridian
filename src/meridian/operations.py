@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 import secrets
-from typing import Any
+import shlex
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from meridian.cluster import ClusterConfig, NodeEntry, RelayEntry
 from meridian.core.deploy_planning import compute_deploy_ports
@@ -24,7 +26,10 @@ from meridian.reconciler.snapshots import (
     hybrid_sync_desired_relays_remove,
     load_applied_snapshot,
 )
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.remnawave import MeridianPanel, RemnawaveError, RemnawaveNotFoundError
+
+if TYPE_CHECKING:
+    from meridian.ssh import ServerConnection
 
 logger = logging.getLogger("meridian.operations")
 
@@ -45,6 +50,7 @@ __all__ = [
     "remove_client",
     "remove_node",
     "remove_relay",
+    "stop_node_containers",
     "update_node",
 ]
 
@@ -52,6 +58,32 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Node operations
 # ---------------------------------------------------------------------------
+
+
+def stop_node_containers(
+    node: NodeEntry,
+    *,
+    connection: ServerConnection | None = None,
+) -> bool:
+    """Stop a node workload, treating an already-removed compose file as clean."""
+    from meridian.config import REMNAWAVE_NODE_DIR
+    from meridian.ssh import ServerConnection, SSHError
+
+    try:
+        conn = connection or ServerConnection(node.ip, node.ssh_user, port=node.ssh_port)
+        compose_path = shlex.quote(f"{REMNAWAVE_NODE_DIR}/docker-compose.yml")
+        result = conn.run(
+            f"if [ ! -f {compose_path} ]; then exit 0; fi; docker compose -f {compose_path} down",
+            timeout=60,
+        )
+    except (OSError, RuntimeError, SSHError) as exc:
+        logger.warning("Could not stop containers on %s: %s", node.ip, exc)
+        return False
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+        logger.warning("Could not stop containers on %s: %s", node.ip, detail)
+        return False
+    return True
 
 
 def add_node(
@@ -242,6 +274,7 @@ def remove_node(
     *,
     node_ip: str,
     force: bool = False,
+    cleanup: Callable[[NodeEntry], bool] | None = None,
 ) -> None:
     """Deregister a node from the panel and remove from cluster.yml.
 
@@ -260,6 +293,12 @@ def remove_node(
         if dependent_relays and not force:
             relay_names = ", ".join(r.name or r.ip for r in dependent_relays)
             raise ValueError(f"Cannot remove node {node.ip} — relays depend on it: {relay_names}")
+        for relay in dependent_relays:
+            remove_relay(cluster, panel, relay_ip=relay.ip)
+
+        cleanup_node = cleanup or stop_node_containers
+        if not cleanup_node(node):
+            raise RuntimeError(f"Could not stop containers on node {node.ip}")
 
     # Find node UUID — from cluster.yml or panel API
     node_uuid = node.uuid if node else ""
@@ -277,10 +316,12 @@ def remove_node(
             logger.warning("Could not disable node %s in panel", node_ip)
         try:
             panel.delete_node(node_uuid)
-        except RemnawaveError as e:
-            logger.warning("Could not delete node %s from panel: %s", node_ip, e)
+        except RemnawaveNotFoundError:
+            logger.info("Node %s is already absent from the panel", node_ip)
 
-    # Remove from cluster.yml (no-op if panel-only node)
+    # Panel errors propagate: local state is the retry record until the remote
+    # node is confirmed deleted (or already absent).
+    cluster.backup()
     cluster.nodes = [n for n in cluster.nodes if n.ip != node_ip]
     cluster.save()
 
@@ -354,8 +395,8 @@ def add_relay(
     if any(r.status == "failed" for r in results):
         raise RuntimeError(f"Relay provisioning failed on {relay_ip}")
 
-    # Create host entries — uses the same function as imperative relay deploy
-    # (creates REALITY + XHTTP hosts with correct security_layer/fingerprint)
+    # Create the supported Reality host and retire any deprecated XHTTP host,
+    # using the same path as imperative relay deploy.
     host_uuids = create_relay_hosts(panel, cluster, relay_ip, port, effective_sni, relay_name)
     if not host_uuids:
         raise RuntimeError(f"Relay {relay_ip}: no panel hosts created")
@@ -405,35 +446,48 @@ def remove_relay(
 
     Reuses the same functions as the imperative ``meridian relay remove``.
     """
-    from meridian.config import RELAY_SERVICE_NAME
-    from meridian.relay_ops import delete_relay_hosts, remove_relay_nginx
-    from meridian.ssh import ServerConnection
+    from meridian.relay_ops import (
+        delete_relay_hosts,
+        remove_relay_artifacts,
+        remove_relay_nginx,
+        stop_relay_service,
+    )
+    from meridian.ssh import ServerConnection, SSHError
 
     relay = cluster.find_relay(relay_ip)
     if relay is None:
         raise ValueError(f"Relay {relay_ip} not found in cluster")
 
-    # Delete host entries from panel (same function as imperative path)
-    delete_relay_hosts(panel, relay)
-
-    # Clean up nginx on exit node (best-effort)
-    exit_node = cluster.find_node(relay.exit_node_ip)
-    if exit_node:
-        try:
-            exit_conn = ServerConnection(exit_node.ip, exit_node.ssh_user, port=exit_node.ssh_port)
-            remove_relay_nginx(exit_conn, relay)
-        except (OSError, RuntimeError) as e:
-            logger.warning("Could not clean up nginx for relay %s: %s", relay_ip, e)
-
-    # Stop Realm service on relay host (same as imperative path)
+    # Stop Realm first. If this fails, no control-plane or routing state has
+    # been removed and the retry record remains intact.
     try:
         relay_conn = ServerConnection(relay_ip, relay.ssh_user, port=relay.ssh_port)
-        relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
-        relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
-    except (OSError, RuntimeError) as e:
-        logger.warning("Could not stop relay service on %s: %s", relay_ip, e)
+        if not stop_relay_service(relay_conn):
+            raise RuntimeError(f"Could not stop relay service on {relay_ip}")
+        if not remove_relay_artifacts(relay_conn, listen_port=relay.port):
+            raise RuntimeError(f"Could not remove relay artifacts on {relay_ip}")
+    except (OSError, SSHError) as e:
+        raise RuntimeError(f"Could not stop relay service on {relay_ip}: {e}") from e
 
-    # Remove from cluster.yml
+    # Clean up nginx before panel hosts. Each cleanup is idempotent, so a
+    # partial attempt can be retried while cluster.yml still has the details.
+    exit_node = cluster.find_node(relay.exit_node_ip)
+    if relay.sni:
+        if exit_node is None:
+            raise RuntimeError(
+                f"Could not clean up relay {relay_ip}: exit node {relay.exit_node_ip} is missing from cluster"
+            )
+        if relay.sni != (exit_node.sni or ""):
+            exit_conn = ServerConnection(exit_node.ip, exit_node.ssh_user, port=exit_node.ssh_port)
+            if not remove_relay_nginx(exit_conn, relay):
+                raise RuntimeError(f"Could not clean up nginx for relay {relay_ip}")
+
+    # Delete host entries from panel (same function as imperative path).
+    if not delete_relay_hosts(panel, relay):
+        raise RuntimeError(f"Could not delete all panel hosts for relay {relay_ip}")
+
+    # Remove from cluster.yml only after every required remote cleanup passed.
+    cluster.backup()
     cluster.relays = [r for r in cluster.relays if r.ip != relay_ip]
     cluster.save()
 

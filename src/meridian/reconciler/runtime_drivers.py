@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import shlex
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -29,6 +28,7 @@ from meridian.reconciler.resources import (
 )
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE
 from meridian.ssh import ServerConnection
+from meridian.xray_client import is_supported_proxy_outbound, parse_xray_subscription, proxy_outbounds
 
 
 class RuntimePanel(Protocol):
@@ -157,9 +157,14 @@ class ProbeDriver:
         host = self._payload(target_ref, HostPayload)
         conn = self.context.connection_for(host.address_server_ref)
         transport = "udp" if host.protocol == "hysteria2" else "tcp"
-        flag = "u" if transport == "udp" else "t"
-        result = conn.run(f"ss -H -ln{flag} 2>/dev/null", timeout=15)
-        return result.returncode == 0 and _port_in_ss(result.stdout, host.public_port)
+        command = "ss -H -lnu 2>/dev/null" if transport == "udp" else "ss -H -lnt 2>/dev/null"
+        result = conn.run(command, timeout=15)
+        if result.returncode != 0:
+            raise ResourceReconcileError(
+                f"Listener evidence is unavailable for {target_ref!r}: ss exited with status {result.returncode}.",
+                hint="Restore SSH access and the remote ss tool, then inspect the topology again.",
+            )
+        return _port_in_ss(result.stdout, host.public_port)
 
     def _subscription_available(self, target_ref: str) -> bool:
         user_payload = self._payload(target_ref, AccessUserPayload)
@@ -210,31 +215,14 @@ class ProbeDriver:
 
 def xray_subscription_is_valid(document: Any) -> bool:
     """Require a canonical Xray document with at least one managed proxy."""
-    if not document.url or not document.content.strip():
+    content = getattr(document, "content", None)
+    if not getattr(document, "url", "") or not isinstance(content, str) or not content.strip():
         return False
     try:
-        parsed = json.loads(document.content)
-    except (TypeError, json.JSONDecodeError):
+        config = parse_xray_subscription(content)
+    except ValueError:
         return False
-    if isinstance(parsed, list):
-        if len(parsed) != 1:
-            return False
-        parsed = parsed[0]
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("outbounds"), list):
-        return False
-    return any(
-        isinstance(outbound, dict)
-        and str(outbound.get("tag", "")).startswith("MERIDIAN_PROXY")
-        and (
-            outbound.get("protocol") == "vless"
-            or (
-                outbound.get("protocol") == "hysteria"
-                and isinstance(outbound.get("settings"), dict)
-                and outbound["settings"].get("version") == 2
-            )
-        )
-        for outbound in parsed["outbounds"]
-    )
+    return any(is_supported_proxy_outbound(outbound) for outbound in proxy_outbounds(config))
 
 
 def _probe_observation(

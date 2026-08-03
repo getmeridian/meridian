@@ -14,9 +14,17 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.cluster import ClusterConfig, DesiredRelay, NodeEntry, PanelConfig, RelayEntry
+from meridian.cluster import (
+    ClusterConfig,
+    ClusterConfigExternallyModifiedError,
+    DesiredRelay,
+    NodeEntry,
+    PanelConfig,
+    RelayEntry,
+)
 from meridian.commands.apply import _handle_update_relay
 from meridian.commands.apply import run as apply_run
+from meridian.core.errors import InfrastructureEvidenceUnavailableError, LocalStateCorruptedError
 from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind
 from meridian.reconciler.executor import ActionResult, ExecutionResult
 
@@ -202,6 +210,49 @@ class TestApplyRunFailureSafety:
             ],
             desired_clients=["alice", "bob"],
         )
+
+    def test_malformed_cluster_json_emits_one_typed_envelope(self) -> None:
+        buf = io.StringIO()
+        error = LocalStateCorruptedError("Cannot safely load cluster.yml", hint="Restore a backup.")
+
+        with (
+            patch.object(ClusterConfig, "load", side_effect=error),
+            redirect_stdout(buf),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            apply_run(yes=True, json_output=True)
+
+        assert exc_info.value.exit_code == 2
+        payload, end = json.JSONDecoder().raw_decode(buf.getvalue())
+        assert not buf.getvalue()[end:].strip()
+        assert payload["command"] == "apply"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "user"
+
+    def test_unavailable_plan_evidence_stops_apply_with_system_exit(self) -> None:
+        cluster = self._build_cluster_with_desired_clients()
+        buf = io.StringIO()
+
+        with (
+            patch.object(ClusterConfig, "load", return_value=cluster),
+            patch("meridian.remnawave.MeridianPanel"),
+            patch("meridian.ssh.ServerConnection"),
+            patch(
+                "meridian.commands.apply.compute_reconciliation_plan",
+                side_effect=InfrastructureEvidenceUnavailableError(
+                    "Could not determine whether the subscription page is running"
+                ),
+            ),
+            redirect_stdout(buf),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            apply_run(yes=True, json_output=True)
+
+        payload = json.loads(buf.getvalue())
+        assert exc_info.value.exit_code == 3
+        assert payload["command"] == "apply"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "system"
 
     def test_failed_action_causes_nonzero_exit(self) -> None:
         cluster = self._build_cluster_with_desired_clients()
@@ -488,6 +539,40 @@ class TestApplyRunFailureSafety:
         assert exc_info.value.exit_code == 3
         payload = json.loads(buf.getvalue())
         assert payload["status"] == "failed"
+        assert payload["errors"][0]["code"] == "MERIDIAN_STATE_SAVE_FAILED"
+        assert payload["data"]["actions"][0]["status"] == "succeeded"
+        assert payload["data"]["all_succeeded"] is False
+
+    @pytest.mark.parametrize(
+        "save_error",
+        [
+            ClusterConfigExternallyModifiedError("cluster.yml changed concurrently"),
+            ValueError("cluster.yml is read-only"),
+        ],
+    )
+    def test_apply_json_state_race_or_validation_failure_preserves_execution_result(
+        self, save_error: Exception
+    ) -> None:
+        cluster = self._build_cluster_with_desired_clients()
+        add_action = PlanAction(kind=PlanActionKind.ADD_CLIENT, target="alice", detail="create client alice")
+        plan = Plan(actions=[add_action])
+        exec_result = ExecutionResult(results=[ActionResult(action=add_action, success=True)])
+        buf = io.StringIO()
+
+        with (
+            patch.object(ClusterConfig, "load", return_value=cluster),
+            patch("meridian.remnawave.MeridianPanel"),
+            patch("meridian.ssh.ServerConnection"),
+            patch("meridian.commands.apply.compute_reconciliation_plan", return_value=plan),
+            patch("meridian.commands.apply.execute_plan", return_value=exec_result),
+            patch.object(ClusterConfig, "save", side_effect=save_error),
+            redirect_stdout(buf),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            apply_run(yes=True, parallel=1, prune_extras="yes", json_output=True)
+
+        assert exc_info.value.exit_code == 3
+        payload = json.loads(buf.getvalue())
         assert payload["errors"][0]["code"] == "MERIDIAN_STATE_SAVE_FAILED"
         assert payload["data"]["actions"][0]["status"] == "succeeded"
         assert payload["data"]["all_succeeded"] is False

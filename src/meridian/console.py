@@ -79,17 +79,17 @@ def error_context(command: str, *, timer: Any | None = None) -> Iterator[None]:
 
 def info(msg: str) -> None:
     if not _state.quiet_mode:
-        err_console.print(f"  [info]\u2192[/info] {msg}")
+        err_console.print(f"  [info]\u2192[/info] {escape(msg)}")
 
 
 def ok(msg: str) -> None:
     if not _state.quiet_mode:
-        err_console.print(f"  [ok]\u2713[/ok] {msg}")
+        err_console.print(f"  [ok]\u2713[/ok] {escape(msg)}")
 
 
 def warn(msg: str) -> None:
     if not _state.quiet_mode:
-        err_console.print(f"  [warn]![/warn] {msg}")
+        err_console.print(f"  [warn]![/warn] {escape(msg)}")
 
 
 _EXIT_CODES = {"user": 2, "system": 3, "bug": 1, "cancelled": 130}
@@ -151,9 +151,9 @@ def fail(
         )
         raise typer.Exit(code=code)
 
-    err_console.print(f"\n  [error]\u2717 {message}[/error]")
+    err_console.print(f"\n  [error]\u2717 {escape(message)}[/error]")
     if hint:
-        err_console.print(f"  [dim]{hint}[/dim]")
+        err_console.print(f"  [dim]{escape(hint)}[/dim]")
     if hint_type in ("user", "cancelled"):
         err_console.print()
     elif hint_type == "system":
@@ -192,7 +192,7 @@ def confirm(message: str = "Continue?") -> bool:
     """Y/n confirmation prompt. Returns True on accept, False on reject."""
     try:
         with open("/dev/tty") as tty:
-            err_console.print(f"\n  [info]\u2192[/info] {message} [dim][Y/n][/dim] ", end="")
+            err_console.print(f"\n  [info]\u2192[/info] {escape(message)} [dim][Y/n][/dim] ", end="")
             answer = tty.readline().strip().lower()
     except OSError:
         return False
@@ -206,7 +206,7 @@ def choose(message: str, options: list[str], *, default: int = 1) -> int:
     Falls back to default on empty input or invalid choice.
     """
     for i, opt in enumerate(options, 1):
-        err_console.print(f"    {i}. {opt}")
+        err_console.print(f"    {i}. {escape(opt)}")
     err_console.print()
     answer = prompt(f"{message}, or press Enter for ({default})")
     if not answer:

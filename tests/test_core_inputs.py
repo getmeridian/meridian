@@ -102,6 +102,14 @@ def test_server_connection_draft_accepts_ip_title_and_port() -> None:
     assert profile.ssh_port == 2222
 
 
+@pytest.mark.parametrize("unsafe", ["title\x00suffix", "title\x1bsuffix", "title\x7fsuffix"])
+def test_server_titles_and_references_reject_terminal_controls(unsafe: str) -> None:
+    with pytest.raises(ValidationError, match="printable"):
+        ServerConnectionDraft(title=unsafe, host="198.51.100.10")
+    with pytest.raises(ValidationError, match="printable"):
+        ServerValidateRequest(server_ref=unsafe)
+
+
 def test_server_connection_draft_rejects_common_typos_readably() -> None:
     with pytest.raises(ValidationError) as exc_info:
         ServerConnectionDraft(title=" \t ", host="vpn.example", ssh_user="bad user", ssh_port=70000)

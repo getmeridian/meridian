@@ -11,9 +11,21 @@ from meridian.core.topology import (
     SetupIntent,
 )
 from meridian.setup.editor import (
+    add_access_users_to_intent,
     add_exit_to_intent,
     add_relay_to_intent,
 )
+
+
+def test_add_access_users_preserves_existing_order() -> None:
+    updated = add_access_users_to_intent(_intent(), ["bob", "carol"])
+
+    assert updated.access.users == ["alice", "bob", "carol"]
+
+
+def test_add_access_users_rejects_existing_name() -> None:
+    with pytest.raises(ValueError, match="already exist"):
+        add_access_users_to_intent(_intent(), ["alice"])
 
 
 def _intent() -> SetupIntent:

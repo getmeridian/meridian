@@ -31,6 +31,49 @@ if TYPE_CHECKING:
 _STATIC_FILES = ("app.js", "styles.css", "sw.js", "icon.svg")
 
 
+def _page_marker(user_uuid: str) -> str:
+    return hashlib.sha256(user_uuid.encode("utf-8")).hexdigest()
+
+
+def connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> bool:
+    """Return persisted evidence that this client's page upload completed."""
+    return _page_marker(user_uuid) in cluster.connection_page_markers
+
+
+def connection_page_failed(cluster: ClusterConfig, user_uuid: str) -> bool:
+    """Return persisted evidence that the latest page deployment failed."""
+    return _page_marker(user_uuid) in cluster.connection_page_failures
+
+
+def mark_connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> None:
+    """Record non-secret page deployment evidence in cluster state."""
+    marker = _page_marker(user_uuid)
+    markers = set(cluster.connection_page_markers)
+    markers.add(marker)
+    cluster.connection_page_markers = sorted(markers)
+    failures = set(cluster.connection_page_failures)
+    failures.discard(marker)
+    cluster.connection_page_failures = sorted(failures)
+
+
+def mark_connection_page_failed(cluster: ClusterConfig, user_uuid: str) -> None:
+    """Record a failed upload without persisting the client credential."""
+    marker = _page_marker(user_uuid)
+    failures = set(cluster.connection_page_failures)
+    failures.add(marker)
+    cluster.connection_page_failures = sorted(failures)
+    markers = set(cluster.connection_page_markers)
+    markers.discard(marker)
+    cluster.connection_page_markers = sorted(markers)
+
+
+def forget_connection_page(cluster: ClusterConfig, user_uuid: str) -> None:
+    """Remove persisted page evidence after confirmed cleanup."""
+    marker = _page_marker(user_uuid)
+    cluster.connection_page_markers = sorted(set(cluster.connection_page_markers) - {marker})
+    cluster.connection_page_failures = sorted(set(cluster.connection_page_failures) - {marker})
+
+
 def generate_client_files(
     protocol_urls: list[ProtocolURL],
     server_ip: str,
@@ -180,6 +223,8 @@ def deploy_client_page(
     logger = logging.getLogger("meridian.pwa")
 
     host = node.domain or node.ip
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
     info_page_path = cluster.panel.sub_path or ""
     if not info_page_path:
         return ""
@@ -253,4 +298,5 @@ def deploy_client_page(
         logger.warning("Could not deploy connection page: %s", error)
         return ""
 
+    mark_connection_page_deployed(cluster, user_uuid)
     return page_url

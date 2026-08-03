@@ -8,9 +8,11 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import Field
 
 from meridian.core.models import CoreModel
+from meridian.core.topology import ProtocolKind
 
-ServerRole = Literal["panel", "exit", "relay"]
-InventoryRole = Literal["panel+node", "node", "relay"]
+NodeRole = Literal["exit", "routing_gateway"]
+ServerRole = Literal["panel", "exit", "relay", "routing_gateway"]
+InventoryRole = Literal["panel+node", "node", "relay", "panel+routing_gateway", "routing_gateway"]
 NodeStatus = Literal["connected", "disconnected", "disabled", "unknown"]
 RelayHealth = Literal["healthy", "unhealthy", "unknown"]
 SourceAvailability = Literal["available", "unavailable", "not_requested", "unknown"]
@@ -35,6 +37,9 @@ class ApiNodeLike(Protocol):
 
 
 class ApiUserLike(Protocol):
+    @property
+    def username(self) -> str: ...
+
     @property
     def status(self) -> str: ...
 
@@ -64,6 +69,8 @@ class TopologyNode(CoreModel):
     sni: str
     xhttp_path: str
     ws_path: str
+    role: NodeRole = "exit"
+    protocols: list[ProtocolKind] = Field(default_factory=list)
 
 
 class RelayHostRef(CoreModel):
@@ -80,6 +87,23 @@ class TopologyRelay(CoreModel):
     exit_node_ip: str
     sni: str
     host_refs: list[RelayHostRef] = Field(default_factory=list)
+
+
+class RelayHopMembership(CoreModel):
+    chain: str
+    position: int = Field(ge=1)
+    advertised: bool
+    health: RelayHealth = "unknown"
+
+
+class TopologyServerMember(CoreModel):
+    id: str
+    ip: str
+    name: str
+    roles: list[ServerRole] = Field(default_factory=list)
+    ssh_user: str
+    ssh_port: int
+    relay_hops: list[RelayHopMembership] = Field(default_factory=list)
 
 
 class DesiredNodeSpec(CoreModel):
@@ -106,6 +130,8 @@ class FleetTopology(CoreModel):
     subscription_page: TopologySubscriptionPage | None = None
     nodes: list[TopologyNode] = Field(default_factory=list)
     relays: list[TopologyRelay] = Field(default_factory=list)
+    servers: list[TopologyServerMember] = Field(default_factory=list)
+    access_users: list[str] | None = None
     desired_nodes: list[DesiredNodeSpec] | None = None
     desired_relays: list[DesiredRelaySpec] | None = None
 
@@ -136,6 +162,7 @@ class ServerInventory(CoreModel):
     roles: list[ServerRole]
     ssh_user: str
     ssh_port: int
+    relay_hops: list[RelayHopMembership] = Field(default_factory=list)
 
 
 class PanelInventory(CoreModel):
@@ -243,9 +270,43 @@ class FleetStatusNode(CoreModel):
     name: str
     uuid: str
     is_panel_host: bool
+    role: NodeRole = "exit"
     status: NodeStatus
     xray_version: str
     traffic_bytes: int
+
+
+class NodeListResult(CoreModel):
+    """Result for listing configured nodes with live panel status."""
+
+    nodes: list[FleetStatusNode] = Field(default_factory=list)
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
+
+
+class RelayListEntry(CoreModel):
+    """Configured relay metadata plus optional live host status."""
+
+    ip: str
+    name: str
+    exit_node_ip: str
+    port: int
+    sni: str
+    enabled: bool | None
+
+
+class RelayListResult(CoreModel):
+    """Result for listing configured relays."""
+
+    relays: list[RelayListEntry] = Field(default_factory=list)
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)
 
 
 class FleetStatusRelay(CoreModel):
@@ -256,6 +317,7 @@ class FleetStatusRelay(CoreModel):
     exit_node_name: str
     health: RelayHealth
     healthy: bool | None
+    evidence: Literal["tcp_listener"] = "tcp_listener"
 
 
 class FleetStatusSummary(CoreModel):
@@ -267,17 +329,23 @@ class FleetStatusSummary(CoreModel):
     active_users: int
     disabled_users: int
     other_users: int
+    missing_access_users: int
+    nonactive_access_users: int
     connected_nodes: int
     disconnected_nodes: int
     disabled_nodes: int
     unknown_nodes: int
     unhealthy_relays: int
+    unknown_relays: int
+    unknown_relay_hops: int = 0
 
     @property
     def text(self) -> str:
         return (
             f"{self.nodes} node(s), {self.relays} relay(s), "
-            f"{self.active_users} active user(s), {self.unhealthy_relays} unhealthy relay(s)"
+            f"{self.active_users} active user(s), {self.missing_access_users} missing access user(s), "
+            f"{self.unhealthy_relays} unreachable relay listener(s), "
+            f"{self.unknown_relays + self.unknown_relay_hops} unverified relay route(s)"
         )
 
 
@@ -310,16 +378,61 @@ def node_api_status(api_node: ApiNodeLike | None) -> NodeStatus:
         return "unknown"
     connected = getattr(api_node, "is_connected", None)
     disabled = getattr(api_node, "is_disabled", None)
-    if connected is True:
-        return "connected"
     if disabled is True:
         return "disabled"
+    if connected is True:
+        return "connected"
     if connected is False or disabled is False:
         return "disconnected"
     return "unknown"
 
 
+def build_node_list_result(
+    nodes: Sequence[TopologyNode],
+    api_nodes: Sequence[ApiNodeLike],
+) -> NodeListResult:
+    """Build a node list from configured topology and live panel observations."""
+    api_by_uuid = {node.uuid: node for node in api_nodes}
+    return NodeListResult(
+        nodes=[
+            FleetStatusNode(
+                ip=node.ip,
+                name=node.name,
+                uuid=node.uuid,
+                is_panel_host=node.is_panel_host,
+                role=node.role,
+                status=node_api_status(api_by_uuid.get(node.uuid)),
+                xray_version=(api_by_uuid[node.uuid].xray_version if node.uuid in api_by_uuid else ""),
+                traffic_bytes=(api_by_uuid[node.uuid].traffic_used if node.uuid in api_by_uuid else 0),
+            )
+            for node in nodes
+        ]
+    )
+
+
+def build_relay_list_result(
+    relays: Sequence[TopologyRelay],
+    enabled_by_endpoint: Mapping[tuple[str, int], bool | None],
+) -> RelayListResult:
+    """Build a relay list from configured topology and live host observations."""
+    return RelayListResult(
+        relays=[
+            RelayListEntry(
+                ip=relay.ip,
+                name=relay.name,
+                exit_node_ip=relay.exit_node_ip,
+                port=relay.port,
+                sni=relay.sni,
+                enabled=enabled_by_endpoint.get((relay.ip, relay.port)),
+            )
+            for relay in relays
+        ]
+    )
+
+
 def node_protocols(node: TopologyNode) -> list[str]:
+    if node.protocols:
+        return list(node.protocols)
     protocols = ["reality"]
     if node.xhttp_path:
         protocols.append("xhttp")
@@ -342,6 +455,20 @@ def relay_desired(relay: TopologyRelay, desired_relays: list[DesiredRelaySpec] |
 
 def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
     """Build a role-oriented server list for graph/UI clients."""
+    if topology.servers:
+        return [
+            ServerInventory(
+                id=server.id,
+                ip=server.ip,
+                name=server.name,
+                roles=server.roles,
+                ssh_user=server.ssh_user,
+                ssh_port=server.ssh_port,
+                relay_hops=server.relay_hops,
+            )
+            for server in topology.servers
+        ]
+
     by_ip: dict[str, ServerInventory] = {}
 
     def upsert(ip: str, name: str, roles: list[ServerRole], ssh_user: str, ssh_port: int) -> None:
@@ -352,11 +479,18 @@ def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
             merged_roles = list(dict.fromkeys([*existing.roles, *roles]))
             by_ip[ip] = existing.model_copy(update={"name": name or existing.name, "roles": merged_roles})
             return
-        by_ip[ip] = ServerInventory(id=ip, ip=ip, name=name, roles=roles, ssh_user=ssh_user, ssh_port=ssh_port)
+        by_ip[ip] = ServerInventory(
+            id=ip,
+            ip=ip,
+            name=name,
+            roles=roles,
+            ssh_user=ssh_user,
+            ssh_port=ssh_port,
+        )
 
     upsert(topology.panel.server_ip, "", ["panel"], topology.panel.ssh_user, topology.panel.ssh_port)
     for node in topology.nodes:
-        roles: list[ServerRole] = ["exit"]
+        roles: list[ServerRole] = [node.role]
         if node.is_panel_host:
             roles.insert(0, "panel")
         upsert(node.ip, node.name, roles, node.ssh_user, node.ssh_port)
@@ -389,6 +523,7 @@ def build_fleet_status(
                 name=node.name,
                 uuid=node.uuid,
                 is_panel_host=node.is_panel_host,
+                role=node.role,
                 status=status,
                 xray_version=getattr(api_node, "xray_version", "") if api_node else "",
                 traffic_bytes=getattr(api_node, "traffic_used", 0) if api_node else 0,
@@ -399,7 +534,9 @@ def build_fleet_status(
     for relay in topology.relays:
         exit_node = topology.find_node(relay.exit_node_ip)
         observed = relay_health.get((relay.ip, relay.port))
-        relay_status: RelayHealth = "unknown" if observed is None else "healthy" if observed else "unhealthy"
+        # A successful TCP connect proves only that the public listener accepts
+        # connections. It cannot certify Realm's upstream or the encrypted path.
+        relay_status: RelayHealth = "unhealthy" if observed is False else "unknown"
         relays.append(
             FleetStatusRelay(
                 ip=relay.ip,
@@ -412,20 +549,47 @@ def build_fleet_status(
             )
         )
 
-    user_statuses = [user.status for user in api_users or []]
+    observed_users = list(api_users or [])
+    declared_users = set(topology.access_users or [])
+    if topology.access_users is not None:
+        observed_users = [user for user in observed_users if user.username in declared_users]
+    observed_usernames = {user.username for user in observed_users}
+    missing_access_users = len(declared_users - observed_usernames) if topology.access_users is not None else 0
+    nonactive_access_users = (
+        sum(1 for user in observed_users if user.status.upper() != "ACTIVE") if topology.access_users is not None else 0
+    )
+    user_statuses = [user.status for user in observed_users]
     active_users = sum(1 for status in user_statuses if status.upper() == "ACTIVE")
     disabled_users = sum(1 for status in user_statuses if status.upper() == "DISABLED")
     other_users = len(user_statuses) - active_users - disabled_users
     disconnected_nodes = sum(1 for node in nodes if node.status == "disconnected")
+    disabled_nodes = sum(1 for node in nodes if node.status == "disabled")
     unknown_nodes = sum(1 for node in nodes if node.status == "unknown")
     unhealthy_relays = sum(1 for relay in relays if relay.health == "unhealthy")
     unknown_relays = sum(1 for relay in relays if relay.health == "unknown")
-    missing_required_sources = sources.panel == "unavailable" or sources.nodes == "unavailable"
+    unknown_relay_hops = sum(
+        1 for server in topology.servers for hop in server.relay_hops if not hop.advertised and hop.health == "unknown"
+    )
+    missing_required_sources = (
+        sources.panel == "unavailable" or sources.nodes == "unavailable" or sources.users == "unavailable"
+    )
     health: FleetHealth
-    if not panel_healthy or missing_required_sources or unknown_nodes > 0 or unknown_relays > 0:
-        health = "unknown"
-    elif disconnected_nodes > 0 or unhealthy_relays > 0:
+    if (
+        disconnected_nodes > 0
+        or disabled_nodes > 0
+        or unhealthy_relays > 0
+        or missing_access_users > 0
+        or nonactive_access_users > 0
+    ):
         health = "degraded"
+    elif (
+        not panel_healthy
+        or missing_required_sources
+        or unknown_nodes > 0
+        or unknown_relays > 0
+        or unknown_relay_hops > 0
+    ):
+        health = "unknown"
     else:
         health = "healthy"
     needs_attention = health != "healthy"
@@ -438,11 +602,15 @@ def build_fleet_status(
         active_users=active_users,
         disabled_users=disabled_users,
         other_users=other_users,
+        missing_access_users=missing_access_users,
+        nonactive_access_users=nonactive_access_users,
         connected_nodes=sum(1 for node in nodes if node.status == "connected"),
         disconnected_nodes=disconnected_nodes,
-        disabled_nodes=sum(1 for node in nodes if node.status == "disabled"),
+        disabled_nodes=disabled_nodes,
         unknown_nodes=unknown_nodes,
         unhealthy_relays=unhealthy_relays,
+        unknown_relays=unknown_relays,
+        unknown_relay_hops=unknown_relay_hops,
     )
     return FleetStatus(
         panel=PanelStatus(url=topology.panel_url, healthy=panel_healthy),
@@ -490,7 +658,15 @@ def build_fleet_inventory(
                 ip=node.ip,
                 name=node.name,
                 uuid=node.uuid,
-                role="panel+node" if node.is_panel_host else "node",
+                role=(
+                    "panel+routing_gateway"
+                    if node.is_panel_host and node.role == "routing_gateway"
+                    else "routing_gateway"
+                    if node.role == "routing_gateway"
+                    else "panel+node"
+                    if node.is_panel_host
+                    else "node"
+                ),
                 ssh_user=node.ssh_user,
                 ssh_port=node.ssh_port,
                 domain=node.domain,

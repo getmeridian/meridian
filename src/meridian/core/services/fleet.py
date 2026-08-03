@@ -182,6 +182,9 @@ def collect_fleet_status(
                     )
                 try:
                     api_users = panel.list_users()
+                    if topology.access_users is not None:
+                        allowed_users = set(topology.access_users)
+                        api_users = [user for user in api_users if user.username in allowed_users]
                     sources = sources.model_copy(update={"users": "available"})
                 except Exception as exc:  # Protocol adapter — concrete exception type unknown
                     _handle_error(exc, classify_error)

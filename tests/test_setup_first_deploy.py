@@ -118,6 +118,13 @@ class TestSetupFirstDeployHappyPath:
         """Admin creds saved to cluster BEFORE API token creation (lockout prevention)."""
         cluster = ClusterConfig()
         panel = _make_panel_mock()
+        panel.create_user.return_value = SimpleNamespace(
+            uuid="user-uuid",
+            username=_CLIENT,
+            vless_uuid="550e8400-e29b-41d4-a716-446655440000",
+            short_uuid="short-user",
+        )
+        panel.get_subscription_url.return_value = "https://panel.example/api/sub/short-user"
         save_calls: list[str] = []
 
         with (
@@ -136,6 +143,10 @@ class TestSetupFirstDeployHappyPath:
             patch("meridian.panel_bootstrap.get_docker_gateway", return_value=_GATEWAY),
             patch("meridian.panel_bootstrap.deploy_node_container"),
             patch("meridian.panel_bootstrap.create_hosts_for_node"),
+            patch(
+                "meridian.panel_bootstrap.pwa.deploy_client_page",
+                return_value="https://198.51.100.1/share/client/",
+            ),
             patch("meridian.panel_bootstrap.MeridianPanel", return_value=panel),
             patch("meridian.panel_bootstrap.secrets.token_hex", side_effect=lambda n: "a" * (n * 2)),
             patch.object(cluster, "save", side_effect=lambda: save_calls.append("save")),
@@ -143,7 +154,7 @@ class TestSetupFirstDeployHappyPath:
         ):
             from meridian.panel_bootstrap import setup_first_deploy
 
-            setup_first_deploy(
+            handoff = setup_first_deploy(
                 resolved=_make_resolved(),
                 cluster=cluster,
                 domain="",
@@ -162,6 +173,10 @@ class TestSetupFirstDeployHappyPath:
         assert len(save_calls) >= 2
         # Admin creds set before first save
         assert cluster.panel.admin_user != ""
+        assert handoff.connection_page_url == "https://198.51.100.1/share/client/"
+        assert handoff.subscription_url == "https://panel.example/api/sub/short-user"
+        assert "_page_url" not in cluster._extra
+        assert "_subscription_url" not in cluster._extra
 
     def test_node_entry_has_reality_keys(self) -> None:
         cluster = ClusterConfig()
@@ -348,6 +363,35 @@ class TestSetupFirstDeployHappyPath:
 
 
 class TestSetupFirstDeployAdminRegistration:
+    def test_admin_checkpoint_save_failure_reports_remote_change(self) -> None:
+        from meridian.core.errors import PanelSetupError
+        from meridian.panel_bootstrap import setup_first_deploy
+
+        cluster = ClusterConfig()
+        with (
+            patch("meridian.panel_bootstrap.check_panel_api_ready", return_value=True),
+            patch("meridian.panel_bootstrap.MeridianPanel.register_admin", return_value=_AUTH_TOKEN),
+            patch.object(cluster, "backup"),
+            patch.object(cluster, "save", side_effect=OSError("disk full")),
+            pytest.raises(PanelSetupError, match="Remote panel or node state changed") as exc_info,
+        ):
+            setup_first_deploy(
+                resolved=_make_resolved(),
+                cluster=cluster,
+                domain="",
+                sni=_SNI,
+                client_name=_CLIENT,
+                secret_path=_SECRET_PATH,
+                reality_port=_REALITY_PORT,
+                xhttp_port=_XHTTP_PORT,
+                wss_port=_WSS_PORT,
+                geo_block=True,
+                version=_VERSION,
+            )
+
+        assert isinstance(exc_info.value.__cause__, OSError)
+        assert "disk full" in exc_info.value.hint
+
     def _run_with_register_result(self, register_effect, login_effect=None) -> ClusterConfig:
         from meridian.panel_bootstrap import setup_first_deploy
 

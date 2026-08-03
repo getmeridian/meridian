@@ -234,6 +234,11 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     if applied_dict:
         out["applied_state"] = applied_dict
 
+    if cfg.connection_page_markers:
+        out["connection_page_markers"] = list(cfg.connection_page_markers)
+    if cfg.connection_page_failures:
+        out["connection_page_failures"] = list(cfg.connection_page_failures)
+
     out.update(serialize_cluster_v3(cfg))
 
     # Extra fields (forward-compat)
@@ -314,6 +319,14 @@ def _load_applied_state(raw: dict[str, Any]) -> AppliedState:
         clients=_load_applied_list(raw.get("clients")),
         relays=_load_applied_list(raw.get("relays")),
     )
+
+
+def _load_string_list(data: dict[str, Any], key: str) -> list[str]:
+    """Load one required string-list shape from typed cluster state."""
+    raw = data.get(key, [])
+    if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
+        raise ValueError(f"{key} must be a list of strings")
+    return list(raw)
 
 
 def _migrate_pre_v4_1_applied_state(data: dict[str, Any]) -> AppliedState:
@@ -443,6 +456,8 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
     applied_state = (
         _load_applied_state(_applied_raw) if isinstance(_applied_raw, dict) else _migrate_pre_v4_1_applied_state(data)
     )
+    connection_page_markers = _load_string_list(data, "connection_page_markers")
+    connection_page_failures = _load_string_list(data, "connection_page_failures")
 
     source_version = data.get("version", CURRENT_CLUSTER_VERSION)
     profile_uuid = data.get("config_profile_uuid", "")
@@ -480,6 +495,8 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         managed_bindings=v3.managed_bindings,
         allocations=v3.allocations,
         action_checkpoints=v3.action_checkpoints,
+        connection_page_markers=connection_page_markers,
+        connection_page_failures=connection_page_failures,
         active_generation=v3.active_generation,
         active_plan_hash=v3.active_plan_hash,
         pending_generation=v3.pending_generation,

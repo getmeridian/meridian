@@ -74,6 +74,7 @@ from meridian.reconciler.server_drivers import (
     ServerDriverContext,
     build_server_drivers,
 )
+from meridian.reconciler.server_evidence import file_content_or_absent, require_successful_evidence
 from meridian.reconciler.workloads import (
     SSHRealityKeyFactory,
     WorkloadStateManager,
@@ -490,12 +491,23 @@ def _control_runtime_ready(
         return False
     attestation = connection.get_text(_CONTROL_ATTESTATION_PATH, timeout=15)
     expected_attestation = _control_runtime_attestation(action, plan)
-    if attestation.returncode != 0 or attestation.stdout != f"{expected_attestation}\n":
+    attestation_content = file_content_or_absent(
+        action.resource.logical_id,
+        attestation,
+        "control-plane attestation",
+    )
+    if attestation_content != f"{expected_attestation}\n":
         return False
     sockets = connection.run("ss -H -lnt 2>/dev/null", timeout=15)
-    if sockets.returncode != 0 or not _socket_table_has_port(sockets.stdout, payload.internal_https_port):
+    require_successful_evidence(action.resource.logical_id, sockets, "control-plane listener inspection")
+    if not _socket_table_has_port(sockets.stdout, payload.internal_https_port):
         return False
-    return panel.ping()
+    if not panel.ping():
+        raise ResourceReconcileError(
+            "Control-plane API readiness evidence is unavailable.",
+            hint="Restore panel connectivity, then inspect the topology again.",
+        )
+    return True
 
 
 def _write_control_runtime_attestation(

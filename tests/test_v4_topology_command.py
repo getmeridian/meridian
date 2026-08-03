@@ -12,9 +12,11 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import ReviewedApplyPersistenceError
 from meridian.commands.apply import run as run_apply_command
 from meridian.commands.plan import run as run_plan_command
 from meridian.commands.v4_topology import run_v4_apply, run_v4_plan
+from meridian.compiler import TopologyCompileError
 from meridian.console import set_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext
@@ -160,7 +162,14 @@ def test_v4_apply_json_confirmation_returns_typed_preview() -> None:
 
 
 @pytest.mark.parametrize("command", ["apply", "plan"])
-def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str) -> None:
+@pytest.mark.parametrize(
+    "error",
+    [
+        LocalStateError("Saved panel credentials are missing."),
+        TopologyCompileError("The reviewed topology cannot be represented."),
+    ],
+)
+def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error: Exception) -> None:
     output = io.StringIO()
     target = f"meridian.commands.{command}._run_v4_{'topology' if command == 'apply' else 'plan'}"
     kwargs = {"yes": True, "json_output": True} if command == "apply" else {"json_output": True}
@@ -169,7 +178,7 @@ def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str) -> No
     try:
         with (
             patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
-            patch(target, side_effect=LocalStateError("Saved panel credentials are missing.")),
+            patch(target, side_effect=error),
             redirect_stdout(output),
             pytest.raises(typer.Exit) as exc_info,
         ):
@@ -186,13 +195,63 @@ def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str) -> No
     assert payload["errors"][0]["category"] == "user"
 
 
+def test_v4_apply_persistence_failure_is_typed_system_error() -> None:
+    runtime = _runtime(_execution())
+    runtime.apply_intent.side_effect = ReviewedApplyPersistenceError(
+        "disk full. Remote state may have changed; rerun plan and apply."
+    )
+    output = io.StringIO()
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            redirect_stdout(output),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_apply_command(yes=True, json_output=True)
+    finally:
+        set_json_mode(False)
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["errors"][0]["category"] == "system"
+    assert "remote state may have changed" in payload["errors"][0]["message"]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"parallel": 8, "prune_extras": "ask"},
+        {"parallel": 4, "prune_extras": "yes"},
+    ],
+)
+def test_v4_apply_rejects_legacy_only_flags(kwargs: dict[str, object]) -> None:
+    output = io.StringIO()
+    with (
+        patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
+        patch("meridian.commands.apply._run_v4_topology") as apply_v4,
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_apply_command(yes=True, json_output=True, **kwargs)
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 2
+    assert payload["status"] == "failed"
+    assert "legacy apply options" in payload["errors"][0]["message"]
+    apply_v4.assert_not_called()
+
+
 def test_v4_plan_json_uses_typed_compiled_result() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
         converged=True,
         drifted=[],
-        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource))],
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
     )
     runtime = MagicMock()
     runtime.inspect_intent.return_value = inspection
@@ -221,3 +280,65 @@ def test_v4_plan_json_uses_typed_compiled_result() -> None:
             "dependencies": [],
         }
     ]
+
+
+def test_v4_plan_reports_generation_activation_when_resources_match() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        converged=True,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 2
+    assert payload["status"] == "changed"
+    assert payload["data"]["drifted_resources"] == []
+    assert payload["data"]["state_changes"] == ["activate this reviewed plan as the current generation"]
+    assert "requires activation" in payload["summary"]["text"]
+
+
+def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        converged=False,
+        inspections=[
+            SimpleNamespace(
+                action=SimpleNamespace(resource=resource),
+                error="observation failed: panel unavailable",
+                converged=False,
+            )
+        ],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_v4_plan(_cluster(), json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["data"]["exit_code"] == 3
+    assert payload["errors"][0]["code"] == "MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE"
+    assert payload["data"]["drifted_resources"] == []
+    assert payload["data"]["observation_errors"][0]["logical_id"] == resource.logical_id

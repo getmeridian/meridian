@@ -112,6 +112,12 @@
           "title": "Failure Data Schema",
           "type": "string"
         },
+        "interrupt_behavior": {
+          "const": "exit_130_without_envelope",
+          "default": "exit_130_without_envelope",
+          "title": "Interrupt Behavior",
+          "type": "string"
+        },
         "machine_flags": {
           "items": {
             "type": "string"
@@ -219,7 +225,7 @@
     },
     "EmptyData": {
       "additionalProperties": false,
-      "description": "Empty data object used by failed or cancelled envelopes.",
+      "description": "Empty data object used by envelopes without command-specific failure data.",
       "properties": {},
       "title": "EmptyData",
       "type": "object"
@@ -429,10 +435,7 @@
           "type": "string"
         },
         "status": {
-          "enum": [
-            "failed",
-            "cancelled"
-          ],
+          "const": "failed",
           "title": "Status",
           "type": "string"
         },
@@ -468,7 +471,6 @@
   "description": "Envelope schema for `meridian api commands --json`.",
   "discriminator": {
     "mapping": {
-      "cancelled": "#/$defs/_ApiCommandsTerminalEnvelope",
       "failed": "#/$defs/_ApiCommandsTerminalEnvelope",
       "ok": "#/$defs/_ApiCommandsSuccessEnvelope"
     },

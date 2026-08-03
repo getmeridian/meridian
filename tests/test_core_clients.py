@@ -6,7 +6,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from meridian.core.clients import build_client_list_result, build_client_show_result
+from meridian.core.clients import (
+    build_client_add_result,
+    build_client_list_result,
+    build_client_remove_result,
+    build_client_show_result,
+    build_client_status_result,
+)
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
 
 
@@ -26,6 +32,7 @@ class PanelUser:
 class PanelClient:
     def __init__(self, users: list[PanelUser]) -> None:
         self.users = users
+        self.requested_usernames: list[str] = []
 
     def __enter__(self) -> PanelClient:
         return self
@@ -34,6 +41,7 @@ class PanelClient:
         return None
 
     def get_user(self, username: str) -> PanelUser | None:
+        self.requested_usernames.append(username)
         return next((user for user in self.users if user.username == username), None)
 
     def list_users(self) -> list[PanelUser]:
@@ -85,11 +93,33 @@ def test_client_show_result_reports_handoff_availability_without_links() -> None
     }
 
 
+def test_client_mutation_results_preserve_public_wire_shapes() -> None:
+    added = build_client_add_result([("alice", PanelUser(status="ACTIVE"))])
+    removed = build_client_remove_result("alice")
+    enabled = build_client_status_result("alice", "active")
+    disabled = build_client_status_result("alice", "disabled")
+
+    assert added.to_data() == {"clients": [{"username": "alice", "uuid": "user-uuid", "status": "active"}]}
+    assert removed.to_data() == {"client": {"username": "alice"}}
+    assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
+    assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}
+
+
 def test_collect_client_list_uses_panel_adapter() -> None:
     result = collect_client_list(PanelClient([PanelUser(username="alice"), PanelUser(username="bob")]))
 
     assert result.clients.summary.clients == 2
     assert [client.username for client in result.clients.clients] == ["alice", "bob"]
+
+
+def test_collect_client_list_filters_users_outside_ownership_allowlist() -> None:
+    result = collect_client_list(
+        PanelClient([PanelUser(username="alice"), PanelUser(username="meridian-route-123")]),
+        allowed_usernames=["alice"],
+    )
+
+    assert result.clients.summary.clients == 1
+    assert [client.username for client in result.clients.clients] == ["alice"]
 
 
 def test_collect_client_show_builds_subscription_and_share_urls() -> None:
@@ -109,3 +139,16 @@ def test_collect_client_show_builds_subscription_and_share_urls() -> None:
 def test_collect_client_show_raises_not_found() -> None:
     with pytest.raises(ClientNotFoundError):
         collect_client_show(PanelClient([]), "alice")
+
+
+def test_collect_client_show_does_not_look_up_user_outside_ownership_allowlist() -> None:
+    panel = PanelClient([PanelUser(username="meridian-route-123")])
+
+    with pytest.raises(ClientNotFoundError):
+        collect_client_show(
+            panel,
+            "meridian-route-123",
+            allowed_usernames=["alice"],
+        )
+
+    assert panel.requested_usernames == []

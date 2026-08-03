@@ -56,6 +56,7 @@ export type Error = string;
 export type LogicalId = string;
 export type DriftedResources = CompiledPlanDriftResult[];
 export type ExitCode1 = number;
+export type ObservationErrors = CompiledPlanDriftResult[];
 export type PlanHash = string;
 export type Dependencies = string[];
 export type DesiredHash = string;
@@ -83,6 +84,7 @@ export type Kind1 =
   | "probe";
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
+export type StateChanges = string[];
 export type Summary1 = string;
 
 export interface PlanResult {
@@ -133,8 +135,10 @@ export interface CompiledPlanResult {
   converged: Converged1;
   drifted_resources?: DriftedResources;
   exit_code: ExitCode1;
+  observation_errors?: ObservationErrors;
   plan_hash: PlanHash;
   resources?: Resources;
+  state_changes?: StateChanges;
   summary: Summary1;
 }
 /**

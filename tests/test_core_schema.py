@@ -6,6 +6,12 @@ import pytest
 from pydantic import ValidationError
 
 from meridian.core.clients import build_client_list_result
+from meridian.core.command_catalog import (
+    CommandContract,
+    command_contract,
+    command_contracts,
+    command_schema_bindings,
+)
 from meridian.core.deploy import DeployResult
 from meridian.core.deploy_planning import DeployClusterState, build_deploy_plan
 from meridian.core.models import MeridianError
@@ -15,10 +21,23 @@ from meridian.core.schema import (
     ApiSchemasResult,
     DeployOutputEnvelope,
     PlanOutputEnvelope,
+    ProbeOutputEnvelope,
     command_catalog,
     schema_catalog,
     schema_for,
     schema_names,
+)
+from meridian.core.schema import (
+    TestOutputEnvelope as VerificationTestOutputEnvelope,
+)
+from meridian.core.verification import (
+    ProbeResult,
+    VerificationCheck,
+    VerificationFinding,
+    VerificationTarget,
+)
+from meridian.core.verification import (
+    TestResult as VerificationTestResult,
 )
 
 
@@ -40,6 +59,12 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "api-workflow-envelope" in names
     assert "client-list-envelope" in names
     assert "client-show-envelope" in names
+    assert "client-add-envelope" in names
+    assert "client-remove-envelope" in names
+    assert "client-enable-envelope" in names
+    assert "client-disable-envelope" in names
+    assert "node-list-envelope" in names
+    assert "relay-list-envelope" in names
     assert "client-name-request" in names
     assert "deploy-command-data" in names
     assert "deploy-envelope" in names
@@ -72,6 +97,19 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "input-option" in names
     assert "input-section" in names
     assert "plan-envelope" in names
+    assert "probe-envelope" in names
+    assert "probe-failure" in names
+    assert "probe-result" in names
+    assert "test-envelope" in names
+    assert "test-failure" in names
+    assert "test-result" in names
+    assert "verification-aggregate" in names
+    assert "verification-check" in names
+    assert "verification-context" in names
+    assert "verification-counts" in names
+    assert "verification-finding" in names
+    assert "verification-result" in names
+    assert "verification-target" in names
     assert "fleet-status-envelope" in names
     assert "fleet-inventory-envelope" in names
     assert "event" in names
@@ -91,6 +129,11 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "plan-result" in names
     assert "fleet-status" in names
     assert "fleet-inventory" in names
+    assert "client-add" in names
+    assert "client-remove" in names
+    assert "client-status" in names
+    assert "node-list" in names
+    assert "relay-list" in names
 
 
 def test_schema_for_output_envelope_uses_wire_aliases() -> None:
@@ -151,6 +194,14 @@ def test_topology_schemas_model_capabilities_and_country_routes() -> None:
     assert route_rule["entry_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
     assert route_rule["exit_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
     assert route_card["sentence"]["type"] == "string"
+
+
+def test_connection_test_schema_exposes_scope_and_client() -> None:
+    properties = schema_for("test-result")["properties"]
+
+    assert properties["scope"]["enum"] == ["basic", "full"]
+    assert properties["scope"]["default"] == "full"
+    assert properties["client"] == {"default": "", "title": "Client", "type": "string"}
 
 
 def test_server_onboarding_schemas_expose_cross_field_constraints() -> None:
@@ -237,7 +288,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
 
     assert by_command["plan"]["envelope_schema"] == "plan-envelope"
     assert by_command["plan"]["data_schema"] == "plan-command-data"
-    assert by_command["plan"]["failure_data_schema"] == "empty-data"
+    assert by_command["plan"]["failure_data_schema"] == "plan-failure"
     assert by_command["plan"]["error_schema"] == "error"
     assert by_command["plan"]["machine_flags"] == ["--json"]
     assert by_command["plan"]["argv"] == ["plan"]
@@ -252,6 +303,20 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
         "meaning": "user or configuration error",
     } in by_command["plan"]["outcomes"]
     assert by_command["client.list"]["data_schema"] == "client-list"
+    assert by_command["client.add"]["data_schema"] == "client-add"
+    assert by_command["client.remove"]["data_schema"] == "client-remove"
+    assert by_command["client.remove"]["machine_flags"] == ["--json", "--yes"]
+    assert {
+        "status": "ok",
+        "exit_code": 3,
+        "category": "none",
+        "meaning": "client was removed but local state or legacy page cleanup is incomplete",
+    } in by_command["client.remove"]["outcomes"]
+    assert by_command["client.enable"]["data_schema"] == "client-status"
+    assert by_command["client.disable"]["data_schema"] == "client-status"
+    assert by_command["node.list"]["data_schema"] == "node-list"
+    assert by_command["relay.list"]["data_schema"] == "relay-list"
+    assert by_command["relay.list"]["machine_flags"] == ["--json", "--exit"]
     assert by_command["apply"]["data_schema"] == "apply-command-data"
     assert by_command["apply"]["failure_data_schema"] == "apply-failure"
     assert by_command["apply"]["machine_flags"] == ["--json"]
@@ -263,10 +328,85 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["api.workflow"]["data_schema"] == "api-workflow"
     assert by_command["api.workflow"]["machine_flags"] == ["--json"]
     assert by_command["fleet.status"]["data_schema"] == "fleet-status"
-    assert by_command["fleet.inventory"]["statuses"] == ["ok", "failed", "cancelled"]
-    assert by_command["fleet.inventory"]["exit_codes"]["130"] == "cancelled by the user"
+    assert by_command["fleet.inventory"]["statuses"] == ["ok", "failed"]
+    assert by_command["probe"]["data_schema"] == "probe-result"
+    assert by_command["probe"]["failure_data_schema"] == "probe-failure"
+    assert by_command["probe"]["exit_codes"]["4"] == "probe completed with negative findings"
+    assert by_command["probe"]["machine_flags"] == ["--json", "--server", "--sni", "--timeout"]
+    assert {
+        "status": "ok",
+        "exit_code": 4,
+        "category": "none",
+        "meaning": "probe completed with negative findings",
+    } in by_command["probe"]["outcomes"]
+    assert by_command["test"]["data_schema"] == "test-result"
+    assert by_command["test"]["failure_data_schema"] == "test-failure"
+    assert by_command["test"]["machine_flags"] == [
+        "--json",
+        "--server",
+        "--domain",
+        "--sni",
+        "--client",
+        "--basic",
+        "--timeout",
+    ]
+    assert {
+        "status": "failed",
+        "exit_code": 3,
+        "category": "system",
+        "meaning": "test failed or was inconclusive",
+    } in by_command["test"]["outcomes"]
     for contract in by_command.values():
         assert contract["exit_codes"]["1"] == "unexpected Meridian bug"
+
+
+def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -> None:
+    for contract in command_catalog(include_schemas=True):
+        assert contract["exit_codes"]["130"] == "process interrupted; no JSON envelope is emitted"
+        assert contract["interrupt_behavior"] == "exit_130_without_envelope"
+        assert "cancelled" not in contract["statuses"]
+        assert all(outcome["exit_code"] != 130 for outcome in contract["outcomes"])
+        envelope = contract["envelope"]
+        terminal_ref = next(option["$ref"] for option in envelope["oneOf"] if "TerminalEnvelope" in option["$ref"])
+        terminal = envelope["$defs"][terminal_ref.rsplit("/", 1)[-1]]
+        assert terminal["properties"]["status"]["const"] == "failed"
+
+
+@pytest.mark.parametrize(
+    ("command", "envelope_name", "data_model"),
+    [
+        ("client.add", "client-add-envelope", "ClientAddResult"),
+        ("client.remove", "client-remove-envelope", "ClientRemoveResult"),
+        ("client.enable", "client-enable-envelope", "ClientStatusResult"),
+        ("client.disable", "client-disable-envelope", "ClientStatusResult"),
+        ("node.list", "node-list-envelope", "NodeListResult"),
+        ("relay.list", "relay-list-envelope", "RelayListResult"),
+    ],
+)
+def test_secondary_command_envelopes_bind_typed_success_and_empty_failure_data(
+    command: str,
+    envelope_name: str,
+    data_model: str,
+) -> None:
+    schema = schema_for(envelope_name)
+    success_ref = next(option["$ref"] for option in schema["oneOf"] if "SuccessEnvelope" in option["$ref"])
+    terminal_ref = next(option["$ref"] for option in schema["oneOf"] if "TerminalEnvelope" in option["$ref"])
+    success = schema["$defs"][success_ref.rsplit("/", 1)[-1]]
+    terminal = schema["$defs"][terminal_ref.rsplit("/", 1)[-1]]
+
+    assert success["properties"]["command"]["const"] == command
+    assert success["properties"]["data"]["$ref"].endswith(f"/{data_model}")
+    assert terminal["properties"]["data"]["$ref"].endswith("/EmptyData")
+
+
+def test_command_contract_registry_is_public_and_schema_neutral() -> None:
+    contracts = command_contracts()
+
+    assert all(isinstance(contract, CommandContract) for contract in contracts)
+    assert [contract.command for contract in contracts] == sorted(contract.command for contract in contracts)
+    assert command_contract("probe") is not None
+    assert command_contract("missing") is None
+    assert command_schema_bindings()["test"] == "test-envelope"
 
 
 def test_command_catalog_can_embed_command_schemas() -> None:
@@ -288,7 +428,7 @@ def test_command_catalog_can_embed_command_schemas() -> None:
     resource_ref = compiled_plan["properties"]["resources"]["items"]["$ref"]
     resource = plan["data"]["$defs"][resource_ref.rsplit("/", 1)[-1]]
     assert set(resource["properties"]["kind"]["enum"]) >= {"node_runtime", "probe"}
-    assert plan["failure_data"]["title"] == "EmptyData"
+    assert plan["failure_data"]["title"] == "PlanFailureData"
     assert plan["error"]["title"] == "MeridianError"
     assert next(item for item in parsed.commands if item.command == "plan").data is not None
 
@@ -382,6 +522,96 @@ def test_command_envelope_schema_rejects_success_without_typed_data() -> None:
 
     with pytest.raises(ValidationError):
         PlanOutputEnvelope.model_validate(payload.model_dump(mode="json", by_alias=True))
+
+
+def test_probe_envelope_accepts_completed_negative_findings() -> None:
+    result = ProbeResult.from_checks(
+        target=VerificationTarget(requested="198.51.100.20", resolved_ip="198.51.100.20"),
+        checks=[
+            VerificationCheck(
+                id="tls.certificate",
+                name="TLS certificate",
+                status="failed",
+                findings=[
+                    VerificationFinding(
+                        code="TLS_CERTIFICATE_MISMATCH",
+                        status="failed",
+                        message="The certificate does not match the expected deployment.",
+                        remediation="Verify the configured domain and certificate.",
+                    )
+                ],
+            )
+        ],
+    )
+    payload = command_envelope(
+        command="probe",
+        data=result.to_data(),
+        summary="Probe completed with findings",
+        status="ok",
+        exit_code=4,
+        timer=OperationTimer(started_at="2026-05-04T21:00:00Z", operation_id="op-probe"),
+    )
+
+    parsed = ProbeOutputEnvelope.model_validate(payload.model_dump(mode="json", by_alias=True))
+
+    assert parsed.root.status == "ok"
+    assert parsed.root.exit_code == 4
+    assert parsed.root.data.verdict == "findings"
+
+
+def test_test_failure_envelope_accepts_partial_typed_result_or_empty_data() -> None:
+    result = VerificationTestResult.from_checks(
+        target=VerificationTarget(requested="edge.example"),
+        checks=[
+            VerificationCheck(
+                id="proxy.connect",
+                name="Proxy connection",
+                status="skipped",
+            )
+        ],
+    )
+    error = MeridianError(
+        code="MERIDIAN_TEST_NETWORK_ERROR",
+        category="system",
+        message="The proxy endpoint could not be reached.",
+        exit_code=3,
+    )
+    partial_payload = command_envelope(
+        command="test",
+        data=result.to_data(),
+        summary="Connection test was inconclusive",
+        status="failed",
+        exit_code=3,
+        errors=[error],
+        timer=OperationTimer(started_at="2026-05-04T21:00:00Z", operation_id="op-test-partial"),
+    )
+
+    parsed_partial = VerificationTestOutputEnvelope.model_validate(
+        partial_payload.model_dump(mode="json", by_alias=True)
+    )
+
+    assert parsed_partial.root.data.verdict == "inconclusive"
+    assert parsed_partial.root.data.counts.skipped == 1
+
+    empty_payload = command_envelope(
+        command="test",
+        summary="Invalid test target",
+        status="failed",
+        exit_code=2,
+        errors=[
+            MeridianError(
+                code="MERIDIAN_TEST_TARGET_INVALID",
+                category="user",
+                message="The test target is invalid.",
+                exit_code=2,
+            )
+        ],
+        timer=OperationTimer(started_at="2026-05-04T21:00:00Z", operation_id="op-test-empty"),
+    )
+
+    parsed_empty = VerificationTestOutputEnvelope.model_validate(empty_payload.model_dump(mode="json", by_alias=True))
+
+    assert parsed_empty.root.data.model_dump() == {}
 
 
 def test_deploy_command_envelope_accepts_result_and_dry_run_plan() -> None:

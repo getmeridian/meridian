@@ -6,15 +6,31 @@ panel client creation, and traffic formatting.
 
 from __future__ import annotations
 
-from meridian.cluster import ClusterConfig
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.console import fail
+from meridian.core.errors import LocalStateError
 from meridian.remnawave import MeridianPanel
 
 
-def load_cluster() -> ClusterConfig:
-    """Load and validate cluster configuration. Exits if not configured."""
-    cluster = ClusterConfig.load()
-    if not cluster.is_configured:
+class ReviewedApplyPersistenceError(Exception):
+    """A V4 apply checkpoint could not be written to local state."""
+
+
+_REVIEWED_APPLY_RECOVERY = (
+    "Remote state may have changed. Repair local state, then rerun `meridian plan` and `meridian apply` to reconcile."
+)
+
+
+def load_cluster(*, require_configured: bool = True) -> ClusterConfig:
+    """Load local cluster state through the CLI error boundary."""
+    try:
+        cluster = ClusterConfig.load()
+    except LocalStateError as exc:
+        fail(exc)
+    if require_configured and not cluster.is_configured:
         fail(
             "No cluster configured",
             hint="Deploy first: meridian deploy",
@@ -26,6 +42,43 @@ def load_cluster() -> ClusterConfig:
 def make_panel(cluster: ClusterConfig) -> MeridianPanel:
     """Create a MeridianPanel client from cluster config."""
     return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
+
+
+@contextmanager
+def remote_mutation_persistence(operation: str) -> Iterator[None]:
+    """Render local persistence failures after a remote mutation as partial."""
+    try:
+        yield
+    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+        fail(
+            f"{operation}, but Meridian could not save the matching local state",
+            hint=(
+                f"{exc} Remote state changed. Fix local state permissions or disk space, "
+                "review cluster.yml, then rerun the command to reconcile."
+            ),
+            hint_type="system",
+        )
+
+
+@contextmanager
+def reviewed_apply_persistence(operation: str) -> Iterator[None]:
+    """Render ambiguous V4 checkpoint write failures at the CLI boundary."""
+    try:
+        yield
+    except ReviewedApplyPersistenceError as exc:
+        fail(
+            f"{operation} could not save local convergence state",
+            hint=str(exc),
+            hint_type="system",
+        )
+
+
+def persist_reviewed_apply(cluster: ClusterConfig) -> None:
+    """Persist a V4 checkpoint while preserving its failure provenance."""
+    try:
+        cluster.save()
+    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+        raise ReviewedApplyPersistenceError(f"{exc} {_REVIEWED_APPLY_RECOVERY}") from exc
 
 
 def format_traffic(bytes_used: int, bytes_limit: int = 0) -> str:

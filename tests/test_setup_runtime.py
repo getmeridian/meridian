@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.compiler.models import RealmHopPayload, ResourceKind, ResourcePlan
+from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
@@ -69,7 +69,11 @@ class _Panel:
     ) -> SimpleNamespace:
         return SimpleNamespace(
             url=f"https://panel.example/api/sub/{short_uuid}/{client_type}",
-            content='[{"outbounds": [{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}]',
+            content=(
+                '[{"inbounds": [{"tag": "SOCKS", "listen": "127.0.0.1", '
+                '"port": 1080, "protocol": "socks"}], "outbounds": '
+                '[{"tag": "MERIDIAN_PROXY_1", "protocol": "vless"}]}]'
+            ),
         )
 
 
@@ -183,6 +187,51 @@ def test_review_ignores_selected_servers_that_have_no_topology_role(tmp_path) ->
     assert set(review.plan.deployment_contract.server_targets) == {"srv-control", "srv-exit"}
 
 
+def test_inspect_intent_reports_unavailable_control_ssh_as_observation_error(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    cluster = ClusterConfig(
+        panel=PanelConfig(
+            url="https://panel.example",
+            api_token="token",
+            server_ip="198.51.100.10",
+        )
+    )
+    panel = _Panel()
+    connection = MagicMock(spec=ServerConnection)
+    connection.get_text.return_value = SimpleNamespace(returncode=255, stdout="", stderr="SSH unavailable")
+    connection.run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+    runtime = SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+        panel_factory=lambda _url, _token: cast(MeridianPanel, panel),
+        connection_builder=lambda _entry: connection,
+    )
+    monkeypatch.setattr(
+        "meridian.setup.runtime.build_remnawave_drivers",
+        lambda context: _drivers(context.plan),
+    )
+    monkeypatch.setattr(
+        "meridian.setup.runtime.build_server_drivers",
+        lambda context: _drivers(context.plan),
+    )
+
+    result = runtime.inspect_intent(_intent())
+
+    control = next(
+        inspection
+        for inspection in result.inspections
+        if isinstance(inspection.action.resource.payload, ControlPlaneRuntimePayload)
+    )
+    assert control.observation is None
+    assert "control-plane attestation evidence is unavailable" in control.error
+    assert "SSH transport failed" in control.error
+    assert panel.closed == 1
+
+
 def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -206,6 +255,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     connection.get_text.side_effect = lambda path, **_kwargs: SimpleNamespace(
         returncode=0 if path in remote_files else 1,
         stdout=remote_files.get(path, ""),
+        stderr="" if path in remote_files else "cat: No such file or directory",
     )
 
     def put_text(path: str, content: str, **_kwargs):

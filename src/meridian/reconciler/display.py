@@ -7,6 +7,7 @@ updates. Color-coded: green for add, red for remove, yellow for update.
 from __future__ import annotations
 
 from rich.console import Console
+from rich.markup import escape
 
 from meridian.reconciler.diff import Plan, PlanAction
 
@@ -44,6 +45,6 @@ def _print_action(action: PlanAction, console: Console) -> None:
         color = "yellow"
 
     kind_label = action.kind.value.replace("_", " ")
-    console.print(f"  [{color}]{symbol}[/{color}] {kind_label}: [bold]{action.target}[/bold]")
+    console.print(f"  [{color}]{symbol}[/{color}] {kind_label}: [bold]{escape(action.target)}[/bold]")
     if action.detail:
-        console.print(f"      {action.detail}")
+        console.print(f"      {escape(action.detail)}")

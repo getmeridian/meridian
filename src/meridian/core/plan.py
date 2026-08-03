@@ -100,6 +100,8 @@ class CompiledPlanResult(CoreModel):
     converged: bool
     summary: str
     exit_code: int
+    state_changes: list[str] = Field(default_factory=list)
+    observation_errors: list[CompiledPlanDriftResult] = Field(default_factory=list)
     drifted_resources: list[CompiledPlanDriftResult] = Field(default_factory=list)
     resources: list[CompiledPlanResourceResult] = Field(default_factory=list)
 

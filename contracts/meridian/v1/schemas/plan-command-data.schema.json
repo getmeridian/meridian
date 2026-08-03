@@ -94,6 +94,13 @@
           "title": "Exit Code",
           "type": "integer"
         },
+        "observation_errors": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Observation Errors",
+          "type": "array"
+        },
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
@@ -103,6 +110,13 @@
             "$ref": "#/$defs/CompiledPlanResourceResult"
           },
           "title": "Resources",
+          "type": "array"
+        },
+        "state_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "State Changes",
           "type": "array"
         },
         "summary": {
