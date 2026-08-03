@@ -1,0 +1,35 @@
+{
+  "command": "deploy",
+  "data": {
+    "info_page_path": "0000000000000000",
+    "mode": "first_deploy",
+    "node_count": 0,
+    "ports": {
+      "reality_port": 10790,
+      "wss_port": 21790,
+      "xhttp_port": 31790
+    },
+    "relay_count": 0,
+    "secret_path": "[redacted]",
+    "server_ip": "198.51.100.10",
+    "ws_path": "0000000000000000",
+    "xhttp_path": "0000000000000000"
+  },
+  "duration_ms": 0,
+  "errors": [],
+  "exit_code": 0,
+  "meridian_version": "4.0.0",
+  "operation_id": "op-fixture-deploy-dry-run",
+  "schema": "meridian.output/v1",
+  "started_at": "2026-05-04T21:00:00Z",
+  "status": "ok",
+  "summary": {
+    "changed": false,
+    "counts": {
+      "nodes": 0,
+      "relays": 0
+    },
+    "text": "Deploy plan: first_deploy for 198.51.100.10"
+  },
+  "warnings": []
+}

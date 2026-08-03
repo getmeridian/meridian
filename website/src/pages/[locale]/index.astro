@@ -32,7 +32,7 @@ const t = createT(locale);
 const dir = locale === 'fa' ? 'rtl' : 'ltr';
 
 const detailSteps = [
-  { title: t('step.1.title', 'Installs Docker'), text: t('step.1.text', ' and deploys <strong>Xray</strong> via the <strong>3x-ui</strong> management panel') },
+  { title: t('step.1.title', 'Installs Docker'), text: t('step.1.text', ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel') },
   { title: t('step.2.title', 'Generates x25519 keypair'), text: t('step.2.text', ' — unique encryption keys for Reality authentication') },
   { title: t('step.3.title', 'Hardens the server'), text: t('step.3.text', ' — UFW firewall (ports 22 + 443 only), SSH key-only auth, <strong>BBR</strong> congestion control') },
   { title: t('step.4.title', 'Configures VLESS+Reality'), text: t('step.4.text', ' on port 443 — impersonates a real TLS server') },
@@ -216,8 +216,8 @@ const hreflangLinks = [
               extra port exposed.
             </p>
             <p>
-              The 3x-ui panel is reverse-proxied by nginx on a secret path — accessible
-              via HTTPS, no SSH tunnel needed.
+              The Remnawave admin panel is reverse-proxied by nginx on a secret path —
+              accessible via HTTPS, no SSH tunnel needed.
             </p>
           </Accordion>
 

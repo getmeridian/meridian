@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Allow manually triggering CI on any branch from the Actions UI or via
+  # `gh workflow run ci.yml --ref <branch>`. Useful for validating feature
+  # branches on the fork before opening an upstream PR.
+  workflow_dispatch:
 
 jobs:
   python-test:
@@ -12,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
 
@@ -20,11 +24,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package with dev dependencies
-        run: pip install ".[dev]"
+      - uses: astral-sh/setup-uv@v7
 
-      - name: Run tests (skip integration — no Docker)
-        run: pytest tests/ -v --tb=short --ignore=tests/test_integration_3xui.py
+      - name: Install package with dev dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
 
   python-lint:
     name: Python Lint
@@ -36,20 +42,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install ruff
-        run: pip install 'ruff>=0.4,<1.0'
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install dev dependencies
+        run: uv sync --extra dev
 
       - name: Ruff check
-        run: ruff check src/ tests/
+        run: uv run ruff check src/ tests/
 
       - name: Ruff format check
-        run: ruff format --check src/ tests/
+        run: uv run ruff format --check src/ tests/
 
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v7
 
@@ -73,28 +85,6 @@ jobs:
         run: |
           pip install jinja2
           python3 tests/render_templates.py
-
-      - name: Verify connection-info app links match website data
-        run: |
-          python3 -c "
-          import json, re, sys
-          template = 'src/meridian/templates/connection-info.html.j2'
-          data_file = 'website/src/data/apps.json'
-          def extract_links(path):
-              content = open(path).read()
-              return sorted(set(re.findall(r'https://(?:play\.google\.com|apps\.apple\.com|github\.com/\S+/releases)[^\s\"<]*', content)))
-          def extract_json_links(path):
-              data = json.load(open(path))
-              return sorted(set(item['url'] for item in data if re.match(r'https://(?:play\.google\.com|apps\.apple\.com|github\.com/)', item['url'])))
-          baseline = extract_links(template)
-          data_links = extract_json_links(data_file)
-          if data_links != baseline:
-              print(f'MISMATCH between template and website/src/data/apps.json')
-              print(f'  Template: {baseline}')
-              print(f'  Data:     {data_links}')
-              sys.exit(1)
-          print(f'OK: App download links match between template and apps.json')
-          "
 
       - name: Verify VERSION file format
         run: |
@@ -126,6 +116,9 @@ jobs:
       - name: Verify _PWA_APPS matches apps.json
         run: uv run python tests/validate_apps_sync.py
 
+      - name: Verify generated Meridian contracts are current
+        run: uv run python scripts/export_contracts.py --check
+
   shellcheck:
     name: Shell
     runs-on: ubuntu-latest
@@ -133,85 +126,16 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Check script syntax
-        run: |
-          bash -n install.sh
-          bash -n setup.sh
+        run: bash -n install.sh
 
       - name: Shellcheck
-        run: |
-          shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
-          shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning setup.sh
-
-  integration:
-    name: Integration
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install package with dev dependencies
-        run: pip install ".[dev]"
-
-      - name: Start 3x-ui container
-        run: docker compose -f docker-compose.test.yml up -d
-
-      - name: Wait for panel
-        run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:2053/ 2>/dev/null || echo "000")
-            if [ "$code" != "000" ]; then
-              echo "Panel ready (HTTP $code)"
-              break
-            fi
-            echo "Waiting... attempt $i"
-            sleep 2
-          done
-
-      - name: Run integration tests
-        run: pytest tests/test_integration_3xui.py -v --tb=short
-
-      - name: Dump container logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.test.yml logs
-
-      - name: Stop container
-        if: always()
-        run: docker compose -f docker-compose.test.yml down -v
-
-  e2e:
-    name: E2E Provisioner
-    runs-on: ubuntu-latest
-    needs: [python-test, python-lint]
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Pre-pull 3x-ui image
-        run: docker pull ghcr.io/mhsanaei/3x-ui:2.8.11
-
-      - name: Run E2E tests
-        run: docker compose -f tests/e2e/docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
-
-      - name: Dump E2E container logs on failure
-        if: failure()
-        run: |
-          docker compose -f tests/e2e/docker-compose.e2e.yml logs
-          docker logs 3x-ui 2>&1 || true
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker rm -f 3x-ui 2>/dev/null || true
-          docker compose -f tests/e2e/docker-compose.e2e.yml down -v
+        run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
 
   system-lab:
     name: System Lab
     runs-on: ubuntu-latest
     needs: [python-test, python-lint]
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -235,24 +159,36 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
 
       - name: Build Astro site
-        run: cd website && npm ci && npm run build
+        run: |
+          cd website
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
 
       - name: Type-check Astro components
-        run: cd website && npx astro check --minimumSeverity warning
+        run: cd website && pnpm exec astro check --minimumSeverity warning
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
+
+      - name: Validate packaged Studio assets
+        run: |
+          uv build --wheel
+          python3 scripts/verify_package_assets.py dist/*.whl
 
       - name: Validate PWA demo generation
         run: |
-          sudo apt-get install -y qrencode
           uv run meridian dev preview --output website/dist/demo
           # Verify expected files exist
           test -f website/dist/demo/index.html

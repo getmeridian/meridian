@@ -9,7 +9,7 @@ import Callout from '../components/Callout.astro';
 import CommandBuilder from '../components/CommandBuilder.astro';
 
 const detailSteps = [
-  { title: 'Installs Docker', text: ' and deploys <strong>Xray</strong> via the <strong>3x-ui</strong> management panel', titleKey: 'step.1.title', textKey: 'step.1.text' },
+  { title: 'Installs Docker', text: ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel', titleKey: 'step.1.title', textKey: 'step.1.text' },
   { title: 'Generates x25519 keypair', text: ' — unique encryption keys for Reality authentication', titleKey: 'step.2.title', textKey: 'step.2.text' },
   { title: 'Hardens the server', text: ' — UFW firewall (ports 22 + 443 only), SSH key-only auth, <strong>BBR</strong> congestion control', titleKey: 'step.3.title', textKey: 'step.3.text' },
   { title: 'Configures VLESS+Reality', text: ' on port 443 — impersonates a real TLS server', titleKey: 'step.4.title', textKey: 'step.4.text' },
@@ -31,7 +31,7 @@ const detailSteps = [
       "name": "Meridian",
       "url": "https://getmeridian.org",
       "logo": "https://getmeridian.org/img/logo-512.png",
-      "sameAs": ["https://github.com/uburuntu/meridian"],
+      "sameAs": ["https://github.com/getmeridian/meridian"],
     })} />
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
@@ -238,8 +238,8 @@ const detailSteps = [
               extra port exposed.
             </p>
             <p>
-              The 3x-ui panel is reverse-proxied by nginx on a secret path — accessible
-              via HTTPS, no SSH tunnel needed.
+              The Remnawave admin panel is reverse-proxied by nginx on a secret path —
+              accessible via HTTPS, no SSH tunnel needed.
             </p>
           </Accordion>
 

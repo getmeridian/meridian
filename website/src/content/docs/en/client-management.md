@@ -11,15 +11,19 @@ section: guides
 meridian client add alice
 ```
 
-This creates a unique connection key for "alice" and displays:
-- A **QR code** in the terminal — scan it with a VPN app to connect instantly
-- **Connection URLs** — VLESS links for each protocol (Reality, XHTTP, and WSS if domain mode is enabled)
-- A **shareable page URL** — hosted on your server, ready to send via any messenger
-- An **HTML file** saved locally — backup for offline sharing
+This creates a unique connection key for "alice" and displays the canonical subscription URL. Legacy deployments also show a QR code and self-hosted connection-page URL when the page upload has been verified. V4 access is managed through `topology_intent`, so no legacy PWA is fabricated.
+
+Pass multiple names to add several clients at once:
+
+```
+meridian client add alice bob charlie
+```
+
+Each client gets their own key. Legacy batch failures are reported per client and successful creations are kept.
 
 ### What the recipient sees
 
-The shareable URL opens a connection page with:
+When a legacy connection page is available, its shareable URL opens a page with:
 - Step-by-step instructions for installing a VPN app (v2RayTun, v2rayNG, Hiddify, or v2rayN)
 - QR codes for each connection protocol
 - One-tap "Open in App" deep links
@@ -35,9 +39,15 @@ To re-display connection info for an existing client at any time:
 meridian client show alice
 ```
 
-This outputs the same QR code, connection URLs, and shareable page link — without creating a new key. Use this when:
+This shows the usable subscription and any evidenced legacy share-page link without creating a new key. If a legacy page is missing, repair it explicitly:
+
+```bash
+meridian client show alice --repair-page
+```
+
+Use `client show` when:
 - You need to re-share the connection page with someone
-- You lost the original QR code or HTML file
+- You lost the original QR code or URL
 - You want to verify what a client's connection looks like
 
 ## List clients
@@ -46,7 +56,7 @@ This outputs the same QR code, connection URLs, and shareable page link — with
 meridian client list
 ```
 
-Shows all clients with their protocol connections (Reality, XHTTP, WSS).
+Shows managed clients with status, traffic, creation time, and last-seen metadata. On V4, the list is restricted to `topology_intent.access.users`; internal routing accounts never appear.
 
 ## Remove a client
 
@@ -54,50 +64,79 @@ Shows all clients with their protocol connections (Reality, XHTTP, WSS).
 meridian client remove alice
 ```
 
-Revokes access immediately. The client's UUID is removed from all inbounds on the server.
+Legacy deployments revoke access immediately. V4 refuses direct removal with exit `2` because safe managed-user retirement is not implemented yet. Use `client disable` for immediate temporary revocation, which lasts until the next `meridian apply`.
 
-## Multi-server
-
-Use `--server` to target a specific named server:
+## Suspend a client
 
 ```
-meridian client add alice --server finland
-meridian client show alice --server finland
-meridian client list --server finland
+meridian client disable alice
 ```
 
-If you have only one server, it's auto-selected.
+Temporarily blocks the client without deleting keys. On V4, the next topology apply restores every declared access user, so `disable` is an operational pause rather than durable desired state.
+
+To re-enable: `meridian client enable alice`
+
+## Re-enable a client
+
+```
+meridian client enable alice
+```
+
+Resumes a previously suspended client. They can connect again immediately using their existing keys and subscription URL.
 
 ## Where credentials are stored
 
-When you run `meridian deploy` from your laptop, Meridian saves server credentials locally:
+Meridian stores fleet topology locally in `~/.meridian/cluster.yml` — panel URL, API token, admin credentials, nodes, and relays. Client state (users, UUIDs, traffic) lives in the Remnawave panel's PostgreSQL database, which is the source of truth.
 
 ```
-~/.meridian/credentials/<IP>/proxy.yml   # keys, UUIDs, panel access
-~/.meridian/servers                      # server registry
+~/.meridian/cluster.yml                 # fleet topology + panel access
 ```
 
-On the server itself, the same data lives in `/etc/meridian/proxy.yml`. Meridian syncs between them automatically after `client add` and `client remove`.
+Routine client state uses the panel REST API. Legacy connection-page upload and explicit `--repair-page` also require SSH to the panel host; subscription-only V4 operations do not.
 
-This is why `meridian client add alice` works without specifying the server — Meridian looks it up in the local registry. If you have multiple servers, use `--server NAME`.
-
-If credentials get out of sync (e.g. you added a client from a different machine), `client show` will recover the data from the server panel automatically.
+`meridian fleet recover` can import one legacy shared profile after local state is lost. It cannot reconstruct V4 topology intent; restore a backup or rerun `meridian setup` for V4 deployments.
 
 ## Web panel
 
-Meridian deploys a 3x-ui management panel for traffic monitoring. Access it at the secret HTTPS path shown in your credentials:
+Meridian deploys the [Remnawave](https://remna.st/) admin panel for traffic monitoring, user management, and advanced configuration. It is reverse-proxied by nginx at a randomized HTTPS path — no SSH tunnel needed. Find the URL and admin credentials in `~/.meridian/cluster.yml`:
 
 ```
-cat ~/.meridian/credentials/<IP>/proxy.yml | grep -A5 panel
+grep -A6 "^panel:" ~/.meridian/cluster.yml
 ```
 
-The panel URL, username, and password are listed there. No SSH tunnel needed — nginx reverse-proxies the panel at a randomized HTTPS path.
+Relevant fields:
+
+```yaml
+panel:
+  url: https://<your-server-ip>/<secret_path>/
+  admin_user: admin
+  admin_pass: <generated>
+  api_token: <JWT used by Meridian CLI>
+  secret_path: <random>
+  sub_path: <random>   # subscription page path
+```
+
+Open `url` in a browser and log in with `admin_user` / `admin_pass`.
+
+Panel-side edits surface as drift. V4 converges against compiled `topology_intent`; legacy deployments may use the optional `desired_*` fields. Review `meridian plan` before applying.
 
 ## How it works
 
-Client names map to 3x-ui `email` fields with protocol prefixes:
-- `reality-alice` — Reality inbound
-- `xhttp-alice` — XHTTP inbound
-- `wss-alice` — WSS inbound (domain mode)
+Each Meridian client is a single Remnawave user (one UUID in the `users` table). The user is assigned to Meridian's default Internal Squad, which grants visibility over every inbound the panel knows about (`vless-reality`, `vless-xhttp`, and `vless-xhttp-ws` in domain mode). The subscription URL — `https://<ip>/<sub_path>/<short_uuid>` — is served by the Remnawave subscription-page container and contains all inbound endpoints the client can use.
 
-Each client gets a unique UUID across all inbounds on the server.
+Client apps (v2rayNG, Streisand, Hiddify, sing-box) treat the subscription URL as a single source of truth: refreshing it pulls in new inbounds when you deploy a new exit, add a relay, or rotate Reality keys.
+
+## Declarative client list
+
+V4 stores managed users in `topology_intent.access.users`. Use `client add` to expand that intent and apply it. Direct V4 removal is intentionally unavailable until safe managed-user retirement is implemented; do not delete the panel user directly.
+
+Legacy clusters can opt into the older `desired_clients` list in `~/.meridian/cluster.yml`:
+
+```yaml
+desired_clients:
+  - alice
+  - bob
+  - charlie
+```
+
+Then `meridian plan` shows the legacy diff against the panel and `meridian apply` converges it. This field is not the authority for V4 topology.

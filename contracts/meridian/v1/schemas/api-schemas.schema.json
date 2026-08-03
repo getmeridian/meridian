@@ -1,0 +1,65 @@
+{
+  "$defs": {
+    "SchemaCatalogEntry": {
+      "additionalProperties": false,
+      "description": "Discoverable schema catalog entry.",
+      "properties": {
+        "commands": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "description"
+      ],
+      "title": "SchemaCatalogEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for `meridian api schemas --json`.",
+  "properties": {
+    "schemas": {
+      "items": {
+        "$ref": "#/$defs/SchemaCatalogEntry"
+      },
+      "title": "Schemas",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemas"
+  ],
+  "title": "ApiSchemasResult",
+  "type": "object"
+}

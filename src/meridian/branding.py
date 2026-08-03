@@ -212,7 +212,7 @@ def _resize_with_pillow(data: bytes, content_type: str) -> str:
 
         b64 = base64.b64encode(png_bytes).decode()
         return f"data:image/png;base64,{b64}"
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.warning("Pillow processing failed: %s", exc)
         return ""
 

@@ -4,36 +4,36 @@
 
 **One file per command** — keeps concerns isolated. Each is a Typer sub-app registered in `cli.py`.
 
-**Server resolution cascade** in `resolve.py` — strict priority order ensures predictable behavior:
-1. Explicit IP → 2. `--server` name → 3. `local` keyword → 4. Single-server auto-select → 5. Multi-server prompt → 6. Fail with hint
+**Cluster-first pattern** — commands load `ClusterConfig` from `cluster.yml` and use the panel API for routine client/fleet reads. Legacy page repair and fleet recovery also open bounded SSH connections for evidence or asset recovery.
 
-**Three-step pattern**: resolve → ensure connection → fetch credentials. Every server-touching command follows this. Deviating causes subtle bugs.
+**Server resolution cascade** in `resolve.py` — adds CLI-specific Rich output around the shared helpers in `meridian.resolve`. Strict priority order for server-touching commands (deploy, node add):
+1. Explicit IP / `local` → 2. `--server` name → 3. Local-mode detection → 4. Single-server auto-select → 5. Fail with candidates and hint
 
-**Version mismatch check** — `fetch_credentials()` compares `deployed_with` against running CLI. Warns once per server per session. Non-blocking.
+**Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr.
 
-**CLI UX vision** — every command output is a guided experience, not a status dump:
-- **Educate** — explain *why*, not just what. A user who runs `deploy` should understand Reality camouflage without reading docs. Help text teaches; it doesn't just label flags.
-- **Unbreak paths** — every error and broken state must suggest the recovery protocol. Deployment failed? → `meridian preflight`. Server unreachable? → `meridian test`. Weird state? → `meridian teardown` + `meridian deploy`.
-- **Upsell the next step** — after `deploy`, suggest `test` and `client add`. After `client add`, suggest `client list` and `test`. Every command's output should make the user aware of what's possible next. The CLI is a guided tour, not a dead end.
-- **Cohesive flag language** — same flag means the same thing everywhere. No `--name` meaning three different things on three commands.
+**Health process API** — completed negative evidence exits 4, unavailable required evidence exits 3, and only fully passed checks exit 0; panel/system failures are inconclusive, while `--basic` never accepts or selects `--client`.
+**Canonical connection test** — full `test` fetches one deterministic active client's delivered Xray JSON and executes its fallback plus each target outbound without rebuilding credentials or transports locally.
 
-**Wizard UX conventions** — the deploy wizard uses `console.py` helpers exclusively:
-- **`choose()`** for any decision with 2+ options. Never raw Y/n prompts. Shows numbered list, user picks a number. Default is always 1.
-- **`prompt()`** for free-text input (IP address, domain, server name). Show defaults in brackets.
-- **`confirm()`** only for the final deploy confirmation. One per command, at the end.
-- **Section pattern**: bold header → dim description → blank line → `choose()`/`prompt()`.
-- **`rich.status.Status`** spinner for any operation >5 seconds (scan, download). Same style as provisioner steps.
-- **Summary Panel** before deploy: show all chosen settings so user can review before confirming.
+**V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
+
+**Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
+
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory/recover). Top-level: `setup`, `deploy`, `test`, `probe`, `doctor`, `teardown`.
 
 ## What's done well
 
-- **`local` keyword everywhere** — `deploy local`, `check local`, `--server local` all work. Case-insensitive. Same code path.
+- **`client add` follows topology ownership** — legacy creates panel users directly; V4 expands declared access intent and applies the reviewed topology.
+- **`fleet recover`** — recovers only provable legacy state; it refuses V4 profiles, ambiguous roles, and unconfirmed overwrites.
+- **`fleet inventory`** — prints local topology with live panel status without exposing tokens.
+- **V4 read and health commands** — node, relay, fleet, and doctor consume registry-backed topology plus compiled listener allocations while preserving legacy behavior.
 
 ## Pitfalls
-
-- **Local mode has two entry points** — `local` keyword and root auto-detect. They converge on `local_mode=True` but differ on `creds_dir`.
-- **Registry mixes exits and relays** — relay nodes are stored in `~/.meridian/servers` too. New relay entries carry an explicit role tag; legacy ones still need inference from local relay metadata or cached exit creds. Never let implicit auto-select depend only on whichever exit happens to have a local `proxy.yml`.
-- **Write commands must fail closed on refresh/sync** — if a command mutates credentials, a stale local cache cannot be trusted and a failed post-save sync must abort before success output or handoff artifact generation.
-- **`deploy` refresh is asymmetric** — first deploy may legitimately have nothing to fetch, but redeploy must abort if forced refresh fails and Meridian state already exists either locally or on the server. Never treat “no local cache” as proof of a fresh machine.
-- **`console.fail()` always exits** — raises `typer.Exit(1)`. Only call from command entry points, never library code.
-- **`dev` subcommand is hidden** — not shown in `--help`. Intentional — developer tools only.
+- **`console.fail()` always exits** — raises `typer.Exit` with semantic codes (user=2, system=3, bug=1). Only call from command entry points.
+- **`confirm()` returns bool** — returns True on accept, False on reject. Callers must check `if not confirm(...): raise typer.Exit(1)`.
+- **Topology deletion is guarded** — node/server removal checks legacy state plus V4 intent, workloads, and allocations.
+- Post-mutation local save failures exit 3, say remote state changed, and preserve typed partial data where the command contract supports it.
+- V4 client reads and connectivity tests expose only users declared in `topology_intent.access.users`; never fall back to panel-wide service users.
+- Never render saved panel administrator credentials; client handoff output is limited to redacted links and non-secret metadata.
+- Doctor reports pass every free-form line through `redact_string()` and render with Rich markup disabled before sharing.
+- Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
+- V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.

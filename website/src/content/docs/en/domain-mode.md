@@ -11,14 +11,14 @@ Domain mode extends the standalone setup with three components:
 
 1. **nginx stream SNI routing** — routes domain traffic to nginx http alongside Reality traffic to Xray
 2. **nginx TLS** — certificates managed by acme.sh (Let's Encrypt) for your domain
-3. **VLESS+WSS inbound** — CDN fallback through Cloudflare
+3. **VLESS+WSS inbound** — legacy CDN fallback through Cloudflare (prefer XHTTP as the secondary transport)
 
-The WSS connection routes through Cloudflare's CDN, making it work even if your server's IP is blocked — Cloudflare's IP ranges are too widely used to block.
+The WSS connection routes through Cloudflare's CDN, making it work even if your server's IP is blocked — Cloudflare's IP ranges are too widely used to block. WSS is maintained for backward compatibility; XHTTP is the preferred alternative transport for new deployments.
 
 ## Deploy with domain
 
 ```
-meridian deploy 1.2.3.4 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain proxy.example.com
 ```
 
 ## Cloudflare setup
@@ -33,7 +33,7 @@ meridian deploy 1.2.3.4 --domain proxy.example.com
 
 > **Important:** acme.sh obtains certificates via HTTP-01 challenge on port 80. If Cloudflare's "Always Use HTTPS" is active, it breaks the challenge. Disable it or add a page rule for `/.well-known/acme-challenge/*`.
 
-> **Also important:** in domain mode, the hosted connection page and the hidden 3x-ui panel path are served on this same hostname. Once you switch the record to orange-cloud, those pages go through Cloudflare too. Disable Cloudflare features that inject scripts or modify HTML on this hostname (for example Website Analytics / RUM), because Meridian's connection page intentionally uses a strict self-hosted CSP. If the page starts failing while proxied, temporarily switch the record back to DNS only to confirm it is a Cloudflare-side issue.
+> **Also important:** in domain mode, the hosted connection page and the hidden Remnawave admin UI + subscription-page paths are served on this same hostname. Once you switch the record to orange-cloud, those pages go through Cloudflare too. Disable Cloudflare features that inject scripts or modify HTML on this hostname (for example Website Analytics / RUM), because Meridian's connection page intentionally uses a strict self-hosted CSP. If the page starts failing while proxied, temporarily switch the record back to DNS only to confirm it is a Cloudflare-side issue.
 
 ## Connection links
 
@@ -43,6 +43,6 @@ With domain mode, users get three connection options:
 |----------|----------|-------|
 | Reality | Primary | Direct to server IP |
 | XHTTP | Alternative | Through nginx on port 443 |
-| WSS | Backup | Through Cloudflare CDN |
+| WSS | Legacy backup | Through Cloudflare CDN |
 
-Users should try Reality first (fastest), XHTTP second, and WSS only if both fail (IP is blocked).
+Users should try Reality first (fastest), XHTTP second, and WSS only as a last resort if both fail (e.g. IP is blocked).

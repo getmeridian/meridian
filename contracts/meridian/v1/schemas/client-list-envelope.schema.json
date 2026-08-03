@@ -1,0 +1,371 @@
+{
+  "$defs": {
+    "ClientListResult": {
+      "additionalProperties": false,
+      "description": "Result for listing clients.",
+      "properties": {
+        "clients": {
+          "items": {
+            "$ref": "#/$defs/ClientRecord"
+          },
+          "title": "Clients",
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/ClientListSummary"
+        }
+      },
+      "required": [
+        "summary"
+      ],
+      "title": "ClientListResult",
+      "type": "object"
+    },
+    "ClientListSummary": {
+      "additionalProperties": false,
+      "description": "Aggregate client counts for dashboards.",
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "integer"
+        },
+        "clients": {
+          "title": "Clients",
+          "type": "integer"
+        },
+        "disabled": {
+          "title": "Disabled",
+          "type": "integer"
+        },
+        "expired": {
+          "title": "Expired",
+          "type": "integer"
+        },
+        "limited": {
+          "title": "Limited",
+          "type": "integer"
+        },
+        "other": {
+          "title": "Other",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clients",
+        "active",
+        "disabled",
+        "limited",
+        "expired",
+        "other"
+      ],
+      "title": "ClientListSummary",
+      "type": "object"
+    },
+    "ClientRecord": {
+      "additionalProperties": false,
+      "description": "Redacted client metadata suitable for list views.",
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "last_seen": {
+          "title": "Last Seen",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_used_bytes": {
+          "title": "Traffic Used Bytes",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "uuid",
+        "status",
+        "traffic_used_bytes",
+        "traffic_limit_bytes",
+        "created_at",
+        "last_seen"
+      ],
+      "title": "ClientRecord",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "MeridianError": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_ClientListSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.list",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/ClientListResult"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientListSuccessEnvelope",
+      "type": "object"
+    },
+    "_ClientListTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "client.list",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_ClientListTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian client list --json`.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_ClientListTerminalEnvelope",
+      "ok": "#/$defs/_ClientListSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_ClientListSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_ClientListTerminalEnvelope"
+    }
+  ],
+  "title": "ClientListOutputEnvelope"
+}

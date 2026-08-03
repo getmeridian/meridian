@@ -1,0 +1,74 @@
+{
+  "additionalProperties": false,
+  "description": "Beginner-facing saved-server card for topology assignment.",
+  "properties": {
+    "capabilities": {
+      "items": {
+        "enum": [
+          "panel",
+          "exit",
+          "relay",
+          "routing_gateway"
+        ],
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "host": {
+      "title": "Host",
+      "type": "string"
+    },
+    "last_checked_at": {
+      "default": "",
+      "title": "Last Checked At",
+      "type": "string"
+    },
+    "region": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    },
+    "ssh_port": {
+      "default": 22,
+      "title": "Ssh Port",
+      "type": "integer"
+    },
+    "ssh_user": {
+      "default": "root",
+      "title": "Ssh User",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "validation_state": {
+      "default": "unknown",
+      "enum": [
+        "unknown",
+        "validated",
+        "key_ready",
+        "failed"
+      ],
+      "title": "Validation State",
+      "type": "string"
+    }
+  },
+  "required": [
+    "server_ref",
+    "title",
+    "host"
+  ],
+  "title": "TopologyServerShelfItem",
+  "type": "object"
+}

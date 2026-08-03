@@ -1,25 +1,12 @@
 """Shared data models used across meridian modules.
 
 Centralizes dataclasses that would otherwise create circular imports
-between panel.py, protocols.py, and output.py.
+between protocols.py and output.py.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-
-@dataclass
-class Inbound:
-    """An inbound from the 3x-ui panel."""
-
-    id: int
-    remark: str
-    protocol: str
-    port: int
-    listen: str = ""
-    clients: list[dict] = field(default_factory=list)
-    stream_settings: dict = field(default_factory=dict)
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

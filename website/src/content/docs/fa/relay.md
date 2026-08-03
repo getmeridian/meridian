@@ -19,10 +19,9 @@ section: guides
 
 یک رله [Realm](https://github.com/zhboner/realm) را اجرا می‌کند، یک forwarder TCP سبک‌وزن و بدون کپی (~5 مگابایت Rust باینری). به پورت 443 (قابل پیکربندی) گوش می‌دهد و تمام ترافیک را به پورت 443 سرور خروجی ارسال می‌کند. بدون Docker، بدون نرم‌افزار VPN، بدون پنل مدیریتی.
 
-تمام پروتکل‌ها از طریق رله کار می‌کنند:
-- **Reality** — دست‌دهی end-to-end، رله کاملاً شفاف است
-- **XHTTP** — مسیریابی شده از طریق رله با پارامتر صریح `sni=`
-- **WSS** — حالت دامنه، مسیریابی شده با `sni=domain&host=domain`
+Relayهای legacy مبتنی بر Realm فقط **Reality** را منتشر می‌کنند. مسیر اختصاصی SNI آن‌ها در Reality inbound سرور خروجی پایان می‌یابد، در حالی که transportهای HTTP به مسیریابی host/path خود نیاز دارند. گزینه‌های مستقیم XHTTP و WSS در همان اشتراک به‌عنوان fallback باقی می‌مانند.
+
+در V4، relay یک زنجیره در `topology_intent` است: هر hop به هویت ذخیره‌شده سرور اشاره می‌کند و entry hop می‌تواند برای کلاینت‌ها منتشر شود. دسترس‌پذیری listener ورودی به معنی تأیید hopهای داخلی نیست.
 
 ## استقرار یک رله
 
@@ -32,7 +31,7 @@ section: guides
 meridian relay deploy RELAY_IP --exit EXIT_IP
 ```
 
-Provisioner:
+در حالت legacy، provisioner:
 1. بسته‌های مورد نیاز را نصب می‌کند و BBR را فعال می‌کند
 2. firewall UFW را پیکربندی می‌کند (اجازه SSH + پورت رله)
 3. Realm باینری را دانلود می‌کند (نسخه ثابت‌شده، SHA256-تأیید‌شده)
@@ -46,37 +45,44 @@ Provisioner:
 | `--exit/-e EXIT` | (الزامی) | IP یا نام سرور خروجی |
 | `--name NAME` | (خودکار) | نام دوست‌انه برای رله (مثلاً `ru-moscow`) |
 | `--port/-p PORT` | 443 | پورت گوش‌دهی روی سرور رله |
+| `--sni HOST` | (خودکار) | هدف استتار Reality مخصوص رله |
 | `--user/-u USER` | root | کاربر SSH روی سرور رله |
+| `--ssh-port PORT` | 22 | پورت SSH سرور رله |
 | `--yes/-y` | | پرسش‌های تأیید را رد کنید |
+
+در legacy حذف `--sni` باعث اجرای RealiTLScanner روی شبکه IPv4 relay می‌شود. در V4، `--exit` باید بدون ابهام یک exit موجود intent را مشخص کند؛ دستور زنجیره را اضافه و plan را فوراً apply می‌کند و SNI خالی مسیر Reality خروجی را به ارث می‌برد.
 
 ### مثال با تمام گزینه‌ها
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+  --port 443 --sni www.microsoft.com --user ubuntu --ssh-port 2222 --yes
 ```
 
 ## چگونه کلاینت‌ها اتصال برقرار می‌کنند
 
-پس از استقرار یک رله، تمام صفحات اتصال کلاینت موجود **به‌طور خودکار دوباره تولید می‌شوند**. URL‌های رله به عنوان اتصال توصیه‌شده نشان داده می‌شوند، URL‌های مستقیم به عنوان پشتیبان.
+پس از استقرار، Meridian میزبان Reality رله را به Remnawave اضافه می‌کند. کلاینت‌های موجود در refresh بعدی اشتراک آن را دریافت می‌کنند و transportهای مستقیم fallback باقی می‌مانند.
 
 هنگام افزودن کلاینت‌های جدید، URL‌های رله به‌طور خودکار شامل می‌شوند:
 
 ```bash
-meridian client add alice --server 1.2.3.4   # URL‌های رله شامل هستند
+meridian client add alice   # URL‌های رله به‌طور خودکار اضافه می‌شوند
 ```
 
 ## مدیریت نودهای رله
 
 ```bash
 meridian relay list                    # تمام نودهای رله در تمام سرورهای خروجی
-meridian relay list --exit 1.2.3.4     # نودهای رله برای یک خروجی خاص
-meridian relay check RELAY_IP          # بررسی سلامت 4 نقطه‌ای
+meridian relay list --exit 198.51.100.10     # نودهای رله برای یک خروجی خاص
+meridian relay check RELAY_IP          # بررسی سلامت رله و پنل
 meridian relay remove RELAY_IP         # توقف سرویس + حذف از پیکربندی
 ```
 
+`relay list` هم رکوردهای legacy و هم projection V4 را نشان می‌دهد. `relay check` و `relay remove` فقط برای relay قدیمی Realm هستند. در V4 عمداً رد می‌شوند: زنجیره کامل را با `meridian test` بررسی کنید و حذف آن را در `meridian setup` بازبینی و به‌عنوان تغییر intent اعمال کنید.
+
 ### بررسی سلامت
 
-`meridian relay check` چهار چیز را آزمایش می‌کند:
+برای legacy، `meridian relay check` مسیر relay و ثبت آن در پنل را آزمایش می‌کند:
 
 | بررسی | آنچه که آزمایش می‌شود |
 |-------|---------------|
@@ -84,6 +90,11 @@ meridian relay remove RELAY_IP         # توقف سرویس + حذف از پی�
 | سرویس Realm | آیا سرویس systemd فعال است؟ |
 | رله → خروجی TCP | آیا رله می‌تواند سرور خروجی را در پورت 443 برسد؟ |
 | محلی → رله TCP | آیا ماشین شما می‌تواند رله را در پورت گوش‌دهی خود برسد؟ |
+| میزبان‌های پنل | آیا ورودی‌های میزبان رله در Remnawave وجود دارند و فعال‌اند؟ |
+
+کد `0` یعنی سالم، `4` یعنی بررسی تکمیل شده و مشکل یافته است، و `3` یعنی شواهد الزامی SSH یا پنل در دسترس نیست.
+
+`meridian fleet status` برای relay عمومی فقط اتصال TCP به listener را بررسی می‌کند؛ این شواهد موفقیت ترافیک proxy در تمام مسیر نیست. hopهای داخلی V4 `unknown` می‌مانند و تا بررسی جداگانه مسیر رسمی، فلیت ممکن است کد `3` برگرداند.
 
 ### حذف یک رله
 
@@ -91,18 +102,18 @@ meridian relay remove RELAY_IP         # توقف سرویس + حذف از پی�
 meridian relay remove RELAY_IP [--exit EXIT_IP] [--yes]
 ```
 
-این سرویس Realm را متوقف می‌کند، رله را از اعتبارات سرور خروجی حذف می‌کند و تمام صفحات اتصال کلاینت را دوباره تولید می‌کند (بازگشت به URL‌های مستقیم تنهایی).
+دستور legacy سرویس Realm، binary و config، قانون دقیق UFW، routing nginx روی exit و Hostهای Remnawave را حذف می‌کند. ورودی `cluster.yml` تا موفقیت کامل پاک‌سازی راه‌دور برای retry حفظ می‌شود. کلاینت‌ها پس از refresh بعدی دیگر آن relay را دریافت نمی‌کنند.
 
 ## رله‌های متعدد
 
 می‌توانید چندین رله را به یک سرور خروجی متصل کنید — برای مثال، رله‌هایی در شهرهای مختلف یا ISP‌های مختلف:
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
-کلاینت‌ها تمام گزینه‌های رله را در صفحه اتصال خود می‌بینند.
+کلاینت‌ها همه گزینه‌های رله را در اشتراک خود دریافت می‌کنند.
 
 ## حل مسائل
 
@@ -116,7 +127,7 @@ meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
 
 ### سرور خروجی غیرقابل دسترسی است
 
-رله باید بتواند سرور خروجی را در پورت 443 برسد. با `curl -I https://EXIT_IP` از رله آزمایش کنید، یا `meridian relay check` را اجرا کنید.
+relay باید به TCP/443 سرور خروجی برسد. در legacy از `meridian relay check` استفاده کنید؛ در V4 `meridian test` را اجرا کنید، چون دسترس‌پذیری یک hop به‌تنهایی مسیر رسمی کلاینت را تأیید نمی‌کند.
 
 ### سرویس رله شروع نشده است
 

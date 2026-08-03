@@ -8,7 +8,6 @@ from meridian.xray_client import (
     _parse_dgst,
     _resolve_asset_name,
     build_reality_config,
-    build_test_configs,
     build_wss_config,
     build_xhttp_config,
 )
@@ -87,19 +86,6 @@ class TestRealityConfig:
         assert stream["realitySettings"]["shortId"] == "abcd1234"
         assert stream["realitySettings"]["serverName"] == "www.microsoft.com"
 
-    def test_pq_encryption(self) -> None:
-        config = build_reality_config(
-            socks_port=10808,
-            server_ip="198.51.100.1",
-            uuid="test-uuid",
-            sni="www.microsoft.com",
-            public_key="testpbk",
-            short_id="abcd1234",
-            encryption="mlkem768x25519plus.native.0rtt.testkey",
-        )
-        user = config["outbounds"][0]["settings"]["vnext"][0]["users"][0]
-        assert user["encryption"] == "mlkem768x25519plus.native.0rtt.testkey"
-
     def test_is_valid_json(self) -> None:
         config = build_reality_config(10808, "198.51.100.1", "uuid", "sni", "pbk", "sid")
         # Roundtrip through JSON
@@ -141,73 +127,3 @@ class TestWSSConfig:
         assert stream["wsSettings"]["headers"]["Host"] == "example.com"
         # WSS must NOT have flow
         assert "flow" not in outbound["settings"]["vnext"][0]["users"][0]
-
-
-class TestBuildTestConfigs:
-    def test_reality_only(self) -> None:
-        from meridian.credentials import PanelConfig, RealityConfig, ServerConfig, ServerCredentials
-
-        creds = ServerCredentials(
-            panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com"),
-            protocols={
-                "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
-            },
-        )
-        configs = build_test_configs(creds)
-        assert len(configs) == 1
-        assert configs[0][0] == "Reality (TCP)"
-        assert configs[0][2] is True  # expect_ip_match
-
-    def test_all_protocols(self) -> None:
-        from meridian.credentials import (
-            PanelConfig,
-            RealityConfig,
-            ServerConfig,
-            ServerCredentials,
-            WSSConfig,
-            XHTTPConfig,
-        )
-
-        creds = ServerCredentials(
-            panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com", domain="example.com"),
-            protocols={
-                "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
-                "xhttp": XHTTPConfig(xhttp_path="xp"),
-                "wss": WSSConfig(uuid="wss-uuid", ws_path="ws"),
-            },
-        )
-        configs = build_test_configs(creds)
-        labels = [c[0] for c in configs]
-        assert "Reality (TCP)" in labels
-        assert "XHTTP" in labels
-        assert "WSS (CDN)" in labels
-
-    def test_no_creds_returns_empty(self) -> None:
-        from meridian.credentials import PanelConfig, ServerConfig, ServerCredentials
-
-        creds = ServerCredentials(
-            panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1"),
-            protocols={},
-        )
-        configs = build_test_configs(creds)
-        assert configs == []
-
-    def test_warp_disables_ip_match(self) -> None:
-        """WARP routes through Cloudflare — exit IP won't match server IP."""
-        from meridian.credentials import PanelConfig, RealityConfig, ServerConfig, ServerCredentials, XHTTPConfig
-
-        creds = ServerCredentials(
-            panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com", warp=True),
-            protocols={
-                "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
-                "xhttp": XHTTPConfig(xhttp_path="xp"),
-            },
-        )
-        configs = build_test_configs(creds)
-        # With WARP, no protocol should expect IP match
-        for label, _config, expect_ip_match in configs:
-            assert expect_ip_match is False, f"{label} should not expect IP match with WARP"

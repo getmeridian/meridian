@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "ClientCreated": {
+      "additionalProperties": false,
+      "description": "Client metadata returned after creation.",
+      "properties": {
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "uuid",
+        "status"
+      ],
+      "title": "ClientCreated",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for adding one or more clients.",
+  "properties": {
+    "clients": {
+      "items": {
+        "$ref": "#/$defs/ClientCreated"
+      },
+      "title": "Clients",
+      "type": "array"
+    }
+  },
+  "title": "ClientAddResult",
+  "type": "object"
+}

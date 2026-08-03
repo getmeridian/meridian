@@ -11,14 +11,14 @@ section: guides
 
 1. **مسیریابی SNI nginx stream** — ترافیک دامنه را به nginx http در کنار ترافیک Reality به Xray مسیر می‌دهد
 2. **TLS nginx** — گواهینامه‌ها توسط acme.sh (Let's Encrypt) مدیریت می‌شوند
-3. **inbound VLESS+WSS** — fallback CDN از طریق Cloudflare
+3. **inbound VLESS+WSS** — مسیر fallback قدیمی از طریق CDN Cloudflare؛ برای transport دوم، XHTTP را ترجیح دهید
 
-اتصال WSS از طریق CDN Cloudflare مسیر می‌یابد، که آن را حتی اگر IP سرور شما مسدود شود کار می‌کند — محدوده‌های IP Cloudflare بسیار گسترده‌ای برای مسدود کردن هستند.
+اتصال WSS از طریق CDN Cloudflare عبور می‌کند و حتی در صورت مسدود شدن IP سرور نیز کار می‌کند، چون مسدود کردن گسترده محدوده‌های IP Cloudflare عملی نیست. WSS برای سازگاری با استقرارهای قدیمی نگه داشته شده است؛ در استقرارهای جدید، XHTTP transport جایگزین ترجیحی است.
 
 ## نصب با دامنه
 
 ```
-meridian deploy 1.2.3.4 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain proxy.example.com
 ```
 
 ## تنظیم Cloudflare
@@ -33,7 +33,7 @@ meridian deploy 1.2.3.4 --domain proxy.example.com
 
 > **مهم:** acme.sh گواهینامه‌ها را از طریق چالش HTTP-01 روی پورت 80 به دست می‌آورد. اگر "Always Use HTTPS" Cloudflare فعال باشد، این چالش را می‌شکند. آن را غیرفعال کنید یا یک page rule برای `/.well-known/acme-challenge/*` اضافه کنید.
 
-> **نکته مهم دیگر:** در حالت دامنه، صفحه اتصال میزبانی‌شده و مسیر مخفی پنل 3x-ui روی همین hostname ارائه می‌شوند. بعد از اینکه رکورد را به ابر نارنجی تغییر دهید، این صفحات هم از Cloudflare عبور می‌کنند. قابلیت‌های Cloudflare که اسکریپت تزریق می‌کنند یا HTML را تغییر می‌دهند (مثل Website Analytics / RUM) را برای این hostname غیرفعال کنید، چون صفحه اتصال Meridian عمداً از یک CSP سخت‌گیرانه و self-hosted استفاده می‌کند. اگر هنگام پروکسی بودن صفحه از کار افتاد، موقتاً رکورد را به DNS only برگردانید تا مشخص شود مشکل از سمت Cloudflare است.
+> **نکته مهم دیگر:** در حالت دامنه، صفحه اتصال میزبانی‌شده و مسیرهای مخفی رابط مدیریت و صفحه اشتراک Remnawave روی همین hostname ارائه می‌شوند. بعد از اینکه رکورد را به ابر نارنجی تغییر دهید، این صفحات هم از Cloudflare عبور می‌کنند. قابلیت‌های Cloudflare که اسکریپت تزریق می‌کنند یا HTML را تغییر می‌دهند (مثل Website Analytics / RUM) را برای این hostname غیرفعال کنید، چون صفحه اتصال Meridian عمداً از یک CSP سخت‌گیرانه و self-hosted استفاده می‌کند. اگر هنگام پروکسی بودن صفحه از کار افتاد، موقتاً رکورد را به DNS only برگردانید تا مشخص شود مشکل از سمت Cloudflare است.
 
 ## لینک‌های اتصال
 
@@ -43,6 +43,6 @@ meridian deploy 1.2.3.4 --domain proxy.example.com
 |----------|----------|-------|
 | Reality | اولیه | مستقیم به IP سرور |
 | XHTTP | جایگزین | از طریق nginx روی پورت 443 |
-| WSS | Backup | از طریق CDN Cloudflare |
+| WSS | پشتیبان قدیمی | از طریق CDN Cloudflare |
 
-کاربران باید ابتدا Reality (سریع‌ترین) را امتحان کنند، سپس XHTTP، و WSS فقط اگر هر دو ناکام شوند (IP مسدود است).
+کاربران باید ابتدا Reality (سریع‌ترین) را امتحان کنند، سپس XHTTP، و تنها اگر هر دو ناموفق بودند سراغ WSS بروند (برای مثال وقتی IP مسدود شده است).

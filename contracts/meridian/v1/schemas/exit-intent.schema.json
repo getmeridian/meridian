@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "ProtocolPathIntent": {
+      "additionalProperties": false,
+      "description": "One protocol-specific public path backed by an exit workload.",
+      "properties": {
+        "host": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Host"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "listen_port": {
+          "default": 0,
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "Listen Port",
+          "type": "integer"
+        },
+        "path": {
+          "default": "",
+          "maxLength": 200,
+          "pattern": "^$|^/?[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "protocol": {
+          "enum": [
+            "reality",
+            "xhttp",
+            "wss",
+            "hysteria2"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        },
+        "public_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Public Port",
+          "type": "integer"
+        },
+        "reality_sni": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Reality Sni"
+        },
+        "tls_sni": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Tls Sni"
+        }
+      },
+      "required": [
+        "id",
+        "protocol"
+      ],
+      "title": "ProtocolPathIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One independent Xray exit workload and its public protocol paths.",
+  "properties": {
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "paths": {
+      "items": {
+        "$ref": "#/$defs/ProtocolPathIntent"
+      },
+      "minItems": 1,
+      "title": "Paths",
+      "type": "array"
+    },
+    "region": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    },
+    "warp": {
+      "default": false,
+      "title": "Warp",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "server_ref",
+    "paths"
+  ],
+  "title": "ExitIntent",
+  "type": "object"
+}

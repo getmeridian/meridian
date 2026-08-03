@@ -3,20 +3,27 @@
   "type": "module",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "pnpm@10.33.3",
   "scripts": {
     "dev": "uv run --project .. meridian dev preview --output public/demo 2>/dev/null; astro dev",
-    "build": "node scripts/validate-mermaid.mjs && astro build && npx pagefind --site dist",
+    "build": "node scripts/validate-mermaid.mjs && pnpm run studio:test && astro build && node scripts/check-runtime-assets.mjs && pagefind --site dist",
+    "contracts:generate": "node scripts/generate-contract-types.mjs",
+    "contracts:check": "node scripts/generate-contract-types.mjs --check && pnpm run contracts:typecheck",
+    "contracts:typecheck": "tsc --noEmit --skipLibCheck false --moduleResolution bundler --module esnext --target es2022 src/studio/generated/schemas/index.d.ts",
+    "studio:test": "node --test src/studio/*.test.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.1",
     "astro": "^5.7.0",
-    "mermaid": "^11.13.0"
+    "mermaid": "^11.13.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.2",
     "jsdom": "^29.0.1",
+    "json-schema-to-typescript": "^15.0.4",
     "pagefind": "^1.3.0",
     "typescript": "^5.9.3"
   }

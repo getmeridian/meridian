@@ -1,0 +1,155 @@
+{
+  "$defs": {
+    "CommandOutcome": {
+      "additionalProperties": false,
+      "description": "Structured command outcome for process clients.",
+      "properties": {
+        "category": {
+          "anyOf": [
+            {
+              "enum": [
+                "user",
+                "system",
+                "bug",
+                "cancelled"
+              ],
+              "type": "string"
+            },
+            {
+              "const": "none",
+              "type": "string"
+            }
+          ],
+          "title": "Category"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meaning": {
+          "title": "Meaning",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "changed",
+            "no_changes",
+            "failed",
+            "cancelled"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "exit_code",
+        "category",
+        "meaning"
+      ],
+      "title": "CommandOutcome",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Discoverable command-to-schema contract for process API clients.",
+  "properties": {
+    "argv": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Argv",
+      "type": "array"
+    },
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "data_schema": {
+      "title": "Data Schema",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "envelope_schema": {
+      "title": "Envelope Schema",
+      "type": "string"
+    },
+    "error_schema": {
+      "title": "Error Schema",
+      "type": "string"
+    },
+    "exit_codes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Exit Codes",
+      "type": "object"
+    },
+    "failure_data_schema": {
+      "title": "Failure Data Schema",
+      "type": "string"
+    },
+    "interrupt_behavior": {
+      "const": "exit_130_without_envelope",
+      "default": "exit_130_without_envelope",
+      "title": "Interrupt Behavior",
+      "type": "string"
+    },
+    "machine_flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Machine Flags",
+      "type": "array"
+    },
+    "outcomes": {
+      "items": {
+        "$ref": "#/$defs/CommandOutcome"
+      },
+      "title": "Outcomes",
+      "type": "array"
+    },
+    "stability": {
+      "enum": [
+        "stable",
+        "preview"
+      ],
+      "title": "Stability",
+      "type": "string"
+    },
+    "statuses": {
+      "items": {
+        "enum": [
+          "ok",
+          "changed",
+          "no_changes",
+          "failed",
+          "cancelled"
+        ],
+        "type": "string"
+      },
+      "title": "Statuses",
+      "type": "array"
+    }
+  },
+  "required": [
+    "command",
+    "argv",
+    "envelope_schema",
+    "data_schema",
+    "failure_data_schema",
+    "error_schema",
+    "statuses",
+    "outcomes",
+    "exit_codes",
+    "machine_flags",
+    "stability",
+    "description"
+  ],
+  "title": "CommandContract",
+  "type": "object"
+}

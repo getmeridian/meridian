@@ -1,0 +1,86 @@
+{
+  "config_profile": {
+    "config": {"inbounds": []},
+    "inbounds": [
+      {
+        "network": "tcp",
+        "port": 443,
+        "profileUuid": "00000000-0000-0000-0000-000000000001",
+        "security": "reality",
+        "tag": "vless-reality",
+        "type": "vless",
+        "uuid": "00000000-0000-0000-0000-000000000002"
+      }
+    ],
+    "name": "meridian-exit-a",
+    "uuid": "00000000-0000-0000-0000-000000000001"
+  },
+  "host": {
+    "address": "198.51.100.10",
+    "host": null,
+    "inbound": {
+      "configProfileInboundUuid": "00000000-0000-0000-0000-000000000002",
+      "configProfileUuid": "00000000-0000-0000-0000-000000000001"
+    },
+    "isDisabled": false,
+    "path": null,
+    "port": 443,
+    "remark": "reality-exit-a",
+    "securityLayer": "DEFAULT",
+    "sni": "www.microsoft.com",
+    "uuid": "00000000-0000-0000-0000-000000000003"
+  },
+  "internal_squad": {
+    "inbounds": [
+      {"uuid": "00000000-0000-0000-0000-000000000002"}
+    ],
+    "info": {"inboundsCount": 1, "membersCount": 1},
+    "name": "Meridian-Access",
+    "uuid": "00000000-0000-0000-0000-000000000004"
+  },
+  "node": {
+    "address": "198.51.100.10",
+    "configProfile": {
+      "activeConfigProfileUuid": "00000000-0000-0000-0000-000000000001",
+      "activeInbounds": [
+        {"uuid": "00000000-0000-0000-0000-000000000002"}
+      ]
+    },
+    "countryCode": "DE",
+    "isConnected": true,
+    "isDisabled": false,
+    "name": "exit-a",
+    "port": 2222,
+    "trafficUsedBytes": 1024,
+    "uuid": "00000000-0000-0000-0000-000000000005",
+    "xrayVersion": "26.6.27"
+  },
+  "subscription_settings": {
+    "customResponseHeaders": {"X-Meridian": "managed"},
+    "profileTitle": "Family VPN",
+    "profileUpdateInterval": 12,
+    "randomizeHosts": false,
+    "responseRules": {
+      "rules": [{"enabled": true, "name": "keep-unmanaged"}],
+      "version": "1"
+    },
+    "serveJsonAtBaseSubscription": true,
+    "supportLink": "https://support.example.com",
+    "uuid": "00000000-0000-0000-0000-000000000006"
+  },
+  "user": {
+    "activeInternalSquads": [
+      {"name": "Meridian-Access", "uuid": "00000000-0000-0000-0000-000000000004"}
+    ],
+    "description": "Managed by Meridian service routing",
+    "externalSquadUuid": null,
+    "shortUuid": "service-short",
+    "status": "ACTIVE",
+    "subscriptionUrl": "https://panel.example.com/api/sub/service-short",
+    "trafficLimitBytes": 0,
+    "userTraffic": {"usedTrafficBytes": 0},
+    "username": "meridian_bridge_a",
+    "uuid": "00000000-0000-0000-0000-000000000007",
+    "vlessUuid": "00000000-0000-0000-0000-000000000008"
+  }
+}

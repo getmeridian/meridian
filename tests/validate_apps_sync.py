@@ -10,6 +10,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -17,18 +18,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 APPS_JSON = ROOT / "website" / "src" / "data" / "apps.json"
+RENDER_PY = ROOT / "src" / "meridian" / "render.py"
+
+
+def _load_python_apps() -> list[dict[str, object]]:
+    tree = ast.parse(RENDER_PY.read_text())
+    for node in tree.body:
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "_PWA_APPS"
+            and node.value is not None
+        ):
+            value = ast.literal_eval(node.value)
+            if not isinstance(value, list):
+                break
+            return value
+    raise ValueError(f"_PWA_APPS list not found in {RENDER_PY.relative_to(ROOT)}")
 
 
 def main() -> int:
-    # Import the Python constant
-    from meridian.render import _PWA_APPS
-
     with open(APPS_JSON) as f:
         json_apps = json.load(f)
+    python_apps = _load_python_apps()
 
     # Build lookup by name
     json_by_name = {app["name"]: app for app in json_apps}
-    py_by_name = {app["name"]: app for app in _PWA_APPS}
+    py_by_name = {app["name"]: app for app in python_apps}
 
     errors: list[str] = []
 
@@ -42,7 +58,7 @@ def main() -> int:
         errors.append(f"  {name}: in _PWA_APPS (render.py) but missing from apps.json")
 
     # Check matching apps for field differences
-    compare_fields = ("platform", "url", "deeplink", "urls")
+    compare_fields = ("platform", "url", "deeplink", "urls", "protocols")
     for name in sorted(set(json_by_name) & set(py_by_name)):
         j = json_by_name[name]
         p = py_by_name[name]

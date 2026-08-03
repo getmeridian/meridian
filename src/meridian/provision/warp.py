@@ -10,8 +10,6 @@ nginx, Xray inbound) are completely unaffected.
 
 from __future__ import annotations
 
-import json
-
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -113,79 +111,6 @@ class InstallWarp:
         )
 
 
-# ---------------------------------------------------------------------------
-# ConfigureWarpOutbound
-# ---------------------------------------------------------------------------
-
-_WARP_OUTBOUND = {
-    "protocol": "socks",
-    "tag": "warp",
-    "settings": {
-        "servers": [
-            {
-                "address": "127.0.0.1",
-                "port": WARP_PROXY_PORT,
-            }
-        ]
-    },
-}
-
-
-class ConfigureWarpOutbound:
-    """Add WARP SOCKS5 as default Xray outbound so all egress goes through Cloudflare."""
-
-    name = "Configure WARP outbound"
-
-    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        from meridian.panel import PanelError
-
-        panel = ctx.panel
-        if panel is None:
-            return StepResult(name=self.name, status="failed", detail="No panel client in context")
-
-        try:
-            data = panel.api_post_empty("/panel/xray/")
-        except PanelError as e:
-            return StepResult(name=self.name, status="failed", detail=f"Failed to fetch Xray config: {e}")
-
-        if not data.get("success"):
-            return StepResult(name=self.name, status="failed", detail="Failed to fetch Xray config template")
-
-        obj = data.get("obj", "")
-        try:
-            wrapper = json.loads(obj) if isinstance(obj, str) else obj
-            template_str = wrapper.get("xraySetting", "")
-            template = json.loads(template_str) if isinstance(template_str, str) else template_str
-        except (json.JSONDecodeError, TypeError, AttributeError) as e:
-            return StepResult(name=self.name, status="failed", detail=f"Failed to parse Xray template: {e}")
-
-        outbounds = template.get("outbounds", [])
-        has_warp = any(o.get("tag") == "warp" for o in outbounds)
-
-        if has_warp:
-            return StepResult(name=self.name, status="ok", detail="WARP outbound already configured")
-
-        # Insert WARP as first outbound (Xray uses first as default).
-        # Geo-blocking rules still route to "blocked"; everything else
-        # goes through WARP instead of "direct".
-        outbounds.insert(0, dict(_WARP_OUTBOUND))
-        template["outbounds"] = outbounds
-
-        updated_json = json.dumps(template)
-        try:
-            from urllib.parse import quote as urlquote
-
-            form_data = f"xraySetting={urlquote(updated_json, safe='')}"
-            save_data = panel.api_post_form("/panel/xray/update", form_data)
-        except PanelError as e:
-            return StepResult(name=self.name, status="failed", detail=f"Failed to save Xray config: {e}")
-
-        if not save_data.get("success"):
-            return StepResult(name=self.name, status="failed", detail=f"Save failed: {save_data.get('msg', 'unknown')}")
-
-        try:
-            panel.api_post_empty("/panel/api/server/restartXrayService")
-        except PanelError:
-            pass  # Non-fatal — Xray picks up config on next restart
-
-        return StepResult(name=self.name, status="changed", detail="WARP set as default outbound")
+# Note: WARP outbound configuration is handled in _build_xray_config (setup.py)
+# which adds the WARP SOCKS5 outbound to the Xray config profile at deploy time.
+# The old ConfigureWarpOutbound provisioner step is no longer needed.

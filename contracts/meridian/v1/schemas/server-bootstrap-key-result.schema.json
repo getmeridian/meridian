@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "ServerProfile": {
+      "additionalProperties": false,
+      "description": "Saved server profile referenced by deploy, relay, verify, and recovery flows.",
+      "properties": {
+        "auth_state": {
+          "default": "unknown",
+          "enum": [
+            "unknown",
+            "validated",
+            "key_ready",
+            "failed"
+          ],
+          "title": "Auth State",
+          "type": "string"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "format": "ipv6",
+              "type": "string"
+            }
+          ],
+          "title": "Host"
+        },
+        "id": {
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_path": {
+          "default": "",
+          "title": "Key Path",
+          "type": "string"
+        },
+        "last_error": {
+          "default": "",
+          "title": "Last Error",
+          "type": "string"
+        },
+        "last_validated_at": {
+          "default": "",
+          "title": "Last Validated At",
+          "type": "string"
+        },
+        "source": {
+          "default": "manual",
+          "enum": [
+            "manual",
+            "engine"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "ssh_port": {
+          "default": 22,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "default": "root",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9._-]+$",
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "host"
+      ],
+      "title": "ServerProfile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result from key bootstrap without exposing private key or password material.",
+  "properties": {
+    "installed": {
+      "title": "Installed",
+      "type": "boolean"
+    },
+    "key_path": {
+      "default": "",
+      "title": "Key Path",
+      "type": "string"
+    },
+    "key_policy": {
+      "enum": [
+        "generate_meridian",
+        "use_existing"
+      ],
+      "title": "Key Policy",
+      "type": "string"
+    },
+    "password_auth_disabled": {
+      "default": false,
+      "title": "Password Auth Disabled",
+      "type": "boolean"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerProfile"
+    },
+    "verified": {
+      "title": "Verified",
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "server",
+    "key_policy",
+    "installed",
+    "verified"
+  ],
+  "title": "ServerBootstrapKeyResult",
+  "type": "object"
+}

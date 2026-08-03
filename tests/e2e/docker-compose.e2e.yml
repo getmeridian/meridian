@@ -1,9 +1,0 @@
-services:
-  e2e:
-    build:
-      context: ../..
-      dockerfile: tests/e2e/Dockerfile
-    network_mode: host
-    privileged: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock

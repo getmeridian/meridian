@@ -94,13 +94,13 @@ graph TD
 
 ### What to do when things go wrong
 
-Even with a well-configured setup, occasional issues can arise. The most common problem is the server's IP address being blocked by network administrators or online services. With a commercial VPN, you would typically need to contact customer support and wait for a resolution. With a self-hosted proxy, you have the ability to resolve the issue yourself within minutes. The process is straightforward: acquire a new VPS with a new IP address, and then execute the Meridian deployment command again, specifying the new IP address. Our [recovery documentation](https://getmeridian.org/docs/en/recovery) explains this in more detail.
+Even with a well-configured setup, occasional issues can arise. The most common problem is the server's IP address being blocked by network administrators or online services. With a commercial VPN, you would typically need to contact customer support and wait for a resolution. With a self-hosted proxy, you can add a replacement exit while the existing panel remains reachable. Our [recovery documentation](https://getmeridian.org/docs/en/recovery/) explains panel-host and relay cases in more detail.
 
 ```bash
-meridian deploy <NEW_IP_ADDRESS>
+meridian node add <NEW_IP_ADDRESS> --name replacement
 ```
 
-After deploying to the new server, you will need to re-add your clients with `meridian client add <name>` and share the updated connection pages. While this requires a few extra steps on your end, the process is fast and straightforward. Your users simply scan the new QR code or click the new link, and they are back online. This rapid rebuild workflow is a key feature of a resilient and reliable self-hosted setup. It transforms a potentially disruptive event into a minor inconvenience that you can resolve quickly and efficiently.
+Existing clients receive the replacement exit on their next subscription refresh, so their accounts and share links remain intact.
 
 ### The five-dollar-a-month math
 

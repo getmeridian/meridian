@@ -31,7 +31,6 @@ self.addEventListener('fetch', function(event) {
 
   /* Network-first for dynamic per-client data */
   if (path.endsWith('/config.json') ||
-      path.endsWith('/sub.txt') ||
       path.indexOf('/stats/') !== -1) {
     event.respondWith(networkFirst(event.request));
     return;

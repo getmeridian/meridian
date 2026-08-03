@@ -1,0 +1,863 @@
+{
+  "$defs": {
+    "DesiredNodeInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "warp": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Warp"
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "ssh_user",
+        "ssh_port",
+        "domain",
+        "sni",
+        "warp",
+        "present"
+      ],
+      "title": "DesiredNodeInventory",
+      "type": "object"
+    },
+    "DesiredRelayInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_node": {
+          "title": "Exit Node",
+          "type": "string"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "present": {
+          "title": "Present",
+          "type": "boolean"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "ssh_user",
+        "ssh_port",
+        "exit_node",
+        "sni",
+        "present"
+      ],
+      "title": "DesiredRelayInventory",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "FleetInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "desired_nodes": {
+          "items": {
+            "$ref": "#/$defs/DesiredNodeInventory"
+          },
+          "title": "Desired Nodes",
+          "type": "array"
+        },
+        "desired_relays": {
+          "items": {
+            "$ref": "#/$defs/DesiredRelayInventory"
+          },
+          "title": "Desired Relays",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/NodeInventory"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "panel": {
+          "$ref": "#/$defs/PanelInventory"
+        },
+        "relays": {
+          "items": {
+            "$ref": "#/$defs/RelayInventory"
+          },
+          "title": "Relays",
+          "type": "array"
+        },
+        "servers": {
+          "items": {
+            "$ref": "#/$defs/ServerInventory"
+          },
+          "title": "Servers",
+          "type": "array"
+        },
+        "sources": {
+          "$ref": "#/$defs/FleetSources"
+        },
+        "summary": {
+          "$ref": "#/$defs/FleetInventorySummary"
+        }
+      },
+      "required": [
+        "panel",
+        "summary"
+      ],
+      "title": "FleetInventory",
+      "type": "object"
+    },
+    "FleetInventorySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "desired_nodes": {
+          "title": "Desired Nodes",
+          "type": "integer"
+        },
+        "desired_relays": {
+          "title": "Desired Relays",
+          "type": "integer"
+        },
+        "nodes": {
+          "title": "Nodes",
+          "type": "integer"
+        },
+        "pending_desired_resources": {
+          "title": "Pending Desired Resources",
+          "type": "integer"
+        },
+        "relays": {
+          "title": "Relays",
+          "type": "integer"
+        },
+        "unapplied_desired_nodes": {
+          "title": "Unapplied Desired Nodes",
+          "type": "integer"
+        },
+        "unapplied_desired_relays": {
+          "title": "Unapplied Desired Relays",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes",
+        "relays",
+        "desired_nodes",
+        "desired_relays",
+        "unapplied_desired_nodes",
+        "unapplied_desired_relays",
+        "pending_desired_resources"
+      ],
+      "title": "FleetInventorySummary",
+      "type": "object"
+    },
+    "FleetSources": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Nodes",
+          "type": "string"
+        },
+        "panel": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Panel",
+          "type": "string"
+        },
+        "relays": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Relays",
+          "type": "string"
+        },
+        "users": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Users",
+          "type": "string"
+        }
+      },
+      "title": "FleetSources",
+      "type": "object"
+    },
+    "MeridianError": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "NodeInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "desired": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Desired"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "panel_status": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "disabled",
+            "unknown"
+          ],
+          "title": "Panel Status",
+          "type": "string"
+        },
+        "protocols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Protocols",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "panel+node",
+            "node",
+            "relay",
+            "panel+routing_gateway",
+            "routing_gateway"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        },
+        "xray_version": {
+          "title": "Xray Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "uuid",
+        "role",
+        "ssh_user",
+        "ssh_port",
+        "domain",
+        "sni",
+        "protocols",
+        "desired",
+        "panel_status",
+        "xray_version"
+      ],
+      "title": "NodeInventory",
+      "type": "object"
+    },
+    "PanelInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "deployed_with": {
+          "title": "Deployed With",
+          "type": "string"
+        },
+        "healthy": {
+          "title": "Healthy",
+          "type": "boolean"
+        },
+        "server_ip": {
+          "title": "Server Ip",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        },
+        "subscription_page": {
+          "$ref": "#/$defs/SubscriptionPageInventory"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "server_ip",
+        "ssh_user",
+        "ssh_port",
+        "healthy",
+        "deployed_with",
+        "subscription_page"
+      ],
+      "title": "PanelInventory",
+      "type": "object"
+    },
+    "RelayHopMembership": {
+      "additionalProperties": false,
+      "properties": {
+        "advertised": {
+          "title": "Advertised",
+          "type": "boolean"
+        },
+        "chain": {
+          "title": "Chain",
+          "type": "string"
+        },
+        "health": {
+          "default": "unknown",
+          "enum": [
+            "healthy",
+            "unhealthy",
+            "unknown"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "position": {
+          "minimum": 1,
+          "title": "Position",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain",
+        "position",
+        "advertised"
+      ],
+      "title": "RelayHopMembership",
+      "type": "object"
+    },
+    "RelayHostRef": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "title": "Protocol",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "uuid"
+      ],
+      "title": "RelayHostRef",
+      "type": "object"
+    },
+    "RelayInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "desired": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Desired"
+        },
+        "exit_node_ip": {
+          "title": "Exit Node Ip",
+          "type": "string"
+        },
+        "exit_node_name": {
+          "title": "Exit Node Name",
+          "type": "string"
+        },
+        "host_count": {
+          "title": "Host Count",
+          "type": "integer"
+        },
+        "host_refs": {
+          "items": {
+            "$ref": "#/$defs/RelayHostRef"
+          },
+          "title": "Host Refs",
+          "type": "array"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "panel+node",
+            "node",
+            "relay",
+            "panel+routing_gateway",
+            "routing_gateway"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "role",
+        "port",
+        "ssh_user",
+        "ssh_port",
+        "exit_node_ip",
+        "exit_node_name",
+        "sni",
+        "host_count",
+        "desired"
+      ],
+      "title": "RelayInventory",
+      "type": "object"
+    },
+    "ServerInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "relay_hops": {
+          "items": {
+            "$ref": "#/$defs/RelayHopMembership"
+          },
+          "title": "Relay Hops",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "enum": [
+              "panel",
+              "exit",
+              "relay",
+              "routing_gateway"
+            ],
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ip",
+        "name",
+        "roles",
+        "ssh_user",
+        "ssh_port"
+      ],
+      "title": "ServerInventory",
+      "type": "object"
+    },
+    "SubscriptionPageInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "path"
+      ],
+      "title": "SubscriptionPageInventory",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_FleetInventorySuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "fleet.inventory",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/FleetInventory"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_FleetInventorySuccessEnvelope",
+      "type": "object"
+    },
+    "_FleetInventoryTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "fleet.inventory",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_FleetInventoryTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian fleet inventory --json`.",
+  "discriminator": {
+    "mapping": {
+      "failed": "#/$defs/_FleetInventoryTerminalEnvelope",
+      "ok": "#/$defs/_FleetInventorySuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_FleetInventorySuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_FleetInventoryTerminalEnvelope"
+    }
+  ],
+  "title": "FleetInventoryOutputEnvelope"
+}

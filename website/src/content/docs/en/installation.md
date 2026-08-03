@@ -12,10 +12,10 @@ curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
 This script:
-1. Installs [uv](https://docs.astral.sh/uv/) if not present (or uses pipx as fallback)
+1. Installs [uv](https://docs.astral.sh/uv/) if it is not present, with pipx or pip as fallbacks
 2. Installs `meridian-vpn` from PyPI
-3. Creates a symlink at `/usr/local/bin/meridian` for system-wide access
-4. Migrates from the old bash-based CLI if present
+3. Adds the tool directory to your shell PATH when needed
+4. Creates `/usr/local/bin/meridian` only when passwordless sudo is available
 
 ## Manual install
 
@@ -35,16 +35,14 @@ pipx install meridian-vpn
 meridian update
 ```
 
-Meridian checks for updates automatically:
-- **Patch versions** (bug fixes) — installed silently
-- **Minor versions** (new features) — you're prompted to update
-- **Major versions** (breaking changes) — you're prompted to update
+Meridian periodically checks PyPI before interactive commands and prints a notice when a newer version exists. It never installs updates automatically. `meridian update` explicitly upgrades through the available package manager; review release notes before a major update. Set `MERIDIAN_DISABLE_UPDATE_CHECK=1` to disable background version checks in automation.
 
 ## Requirements
 
-- **Python 3.10+** (installed automatically by uv/pipx)
-- **SSH key access** to your target server
-- **qrencode** (optional, for terminal QR codes): `brew install qrencode` or `apt install qrencode`
+- **Python 3.11+** (the project minimum; uv can install and manage it automatically)
+- **SSH access** to your target server. Terminal commands require key access; Studio can use the password once to install a key
+
+Terminal QR codes are rendered by the bundled `segno` Python package — no system dependency required.
 
 ## Verify installation
 

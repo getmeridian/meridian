@@ -12,3 +12,5 @@ __pycache__
 .venv
 *.pyc
 tests/systemlab/output
+tests/systemlab/.docker-runtime
+references

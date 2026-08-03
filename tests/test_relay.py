@@ -1,504 +1,233 @@
-"""Tests for relay node functionality."""
+"""Tests for current cluster-backed relay behavior."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
-from meridian.credentials import RelayEntry, ServerCredentials
+from meridian.cluster import ClusterConfig, InboundRef, NodeEntry, PanelConfig, ProtocolKey, RelayEntry
+from meridian.commands._helpers import ReviewedApplyPersistenceError
+from meridian.core.errors import LocalStateError
+from meridian.core.fleet import FleetTopology, TopologyPanel, TopologyRelay
+from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
 from meridian.models import ProtocolURL, RelayURLSet
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def sample_proxy_with_relays(creds_dir: Path) -> Path:
-    """Write a v2 proxy.yml with relay entries."""
-    content = """\
-version: 2
-panel_configured: true
-panel:
-  username: admin
-  password: "s3cret!pass"
-  web_base_path: abc123
-  info_page_path: info456
-  port: 2053
-server:
-  ip: 5.6.7.8
-  sni: www.microsoft.com
-  hosted_page: true
-protocols:
-  reality:
-    uuid: 550e8400-e29b-41d4-a716-446655440000
-    private_key: WBNp7SHzGMaqp6ohXMfJHUyBMWHoeHMflVPaaxdtRHo
-    public_key: K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy
-    short_id: abcd1234
-  wss:
-    uuid: 660e8400-e29b-41d4-a716-446655440001
-    ws_path: ws789
-  xhttp:
-    xhttp_path: xhttp123
-clients:
-  - name: default
-    added: "2026-01-01T00:00:00Z"
-    reality_uuid: 550e8400-e29b-41d4-a716-446655440000
-    wss_uuid: 660e8400-e29b-41d4-a716-446655440001
-relays:
-  - ip: 1.2.3.4
-    name: ru-moscow
-    port: 443
-    added: "2026-03-22T12:00:00Z"
-    sni: yandex.ru
-  - ip: 10.20.30.40
-    name: ru-spb
-    port: 443
-    added: "2026-03-22T13:00:00Z"
-"""
-    proxy = creds_dir / "proxy.yml"
-    proxy.write_text(content)
-    proxy.chmod(0o600)
-    return proxy
-
-
-# ---------------------------------------------------------------------------
-# Credential tests
-# ---------------------------------------------------------------------------
-
-
-class TestRelayEntry:
-    def test_relay_entry_defaults(self) -> None:
-        entry = RelayEntry()
-        assert entry.ip == ""
-        assert entry.name == ""
-        assert entry.port == 443
-        assert entry.added == ""
-        assert entry.sni == ""
-
-    def test_relay_entry_with_values(self) -> None:
-        entry = RelayEntry(ip="1.2.3.4", name="ru-moscow", port=443, added="2026-01-01T00:00:00Z", sni="yandex.ru")
-        assert entry.ip == "1.2.3.4"
-        assert entry.name == "ru-moscow"
-        assert entry.port == 443
-        assert entry.sni == "yandex.ru"
-
-
-class TestCredentialsWithRelays:
-    def test_load_with_relays(self, sample_proxy_with_relays: Path) -> None:
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        assert len(creds.relays) == 2
-        assert creds.relays[0].ip == "1.2.3.4"
-        assert creds.relays[0].name == "ru-moscow"
-        assert creds.relays[0].sni == "yandex.ru"
-        assert creds.relays[1].ip == "10.20.30.40"
-        assert creds.relays[1].name == "ru-spb"
-        assert creds.relays[1].sni == ""  # no SNI = legacy behavior
-
-    def test_load_without_relays(self, sample_proxy_yml: Path) -> None:
-        """Old credentials without relays should have empty relay list."""
-        creds = ServerCredentials.load(sample_proxy_yml)
-        assert creds.relays == []
-
-    def test_save_and_load_relays_roundtrip(self, tmp_path: Path) -> None:
-        creds = ServerCredentials()
-        creds.relays = [
-            RelayEntry(ip="1.2.3.4", name="test-relay", port=443, added="2026-01-01T00:00:00Z"),
-        ]
-        path = tmp_path / "proxy.yml"
-        creds.save(path)
-
-        loaded = ServerCredentials.load(path)
-        assert len(loaded.relays) == 1
-        assert loaded.relays[0].ip == "1.2.3.4"
-        assert loaded.relays[0].name == "test-relay"
-        assert loaded.relays[0].port == 443
-
-    def test_add_and_remove_relay(self) -> None:
-        creds = ServerCredentials()
-        relay = RelayEntry(ip="1.2.3.4", name="relay1")
-        creds.relays.append(relay)
-        assert len(creds.relays) == 1
-
-        creds.relays = [r for r in creds.relays if r.ip != "1.2.3.4"]
-        assert len(creds.relays) == 0
-
-    def test_save_without_relays_omits_section(self, tmp_path: Path) -> None:
-        """Credentials with no relays should not have a relays key in YAML."""
-        creds = ServerCredentials()
-        path = tmp_path / "proxy.yml"
-        creds.save(path)
-
-        raw = path.read_text()
-        assert "relays" not in raw
-
-
-# ---------------------------------------------------------------------------
-# URL generation tests
-# ---------------------------------------------------------------------------
-
-
-class TestBuildRelayUrls:
-    def test_build_relay_urls(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.urls import build_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        result = build_relay_urls("alice", uuid, wss_uuid, creds, "1.2.3.4", "ru-moscow")
-
-        assert isinstance(result, RelayURLSet)
-        assert result.relay_ip == "1.2.3.4"
-        assert result.relay_name == "ru-moscow"
-        # Should have Reality + XHTTP + WSS (since sample has domain='' but xhttp_path set)
-        assert len(result.urls) >= 1
-
-        # Reality URL should contain relay IP, not exit IP
-        reality_url = next(u for u in result.urls if u.key == "reality")
-        assert "@1.2.3.4:" in reality_url.url
-        assert "@5.6.7.8:" not in reality_url.url
-
-        # URL should contain exit's Reality parameters
-        assert "K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy" in reality_url.url  # public key
-        assert "abcd1234" in reality_url.url  # short ID
-        # Without relay_sni, Reality SNI defaults to exit's SNI
-        assert "www.microsoft.com" in reality_url.url
-        assert uuid in reality_url.url
-
-        # Fragment should include relay identifier
-        assert "via-ru-moscow" in reality_url.url
-
-        # XHTTP URL should exist (xhttp_path is set in fixture)
-        xhttp_urls = [u for u in result.urls if u.key == "xhttp"]
-        assert len(xhttp_urls) == 1
-        xhttp_url = xhttp_urls[0].url
-        assert "@1.2.3.4:" in xhttp_url  # connects to relay
-        assert "sni=5.6.7.8" in xhttp_url  # no relay SNI, no domain → falls back to exit IP
-        assert "fp=chrome" in xhttp_url  # TLS fingerprint
-        assert "xhttp123" in xhttp_url  # path preserved
-
-    def test_build_relay_urls_with_relay_sni(self, sample_proxy_with_relays: Path) -> None:
-        """When relay_sni is set, Reality URL uses it instead of exit's SNI."""
-        from meridian.urls import build_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        result = build_relay_urls(
-            "alice",
-            uuid,
-            wss_uuid,
-            creds,
-            "1.2.3.4",
-            "ru-moscow",
-            relay_sni="yandex.ru",
-        )
-        reality_url = next(u for u in result.urls if u.key == "reality")
-
-        # Reality SNI should be relay-specific
-        assert "sni=yandex.ru" in reality_url.url
-        assert "sni=www.microsoft.com" not in reality_url.url
-
-        # XHTTP should also use relay SNI
-        xhttp_urls = [u for u in result.urls if u.key == "xhttp"]
-        if xhttp_urls:
-            assert "sni=yandex.ru" in xhttp_urls[0].url
-
-    def test_build_all_relay_urls_uses_relay_sni(self, sample_proxy_with_relays: Path) -> None:
-        """build_all_relay_urls passes relay.sni from each RelayEntry."""
-        from meridian.urls import build_all_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        results = build_all_relay_urls("alice", uuid, wss_uuid, creds)
-        assert len(results) == 2
-
-        # First relay has sni=yandex.ru → Reality URL uses it
-        r0_reality = next(u for u in results[0].urls if u.key == "reality")
-        assert "sni=yandex.ru" in r0_reality.url
-
-        # Second relay has no sni → Reality URL uses exit's default
-        r1_reality = next(u for u in results[1].urls if u.key == "reality")
-        assert "sni=www.microsoft.com" in r1_reality.url
-
-    def test_build_relay_urls_no_name(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.urls import build_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        result = build_relay_urls("bob", uuid, wss_uuid, creds, "9.9.9.9")
-        assert "via-9.9.9.9" in result.urls[0].url
-
-    def test_build_relay_urls_custom_port(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.urls import build_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        result = build_relay_urls("alice", uuid, wss_uuid, creds, "1.2.3.4", "test", relay_port=9443)
-
-        # All URLs must use port 9443, not 443
-        for purl in result.urls:
-            assert "@1.2.3.4:9443" in purl.url, f"{purl.key} URL has wrong port: {purl.url}"
-            assert ":443" not in purl.url.split("@")[1].split("?")[0], f"{purl.key} URL still has :443"
-
-    def test_build_all_relay_urls(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.urls import build_all_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        results = build_all_relay_urls("alice", uuid, wss_uuid, creds)
-        assert len(results) == 2
-        assert results[0].relay_ip == "1.2.3.4"
-        assert results[1].relay_ip == "10.20.30.40"
-
-    def test_build_all_relay_urls_no_relays(self, sample_proxy_yml: Path) -> None:
-        from meridian.urls import build_all_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_yml)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-
-        results = build_all_relay_urls("alice", uuid, "", creds)
-        assert results == []
-
-    def test_build_relay_urls_with_server_name(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.urls import build_relay_urls
-
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        uuid = "550e8400-e29b-41d4-a716-446655440000"
-        wss_uuid = "660e8400-e29b-41d4-a716-446655440001"
-
-        result = build_relay_urls(
-            "alice",
-            uuid,
-            wss_uuid,
-            creds,
-            "1.2.3.4",
-            "ru-moscow",
-            server_name="My VPN",
-        )
-        reality_url = next(u for u in result.urls if u.key == "reality")
-        assert "#alice @ My VPN-via-ru-moscow" in reality_url.url
-
-
-# ---------------------------------------------------------------------------
-# RelayURLSet model tests
-# ---------------------------------------------------------------------------
+from meridian.remnawave import RemnawaveError
 
 
 class TestRelayURLSet:
     def test_frozen(self) -> None:
         url_set = RelayURLSet(
-            relay_ip="1.2.3.4",
-            relay_name="test",
-            urls=[ProtocolURL(key="reality", label="Primary", url="vless://test@1.2.3.4:443")],
+            relay_ip="203.0.113.10",
+            relay_name="relay-a",
+            urls=[
+                ProtocolURL(
+                    key="reality",
+                    label="Primary",
+                    url="vless://test@203.0.113.10:443",
+                )
+            ],
         )
-        assert url_set.relay_ip == "1.2.3.4"
-        assert url_set.relay_name == "test"
+
+        assert url_set.relay_ip == "203.0.113.10"
+        assert url_set.relay_name == "relay-a"
         assert len(url_set.urls) == 1
 
 
-# ---------------------------------------------------------------------------
-# Provisioner tests
-# ---------------------------------------------------------------------------
-
-
-class TestRelayProvisioner:
-    def test_build_relay_steps(self) -> None:
-        from meridian.provision.relay import RelayContext, build_relay_steps
-
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-        steps = build_relay_steps(ctx)
-        assert len(steps) == 6
-        names = [s.name for s in steps]
-        assert "Install system packages" in names
-        assert "Enable BBR congestion control" in names
-        assert "Configure relay firewall" in names
-        assert "Install Realm TCP relay" in names
-        assert "Configure Realm relay" in names
-        assert "Verify relay connectivity" in names
-
-    def test_relay_context_defaults(self) -> None:
-        from meridian.provision.relay import RelayContext
-
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-        assert ctx.exit_port == 443
-        assert ctx.listen_port == 443
-        assert ctx.user == "root"
-
-    def test_configure_realm_generates_correct_config(self) -> None:
-        """Verify ConfigureRealm generates valid TOML-like config content."""
-        from meridian.provision.relay import ConfigureRealm, RelayContext
-
-        step = ConfigureRealm()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8", listen_port=443)
-
-        # Mock ServerConnection
-        conn = MagicMock()
-        conn.run = MagicMock(return_value=MagicMock(returncode=0, stdout="", stderr=""))
-
-        result = step.run(conn, ctx)
-        assert result.status == "changed"
-
-        # Check that config was written with correct exit IP and port
-        calls = [str(c) for c in conn.run.call_args_list]
-        config_call = [c for c in calls if "realm.toml" in c]
-        assert len(config_call) > 0
-
-    def test_verify_relay_checks_service_and_tcp(self) -> None:
-        from meridian.provision.relay import RelayContext, VerifyRelay
-
-        step = VerifyRelay()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-
-        # Mock: service active, TCP reachable
-        conn = MagicMock()
-        conn.run = MagicMock(
-            side_effect=[
-                MagicMock(returncode=0, stdout="active\n", stderr=""),  # systemctl is-active
-                MagicMock(returncode=0, stdout="", stderr=""),  # TCP test
-            ]
-        )
-
-        result = step.run(conn, ctx)
-        assert result.status == "ok"
-
-    def test_verify_relay_fails_on_inactive_service(self) -> None:
-        from meridian.provision.relay import RelayContext, VerifyRelay
-
-        step = VerifyRelay()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-
-        conn = MagicMock()
-        conn.run = MagicMock(
-            side_effect=[
-                # 4 retries of systemctl is-active, all inactive
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-                MagicMock(returncode=0, stdout="", stderr=""),  # journalctl
-            ]
-        )
-
-        with patch("meridian.provision.relay.time.sleep"):
-            result = step.run(conn, ctx)
-        assert result.status == "failed"
-
-    def test_verify_relay_retries_until_active(self) -> None:
-        """Service becomes active on third attempt — should succeed."""
-        from meridian.provision.relay import RelayContext, VerifyRelay
-
-        step = VerifyRelay()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-
-        conn = MagicMock()
-        conn.run = MagicMock(
-            side_effect=[
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),  # attempt 1
-                MagicMock(returncode=3, stdout="inactive\n", stderr=""),  # attempt 2
-                MagicMock(returncode=0, stdout="active\n", stderr=""),  # attempt 3 — success
-                MagicMock(returncode=0, stdout="", stderr=""),  # TCP test
-            ]
-        )
-
-        with patch("meridian.provision.relay.time.sleep") as mock_sleep:
-            result = step.run(conn, ctx)
-        assert result.status == "ok"
-        assert mock_sleep.call_count == 2  # slept before attempt 2 and 3
-
-    def test_install_realm_verifies_checksum(self) -> None:
-        """InstallRealm should reject a binary with mismatched SHA256."""
-        from meridian.provision.relay import InstallRealm, RelayContext
-
-        step = InstallRealm()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-
-        conn = MagicMock()
-
-        def mock_run(cmd: str, timeout: int = 30, **kwargs: object) -> MagicMock:
-            result = MagicMock()
-            result.returncode = 0
-            result.stderr = ""
-            if "uname -m" in cmd:
-                result.stdout = "x86_64\n"
-            elif "realm --version" in cmd:
-                # Not installed yet
-                result.returncode = 1
-                result.stdout = ""
-            elif "sha256sum" in cmd:
-                # Return a bad hash
-                result.stdout = "deadbeef00000000000000000000000000000000000000000000000000000000\n"
-            elif "rm -f" in cmd:
-                result.stdout = ""
-            else:
-                result.stdout = ""
-            return result
-
-        conn.run = MagicMock(side_effect=mock_run)
-        result = step.run(conn, ctx)
-        assert result.status == "failed"
-        assert "checksum mismatch" in result.detail
-
-    def test_install_realm_passes_correct_checksum(self) -> None:
-        """InstallRealm should succeed when SHA256 matches."""
-        from meridian.config import REALM_SHA256
-        from meridian.provision.relay import InstallRealm, RelayContext
-
-        step = InstallRealm()
-        ctx = RelayContext(relay_ip="1.2.3.4", exit_ip="5.6.7.8")
-        expected_hash = REALM_SHA256["x86_64-unknown-linux-gnu"]
-        version_calls = []
-
-        conn = MagicMock()
-
-        def mock_run(cmd: str, timeout: int = 30, **kwargs: object) -> MagicMock:
-            result = MagicMock()
-            result.returncode = 0
-            result.stderr = ""
-            if "uname -m" in cmd:
-                result.stdout = "x86_64\n"
-            elif "realm --version" in cmd:
-                version_calls.append(cmd)
-                if len(version_calls) == 1:
-                    # First check: not installed yet
-                    result.returncode = 1
-                    result.stdout = ""
-                else:
-                    # Post-install verification
-                    result.stdout = f"realm {ctx.realm_version}\n"
-            elif "sha256sum" in cmd:
-                # Mock returns just the hash (as if cut -d' ' -f1 ran)
-                result.stdout = f"{expected_hash}\n"
-            else:
-                result.stdout = ""
-            return result
-
-        conn.run = MagicMock(side_effect=mock_run)
-        result = step.run(conn, ctx)
-        assert result.status == "changed"
-
-
 class TestRelayCLI:
+    @staticmethod
+    def _v4_intent() -> SetupIntent:
+        return SetupIntent(
+            control=ControlPlaneIntent(server_ref="srv-control"),
+            exits=[
+                ExitIntent(
+                    id="exit-a",
+                    server_ref="srv-exit",
+                    paths=[
+                        ProtocolPathIntent(
+                            id="reality-a",
+                            protocol="reality",
+                            reality_sni="www.example.com",
+                        )
+                    ],
+                )
+            ],
+            default_egress_ref="exit-a",
+            access=AccessIntent(users=["default"]),
+        )
+
+    def test_v4_deploy_state_error_is_rendered_at_command_boundary(self) -> None:
+        from meridian.commands.relay import run_deploy
+
+        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        registry = MagicMock()
+        registry.find.side_effect = [
+            SimpleNamespace(id="srv-exit", host="198.51.100.10", name="exit-a"),
+            SimpleNamespace(id="srv-relay", host="198.51.100.20", name="relay-a"),
+        ]
+
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.relay.ServerConnection"),
+            patch(
+                "meridian.setup.runtime.SetupRuntime.apply_intent",
+                side_effect=LocalStateError("review state changed"),
+            ),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_deploy("198.51.100.20", "exit-a", relay_name="relay-a", yes=True)
+
+        assert exc_info.value.exit_code == 2
+        registry.add.assert_called_once()
+
+    def test_v4_deploy_persistence_error_warns_remote_state_may_have_changed(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.commands.relay import run_deploy
+
+        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        registry = MagicMock()
+        registry.find.side_effect = [
+            SimpleNamespace(id="srv-exit", host="198.51.100.10", name="exit-a"),
+            SimpleNamespace(id="srv-relay", host="198.51.100.20", name="relay-a"),
+        ]
+
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.relay.ServerConnection"),
+            patch(
+                "meridian.setup.runtime.SetupRuntime.apply_intent",
+                side_effect=ReviewedApplyPersistenceError(
+                    "read-only filesystem. Remote state may have changed. Repair local state, then rerun "
+                    "`meridian plan` and `meridian apply` to reconcile."
+                ),
+            ),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_deploy("198.51.100.20", "exit-a", relay_name="relay-a", yes=True)
+
+        assert exc_info.value.exit_code == 3
+        output = capsys.readouterr().err
+        assert "Remote state may have changed" in output
+        assert "meridian plan" in output
+        assert "meridian apply" in output
+
+    def test_legacy_deploy_does_not_stop_existing_realm_before_confirmation(self) -> None:
+        from meridian.commands.relay import run_deploy
+
+        cluster = ClusterConfig(
+            panel=PanelConfig(url="https://198.51.100.1/panel", api_token="token"),
+            nodes=[NodeEntry(ip="198.51.100.10", name="exit-a")],
+        )
+        connection = MagicMock()
+        connection.run.side_effect = [
+            SimpleNamespace(
+                returncode=0,
+                stdout='State Recv-Q Send-Q Local Address:Port\nLISTEN 0 128 *:443 users:(("realm",pid=42))\n',
+            ),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+        ]
+
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.commands.relay.confirm", return_value=False),
+            patch("meridian.commands.relay.stop_relay_service") as stop_service,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_deploy("198.51.100.20", "exit-a", sni="www.example.com")
+
+        assert exc_info.value.exit_code == 1
+        stop_service.assert_not_called()
+
+    def test_deploy_reports_remote_change_when_local_state_cannot_be_saved(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.commands.relay import run_deploy
+
+        cluster = ClusterConfig(
+            panel=PanelConfig(url="https://198.51.100.1/panel", api_token="token"),
+            nodes=[NodeEntry(ip="198.51.100.10", name="exit-a", sni="www.example.com")],
+            desired_relays=[],
+        )
+        connection = MagicMock()
+        connection.run.side_effect = [
+            SimpleNamespace(returncode=1, stdout="", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+        ]
+        provisioner = MagicMock()
+        provisioner.run.return_value = []
+        panel = MagicMock()
+        panel.__enter__.return_value = panel
+
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.provision.steps.Provisioner", return_value=provisioner),
+            patch(
+                "meridian.commands.relay.create_relay_hosts",
+                return_value={"reality": "550e8400-e29b-41d4-a716-446655440001"},
+            ),
+            patch("meridian.commands.relay.make_panel", return_value=panel),
+            patch("meridian.node_deploy.enforce_host_ordering"),
+            patch.object(cluster, "backup"),
+            patch.object(cluster, "save", side_effect=[None, OSError("disk full")]) as save,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_deploy(
+                "198.51.100.20",
+                "exit-a",
+                relay_name="relay-a",
+                sni="www.example.com",
+                yes=True,
+            )
+
+        assert exc_info.value.exit_code == 3
+        provisioner.run.assert_called_once()
+        assert save.call_count == 2
+        output = capsys.readouterr().err
+        assert "deployed remotely" in output
+        assert "Remote state changed" in output
+
+    @staticmethod
+    def _projected_relay() -> FleetTopology:
+        return FleetTopology(
+            panel=TopologyPanel(
+                url="https://198.51.100.1/panel",
+                display_url="https://198.51.100.1/panel",
+                server_ip="198.51.100.1",
+                ssh_user="root",
+                ssh_port=22,
+                deployed_with="v4",
+            ),
+            relays=[
+                TopologyRelay(
+                    ip="198.51.100.20",
+                    name="relay-a",
+                    port=443,
+                    ssh_user="root",
+                    ssh_port=22,
+                    exit_node_ip="198.51.100.10",
+                    sni="www.example.com",
+                )
+            ],
+        )
+
     def test_relay_help(self) -> None:
         from typer.testing import CliRunner
 
         from meridian.cli import app
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["relay", "--help"])
+        result = CliRunner().invoke(app, ["relay", "--help"])
+
         assert result.exit_code == 0
         assert "deploy" in result.output
         assert "list" in result.output
@@ -510,350 +239,635 @@ class TestRelayCLI:
 
         from meridian.cli import app
 
-        runner = CliRunner()
-        result = runner.invoke(app, ["relay", "deploy", "--help"])
+        result = CliRunner().invoke(app, ["relay", "deploy", "--help"])
+
         assert result.exit_code == 0
         assert "RELAY_IP" in result.output
         assert "Exit server" in result.output
 
-
-class TestRelayRemoveSync:
-    def test_remove_sync_failure_restores_local_state_and_fails(self, sample_proxy_with_relays: Path) -> None:
+    def test_remove_failure_retains_relay_for_retry(self) -> None:
         from meridian.commands.relay import run_remove
 
-        creds_dir = sample_proxy_with_relays.parent
-        original = sample_proxy_with_relays.read_text()
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "5.6.7.8"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = creds_dir
-        resolved_exit.conn = MagicMock()
-
-        registry = MagicMock()
-        relay_conn = MagicMock()
-        panel = MagicMock()
-        panel.login.return_value = None
-        panel.find_inbound.return_value = MagicMock(id=42)
-        panel.api_post_empty.return_value = None
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(relays=[relay])
+        connection = MagicMock()
 
         with (
-            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
-            patch("meridian.commands.relay.fetch_credentials", return_value=True),
-            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn),
-            patch("meridian.commands.relay._sync_exit_credentials_to_server", return_value=False),
-            patch("meridian.panel.PanelClient", return_value=panel),
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.commands.relay.stop_relay_service", return_value=False),
+            pytest.raises(typer.Exit),
         ):
-            with pytest.raises(typer.Exit) as exc:
-                run_remove("1.2.3.4", exit_arg="5.6.7.8", yes=True)
+            run_remove(relay.ip, yes=True)
 
-        assert exc.value.exit_code == 1
-        # Relay should remain in local creds if sync fails
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        assert any(r.ip == "1.2.3.4" for r in creds.relays)
-        assert sample_proxy_with_relays.read_text() == original
-        registry.remove.assert_not_called()
+        assert cluster.relays == [relay]
 
-    def test_remove_warns_on_panel_failure_but_completes(self, sample_proxy_with_relays: Path) -> None:
-        from meridian.commands.relay import run_remove
-        from meridian.panel import PanelError
-
-        creds_dir = sample_proxy_with_relays.parent
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "5.6.7.8"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = creds_dir
-        resolved_exit.conn = MagicMock()
-
-        registry = MagicMock()
-        relay_conn = MagicMock()
-        panel = MagicMock()
-        panel.login.return_value = None
-        panel.find_inbound.return_value = MagicMock(id=42)
-        panel.api_post_empty.side_effect = PanelError("backend failed")
-
-        with (
-            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
-            patch("meridian.commands.relay.fetch_credentials", return_value=True),
-            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn),
-            patch("meridian.commands.relay._remove_relay_nginx", return_value=True),
-            patch("meridian.commands.relay._sync_exit_credentials_to_server", return_value=True),
-            patch("meridian.panel.PanelClient", return_value=panel),
-        ):
-            run_remove("1.2.3.4", exit_arg="5.6.7.8", yes=True)
-
-        # Relay should still be removed locally despite panel failure
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        assert all(r.ip != "1.2.3.4" for r in creds.relays)
-        registry.remove.assert_called_once_with("1.2.3.4")
-
-    def test_remove_nginx_cleanup_failure_keeps_local_state(self, sample_proxy_with_relays: Path) -> None:
+    def test_remove_artifact_failure_retains_relay_for_retry(self) -> None:
         from meridian.commands.relay import run_remove
 
-        creds_dir = sample_proxy_with_relays.parent
-        original = sample_proxy_with_relays.read_text()
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "5.6.7.8"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = creds_dir
-        resolved_exit.conn = MagicMock()
-
-        registry = MagicMock()
-        relay_conn = MagicMock()
-        panel = MagicMock()
-        panel.login.return_value = None
-        panel.find_inbound.return_value = MagicMock(id=42)
-        panel.api_post_empty.return_value = None
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(relays=[relay])
+        connection = MagicMock()
 
         with (
-            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
-            patch("meridian.commands.relay.fetch_credentials", return_value=True),
-            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn),
-            patch("meridian.commands.relay._remove_relay_nginx", return_value=False),
-            patch("meridian.panel.PanelClient", return_value=panel),
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.commands.relay.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=False),
+            pytest.raises(typer.Exit),
         ):
-            with pytest.raises(typer.Exit) as exc:
-                run_remove("1.2.3.4", exit_arg="5.6.7.8", yes=True)
+            run_remove(relay.ip, yes=True)
 
-        assert exc.value.exit_code == 1
-        assert sample_proxy_with_relays.read_text() == original
-        creds = ServerCredentials.load(sample_proxy_with_relays)
-        assert any(r.ip == "1.2.3.4" for r in creds.relays)
-        registry.remove.assert_not_called()
+        assert cluster.relays == [relay]
 
-
-class TestRelayStoredUser:
-    def test_remove_uses_registry_user_by_default(self, sample_proxy_with_relays: Path) -> None:
+    def test_remove_reports_remote_change_when_local_state_cannot_be_saved(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         from meridian.commands.relay import run_remove
 
-        creds_dir = sample_proxy_with_relays.parent
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "5.6.7.8"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = creds_dir
-        resolved_exit.conn = MagicMock()
-
-        registry = MagicMock()
-        registry.find.return_value = MagicMock(user="ubuntu")
-        relay_conn = MagicMock()
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(
+            panel=PanelConfig(url="https://198.51.100.1/panel", api_token="token"),
+            relays=[relay],
+        )
+        connection = MagicMock()
         panel = MagicMock()
-        panel.login.return_value = None
-        panel.find_inbound.return_value = None
+        panel.__enter__.return_value = panel
 
         with (
-            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
-            patch("meridian.commands.relay.fetch_credentials", return_value=True),
-            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn) as mock_conn_cls,
-            patch("meridian.commands.relay._sync_exit_credentials_to_server", return_value=True),
-            patch("meridian.commands.relay._remove_relay_nginx", return_value=True),
-            patch("meridian.panel.PanelClient", return_value=panel),
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.commands.relay.stop_relay_service", return_value=True),
+            patch("meridian.relay_ops.remove_relay_artifacts", return_value=True),
+            patch("meridian.commands.relay.delete_relay_hosts", return_value=True),
+            patch("meridian.commands.relay.make_panel", return_value=panel),
+            patch.object(cluster, "backup"),
+            patch.object(cluster, "save", side_effect=OSError("read-only filesystem")),
+            pytest.raises(typer.Exit) as exc_info,
         ):
-            run_remove("1.2.3.4", exit_arg="5.6.7.8", yes=True)
+            run_remove(relay.ip, yes=True)
 
-        relay_conn.check_ssh.assert_called_once()
-        mock_conn_cls.assert_called_once_with(ip="1.2.3.4", user="ubuntu")
+        assert exc_info.value.exit_code == 3
+        connection.check_ssh.assert_called_once()
+        output = capsys.readouterr().err
+        assert "removed remotely" in output
+        assert "read-only filesystem" in output
 
-    def test_check_uses_registry_user_by_default(self, sample_proxy_with_relays: Path) -> None:
+    def test_check_returns_finding_exit_when_service_is_inactive(self) -> None:
         from meridian.commands.relay import run_check
 
-        creds_dir = sample_proxy_with_relays.parent
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "5.6.7.8"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = creds_dir
-        resolved_exit.conn = MagicMock()
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(relays=[relay])
+        connection = MagicMock()
+        connection.run.side_effect = [
+            SimpleNamespace(returncode=3, stdout="inactive\n", stderr=""),
+            SimpleNamespace(returncode=0, stdout="", stderr=""),
+        ]
+        panel = MagicMock()
+        panel.__enter__.return_value.list_hosts.return_value = []
 
-        registry = MagicMock()
-        registry.find.return_value = MagicMock(user="ubuntu")
-        relay_conn = MagicMock()
-        relay_conn.run.side_effect = [
-            MagicMock(returncode=0, stdout="active\n", stderr=""),
-            MagicMock(returncode=0, stdout="", stderr=""),
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.health.tcp_connect", return_value=True),
+            patch("meridian.commands.relay.make_panel", return_value=panel),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_check(relay.ip)
+
+        assert exc_info.value.exit_code == 4
+
+    def test_check_returns_inconclusive_exit_when_ssh_is_unavailable(self) -> None:
+        from meridian.commands.relay import run_check
+        from meridian.ssh import SSHError
+
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(relays=[relay])
+        connection = MagicMock()
+        connection.check_ssh.side_effect = SSHError("connection refused")
+
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_check(relay.ip)
+
+        assert exc_info.value.exit_code == 3
+
+    @pytest.mark.parametrize(
+        ("status_code", "connectivity_code"),
+        [(124, 0), (255, 0), (127, 0), (0, 124), (0, 255), (0, 127)],
+    )
+    def test_check_returns_inconclusive_when_relay_tools_are_unavailable(
+        self,
+        status_code: int,
+        connectivity_code: int,
+    ) -> None:
+        from meridian.commands.relay import run_check
+
+        host_uuid = "550e8400-e29b-41d4-a716-446655440001"
+        relay = RelayEntry(
+            ip="198.51.100.20",
+            exit_node_ip="198.51.100.1",
+            name="relay-a",
+            host_uuids={ProtocolKey.REALITY: host_uuid},
+        )
+        cluster = ClusterConfig(relays=[relay])
+        connection = MagicMock()
+        connection.run.side_effect = [
+            SimpleNamespace(
+                returncode=status_code,
+                stdout="active\n" if status_code == 0 else "",
+                stderr="",
+            ),
+            SimpleNamespace(returncode=connectivity_code, stdout="", stderr=""),
+        ]
+        panel = MagicMock()
+        panel.__enter__.return_value.list_hosts.return_value = [
+            SimpleNamespace(uuid=host_uuid, is_disabled=False),
         ]
 
         with (
-            patch("meridian.commands.relay._find_exit_for_relay", return_value=(registry, resolved_exit)),
-            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn) as mock_conn_cls,
-            patch("meridian.ssh.tcp_connect", return_value=True),
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection", return_value=connection),
+            patch("meridian.health.tcp_connect", return_value=True),
+            patch("meridian.commands.relay.make_panel", return_value=panel),
+            pytest.raises(typer.Exit) as exc_info,
         ):
-            run_check("1.2.3.4")
+            run_check(relay.ip)
 
-        mock_conn_cls.assert_called_once_with(ip="1.2.3.4", user="ubuntu")
+        assert exc_info.value.exit_code == 3
 
+    def test_check_rejects_v4_chain_before_legacy_service_checks(self) -> None:
+        from meridian.commands.relay import run_check
 
-# ---------------------------------------------------------------------------
-# Rendering tests
-# ---------------------------------------------------------------------------
+        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.topology_from_local_cluster", return_value=self._projected_relay()),
+            patch("meridian.commands.relay.ServerConnection") as connection,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_check("198.51.100.20")
 
+        assert exc_info.value.exit_code == 2
+        connection.assert_not_called()
 
-class TestRenderingWithRelays:
-    def test_save_connection_html_with_relays_fallback(self, tmp_path: Path) -> None:
-        """Test HTML output with relay entries includes relay section."""
-        from meridian.render import save_connection_html
+    def test_remove_rejects_v4_chain_before_legacy_cleanup(self) -> None:
+        from meridian.commands.relay import run_remove
 
-        protocol_urls = [
-            ProtocolURL(key="reality", label="Primary", url="vless://uuid@5.6.7.8:443?security=reality#alice"),
-        ]
-        relay_entries = [
-            RelayURLSet(
-                relay_ip="1.2.3.4",
-                relay_name="ru-moscow",
-                urls=[
-                    ProtocolURL(
-                        key="reality",
-                        label="Primary (via relay)",
-                        url="vless://uuid@1.2.3.4:443?security=reality#alice-via-ru-moscow",
-                    )
-                ],
-            ),
-        ]
+        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.topology_from_local_cluster", return_value=self._projected_relay()),
+            patch("meridian.commands.relay.ServerConnection") as connection,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_remove("198.51.100.20", yes=True)
 
-        dest = tmp_path / "test.html"
-        save_connection_html(protocol_urls, dest, "5.6.7.8", relay_entries=relay_entries)
+        assert exc_info.value.exit_code == 2
+        connection.assert_not_called()
 
-        content = dest.read_text()
-        # Relay section should be present
-        assert "BACKUP" in content
-        assert "1.2.3.4" in content
-        assert "ru-moscow" in content
-        # Direct Primary card should NOT say "Recommended" when relays exist
-        assert "Recommended — fastest" not in content
+    def test_check_validates_requested_exit_before_connecting(self) -> None:
+        from meridian.commands.relay import run_check
 
-    def test_save_connection_html_without_relays_unchanged(self, tmp_path: Path) -> None:
-        """Without relays, HTML output should not contain relay sections."""
-        from meridian.render import save_connection_html
+        relay = RelayEntry(ip="198.51.100.20", exit_node_ip="198.51.100.1", name="relay-a")
+        cluster = ClusterConfig(
+            nodes=[
+                NodeEntry(ip="198.51.100.1", name="exit-a"),
+                NodeEntry(ip="198.51.100.2", name="exit-b"),
+            ],
+            relays=[relay],
+        )
+        with (
+            patch("meridian.commands.relay.load_cluster", return_value=cluster),
+            patch("meridian.commands.relay.ServerConnection") as connection,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_check(relay.ip, exit_arg="exit-b")
 
-        protocol_urls = [
-            ProtocolURL(key="reality", label="Primary", url="vless://uuid@5.6.7.8:443?security=reality#alice"),
-        ]
-
-        dest = tmp_path / "test.html"
-        save_connection_html(protocol_urls, dest, "5.6.7.8")
-
-        content = dest.read_text()
-        assert "BACKUP (DIRECT)" not in content
-        assert "via relay" not in content
-
-
-# ---------------------------------------------------------------------------
-# Nginx stream config tests
-# ---------------------------------------------------------------------------
+        assert exc_info.value.exit_code == 2
+        connection.assert_not_called()
 
 
 class TestNginxStreamRelay:
     def test_stream_config_includes_relay_maps(self) -> None:
-        """Main stream config should include relay-maps directory."""
-        from meridian.provision.services import _render_nginx_stream_config
+        from meridian.provision.nginx_render import render_nginx_stream_config
 
-        config = _render_nginx_stream_config(
+        config = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
-            server_ip="5.6.7.8",
+            server_ip="198.51.100.10",
         )
+
         assert "include /etc/nginx/stream.d/relay-maps/*.conf;" in config
 
 
-# ---------------------------------------------------------------------------
-# Relay helper tests
-# ---------------------------------------------------------------------------
-
-
 class TestRelayHelpers:
-    def test_relay_label_from_name(self) -> None:
-        from meridian.commands.relay import _relay_label
+    def test_relay_hosts_only_advertise_supported_reality_route(self) -> None:
+        from meridian.relay_ops import create_relay_hosts
 
-        entry = RelayEntry(ip="1.2.3.4", name="ru-moscow")
-        assert _relay_label(entry) == "ru-moscow"
+        cluster = ClusterConfig(
+            inbounds={
+                ProtocolKey.REALITY: InboundRef(
+                    uuid="550e8400-e29b-41d4-a716-446655440001",
+                    tag="vless-reality",
+                ),
+                ProtocolKey.XHTTP: InboundRef(
+                    uuid="550e8400-e29b-41d4-a716-446655440002",
+                    tag="vless-xhttp",
+                ),
+            },
+            config_profile_uuid="550e8400-e29b-41d4-a716-446655440003",
+        )
+        panel = MagicMock()
+        old_xhttp = SimpleNamespace(uuid="550e8400-e29b-41d4-a716-446655440004")
+        panel.find_host_by_remark.side_effect = lambda remark: old_xhttp if remark.endswith("-xhttp") else None
+        panel.create_host.return_value = SimpleNamespace(uuid="550e8400-e29b-41d4-a716-446655440005")
+
+        result = create_relay_hosts(
+            panel,
+            cluster,
+            "198.51.100.20",
+            443,
+            "relay.test",
+            "relay-a",
+        )
+
+        assert result == {"reality": "550e8400-e29b-41d4-a716-446655440005"}
+        panel.create_host.assert_called_once()
+        assert panel.create_host.call_args.kwargs["inbound_uuid"] == "550e8400-e29b-41d4-a716-446655440001"
+        panel.delete_host.assert_called_once_with(old_xhttp.uuid)
+
+    def test_relay_host_deploy_fails_when_deprecated_host_cannot_be_removed(self) -> None:
+        from meridian.relay_ops import create_relay_hosts
+
+        cluster = ClusterConfig(
+            inbounds={
+                ProtocolKey.REALITY: InboundRef(
+                    uuid="550e8400-e29b-41d4-a716-446655440001",
+                    tag="vless-reality",
+                )
+            },
+            config_profile_uuid="550e8400-e29b-41d4-a716-446655440003",
+        )
+        panel = MagicMock()
+        panel.find_host_by_remark.return_value = SimpleNamespace(uuid="550e8400-e29b-41d4-a716-446655440004")
+        panel.delete_host.side_effect = RemnawaveError("panel unavailable")
+
+        with pytest.raises(RemnawaveError, match="deprecated relay XHTTP host"):
+            create_relay_hosts(panel, cluster, "198.51.100.20", 443, "relay.test", "relay-a")
+
+    def test_relay_label_from_name(self) -> None:
+        from meridian.relay_ops import relay_label
+
+        assert relay_label(RelayEntry(ip="203.0.113.10", name="relay-a")) == "relay-a"
 
     def test_relay_label_from_ip(self) -> None:
-        from meridian.commands.relay import _relay_label
+        from meridian.relay_ops import relay_label
 
-        entry = RelayEntry(ip="1.2.3.4")
-        assert _relay_label(entry) == "1-2-3-4"
+        assert relay_label(RelayEntry(ip="203.0.113.10")) == "203-0-113-10"
 
-    def test_relay_inbound_remark(self) -> None:
-        from meridian.commands.relay import _relay_inbound_remark
+    def test_relay_xray_port_is_stable_and_host_specific(self) -> None:
+        from meridian.relay_ops import relay_xray_port
 
-        entry = RelayEntry(ip="1.2.3.4", name="ru-moscow")
-        assert _relay_inbound_remark(entry) == "VLESS-Reality-Relay-ru-moscow"
-
-    def test_relay_xray_port_deterministic(self) -> None:
-        from meridian.commands.relay import _relay_xray_port
-
-        port = _relay_xray_port("1.2.3.4")
+        port = relay_xray_port("203.0.113.10")
         assert 40000 <= port <= 49999
-        assert _relay_xray_port("1.2.3.4") == port  # same input → same output
+        assert relay_xray_port("203.0.113.10") == port
+        assert relay_xray_port("203.0.113.10") != relay_xray_port("203.0.113.11")
 
-    def test_relay_xray_port_differs_per_ip(self) -> None:
-        from meridian.commands.relay import _relay_xray_port
+    def test_delete_hosts_treats_missing_as_idempotent_success(self) -> None:
+        from meridian.relay_ops import delete_relay_hosts
+        from meridian.remnawave import RemnawaveNotFoundError
 
-        assert _relay_xray_port("1.2.3.4") != _relay_xray_port("5.6.7.8")
+        panel = MagicMock()
+        panel.delete_host.side_effect = RemnawaveNotFoundError("already absent")
+        relay = RelayEntry(
+            ip="198.51.100.20",
+            host_uuids={"reality": "550e8400-e29b-41d4-a716-446655440001"},
+        )
+
+        assert delete_relay_hosts(panel, relay) is True
+
+    def test_remove_nginx_reports_config_file_delete_failure(self) -> None:
+        from meridian.relay_ops import remove_relay_nginx
+
+        connection = MagicMock()
+        connection.run.return_value = SimpleNamespace(returncode=1)
+
+        assert remove_relay_nginx(connection, RelayEntry(ip="198.51.100.20")) is False
+        assert connection.run.call_count == 1
+
+    def test_stop_service_treats_missing_systemd_unit_as_clean(self) -> None:
+        from meridian.relay_ops import stop_relay_service
+
+        connection = MagicMock()
+        connection.run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        assert stop_relay_service(connection) is True
+
+        command = connection.run.call_args.args[0]
+        assert "LoadState" in command
+        assert '"not-found"' in command
+        assert "systemctl stop meridian-relay" in command
+        assert "systemctl disable meridian-relay" in command
+
+    def test_stop_service_propagates_real_systemd_failure(self) -> None:
+        from meridian.relay_ops import stop_relay_service
+
+        connection = MagicMock()
+        connection.run.return_value = SimpleNamespace(returncode=1, stdout="", stderr="permission denied")
+
+        assert stop_relay_service(connection) is False
 
 
-# ---------------------------------------------------------------------------
-# Relay SNI serialization roundtrip
-# ---------------------------------------------------------------------------
+class TestRelayProvisioningBranches:
+    def test_install_realm_rejects_checksum_mismatch(self) -> None:
+        from meridian.provision.relay import InstallRealm, RelayContext
 
+        conn = MagicMock()
 
-class TestRelaySNISerialization:
-    def test_save_load_roundtrip_with_sni(self, tmp_path: Path) -> None:
-        creds = ServerCredentials()
-        creds.relays = [
-            RelayEntry(ip="1.2.3.4", name="ru", port=443, sni="yandex.ru"),
-            RelayEntry(ip="5.6.7.8", name="legacy", port=443),
-        ]
-        path = tmp_path / "proxy.yml"
-        creds.save(path)
-        loaded = ServerCredentials.load(path)
-        assert loaded.relays[0].sni == "yandex.ru"
-        assert loaded.relays[1].sni == ""
+        def run(command: str, **_kwargs: object) -> MagicMock:
+            result = MagicMock(returncode=0, stdout="", stderr="")
+            if "realm --version" in command:
+                result.returncode = 1
+            elif "uname -m" in command:
+                result.stdout = "x86_64\n"
+            elif "sha256sum" in command:
+                result.stdout = f"{'0' * 64}\n"
+            return result
 
-    def test_legacy_yaml_without_sni_defaults_empty(self, tmp_path: Path) -> None:
-        """YAML without sni field should load with sni='' (backward compat)."""
-        path = tmp_path / "proxy.yml"
-        path.write_text("""\
-version: 2
-relays:
-  - ip: 1.2.3.4
-    name: test
-    port: 443
-""")
-        creds = ServerCredentials.load(path)
-        assert creds.relays[0].sni == ""
+        conn.run.side_effect = run
+        result = InstallRealm().run(
+            conn,
+            RelayContext(relay_ip="203.0.113.10", exit_ip="198.51.100.10"),
+        )
 
+        assert result.status == "failed"
+        assert "checksum mismatch" in result.detail
 
-class TestRelayDeploySNISelection:
-    def test_deploy_fails_when_scan_finds_no_local_sni(self, sample_proxy_yml: Path) -> None:
-        from meridian.commands.relay import run_deploy
+    def test_verify_relay_retries_until_service_is_active(self) -> None:
+        from meridian.provision.relay import RelayContext, VerifyRelay
 
-        resolved_exit = MagicMock()
-        resolved_exit.ip = "1.2.3.4"
-        resolved_exit.user = "root"
-        resolved_exit.local_mode = False
-        resolved_exit.creds_dir = sample_proxy_yml.parent
-        resolved_exit.conn = MagicMock()
-
-        relay_conn = MagicMock()
-        relay_conn.run.side_effect = [
-            MagicMock(returncode=1, stdout="", stderr=""),
+        conn = MagicMock()
+        conn.run.side_effect = [
+            MagicMock(returncode=3, stdout="inactive\n", stderr=""),
+            MagicMock(returncode=3, stdout="inactive\n", stderr=""),
+            MagicMock(returncode=0, stdout="active\n", stderr=""),
             MagicMock(returncode=0, stdout="", stderr=""),
         ]
 
-        with (
-            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
-            patch("meridian.commands.relay.ServerRegistry"),
-            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn),
-            patch("meridian.commands.scan.scan_for_sni", return_value=[]),
-            pytest.raises(typer.Exit),
-        ):
-            run_deploy("2.3.4.5", "1.2.3.4", yes=True)
+        with patch("meridian.provision.relay.time.sleep") as sleep:
+            result = VerifyRelay().run(
+                conn,
+                RelayContext(relay_ip="203.0.113.10", exit_ip="198.51.100.10"),
+            )
+
+        assert result.status == "ok"
+        assert sleep.call_count == 2
+
+
+class TestRelayClusterSerialization:
+    def test_save_load_roundtrip_preserves_current_fields(self, tmp_path: Path) -> None:
+        path = tmp_path / "cluster.yml"
+        cluster = ClusterConfig(
+            relays=[
+                RelayEntry(
+                    ip="203.0.113.10",
+                    name="relay-a",
+                    port=9443,
+                    exit_node_ip="198.51.100.10",
+                    sni="example.com",
+                    ssh_user="ubuntu",
+                    ssh_port=2222,
+                )
+            ]
+        )
+
+        cluster.save(path)
+        loaded = ClusterConfig.load(path)
+
+        assert loaded.relays == cluster.relays
+
+
+class TestRelayListJsonEnvelope:
+    def test_empty_list_json_outputs_typed_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.commands.relay import run_list
+        from meridian.console import set_json_mode
+
+        set_json_mode(True)
+        try:
+            cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/panel", api_token="token"))
+            with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):
+                run_list()
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["command"] == "relay.list"
+        assert payload["summary"]["counts"] == {"relays": 0}
+        assert payload["data"] == {"relays": []}
+
+    def test_list_json_outputs_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.cluster import InboundRef, NodeEntry, PanelConfig, ProtocolKey
+        from meridian.commands.relay import run_list
+        from meridian.console import set_json_mode
+        from meridian.remnawave import RemnawaveError
+
+        cluster = ClusterConfig(
+            panel=PanelConfig(
+                url="https://198.51.100.10/panel",
+                api_token="tok",
+                server_ip="198.51.100.10",
+                secret_path="/secret",
+            ),
+            nodes=[
+                NodeEntry(
+                    ip="198.51.100.10",
+                    uuid="550e8400-e29b-41d4-a716-446655440001",
+                    is_panel_host=True,
+                    name="panel-node",
+                )
+            ],
+            relays=[
+                RelayEntry(
+                    ip="203.0.113.10",
+                    name="relay-a",
+                    exit_node_ip="198.51.100.10",
+                    port=443,
+                    sni="example.com",
+                )
+            ],
+            inbounds={
+                ProtocolKey.REALITY: InboundRef(
+                    uuid="550e8400-e29b-41d4-a716-446655440010",
+                    tag="vless-reality",
+                ),
+            },
+        )
+        panel = MagicMock()
+        panel.__enter__.return_value = panel
+        panel.__exit__.return_value = False
+        panel.list_hosts.side_effect = RemnawaveError("Panel unreachable")
+
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                pytest.raises(typer.Exit) as exc_info,
+            ):
+                run_list()
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["schema"] == "meridian.output/v1"
+        assert exc_info.value.exit_code == 3
+        assert payload["exit_code"] == 3
+        assert payload["warnings"][0]["code"] == "MERIDIAN_RELAY_HOST_STATUS_UNAVAILABLE"
+        assert payload["command"] == "relay.list"
+        assert payload["status"] == "ok"
+        assert payload["summary"]["counts"]["relays"] == 1
+        assert payload["data"]["relays"][0]["ip"] == "203.0.113.10"
+        assert payload["data"]["relays"][0]["name"] == "relay-a"
+        assert payload["data"]["relays"][0]["sni"] == "example.com"
+
+    def test_list_uses_v4_topology_projection(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.cluster import PanelConfig
+        from meridian.commands.relay import run_list
+        from meridian.console import set_json_mode
+        from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel, TopologyRelay
+
+        cluster = ClusterConfig(
+            panel=PanelConfig(
+                url="https://198.51.100.10/panel",
+                api_token="tok",
+            )
+        )
+        topology = FleetTopology(
+            panel=TopologyPanel(
+                url=cluster.panel.url,
+                display_url=cluster.panel.display_url,
+                server_ip="198.51.100.10",
+                ssh_user="root",
+                ssh_port=22,
+                deployed_with="",
+            ),
+            nodes=[
+                TopologyNode(
+                    ip="198.51.100.20",
+                    name="exit-v4",
+                    uuid="node-v4",
+                    is_panel_host=False,
+                    ssh_user="root",
+                    ssh_port=22,
+                    domain="",
+                    sni="www.example.com",
+                    xhttp_path="",
+                    ws_path="",
+                )
+            ],
+            relays=[
+                TopologyRelay(
+                    ip="198.51.100.30",
+                    name="relay-v4",
+                    port=8443,
+                    ssh_user="root",
+                    ssh_port=22,
+                    exit_node_ip="198.51.100.20",
+                    sni="www.example.com",
+                )
+            ],
+        )
+        panel = MagicMock()
+        panel.list_hosts.return_value = []
+
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.commands.relay.topology_from_local_cluster", return_value=topology),
+            ):
+                run_list(exit_arg="exit-v4")
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["summary"]["counts"]["relays"] == 1
+        assert payload["data"]["relays"][0]["ip"] == "198.51.100.30"
+        assert payload["data"]["relays"][0]["exit_node_ip"] == "198.51.100.20"
+
+    def test_list_keeps_shared_relay_server_status_separate_by_port(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from meridian.commands.relay import run_list
+        from meridian.console import set_json_mode
+        from meridian.core.fleet import RelayHostRef
+        from meridian.remnawave import Host
+
+        cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/panel", api_token="tok"))
+        topology = FleetTopology(
+            panel=TopologyPanel(
+                url=cluster.panel.url,
+                display_url=cluster.panel.display_url,
+                server_ip="198.51.100.10",
+                ssh_user="root",
+                ssh_port=22,
+                deployed_with="",
+            ),
+            relays=[
+                TopologyRelay(
+                    ip="198.51.100.30",
+                    name="chain-a",
+                    port=8443,
+                    ssh_user="root",
+                    ssh_port=22,
+                    exit_node_ip="198.51.100.20",
+                    sni="www.example.com",
+                    host_refs=[RelayHostRef(protocol="reality", uuid="host-a")],
+                ),
+                TopologyRelay(
+                    ip="198.51.100.30",
+                    name="chain-b",
+                    port=9443,
+                    ssh_user="root",
+                    ssh_port=22,
+                    exit_node_ip="198.51.100.21",
+                    sni="www.example.com",
+                    host_refs=[RelayHostRef(protocol="reality", uuid="host-b")],
+                ),
+            ],
+        )
+        panel = MagicMock()
+        panel.__enter__.return_value = panel
+        panel.__exit__.return_value = False
+        panel.list_hosts.return_value = [Host(uuid="host-a"), Host(uuid="host-b", is_disabled=True)]
+
+        set_json_mode(True)
+        try:
+            with (
+                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+                patch("meridian.commands.relay.topology_from_local_cluster", return_value=topology),
+            ):
+                run_list()
+        finally:
+            set_json_mode(False)
+
+        payload = json.loads(capsys.readouterr().out)
+        assert [relay["enabled"] for relay in payload["data"]["relays"]] == [True, False]

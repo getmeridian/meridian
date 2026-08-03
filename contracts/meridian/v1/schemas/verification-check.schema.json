@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "VerificationFinding": {
+      "additionalProperties": false,
+      "description": "One structured observation produced by a verification check.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "remediation": {
+          "default": "",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "status",
+        "message"
+      ],
+      "title": "VerificationFinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One independently reportable verification check.",
+  "properties": {
+    "duration_ms": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/VerificationFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "warning",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "status"
+  ],
+  "title": "VerificationCheck",
+  "type": "object"
+}

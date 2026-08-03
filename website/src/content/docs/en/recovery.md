@@ -23,52 +23,46 @@ If you have a **relay** deployed, clients connecting through the relay are unaff
 
 ## Recovery options
 
-### Option A: Deploy a new server
+### Option A: Add a replacement exit
 
-The fastest path if you have few clients and no relay:
+The fastest path while the existing panel is still reachable:
 
 ```bash
 # 1. Get a new VPS from your provider (new IP)
-# 2. Deploy Meridian
-meridian deploy NEW_IP
-
-# 3. Re-add each client
-meridian client add alice --server NEW_IP
-meridian client add bob --server NEW_IP
-
-# 4. Send new connection pages to your users
+# 2. Add it to the existing fleet
+meridian node add NEW_IP --name replacement
 ```
 
-The deploy is idempotent — re-running on the same IP is safe and picks up where it left off.
+Existing clients receive the replacement exit on their next subscription refresh; their accounts do not need to be recreated.
 
 ### Option B: New exit server + existing relay
 
-Best if you have a relay deployed — your clients keep their relay connection while you swap the exit server behind it:
+On a legacy deployment, an existing relay can be removed and redeployed against the new exit:
 
 ```bash
 # 1. Deploy new exit server
-meridian deploy NEW_EXIT_IP
+meridian node add NEW_EXIT_IP --name replacement
 
-# 2. Re-add clients on new exit
-meridian client add alice --server NEW_EXIT_IP
-meridian client add bob --server NEW_EXIT_IP
-
-# 3. Switch relay to new exit
+# 2. Switch relay to new exit
 meridian relay remove RELAY_IP --exit OLD_EXIT_IP
 meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
 
 # Clients reconnect automatically — relay IP unchanged
 ```
 
+V4 relay chains cannot be mutated with `relay remove`. Open `meridian setup`, replace the exit/chain references, review the plan, and apply it. Use `meridian test` to verify the resulting route.
+
 ### Option C: Add domain mode for CDN fallback
 
 If you weren't using domain mode before, add it now to prevent future disruption:
 
 ```bash
-meridian deploy NEW_IP --domain proxy.example.com
+meridian node add NEW_IP --domain proxy.example.com
 ```
 
 With domain mode, the WSS/CDN connection works even when the server IP is blocked — traffic routes through Cloudflare. See the [Domain mode guide](/docs/en/domain-mode/) for Cloudflare setup.
+
+`meridian node add` requires the current Remnawave panel to remain reachable. If the lost server also hosted the panel, restore that host first; automatic panel migration is not available yet.
 
 ## Proactive defense
 
@@ -86,15 +80,13 @@ Set up resilience **before** your IP gets blocked:
 
 3. **Both** — maximum resilience. Clients have three paths: relay (domestic), CDN (Cloudflare), and direct (if unblocked).
 
-## Client migration
+## Clients and subscriptions
 
-Each client must be re-added manually on the new server — there is no automated migration tool yet. The workflow:
+Clients belong to the Remnawave panel, not to an individual exit node. `meridian node add` and `meridian relay deploy` add hosts to existing subscriptions, so clients do not need to be recreated.
 
-1. Deploy new server
-2. `meridian client add NAME` for each client
-3. Share new connection pages with users (QR code, shareable URL, or HTML file)
+Ask users to refresh their subscription. Run `meridian client show NAME` for the canonical subscription. A legacy page is shown only when its deployment is evidenced; repair a missing one with `--repair-page`.
 
-Connection pages are auto-generated with all available connection options (direct, relay, CDN). If you have server-hosted pages enabled, the shareable URLs update automatically.
+If the panel database itself is lost and cannot be restored from backup, you must create a new cluster and recreate each client; automatic cross-panel migration is not available.
 
 ## Keep your old server
 

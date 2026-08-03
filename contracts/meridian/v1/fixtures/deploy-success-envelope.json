@@ -1,0 +1,41 @@
+{
+  "command": "deploy",
+  "data": {
+    "client_name": "default",
+    "connection_page_path": "connect",
+    "connection_page_url": "",
+    "domain": "vpn.example",
+    "geo_block": true,
+    "harden": true,
+    "mode": "first_deploy",
+    "node_count": 1,
+    "panel_secret_path": "[redacted]",
+    "panel_url": "https://vpn.example/[redacted]",
+    "relay_count": 0,
+    "server_ip": "198.51.100.10",
+    "sni": "www.microsoft.com",
+    "ssh_port": 22,
+    "ssh_user": "root",
+    "subscription_url": "[redacted]",
+    "summary": "Deploy completed for 198.51.100.10",
+    "test_command": "",
+    "warp": false
+  },
+  "duration_ms": 0,
+  "errors": [],
+  "exit_code": 0,
+  "meridian_version": "4.0.0",
+  "operation_id": "op-fixture-deploy-success",
+  "schema": "meridian.output/v1",
+  "started_at": "2026-05-04T21:00:00Z",
+  "status": "changed",
+  "summary": {
+    "changed": true,
+    "counts": {
+      "nodes": 1,
+      "relays": 0
+    },
+    "text": "Deploy completed for 198.51.100.10"
+  },
+  "warnings": []
+}

@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "A command request that targets one client by name.",
+  "properties": {
+    "name": {
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ClientNameRequest",
+  "type": "object"
+}

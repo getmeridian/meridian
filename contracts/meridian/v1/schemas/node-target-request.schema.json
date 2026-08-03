@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "description": "Request that targets an existing node by IP or name.",
+  "properties": {
+    "ip_or_name": {
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Ip Or Name",
+      "type": "string"
+    },
+    "user": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ip_or_name"
+  ],
+  "title": "NodeTargetRequest",
+  "type": "object"
+}

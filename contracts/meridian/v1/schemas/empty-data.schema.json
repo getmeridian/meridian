@@ -1,0 +1,7 @@
+{
+  "additionalProperties": false,
+  "description": "Empty data object used by envelopes without command-specific failure data.",
+  "properties": {},
+  "title": "EmptyData",
+  "type": "object"
+}

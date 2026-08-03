@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "ClientStatus": {
+      "additionalProperties": false,
+      "description": "Client identity and status returned after a status mutation.",
+      "properties": {
+        "status": {
+          "enum": [
+            "active",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "status"
+      ],
+      "title": "ClientStatus",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for enabling or disabling one client.",
+  "properties": {
+    "client": {
+      "$ref": "#/$defs/ClientStatus"
+    }
+  },
+  "required": [
+    "client"
+  ],
+  "title": "ClientStatusResult",
+  "type": "object"
+}

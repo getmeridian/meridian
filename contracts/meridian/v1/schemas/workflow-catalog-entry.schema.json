@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "description": "Discoverable workflow contract metadata.",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "ready_request_schema": {
+      "title": "Ready Request Schema",
+      "type": "string"
+    },
+    "stability": {
+      "default": "preview",
+      "enum": [
+        "stable",
+        "preview"
+      ],
+      "title": "Stability",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "summary",
+    "ready_request_schema"
+  ],
+  "title": "WorkflowCatalogEntry",
+  "type": "object"
+}

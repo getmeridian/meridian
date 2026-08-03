@@ -1,171 +1,204 @@
 """Provisioning engine — deploys and configures proxy servers via SSH.
 
 The build_setup_steps() function assembles the full deployment pipeline:
-  common -> docker -> xray (panel + inbounds) -> nginx -> connection page
+  common -> docker -> remnawave (panel + node) -> nginx -> connection page
+
+Uses the Remnawave panel/node architecture.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from meridian.provision.baseline import BaselineCheck, build_server_baseline_checks, build_server_baseline_steps
+from meridian.provision.progress import NoopStepRenderer, RichStepRenderer, StepRenderer
+from meridian.provision.recipe import Operation, Recipe, RecipeValidationError, Resource, op
 from meridian.provision.steps import ProvisionContext, Provisioner, Step, StepContext, StepResult
 
-__all__ = ["Provisioner", "ProvisionContext", "Step", "StepContext", "StepResult", "build_setup_steps"]
+__all__ = [
+    "NoopStepRenderer",
+    "BaselineCheck",
+    "Operation",
+    "Provisioner",
+    "ProvisionContext",
+    "Recipe",
+    "RecipeValidationError",
+    "Resource",
+    "RichStepRenderer",
+    "Step",
+    "StepContext",
+    "StepRenderer",
+    "StepResult",
+    "build_node_steps",
+    "build_server_baseline_checks",
+    "build_server_baseline_steps",
+    "build_setup_steps",
+]
 
 
-def build_setup_steps(ctx: ProvisionContext) -> list[Step]:
-    """Assemble the full deployment step pipeline.
+def _needs_web_server(ctx: ProvisionContext) -> bool:
+    return ctx.needs_web_server
 
-    Execution order:
-    1. common: packages, hardening, sysctl, firewall
-    2. docker: install Docker, deploy 3x-ui container
-    3. xray: configure panel, login, create inbounds, verify
-    4. nginx: SNI routing + TLS + web serving (domain mode or hosted page)
-    5. connection page: QR codes, stats, HTML (domain mode or hosted page)
+
+def _domain_mode(ctx: ProvisionContext) -> bool:
+    return ctx.needs_web_server and ctx.domain_mode
+
+
+def _ip_web_mode(ctx: ProvisionContext) -> bool:
+    return ctx.needs_web_server and not ctx.domain_mode
+
+
+def _panel_host(ctx: ProvisionContext) -> bool:
+    return ctx.is_panel_host
+
+
+def _warp(ctx: ProvisionContext) -> bool:
+    return ctx.warp
+
+
+def build_setup_steps(ctx: ProvisionContext) -> list[Operation]:
+    """Assemble the full deployment recipe.
+
+    Steps declare resource contracts and the recipe graph derives the
+    execution order for the active operations in the current context.
     """
-    from meridian.provision.common import (
-        REQUIRED_PACKAGES,
-        CheckDiskSpace,
-        ConfigureBBR,
-        ConfigureFail2ban,
-        ConfigureFirewall,
-        EnableAutoUpgrades,
-        EnsurePort443,
-        HardenSSH,
-        InstallPackages,
-        SetTimezone,
-    )
-    from meridian.provision.docker import Deploy3xui, InstallDocker
-    from meridian.provision.panel import ConfigurePanel, LoginToPanel
-    from meridian.provision.xray import (
-        ConfigureGeoBlocking,
-        CreateInbound,
-        DisableGeoBlocking,
-        DisableXrayLogs,
-        VerifyXray,
+    from meridian.provision.remnawave_panel import DeployRemnawavePanel
+
+    operations = build_server_baseline_steps(ctx, install_docker=True)
+
+    # -- Remnawave panel (node deployed after API setup, not here) --
+    operations.append(
+        op(
+            DeployRemnawavePanel(),
+            requires=[Resource.DOCKER_INSTALLED],
+            provides=[Resource.REMNAWAVE_PANEL_RUNNING],
+            when=_panel_host,
+        )
     )
 
-    first_client = ctx.get("first_client_name", "default") or "default"
-    creds_path = Path(ctx.creds_dir) / "proxy.yml"
+    # -- WARP client (optional) --
+    from meridian.provision.warp import InstallWarp
 
-    steps: list[Step] = [
-        # -- Pre-flight --
-        CheckDiskSpace(),
-        # -- Common (OS-level setup) --
-        InstallPackages(REQUIRED_PACKAGES + ["fail2ban"] if ctx.harden else None),
-        EnableAutoUpgrades(),
-        SetTimezone(),
-    ]
+    operations.append(
+        op(InstallWarp(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.WARP_CONNECTED], when=_warp)
+    )
 
-    # Server hardening (optional — skip for shared servers with existing services)
-    if ctx.harden:
-        steps.append(HardenSSH())
-        steps.append(ConfigureFail2ban())
+    # -- nginx + TLS + connection page --
+    from meridian.provision.nginx import ConfigureNginx, InstallNginx
+    from meridian.provision.tls import IssueTLSCert
 
-    steps.extend(
+    operations.extend(
         [
-            ConfigureBBR(),
-        ]
-    )
-
-    if ctx.harden:
-        steps.append(ConfigureFirewall())
-    else:
-        # Even without --harden, ensure port 443 is allowed if ufw is active.
-        # Without this, a pre-existing firewall blocks the deployment.
-        steps.append(EnsurePort443())
-
-    steps.extend(
-        [
-            # -- Docker --
-            InstallDocker(),
-            Deploy3xui(),
-            # -- Panel + Xray --
-            ConfigurePanel(
-                creds_path=creds_path,
-                server_ip=ctx.ip,
-                domain=ctx.domain,
-                sni=ctx.sni,
-                first_client_name=first_client,
-                panel_port=ctx.panel_port,
-                xhttp_enabled=ctx.xhttp_enabled,
+            op(
+                InstallNginx(),
+                requires=[Resource.SYSTEM_PACKAGES],
+                provides=[Resource.NGINX_INSTALLED],
+                when=_needs_web_server,
             ),
-            LoginToPanel(),
-            CreateInbound(
-                protocol_key="reality",
-                port=ctx.reality_port,
-                first_client_name=first_client,
-                listen="127.0.0.1" if ctx.needs_web_server else "",
-                delete_on_port_mismatch=True,
+            op(
+                ConfigureNginx(domain=ctx.domain, reality_backend_port=ctx.reality_port),
+                requires=[Resource.NGINX_INSTALLED],
+                provides=[Resource.NGINX_CONFIGURED],
+                when=_domain_mode,
             ),
-        ]
-    )
-
-    # XHTTP inbound (enabled by default)
-    if ctx.xhttp_enabled:
-        steps.append(
-            CreateInbound(
-                protocol_key="xhttp",
-                port=ctx.xhttp_port,
-                first_client_name=first_client,
-                listen="127.0.0.1",
-                ctx_exports={"xhttp_port": "port"},
-            )
-        )
-
-    # Domain mode: WSS inbound
-    if ctx.domain_mode:
-        steps.append(
-            CreateInbound(
-                protocol_key="wss",
-                port=ctx.wss_port,
-                first_client_name=first_client,
-                listen="127.0.0.1",
-            )
-        )
-
-    steps.append(DisableXrayLogs())
-    if ctx.geo_block:
-        steps.append(ConfigureGeoBlocking())
-    else:
-        steps.append(DisableGeoBlocking())
-
-    # WARP outbound (optional — routes egress through Cloudflare)
-    if ctx.warp:
-        from meridian.provision.warp import ConfigureWarpOutbound, InstallWarp
-
-        steps.append(InstallWarp())
-        steps.append(ConfigureWarpOutbound())
-
-    steps.append(VerifyXray())
-
-    # nginx + connection page (domain mode or hosted page)
-    if ctx.needs_web_server:
-        from meridian.provision.services import (
-            ConfigureNginx,
-            DeployConnectionPage,
-            DeployPWAAssets,
-            InstallNginx,
-            IssueTLSCert,
-        )
-
-        steps.append(InstallNginx())
-
-        if ctx.domain_mode:
-            steps.append(ConfigureNginx(domain=ctx.domain, reality_backend_port=ctx.reality_port))
-            steps.append(IssueTLSCert(domain=ctx.domain))
-        else:
-            steps.append(
+            op(
                 ConfigureNginx(
                     domain="",
                     ip_mode=True,
                     server_ip=ctx.ip,
                     reality_backend_port=ctx.reality_port,
-                )
-            )
-            steps.append(IssueTLSCert(domain="", ip_mode=True, server_ip=ctx.ip))
+                ),
+                requires=[Resource.NGINX_INSTALLED],
+                provides=[Resource.NGINX_CONFIGURED],
+                when=_ip_web_mode,
+            ),
+            op(
+                IssueTLSCert(domain=ctx.domain),
+                requires=[Resource.NGINX_CONFIGURED],
+                provides=[Resource.TLS_CERTIFICATE],
+                when=_domain_mode,
+            ),
+            op(
+                IssueTLSCert(domain="", ip_mode=True, server_ip=ctx.ip),
+                requires=[Resource.NGINX_CONFIGURED],
+                provides=[Resource.TLS_CERTIFICATE],
+                when=_ip_web_mode,
+            ),
+        ]
+    )
 
-        steps.append(DeployPWAAssets())
-        steps.append(DeployConnectionPage(server_ip=ctx.ip))
+    # PWA assets (connection pages deployed via post-provisioner API setup)
+    from meridian.provision.nginx import DeployPWAAssets
 
-    return steps
+    operations.append(
+        op(
+            DeployPWAAssets(),
+            requires=[Resource.TLS_CERTIFICATE],
+            provides=[Resource.PWA_ASSETS],
+            when=_needs_web_server,
+        )
+    )
+
+    return Recipe(tuple(operations)).steps(ctx)
+
+
+def build_node_steps(ctx: ProvisionContext) -> list[Operation]:
+    """Assemble the recipe for adding a node-only server (no panel).
+
+    Used by `meridian node add <IP>`.
+    """
+    from meridian.provision.warp import InstallWarp
+
+    operations = [
+        *build_server_baseline_steps(ctx, install_docker=True),
+        op(
+            InstallWarp(),
+            requires=[Resource.DOCKER_INSTALLED],
+            provides=[Resource.WARP_CONNECTED],
+            when=_warp,
+        ),
+        # Node deployed after API setup (setup.py), not in pipeline
+    ]
+
+    from meridian.provision.nginx import ConfigureNginx, InstallNginx
+    from meridian.provision.tls import IssueTLSCert
+
+    operations.extend(
+        [
+            op(
+                InstallNginx(),
+                requires=[Resource.SYSTEM_PACKAGES],
+                provides=[Resource.NGINX_INSTALLED],
+                when=_needs_web_server,
+            ),
+            op(
+                ConfigureNginx(domain=ctx.domain, reality_backend_port=ctx.reality_port),
+                requires=[Resource.NGINX_INSTALLED],
+                provides=[Resource.NGINX_CONFIGURED],
+                when=_domain_mode,
+            ),
+            op(
+                ConfigureNginx(
+                    domain="",
+                    ip_mode=True,
+                    server_ip=ctx.ip,
+                    reality_backend_port=ctx.reality_port,
+                ),
+                requires=[Resource.NGINX_INSTALLED],
+                provides=[Resource.NGINX_CONFIGURED],
+                when=_ip_web_mode,
+            ),
+            op(
+                IssueTLSCert(domain=ctx.domain),
+                requires=[Resource.NGINX_CONFIGURED],
+                provides=[Resource.TLS_CERTIFICATE],
+                when=_domain_mode,
+            ),
+            op(
+                IssueTLSCert(domain="", ip_mode=True, server_ip=ctx.ip),
+                requires=[Resource.NGINX_CONFIGURED],
+                provides=[Resource.TLS_CERTIFICATE],
+                when=_ip_web_mode,
+            ),
+        ]
+    )
+
+    return Recipe(tuple(operations)).steps(ctx)

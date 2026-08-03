@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "Event": {
+      "additionalProperties": false,
+      "description": "JSONL event model for long-running operations.",
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "phase": {
+          "default": "",
+          "title": "Phase",
+          "type": "string"
+        },
+        "resource": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema": {
+          "const": "meridian.event/v1",
+          "default": "meridian.event/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "time": {
+          "title": "Time",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "command.started",
+            "command.completed",
+            "command.failed",
+            "plan.computed",
+            "plan.action.started",
+            "plan.action.completed",
+            "plan.action.failed",
+            "plan.action.skipped",
+            "provision.step.started",
+            "provision.step.completed",
+            "provision.step.failed",
+            "ssh.command.completed",
+            "state.loaded",
+            "state.saved",
+            "warning",
+            "error"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "seq",
+        "time",
+        "level",
+        "type"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "OperationSnapshot": {
+      "additionalProperties": false,
+      "description": "Public state summary for a long-running local Engine operation.",
+      "properties": {
+        "cancelable": {
+          "default": false,
+          "title": "Cancelable",
+          "type": "boolean"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "current_phase": {
+          "default": "",
+          "title": "Current Phase",
+          "type": "string"
+        },
+        "error_count": {
+          "default": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "event_count": {
+          "title": "Event Count",
+          "type": "integer"
+        },
+        "has_error": {
+          "default": false,
+          "title": "Has Error",
+          "type": "boolean"
+        },
+        "has_result": {
+          "default": false,
+          "title": "Has Result",
+          "type": "boolean"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "deploy",
+          "title": "Kind",
+          "type": "string"
+        },
+        "last_seq": {
+          "default": 0,
+          "title": "Last Seq",
+          "type": "integer"
+        },
+        "latest_event": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Event"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "request_target": {
+          "title": "Request Target",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancel_requested",
+            "cancelled",
+            "completed_after_cancel"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "string"
+        },
+        "warning_count": {
+          "default": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "request_target",
+        "created_at",
+        "updated_at",
+        "event_count"
+      ],
+      "title": "OperationSnapshot",
+      "type": "object"
+    },
+    "ResourceRef": {
+      "additionalProperties": false,
+      "description": "Resource identifier carried by events.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "ResourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Single operation snapshot response.",
+  "properties": {
+    "operation": {
+      "$ref": "#/$defs/OperationSnapshot"
+    },
+    "schema": {
+      "const": "meridian.operation/v1",
+      "default": "meridian.operation/v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operation"
+  ],
+  "title": "OperationEnvelope",
+  "type": "object"
+}

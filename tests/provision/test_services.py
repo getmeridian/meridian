@@ -3,21 +3,20 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
-from meridian.provision.services import (
+from meridian.provision.nginx import (
     ConfigureNginx,
-    DeployConnectionPage,
     DeployPWAAssets,
     InstallNginx,
-    IssueTLSCert,
-    _render_nginx_http_config,
-    _render_nginx_ip_config,
-    _render_nginx_stream_config,
-    _render_stats_script,
+)
+from meridian.provision.nginx_render import (
+    render_nginx_http_config,
+    render_nginx_ip_config,
+    render_nginx_stream_config,
 )
 from meridian.provision.steps import ProvisionContext
-from tests.provision.conftest import MockConnection, make_credentials
+from meridian.provision.tls import IssueTLSCert
+from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
 # Config rendering: nginx stream (SNI routing)
@@ -26,7 +25,7 @@ from tests.provision.conftest import MockConnection, make_credentials
 
 class TestRenderNginxStreamConfig:
     def test_contains_sni_routing(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -37,7 +36,7 @@ class TestRenderNginxStreamConfig:
         assert "proxy_pass $meridian_backend" in cfg
 
     def test_reality_sni_routes_to_xray(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -47,7 +46,7 @@ class TestRenderNginxStreamConfig:
         assert "127.0.0.1:10443" in cfg
 
     def test_server_ip_routes_to_nginx(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -56,7 +55,7 @@ class TestRenderNginxStreamConfig:
         assert "198.51.100.1  nginx_https" in cfg
 
     def test_domain_routes_to_nginx(self):
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -68,7 +67,7 @@ class TestRenderNginxStreamConfig:
 
     def test_no_sni_routes_to_nginx(self):
         """Browsers connecting to bare IP send no SNI (RFC 6066)."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -78,7 +77,7 @@ class TestRenderNginxStreamConfig:
 
     def test_unknown_sni_routes_to_reality_dest(self):
         """Unknown SNI routes to reality dest — eliminates SNI differential."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -90,7 +89,7 @@ class TestRenderNginxStreamConfig:
 
     def test_no_domain_no_domain_rule(self):
         """Without domain, only server IP + no-SNI route to nginx. Default → reality_dest."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -114,7 +113,7 @@ class TestRenderNginxStreamConfig:
 
 class TestRenderNginxIpConfig:
     def test_has_ssl_certificate(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -125,7 +124,7 @@ class TestRenderNginxIpConfig:
         assert "/etc/ssl/meridian/fullchain.pem" in cfg
 
     def test_has_server_tokens_off(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -135,7 +134,7 @@ class TestRenderNginxIpConfig:
         assert "server_tokens off" in cfg
 
     def test_has_acme_challenge_location(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -152,7 +151,7 @@ class TestRenderNginxIpConfig:
 
 class TestNginxPWAHeaders:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -161,7 +160,7 @@ class TestNginxPWAHeaders:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -203,7 +202,7 @@ class TestNginxPWAHeaders:
 
 class TestNginxXHTTPBlock:
     def test_ip_config_xhttp_proxy_pass(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -217,7 +216,7 @@ class TestNginxXHTTPBlock:
         assert "xh-abc123" in cfg
 
     def test_domain_config_xhttp_proxy_pass(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -233,7 +232,7 @@ class TestNginxXHTTPBlock:
         assert "xh-def456" in cfg
 
     def test_xhttp_routes_exact_and_slash_paths(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -247,7 +246,7 @@ class TestNginxXHTTPBlock:
         assert cfg.count("proxy_pass http://meridian_xhttp;") == 2
 
     def test_xhttp_before_panel(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -261,7 +260,7 @@ class TestNginxXHTTPBlock:
         assert xhttp_pos < panel_pos
 
     def test_no_xhttp_without_params(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -272,7 +271,7 @@ class TestNginxXHTTPBlock:
         assert "meridian_xhttp" not in cfg
 
     def test_xhttp_has_streaming_timeouts(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -287,7 +286,7 @@ class TestNginxXHTTPBlock:
 
     def test_xhttp_upstream_keepalive(self):
         """XHTTP upstream block enables connection reuse to Xray."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -304,7 +303,7 @@ class TestNginxXHTTPBlock:
 
     def test_xhttp_upstream_keepalive_domain(self):
         """Domain mode also gets upstream keepalive."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -321,13 +320,13 @@ class TestNginxXHTTPBlock:
 
 
 # ---------------------------------------------------------------------------
-# nginx config: panel proxy (WebSocket support for 3x-ui)
+# nginx config: panel proxy (WebSocket support for Remnawave admin UI)
 # ---------------------------------------------------------------------------
 
 
 class TestNginxPanelProxy:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -336,7 +335,7 @@ class TestNginxPanelProxy:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -347,7 +346,7 @@ class TestNginxPanelProxy:
         )
 
     def test_ip_panel_has_websocket_upgrade(self):
-        """3x-ui panel uses WebSocket — proxy must pass upgrade headers."""
+        """Remnawave admin UI uses WebSocket — proxy must pass upgrade headers."""
         cfg = self._ip_config()
         panel_block = cfg[cfg.index("secretpanel") :]
         assert "proxy_set_header Upgrade" in panel_block
@@ -378,7 +377,7 @@ class TestNginxPanelProxy:
 
 class TestNginxLocationStructure:
     def _ip_config(self) -> str:
-        return _render_nginx_ip_config(
+        return render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -387,7 +386,7 @@ class TestNginxLocationStructure:
         )
 
     def _domain_config(self) -> str:
-        return _render_nginx_http_config(
+        return render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -436,7 +435,7 @@ class TestNginxLocationStructure:
 
 class TestNginxWSS:
     def test_domain_config_has_websocket_upgrade(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -451,7 +450,7 @@ class TestNginxWSS:
 
     def test_ip_config_has_no_wss(self):
         """IP mode should not have WSS location block."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -462,11 +461,11 @@ class TestNginxWSS:
 
 
 # ---------------------------------------------------------------------------
-# nginx config: decoy mode
+# nginx config: default fallback behavior
 # ---------------------------------------------------------------------------
 
 
-class TestNginxDecoy:
+class TestNginxFallback:
     def test_default_returns_nginx_403_404(self):
         """Default uses nginx's built-in 403/404 — not custom HTML.
 
@@ -475,7 +474,7 @@ class TestNginxDecoy:
         on all IPs.  nginx-generated error pages are identical across all
         nginx installations — no Meridian-specific content.
         """
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -491,7 +490,7 @@ class TestNginxDecoy:
 
     def test_domain_default_returns_nginx_403_404(self):
         """Domain mode also uses nginx-generated 403/404."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -507,7 +506,7 @@ class TestNginxDecoy:
         assert "return 200" not in https_block
 
     def test_default_has_security_headers(self):
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -521,14 +520,14 @@ class TestNginxDecoy:
     def test_server_tokens_off(self):
         """Both modes should have server_tokens off."""
         for cfg in [
-            _render_nginx_ip_config(
+            render_nginx_ip_config(
                 server_ip="198.51.100.1",
                 nginx_internal_port=8443,
                 panel_web_base_path="secretpanel",
                 panel_internal_port=2053,
                 info_page_path="connect",
             ),
-            _render_nginx_http_config(
+            render_nginx_http_config(
                 domain="example.com",
                 nginx_internal_port=8443,
                 ws_path="wspath",
@@ -551,17 +550,18 @@ class TestNginxFingerprinting:
 
     def test_http2_enabled(self):
         """HTTP/2 must be enabled — missing h2 ALPN is a fingerprinting vector."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
             panel_internal_port=2053,
             info_page_path="connect",
         )
+        assert "ssl;" in cfg
         assert "http2 on;" in cfg
 
     def test_domain_http2_enabled(self):
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -570,11 +570,12 @@ class TestNginxFingerprinting:
             panel_internal_port=2053,
             info_page_path="connect",
         )
+        assert "ssl;" in cfg
         assert "http2 on;" in cfg
 
     def test_tls_modern_protocols_only(self):
         """Only TLSv1.2 and TLSv1.3 — no older protocols."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -586,30 +587,30 @@ class TestNginxFingerprinting:
         assert "TLSv1.1" not in cfg
         assert "SSLv" not in cfg
 
-    def test_stream_ipv4_listening(self):
-        """Stream server listens on IPv4 (IPv6 omitted for host compatibility)."""
-        cfg = _render_nginx_stream_config(
+    def test_stream_ipv4_and_ipv6_listening(self):
+        """Stream server listens on both IPv4 and IPv6."""
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
         assert "listen 443;" in cfg
-        assert "[::]:443" not in cfg
+        assert "listen [::]:443;" in cfg
 
     def test_stream_proxy_connect_timeout(self):
         """Stream proxy should have a short connect timeout (good practice)."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
-        assert "proxy_connect_timeout 1s" in cfg
+        assert "proxy_connect_timeout 5s" in cfg
 
     def test_stream_proxy_timeout(self):
         """Stream proxy needs a long idle timeout for VPN sessions."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -619,7 +620,7 @@ class TestNginxFingerprinting:
 
     def test_stream_socket_keepalive(self):
         """TCP keepalives keep relay→exit connections alive through NATs."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -629,7 +630,7 @@ class TestNginxFingerprinting:
 
     def test_ip_mode_no_http_redirect(self):
         """IP mode must NOT redirect HTTP→HTTPS (redirect to 403 is a contradiction)."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -645,7 +646,7 @@ class TestNginxFingerprinting:
 
     def test_domain_mode_keeps_http_redirect(self):
         """Domain mode SHOULD redirect HTTP→HTTPS (has real content)."""
-        cfg = _render_nginx_http_config(
+        cfg = render_nginx_http_config(
             domain="example.com",
             nginx_internal_port=8443,
             ws_path="wspath",
@@ -659,7 +660,7 @@ class TestNginxFingerprinting:
 
     def test_port80_server_tokens_off(self):
         """Port 80 server must also have server_tokens off."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -672,14 +673,14 @@ class TestNginxFingerprinting:
     def test_no_444_in_https_server_block(self):
         """HTTPS block must never use 444 — silent close after TLS is the highest signal."""
         for cfg in [
-            _render_nginx_ip_config(
+            render_nginx_ip_config(
                 server_ip="198.51.100.1",
                 nginx_internal_port=8443,
                 panel_web_base_path="secretpanel",
                 panel_internal_port=2053,
                 info_page_path="connect",
             ),
-            _render_nginx_http_config(
+            render_nginx_http_config(
                 domain="example.com",
                 nginx_internal_port=8443,
                 ws_path="wspath",
@@ -697,7 +698,7 @@ class TestNginxFingerprinting:
 
     def test_no_custom_html_in_response(self):
         """HTTPS block must not serve custom HTML — it would be fingerprintable."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -710,7 +711,7 @@ class TestNginxFingerprinting:
 
     def test_csp_restricts_external_resources(self):
         """CSP must block external resource loading (self-hosted everything)."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -721,7 +722,7 @@ class TestNginxFingerprinting:
 
     def test_unknown_sni_proxied_to_dest(self):
         """Unknown SNIs must be TCP-proxied to Reality dest, not served by nginx."""
-        cfg = _render_nginx_stream_config(
+        cfg = render_nginx_stream_config(
             reality_sni="www.microsoft.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
@@ -732,7 +733,7 @@ class TestNginxFingerprinting:
 
     def test_root_403_vs_default_404(self):
         """Root returns 403, other paths 404 — all nginx-generated, not Meridian."""
-        cfg = _render_nginx_ip_config(
+        cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",
             nginx_internal_port=8443,
             panel_web_base_path="secretpanel",
@@ -750,7 +751,7 @@ class TestNginxFingerprinting:
 
 
 class TestInstallNginx:
-    def test_already_installed_returns_ok(self, tmp_path: Path):
+    def test_already_installed_returns_ok(self):
         conn = MockConnection()
         # nginx installed, stream module available
         conn.when("dpkg -l nginx", stdout="ii  nginx")
@@ -768,13 +769,13 @@ class TestInstallNginx:
         conn.when("systemctl stop caddy", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = InstallNginx()
         result = step.run(conn, ctx)
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
 
-    def test_missing_acme_cron_returns_changed(self, tmp_path: Path):
+    def test_missing_acme_cron_returns_changed(self):
         conn = MockConnection()
         conn.when("dpkg -l nginx", stdout="ii  nginx")
         conn.when("nginx -V", stdout="--with-stream_ssl_preread_module")
@@ -788,12 +789,12 @@ class TestInstallNginx:
         conn.when("systemctl stop caddy", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = InstallNginx()
         result = step.run(conn, ctx)
         assert result.status == "changed"
 
-    def test_acme_cron_install_failure_returns_failed(self, tmp_path: Path):
+    def test_acme_cron_install_failure_returns_failed(self):
         conn = MockConnection()
         conn.when("dpkg -l nginx", stdout="ii  nginx")
         conn.when("nginx -V", stdout="--with-stream_ssl_preread_module")
@@ -807,7 +808,7 @@ class TestInstallNginx:
         conn.when("systemctl stop caddy", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = InstallNginx()
         result = step.run(conn, ctx)
         assert result.status == "failed"
@@ -820,7 +821,7 @@ class TestInstallNginx:
 
 
 class TestConfigureNginx:
-    def test_deploys_config(self, tmp_path: Path):
+    def test_deploys_config(self):
         conn = MockConnection()
         # cert exists
         conn.when("test -f /etc/ssl/meridian/fullchain.pem", stdout="", rc=0)
@@ -832,13 +833,13 @@ class TestConfigureNginx:
         conn.when("systemctl", stdout="")
         conn.when("mkdir", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = ConfigureNginx(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
         assert "nginx" in result.detail
 
-    def test_bootstrap_cert_uses_ip_subject_alt_name(self, tmp_path: Path):
+    def test_bootstrap_cert_uses_ip_subject_alt_name(self):
         conn = MockConnection()
         conn.when("test -f /etc/ssl/meridian/fullchain.pem", stdout="", rc=1)
         conn.when("openssl req -x509", stdout="")
@@ -849,7 +850,7 @@ class TestConfigureNginx:
         conn.when("systemctl", stdout="")
         conn.when("mkdir", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = ConfigureNginx(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
 
@@ -858,7 +859,7 @@ class TestConfigureNginx:
         assert bootstrap_calls
         assert "subjectAltName=IP:198.51.100.1" in bootstrap_calls[0]
 
-    def test_bootstrap_cert_uses_dns_subject_alt_name(self, tmp_path: Path):
+    def test_bootstrap_cert_uses_dns_subject_alt_name(self):
         conn = MockConnection()
         conn.when("dig +short", stdout="198.51.100.1")
         conn.when("test -f /etc/ssl/meridian/fullchain.pem", stdout="", rc=1)
@@ -870,7 +871,7 @@ class TestConfigureNginx:
         conn.when("systemctl", stdout="")
         conn.when("mkdir", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", domain="example.com", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1", domain="example.com")
         step = ConfigureNginx(domain="example.com", ip_mode=False, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
 
@@ -886,7 +887,7 @@ class TestConfigureNginx:
 
 
 class TestIssueTLSCert:
-    def test_cert_already_valid(self, tmp_path: Path):
+    def test_cert_already_valid(self):
         conn = MockConnection()
         # acme.sh issue (cert already valid)
         conn.when("acme.sh --info", stdout="", rc=1)
@@ -894,7 +895,7 @@ class TestIssueTLSCert:
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -906,55 +907,54 @@ class TestIssueTLSCert:
         assert "--force" not in acme_calls[0]
         conn.assert_called_with_pattern("acme.sh --install-cert")
 
-    def test_acme_failure_returns_warning(self, tmp_path: Path):
-        """ACME failure returns changed with warning, not failed."""
+    def test_acme_failure_blocks_panel_credential_exchange(self):
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=1)
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
-        assert result.status == "changed"
-        assert "WARNING" in result.detail
-        assert "self-signed" in result.detail
+        assert result.status == "failed"
+        assert "trusted TLS certificate" in result.detail
+        assert "not sent over self-signed TLS" in result.detail
         # nginx should NOT be reloaded on ACME failure
         conn.assert_not_called_with_pattern("systemctl reload")
 
-    def test_install_cert_failure_returns_failed(self, tmp_path: Path):
+    def test_install_cert_failure_returns_failed(self):
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=2)
         conn.when("acme.sh --install-cert", stderr="copy failed", rc=1)
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "failed"
         assert "Failed to install TLS cert" in result.detail
         assert all(c != "systemctl reload nginx" for c in conn.calls)
 
-    def test_reload_failure_returns_failed(self, tmp_path: Path):
+    def test_reload_failure_returns_failed(self):
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=2)
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl reload nginx", stderr="reload failed", rc=1)
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "failed"
         assert "Failed to reload nginx" in result.detail
 
-    def test_domain_mode_omits_shortlived(self, tmp_path: Path):
+    def test_domain_mode_omits_shortlived(self):
         """Domain mode does not use --certificate-profile shortlived."""
         conn = MockConnection()
         conn.when("acme.sh --issue", stdout="", rc=2)
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="example.com", ip_mode=False)
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -964,15 +964,15 @@ class TestIssueTLSCert:
         assert "shortlived" not in acme_calls[0]
         assert "--days" not in acme_calls[0]
 
-    def test_uses_configured_acme_server(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setattr("meridian.provision.services.ACME_SERVER", "https://acme.test/directory")
+    def test_uses_configured_acme_server(self, monkeypatch):
+        monkeypatch.setattr("meridian.provision.tls.ACME_SERVER", "https://acme.test/directory")
         conn = MockConnection()
         conn.when("acme.sh --info", stdout="", rc=1)
         conn.when("acme.sh --issue", stdout="", rc=2)
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
 
@@ -981,7 +981,7 @@ class TestIssueTLSCert:
         assert acme_calls
         assert "https://acme.test/directory" in acme_calls[0]
 
-    def test_ip_mode_force_renews_stale_acme_schedule(self, tmp_path: Path):
+    def test_ip_mode_force_renews_stale_acme_schedule(self):
         conn = MockConnection()
         conn.when(
             "acme.sh --info",
@@ -992,7 +992,7 @@ class TestIssueTLSCert:
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -1002,7 +1002,7 @@ class TestIssueTLSCert:
         assert "--days 5" in acme_calls[0]
         assert "--force" in acme_calls[0]
 
-    def test_ip_mode_force_renews_when_renewal_days_missing(self, tmp_path: Path):
+    def test_ip_mode_force_renews_when_renewal_days_missing(self):
         stale_next_renew = int(time.time()) + 30 * 24 * 60 * 60
         conn = MockConnection()
         conn.when(
@@ -1014,7 +1014,7 @@ class TestIssueTLSCert:
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -1023,7 +1023,7 @@ class TestIssueTLSCert:
         assert "shortlived" in acme_calls[0]
         assert "--force" in acme_calls[0]
 
-    def test_ip_mode_missing_renewal_days_respects_short_next_renew(self, tmp_path: Path):
+    def test_ip_mode_missing_renewal_days_respects_short_next_renew(self):
         next_renew = int(time.time()) + 24 * 60 * 60
         conn = MockConnection()
         conn.when(
@@ -1035,7 +1035,7 @@ class TestIssueTLSCert:
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -1043,7 +1043,7 @@ class TestIssueTLSCert:
         assert acme_calls
         assert "--force" not in acme_calls[0]
 
-    def test_ip_mode_does_not_force_when_schedule_is_already_correct(self, tmp_path: Path):
+    def test_ip_mode_does_not_force_when_schedule_is_already_correct(self):
         conn = MockConnection()
         conn.when(
             "acme.sh --info",
@@ -1054,7 +1054,7 @@ class TestIssueTLSCert:
         conn.when("acme.sh --install-cert", stdout="")
         conn.when("systemctl", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1")
         result = step.run(conn, ctx)
         assert result.status == "changed"
@@ -1066,96 +1066,29 @@ class TestIssueTLSCert:
 
 
 # ---------------------------------------------------------------------------
-# DeployConnectionPage step
-# ---------------------------------------------------------------------------
-
-
-class TestDeployConnectionPage:
-    def test_no_credentials_fails(self, tmp_path: Path):
-        conn = MockConnection()
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
-        # Provide credentials with empty reality UUID to trigger failure
-        creds = make_credentials()
-        creds.protocols["reality"].uuid = ""
-        ctx["credentials"] = creds
-
-        step = DeployConnectionPage(server_ip="198.51.100.1")
-        result = step.run(conn, ctx)
-        assert result.status == "failed"
-        assert "UUID" in result.detail
-
-
-# ---------------------------------------------------------------------------
 # DeployPWAAssets step
 # ---------------------------------------------------------------------------
 
 
 class TestDeployPWAAssets:
-    def test_uploads_static_files(self, tmp_path: Path):
+    def test_uploads_static_files(self):
         conn = MockConnection()
         conn.when("mkdir", stdout="")
-        conn.when("printf", stdout="")
-        conn.when("chown", stdout="")
+        conn.when("cat >", stdout="")
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = DeployPWAAssets()
         result = step.run(conn, ctx)
         assert result.status == "changed"
         assert "PWA" in result.detail
 
-    def test_failure_returns_failed(self, tmp_path: Path):
+    def test_failure_returns_failed(self):
         conn = MockConnection()
         conn.when("mkdir", stdout="")
         # File upload fails
-        conn.when("printf", stdout="", rc=1)
+        conn.when("cat >", stdout="", rc=1)
 
-        ctx = ProvisionContext(ip="198.51.100.1", creds_dir=str(tmp_path))
+        ctx = ProvisionContext(ip="198.51.100.1")
         step = DeployPWAAssets()
         result = step.run(conn, ctx)
         assert result.status == "failed"
-
-
-# ---------------------------------------------------------------------------
-# _render_stats_script() basic test
-# ---------------------------------------------------------------------------
-
-
-class TestRenderStatsScript:
-    """Verify the stats update script is valid Python with correct parameters."""
-
-    def test_output_is_valid_python(self):
-        script = _render_stats_script(panel_internal_port=2053)
-        # compile() will raise SyntaxError if the script is not valid Python
-        compile(script, "<stats-script>", "exec")
-
-    def test_contains_panel_url_with_port(self):
-        script = _render_stats_script(panel_internal_port=9999)
-        assert "127.0.0.1:9999" in script
-
-    def test_contains_credential_file_path(self):
-        script = _render_stats_script(panel_internal_port=2053)
-        assert "/etc/meridian/proxy.yml" in script
-
-    def test_handles_url_encoded_password(self):
-        """Script should use urllib.parse.quote for password in login data."""
-        script = _render_stats_script(panel_internal_port=2053)
-        assert "urllib.parse.quote" in script
-
-    def test_uses_different_ports(self):
-        """Port parameter should be correctly interpolated."""
-        script_a = _render_stats_script(panel_internal_port=2053)
-        script_b = _render_stats_script(panel_internal_port=5555)
-        assert "127.0.0.1:2053" in script_a
-        assert "127.0.0.1:5555" in script_b
-        assert "127.0.0.1:5555" not in script_a
-
-    def test_writes_stats_to_uuid_json(self):
-        """Script should write per-client stats files keyed by UUID."""
-        script = _render_stats_script(panel_internal_port=2053)
-        assert "/var/www/private/stats" in script
-        assert ".json" in script
-
-    def test_has_main_guard(self):
-        script = _render_stats_script(panel_internal_port=2053)
-        assert "__name__" in script
-        assert "__main__" in script

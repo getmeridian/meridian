@@ -1,0 +1,86 @@
+{
+  "additionalProperties": false,
+  "description": "Request to provision and add an exit node.",
+  "properties": {
+    "domain": {
+      "anyOf": [
+        {
+          "const": "",
+          "type": "string"
+        },
+        {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "title": "Domain"
+    },
+    "harden": {
+      "default": true,
+      "title": "Harden",
+      "type": "boolean"
+    },
+    "ip": {
+      "anyOf": [
+        {
+          "format": "ipv4",
+          "type": "string"
+        },
+        {
+          "format": "ipv6",
+          "type": "string"
+        }
+      ],
+      "title": "Ip"
+    },
+    "name": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+      "title": "Name",
+      "type": "string"
+    },
+    "sni": {
+      "anyOf": [
+        {
+          "const": "",
+          "type": "string"
+        },
+        {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+          "type": "string"
+        }
+      ],
+      "default": "",
+      "title": "Sni"
+    },
+    "ssh_port": {
+      "default": 22,
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Ssh Port",
+      "type": "integer"
+    },
+    "user": {
+      "default": "root",
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ip"
+  ],
+  "title": "NodeAddRequest",
+  "type": "object"
+}

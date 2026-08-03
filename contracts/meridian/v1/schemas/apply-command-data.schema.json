@@ -1,0 +1,455 @@
+{
+  "$defs": {
+    "ApplyActionResult": {
+      "additionalProperties": false,
+      "description": "Execution result for one plan action.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/PlanActionResult"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "action",
+        "status",
+        "success"
+      ],
+      "title": "ApplyActionResult",
+      "type": "object"
+    },
+    "ApplyCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate counts for apply execution.",
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "failed": {
+          "title": "Failed",
+          "type": "integer"
+        },
+        "skipped": {
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "succeeded": {
+          "title": "Succeeded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "title": "ApplyCounts",
+      "type": "object"
+    },
+    "ApplyResult": {
+      "additionalProperties": false,
+      "description": "Final apply result for process/API clients.",
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ApplyActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "all_succeeded": {
+          "title": "All Succeeded",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/ApplyCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "plan": {
+          "$ref": "#/$defs/PlanResult"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "all_succeeded",
+        "summary",
+        "exit_code",
+        "plan",
+        "counts"
+      ],
+      "title": "ApplyResult",
+      "type": "object"
+    },
+    "CompiledApplyActionResult": {
+      "additionalProperties": false,
+      "description": "Execution result for one V4 compiler resource.",
+      "properties": {
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "converged",
+            "applied",
+            "failed",
+            "unknown",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "success": {
+          "title": "Success",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource_id",
+        "status",
+        "success",
+        "changed"
+      ],
+      "title": "CompiledApplyActionResult",
+      "type": "object"
+    },
+    "CompiledApplyResult": {
+      "additionalProperties": false,
+      "description": "Apply result for one generation-scoped V4 compiler plan.",
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/CompiledApplyActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "all_succeeded": {
+          "title": "All Succeeded",
+          "type": "boolean"
+        },
+        "changed": {
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/ApplyCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "generation": {
+          "minimum": 0,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "generation",
+        "all_succeeded",
+        "changed",
+        "summary",
+        "exit_code",
+        "counts"
+      ],
+      "title": "CompiledApplyResult",
+      "type": "object"
+    },
+    "PlanActionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "can_run_parallel": {
+          "default": false,
+          "title": "Can Run Parallel",
+          "type": "boolean"
+        },
+        "change_set": {
+          "items": {
+            "$ref": "#/$defs/PlanChange"
+          },
+          "title": "Change Set",
+          "type": "array"
+        },
+        "destructive": {
+          "title": "Destructive",
+          "type": "boolean"
+        },
+        "destructive_reason": {
+          "title": "Destructive Reason",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "execution_order": {
+          "title": "Execution Order",
+          "type": "integer"
+        },
+        "from_extras": {
+          "title": "From Extras",
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "add_node",
+            "update_node",
+            "remove_node",
+            "add_client",
+            "remove_client",
+            "add_relay",
+            "update_relay",
+            "remove_relay",
+            "add_subscription_page",
+            "remove_subscription_page"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "add",
+            "update",
+            "remove",
+            "replace"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "provision",
+            "configure",
+            "deprovision",
+            "replace"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "plan_index": {
+          "title": "Plan Index",
+          "type": "integer"
+        },
+        "replacement": {
+          "title": "Replacement",
+          "type": "boolean"
+        },
+        "replacement_strategy": {
+          "enum": [
+            "none",
+            "delete_then_create"
+          ],
+          "title": "Replacement Strategy",
+          "type": "string"
+        },
+        "requires_confirmation": {
+          "title": "Requires Confirmation",
+          "type": "boolean"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_type": {
+          "enum": [
+            "node",
+            "client",
+            "relay",
+            "subscription_page"
+          ],
+          "title": "Resource Type",
+          "type": "string"
+        },
+        "symbol": {
+          "enum": [
+            "+",
+            "~",
+            "-"
+          ],
+          "title": "Symbol",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_index",
+        "execution_order",
+        "kind",
+        "operation",
+        "resource_type",
+        "resource_id",
+        "target",
+        "detail",
+        "destructive",
+        "replacement",
+        "replacement_strategy",
+        "from_extras",
+        "phase",
+        "requires_confirmation",
+        "destructive_reason",
+        "symbol"
+      ],
+      "title": "PlanActionResult",
+      "type": "object"
+    },
+    "PlanChange": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "title": "After",
+          "type": "string"
+        },
+        "before": {
+          "title": "Before",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "before",
+        "after"
+      ],
+      "title": "PlanChange",
+      "type": "object"
+    },
+    "PlanCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "adds": {
+          "title": "Adds",
+          "type": "integer"
+        },
+        "destructive": {
+          "title": "Destructive",
+          "type": "integer"
+        },
+        "from_extras": {
+          "title": "From Extras",
+          "type": "integer"
+        },
+        "removes": {
+          "title": "Removes",
+          "type": "integer"
+        },
+        "replacements": {
+          "title": "Replacements",
+          "type": "integer"
+        },
+        "updates": {
+          "title": "Updates",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "adds",
+        "updates",
+        "replacements",
+        "removes",
+        "destructive",
+        "from_extras"
+      ],
+      "title": "PlanCounts",
+      "type": "object"
+    },
+    "PlanResult": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/PlanActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/PlanCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "converged",
+        "summary",
+        "exit_code",
+        "counts"
+      ],
+      "title": "PlanResult",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/ApplyResult"
+    },
+    {
+      "$ref": "#/$defs/CompiledApplyResult"
+    }
+  ],
+  "description": "Success data returned by legacy and V4 apply execution.",
+  "title": "ApplyCommandData"
+}

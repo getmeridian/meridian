@@ -57,7 +57,7 @@ class TestRunPreviewOutput:
         assert (client_dir / "index.html").is_file()
         assert (client_dir / "config.json").is_file()
         assert (client_dir / "manifest.webmanifest").is_file()
-        assert (client_dir / "sub.txt").is_file()
+        assert not (client_dir / "sub.txt").exists()
 
     def test_config_json_has_demo_data(self, tmp_path: Path) -> None:
         output_dir = tmp_path / "preview"

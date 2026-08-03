@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "description": "Plain-language route card for Studio and CLI review screens.",
+  "properties": {
+    "action": {
+      "enum": [
+        "route",
+        "block"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "entry_label": {
+      "default": "",
+      "title": "Entry Label",
+      "type": "string"
+    },
+    "exit_label": {
+      "default": "",
+      "title": "Exit Label",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "sentence": {
+      "title": "Sentence",
+      "type": "string"
+    },
+    "traffic_label": {
+      "title": "Traffic Label",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "enabled",
+    "action",
+    "traffic_label",
+    "sentence"
+  ],
+  "title": "RouteCard",
+  "type": "object"
+}

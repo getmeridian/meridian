@@ -1,163 +1,141 @@
-"""SSH connection helpers."""
+"""SSH connection helpers.
+
+This module is a pure transport layer with no Rich/console dependency.
+All user-facing output goes through an optional ``SSHUI`` callback
+protocol so that CLI callers get Rich output while Engine/headless
+callers stay dependency-free.
+"""
 
 from __future__ import annotations
 
+import logging
+import os
+import re
 import shlex
-import shutil
 import subprocess
-from pathlib import Path
+import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Iterable
 
-from meridian.console import err_console, info, ok, warn
+if TYPE_CHECKING:
+    from meridian.core.execution import RemoteCommandResult
+
+from meridian.core.errors import MeridianError
+from meridian.ssh_auth import (
+    _DEFAULT_UI,
+    SSHUI,
+    _host_key_known,
+    _verify_host_key,
+    ensure_askpass_script,
+    ensure_multiplex_dir,
+)
+from meridian.ssh_transfer import _FileTransferMixin
+
+logger = logging.getLogger("meridian.ssh")
 
 
-class SSHError(Exception):
-    """Raised when an SSH operation fails.
+class SSHError(MeridianError):
+    """Raised when an SSH operation fails."""
 
-    Attributes:
-        hint: Optional recovery suggestion for the user.
-        hint_type: Error category — "user", "system", or "bug".
+
+# Patterns to redact from debug log output (env var assignments with secrets)
+_SECRET_PATTERNS = re.compile(
+    r"((?:"
+    r"SECRET_KEY|PASSWORD|PASS|TOKEN|API_TOKEN|REMNAWAVE_API_TOKEN|"
+    r"JWT_AUTH_SECRET|JWT_API_TOKENS_SECRET|POSTGRES_PASSWORD|METRICS_PASS|"
+    r"DATABASE_URL"
+    r")\s*=\s*)\S+",
+    re.IGNORECASE,
+)
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _redact_command(cmd: str) -> str:
+    """Mask secret values in SSH commands for safe debug logging."""
+    return _SECRET_PATTERNS.sub(r"\1***", cmd[:200])
+
+
+@dataclass
+class CommandResult:
+    """Result of a command executed through ServerConnection.
+
+    Keeps the ``subprocess.CompletedProcess`` surface used throughout the
+    codebase while carrying the extra metadata needed for diagnostics.
     """
 
-    def __init__(self, msg: str, *, hint: str = "", hint_type: str = "system") -> None:
-        super().__init__(msg)
-        self.hint = hint
-        self.hint_type = hint_type
+    args: Any
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+    duration_ms: int = 0
+    attempts: int = 1
+    timed_out: bool = False
+    sudo: bool = False
+    redacted_command: str = ""
+    operation_name: str = ""
+
+    @property
+    def ok(self) -> bool:
+        """Whether the command exited successfully."""
+        return self.returncode == 0
+
+    def to_remote(self) -> RemoteCommandResult:
+        """Convert to a core ``RemoteCommandResult`` with explicit field mapping."""
+        from meridian.core.execution import RemoteCommandResult
+
+        return RemoteCommandResult(
+            args=self.args,
+            returncode=self.returncode,
+            stdout=self.stdout,
+            stderr=self.stderr,
+            duration_ms=self.duration_ms,
+            attempts=self.attempts,
+            timed_out=self.timed_out,
+            sudo=self.sudo,
+            redacted_command=self.redacted_command,
+            operation_name=self.operation_name,
+        )
+
+    @classmethod
+    def from_remote(cls, result: RemoteCommandResult) -> CommandResult:
+        """Create from a core ``RemoteCommandResult`` with explicit field mapping."""
+        return cls(
+            args=result.args,
+            returncode=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            duration_ms=result.duration_ms,
+            attempts=result.attempts,
+            timed_out=result.timed_out,
+            sudo=result.sudo,
+            redacted_command=result.redacted_command,
+            operation_name=result.operation_name,
+        )
 
 
-SSH_OPTS: list[str] = [
+def _stringify_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return value
+
+
+# SSH multiplexing: reuse a single TCP connection for multiple commands
+# to the same host. ControlPersist=300 keeps the master alive for 5min
+# after the last command, so sequential provisioner steps don't pay
+# the TCP+auth handshake each time.
+SSH_MULTIPLEX_OPTS: list[str] = [
     "-o",
-    "BatchMode=yes",
+    "ControlMaster=auto",
     "-o",
-    "ConnectTimeout=10",
+    "ControlPath=~/.meridian/ssh/%r@%h:%p",
     "-o",
-    "StrictHostKeyChecking=yes",
+    "ControlPersist=300",
 ]
 
 
-def scp_host(ip: str) -> str:
-    """Format IP for SCP host:path syntax (brackets IPv6)."""
-    if ":" in ip and not ip.startswith("["):
-        return f"[{ip}]"
-    return ip
-
-
-def _host_key_known(ip: str, port: int = 22) -> bool:
-    """Check if the host key for this IP is already in known_hosts."""
-    # ssh-keygen -F uses [host]:port notation for non-default ports
-    lookup = f"[{ip}]:{port}" if port != 22 else ip
-    try:
-        result = subprocess.run(
-            ["ssh-keygen", "-F", lookup],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            stdin=subprocess.DEVNULL,
-        )
-        return result.returncode == 0 and bool(result.stdout.strip())
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def _verify_host_key(ip: str, port: int = 22) -> bool:
-    """Scan, display, and prompt user to verify the SSH host key.
-
-    Returns True if the user accepts (key added to known_hosts), False otherwise.
-    Uses ssh-keyscan to fetch the key and ssh-keygen to compute the fingerprint.
-    """
-    # Scan the host key
-    keyscan_cmd = ["ssh-keyscan", "-T", "5"]
-    if port != 22:
-        keyscan_cmd.extend(["-p", str(port)])
-    keyscan_cmd.append(ip)
-    try:
-        result = subprocess.run(
-            keyscan_cmd,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            stdin=subprocess.DEVNULL,
-        )
-        if result.returncode != 0 or not result.stdout.strip():
-            warn(f"Could not scan host key for {ip}")
-            return False
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        warn(f"Could not scan host key for {ip}")
-        return False
-
-    key_lines = [line for line in result.stdout.strip().splitlines() if line and not line.startswith("#")]
-    if not key_lines:
-        warn(f"No host keys found for {ip}")
-        return False
-
-    # Prefer ed25519 > ecdsa > rsa
-    preferred = None
-    for pref in ("ssh-ed25519", "ecdsa-sha2", "ssh-rsa"):
-        for line in key_lines:
-            if pref in line:
-                preferred = line
-                break
-        if preferred:
-            break
-    if not preferred:
-        preferred = key_lines[0]
-
-    # Compute fingerprint
-    try:
-        result = subprocess.run(
-            ["ssh-keygen", "-lf", "-"],
-            input=preferred,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        fingerprint = result.stdout.strip() if result.returncode == 0 else ""
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        fingerprint = ""
-
-    # Display to user
-    key_type = preferred.split()[1] if len(preferred.split()) >= 2 else "unknown"
-    # key_type is the full key data, extract algorithm from the 3rd field
-    parts = preferred.split()
-    algo = parts[1] if len(parts) >= 3 else key_type
-
-    err_console.print()
-    err_console.print(f"  [warn]![/warn] First connection to {ip}")
-    if fingerprint:
-        err_console.print("  [dim]Host key fingerprint:[/dim]")
-        err_console.print(f"  [bold]{fingerprint}[/bold]")
-    else:
-        err_console.print(f"  [dim]Host key type: {algo}[/dim]")
-    err_console.print()
-    err_console.print("  [dim]Verify this matches your VPS provider's console.[/dim]")
-    err_console.print("  [dim]A mismatch may indicate a network attack.[/dim]")
-
-    # Prompt user
-    try:
-        with open("/dev/tty") as tty:
-            err_console.print("\n  [info]\u2192[/info] Trust this host key? [dim][Y/n][/dim] ", end="")
-            answer = tty.readline().strip().lower()
-    except OSError:
-        # No TTY — refuse to accept host key silently (MitM risk)
-        raise SSHError(
-            f"Cannot verify host key for {ip} (no terminal available)",
-            hint="Run interactively, or pre-add the key: ssh-keyscan IP >> ~/.ssh/known_hosts",
-            hint_type="user",
-        )
-
-    if answer not in ("", "y", "yes"):
-        return False
-
-    # Add only the verified key to known_hosts (user only saw this fingerprint)
-    known_hosts = Path.home() / ".ssh" / "known_hosts"
-    known_hosts.parent.mkdir(mode=0o700, exist_ok=True)
-    with open(known_hosts, "a") as f:
-        f.write(preferred + "\n")
-
-    ok("Host key saved")
-    return True
-
-
-class ServerConnection:
+class ServerConnection(_FileTransferMixin):
     """Manage SSH connections to a remote server.
 
     Non-root remote users: commands are wrapped in sudo -n sh -c via SSH.
@@ -166,342 +144,313 @@ class ServerConnection:
     Passwordless sudo is required (standard on AWS/GCP/Azure/DO).
     """
 
-    def __init__(self, ip: str, user: str = "root", local_mode: bool = False, port: int = 22) -> None:
+    def __init__(
+        self,
+        ip: str,
+        user: str = "root",
+        local_mode: bool = False,
+        port: int = 22,
+        multiplex: bool = True,
+        identity_file: str = "",
+        password: str = "",
+    ) -> None:
         self.ip = ip
         self.user = user
         self.port = port
         self.local_mode = local_mode
+        self.identity_file = identity_file
+        self.password = password
         self.needs_sudo = False  # on-server non-root — run commands via sudo
+        self.multiplex = multiplex and not identity_file and not password
+        if self.multiplex and not local_mode:
+            ensure_multiplex_dir()
+
+    def __enter__(self) -> ServerConnection:
+        # Several call sites use ``with ServerConnection(...) as conn:``. The
+        # SSH ControlMaster (multiplex) layer manages its own connection
+        # lifetime, so __enter__/__exit__ are no-ops; defining them prevents
+        # AttributeError that was silently swallowed by surrounding try/except
+        # in commands/client.py and commands/recover.py.
+        return self
+
+    def __exit__(self, *_exc_info: object) -> None:
+        # Multiplexed connections persist for SSH_MULTIPLEX_OPTS' lifetime;
+        # nothing to release here.
+        return None
 
     @property
     def _ssh_opts(self) -> list[str]:
-        opts = list(SSH_OPTS)
+        opts = [
+            "-o",
+            "BatchMode=no" if self.password else "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=10",
+            "-o",
+            "StrictHostKeyChecking=yes",
+        ]
+        if self.multiplex and not self.local_mode:
+            opts.extend(SSH_MULTIPLEX_OPTS)
+        if self.identity_file:
+            opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
         if self.port != 22:
             opts.extend(["-p", str(self.port)])
         return opts
 
-    @property
-    def _scp_opts(self) -> list[str]:
-        """SSH options for SCP commands (uses -P for port, not -p)."""
-        opts = list(SSH_OPTS)
-        if self.port != 22:
-            opts.extend(["-P", str(self.port)])
-        return opts
+    def _prepare_command(
+        self,
+        command: str,
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> str:
+        """Apply cwd/env wrappers to a shell command."""
+        parts: list[str] = []
+        if cwd:
+            parts.append(f"cd {shlex.quote(cwd)}")
+        if env:
+            assignments = []
+            for key, value in env.items():
+                if not _ENV_KEY_RE.match(key):
+                    raise ValueError(f"Invalid environment variable name: {key!r}")
+                assignments.append(f"{key}={shlex.quote(str(value))}")
+            parts.append("export " + " ".join(assignments))
+        parts.append(command)
+        return " && ".join(parts)
 
-    @property
-    def _scp_host(self) -> str:
-        """Host string for SCP commands (brackets IPv6 addresses)."""
-        if ":" in self.ip and not self.ip.startswith("["):
-            return f"[{self.ip}]"
-        return self.ip
+    def _completed_to_result(
+        self,
+        completed: subprocess.CompletedProcess[Any],
+        *,
+        duration_ms: int,
+        attempts: int,
+        timed_out: bool,
+        sudo: bool,
+        redacted_command: str,
+        operation_name: str,
+    ) -> CommandResult:
+        return CommandResult(
+            args=completed.args,
+            returncode=completed.returncode,
+            stdout=_stringify_output(completed.stdout),
+            stderr=_stringify_output(completed.stderr),
+            duration_ms=duration_ms,
+            attempts=attempts,
+            timed_out=timed_out,
+            sudo=sudo,
+            redacted_command=redacted_command,
+            operation_name=operation_name,
+        )
 
-    def run(self, command: str, timeout: int = 30, *, sudo: bool | None = None) -> subprocess.CompletedProcess[str]:
+    def run(
+        self,
+        command: str,
+        timeout: int = 30,
+        *,
+        sudo: bool | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        retries: int = 1,
+        retry_delay: float = 0.0,
+        ok_codes: Iterable[int] = (0,),
+        sensitive: bool = False,
+        input: str | None = None,
+        operation_name: str = "",
+    ) -> CommandResult:
         """Run a command on the remote server via SSH.
 
         Args:
             command: Shell command to execute.
             timeout: Timeout in seconds.
             sudo: Force sudo wrapping. None = auto (sudo when user != root).
+            cwd: Optional working directory on the target.
+            env: Environment variables to prefix before the command.
+            retries: Number of attempts before returning the last result.
+            retry_delay: Seconds to sleep between failed attempts.
+            ok_codes: Return codes that count as success for retry purposes.
+            sensitive: Hide command content from logs/result metadata.
+            input: Optional stdin text for the process.
+            operation_name: Human-readable operation label for diagnostics.
 
-        Returns a synthetic CompletedProcess with returncode=124 if the
-        command times out (matching GNU ``timeout`` convention), instead
-        of letting ``subprocess.TimeoutExpired`` crash the caller.
+        Returns a CommandResult with returncode=124 if the command times out
+        (matching GNU ``timeout`` convention), instead of letting
+        ``subprocess.TimeoutExpired`` crash the caller.
         """
+        if retries < 1:
+            raise ValueError("retries must be >= 1")
+
+        command = self._prepare_command(command, cwd=cwd, env=env)
         use_sudo = sudo if sudo is not None else (self.user != "root")
+        redacted = "<sensitive command>" if sensitive else _redact_command(command)
+        logger.debug("SSH %s@%s: %s", self.user, self.ip, redacted)
 
-        if self.local_mode:
-            if self.needs_sudo or use_sudo:
-                cmd = ["sudo", "-n", "bash", "-c", command]
+        ok_code_set = set(ok_codes)
+        last: CommandResult | None = None
+
+        for attempt in range(1, retries + 1):
+            started = time.monotonic()
+            timed_out = False
+
+            if self.local_mode:
+                if self.needs_sudo or use_sudo:
+                    cmd = ["sudo", "-n", "bash", "-c", command]
+                else:
+                    cmd = ["bash", "-c", command]
+                try:
+                    completed = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        stdin=subprocess.DEVNULL if input is None else None,
+                        input=input,
+                    )
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    completed = subprocess.CompletedProcess(
+                        args=cmd,
+                        returncode=124,
+                        stdout="",
+                        stderr=f"Command timed out after {timeout}s",
+                    )
             else:
-                cmd = ["bash", "-c", command]
-            try:
-                return subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                    stdin=subprocess.DEVNULL,
-                )
-            except subprocess.TimeoutExpired:
-                return subprocess.CompletedProcess(
-                    args=cmd,
-                    returncode=124,
-                    stdout="",
-                    stderr=f"Command timed out after {timeout}s",
-                )
-        # Remote SSH
-        if use_sudo and not self.needs_sudo:
-            # Non-root remote user: wrap in sudo via SSH
-            # SSH passes the command string to the remote shell, which handles
-            # the first layer of quoting. sudo -n sh -c adds a second layer.
-            command = f"sudo -n sh -c {shlex.quote(command)}"
-        cmd = ["ssh", *self._ssh_opts, f"{self.user}@{self.ip}", command]
-        try:
-            return subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                stdin=subprocess.DEVNULL,
-            )
-        except subprocess.TimeoutExpired:
-            return subprocess.CompletedProcess(
-                args=cmd,
-                returncode=124,
-                stdout="",
-                stderr=f"Command timed out after {timeout}s",
-            )
+                remote_command = command
+                if use_sudo and not self.needs_sudo:
+                    # Non-root remote user: wrap in sudo via SSH. SSH passes
+                    # the command string to the remote shell, which handles the
+                    # first layer of quoting. sudo -n sh -c adds a second layer.
+                    remote_command = f"sudo -n sh -c {shlex.quote(remote_command)}"
+                cmd = ["ssh", *self._ssh_opts, f"{self.user}@{self.ip}", remote_command]
+                process_env = None
+                if self.password:
+                    process_env = os.environ.copy()
+                    process_env.update(
+                        {
+                            "DISPLAY": process_env.get("DISPLAY") or "meridian",
+                            "MERIDIAN_SSH_PASSWORD": self.password,
+                            "SSH_ASKPASS": str(ensure_askpass_script()),
+                            "SSH_ASKPASS_REQUIRE": "force",
+                        }
+                    )
+                try:
+                    completed = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        stdin=subprocess.DEVNULL if input is None else None,
+                        input=input,
+                        env=process_env,
+                    )
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    completed = subprocess.CompletedProcess(
+                        args=cmd,
+                        returncode=124,
+                        stdout="",
+                        stderr=f"Command timed out after {timeout}s",
+                    )
 
-    def check_ssh(self) -> None:
-        """Verify SSH connectivity. Exits on failure.
+            duration_ms = int((time.monotonic() - started) * 1000)
+            result = self._completed_to_result(
+                completed,
+                duration_ms=duration_ms,
+                attempts=attempt,
+                timed_out=timed_out,
+                sudo=bool(self.needs_sudo or use_sudo),
+                redacted_command=redacted,
+                operation_name=operation_name,
+            )
+            logger.debug("SSH rc=%d attempt=%d/%d", result.returncode, attempt, retries)
+            last = result
+            if result.returncode in ok_code_set:
+                return result
+            if attempt < retries and retry_delay > 0:
+                time.sleep(retry_delay)
+
+        assert last is not None
+        return last
+
+    def check_ssh(self, *, ui: SSHUI | None = None) -> None:
+        """Verify SSH connectivity. Raises SSHError on failure.
 
         On first connection to an unknown host, scans the host key,
         displays the fingerprint, and prompts the user to verify it.
+
+        Args:
+            ui: Optional UI callback for progress/error output.
+                Defaults to logger-based output.
         """
         if self.local_mode:
             return
-        info(f"Checking SSH connectivity to {self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else ""))
+        if ui is None:
+            ui = _DEFAULT_UI
+
+        ui.info(f"Checking SSH connectivity to {self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else ""))
 
         # Verify host key on first connection
         if not _host_key_known(self.ip, self.port):
-            if not _verify_host_key(self.ip, self.port):
+            if not _verify_host_key(self.ip, self.port, ui=ui):
                 raise SSHError(
                     f"Host key for {self.ip} not accepted",
                     hint="Verify the fingerprint matches your VPS provider's console.",
-                    hint_type="user",
+                    category="user",
                 )
 
         try:
             result = self.run("echo ok", timeout=10)
-            if result.returncode != 0:
-                stderr = result.stderr.strip()
-                # Host key changed — warn clearly
-                if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
-                    err_console.print(f"\n  [error]Host key for {self.ip} has CHANGED![/error]")
-                    err_console.print("  [warn]This could indicate a network attack (MitM).[/warn]")
-                    err_console.print("  [dim]If you recently rebuilt this server, remove the old key:[/dim]")
-                    err_console.print(f"  [dim]  ssh-keygen -R {self.ip}[/dim]")
-                    raise SSHError(f"Host key verification failed for {self.ip}", hint_type="system")
-                # sudo not found — non-root user on a system without sudo
-                if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
-                    raise SSHError(
-                        f"sudo is not installed on {self.ip}",
-                        hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
-                        hint_type="system",
-                    )
-                err_console.print(f"\n  [error]SSH connection failed:[/error] {stderr}")
-                err_console.print(f"  [dim]1. Copy your SSH key:  ssh-copy-id {self.user}@{self.ip}[/dim]")
-                err_console.print(f"  [dim]2. Test manually:      ssh {self.user}@{self.ip}[/dim]")
-                err_console.print("  [dim]3. Different user:     meridian deploy IP --user ubuntu[/dim]")
-                raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", hint_type="system")
-            ok("SSH connection successful")
-        except subprocess.TimeoutExpired:
-            raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", hint_type="system")
         except FileNotFoundError:
-            raise SSHError("ssh command not found. Please install OpenSSH client.", hint_type="system")
+            raise SSHError("ssh command not found. Please install OpenSSH client.", category="system")
+
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            # run() converts TimeoutExpired to returncode=124
+            if result.returncode == 124:
+                raise SSHError(f"SSH connection timed out (10s) to {self.user}@{self.ip}", category="system")
+            # Host key changed
+            if "REMOTE HOST IDENTIFICATION HAS CHANGED" in stderr:
+                ui.host_key_changed(self.ip)
+                raise SSHError(f"Host key verification failed for {self.ip}", category="system")
+            # sudo not found
+            if self.user != "root" and ("sudo" in stderr and ("not found" in stderr or "No such file" in stderr)):
+                raise SSHError(
+                    f"sudo is not installed on {self.ip}",
+                    hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
+                    category="system",
+                )
+            ui.ssh_failed(self.ip, self.user, stderr)
+            raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", category="system")
+        ui.ok("SSH connection successful")
 
     def detect_local_mode(self) -> bool:
         """Check if we're running on the target server itself.
 
-        Detection is file-based only: /etc/meridian/proxy.yml readable (root)
-        or /etc/meridian/ directory exists (non-root on deployed server).
+        Detection is file-based only: /etc/meridian/node.yml readable (root),
+        or /etc/meridian/ exists but the identity file is unreadable (non-root).
 
         Does NOT use public IP matching — that produces false positives when
         the user is connected to the server via TUN mode (VPN), since their
         outbound IP matches the server IP.
         """
-        from meridian.config import SERVER_CREDS_DIR
+        from meridian.config import SERVER_CREDS_DIR, SERVER_NODE_CONFIG
 
-        proxy = SERVER_CREDS_DIR / "proxy.yml"
+        file_check_failed = False
+
         try:
-            if proxy.is_file() and proxy.stat().st_size > 0:
+            if SERVER_NODE_CONFIG.is_file() and SERVER_NODE_CONFIG.stat().st_size > 0:
                 self.local_mode = True
                 return True
         except (PermissionError, OSError):
-            # Can't stat the file — check if /etc/meridian/ dir exists
-            # (non-root on a deployed server)
+            file_check_failed = True
+
+        # Dir exists but files not readable → non-root on deployed server
+        if file_check_failed:
             try:
                 if SERVER_CREDS_DIR.is_dir():
-                    warn("Running as non-root on the server. Using sudo for commands.")
+                    logger.warning("Running as non-root on the server. Using sudo for commands.")
                     self.local_mode = True
                     self.needs_sudo = True
                     return True
             except (PermissionError, OSError):
                 pass
-            return False
 
-        return False
-
-    def fetch_credentials(self, local_creds_dir: Path) -> bool:
-        """Fetch credentials from server's /etc/meridian/ via SCP.
-
-        In local mode (root), copies directly from /etc/meridian/.
-        In remote mode, uses SCP for root or SSH+sudo for non-root users
-        (SCP can't read root-owned /etc/meridian/ without sudo).
-        """
-        if self.local_mode:
-            return self._copy_local_credentials(local_creds_dir)
-
-        local_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-
-        if self.user != "root":
-            # Non-root: SCP can't read root-owned /etc/meridian/.
-            # Use SSH + sudo cat instead (conn.run() adds sudo automatically).
-            result = self.run("cat /etc/meridian/proxy.yml", timeout=30)
-            if result.returncode == 0 and result.stdout:
-                dst = local_creds_dir / "proxy.yml"
-                dst.write_text(result.stdout, encoding="utf-8")
-                dst.chmod(0o600)
-                return True
-            return False
-
-        try:
-            result = subprocess.run(
-                [
-                    "scp",
-                    *self._scp_opts,
-                    f"{self.user}@{self._scp_host}:/etc/meridian/proxy.yml",
-                    str(local_creds_dir / "proxy.yml"),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                stdin=subprocess.DEVNULL,
-            )
-            if result.returncode == 0:
-                (local_creds_dir / "proxy.yml").chmod(0o600)
-                return True
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
-        return False
-
-    def write_file(self, local_path: Path, remote_path: str) -> bool:
-        """Write a local file to the server, using sudo for non-root users.
-
-        SCP can't write to root-owned directories (like /etc/meridian/) as a
-        non-root user.  This method uses SSH + sudo tee instead.
-        For root, plain SCP is used.
-        """
-        if self.local_mode:
-            dst = Path(remote_path)
-            if dst == local_path:
-                return True
-            if self.needs_sudo or self.user != "root":
-                try:
-                    result = subprocess.run(
-                        ["sudo", "-n", "tee", remote_path],
-                        input=local_path.read_bytes(),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.PIPE,
-                        timeout=15,
-                    )
-                    if result.returncode != 0:
-                        return False
-                    subprocess.run(
-                        ["sudo", "-n", "chmod", "600", remote_path],
-                        capture_output=True,
-                        timeout=5,
-                        stdin=subprocess.DEVNULL,
-                    )
-                    return True
-                except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-                    return False
-            try:
-                shutil.copy2(str(local_path), str(dst))
-                dst.chmod(0o600)
-                return True
-            except (PermissionError, OSError):
-                return False
-
-        if self.user != "root":
-            # Non-root: pipe file content through SSH with sudo tee
-            q_path = shlex.quote(remote_path)
-            remote_cmd = f"sudo -n tee {q_path} > /dev/null"
-            try:
-                result = subprocess.run(
-                    ["ssh", *self._ssh_opts, f"{self.user}@{self.ip}", remote_cmd],
-                    input=local_path.read_bytes(),
-                    capture_output=True,
-                    timeout=15,
-                )
-                if result.returncode == 0:
-                    chmod = self.run(f"chmod 600 {q_path}", timeout=5)
-                    return chmod.returncode == 0
-                return False
-            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-                return False
-
-        # Root: SCP works fine
-        try:
-            result = subprocess.run(
-                [
-                    "scp",
-                    *self._scp_opts,
-                    str(local_path),
-                    f"{self.user}@{self._scp_host}:{remote_path}",
-                ],
-                capture_output=True,
-                timeout=15,
-                stdin=subprocess.DEVNULL,
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return False
-
-    def _copy_local_credentials(self, local_creds_dir: Path) -> bool:
-        """Copy credentials from /etc/meridian/ in local mode.
-
-        When needs_sudo is set, uses sudo to read root-owned credential files.
-        """
-        from meridian.config import SERVER_CREDS_DIR
-
-        src = SERVER_CREDS_DIR / "proxy.yml"
-        dst = local_creds_dir / "proxy.yml"
-
-        if dst == src:
-            return True
-
-        local_creds_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-
-        # Copy main credentials (required)
-        if not self._copy_one_file(SERVER_CREDS_DIR / "proxy.yml", local_creds_dir / "proxy.yml"):
-            return False
-        return True
-
-    def _copy_one_file(self, src: Path, dst: Path) -> bool:
-        """Copy a single file, using sudo if needed. Returns True on success."""
-        if self.needs_sudo:
-            try:
-                result = subprocess.run(
-                    ["sudo", "-n", "cat", str(src)],
-                    capture_output=True,
-                    timeout=5,
-                    stdin=subprocess.DEVNULL,
-                )
-                if result.returncode != 0:
-                    return False
-                dst.write_bytes(result.stdout)
-                dst.chmod(0o600)
-                return True
-            except (subprocess.TimeoutExpired, FileNotFoundError):
-                return False
-        try:
-            if src.is_file():
-                shutil.copy2(str(src), str(dst))
-                dst.chmod(0o600)
-                return True
-        except (PermissionError, OSError):
-            pass
-        return False
-
-
-def tcp_connect(host: str, port: int, timeout: int = 5) -> bool:
-    """Test TCP connectivity to host:port using a Python socket."""
-    import socket as _socket
-
-    try:
-        conn = _socket.create_connection((host, port), timeout=timeout)
-        conn.close()
-        return True
-    except (OSError, _socket.timeout):
         return False

@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "FleetStatusNode": {
+      "additionalProperties": false,
+      "properties": {
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "is_panel_host": {
+          "title": "Is Panel Host",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "default": "exit",
+          "enum": [
+            "exit",
+            "routing_gateway"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "disabled",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_bytes": {
+          "title": "Traffic Bytes",
+          "type": "integer"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        },
+        "xray_version": {
+          "title": "Xray Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "uuid",
+        "is_panel_host",
+        "status",
+        "xray_version",
+        "traffic_bytes"
+      ],
+      "title": "FleetStatusNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for listing configured nodes with live panel status.",
+  "properties": {
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/FleetStatusNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    }
+  },
+  "title": "NodeListResult",
+  "type": "object"
+}

@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "EgressPoolIntent": {
+      "additionalProperties": false,
+      "description": "An ordered set of exits used for server-side failover.",
+      "properties": {
+        "exit_refs": {
+          "items": {
+            "maxLength": 48,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9_-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Exit Refs",
+          "type": "array"
+        },
+        "fail_closed": {
+          "default": true,
+          "title": "Fail Closed",
+          "type": "boolean"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "probe_url": {
+          "default": "https://www.apple.com/library/test/success.html",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Probe Url",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "least_ping",
+          "default": "least_ping",
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "exit_refs"
+      ],
+      "title": "EgressPoolIntent",
+      "type": "object"
+    },
+    "OrderedRouteIntent": {
+      "additionalProperties": false,
+      "description": "One explicit first-match routing rule.",
+      "properties": {
+        "action": {
+          "default": "route",
+          "enum": [
+            "route",
+            "block"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match": {
+          "default": "all",
+          "enum": [
+            "all",
+            "country",
+            "domain",
+            "ip",
+            "network"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "match_values": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Match Values",
+          "type": "array"
+        },
+        "priority": {
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "source_gateway_ref": {
+          "default": "",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+          "title": "Source Gateway Ref",
+          "type": "string"
+        },
+        "target_ref": {
+          "default": "",
+          "maxLength": 48,
+          "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+          "title": "Target Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "priority"
+      ],
+      "title": "OrderedRouteIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Default egress, ordered routes, and optional failover pools.",
+  "properties": {
+    "default_egress_ref": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Default Egress Ref",
+      "type": "string"
+    },
+    "egress_pools": {
+      "items": {
+        "$ref": "#/$defs/EgressPoolIntent"
+      },
+      "title": "Egress Pools",
+      "type": "array"
+    },
+    "routes": {
+      "items": {
+        "$ref": "#/$defs/OrderedRouteIntent"
+      },
+      "title": "Routes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "default_egress_ref"
+  ],
+  "title": "SetupRoutingSelection",
+  "type": "object"
+}

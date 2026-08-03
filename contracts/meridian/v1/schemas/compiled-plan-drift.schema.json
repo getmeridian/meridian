@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "One V4 compiler resource that does not match remote state.",
+  "properties": {
+    "error": {
+      "default": "",
+      "title": "Error",
+      "type": "string"
+    },
+    "logical_id": {
+      "title": "Logical Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "logical_id"
+  ],
+  "title": "CompiledPlanDriftResult",
+  "type": "object"
+}

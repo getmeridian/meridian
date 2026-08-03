@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "Existing node state relevant to redeploy planning.",
+  "properties": {
+    "ip": {
+      "title": "Ip",
+      "type": "string"
+    },
+    "ws_path": {
+      "default": "",
+      "title": "Ws Path",
+      "type": "string"
+    },
+    "xhttp_path": {
+      "default": "",
+      "title": "Xhttp Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ip"
+  ],
+  "title": "DeployNodeState",
+  "type": "object"
+}

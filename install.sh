@@ -3,7 +3,6 @@
 # Meridian CLI Installer
 #
 # Installs `meridian` from PyPI via uv (preferred) or pipx (fallback).
-# Detects and migrates old bash CLI installations automatically.
 #
 # Usage:
 #   curl -sSf https://getmeridian.org/install.sh | bash
@@ -11,11 +10,10 @@
 set -euo pipefail
 
 R='\033[0m' B='\033[1m' D='\033[2m'
-G='\033[32m' C='\033[36m' Y='\033[33m' RED='\033[31m'
+G='\033[32m' C='\033[36m' RED='\033[31m'
 
 info()  { printf "  ${C}→${R} %s\n" "$*"; }
 ok()    { printf "  ${G}✓${R} %s\n" "$*"; }
-warn()  { printf "  ${Y}!${R} %s\n" "$*"; }
 fail()  { printf "\n  ${RED}✗ %s${R}\n" "$*" >&2; exit 1; }
 
 PYPI_PACKAGE="meridian-vpn"
@@ -23,22 +21,6 @@ PYPI_PACKAGE="meridian-vpn"
 printf "\n"
 printf "  ${B}Meridian Installer${R}\n"
 printf "\n"
-
-# =============================================================================
-# Detect and migrate old bash CLI
-# =============================================================================
-OLD_MERIDIAN=$(command -v meridian 2>/dev/null || true)
-if [[ -n "$OLD_MERIDIAN" ]] && grep -q 'MERIDIAN_VERSION=' "$OLD_MERIDIAN" 2>/dev/null; then
-  warn "Found old bash CLI at $OLD_MERIDIAN"
-  info "Migrating to Python package..."
-  if rm -f "$OLD_MERIDIAN" 2>/dev/null; then
-    ok "Old CLI removed (credentials preserved)"
-  else
-    warn "Cannot remove $OLD_MERIDIAN (permission denied). Remove manually: sudo rm $OLD_MERIDIAN"
-  fi
-  # Clean up old playbook cache (now bundled in package)
-  rm -rf "$HOME/.meridian/playbooks" 2>/dev/null || true
-fi
 
 # =============================================================================
 # Install uv if not present
@@ -183,12 +165,12 @@ if [[ "$PATH_ADDED" == "1" ]]; then
 fi
 printf "  ${B}Quick start:${R}\n"
 printf "     ${C}meridian deploy${R}              ${D}# deploy proxy (interactive wizard)${R}\n"
-printf "     ${C}meridian deploy 1.2.3.4${R}      ${D}# deploy to specific server${R}\n\n"
+printf "     ${C}meridian deploy 198.51.100.10${R} ${D}# deploy to specific server${R}\n\n"
 printf "  ${B}Before deploying:${R}\n"
-printf "     ${C}meridian preflight 1.2.3.4${R}   ${D}# validate server (ports, OS, DNS)${R}\n"
-printf "     ${C}meridian scan 1.2.3.4${R}        ${D}# find best SNI target nearby${R}\n\n"
+printf "     ${C}meridian preflight 198.51.100.10${R} ${D}# validate server (ports, OS, DNS)${R}\n"
+printf "     ${C}meridian scan 198.51.100.10${R}  ${D}# find best SNI target nearby${R}\n\n"
 printf "  ${B}After deploying:${R}\n"
-printf "     ${C}meridian test 1.2.3.4${R}        ${D}# test connection from your device${R}\n"
+printf "     ${C}meridian test 198.51.100.10${R}  ${D}# test connection from your device${R}\n"
 printf "     ${C}meridian client add alice${R}    ${D}# share access with others${R}\n"
 printf "     ${C}meridian client list${R}         ${D}# view all clients${R}\n\n"
 printf "  ${D}All commands: meridian --help${R}\n"

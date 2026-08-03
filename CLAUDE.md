@@ -1,72 +1,126 @@
 # CLAUDE.md
 
+Project-wide context for any AI coding assistant working on Meridian.
+Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
+
 ## Vision
 
-Deploy it right. Share it easily.
+**Deploy it right. Share it easily.** A strong protocol means nothing if the deployment leaks — an open port, a TLS mismatch, a fingerprint that gives the server away. Meridian ships the strongest available protocol (today: VLESS+Reality) AND configures every layer correctly: firewall, certificates, SNI routing, fingerprinting. One command. Done right.
 
-A strong protocol means nothing if the deployment leaks — an open port, a TLS mismatch, a fingerprint that gives the server away. Meridian deploys the strongest available protocol AND configures every layer correctly: firewall, certificates, SNI routing, fingerprinting. Your server is indistinguishable from any other website. One command. Done right.
-
-**The north star:** always offer the strongest available protocol with an airtight deployment. Today that's VLESS+Reality. Tomorrow the protocol may change, but the promise stays: undetectable, zero-mistakes deploy, effortless client handoff.
-
-**Audience:** deployers (self-hosters who want correctness out of the box) + their users (people who scan a QR code and connect)
+**Audience:** deployers (self-hosters who want correctness out of the box) + their users (people who scan a QR code and connect).
 
 **Design principles:**
-- **Strongest protocol, always** — research and adopt whatever is most resistant to detection. Don't chase breadth (20 protocols); chase depth (the best one, perfectly deployed). No open ports, no TLS leaks, no fingerprinting mistakes.
-- **It just works** — Meridian makes no stupid mistakes. Every deployment is hardened by default. The deployer doesn't need to understand firewall rules, TLS configuration, or SNI routing — Meridian handles it correctly every time.
-- **Two-sided UX** — deployer experience (CLI wizard, smart defaults, rebuild-fast) AND end-user experience (PWA connection pages, QR codes, subscription auto-update, deep links) both matter equally.
-- **Aesthetics are trust** — every surface is UI. CLI output, terminal colors, connection pages, URLs, error messages. In censored regions, a polished page says "this is safe to use" more than any documentation.
+- **Strongest protocol, always** — chase depth, not breadth. No open ports, no TLS leaks, no fingerprinting mistakes.
+- **It just works** — every deployment hardened by default. Deployer doesn't need to understand firewall rules, TLS, or SNI.
+- **Two-sided UX** — deployer (CLI wizard, smart defaults) AND end-user (PWA connection pages, QR codes, subscription auto-update).
+- **Aesthetics are trust** — every surface is UI. CLI output, pages, error messages. In censored regions, polished = safe.
 
-## Architecture
+## Architecture (summary)
 
-Python CLI (`meridian-vpn` on PyPI). nginx (port 443 stream SNI routing + TLS termination + web serving + reverse proxy) + acme.sh (certificates) + Xray (VLESS+Reality). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm) for domestic entry points. Website at `getmeridian.org` built with Astro.
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 
-Every meaningful folder has a `CLAUDE.md`. Together they form a **self-sustaining, self-healing knowledge system**.
+Every folder with distinct architectural concerns has a `CLAUDE.md`. AI assistants load the nearest one before writing code. A pitfall documented here is a bug that never recurs.
 
-**How it works:** AI assistants automatically load CLAUDE.md files into context before writing code. A design decision documented here is a decision that gets followed. A pitfall documented here is a bug that never recurs — even across different developers, different sessions, different months.
+**Format (applies to every file, root excepted):**
+- Section order: **Design decisions → What's done well → Pitfalls → (optional) Links**
+- ≤ 40 lines (leaf files). Root is the spine; longer is acceptable but resist bloat.
+- Pitfalls are one-line, concrete, actionable.
+- No duplication across files. Root has the big picture; folders have the details. Cross-reference by path.
+- No line numbers or function signatures (they drift with code).
 
-**The self-healing loop:**
-1. A subtle bug is found and fixed
-2. The pitfall is added to the relevant folder's CLAUDE.md
-3. Next session, the AI reads it before touching that code
-4. The same bug is never introduced again
+**Manifest** — every CLAUDE.md in the tree:
 
-**The self-evolving property:** as the codebase grows, new folders get CLAUDE.md files. As bugs are found, pitfalls accumulate. The system gets smarter over time without any maintenance burden — updating CLAUDE.md is part of the fix, not a separate task.
-
-**Format** — each file has three sections:
-- **Design decisions** — WHY, not what. Rationale survives code rewrites.
-- **What's done well** — preserve these properties. Don't "improve" them away.
-- **Pitfalls** — learned the hard way. The most valuable section.
-
-**Rules:**
-- Create one for any folder with 3+ files and distinct architectural concerns
-- Update it as part of the PR, not as a separate task
-- Keep it under 40 lines. Less is more — a long CLAUDE.md won't be read
-- No line numbers, function signatures, or anything that drifts with code
-- No duplication across files. Root has the big picture; folders have the details
-
-**Current coverage:**
 ```
-CLAUDE.md                          — this file (vision, system, workflow)
-src/meridian/                      — protocol registry, credentials, SSH, API quirks
-  commands/                        — resolution cascade, three-step pattern
-  provision/                       — step pipeline, idempotency, lockout prevention
-  templates/pwa/                   — vanilla JS rationale, security model, CSS lessons
-tests/                             — testing philosophy, MockConnection, fixtures
-  provision/                       — mock boundary, idempotency dual-path testing
-  e2e/                             — Docker lifecycle, shell-script E2E, PID namespace
-  systemlab/                       — multi-node system lab, Docker topology, CI boundary
-website/                           — Astro rationale, i18n strategy, CLI relationship
-  src/components/                  — composition pattern, Accordion CSS lesson
-  src/content/docs/                — locale parity, frontmatter schema, machine-readable
-  src/i18n/                        — asymmetric i18n, detection cascade, translation keys
-  src/layouts/                     — Base/Docs/BlogPost shells, locale bridge, RTL
-  src/styles/                      — token system, warm light-first palette
-  src/pages/                       — dynamic routing, machine-readable endpoints
-  src/pages/blog/                  — blog index, post route, English-only linear reads
-.github/workflows/                 — two-stage pipeline, VERSION-driven releases
+CLAUDE.md                               — this file (vision, manifest, conventions)
+AGENTS.md                               — cross-tool agent discovery pointer
+contracts/CLAUDE.md                     — generated meridian-core contract artifacts
+README.md                               — public project landing
+ROADMAP.md                              — thematic direction + follow-up issue links
+SECURITY.md / CONTRIBUTING.md           — public policies
+scripts/CLAUDE.md                       — repository automation and contract export
+
+src/meridian/CLAUDE.md                  — Python CLI package overview
+├── operations.py                       — client/node/relay CRUD orchestration
+├── panel_bootstrap.py                  — panel setup orchestration (first deploy, redeploy)
+├── node_deploy.py                      — node container deployment, host creation, panel API helpers
+├── relay_ops.py                        — relay infrastructure operations
+├── resolve.py                          — ResolvedServer, ensure_server_connection
+├── xray_config.py                      — Xray inbound/outbound config generation
+├── cluster_persistence.py              — cluster.yml serialization/deserialization
+├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
+├── core/CLAUDE.md                      — transport-neutral API contracts
+│   ├── defaults.py                     — core-owned constants (DEFAULT_SNI)
+│   └── errors.py                       — shared error base types
+├── commands/CLAUDE.md                  — per-subcommand pattern
+│   └── wizard.py                       — interactive deploy wizard
+├── setup/CLAUDE.md                     — resumable setup draft + server shelf
+├── compiler/CLAUDE.md                  — pure finite topology compiler
+├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
+├── engine/CLAUDE.md                    — local Engine use-case boundary
+│   └── routes.py                       — FastAPI route handlers
+├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple
+├── provision/CLAUDE.md                 — step pipeline + idempotency
+├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
+├── reconciler/CLAUDE.md                — compute_plan purity + executor ordering
+│   ├── prepare.py                      — shared plan computation entry point
+│   └── snapshots.py                    — applied-state snapshots + hybrid sync
+└── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
+
+tests/CLAUDE.md                         — testing philosophy, MockConnection
+├── provision/CLAUDE.md                 — mock boundary, idempotency dual-path
+├── systemlab/CLAUDE.md                 — Docker lab topology, CI boundary
+└── realvm/CLAUDE.md                    — real-VM harness, tier α/β/γ, never-in-CI
+
+website/CLAUDE.md                       — Astro rationale, i18n strategy
+├── src/components/CLAUDE.md            — composition pattern
+├── src/content/docs/CLAUDE.md          — locale parity, frontmatter schema
+├── src/i18n/CLAUDE.md                  — asymmetric i18n, detection cascade
+├── src/layouts/CLAUDE.md               — Base/Docs/BlogPost shells, RTL
+├── src/pages/CLAUDE.md                 — dynamic routing, machine-readable endpoints
+├── src/pages/blog/CLAUDE.md            — blog index, post route
+├── src/studio/CLAUDE.md                — generated Studio contracts, future adapters
+└── src/styles/CLAUDE.md                — token system, warm light-first palette
+
+.github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
 ```
+
+## How to update CLAUDE.md
+
+Updating is part of the change, not a separate task. In the SAME commit:
+
+- **Bug fix** → add a one-line pitfall under the relevant folder's `Pitfalls` section.
+- **Design change** → update `Design decisions` of the closest folder. If it changes the big picture, update root Architecture summary + website `architecture.md`.
+- **New invariant worth preserving** → add under `What's done well`.
+- **Reverted / deprecated** → remove the stale entry. Don't leave historical notes.
+- **New folder with distinct concerns** → create a new CLAUDE.md, add it to the Manifest above.
+
+When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100-line one that's half-stale.
+
+## Conventions
+
+- **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
+- **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
+- **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked
+- **Self-hosted everything**: zero external requests (fonts, JS, CSS). Target regions block CDNs
+- **Commit per change**: each logical change gets its own commit; include `Refs: getmeridian/meridian#NN` footer when resolving an issue
+- **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
+- **ctx7 CLI**: check library docs before writing code that depends on external packages
+
+## Module discipline
+
+Rules enforced by `tests/test_architecture.py` — violations fail CI.
+
+- **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
+- **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
+- **Layer boundaries** — `core/` never imports console, config, commands, or Rich. `engine/` never imports commands, provision, ssh, or remnawave. `adapters/` never imports engine. Enforced by both ruff (`TID251`) and pytest.
+- **One concept, one place** — before adding a new type, helper, or constant, search for an existing one. Duplicate port computations, result types, error hierarchies, and field sets were the top source of drift.
+- **Typed contracts at boundaries** — new result types must reference or compose existing core types. Don't reinvent `returncode, stdout, stderr`; use `CommandResult`. Don't hand-build dicts that match a Pydantic model; construct the model.
+
+## Community & public communication
+
+**Always ask before posting.** Show the exact text to the user and get approval before any `gh issue`, `gh pr create`, or GitHub comment. This covers issue bodies, PR descriptions, discussion replies, and any `gh` command that creates or modifies public content.
 
 ## Development
 
@@ -74,69 +128,25 @@ website/                           — Astro rationale, i18n strategy, CLI relat
 make install     # uv sync --extra dev --reinstall-package meridian-vpn
 uv run meridian  # always use uv run (not system-wide meridian)
 make ci          # lint + format + test + templates
+make system-lab  # multi-node Docker lab (~10-15 min)
+make real-lab    # optional real-VM on Hetzner (local-only, ~€0.01)
 ```
 
-`uv run` ensures the local editable install. `--reinstall-package` refreshes after VERSION bumps.
+## Where things live
 
-## Conventions
+- Concrete tracked work → **[GitHub issues](https://github.com/getmeridian/meridian/issues)**
+- High-level direction → **[ROADMAP.md](ROADMAP.md)**
+- Shipped history → **[CHANGELOG.md](CHANGELOG.md)**
+- Cross-tool agent rules → **[AGENTS.md](AGENTS.md)**
 
-- **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
-- **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
-- **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless explicitly asked. User may share feedback from others — keep sources anonymous
-- **Self-hosted everything**: zero external requests (fonts, JS, CSS). Target regions block CDNs
-- **Commit per change**: each logical change gets its own commit
-- **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
-- **GitHub CLI**: `GH_CONFIG_DIR=~/.cc-gh-config gh` for all `gh` commands
-- **context7 MCP**: always check docs before writing code depending on external libraries
-- **When the user says "remember"**: save to this CLAUDE.md, not auto-memory
+## Agent-context imports
 
-## Change recipes
+The `@path` directives below are a Claude Code convention for pulling in extra files during indexing. Agents that don't support them still find the same content by walking the Manifest above.
 
-**New subcommand**: `commands/X.py` → register in `cli.py` → test → README + website docs. AI docs auto-generated by CI.
-
-**New protocol**: `InboundType` + `Protocol` subclass in `protocols.py` → provisioner step → `urls.py`, `render.py`, `display.py`, template → tests → website docs.
-
-**New relay**: `RelayEntry` in `credentials.py` → `provision/relay.py` step → `urls.py` → rendering → `commands/relay.py` → tests.
-
-## Source of truth
-
-| What | SOT | Propagated to | CI-validated? |
-|---|---|---|---|
-| CLI commands & flags | `cli.py` | cli-reference.md, deploy.md, README, CommandBuilder | Yes (all commands) |
-| App download links | `apps.json` | template, `render.py` `_PWA_APPS` | Yes (both) |
-| Version | `VERSION` | importlib, CHANGELOG, website, PyPI | Yes |
-| AI reference | en/ docs | `ai-reference.md` (via `make ai-docs`, gitignored) | Generated at build |
-| Protocol definitions | `protocols.py` | provisioning, URLs, rendering | Yes (unit tests) |
-| Architecture | this file | website docs, README | No (manual) |
-
-## Versioning
-
-Patch: fixes/docs (auto). Minor: features (prompted). Major: breaking (prompted). One bump per session.
-
-**Version bump protocol:**
-1. Push commits to main (direct push OK)
-2. Wait for GitHub Actions CI to pass (lint + unit tests + E2E)
-3. Optional: manual smoke test on a real server (especially after provisioner/deploy changes):
-   - Ask the user for a test server if none is in context
-   - Re-deploy over existing → `meridian test` → teardown → fresh deploy → `meridian test`
-   - This catches regressions that mocked E2E can't (real SSH, real Docker, real networking)
-4. Ask the user before bumping — never bump autonomously
-5. Bump `VERSION` + `CHANGELOG.md`, commit, push
-6. Wait for CI to pass again, then CI creates the GitHub release automatically — don't create releases manually
-
-**Update UX tone:** don't push users to update. If their server works, there's no urgency. Link to GitHub releases so they can decide. CLI update is local-only — always remind that `meridian deploy` is needed to apply changes to servers. Servers and Linux environments are diverse; update + redeploy is for people ready to address a potentially broken state.
-
-## Community & public communication
-
-**Always ask before posting.** Show the exact text to the user and get approval before:
-- GitHub issue/PR comments
-- GitHub discussion replies
-- Any public-facing text posted on the user's behalf
-
-This applies to all `gh` commands that create or modify public content.
-
-## Backlog
-
-See `BACKLOG.md` — includes Manual/External section for promotion and non-code work.
-
-**After completing work**, check if any BACKLOG items were resolved and mark them done or remove them. Keep the backlog in sync with reality.
+@src/meridian/CLAUDE.md
+@src/meridian/commands/CLAUDE.md
+@src/meridian/provision/CLAUDE.md
+@src/meridian/infra/CLAUDE.md
+@src/meridian/reconciler/CLAUDE.md
+@tests/CLAUDE.md
+@tests/realvm/CLAUDE.md

@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "ClientDetail": {
+      "additionalProperties": false,
+      "description": "Client metadata for a detail view.",
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "string"
+        },
+        "last_seen": {
+          "title": "Last Seen",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_limit_bytes": {
+          "title": "Traffic Limit Bytes",
+          "type": "integer"
+        },
+        "traffic_used_bytes": {
+          "title": "Traffic Used Bytes",
+          "type": "integer"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "uuid",
+        "status",
+        "traffic_used_bytes",
+        "traffic_limit_bytes",
+        "created_at",
+        "last_seen"
+      ],
+      "title": "ClientDetail",
+      "type": "object"
+    },
+    "ClientHandoff": {
+      "additionalProperties": false,
+      "description": "Availability metadata for client handoff links in redacted JSON.",
+      "properties": {
+        "redacted": {
+          "default": true,
+          "title": "Redacted",
+          "type": "boolean"
+        },
+        "share_available": {
+          "title": "Share Available",
+          "type": "boolean"
+        },
+        "subscription_available": {
+          "title": "Subscription Available",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "share_available",
+        "subscription_available"
+      ],
+      "title": "ClientHandoff",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for showing one client.",
+  "properties": {
+    "client": {
+      "$ref": "#/$defs/ClientDetail"
+    },
+    "handoff": {
+      "$ref": "#/$defs/ClientHandoff"
+    }
+  },
+  "required": [
+    "client",
+    "handoff"
+  ],
+  "title": "ClientShowResult",
+  "type": "object"
+}

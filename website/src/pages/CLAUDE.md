@@ -17,3 +17,4 @@
 
 - **Ping page CORS** — fetch tests may fail for CORS reasons even if server is reachable. Results need cautious interpretation.
 - **Build-time file reading** — `llms-full.txt.ts` reads fs. All markdown must exist before build.
+- **JS helpers in Astro frontmatter** — add an explicit boundary type before iterating helper results; otherwise `astro check` reports implicit `any`.

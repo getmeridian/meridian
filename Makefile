@@ -1,4 +1,4 @@
-.PHONY: help install sync test lint format check typecheck ci e2e system-lab \
+.PHONY: help install sync test lint format check typecheck ci system-lab-preflight system-lab system-lab-fast \
        templates ai-docs build publish clean hooks
 
 ## —— Setup ——————————————————————————————————————————————
@@ -41,14 +41,63 @@ templates: ## Validate Jinja2 template rendering
 
 ci: check templates ## Run full CI locally
 
-e2e: ## Run E2E provisioner tests in Docker (Linux only, needs docker socket)
-	docker compose -f tests/e2e/docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from e2e
-	docker compose -f tests/e2e/docker-compose.e2e.yml down -v
+system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
+	bash tests/systemlab/scripts/preflight.sh
 
-system-lab: ## Run multi-node system lab (Linux, privileged containers, ~20min)
+system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10min)
 	bash tests/systemlab/scripts/setup-fixtures.sh
-	docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
-	docker compose -f tests/systemlab/compose.yml down -v
+	@set -eu; \
+		cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
+		cleanup_on_exit() { \
+			status=$$?; trap - EXIT; cleanup_status=0; \
+			cleanup || cleanup_status=$$?; \
+			if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+			exit "$$cleanup_status"; \
+		}; \
+		trap cleanup_on_exit EXIT; \
+		cleanup; \
+		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
+
+system-lab-fast: system-lab-preflight ## Re-run system lab preserving cached images (~3-4min after first run)
+	bash tests/systemlab/scripts/setup-fixtures.sh
+	@set -eu; \
+		cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \
+		cleanup_on_exit() { \
+			status=$$?; trap - EXIT; cleanup_status=0; \
+			cleanup || cleanup_status=$$?; \
+			if [ "$$status" -ne 0 ]; then exit "$$status"; fi; \
+			exit "$$cleanup_status"; \
+		}; \
+		trap cleanup_on_exit EXIT; \
+		cleanup; \
+		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
+
+## —— Real-VM harness (LOCAL ONLY, costs real money) ————————————————
+
+real-lab: ## Provision Hetzner VM + verify + destroy (TOPO=single by default)
+	@if [ -z "$$HCLOUD_TOKEN" ]; then \
+		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
+	fi
+	@echo "  NOTE: this provisions a real VM and costs real money (~€0.01 for a full run)."
+	PYTHONUNBUFFERED=1 uv run python -m tests.realvm.orchestrator up $${TOPO:-single}
+
+real-lab-keep: ## Provision + verify, but DON'T auto-destroy (useful with TIER=interactive)
+	@if [ -z "$$HCLOUD_TOKEN" ]; then \
+		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
+	fi
+	PYTHONUNBUFFERED=1 uv run python -m tests.realvm.orchestrator up $${TOPO:-single} --keep
+
+real-lab-orphans: ## List harness-tagged VMs left behind in the Hetzner project
+	@if [ -z "$$HCLOUD_TOKEN" ]; then \
+		echo "  ✗ HCLOUD_TOKEN is not set."; exit 2; \
+	fi
+	uv run python -m tests.realvm.orchestrator orphans
+
+real-lab-down: ## Destroy ALL harness-tagged VMs in the project (orphan cleanup)
+	@if [ -z "$$HCLOUD_TOKEN" ]; then \
+		echo "  ✗ HCLOUD_TOKEN is not set."; exit 2; \
+	fi
+	uv run python -m tests.realvm.orchestrator down
 
 ## —— Build & Publish ————————————————————————————————————
 
@@ -64,8 +113,14 @@ ai-docs: ## Generate AI reference from human docs (strip frontmatter)
 		echo ""; \
 	done > src/meridian/data/ai-reference.md
 
-build: ai-docs ## Build wheel and sdist
+studio-assets: ## Build website assets bundled into `meridian studio`
+	cd website && pnpm run contracts:check && pnpm run build
+	cp VERSION website/dist/version
+	find website/dist -name .DS_Store -delete
+
+build: ai-docs studio-assets ## Build wheel and sdist
 	uv build
+	uv run python scripts/verify_package_assets.py dist/*.whl
 
 publish: build ## Publish to PyPI (requires trusted publisher or token)
 	uv publish

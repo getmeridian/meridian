@@ -26,7 +26,9 @@ REALITY_URL = (
 )
 XHTTP_URL = "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=tls&type=xhttp#Test-XHTTP"
 WSS_URL = "vless://660e8400-e29b-41d4-a716-446655440000@example.com:443?security=tls&type=ws#Test-WSS"
-RELAY_URL = "vless://550e8400-e29b-41d4-a716-446655440000@10.0.0.1:443?security=reality&sni=www.example.com#Test-Relay"
+RELAY_URL = (
+    "vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=reality&sni=www.example.com#Test-Relay"
+)
 
 
 @pytest.fixture()
@@ -41,7 +43,7 @@ def protocol_urls() -> list[ProtocolURL]:
 def relay_entries() -> list[RelayURLSet]:
     return [
         RelayURLSet(
-            relay_ip="10.0.0.1",
+            relay_ip="203.0.113.10",
             relay_name="ru-moscow",
             urls=[ProtocolURL(key="reality", label="Primary (via relay)", url=RELAY_URL, qr_b64="cmVsYXk=")],
         ),
@@ -87,7 +89,7 @@ class TestRenderConfigJson:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
         assert len(result["relays"]) == 1
         assert result["relays"][0]["name"] == "ru-moscow"
-        assert result["relays"][0]["ip"] == "10.0.0.1"
+        assert result["relays"][0]["ip"] == "203.0.113.10"
 
     def test_client_name(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1", client_name="alice"))
@@ -153,7 +155,7 @@ class TestRenderSubscription:
         lines = decoded.strip().split("\n")
         # 1 relay + 2 direct = 3
         assert len(lines) == 3
-        assert "10.0.0.1" in lines[0]  # relay URL comes first
+        assert "203.0.113.10" in lines[0]  # relay URL comes first
 
     def test_relay_urls_first(
         self,
@@ -163,7 +165,7 @@ class TestRenderSubscription:
         result = render_subscription(protocol_urls, relay_entries=relay_entries)
         decoded = base64.b64decode(result).decode()
         lines = decoded.strip().split("\n")
-        assert "10.0.0.1" in lines[0]
+        assert "203.0.113.10" in lines[0]
 
     def test_empty_urls(self) -> None:
         result = render_subscription([])
@@ -373,6 +375,32 @@ class TestPWAAppsSync:
         json_links = {a["name"]: a.get("deeplink") for a in apps_json}
         pwa_links = {a["name"]: a.get("deeplink") for a in _PWA_APPS}
         assert json_links == pwa_links, f"Deeplink mismatch:\n  apps.json: {json_links}\n  _PWA_APPS: {pwa_links}"
+
+    def test_protocols_field_present(self) -> None:
+        """Every app must have a protocols array."""
+        for app in _PWA_APPS:
+            assert "protocols" in app, f"{app['name']} missing protocols field"
+            assert isinstance(app["protocols"], list), f"{app['name']} protocols must be a list"
+            assert len(app["protocols"]) >= 1, f"{app['name']} protocols must not be empty"
+
+    def test_protocols_values_valid(self) -> None:
+        """Protocol values must be from the known set."""
+        valid = {"reality", "xhttp", "wss"}
+        for app in _PWA_APPS:
+            for proto in app.get("protocols", []):
+                assert proto in valid, f"{app['name']} has unknown protocol {proto!r}"
+
+    def test_protocols_sync_with_apps_json(self) -> None:
+        """Protocol values in _PWA_APPS must match apps.json."""
+        repo_root = Path(__file__).resolve().parent.parent
+        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
+        with open(apps_json_path) as f:
+            apps_json = json.load(f)
+        json_protocols = {a["name"]: a.get("protocols") for a in apps_json}
+        pwa_protocols = {a["name"]: a.get("protocols") for a in _PWA_APPS}
+        assert json_protocols == pwa_protocols, (
+            f"Protocols mismatch:\n  apps.json: {json_protocols}\n  _PWA_APPS: {pwa_protocols}"
+        )
 
 
 # ---------------------------------------------------------------------------

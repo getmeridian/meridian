@@ -1,7 +1,6 @@
 """Uninstall provisioning steps.
 
-Replaces playbook-uninstall.yml. Removes proxy components but leaves
-Docker engine and system packages intact.
+Removes proxy components but leaves Docker engine and system packages intact.
 """
 
 from __future__ import annotations
@@ -13,11 +12,11 @@ from meridian.ssh import ServerConnection
 class Uninstall:
     """Remove all Meridian proxy components from the server.
 
-    Removes: 3x-ui container+image, /opt/3x-ui, nginx Meridian configs,
-    TLS certificates, web files, cron jobs, server credentials,
-    CLI symlink, UFW rules.
+    Removes: Remnawave containers (panel, node, db, redis), Docker volumes,
+    nginx Meridian configs, TLS certificates, web files, cron jobs,
+    server credentials, CLI symlink, UFW rules.
 
-    Also cleans up legacy HAProxy + Caddy configs from older deployments.
+    Also cleans up HAProxy/Caddy configs from earlier Meridian deployments.
 
     Does NOT remove: Docker engine, system packages, SSH settings.
     """
@@ -26,12 +25,21 @@ class Uninstall:
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         commands = [
-            # 3x-ui container and data
-            "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
-            "rm -rf /opt/3x-ui",
+            # Remnawave panel stack (backend + PostgreSQL + Valkey)
+            "cd /opt/remnawave && docker compose down --rmi all -v 2>/dev/null; true",
+            "rm -rf /opt/remnawave",
+            # Remnawave node
+            "cd /opt/remnanode && docker compose down --rmi all -v 2>/dev/null; true",
+            "rm -rf /opt/remnanode",
+            # Realm transparent relay
+            "systemctl stop meridian-relay 2>/dev/null; systemctl disable meridian-relay 2>/dev/null; true",
+            "rm -f /etc/systemd/system/meridian-relay.service /usr/local/bin/realm /etc/meridian/realm.toml",
+            # Docker volumes (may remain after compose down)
+            "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
             # nginx (+ systemd restart override)
             "systemctl stop nginx 2>/dev/null; systemctl disable nginx 2>/dev/null; true",
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",
+            "rm -rf /etc/nginx/stream.d/relay-maps",
             "rm -rf /etc/systemd/system/nginx.service.d",
             # TLS certificates
             "rm -rf /etc/ssl/meridian",
@@ -58,7 +66,7 @@ class Uninstall:
             "rm -rf /etc/meridian /root/meridian",
             # CLI symlink
             "rm -f /usr/local/bin/meridian",
-            # Systemd daemon-reload after removing overrides
+            # Systemd daemon-reload after removing units and overrides
             "systemctl daemon-reload 2>/dev/null; true",
             # UFW rules
             "ufw delete allow 443/tcp 2>/dev/null; true",
@@ -66,10 +74,6 @@ class Uninstall:
             # fail2ban
             "systemctl stop fail2ban 2>/dev/null; systemctl disable fail2ban 2>/dev/null; true",
         ]
-
-        # XHTTP port cleanup
-        if ctx.xhttp_port:
-            commands.append(f"ufw delete allow {ctx.xhttp_port}/tcp 2>/dev/null; true")
 
         errors = []
         for cmd in commands:

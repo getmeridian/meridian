@@ -8,10 +8,11 @@ section: reference
 ## Technology stack
 
 - **VLESS+Reality** (Xray-core) — proxy protocol that impersonates a legitimate TLS website. Censors probing the server see a real certificate (e.g., from microsoft.com). Only clients with the correct private key can connect.
-- **3x-ui** — web panel for managing Xray, deployed as a Docker container. Meridian controls it entirely via REST API.
-- **nginx** — single-process web server handling both SNI routing and TLS. The stream module listens on port 443 and routes traffic by SNI hostname without terminating TLS. The http module on port 8443 terminates TLS, serves connection pages, reverse-proxies the panel, and proxies XHTTP/WSS traffic to Xray. Certificates are managed by acme.sh (Let's Encrypt IP certificate via ACME `shortlived` profile in standalone mode, domain certificate in domain mode).
-- **Docker** — runs 3x-ui (which contains Xray). All proxy traffic flows through the container.
-- **Pure-Python provisioner** — `src/meridian/provision/` executes deployment steps via SSH. Each step gets `(conn, ctx)` and returns a `StepResult`.
+- **Hysteria2** (Xray-core) — UDP/443 fallback for lossy or high-latency networks. Subscription ordering keeps the TCP transports first.
+- **Remnawave** — modern panel stack for Xray, deployed as separate `remnawave/backend`, `remnawave/node`, and `remnawave/subscription-page` Docker containers. Backend exposes a REST API (managed via the official `remnawave` Python SDK); node runs Xray in `network_mode: host`; subscription-page serves per-user config URLs.
+- **nginx** — single-process web server handling both SNI routing and TLS. The stream module listens on port 443 and routes traffic by SNI hostname without terminating TLS. The http module on port 8443 terminates TLS, serves connection pages, reverse-proxies the Remnawave admin UI + subscription page, and proxies XHTTP/WSS traffic to Xray. Certificates are managed by [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt).
+- **Docker** — runs Remnawave backend + PostgreSQL + Valkey (panel host only), Remnawave node (every exit node), and Remnawave subscription-page (panel host, optional).
+- **Pure-Python provisioner** — `src/meridian/provision/` executes deployment steps via SSH. Each step gets `(conn, ctx)` and returns a `StepResult`. The `StepRenderer` protocol in `progress.py` decouples step execution from Rich rendering, keeping `steps.py` free of display imports.
 - **uTLS** — impersonates Chrome's TLS Client Hello fingerprint, making connections indistinguishable from real browser traffic.
 
 ## Service topology
@@ -21,17 +22,18 @@ section: reference
 ```mermaid
 flowchart TD
     Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
+    Nginx -->|"SNI = reality_sni"| XrayReal["Xray Reality<br>node host network"]
     Nginx -->|"SNI = server IP"| NginxHTTP["nginx http<br>:8443"]
     NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
+    NginxHTTP -->|/secret-path| Panel[Remnawave Admin UI<br>backend :3000]
+    NginxHTTP -->|/sub-path| SubPage[Remnawave Subscription Page<br>:3020]
     NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
     Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
 nginx stream **does not** terminate TLS. It reads the SNI hostname from the TLS Client Hello and forwards the raw TCP stream to the appropriate backend.
 
-acme.sh requests a Let's Encrypt IP certificate via the ACME `shortlived` profile (6-day validity, auto-renewed). Falls back to self-signed if IP cert issuance is not supported.
+acme.sh requests a Let's Encrypt IP certificate (6-day shortlived profile, auto-renewed). Provisioning stops if a trusted certificate cannot be issued; Meridian never sends panel credentials over the temporary self-signed bootstrap certificate.
 
 XHTTP runs on a localhost-only port and is reverse-proxied by nginx — no extra external port exposed.
 
@@ -40,17 +42,18 @@ XHTTP runs on a localhost-only port and is reverse-proxied by nginx — no extra
 ```mermaid
 flowchart TD
     Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
+    Nginx -->|"SNI = reality_sni"| XrayReal["Xray Reality<br>node host network"]
     Nginx -->|"SNI = domain"| NginxHTTP["nginx http<br>:8443"]
     NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
+    NginxHTTP -->|/secret-path| Panel[Remnawave Admin UI<br>backend :3000]
+    NginxHTTP -->|/sub-path| SubPage[Remnawave Subscription Page<br>:3020]
     NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
     NginxHTTP -->|/ws-path| XrayWSS["Xray WSS<br>localhost"]
     Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
     Internet -.->|"CDN (Cloudflare)"| NginxHTTP
 ```
 
-Domain mode adds VLESS+WSS as a CDN fallback path. Traffic flows through Cloudflare's CDN via WebSocket, making the connection work even if the server's IP is blocked.
+Domain mode adds VLESS+WSS as a legacy CDN fallback path. WSS is maintained for backward compatibility with Cloudflare CDN deployments; new deployments should prefer XHTTP as the secondary transport. Traffic flows through Cloudflare's CDN via WebSocket, making the connection work even if the server's IP is blocked.
 
 ### Relay topology
 
@@ -63,6 +66,11 @@ flowchart LR
 
 A relay node is a lightweight TCP forwarder running [Realm](https://github.com/zhboner/realm). The client connects to the relay's domestic IP, which forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext.
 
+The current CLI stores nodes and relays separately, but the core contract
+direction is capabilities plus routing policy. A single server can have both
+relay and exit capability; for example, a regional RU server can be the relay
+entry and also the exit for RU-destination traffic.
+
 ## How Reality protocol works
 
 1. Server generates an **x25519 keypair**. Public key is shared with clients, private key stays on server.
@@ -72,132 +80,145 @@ A relay node is a lightweight TCP forwarder running [Realm](https://github.com/z
 5. If the client includes valid authentication (derived from the x25519 key), the server establishes the VLESS tunnel.
 6. **uTLS** makes the Client Hello byte-for-byte identical to Chrome's, defeating TLS fingerprinting.
 
-## Docker container structure
+## Declarative state model
 
-The `3x-ui` Docker container contains:
-- **3x-ui web panel** — REST API on port 2053 (internal)
-- **Xray binary** at `/app/bin/xray-linux-*` (architecture-dependent path)
-- **Database** at `/etc/x-ui/x-ui.db` (SQLite, stores inbound configs and clients)
-- **Xray config** managed by 3x-ui (not a static file)
+Meridian stores every fleet detail in a single `cluster.yml` at `~/.meridian/cluster.yml`:
 
-Meridian manages 3x-ui entirely via its REST API:
-- `POST /login` — authenticate (form-urlencoded, returns session cookie)
-- `POST /panel/api/inbounds/add` — create VLESS inbound
-- `GET /panel/api/inbounds/list` — list inbounds (check before creating)
-- `POST /panel/setting/update` — configure panel settings
-- `POST /panel/setting/updateUser` — change panel credentials
+- **V4 desired state** — `topology_intent` records control, exits, routing chains, protocol paths, and access users. `meridian setup` edits it; the compiler produces the resources that `plan` and `apply` reconcile.
+- **Observed/legacy state** — `panel`, `nodes[]`, `relays[]`, `inbounds{}`, and branding retain deployed metadata. Legacy clusters may also opt into `desired_nodes[]`, `desired_relays[]`, `desired_clients[]`, and `subscription_page`; those fields are not V4 authority.
 
-## Management panel (3x-ui)
+Remnawave's own state (users, hosts, config profile, internal squads) lives in its PostgreSQL database on the panel host. Meridian reads and writes that state through the official REST API using the pinned `remnawave` Python SDK. The panel database is the source of truth for clients; `cluster.yml` is the source of truth for fleet topology.
 
-Meridian uses [3x-ui](https://github.com/MHSanaei/3x-ui) as its management panel for Xray. While the CLI handles everything automatically, you can also access the web panel directly for monitoring and advanced configuration.
+## Meridian Studio and local Engine
 
-### How to access
+Static Studio consumes generated contracts and can build request files without a
+local process. Executable Studio starts with `meridian studio`, binds a FastAPI
+Engine to `127.0.0.1`, and exposes only narrow typed endpoints for contract
+discovery, saved server reads, server setup, SSH validation, one-time
+password-assisted key bootstrap, and deploy dry-runs. SSH, filesystem, secrets,
+operations, and cancellation stay behind that localhost Engine rather than
+running in the browser.
 
-The panel is reverse-proxied by nginx at a randomized secret HTTPS path — no SSH tunnel needed. Find the URL and credentials in your local credentials file:
+## Docker container layout
 
-```
-cat ~/.meridian/credentials/<IP>/proxy.yml
-```
+**On the panel host** (the first `meridian deploy` target):
+- `remnawave` (backend) — NestJS API on `127.0.0.1:3000`, reverse-proxied at `/<panel.secret_path>/`
+- `remnawave-db` — PostgreSQL storing users, hosts, inbounds
+- `remnawave-redis` — Valkey cache (Redis-compatible fork; container keeps the legacy `redis` name for client-library compatibility)
+- `remnawave-subscription-page` — subscription frontend, container-internal port 3010, remapped to `127.0.0.1:3020` on the host to avoid colliding with the node API on the same machine; reverse-proxied at `/<subscription_page.path>/`
+- `remnawave-node` — Xray runner in `network_mode: host` with `cap_add: NET_ADMIN` (required by panel 2.6.2+ for plugins and IP Control)
 
-Look for the `panel` section:
+**On non-panel nodes** (every `meridian node add` target):
+- `remnawave-node` only — registered against the panel's API via a per-node secret key
 
-```yaml
-panel:
-  username: a1b2c3d4e5f6
-  password: Xk9mP2qR7vW4nL8jF3hT6yBs
-  web_base_path: n7kx2m9qp4wj8vh3rf6tby5e
-  port: 2053
-```
+All panel + subscription images are pinned in `src/meridian/config.py` and kept in lockstep with the SDK.
 
-The panel URL is:
+## Panel API surface used by Meridian
 
-```
-https://<your-server-ip>/n7kx2m9qp4wj8vh3rf6tby5e/
-```
+Meridian talks to Remnawave mostly through the official SDK (`remnawave` v2.8.0). A few bootstrap and fallback paths — initial admin registration, API-token creation, and endpoints not yet covered by the SDK — use raw `httpx` against the panel URL. Surfaces used:
 
-### What you can do
+- **Users** — `create_user`, `get_user`, `delete_user`, `list_users`, `enable_user`, `disable_user` (client CRUD)
+- **Hosts** — `create_host`, `list_hosts`, `enable_host`, `disable_host`, `delete_host` (per-inbound endpoints shown in subscription URLs)
+- **Nodes** — `create_node`, `list_nodes`, `disable_node`, `delete_node`, `update_node_name`, plus the node secret / mTLS keygen bundle
+- **Inbounds** — `list_inbounds`, `assign_inbounds_to_squad` (inbound ↔ squad wiring)
+- **Config profiles** — `create_config_profile`, `get_config_profile`, `update_xray_config` (available; used by future split-routing feature)
+- **Internal squads** — `list_internal_squads` (users grouped for host visibility)
 
-- **Monitor traffic** — per-client upload/download stats
-- **View inbounds** — see all configured VLESS protocols (Reality, XHTTP, WSS)
-- **Check Xray status** — verify the proxy engine is running
-- **Advanced config** — modify Xray settings directly (for power users)
+Reality x25519 keypairs are NOT fetched from the panel — Meridian generates them server-side on the node using the xray binary (`xray x25519`) and persists them in `cluster.yml` so they survive redeploy.
 
-### Important notes
+Admin UI is reverse-proxied by nginx at `/<panel.secret_path>/` on port 443 in all modes — no SSH tunnel needed.
 
-- The `web_base_path` is a random string — this is your panel's security. Don't share it.
-- All management via `meridian` CLI (adding clients, relay setup, etc.) uses this same panel API under the hood.
-- If you change settings in the panel directly, they may be overwritten on the next `meridian deploy`.
+## Drift and plan / apply
+
+Whenever an admin edits state directly in the Remnawave UI (e.g. adds a user, renames a host), the next `meridian plan` reads actual state from the panel, compares it against desired state (`cluster.yml`), and emits the diff as typed `PlanAction` objects. `meridian apply` executes them, calling the same SDK surfaces; `meridian apply --json` returns typed per-action execution results for process/UI clients.
+
+`meridian apply` snapshots desired state into `cluster.applied_state` (a typed `AppliedState` dataclass) after every successful run. The next plan uses that snapshot to distinguish intentional removals (was in last-applied) from drift (was never applied). This mirrors Terraform's state-tracking behaviour.
 
 ## nginx configuration pattern
 
-Meridian writes to `/etc/nginx/conf.d/meridian-stream.conf` and `/etc/nginx/conf.d/meridian-http.conf` (never the main nginx.conf). This allows Meridian to coexist with user's own nginx configuration.
+Meridian writes stream routing to `/etc/nginx/stream.d/meridian.conf` and HTTP routing to `/etc/nginx/conf.d/meridian-http.conf`. If needed, it appends one `stream` include block to the main `nginx.conf`.
 
 nginx handles:
 - SNI routing on port 443 (stream module, no TLS termination)
 - TLS termination on port 8443 (http module, certificates managed by acme.sh)
-- Reverse proxy for the 3x-ui panel (at a random web base path)
+- Reverse proxy for the Remnawave admin UI (`/<panel.secret_path>/` → `127.0.0.1:3000`)
+- Reverse proxy for the Remnawave subscription page (`/<subscription_page.path>/` → `127.0.0.1:3020`)
 - Connection info page serving (hosted pages with shareable URLs)
 - Reverse proxy for XHTTP traffic to Xray (path-based routing, all modes when XHTTP enabled)
 - Reverse proxy for WSS traffic to Xray (domain mode only)
 
 ## Port assignments
 
-| Port | Service | Mode |
-|------|---------|------|
-| 443 | nginx stream (SNI router) | All |
-| 80 | nginx (ACME challenges) | All |
-| 10443 | Xray Reality (internal) | All |
-| 8443 | nginx http (internal) | All |
-| localhost | Xray XHTTP | When XHTTP enabled |
-| localhost | Xray WSS | Domain mode |
-| 2053 | 3x-ui panel (internal) | All |
+| Port | Service | Scope |
+|------|---------|-------|
+| 443/TCP | nginx stream (SNI router) | Public |
+| 443/UDP | Xray Hysteria2 fallback | Public |
+| 80 | nginx (ACME challenges) | Public |
+| 8443 | nginx http (internal terminus) | Internal |
+| 3000 | Remnawave backend (admin UI + API) | localhost |
+| 3010 | Remnawave node API | host network |
+| 3020 | Remnawave subscription page | localhost |
+| 10000-10999 | Xray Reality (per-node deterministic) | host network |
+| 20000-29999 | Xray WSS (domain mode, per-node) | host network |
+| 30000-39999 | Xray XHTTP (per-node deterministic) | host network |
+| 5432 | PostgreSQL (Remnawave DB) | internal Docker network |
 
-XHTTP and WSS ports are localhost-only — nginx reverse-proxies to them on port 443.
+XHTTP, WSS, and Reality backend ports use the node container's host network but are blocked from the public internet by UFW. Hysteria2 listens directly on public UDP/443; nginx handles public TCP/443.
 
 ## Provisioning pipeline
 
-Steps execute sequentially via `build_setup_steps()`. Each step gets `(conn, ctx)` and returns a `StepResult`.
+Steps execute sequentially via `build_setup_steps()` (panel host) or `build_node_steps()` (node-only, used for redeploys and `meridian node add`). Each step gets `(conn, ctx)` and returns a `StepResult`.
 
 | # | Step | Module | Purpose |
 |---|------|--------|---------|
-| 1 | InstallPackages | `common.py` | OS packages |
-| 2 | EnableAutoUpgrades | `common.py` | Unattended upgrades |
-| 3 | SetTimezone | `common.py` | UTC |
-| 4 | HardenSSH | `common.py` | Key-only auth |
-| 5 | ConfigureBBR | `common.py` | TCP congestion control |
-| 6 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 |
-| 7 | InstallDocker | `docker.py` | Docker CE |
-| 8 | Deploy3xui | `docker.py` | 3x-ui container |
-| 9 | ConfigurePanel | `panel.py` | Panel credentials |
-| 10 | LoginToPanel | `panel.py` | API auth |
-| 11 | CreateRealityInbound | `xray.py` | VLESS+Reality |
-| 12 | CreateXHTTPInbound | `xray.py` | VLESS+XHTTP |
-| 13 | CreateWSSInbound | `xray.py` | VLESS+WSS (domain) |
-| 14 | VerifyXray | `xray.py` | Health check |
-| 15 | InstallNginx | `services.py` | SNI routing + TLS + reverse proxy |
-| 16 | DeployConnectionPage | `services.py` | QR codes + page |
+| 1 | CheckDiskSpace | `common.py` | Preflight |
+| 2 | InstallPackages | `common.py` | OS packages (+fail2ban when hardening) |
+| 3 | EnableAutoUpgrades | `common.py` | Unattended upgrades |
+| 4 | SetTimezone | `common.py` | UTC |
+| 5 | HardenSSH | `common.py` | Key-only auth (when hardening) |
+| 6 | ConfigureFail2ban | `common.py` | sshd brute-force jail (when hardening) |
+| 7 | ConfigureBBR | `common.py` | TCP congestion control |
+| 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 (when hardening) |
+| 9 | InstallDocker | `docker.py` | Docker CE |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + subscription-page |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP (optional) |
+| 12 | InstallNginx | `nginx.py` | SNI routing + TLS + reverse proxy |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | nginx config for IP or domain mode |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | PWA connection page assets |
+
+After the provisioner pipeline, `configure_panel_and_node` in `panel_bootstrap.py` uses the Remnawave REST API to register inbounds, create the node container, assign hosts, and create the default client. Node container deployment, host creation, and inbound caching helpers live in `node_deploy.py`. The node container is NOT part of the SSH pipeline because it requires a panel-issued secret key.
+
+## Parallel provisioning
+
+Legacy `meridian apply` can provision independent nodes concurrently via `ThreadPoolExecutor` (`--parallel N`, range 1–32, default 4). Each worker gets its own `MeridianPanel` SDK instance; the underlying httpx client and the per-thread asyncio event loop are isolated via `threading.local()`. `cluster.save()` is protected by an `RLock` so parallel snapshots serialize cleanly. V4 applies the compiled resource graph and rejects a non-default `--parallel` value.
 
 ## Credential lifecycle
 
-1. **Generate**: random credentials (panel password, x25519 keys, client UUID)
-2. **Save locally**: `~/.meridian/credentials/<IP>/proxy.yml` — saved BEFORE applying to server
-3. **Apply**: panel password changed, inbounds created
-4. **Sync**: credentials copied to `/etc/meridian/proxy.yml` on server
-5. **Re-runs**: loaded from cache, not regenerated (idempotent)
-6. **Cross-machine**: `meridian server add IP` fetches from server via SSH
-7. **Uninstall**: deleted from both server and local machine
+1. **Generate**: random credentials (panel password, JWT secrets, PostgreSQL password, node secret key, Reality x25519 keypair per node, client UUIDs)
+2. **Save locally**: `~/.meridian/cluster.yml` — saved immediately before API/SSH operations so a crashed deploy can resume
+3. **Apply**: panel + node containers brought up, inbounds and hosts created via REST API
+4. **Sync**: Remnawave panel database (Postgres) and `cluster.yml` both hold the canonical state; drift is reported by `meridian plan`
+5. **Re-runs**: Reality keys and client UUIDs are preserved across redeploys (the panel refuses to regenerate when they exist)
+6. **Legacy recovery**: `meridian fleet recover --legacy --panel-url URL` imports one unambiguous legacy profile; domain panel URLs also require `--panel-server PUBLIC_IP`. The token comes from a secure prompt, environment, or mode-600 file. V4 topology intent cannot be reconstructed from the panel — restore a backup or rerun `meridian setup`
+7. **Uninstall**: `meridian teardown <IP>` first rejects V4 references and panel-host dependencies, then removes owned remote artifacts. Successful panel-host teardown unlinks the local cluster configuration; non-panel targets retain the remaining fleet state.
 
 ## File locations
 
-### On the server
-- `/etc/meridian/proxy.yml` — credentials and client list
-- `/etc/nginx/conf.d/meridian-stream.conf` — nginx stream config (SNI routing)
+### On the panel host
+- `/opt/remnawave/` — panel compose file + `.env` + subscription page `.env`
+- `/opt/remnawave/data/` — PostgreSQL data volume
+- `/etc/nginx/stream.d/meridian.conf` — nginx stream config (SNI routing)
 - `/etc/nginx/conf.d/meridian-http.conf` — nginx http config (TLS, reverse proxy)
 - `/etc/ssl/meridian/` — TLS certificates (managed by acme.sh)
-- Docker container `3x-ui` — Xray + panel
 
-### On the local machine
-- `~/.meridian/credentials/<IP>/` — cached credentials per server
-- `~/.meridian/servers` — server registry
+### On each node
+- `/opt/remnanode/` — node compose file + `.env`
+
+### On the local (deployer) machine
+- `~/.meridian/cluster.yml` — fleet state (panel creds, nodes, relays, desired state)
+- `~/.meridian/cluster.yml.bak` — automatic backup before destructive operations
+- `~/.meridian/servers.json` — saved SSH server profiles
+- `~/.meridian/ssh/meridian_ed25519` — managed SSH key, when generated
 - `~/.meridian/cache/` — update check throttle cache
 - `~/.local/bin/meridian` — CLI entry point (installed via uv/pipx)

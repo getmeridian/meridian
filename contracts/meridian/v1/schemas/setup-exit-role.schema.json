@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "description": "One saved server assigned an exit workload ID.",
+  "properties": {
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "region": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    },
+    "warp": {
+      "default": false,
+      "title": "Warp",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "server_ref"
+  ],
+  "title": "SetupExitRole",
+  "type": "object"
+}

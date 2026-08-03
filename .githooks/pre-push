@@ -42,28 +42,14 @@ check "CHANGELOG has VERSION entry" bash -c '
     grep -q "## \[$VERSION\]" CHANGELOG.md
 '
 
-check "App links match (template ↔ apps.json)" python3 -c "
-import json, re, sys
-def extract_template(p):
-    return sorted(set(re.findall(r'https://(?:play\.google\.com|apps\.apple\.com|github\.com/\S+/releases)[^\s\"<]*', open(p).read())))
-def extract_json(p):
-    return sorted(set(item['url'] for item in json.load(open(p)) if re.match(r'https://(?:play\.google\.com|apps\.apple\.com|github\.com/)', item['url'])))
-t = extract_template('src/meridian/templates/connection-info.html.j2')
-d = extract_json('website/src/data/apps.json')
-if t != d:
-    print(f'Template: {t}')
-    print(f'Data:     {d}')
-    sys.exit(1)
-"
+check "PWA app metadata matches apps.json" python3 tests/validate_apps_sync.py
 
 # --- Shell scripts ---
 
 if command -v shellcheck &>/dev/null; then
     check "shellcheck install.sh" shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
-    check "shellcheck setup.sh" shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning setup.sh
 else
     check "bash -n install.sh" bash -n install.sh
-    check "bash -n setup.sh" bash -n setup.sh
 fi
 
 # --- Python quality (requires uv + dev deps) ---
@@ -72,7 +58,7 @@ if command -v uv &>/dev/null; then
     check "ruff check" uv run ruff check src/ tests/
     check "ruff format" uv run ruff format --check src/ tests/
     check "mypy" uv run mypy src/meridian/
-    check "pytest" uv run pytest tests/ -q --tb=line --ignore=tests/test_integration_3xui.py
+    check "pytest" uv run pytest tests/ -q --tb=line
     check "templates render" uv run python tests/render_templates.py
 else
     echo "  ${DIM}(uv not found — skipping Python checks)${RESET}"

@@ -1,9 +1,8 @@
 """Protocol/inbound type definitions — single source of truth.
 
-Adding a new protocol (e.g., Hysteria2, TUIC) requires:
-1. Add an InboundType entry to INBOUND_TYPES
-2. Create a Protocol subclass below
-3. Add an entry to the PROTOCOLS dict (and PROTOCOL_ORDER list)
+Adding a new protocol requires:
+1. Create a Protocol subclass below
+2. Add an entry to the PROTOCOLS dict (and PROTOCOL_ORDER list)
 
 The rest of the system (client add/remove, output generation) will
 pick up the new protocol automatically via the registry.
@@ -12,12 +11,9 @@ pick up the new protocol automatically via the registry.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any
 
 from meridian.config import DEFAULT_FINGERPRINT, DEFAULT_SNI
-from meridian.credentials import ServerCredentials
-from meridian.models import Inbound
 
 
 def _bracket_ipv6(ip: str) -> str:
@@ -25,35 +21,6 @@ def _bracket_ipv6(ip: str) -> str:
     if ":" in ip and not ip.startswith("["):
         return f"[{ip}]"
     return ip
-
-
-@dataclass(frozen=True)
-class InboundType:
-    """Defines an inbound protocol type in 3x-ui."""
-
-    remark: str  # 3x-ui inbound remark (e.g., "VLESS-Reality")
-    email_prefix: str  # Client email prefix (e.g., "reality-")
-    flow: str  # Xray flow value (e.g., "xtls-rprx-vision")
-
-
-# Single source of truth for all inbound types.
-INBOUND_TYPES: dict[str, InboundType] = {
-    "reality": InboundType(
-        remark="VLESS-Reality",
-        email_prefix="reality-",
-        flow="xtls-rprx-vision",
-    ),
-    "wss": InboundType(
-        remark="VLESS-WSS",
-        email_prefix="wss-",
-        flow="",
-    ),
-    "xhttp": InboundType(
-        remark="VLESS-Reality-XHTTP",
-        email_prefix="xhttp-",
-        flow="",
-    ),
-}
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +33,6 @@ class Protocol(ABC):
 
     Each Protocol knows how to:
     - Build a connection URL for a given client UUID
-    - Build the 3x-ui addClient API body
-    - Determine if it's available on a server (by inspecting inbounds)
     """
 
     @property
@@ -75,22 +40,6 @@ class Protocol(ABC):
     def key(self) -> str:
         """Protocol key (e.g., 'reality', 'wss', 'xhttp')."""
         ...
-
-    @property
-    @abstractmethod
-    def inbound_type(self) -> InboundType:
-        """The inbound type definition."""
-        ...
-
-    @property
-    def remark(self) -> str:
-        """Convenience: the 3x-ui inbound remark for this protocol."""
-        return self.inbound_type.remark
-
-    @property
-    def email_prefix(self) -> str:
-        """Convenience: email prefix for client emails."""
-        return self.inbound_type.email_prefix
 
     @property
     def display_label(self) -> str:
@@ -111,38 +60,6 @@ class Protocol(ABC):
         """
         ...
 
-    def client_settings(self, uuid: str, email: str) -> dict[str, Any]:
-        """Build the client settings dict for the 3x-ui addClient API.
-
-        Returns a dict with 'clients' key containing a single-element list:
-            {"clients": [{"id": uuid, "flow": ..., "email": ..., ...}]}
-
-        Subclasses can override for protocol-specific fields.
-        """
-        return {
-            "clients": [
-                {
-                    "id": uuid,
-                    "flow": self.inbound_type.flow,
-                    "email": email,
-                    "limitIp": 2,
-                    "totalGB": 0,
-                    "expiryTime": 0,
-                    "enable": True,
-                    "tgId": "",
-                    "subId": "",
-                    "reset": 0,
-                }
-            ]
-        }
-
-    def find_inbound(self, inbounds: list[Inbound]) -> Inbound | None:
-        """Find this protocol's inbound in a list of panel inbounds."""
-        for ib in inbounds:
-            if ib.remark == self.remark:
-                return ib
-        return None
-
     @property
     def requires_domain(self) -> bool:
         """Whether this protocol requires a domain to function."""
@@ -152,7 +69,8 @@ class Protocol(ABC):
     def shares_uuid_with(self) -> str | None:
         """Key of another protocol this one shares a UUID with.
 
-        For example, XHTTP shares the Reality UUID.
+        XHTTP shares the Reality UUID for Xray inbound routing, but uses
+        standard TLS (nginx-terminated), not Reality security.
         None means this protocol uses its own UUID.
         """
         return None
@@ -167,53 +85,6 @@ class Protocol(ABC):
         base = f"{name} @ {server_name}" if server_name else name
         return f"#{base}{extra_suffix}{self.url_suffix}"
 
-    def _resolve_uuid(self, reality_uuid: str, wss_uuid: str) -> str:
-        """Pick the correct UUID for this protocol.
-
-        Reality and protocols sharing Reality's UUID use reality_uuid.
-        Protocols with their own UUID (like WSS) use wss_uuid.
-        """
-        if self.key == "reality" or self.shares_uuid_with is not None:
-            return reality_uuid
-        return wss_uuid
-
-    def build_url_from_creds(
-        self,
-        reality_uuid: str,
-        wss_uuid: str,
-        creds: ServerCredentials,
-        name: str,
-        *,
-        server_name: str = "",
-    ) -> str:
-        """Build a connection URL using server credentials.
-
-        Each subclass extracts its own parameters from creds and delegates
-        to build_url(). Returns empty string if required data is missing
-        (e.g., WSS without a domain, XHTTP without a path).
-        """
-        return ""
-
-    def build_relay_url(
-        self,
-        reality_uuid: str,
-        wss_uuid: str,
-        creds: ServerCredentials,
-        name: str,
-        relay_ip: str,
-        relay_port: int = 443,
-        *,
-        relay_sni: str = "",
-        relay_name: str = "",
-        server_name: str = "",
-    ) -> str:
-        """Build a connection URL routed through a relay node.
-
-        Relay URLs substitute the relay's IP/port for the exit server's.
-        Returns empty string if the protocol is not available.
-        """
-        return ""
-
 
 class RealityProtocol(Protocol):
     """VLESS + Reality + TCP — primary protocol, always present."""
@@ -221,10 +92,6 @@ class RealityProtocol(Protocol):
     @property
     def key(self) -> str:
         return "reality"
-
-    @property
-    def inbound_type(self) -> InboundType:
-        return INBOUND_TYPES["reality"]
 
     @property
     def display_label(self) -> str:
@@ -249,49 +116,6 @@ class RealityProtocol(Protocol):
             f"{fragment}"
         )
 
-    def build_url_from_creds(
-        self, reality_uuid: str, wss_uuid: str, creds: ServerCredentials, name: str, *, server_name: str = ""
-    ) -> str:
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        return self.build_url(
-            uuid,
-            name,
-            ip=creds.server.ip or "",
-            sni=creds.server.sni or DEFAULT_SNI,
-            public_key=creds.reality.public_key or "",
-            short_id=creds.reality.short_id or "",
-            encryption=creds.reality.encryption_key or "none",
-            server_name=server_name,
-        )
-
-    def build_relay_url(
-        self,
-        reality_uuid: str,
-        wss_uuid: str,
-        creds: ServerCredentials,
-        name: str,
-        relay_ip: str,
-        relay_port: int = 443,
-        *,
-        relay_sni: str = "",
-        relay_name: str = "",
-        server_name: str = "",
-    ) -> str:
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        via = f"-via-{relay_name}" if relay_name else f"-via-{relay_ip}"
-        return self.build_url(
-            uuid,
-            name,
-            ip=relay_ip,
-            port=relay_port,
-            sni=relay_sni or creds.server.sni or DEFAULT_SNI,
-            public_key=creds.reality.public_key or "",
-            short_id=creds.reality.short_id or "",
-            encryption=creds.reality.encryption_key or "none",
-            server_name=server_name,
-            extra_suffix=via,
-        )
-
 
 class XHTTPProtocol(Protocol):
     """VLESS + XHTTP — enhanced stealth transport behind nginx."""
@@ -299,10 +123,6 @@ class XHTTPProtocol(Protocol):
     @property
     def key(self) -> str:
         return "xhttp"
-
-    @property
-    def inbound_type(self) -> InboundType:
-        return INBOUND_TYPES["xhttp"]
 
     @property
     def display_label(self) -> str:
@@ -334,53 +154,6 @@ class XHTTPProtocol(Protocol):
             f"&type=xhttp&path=%2F{xhttp_path}{fragment}"
         )
 
-    def build_url_from_creds(
-        self, reality_uuid: str, wss_uuid: str, creds: ServerCredentials, name: str, *, server_name: str = ""
-    ) -> str:
-        xhttp_path = creds.xhttp.xhttp_path or ""
-        if not xhttp_path:
-            return ""
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        return self.build_url(
-            uuid,
-            name,
-            ip=creds.server.ip or "",
-            xhttp_path=xhttp_path,
-            domain=creds.server.domain or "",
-            server_name=server_name,
-        )
-
-    def build_relay_url(
-        self,
-        reality_uuid: str,
-        wss_uuid: str,
-        creds: ServerCredentials,
-        name: str,
-        relay_ip: str,
-        relay_port: int = 443,
-        *,
-        relay_sni: str = "",
-        relay_name: str = "",
-        server_name: str = "",
-    ) -> str:
-        xhttp_path = creds.xhttp.xhttp_path or ""
-        if not xhttp_path:
-            return ""
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        via = f"-via-{relay_name}" if relay_name else f"-via-{relay_ip}"
-        return self.build_url(
-            uuid,
-            name,
-            ip=creds.server.ip or "",
-            port=relay_port,
-            xhttp_path=xhttp_path,
-            domain=creds.server.domain or "",
-            sni=relay_sni,
-            connect_host=_bracket_ipv6(relay_ip),
-            server_name=server_name,
-            extra_suffix=via,
-        )
-
 
 class WSSProtocol(Protocol):
     """VLESS + WSS — CDN fallback via nginx/Cloudflare."""
@@ -388,10 +161,6 @@ class WSSProtocol(Protocol):
     @property
     def key(self) -> str:
         return "wss"
-
-    @property
-    def inbound_type(self) -> InboundType:
-        return INBOUND_TYPES["wss"]
 
     @property
     def display_label(self) -> str:
@@ -422,51 +191,42 @@ class WSSProtocol(Protocol):
             f"{fragment}"
         )
 
-    def build_url_from_creds(
-        self, reality_uuid: str, wss_uuid: str, creds: ServerCredentials, name: str, *, server_name: str = ""
-    ) -> str:
-        domain = creds.server.domain or ""
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        if not domain or not uuid:
-            return ""
-        return self.build_url(
-            uuid,
-            name,
-            domain=domain,
-            ws_path=creds.wss.ws_path or "",
-            server_name=server_name,
-        )
 
-    def build_relay_url(
-        self,
-        reality_uuid: str,
-        wss_uuid: str,
-        creds: ServerCredentials,
-        name: str,
-        relay_ip: str,
-        relay_port: int = 443,
-        *,
-        relay_sni: str = "",
-        relay_name: str = "",
-        server_name: str = "",
-    ) -> str:
-        domain = creds.server.domain or ""
-        uuid = self._resolve_uuid(reality_uuid, wss_uuid)
-        ws_path = creds.wss.ws_path or ""
-        if not domain or not uuid or not ws_path:
-            return ""
-        via = f"-via-{relay_name}" if relay_name else f"-via-{relay_ip}"
-        return self.build_url(
-            uuid,
-            name,
-            domain=domain,
-            port=relay_port,
-            ws_path=ws_path,
-            sni=relay_sni,
-            connect_host=relay_ip,
-            server_name=server_name,
-            extra_suffix=via,
-        )
+class Hysteria2Protocol(Protocol):
+    """Hysteria2 UDP/443 fallback for lossy or high-latency networks.
+
+    Uses QUIC/UDP on port 443, coexisting with TCP/443 (nginx/Reality/XHTTP).
+    Subscription ordering keeps TCP transports ahead of this UDP fallback.
+    """
+
+    @property
+    def key(self) -> str:
+        return "hysteria2"
+
+    @property
+    def display_label(self) -> str:
+        return "UDP fallback"
+
+    @property
+    def requires_domain(self) -> bool:
+        return False
+
+    @property
+    def url_suffix(self) -> str:
+        return "-HY2"
+
+    def build_url(self, uuid: str, name: str, **kwargs: Any) -> str:
+        ip = kwargs["ip"]
+        port = kwargs.get("port", 443)
+        sni = kwargs.get("sni", "")
+        extra_suffix = kwargs.get("extra_suffix", "")
+        fragment = self._build_fragment(name, kwargs.get("server_name", ""), extra_suffix)
+        # insecure=1 only when connecting by IP (cert won't match SNI);
+        # when a domain SNI is available the cert is valid (acme.sh issued)
+        params = f"sni={sni}" if sni else f"sni={_bracket_ipv6(ip)}"
+        if not sni:
+            params += "&insecure=1"
+        return f"hysteria2://{uuid}@{_bracket_ipv6(ip)}:{port}?{params}{fragment}"
 
 
 # ---------------------------------------------------------------------------
@@ -484,28 +244,12 @@ PROTOCOLS: dict[str, Protocol] = {
 # but this makes the intent explicit and allows reordering without changing keys).
 PROTOCOL_ORDER: list[str] = ["reality", "xhttp", "wss"]
 
+# Transport-specific protocols that are built and ordered separately.
+ADDITIONAL_PROTOCOLS: dict[str, Protocol] = {
+    "hysteria2": Hysteria2Protocol(),
+}
+
 
 def get_protocol(key: str) -> Protocol | None:
-    """Find a protocol by key (e.g., 'reality', 'wss', 'xhttp')."""
-    return PROTOCOLS.get(key)
-
-
-def available_protocols(
-    inbounds: list[Inbound],
-    domain: str = "",
-) -> list[Protocol]:
-    """Return protocols that are available on this server.
-
-    A protocol is available when:
-    1. Its inbound exists in the panel (matched by remark)
-    2. If it requires a domain, a domain is configured
-    """
-    result: list[Protocol] = []
-    for key in PROTOCOL_ORDER:
-        proto = PROTOCOLS[key]
-        if proto.find_inbound(inbounds) is None:
-            continue
-        if proto.requires_domain and not domain:
-            continue
-        result.append(proto)
-    return result
+    """Find a protocol by key (e.g., 'reality', 'wss', 'xhttp', 'hysteria2')."""
+    return PROTOCOLS.get(key) or ADDITIONAL_PROTOCOLS.get(key)

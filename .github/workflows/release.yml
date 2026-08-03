@@ -30,36 +30,38 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
 
       - name: Build Astro site
         run: |
           cd website
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Generate PWA demo page
-        run: |
-          sudo apt-get install -y qrencode
-          uv run meridian dev preview --output website/dist/demo
+        run: uv run meridian dev preview --output website/dist/demo
 
-      - name: Add deploy artifacts
+      - name: Add website artifacts
         run: |
-          # Copy CLI files into Astro dist
+          # Copy the CLI installer into Astro dist
           cp install.sh website/dist/install.sh
-          cp setup.sh website/dist/setup.sh
           cp VERSION website/dist/version
           # Generate checksums
           cd website/dist
-          sha256sum install.sh setup.sh > SHA256SUMS
+          sha256sum install.sh > SHA256SUMS
           cd ../..
           # Bundle AI docs
           mkdir -p website/dist/ai
@@ -195,9 +197,27 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
       - name: Build package
         run: |
           pip install hatchling build
+          cd website
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
+          cd ..
+          cp VERSION website/dist/version
+          find website/dist -name .DS_Store -delete
           # Generate AI reference from human docs (not committed, built fresh)
           mkdir -p src/meridian/data
           for f in website/src/content/docs/en/cli-reference.md website/src/content/docs/en/architecture.md website/src/content/docs/en/troubleshooting.md website/src/content/docs/en/deploy.md website/src/content/docs/en/relay.md website/src/content/docs/en/recovery.md; do
@@ -205,6 +225,7 @@ jobs:
             echo ""
           done > src/meridian/data/ai-reference.md
           python -m build
+          python scripts/verify_package_assets.py dist/*.whl
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

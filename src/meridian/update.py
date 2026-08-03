@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -38,17 +39,21 @@ def get_pypi_latest() -> str | None:
 def _should_check() -> bool:
     """Return True if enough time has passed since last check."""
     check_file = CACHE_DIR / "last_update_check"
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-
-    if check_file.exists():
-        try:
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        if check_file.exists():
             last_check = int(check_file.read_text().strip() or "0")
             if time.time() - last_check < UPDATE_CHECK_INTERVAL:
                 return False
-        except (ValueError, OSError):
-            pass
-
-    check_file.write_text(str(int(time.time())))
+        check_file.write_text(str(int(time.time())))
+    except ValueError:
+        try:
+            check_file.write_text(str(int(time.time())))
+        except OSError:
+            return False
+    except OSError:
+        # Update notifications are optional and must never break a command.
+        return False
     return True
 
 
@@ -92,44 +97,63 @@ def check_for_update(current_version: str) -> None:
         )
 
 
-def do_upgrade() -> bool:
-    """Upgrade via uv > pipx > pip3."""
-    success = False
-
+def do_upgrade(expected_version: str = "") -> bool:
+    """Try each available installer until the active command is upgraded."""
+    commands: list[list[str]] = []
     if shutil.which("uv"):
-        result = subprocess.run(
-            ["uv", "tool", "upgrade", PYPI_PACKAGE],
-            capture_output=True,
-            text=True,
+        commands.append(["uv", "tool", "upgrade", PYPI_PACKAGE])
+    if shutil.which("pipx"):
+        commands.append(["pipx", "upgrade", PYPI_PACKAGE])
+    if shutil.which("pip3"):
+        commands.extend(
+            [
+                ["pip3", "install", "--upgrade", "--user", PYPI_PACKAGE],
+                ["pip3", "install", "--upgrade", "--user", "--break-system-packages", PYPI_PACKAGE],
+            ]
         )
-        if result.returncode == 0:
-            success = True
 
-    if not success and shutil.which("pipx"):
-        result = subprocess.run(
-            ["pipx", "upgrade", PYPI_PACKAGE],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            success = True
-
-    if not success and shutil.which("pip3"):
-        # Try --user first, then --break-system-packages for PEP 668
-        for extra_args in [["--user"], ["--user", "--break-system-packages"]]:
+    for command in commands:
+        try:
             result = subprocess.run(
-                ["pip3", "install", "--upgrade", *extra_args, PYPI_PACKAGE],
+                command,
                 capture_output=True,
                 text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=120,
             )
-            if result.returncode == 0:
-                success = True
-                break
-
-    if success:
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode != 0:
+            continue
         _refresh_symlink()
+        if not expected_version or verify_installed_version(expected_version):
+            return True
+    return False
 
-    return success
+
+def verify_installed_version(expected: str) -> bool:
+    """Prove that the command users will invoke resolves to the upgraded version."""
+    meridian_bin = shutil.which("meridian")
+    if not meridian_bin:
+        return False
+    try:
+        result = subprocess.run(
+            [meridian_bin, "--version"],
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            timeout=10,
+            env={**os.environ, "MERIDIAN_DISABLE_UPDATE_CHECK": "1"},
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if result.returncode != 0:
+        return False
+    rendered = result.stdout.strip().removeprefix("meridian ").strip()
+    try:
+        return Version(rendered) == Version(expected)
+    except InvalidVersion:
+        return False
 
 
 def _refresh_symlink() -> None:
@@ -151,14 +175,14 @@ def _refresh_symlink() -> None:
         pass
 
 
-def run_self_update() -> None:
+def run_self_update() -> int:
     """Explicit self-update command."""
     info("Checking for updates...")
     latest = get_pypi_latest()
 
     if not latest:
         warn("Could not reach PyPI to check for updates")
-        return
+        return 3
 
     from meridian import __version__
 
@@ -167,11 +191,11 @@ def run_self_update() -> None:
         remote = Version(latest)
     except InvalidVersion:
         warn("Could not parse version numbers")
-        return
+        return 3
 
     if remote <= current:
         ok(f"Already on the latest version (v{__version__})")
-        return
+        return 0
 
     # Version-level context
     if current.major != remote.major:
@@ -181,9 +205,16 @@ def run_self_update() -> None:
         info(f"v{latest} available. What's new: {_RELEASES_URL}")
 
     info(f"Updating v{__version__} → v{latest}...")
-    if do_upgrade():
+    try:
+        upgraded = do_upgrade(latest)
+    except (OSError, subprocess.SubprocessError):
+        upgraded = False
+    if upgraded and verify_installed_version(latest):
         ok(f"Updated to v{latest}")
         info("Run `meridian deploy` to apply changes to your servers")
-    else:
-        warn("Could not upgrade automatically. Try reinstalling:")
-        info(_INSTALL_CMD)
+        return 0
+    if upgraded:
+        warn("An installer completed, but the active `meridian` command did not change to the requested version")
+    warn("Could not upgrade automatically. Try reinstalling:")
+    info(_INSTALL_CMD)
+    return 3

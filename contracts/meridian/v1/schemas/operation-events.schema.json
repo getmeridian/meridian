@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "Event": {
+      "additionalProperties": false,
+      "description": "JSONL event model for long-running operations.",
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "level": {
+          "enum": [
+            "debug",
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "phase": {
+          "default": "",
+          "title": "Phase",
+          "type": "string"
+        },
+        "resource": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schema": {
+          "const": "meridian.event/v1",
+          "default": "meridian.event/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        },
+        "time": {
+          "title": "Time",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "command.started",
+            "command.completed",
+            "command.failed",
+            "plan.computed",
+            "plan.action.started",
+            "plan.action.completed",
+            "plan.action.failed",
+            "plan.action.skipped",
+            "provision.step.started",
+            "provision.step.completed",
+            "provision.step.failed",
+            "ssh.command.completed",
+            "state.loaded",
+            "state.saved",
+            "warning",
+            "error"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "seq",
+        "time",
+        "level",
+        "type"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "ResourceRef": {
+      "additionalProperties": false,
+      "description": "Resource identifier carried by events.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "ResourceRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Incremental event replay response.",
+  "properties": {
+    "after_seq": {
+      "default": 0,
+      "title": "After Seq",
+      "type": "integer"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/Event"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "latest_seq": {
+      "default": 0,
+      "title": "Latest Seq",
+      "type": "integer"
+    },
+    "operation_id": {
+      "title": "Operation Id",
+      "type": "string"
+    },
+    "schema": {
+      "const": "meridian.operation-events/v1",
+      "default": "meridian.operation-events/v1",
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "operation_id",
+    "events"
+  ],
+  "title": "OperationEvents",
+  "type": "object"
+}

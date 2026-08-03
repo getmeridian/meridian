@@ -7,11 +7,12 @@ section: reference
 
 ## Стек технологий
 
-- **VLESS+Reality** (Xray-core) — прокси-протокол, который маскируется под легитимный TLS-сайт. Цензоры, проверяющие сервер, видят реальный сертификат (например, от microsoft.com). Подключиться могут только клиенты с правильным приватным ключом.
-- **3x-ui** — веб-панель для управления Xray, развёрнутая как Docker-контейнер. Meridian управляет ею полностью через REST API.
-- **nginx** — единый процесс веб-сервера, обрабатывающий как SNI-маршрутизацию, так и TLS. Модуль stream слушает порт 443 и маршрутизирует трафик по SNI-имени хоста без завершения TLS. Модуль http на порту 8443 завершает TLS, обслуживает страницы подключения, обратно проксирует панель и трафик XHTTP/WSS к Xray. Сертификаты управляются acme.sh (сертификат Let's Encrypt IP через профиль ACME `shortlived` в автономном режиме, сертификат домена в режиме домена).
-- **Docker** — запускает 3x-ui (который содержит Xray). Весь прокси-трафик проходит через контейнер.
-- **Чистый Python provisioner** — `src/meridian/provision/` выполняет шаги развёртывания через SSH. Каждый шаг получает `(conn, ctx)` и возвращает `StepResult`.
+- **VLESS+Reality** (Xray-core) — прокси-протокол который маскируется под легитимный TLS-сайт. Цензоры проверяющие сервер видят реальный сертификат (например от microsoft.com). Подключиться могут только клиенты с правильным приватным ключом.
+- **Hysteria2** (Xray-core) — резервный транспорт по UDP/443 для сетей с потерями или высокой задержкой. В подписках TCP-транспорты остаются первыми.
+- **Remnawave** — современный стек панели для Xray развёрнутый как отдельные контейнеры Docker `remnawave/backend`, `remnawave/node` и `remnawave/subscription-page`. Backend выставляет REST API (управляется через официальный Python SDK `remnawave`); узел запускает Xray в `network_mode: host`; страница подписки обслуживает URL-конфигурации для каждого пользователя.
+- **nginx** — однопроцессный веб-сервер обрабатывающий как SNI маршрутизацию так и TLS. Модуль stream слушает на порту 443 и маршрутизирует трафик по SNI имени хоста без завершения TLS. Модуль http на порту 8443 завершает TLS, обслуживает страницы подключения, обратно проксирует UI админа Remnawave + страницу подписки и проксирует трафик XHTTP/WSS к Xray. Сертификаты управляются [acme.sh](https://github.com/acmesh-official/acme.sh) (Let's Encrypt).
+- **Docker** — запускает backend Remnawave + PostgreSQL + Valkey (хост панели только), узел Remnawave (каждый выходной узел) и страницу подписки Remnawave (хост панели, опционально).
+- **Чистый Python provisioner** — `src/meridian/provision/` выполняет шаги развёртывания через SSH. Каждый шаг получает `(conn, ctx)` и возвращает `StepResult`. Протокол `StepRenderer` в `progress.py` разделяет выполнение шага от отрисовки Rich, держа `steps.py` свободным от импортов отображения.
 - **uTLS** — имитирует отпечаток TLS Client Hello Chrome, делая соединения неотличимыми от реального браузерного трафика.
 
 ## Топология сервисов
@@ -21,36 +22,38 @@ section: reference
 ```mermaid
 flowchart TD
     Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
+    Nginx -->|"SNI = reality_sni"| XrayReal["Xray Reality<br>node host network"]
     Nginx -->|"SNI = server IP"| NginxHTTP["nginx http<br>:8443"]
     NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
+    NginxHTTP -->|/secret-path| Panel[Remnawave Admin UI<br>backend :3000]
+    NginxHTTP -->|/sub-path| SubPage[Remnawave Subscription Page<br>:3020]
     NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
     Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
 nginx stream **не** завершает TLS. Он читает имя хоста SNI из TLS Client Hello и пересылает необработанный TCP-поток на соответствующий бэкенд.
 
-acme.sh запрашивает сертификат Let's Encrypt IP через профиль ACME `shortlived` (6-дневное действие, автоматическое обновление). При невозможности выпуска сертификата IP использует самоподписанный сертификат.
+acme.sh запрашивает IP-сертификат Let's Encrypt (короткоживущий профиль на 6 дней, автоматическое обновление). Если доверенный сертификат выпустить не удаётся, установка останавливается; Meridian никогда не отправляет учётные данные панели через временный самоподписанный сертификат.
 
-XHTTP работает на порту localhost и обратно проксируется nginx — дополнительного внешнего порта не требуется.
+XHTTP работает на порту localhost и обратно проксируется nginx'ом — дополнительного внешнего порта не требуется.
 
 ### Режим домена
 
 ```mermaid
 flowchart TD
     Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
+    Nginx -->|"SNI = reality_sni"| XrayReal["Xray Reality<br>node host network"]
     Nginx -->|"SNI = domain"| NginxHTTP["nginx http<br>:8443"]
     NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
+    NginxHTTP -->|/secret-path| Panel[Remnawave Admin UI<br>backend :3000]
+    NginxHTTP -->|/sub-path| SubPage[Remnawave Subscription Page<br>:3020]
     NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
     NginxHTTP -->|/ws-path| XrayWSS["Xray WSS<br>localhost"]
     Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
     Internet -.->|"CDN (Cloudflare)"| NginxHTTP
 ```
 
-Режим домена добавляет VLESS+WSS как резервный путь CDN. Трафик проходит через CDN Cloudflare через WebSocket, что позволяет соединению работать даже если IP-адрес сервера заблокирован.
+Режим домена добавляет VLESS+WSS как путь резерва CDN. Трафик проходит через CDN Cloudflare через WebSocket, позволяя соединению работать даже если IP-адрес сервера заблокирован.
 
 ### Топология ретранслятора
 
@@ -61,143 +64,150 @@ flowchart LR
     Exit --> Internet((Internet))
 ```
 
-Ретранслятор позволяет клиентам подключаться к внутреннему IP-адресу в своей стране, который затем пересылает трафик на выходной сервер за границей. Весь трафик между клиентом и выходом шифруется — ретранслятор видит только необработанный TCP и не может расшифровать содержимое. Все протоколы (Reality, XHTTP, WSS) работают прозрачно через ретранслятор.
+Узел ретранслятора это легковесный TCP маршрутизатор запускающий [Realm](https://github.com/zhboner/realm). Клиент подключается к внутреннему IP-адресу ретранслятора, который пересылает необработанный TCP на выходной сервер за границей. Всё шифрование осуществляется от конца до конца между клиентом и выходом — ретранслятор никогда не видит открытый текст.
+
+V4 моделирует серверы как возможности плюс политика маршрутизации. Один сервер может одновременно быть relay hop, exit или routing gateway. Каждый hop цепочки сохраняется в серверном inventory; только entry hop рекламируется, а внутренние hop'ы остаются с неизвестным здоровьем, пока маршрут не проверен end-to-end.
 
 ## Как работает протокол Reality
 
-1. Сервер генерирует **пару ключей x25519**. Открытый ключ используется с клиентами, приватный ключ остаётся на сервере.
-2. Клиент подключается к порту 443 с TLS Client Hello содержащим домен маскировки (например, `www.microsoft.com`) в качестве SNI.
-3. Для любого наблюдателя это выглядит как обычное HTTPS-соединение с microsoft.com.
-4. Если **проверяющий** отправит свой собственный Client Hello, сервер проксирует соединение на реальный microsoft.com — проверяющий видит действительный сертификат.
-5. Если клиент включает действительную аутентификацию (полученную из ключа x25519), сервер устанавливает VLESS-туннель.
+1. Сервер генерирует **пару ключей x25519**. Открытый ключ делится с клиентами, приватный ключ остаётся на сервере.
+2. Клиент подключается на порту 443 с TLS Client Hello содержащим домен маскировки (например `www.microsoft.com`) как SNI.
+3. Для любого наблюдателя это выглядит как обычное HTTPS соединение с microsoft.com.
+4. Если **зондировщик** отправляет свой собственный Client Hello, сервер проксирует соединение на реальный microsoft.com — зондировщик видит действительный сертификат.
+5. Если клиент включает действительную аутентификацию (полученную из ключа x25519), сервер устанавливает туннель VLESS.
 6. **uTLS** делает Client Hello идентичным Chrome в каждом байте, преодолевая TLS fingerprinting.
 
-## Структура Docker-контейнера
+## Модель декларативного состояния
 
-Docker-контейнер `3x-ui` содержит:
-- **Веб-панель 3x-ui** — REST API на порту 2053 (внутренний)
-- **Бинарник Xray** в `/app/bin/xray-linux-*` (путь зависит от архитектуры)
-- **База данных** в `/etc/x-ui/x-ui.db` (SQLite, хранит конфигурации входящих и клиентов)
-- **Конфигурация Xray** управляется 3x-ui (не статический файл)
+Meridian хранит каждый деталь флота в одном `cluster.yml` в `~/.meridian/cluster.yml`:
 
-Meridian управляет 3x-ui полностью через REST API:
-- `POST /login` — аутентификация (form-urlencoded, возвращает session cookie)
-- `POST /panel/api/inbounds/add` — создание VLESS inbound
-- `GET /panel/api/inbounds/list` — список inbounds (проверка перед созданием)
-- `POST /panel/setting/update` — настройка параметров панели
-- `POST /panel/setting/updateUser` — смена учётных данных панели
+- **Legacy** — `panel`, `nodes[]`, `relays[]`, `inbounds{}` и `branding` описывают отслеживаемое состояние; необязательные `desired_nodes[]`, `desired_relays[]`, `desired_clients[]` и `subscription_page` задают желаемое состояние.
+- **V4** — `topology_intent` является авторитетным желаемым графом control plane, exits, routing gateways, relay chains и access users. Legacy-поля `desired_*` не управляют V4.
 
-## Панель управления (3x-ui)
+Фактическое состояние Remnawave (пользователи, хосты, профили, squads) живёт в PostgreSQL панели и читается через API. В legacy панель является источником фактических пользователей, а `desired_*` — необязательным желаемым слоем. В V4 `topology_intent` определяет владение и желаемый граф; наличие ресурса только в панели не делает его управляемым Meridian.
 
-Meridian использует [3x-ui](https://github.com/MHSanaei/3x-ui) как веб-панель управления Xray. CLI автоматизирует всё, но вы также можете получить прямой доступ к веб-панели для мониторинга и расширенной настройки.
+## Meridian Studio и локальный Engine
 
-### Как получить доступ
+Статическая Studio потребляет сгенерированные контракты и может создавать файлы запросов без локального процесса. Исполняемая Studio запускается с помощью `meridian studio`, привязывает FastAPI Engine к `127.0.0.1` и выставляет только узкие типизированные конечные точки для открытия контрактов, чтения сохранённых серверов, установки сервера, валидации SSH, одноразовой пароль ассистенции при начальной загрузке ключей и пробных развёртываниях. SSH, файловая система, секреты, операции и отмена остаются позади того localhost Engine вместо запуска в браузере.
 
-Панель доступна через nginx по случайному секретному HTTPS-пути — SSH-туннель не нужен. URL и учётные данные хранятся в локальном файле:
+## Расположение Docker контейнеров
 
-```
-cat ~/.meridian/credentials/<IP>/proxy.yml
-```
+**На хосте панели** (первая цель `meridian deploy`):
+- `remnawave` (backend) — NestJS API на `127.0.0.1:3000`, обратно проксируется в `/<panel.secret_path>/`
+- `remnawave-db` — PostgreSQL хранящая пользователей, хостов, входящих
+- `remnawave-redis` — Valkey кэш (Redis совместимый fork; контейнер держит имя наследия `redis` для совместимости библиотеки клиента)
+- `remnawave-subscription-page` — фронтенд подписки, внутренний порт контейнера 3010, переназначено на `127.0.0.1:3020` на хосте чтобы избежать коллизии с API узла на этой же машине; обратно проксируется в `/<subscription_page.path>/`
+- `remnawave-node` — Xray уже в `network_mode: host` с `cap_add: NET_ADMIN` (требуется панелью 2.6.2+ для плагинов и IP Control)
 
-Найдите секцию `panel`:
+**На узлах не-панели** (каждая цель `meridian node add`):
+- `remnawave-node` только — зарегистрирован против API панели через секретный ключ для узла
 
-```yaml
-panel:
-  username: a1b2c3d4e5f6
-  password: Xk9mP2qR7vW4nL8jF3hT6yBs
-  web_base_path: n7kx2m9qp4wj8vh3rf6tby5e
-  port: 2053
-```
+Все образы панели + подписки закреплены в `src/meridian/config.py` и содержатся в синхронизации с SDK.
 
-URL панели:
+## Поверхность API панели используемая Meridian
 
-```
-https://<ip-вашего-сервера>/n7kx2m9qp4wj8vh3rf6tby5e/
-```
+Meridian говорит с Remnawave в основном через официальный SDK (`remnawave` v2.8.0). Несколько путей начальной загрузки и отступления — первичная регистрация админа, создание токена API и конечные точки ещё не охваченные SDK — используют необработанный `httpx` против URL панели. Используемые поверхности:
 
-### Возможности
+- **Пользователи** — `create_user`, `get_user`, `delete_user`, `list_users`, `enable_user`, `disable_user` (CRUD клиента)
+- **Хосты** — `create_host`, `list_hosts`, `enable_host`, `disable_host`, `delete_host` (конечные точки для входящих показываемые в URL подписки)
+- **Узлы** — `create_node`, `list_nodes`, `disable_node`, `delete_node`, `update_node_name`, плюс набор для генерирования секрета узла / mTLS ключа
+- **Входящие** — `list_inbounds`, `assign_inbounds_to_squad` (проводка входящих ↔ squad)
+- **Конфигурационные профили** — `create_config_profile`, `get_config_profile`, `update_xray_config` (доступны; используются будущей особенностью раздельной маршрутизации)
+- **Внутренние squads** — `list_internal_squads` (пользователи сгруппированные для видимости хоста)
 
-- **Мониторинг трафика** — статистика загрузки/выгрузки по клиентам
-- **Просмотр inbounds** — все настроенные протоколы VLESS (Reality, XHTTP, WSS)
-- **Статус Xray** — проверка работоспособности прокси-движка
-- **Расширенная настройка** — прямое изменение параметров Xray (для опытных пользователей)
+Пары ключей Reality x25519 **не** получены из панели — Meridian генерирует их на стороне сервера на узле используя бинарник xray (`xray x25519`) и сохраняет в `cluster.yml` так чтобы они выжили переразворачивание.
 
-### Важно
+UI админа обратно проксируется nginx'ом в `/<panel.secret_path>/` на порту 443 во всех режимах — SSH туннель не требуется.
 
-- `web_base_path` — случайная строка, это защита вашей панели. Не передавайте её посторонним.
-- Все команды `meridian` CLI используют тот же API панели.
-- Если вы измените настройки в панели напрямую, они могут быть перезаписаны при следующем `meridian deploy`.
+## Дрейф и план / применение
 
-## Конфигурация nginx
+Когда угодно администратор редактирует состояние непосредственно в UI Remnawave (например добавляет пользователя, переименовывает хост), следующий `meridian plan` читает фактическое состояние из панели, сравнивает его против желаемого состояния (`cluster.yml`) и выдаёт различие как типизированные объекты `PlanAction`. `meridian apply` выполняет их, вызывая те же поверхности SDK; `meridian apply --json` возвращает типизированные результаты выполнения для каждого действия для клиентов процесса/UI.
 
-Meridian записывает в `/etc/nginx/conf.d/meridian-stream.conf` и `/etc/nginx/conf.d/meridian-http.conf` (никогда в основной nginx.conf). Это позволяет Meridian сосуществовать с собственной конфигурацией пользователя.
+`meridian apply` делает снимок желаемого состояния в `cluster.applied_state` (типизированный dataclass `AppliedState`) после каждого успешного запуска. Следующий план использует этот снимок чтобы различать намеренные удаления (было в последнем применённом) от дрейфа (никогда не применялось). Это отражает поведение отслеживания состояния Terraform.
+
+## Конфигурационный паттерн nginx
+
+Meridian пишет stream-маршрутизацию в `/etc/nginx/stream.d/meridian.conf`, а HTTP-маршрутизацию — в `/etc/nginx/conf.d/meridian-http.conf`. При необходимости в основной `nginx.conf` добавляется один блок `stream` с include.
 
 nginx обрабатывает:
-- SNI-маршрутизацию на порту 443 (модуль stream, без завершения TLS)
+- SNI маршрутизация на порту 443 (модуль stream, без завершения TLS)
 - Завершение TLS на порту 8443 (модуль http, сертификаты управляются acme.sh)
-- Обратный прокси для панели 3x-ui (на случайном пути)
-- Обслуживание страниц подключения (размещённые страницы с URL для обмена)
-- Обратный прокси для XHTTP-трафика к Xray (маршрутизация по пути, во всех режимах когда XHTTP включён)
-- Обратный прокси для WSS-трафика к Xray (только режим домена)
+- Обратный прокси для UI админа Remnawave (`/<panel.secret_path>/` → `127.0.0.1:3000`)
+- Обратный прокси для страницы подписки Remnawave (`/<subscription_page.path>/` → `127.0.0.1:3020`)
+- Обслуживание страницы информации подключения (размещённые страницы с URL для обмена)
+- Обратный прокси для трафика XHTTP к Xray (маршрутизация по пути, все режимы когда XHTTP включён)
+- Обратный прокси для трафика WSS к Xray (только режим домена)
 
 ## Назначение портов
 
-| Порт | Сервис | Режим |
-|------|--------|-------|
-| 443 | nginx stream (SNI router) | Все |
-| 80 | nginx (ACME challenges) | Все |
-| 10443 | Xray Reality (внутренний) | Все |
-| 8443 | nginx http (внутренний) | Все |
-| localhost | Xray XHTTP | Когда XHTTP включён |
-| localhost | Xray WSS | Режим домена |
-| 2053 | 3x-ui panel (внутренний) | Все |
+| Порт | Сервис | Область |
+|------|--------|--------|
+| 443/TCP | nginx stream (SNI маршрутизатор) | Публичный |
+| 443/UDP | Резервный транспорт Xray Hysteria2 | Публичный |
+| 80 | nginx (ACME задачи) | Публичный |
+| 8443 | nginx http (внутренний конец) | Внутренний |
+| 3000 | Backend Remnawave (API админа + UI) | localhost |
+| 3010 | API узла Remnawave | сеть хоста |
+| 3020 | Страница подписки Remnawave | localhost |
+| 10000-10999 | Xray Reality (по узлу детерминированный) | сеть хоста |
+| 20000-29999 | Xray WSS (режим домена, по узлу) | сеть хоста |
+| 30000-39999 | Xray XHTTP (по узлу детерминированный) | сеть хоста |
+| 5432 | PostgreSQL (БД Remnawave) | внутренняя сеть Docker |
 
-Порты XHTTP и WSS видны только на localhost — nginx обратно проксирует их на порт 443.
+Backend-порты XHTTP, WSS и Reality используют сеть хоста, но UFW блокирует к ним доступ из интернета. Hysteria2 слушает публичный UDP/443, а nginx обрабатывает публичный TCP/443.
 
 ## Конвейер подготовки
 
-Шаги выполняются последовательно через `build_setup_steps()`. Каждый шаг получает `(conn, ctx)` и возвращает `StepResult`.
+Шаги выполняются последовательно через `build_setup_steps()` (хост панели) или `build_node_steps()` (только узел, используется для переразворачивания и `meridian node add`). Каждый шаг получает `(conn, ctx)` и возвращает `StepResult`.
 
-| № | Шаг | Модуль | Назначение |
+| # | Шаг | Модуль | Назначение |
 |---|-----|--------|-----------|
-| 1 | InstallPackages | `common.py` | Пакеты ОС |
-| 2 | EnableAutoUpgrades | `common.py` | Автоматические обновления |
-| 3 | SetTimezone | `common.py` | UTC |
-| 4 | HardenSSH | `common.py` | Аутентификация только по ключу |
-| 5 | ConfigureBBR | `common.py` | TCP congestion control |
-| 6 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 |
-| 7 | InstallDocker | `docker.py` | Docker CE |
-| 8 | Deploy3xui | `docker.py` | 3x-ui контейнер |
-| 9 | ConfigurePanel | `panel.py` | Учётные данные панели |
-| 10 | LoginToPanel | `panel.py` | API аутентификация |
-| 11 | CreateRealityInbound | `xray.py` | VLESS+Reality |
-| 12 | CreateXHTTPInbound | `xray.py` | VLESS+XHTTP |
-| 13 | CreateWSSInbound | `xray.py` | VLESS+WSS (домен) |
-| 14 | VerifyXray | `xray.py` | Проверка здоровья |
-| 15 | InstallNginx | `services.py` | SNI маршрутизация + TLS + reverse proxy |
-| 16 | DeployConnectionPage | `services.py` | QR коды + страница |
+| 1 | CheckDiskSpace | `common.py` | Предварительная проверка |
+| 2 | InstallPackages | `common.py` | Пакеты ОС (+fail2ban при защите) |
+| 3 | EnableAutoUpgrades | `common.py` | Автоматические обновления |
+| 4 | SetTimezone | `common.py` | UTC |
+| 5 | HardenSSH | `common.py` | Аутентификация только по ключу (при защите) |
+| 6 | ConfigureFail2ban | `common.py` | Тюрьма brute-force sshd (при защите) |
+| 7 | ConfigureBBR | `common.py` | TCP управление перегруженностью |
+| 8 | ConfigureFirewall | `common.py` | UFW: 22 + 80 + 443 (при защите) |
+| 9 | InstallDocker | `docker.py` | Docker CE |
+| 10 | DeployRemnawavePanel | `remnawave_panel.py` | Backend + PostgreSQL + Valkey + страница подписки |
+| 11 | InstallWarp | `warp.py` | Cloudflare WARP (опционально) |
+| 12 | InstallNginx | `nginx.py` | SNI маршрутизация + TLS + обратный прокси |
+| 13 | ConfigureNginx | `nginx.py` + `nginx_render.py` | Конфигурация nginx для режима IP или домена |
+| 14 | IssueTLSCert | `tls.py` | acme.sh + Let's Encrypt |
+| 15 | DeployPWAAssets | `nginx.py` | Ресурсы PWA страницы подключения |
+
+После конвейера provisioner, `configure_panel_and_node` в `panel_bootstrap.py` использует REST API Remnawave чтобы регистрировать входящие, создавать контейнер узла, назначать хосты и создавать клиента по умолчанию. Развёртывание контейнера узла, создание хоста и помощники кэширования входящих живут в `node_deploy.py`. Контейнер узла **не** часть конвейера SSH потому что требует секретный ключ выпущенный панелью.
+
+## Параллельная подготовка
+
+В legacy `meridian apply` может подготавливать независимые узлы параллельно через `ThreadPoolExecutor` (`--parallel N`, диапазон 1–32, по умолчанию 4). Каждый рабочий получает собственный экземпляр `MeridianPanel` SDK; базовый клиент httpx и цикл событий per-thread asyncio изолированы через `threading.local()`. `cluster.save()` защищён `RLock`, поэтому параллельные снимки сохраняются последовательно. V4 применяет скомпилированный граф ресурсов и отклоняет нестандартное значение `--parallel`.
 
 ## Жизненный цикл учётных данных
 
-1. **Генерация**: случайные учётные данные (пароль панели, ключи x25519, UUID клиента)
-2. **Сохранение локально**: `~/.meridian/credentials/<IP>/proxy.yml` — сохраняется ДО применения к серверу
-3. **Применение**: пароль панели изменён, входящие точки созданы
-4. **Синхронизация**: учётные данные скопированы в `/etc/meridian/proxy.yml` на сервере
-5. **Повторные запуски**: загружены из кэша, не регенерированы (идемпотентно)
-6. **На разных машинах**: загружены с сервера через SSH
-7. **Удаление**: удалены как с сервера, так и с локальной машины
+1. **Генерация**: случайные учётные данные (пароль панели, JWT секреты, пароль PostgreSQL, секретный ключ узла, пара ключей Reality x25519 по узлу, UUID клиента)
+2. **Сохранение локально**: `~/.meridian/cluster.yml` — сохраняется немедленно перед операциями API/SSH так чтобы упалое развёртывание могло возобновиться
+3. **Применение**: контейнеры панели + узла подняты, входящие и хосты созданы через REST API
+4. **Синхронизация**: панель хранит фактические ресурсы; legacy `desired_*` или V4 `topology_intent` задают желаемое состояние, а drift показывает `meridian plan`
+5. **Переустановка**: ключи Reality и UUID клиента сохраняются через переразворачивание (панель отказывается регенерировать когда они существуют)
+6. **Legacy-восстановление**: `meridian fleet recover --legacy --panel-url https://HOST/SECRET_PATH` импортирует один однозначный legacy-профиль, восстанавливает `sub_path` и Reality key через SSH и регистрирует узлы в `servers.json`. Для доменного URL нужен `--panel-server PUBLIC_IP`; неоднозначный WSS node-to-domain останавливает запись. V4 topology intent из панели не восстанавливается
+7. **Удаление**: `meridian teardown <IP>` сначала проверяет владение и зависимости. V4-роли должны быть удалены через setup/apply, а хост панели нельзя удалить, пока существуют другие узлы или ретрансляторы
 
 ## Расположение файлов
 
-### На сервере
-- `/etc/meridian/proxy.yml` — учётные данные и список клиентов
-- `/etc/nginx/conf.d/meridian-stream.conf` — конфигурация nginx stream (SNI маршрутизация)
-- `/etc/nginx/conf.d/meridian-http.conf` — конфигурация nginx http (TLS, reverse proxy)
+### На хосте панели
+- `/opt/remnawave/` — файл compose панели + `.env` + `.env` страницы подписки
+- `/opt/remnawave/data/` — том данных PostgreSQL
+- `/etc/nginx/stream.d/meridian.conf` — конфигурация nginx stream (SNI маршрутизация)
+- `/etc/nginx/conf.d/meridian-http.conf` — конфигурация nginx http (TLS, обратный прокси)
 - `/etc/ssl/meridian/` — TLS сертификаты (управляются acme.sh)
-- Docker-контейнер `3x-ui` — Xray + панель
 
-### На локальной машине
-- `~/.meridian/credentials/<IP>/` — кэшированные учётные данные для каждого сервера
-- `~/.meridian/servers` — реестр серверов
+### На каждом узле
+- `/opt/remnanode/` — файл compose узла + `.env`
+
+### На локальной машине (deployer)
+- `~/.meridian/cluster.yml` — состояние флота и legacy desired state либо авторитетный V4 `topology_intent`
+- `~/.meridian/cluster.yml.bak` — автоматическая резервная копия перед деструктивными операциями
 - `~/.meridian/cache/` — кэш проверки обновлений
 - `~/.local/bin/meridian` — точка входа CLI (установлено через uv/pipx)

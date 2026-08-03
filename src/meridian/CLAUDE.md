@@ -1,31 +1,40 @@
 # src/meridian — Python CLI package
-
 ## Design decisions
-
-**Protocol registry** — `protocols.py` defines `INBOUND_TYPES` + `PROTOCOLS` as the sole source of truth. All URL building, rendering, and provisioning loop over this registry. Adding a protocol means adding a dataclass + `Protocol` subclass — everything else picks it up automatically.
-
-**Credentials versioning** — V2 nested YAML with `_extra` dict for forward-compatibility. Unknown fields are preserved on load and re-emitted on save. V1 flat format auto-migrates. Atomic writes via tempfile+rename with `0o600` permissions.
-
-**SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. This single abstraction lets every command work identically on-server and remotely.
-
-**Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer: no link for input errors, suggests `doctor` for infrastructure, shows GitHub for bugs. Every error must be actionable.
-
-**Panel client** — Wraps 3x-ui REST API via SSH curl. Session cookies in `$HOME/.meridian/.cookie`. Short-lived: create, use, close.
-
+**Protocol registry** — `protocols.py` keeps ordered TCP transports in `PROTOCOLS` and the UDP fallback in `ADDITIONAL_PROTOCOLS`; `get_protocol()` spans both. `ProtocolKey(StrEnum)` provides stable cluster keys.
+**Cluster config** — Schema V3 stores workload-scoped topology intent, generation bindings, allocations, and compact action checkpoints in one hidden `cluster.yml`. Client/user runtime state remains in Remnawave PostgreSQL.
+**Remnawave integration** — `remnawave.py` wraps the REST API with `httpx`. Direct HTTPS calls from deployer's machine (no SSH tunneling for API). JWT auth, retry with backoff, Meridian-specific error types.
+**SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. The `SSHUI` callback protocol in `ssh_auth.py` decouples transport from presentation; CLI callers pass `RichSSHUI` from `ssh_ui.py`, Engine/headless callers get logger-only output by default. File transfer methods (`put_bytes`, `put_text`, `get_text`, `get_bytes`) live in `_FileTransferMixin` in `ssh_transfer.py`; `ServerConnection` inherits from it.
+**Remote execution primitives** — `conn.run()` returns `CommandResult` metadata and supports `cwd`, `env`, retries, ok codes, sensitive commands, and operation labels. File writes use `put_text`/`put_bytes`; never embed generated file content in shell heredocs. `CommandResult` and `RemoteCommandResult` have explicit `to_remote()`/`from_remote()` conversion methods. Adapters delegate to these methods, not dict unpacking.
+**Server facts** — `facts.py` is the typed cache for OS, Docker, UFW, containers, sshd ports, disk, and sysctl data. Use it before adding one-off probe parsing in provisioners or diagnostics.
+**Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer. Every error must be actionable. `ConsoleState` class wraps globals; module-level functions delegate to singleton instance.
+**Engine boundary** — `meridian.engine` owns command-free runtime use cases only when a local executable surface needs them. Static Studio does not need Engine; executable Studio will need it for SSH, files, secrets, events, and cancellation.
+**Pinned version tuple** — `config.py` pins Remnawave images/SDK plus external binaries. Move the tuple together and update the CHANGELOG compatibility matrix; mismatched Remnawave backend/node/SDK versions silently lose data.
+**Resumable setup** — `core/setup.py` owns secret-free contracts; `setup/` owns atomic draft persistence, stage invalidation, and immutable server-shelf selection.
+**Finite compiler** — `compiler/` purely transforms complete setup intent into typed, dependency-ordered, hash-reviewed V4 resources. It never performs I/O or generates secrets.
+**Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only the reviewed protocols and egress policy.
+**Errors over exits** — library modules raise typed exceptions (`MeridianError` hierarchy in `core/errors.py`) and expose their classification as `category`; `hint_type` belongs only to `console.fail()`. Only CLI command entry points call `console.fail()`.
 ## What's done well
-
-- **Credential lockout prevention** — save locally BEFORE changing remote password. If API fails, user has recovery data.
-- **Forward-compatible YAML** — `_extra` dict means newer server versions don't corrupt older CLI reads.
-- **Falsiness matters in `_extra`** — preserved forward-compat fields may legitimately be `false`, `0`, or `[]`. Only strip known empty-string placeholders; never drop unknown fields just because they are falsy.
-- **Single QR warning** — warns once per session if `qrencode` missing, then silently degrades. No spam.
-
+- **Forward-compatible YAML** — `_extra` dict in ClusterConfig preserves unknown YAML keys for forward-compat only. Reconciler state lives in typed `applied_state`; v4.0 top-level `desired_*_applied` keys migrate into it on load. Never store load-bearing runtime state in `_extra`.
+- **Single source of state** — No split-brain. Remnawave DB is authoritative for users. cluster.yml is authoritative for deployment topology. No sync needed.
+- **Relay = Host** — Relays map to Remnawave Host entries. Enable/disable host → subscriptions auto-adapt.
+- **Extracted shared logic** — `panel_bootstrap.py` owns panel setup orchestration (first deploy, redeploy, new node workflows). `node_deploy.py` owns node container deployment, host creation, panel API helpers, and inbound caching. `relay_ops.py` owns relay infrastructure. `resolve.py` owns `ResolvedServer`, `ensure_server_connection`, and pure resolution helpers; `commands/resolve.py` adds CLI prompts and rendering. Library modules import from `meridian.resolve`, never from `commands/`. Applied-state snapshots and hybrid imperative-declarative sync live in `reconciler/snapshots.py`. `cluster_persistence.py` owns YAML serialization/deserialization; `cluster.py` keeps the data model, validation, and query methods. `diagnostics/` owns reusable SSH health and client-side verification checks; commands own rendering.
+- **Architecture tests** — `tests/test_architecture.py` enforces layer boundaries, file size budget, private import bans, commands/resolve import ban for library modules, and contract drift checks at CI time.
+- **Read-only V4 fleet projection** — `adapters/cluster.py` resolves saved server IDs into control, exit, and advertised relay endpoint views without mutating persisted state.
 ## Pitfalls
-
-- **3x-ui API**: login is form-urlencoded (not JSON). `settings`/`streamSettings` must be JSON **strings** (Go quirk). Remove clients by UUID, not email.
+- **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files require recovery, and generated `srv-*` IDs survive connection edits.
+- **Topology deletion is last** — node, relay, and teardown operations retain registry/topology state until every required API and SSH cleanup succeeds or is confirmed already absent.
+- **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path values before nginx, Xray, or Remnawave serialization.
+- **Published Hosts are assertions** — reconcile complete protocol fields against public listeners; observation or mutation failure must stop apply.
 - **Shell injection**: ALL `conn.run()` interpolated values MUST use `shlex.quote()`.
-- **XHTTP dual mode**: no `xtls-rprx-vision` flow (must be empty string). Runs either with Reality (direct) or with `security: none` behind nginx TLS reverse proxy — two distinct stream settings paths.
-- **`xray vlessenc` output changed**: newer Xray prints both X25519 and ML-KEM-768 sections with quoted `"decryption"`/`"encryption"` lines. Meridian's `--pq` path must pick the ML-KEM-768 pair, not the first section.
-- **Local mode**: detection is file-based only — `/etc/meridian/proxy.yml` readable (root) or `/etc/meridian/` dir exists (non-root). Never use IP matching (`curl ifconfig.me`) — it false-positives when the user is connected via TUN mode (VPN) since their outbound IP matches the server.
+- **ProtocolKey is StrEnum** — works as dict key but YAML serialization needs `_stringify_keys()` to avoid Python-tagged output.
+- **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.
+- **Local mode**: detection is file-based only — `/etc/meridian/node.yml` or dir existence.
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
-- **WARP egress**: Cloudflare WARP client for server outbound routing. SOCKS5 on `127.0.0.1:40000`. CLI syntax varies between warp-cli versions (old: `set-mode proxy` vs new: `mode proxy`).
-- **Post-quantum encryption**: ML-KEM-768 hybrid. When `decryption != "none"`, Xray fallbacks must be omitted — the two features are mutually exclusive in stream settings.
+- **Do not call `console.fail()` from library modules** (operations, relay_ops, resolve, xray_config, provision/, panel_bootstrap). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.
+- **PQ encryption removed in v4** — Xray VLESS PQ requires per-user encryption fields on inbound clients plus Remnawave API support. Do not re-add the flag without both.
+- **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients.
+- **Hysteria2 naming boundary** — external keys and URLs use `hysteria2`; Remnawave profiles require protocol/network `hysteria` plus version `2`.
+- **Remnawave 2.8 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token.
+- **Xray runtime and config failures differ** — keep the executable/assets atomic and validate canonical configs with `run -test`; malformed delivery fails, while local runtime absence is inconclusive.
+- **Xray downloads are checksum-verified** — a missing, malformed, or mismatched release SHA2-256 sidecar makes connection verification inconclusive; never execute that archive.
+- **Fleet role contracts are finite** — do not project routing gateways as exits or source-restricted internal relay hops as public endpoints.

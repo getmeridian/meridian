@@ -1,0 +1,423 @@
+{
+  "$defs": {
+    "FleetSources": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Nodes",
+          "type": "string"
+        },
+        "panel": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Panel",
+          "type": "string"
+        },
+        "relays": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Relays",
+          "type": "string"
+        },
+        "users": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested",
+            "unknown"
+          ],
+          "title": "Users",
+          "type": "string"
+        }
+      },
+      "title": "FleetSources",
+      "type": "object"
+    },
+    "FleetStatusNode": {
+      "additionalProperties": false,
+      "properties": {
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "is_panel_host": {
+          "title": "Is Panel Host",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "default": "exit",
+          "enum": [
+            "exit",
+            "routing_gateway"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "disabled",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "traffic_bytes": {
+          "title": "Traffic Bytes",
+          "type": "integer"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        },
+        "xray_version": {
+          "title": "Xray Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "uuid",
+        "is_panel_host",
+        "status",
+        "xray_version",
+        "traffic_bytes"
+      ],
+      "title": "FleetStatusNode",
+      "type": "object"
+    },
+    "FleetStatusRelay": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "const": "tcp_listener",
+          "default": "tcp_listener",
+          "title": "Evidence",
+          "type": "string"
+        },
+        "exit_node_ip": {
+          "title": "Exit Node Ip",
+          "type": "string"
+        },
+        "exit_node_name": {
+          "title": "Exit Node Name",
+          "type": "string"
+        },
+        "health": {
+          "enum": [
+            "healthy",
+            "unhealthy",
+            "unknown"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "healthy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Healthy"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "port",
+        "exit_node_ip",
+        "exit_node_name",
+        "health",
+        "healthy"
+      ],
+      "title": "FleetStatusRelay",
+      "type": "object"
+    },
+    "FleetStatusSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "active_users": {
+          "title": "Active Users",
+          "type": "integer"
+        },
+        "connected_nodes": {
+          "title": "Connected Nodes",
+          "type": "integer"
+        },
+        "disabled_nodes": {
+          "title": "Disabled Nodes",
+          "type": "integer"
+        },
+        "disabled_users": {
+          "title": "Disabled Users",
+          "type": "integer"
+        },
+        "disconnected_nodes": {
+          "title": "Disconnected Nodes",
+          "type": "integer"
+        },
+        "health": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "unknown"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "missing_access_users": {
+          "title": "Missing Access Users",
+          "type": "integer"
+        },
+        "needs_attention": {
+          "title": "Needs Attention",
+          "type": "boolean"
+        },
+        "nodes": {
+          "title": "Nodes",
+          "type": "integer"
+        },
+        "nonactive_access_users": {
+          "title": "Nonactive Access Users",
+          "type": "integer"
+        },
+        "other_users": {
+          "title": "Other Users",
+          "type": "integer"
+        },
+        "relays": {
+          "title": "Relays",
+          "type": "integer"
+        },
+        "unhealthy_relays": {
+          "title": "Unhealthy Relays",
+          "type": "integer"
+        },
+        "unknown_nodes": {
+          "title": "Unknown Nodes",
+          "type": "integer"
+        },
+        "unknown_relay_hops": {
+          "default": 0,
+          "title": "Unknown Relay Hops",
+          "type": "integer"
+        },
+        "unknown_relays": {
+          "title": "Unknown Relays",
+          "type": "integer"
+        },
+        "users": {
+          "title": "Users",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "health",
+        "needs_attention",
+        "nodes",
+        "relays",
+        "users",
+        "active_users",
+        "disabled_users",
+        "other_users",
+        "missing_access_users",
+        "nonactive_access_users",
+        "connected_nodes",
+        "disconnected_nodes",
+        "disabled_nodes",
+        "unknown_nodes",
+        "unhealthy_relays",
+        "unknown_relays"
+      ],
+      "title": "FleetStatusSummary",
+      "type": "object"
+    },
+    "PanelStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "healthy": {
+          "title": "Healthy",
+          "type": "boolean"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "healthy"
+      ],
+      "title": "PanelStatus",
+      "type": "object"
+    },
+    "RelayHopMembership": {
+      "additionalProperties": false,
+      "properties": {
+        "advertised": {
+          "title": "Advertised",
+          "type": "boolean"
+        },
+        "chain": {
+          "title": "Chain",
+          "type": "string"
+        },
+        "health": {
+          "default": "unknown",
+          "enum": [
+            "healthy",
+            "unhealthy",
+            "unknown"
+          ],
+          "title": "Health",
+          "type": "string"
+        },
+        "position": {
+          "minimum": 1,
+          "title": "Position",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain",
+        "position",
+        "advertised"
+      ],
+      "title": "RelayHopMembership",
+      "type": "object"
+    },
+    "ServerInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "relay_hops": {
+          "items": {
+            "$ref": "#/$defs/RelayHopMembership"
+          },
+          "title": "Relay Hops",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "enum": [
+              "panel",
+              "exit",
+              "relay",
+              "routing_gateway"
+            ],
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "ssh_port": {
+          "title": "Ssh Port",
+          "type": "integer"
+        },
+        "ssh_user": {
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "ip",
+        "name",
+        "roles",
+        "ssh_user",
+        "ssh_port"
+      ],
+      "title": "ServerInventory",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/FleetStatusNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "panel": {
+      "$ref": "#/$defs/PanelStatus"
+    },
+    "relays": {
+      "items": {
+        "$ref": "#/$defs/FleetStatusRelay"
+      },
+      "title": "Relays",
+      "type": "array"
+    },
+    "servers": {
+      "items": {
+        "$ref": "#/$defs/ServerInventory"
+      },
+      "title": "Servers",
+      "type": "array"
+    },
+    "sources": {
+      "$ref": "#/$defs/FleetSources"
+    },
+    "summary": {
+      "$ref": "#/$defs/FleetStatusSummary"
+    }
+  },
+  "required": [
+    "panel",
+    "summary"
+  ],
+  "title": "FleetStatus",
+  "type": "object"
+}

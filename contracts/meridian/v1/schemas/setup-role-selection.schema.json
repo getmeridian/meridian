@@ -1,0 +1,222 @@
+{
+  "$defs": {
+    "ControlPlaneIntent": {
+      "additionalProperties": false,
+      "description": "One server that owns the Remnawave control-plane workload.",
+      "properties": {
+        "public_hostname": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Public Hostname"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "title": {
+          "default": "Meridian",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "server_ref"
+      ],
+      "title": "ControlPlaneIntent",
+      "type": "object"
+    },
+    "SetupExitRole": {
+      "additionalProperties": false,
+      "description": "One saved server assigned an exit workload ID.",
+      "properties": {
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "region": {
+          "default": "",
+          "maxLength": 2,
+          "pattern": "^$|^[A-Za-z]{2}$",
+          "title": "Region",
+          "type": "string"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "warp": {
+          "default": false,
+          "title": "Warp",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "server_ref"
+      ],
+      "title": "SetupExitRole",
+      "type": "object"
+    },
+    "SetupGatewayRole": {
+      "additionalProperties": false,
+      "description": "One saved server assigned an Xray routing-gateway workload.",
+      "properties": {
+        "bridge_path_ref": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Bridge Path Ref",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "server_ref": {
+          "maxLength": 120,
+          "minLength": 1,
+          "pattern": "^[^\\r\\n\\t]+$",
+          "title": "Server Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "server_ref",
+        "bridge_path_ref"
+      ],
+      "title": "SetupGatewayRole",
+      "type": "object"
+    },
+    "SetupRelayRole": {
+      "additionalProperties": false,
+      "description": "One ordered set of saved servers assigned a transparent relay path.",
+      "properties": {
+        "exit_ref": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Exit Ref",
+          "type": "string"
+        },
+        "hop_server_refs": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[^\\r\\n\\t]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Hop Server Refs",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "listen_port": {
+          "default": 443,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
+        "protocol_path_ref": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Protocol Path Ref",
+          "type": "string"
+        },
+        "reality_sni": {
+          "anyOf": [
+            {
+              "const": "",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "default": "",
+          "title": "Reality Sni"
+        }
+      },
+      "required": [
+        "id",
+        "hop_server_refs",
+        "exit_ref",
+        "protocol_path_ref"
+      ],
+      "title": "SetupRelayRole",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Role assignments collected before protocol details.",
+  "properties": {
+    "control": {
+      "$ref": "#/$defs/ControlPlaneIntent"
+    },
+    "exits": {
+      "items": {
+        "$ref": "#/$defs/SetupExitRole"
+      },
+      "minItems": 1,
+      "title": "Exits",
+      "type": "array"
+    },
+    "routing_gateways": {
+      "items": {
+        "$ref": "#/$defs/SetupGatewayRole"
+      },
+      "title": "Routing Gateways",
+      "type": "array"
+    },
+    "transparent_relays": {
+      "items": {
+        "$ref": "#/$defs/SetupRelayRole"
+      },
+      "title": "Transparent Relays",
+      "type": "array"
+    }
+  },
+  "required": [
+    "control",
+    "exits"
+  ],
+  "title": "SetupRoleSelection",
+  "type": "object"
+}

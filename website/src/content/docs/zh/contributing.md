@@ -7,15 +7,15 @@ section: reference
 
 ## 报告问题
 
-- **有 Bug？** 使用 [Bug 报告模板](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
-- **连接问题？** 使用 [连接问题模板](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian preflight`
-- **有功能想法？** 使用 [功能请求模板](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
+- **有 Bug？** 使用 [Bug 报告模板](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
+- **连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian preflight`
+- **有功能想法？** 使用 [功能请求模板](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
 - **安全漏洞？** 见 [安全](/docs/zh/security/)——不要开放公开问题
 
 ## 开发设置
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # 在可编辑模式下安装 CLI 和开发依赖
 make install
@@ -41,7 +41,7 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 关键模块：
 - `cli.py`——Typer 应用、子命令注册
 - `commands/`——每个子命令一个模块
-- `credentials.py`——`ServerCredentials` 数据类
+- `cluster.py` + `cluster_persistence.py`——类型化的 `cluster.yml` 状态与持久化
 - `servers.py`——`ServerRegistry` 用于已知服务器
 - `provision/`——幂等步骤管道
 
@@ -56,8 +56,8 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 ## 关键约定
 
 - **Shell 值使用 `shlex.quote()`**——不要插入未清理的值
-- **Connection-info 模板必须保持同步**（CSS/JS/应用链接）
-- **nginx 配置**放在 `/etc/nginx/conf.d/meridian-*.conf`，不是主 nginx.conf
+- **PWA 资产必须保持同步**（`templates/pwa/` 和应用目录）
+- **nginx 配置**使用 `/etc/nginx/stream.d/meridian.conf` 和 `/etc/nginx/conf.d/meridian-http.conf`
 - **配置程序步骤**返回 `StepResult`（ok/changed/skipped/failed）
 
 ## 测试

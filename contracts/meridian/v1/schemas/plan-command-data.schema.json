@@ -1,0 +1,390 @@
+{
+  "$defs": {
+    "CompiledPlanDriftResult": {
+      "additionalProperties": false,
+      "description": "One V4 compiler resource that does not match remote state.",
+      "properties": {
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id"
+      ],
+      "title": "CompiledPlanDriftResult",
+      "type": "object"
+    },
+    "CompiledPlanResourceResult": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for one reviewed V4 compiler resource.",
+      "properties": {
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "desired_hash": {
+          "title": "Desired Hash",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "server_baseline",
+            "control_plane_runtime",
+            "config_profile",
+            "inbound",
+            "node_binding",
+            "node_runtime",
+            "host",
+            "internal_squad",
+            "external_squad",
+            "access_user",
+            "service_user",
+            "subscription_template",
+            "subscription_settings",
+            "nginx_artifact",
+            "realm_hop",
+            "firewall_rule",
+            "certificate",
+            "routing_gateway",
+            "egress_pool",
+            "route_rule",
+            "probe"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id",
+        "kind",
+        "desired_hash"
+      ],
+      "title": "CompiledPlanResourceResult",
+      "type": "object"
+    },
+    "CompiledPlanResult": {
+      "additionalProperties": false,
+      "description": "Read-only drift result for a V4 compiler plan.",
+      "properties": {
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "drifted_resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Drifted Resources",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "observation_errors": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Observation Errors",
+          "type": "array"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanResourceResult"
+          },
+          "title": "Resources",
+          "type": "array"
+        },
+        "state_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "State Changes",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "converged",
+        "summary",
+        "exit_code"
+      ],
+      "title": "CompiledPlanResult",
+      "type": "object"
+    },
+    "PlanActionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "can_run_parallel": {
+          "default": false,
+          "title": "Can Run Parallel",
+          "type": "boolean"
+        },
+        "change_set": {
+          "items": {
+            "$ref": "#/$defs/PlanChange"
+          },
+          "title": "Change Set",
+          "type": "array"
+        },
+        "destructive": {
+          "title": "Destructive",
+          "type": "boolean"
+        },
+        "destructive_reason": {
+          "title": "Destructive Reason",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "execution_order": {
+          "title": "Execution Order",
+          "type": "integer"
+        },
+        "from_extras": {
+          "title": "From Extras",
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "add_node",
+            "update_node",
+            "remove_node",
+            "add_client",
+            "remove_client",
+            "add_relay",
+            "update_relay",
+            "remove_relay",
+            "add_subscription_page",
+            "remove_subscription_page"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "add",
+            "update",
+            "remove",
+            "replace"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "provision",
+            "configure",
+            "deprovision",
+            "replace"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "plan_index": {
+          "title": "Plan Index",
+          "type": "integer"
+        },
+        "replacement": {
+          "title": "Replacement",
+          "type": "boolean"
+        },
+        "replacement_strategy": {
+          "enum": [
+            "none",
+            "delete_then_create"
+          ],
+          "title": "Replacement Strategy",
+          "type": "string"
+        },
+        "requires_confirmation": {
+          "title": "Requires Confirmation",
+          "type": "boolean"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_type": {
+          "enum": [
+            "node",
+            "client",
+            "relay",
+            "subscription_page"
+          ],
+          "title": "Resource Type",
+          "type": "string"
+        },
+        "symbol": {
+          "enum": [
+            "+",
+            "~",
+            "-"
+          ],
+          "title": "Symbol",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_index",
+        "execution_order",
+        "kind",
+        "operation",
+        "resource_type",
+        "resource_id",
+        "target",
+        "detail",
+        "destructive",
+        "replacement",
+        "replacement_strategy",
+        "from_extras",
+        "phase",
+        "requires_confirmation",
+        "destructive_reason",
+        "symbol"
+      ],
+      "title": "PlanActionResult",
+      "type": "object"
+    },
+    "PlanChange": {
+      "additionalProperties": false,
+      "properties": {
+        "after": {
+          "title": "After",
+          "type": "string"
+        },
+        "before": {
+          "title": "Before",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "before",
+        "after"
+      ],
+      "title": "PlanChange",
+      "type": "object"
+    },
+    "PlanCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "title": "Actions",
+          "type": "integer"
+        },
+        "adds": {
+          "title": "Adds",
+          "type": "integer"
+        },
+        "destructive": {
+          "title": "Destructive",
+          "type": "integer"
+        },
+        "from_extras": {
+          "title": "From Extras",
+          "type": "integer"
+        },
+        "removes": {
+          "title": "Removes",
+          "type": "integer"
+        },
+        "replacements": {
+          "title": "Replacements",
+          "type": "integer"
+        },
+        "updates": {
+          "title": "Updates",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actions",
+        "adds",
+        "updates",
+        "replacements",
+        "removes",
+        "destructive",
+        "from_extras"
+      ],
+      "title": "PlanCounts",
+      "type": "object"
+    },
+    "PlanResult": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/PlanActionResult"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "counts": {
+          "$ref": "#/$defs/PlanCounts"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "converged",
+        "summary",
+        "exit_code",
+        "counts"
+      ],
+      "title": "PlanResult",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/PlanResult"
+    },
+    {
+      "$ref": "#/$defs/CompiledPlanResult"
+    }
+  ],
+  "description": "Success data returned by legacy and V4 plan execution.",
+  "title": "PlanCommandData"
+}

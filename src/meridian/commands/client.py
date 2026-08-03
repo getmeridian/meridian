@@ -1,397 +1,317 @@
-"""Client management -- add, list, remove proxy clients."""
+"""Client management -- add, show, list, remove proxy clients.
+
+All client state lives in Remnawave's database. No local proxy.yml,
+no credential sync, no rollback. One API call per operation.
+"""
 
 from __future__ import annotations
 
-import re
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import TYPE_CHECKING
+import typer
+from rich.markup import escape
 
-from meridian.commands.resolve import (
-    ensure_server_connection,
-    fetch_credentials,
-    resolve_server,
+from meridian.commands._helpers import format_traffic, load_cluster, make_panel
+from meridian.commands.client_handoff import (
+    build_page_url as _build_page_url,
 )
-from meridian.config import SERVERS_FILE
-from meridian.console import err_console, fail, info, ok, warn
-from meridian.credentials import ClientEntry, ServerCredentials
-from meridian.display import print_terminal_output
-from meridian.models import Inbound
-from meridian.panel import PanelClient, PanelError
-from meridian.protocols import PROTOCOLS, Protocol, get_protocol
-from meridian.render import save_connection_html
-from meridian.servers import ServerRegistry
-from meridian.urls import build_all_relay_urls, build_protocol_urls
-
-if TYPE_CHECKING:
-    from meridian.commands.resolve import ResolvedServer
-    from meridian.models import ProtocolURL, RelayURLSet
-    from meridian.ssh import ServerConnection
-
-# -- Helpers --
-
-
-def _validate_client_name(name: str) -> None:
-    """Validate client name format. Exits on invalid."""
-    if not name:
-        fail("Client name is required", hint="Usage: meridian client add NAME", hint_type="user")
-    if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$", name):
-        fail(
-            f"Client name '{name}' is invalid",
-            hint="Use letters, numbers, hyphens, and underscores.",
-            hint_type="user",
-        )
-
-
-def _load_creds(creds_dir: Path) -> ServerCredentials:
-    """Load and validate credentials from creds_dir."""
-    proxy_file = creds_dir / "proxy.yml"
-    if not proxy_file.exists():
-        fail("No credentials found", hint="Deploy the server first: meridian deploy", hint_type="user")
-
-    creds = ServerCredentials.load(proxy_file)
-    if not creds.has_credentials:
-        fail("No panel credentials found", hint="Deploy the server first: meridian deploy", hint_type="user")
-    return creds
-
-
-def _make_panel(creds: ServerCredentials, conn: ServerConnection) -> PanelClient:
-    """Create and authenticate a PanelClient."""
-    panel = PanelClient(
-        conn=conn,
-        panel_port=creds.panel.port,
-        web_base_path=creds.panel.web_base_path or "",
-    )
-    try:
-        panel.login(creds.panel.username or "", creds.panel.password or "")
-    except PanelError as e:
-        fail(
-            f"Could not connect to server panel: {e}",
-            hint="Check credentials or run: meridian deploy",
-            hint_type="system",
-        )
-    return panel
-
-
-def _sync_credentials_to_server(resolved: ResolvedServer) -> bool:
-    """Sync local credentials back to the server's /etc/meridian/.
-
-    Uses conn.write_file() which handles sudo for non-root users — SCP alone
-    can't write to root-owned /etc/meridian/.
-    """
-    if resolved.local_mode:
-        return True  # Already on the server
-
-    all_ok = True
-    for path in resolved.creds_dir.iterdir():
-        if not path.is_file():
-            continue
-        if not resolved.conn.write_file(path, f"/etc/meridian/{path.name}"):
-            all_ok = False
-    return all_ok
-
-
-def _refresh_credentials_or_fail(resolved: ResolvedServer, *, action: str) -> None:
-    """Force-refresh credentials before mutating local state."""
-    if fetch_credentials(resolved, force=True):
-        return
-    fail(
-        f"Could not refresh credentials before {action}",
-        hint="Check SSH/SCP and retry. Meridian will not mutate cached state without a fresh server read.",
-        hint_type="system",
-    )
-
-
-def _save_credentials_with_sync(
-    resolved: ResolvedServer,
-    creds: ServerCredentials,
-    *,
-    recovery_hint: str,
-) -> None:
-    """Persist credentials locally and fail closed if server sync fails."""
-    proxy_file = resolved.creds_dir / "proxy.yml"
-    original_bytes = proxy_file.read_bytes() if proxy_file.exists() else None
-
-    creds.save(proxy_file)
-    if _sync_credentials_to_server(resolved):
-        return
-
-    if original_bytes is None:
-        proxy_file.unlink(missing_ok=True)
-    else:
-        proxy_file.write_bytes(original_bytes)
-        proxy_file.chmod(0o600)
-
-    fail(
-        "Could not sync updated credentials to server",
-        hint=recovery_hint,
-        hint_type="system",
-    )
-
-
-def _deploy_client_page(
-    resolved: ResolvedServer,
-    creds: ServerCredentials,
-    protocol_urls: list[ProtocolURL],
-    client_name: str,
-    reality_uuid: str,
-    relay_entries: list[RelayURLSet] | None = None,
-) -> str:
-    """Render and upload PWA connection page files for a client.
-
-    Returns the hosted page URL, or empty string on failure.
-    """
-    from dataclasses import replace as dc_replace
-
-    from meridian.pwa import generate_client_files, upload_client_files
-    from meridian.urls import generate_qr_base64
-
-    info_page_path = creds.panel.info_page_path or ""
-    server_ip = creds.server.ip or resolved.ip
-    domain = creds.server.domain or ""
-
-    # Attach QR codes to protocol URLs
-    urls_with_qr = [dc_replace(p, qr_b64=generate_qr_base64(p.url)) if p.url else p for p in protocol_urls]
-
-    host = domain or server_ip
-    page_url = f"https://{host}/{info_page_path}/{reality_uuid}/"
-
-    client_files = generate_client_files(
-        urls_with_qr,
-        server_ip=server_ip,
-        domain=domain,
-        client_name=client_name,
-        relay_entries=relay_entries,
-        server_name=creds.branding.server_name,
-        server_icon=creds.branding.icon,
-        color=creds.branding.color,
-        page_url=page_url,
-    )
-
-    conn = resolved.conn
-    upload_error = upload_client_files(conn, reality_uuid, client_files)
-    if upload_error:
-        warn(f"Could not deploy server-hosted connection page: {upload_error}")
-        return ""
-
-    return page_url
-
-
-def _remove_client_page(
-    resolved: ResolvedServer,
-    reality_uuid: str,
-) -> None:
-    """Remove a client's server-hosted connection page."""
-    import shlex
-
-    if not reality_uuid:
-        return
-
-    conn = resolved.conn
-    q_uuid = shlex.quote(reality_uuid)
-    conn.run(f"rm -rf /var/www/private/{q_uuid}", timeout=10)
-
+from meridian.commands.client_handoff import (
+    cleanup_client_page as _cleanup_client_page,
+)
+from meridian.commands.client_handoff import (
+    format_status as _format_status,
+)
+from meridian.commands.client_handoff import (
+    get_user_or_fail as _get_user_or_fail,
+)
+from meridian.commands.client_handoff import (
+    print_handoff_links as _print_handoff_links,
+)
+from meridian.commands.client_handoff import (
+    print_subscription as _print_subscription,
+)
+from meridian.commands.client_handoff import (
+    resolve_page_url as _resolve_page_url,
+)
+from meridian.commands.client_handoff import (
+    validate_client_name as _validate_client_name,
+)
+from meridian.commands.client_state import (
+    build_client_persistence_warning as _build_client_persistence_warning,
+)
+from meridian.commands.client_state import (
+    capture_client_state_failure as _capture_client_state_failure,
+)
+from meridian.commands.client_state import (
+    persist_client_state as _persist_client_state,
+)
+from meridian.commands.client_state import (
+    require_v4_access_user as _require_v4_access_user,
+)
+from meridian.commands.client_v4 import run_add_v4 as _run_add_v4
+from meridian.console import confirm, err_console, error_context, fail, info, is_json_mode, ok, warn
+from meridian.core.clients import (
+    PanelUserLike,
+    build_client_add_result,
+    build_client_remove_result,
+    build_client_status_result,
+)
+from meridian.core.fleet import public_url
+from meridian.core.models import MeridianError, Summary
+from meridian.core.output import OperationContext, command_envelope
+from meridian.core.redaction import redact_string
+from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
+from meridian.remnawave import RemnawaveError, User
+from meridian.renderers import emit_json
+from meridian.ssh import SSHError
 
 # -- Client Add --
 
 
 def run_add(
-    name: str,
-    user: str = "root",
-    requested_server: str = "",
+    names: list[str],
+    json_mode: bool = False,
 ) -> None:
-    """Add a new client to the proxy server via direct panel API calls."""
-    _validate_client_name(name)
+    """Add one or more clients to the proxy cluster."""
+    operation = OperationContext()
+    with error_context("client.add", timer=operation.timer):
+        _run_add(names=names, operation=operation, json_mode=json_mode)
 
-    registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, user=user)
-    resolved = ensure_server_connection(resolved)
-    _refresh_credentials_or_fail(resolved, action=f"adding client '{name}'")
 
-    creds = _load_creds(resolved.creds_dir)
-    info(f"Adding client '{name}'...")
+def _run_add(
+    *,
+    names: list[str],
+    operation: OperationContext,
+    json_mode: bool = False,
+) -> None:
+    """Implementation for client add with command metadata attached."""
+    # --- Validate ALL names first (fail early) ---
+    for name in names:
+        _validate_client_name(name)
 
-    # Check for duplicates in credentials
-    if any(c.name == name for c in creds.clients):
-        fail(f"Client '{name}' already exists", hint="Use: meridian client list", hint_type="user")
-
-    # Connect to panel
-    panel = _make_panel(creds, resolved.conn)
-    with panel:
-        # List inbounds and find active ones
-        try:
-            inbounds = panel.list_inbounds()
-        except PanelError as e:
-            fail(f"Could not retrieve server configuration: {e}", hint_type="system")
-
-        # Reality is the canonical protocol -- must exist
-        reality_proto = get_protocol("reality")
-        if reality_proto is None:
-            raise ValueError("Reality protocol not registered -- this is a bug")
-        reality_inbound = reality_proto.find_inbound(inbounds)
-
-        if reality_inbound is None:
+    # Reject duplicates within the batch
+    seen: set[str] = set()
+    for name in names:
+        lower = name.lower()
+        if lower in seen:
             fail(
-                "Server is not set up yet",
-                hint="Deploy first: meridian deploy",
+                f"Duplicate client name in batch: '{name}'",
+                hint="Remove the duplicate and try again",
+                hint_type="user",
+            )
+        seen.add(lower)
+
+    cluster = load_cluster()
+    if cluster.topology_intent is not None:
+        _run_add_v4(names, cluster, operation, print_subscription=_print_subscription)
+        return
+    panel = make_panel(cluster)
+
+    with panel:
+        # Check for conflicts with existing users
+        for name in names:
+            existing = _get_user_or_fail(panel, name, action="check")
+            if existing is not None:
+                fail(
+                    f"Client '{name}' already exists",
+                    hint="Use: meridian client show " + name,
+                    hint_type="user",
+                )
+
+        # --- Best-effort creation ---
+        succeeded: list[tuple[str, User]] = []
+        failed: list[tuple[str, str]] = []
+
+        squad_uuids = [cluster.squad_uuid] if cluster.squad_uuid else None
+        for name in names:
+            info(f"Adding client '{name}'...")
+            try:
+                new_user = panel.create_user(name, squad_uuids=squad_uuids)
+            except RemnawaveError as e:
+                failed.append((name, str(e)))
+                continue
+            succeeded.append((name, new_user))
+
+        # If everything failed, exit with the first error
+        if not succeeded:
+            first_name, first_err = failed[0]
+            fail(
+                f"Could not create client '{first_name}': {first_err}",
+                hint="Check panel connectivity",
                 hint_type="system",
             )
 
-        # Check if client already exists in the panel (by email)
-        reality_email = f"{reality_proto.email_prefix}{name}"
-        for client in reality_inbound.clients:
-            if client.get("email") == reality_email:
-                fail(f"Client '{name}' already exists on the panel", hint="Use: meridian client list", hint_type="user")
+        # Hybrid sync + page deploy for each successful client
+        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_add
 
-        # Generate UUIDs -- one for Reality (shared with XHTTP), one for WSS
+        # Open one SSH connection for all page deployments
+        _conn = None
+        panel_node = cluster.panel_node
+        deploy_pages = bool(cluster.panel.server_ip and panel_node)
+        deployed_page_urls: dict[str, str] = {}
+        page_failures: list[tuple[str, str]] = []
+        page_state_changed = False
+        persistence_error = ""
+
+        if deploy_pages:
+            try:
+                from meridian.ssh import ServerConnection
+
+                _conn = ServerConnection(
+                    cluster.panel.server_ip,
+                    user=cluster.panel.ssh_user or "root",
+                    port=getattr(cluster.panel, "ssh_port", 22) or 22,
+                )
+                _conn.__enter__()
+            except (OSError, RuntimeError, SSHError):
+                _conn = None  # Non-fatal
+
         try:
-            reality_uuid = panel.generate_uuid()
-        except PanelError as e:
-            fail(f"Failed to generate UUID: {e}", hint_type="system")
+            for name, new_user in succeeded:
+                state_error = _capture_client_state_failure(lambda: hybrid_sync_desired_clients_add(cluster, name))
+                persistence_error = state_error or persistence_error
 
-        wss_uuid = ""
-        domain = creds.server.domain or ""
+                page_url = _build_page_url(cluster, new_user.vless_uuid, require_deployed=False)
 
-        # Build active protocol list: (protocol, inbound, uuid)
-        active: list[tuple[Protocol, Inbound, str]] = []
-        uuids: dict[str, str] = {"reality": reality_uuid}
+                # Deploy connection page files
+                if deploy_pages and _conn is not None and page_url and panel_node:
+                    try:
+                        from meridian.pwa import deploy_client_page, mark_connection_page_failed
 
-        for proto in PROTOCOLS.values():
-            ib = proto.find_inbound(inbounds)
-            if ib is None:
-                continue
-            if proto.requires_domain and not domain:
-                continue
+                        sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
+                        deployed_url = deploy_client_page(
+                            _conn,
+                            cluster,
+                            panel_node,
+                            new_user.vless_uuid,
+                            name,
+                            sub_url,
+                        )
+                        if deployed_url:
+                            deployed_page_urls[name] = deployed_url
+                            page_state_changed = True
+                        else:
+                            mark_connection_page_failed(cluster, new_user.vless_uuid)
+                            page_state_changed = True
+                            page_failures.append((name, "page upload did not complete"))
+                    except (OSError, RuntimeError, SSHError, RemnawaveError) as exc:
+                        from meridian.pwa import mark_connection_page_failed
 
-            # Determine UUID: shared or unique
-            if proto.shares_uuid_with and proto.shares_uuid_with in uuids:
-                uuid = uuids[proto.shares_uuid_with]
-            elif proto.key in uuids:
-                uuid = uuids[proto.key]
-            else:
+                        mark_connection_page_failed(cluster, new_user.vless_uuid)
+                        page_state_changed = True
+                        page_failures.append((name, redact_string(str(exc))))
+                elif page_url:
+                    from meridian.pwa import mark_connection_page_failed
+
+                    mark_connection_page_failed(cluster, new_user.vless_uuid)
+                    page_state_changed = True
+                    page_failures.append((name, "panel SSH connection is unavailable"))
+        finally:
+            if _conn is not None:
                 try:
-                    uuid = panel.generate_uuid()
-                except PanelError as e:
-                    fail(f"Failed to generate UUID for {proto.key}: {e}", hint_type="system")
-                uuids[proto.key] = uuid
+                    _conn.__exit__(None, None, None)
+                except (OSError, RuntimeError, SSHError):
+                    pass
+        if page_state_changed or persistence_error:
+            persistence_error = _persist_client_state(cluster)
 
-            if proto.key == "wss":
-                wss_uuid = uuid
-
-            active.append((proto, ib, uuid))
-
-        # Add client to each active inbound
-        for proto, ib, uuid in active:
-            email = f"{proto.email_prefix}{name}"
-            client_settings = proto.client_settings(uuid, email)
-            try:
-                panel.add_client(ib.id, client_settings)
-            except PanelError as e:
-                fail(f"Failed to add client to {proto.remark}: {e}", hint_type="system")
-
-        ok(f"Client '{name}' added to panel")
-
-        # Add client to relay-specific inbounds (per-relay SNI)
-        for relay in creds.relays:
-            if not relay.sni:
-                continue
-            from meridian.commands.relay import _relay_inbound_remark, _relay_label
-
-            remark = _relay_inbound_remark(relay)
-            relay_ib = panel.find_inbound(remark)
-            if relay_ib is None:
-                continue
-            relay_email = f"relay-{_relay_label(relay)}-{name}"
-            relay_client = {
-                "clients": [
-                    {
-                        "id": reality_uuid,
-                        "flow": "xtls-rprx-vision",
-                        "email": relay_email,
-                        "limitIp": 2,
-                        "totalGB": 0,
-                        "expiryTime": 0,
-                        "enable": True,
-                        "tgId": "",
-                        "subId": "",
-                        "reset": 0,
-                    }
-                ],
+        # --- JSON output ---
+        partial_warnings = [
+            MeridianError(
+                code="MERIDIAN_CLIENT_ADD_PARTIAL_FAILURE",
+                category="system",
+                message=f"Could not add client '{name}': {redact_string(reason)}",
+                hint="Retry the failed client after checking panel connectivity.",
+                retryable=True,
+                exit_code=3,
+                details={"client": name},
+            )
+            for name, reason in failed
+        ]
+        partial_warnings.extend(
+            MeridianError(
+                code="MERIDIAN_CLIENT_PAGE_DEPLOY_FAILED",
+                category="system",
+                message=f"Client '{name}' was added, but its share page was not deployed: {reason}",
+                hint=(
+                    f"Use the subscription URL now. After restoring panel SSH, run "
+                    f"`meridian client show {name} --repair-page`."
+                ),
+                retryable=True,
+                exit_code=3,
+                details={"client": name},
+            )
+            for name, reason in page_failures
+        )
+        if persistence_error:
+            partial_warnings.append(
+                _build_client_persistence_warning(
+                    operation="adding clients",
+                    reason=persistence_error,
+                )
+            )
+        if is_json_mode():
+            result = build_client_add_result(succeeded)
+            count = len(succeeded)
+            exit_code = 3 if failed or page_failures or persistence_error else 0
+            counts = {
+                "added": count,
+                "failed": len(failed),
+                "page_deploy_failed": len(page_failures),
             }
-            try:
-                panel.add_client(relay_ib.id, relay_client)
-            except PanelError:
-                warn(f"Could not add client to relay inbound {remark}")
-
-        # Update credentials file
-        creds.clients.append(
-            ClientEntry(
-                name=name,
-                added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                reality_uuid=reality_uuid,
-                wss_uuid=wss_uuid,
+            if persistence_error:
+                counts["state_save_failed"] = 1
+            emit_json(
+                command_envelope(
+                    command="client.add",
+                    data=result.to_data(),
+                    summary=Summary(
+                        text=f"Added {count} client(s); {len(failed)} failed",
+                        changed=True,
+                        counts=counts,
+                    ),
+                    exit_code=exit_code,
+                    warnings=partial_warnings,
+                    timer=operation.timer,
+                )
             )
-        )
-        _save_credentials_with_sync(
-            resolved,
-            creds,
-            recovery_hint=(
-                f"The client may already exist on the panel. Once SSH/SCP works, run: "
-                f"meridian client show {name} --server {resolved.ip}"
-            ),
-        )
+            if exit_code:
+                raise typer.Exit(exit_code)
+            return
 
-        # Generate output files
-        protocol_urls = build_protocol_urls(
-            name=name,
-            reality_uuid=reality_uuid,
-            wss_uuid=wss_uuid,
-            creds=creds,
-            server_name=creds.branding.server_name,
-        )
+        # --- Report results ---
+        succeeded_names = [n for n, _ in succeeded]
+        if failed:
+            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
+            for fail_name, fail_err in failed:
+                err_console.print(
+                    f"  [red]Failed to add '{escape(fail_name)}': {escape(redact_string(fail_err))}[/red]"
+                )
+        else:
+            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
+        for page_name, page_error in page_failures:
+            warn(f"Share page for '{page_name}' was not deployed: {page_error}")
+        if persistence_error:
+            warn(partial_warnings[-1].message)
 
-        # Build relay URL sets (if exit has relays)
-        relay_url_sets = build_all_relay_urls(
-            name,
-            reality_uuid,
-            wss_uuid,
-            creds,
-            server_name=creds.branding.server_name,
-        )
+        # Show subscription info for each added client
+        handoff_failures: list[tuple[str, str]] = []
+        for name, new_user in succeeded:
+            page_url = deployed_page_urls.get(name, "")
+            if len(succeeded) > 1:
+                err_console.print()
+                err_console.print(f"  [bold]— {escape(name)} —[/bold]")
+            handoff_error = _print_subscription(panel, new_user, page_url=page_url)
+            if isinstance(handoff_error, str) and handoff_error:
+                handoff_failures.append((name, handoff_error))
+                warn(f"Client '{name}' was added, but its subscription handoff is unavailable: {handoff_error}")
 
-        server_ip = creds.server.ip or resolved.ip
-        file_prefix = f"{resolved.ip}-{name}"
-        save_connection_html(
-            protocol_urls,
-            resolved.creds_dir / f"{file_prefix}-connection-info.html",
-            server_ip,
-            domain=domain,
-            relay_entries=relay_url_sets,
-        )
-
-        # Deploy server-hosted connection page (if enabled)
-        hosted_page_url = ""
-        if creds.server.hosted_page and creds.panel.info_page_path:
-            hosted_page_url = _deploy_client_page(
-                resolved,
-                creds,
-                protocol_urls,
-                name,
-                reality_uuid,
-                relay_entries=relay_url_sets or None,
-            )
-
-        # Print terminal output
-        print_terminal_output(
-            protocol_urls,
-            resolved.creds_dir,
-            server_ip,
-            hosted_page_url=hosted_page_url,
-            relay_entries=relay_url_sets or None,
-        )
-
-        err_console.print(f"  [dim]Test reachability: meridian test {resolved.ip}[/dim]")
-        err_console.print("  [dim]View all clients:  meridian client list[/dim]\n")
+    err_console.print()
+    if len(succeeded) == 1:
+        only_name = succeeded[0][0]
+        err_console.print("  [dim]Show client:       meridian client show " + escape(only_name) + "[/dim]")
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+    if failed or page_failures or handoff_failures or persistence_error:
+        raise typer.Exit(3)
 
 
 # -- Client Show --
@@ -399,300 +319,156 @@ def run_add(
 
 def run_show(
     name: str,
-    user: str = "root",
-    requested_server: str = "",
+    repair_page: bool = False,
 ) -> None:
     """Display connection info for an existing client."""
-    _validate_client_name(name)
-
-    registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, user=user)
-    resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
-
-    creds = _load_creds(resolved.creds_dir)
-
-    # Find the client in credentials
-    client_entry = next((c for c in creds.clients if c.name == name), None)
-    if client_entry is None:
-        # Client not in local creds — try to find in panel (handles credential sync gaps)
-        panel = _make_panel(creds, resolved.conn)
-        with panel:
-            try:
-                inbounds = panel.list_inbounds()
-            except PanelError:
-                fail(
-                    f"Client '{name}' not found in credentials",
-                    hint="Check client name with: meridian client list",
-                    hint_type="user",
-                )
-            reality_proto = get_protocol("reality")
-            if reality_proto is None:
-                raise ValueError("Reality protocol not registered -- this is a bug")
-            reality_inbound = reality_proto.find_inbound(inbounds)
-            if reality_inbound is None:
-                fail(
-                    f"Client '{name}' not found",
-                    hint="Check client name with: meridian client list",
-                    hint_type="user",
-                )
-
-            # Find client by email
-            reality_email = f"{reality_proto.email_prefix}{name}"
-            reality_uuid = ""
-            for client in reality_inbound.clients:
-                if client.get("email") == reality_email:
-                    reality_uuid = client.get("id", "")
-                    break
-
-            if not reality_uuid:
-                fail(
-                    f"Client '{name}' not found",
-                    hint="Check client name with: meridian client list",
-                    hint_type="user",
-                )
-
-            # Find WSS UUID if applicable
-            wss_uuid = ""
-            wss_proto = get_protocol("wss")
-            if wss_proto:
-                wss_inbound = wss_proto.find_inbound(inbounds)
-                if wss_inbound:
-                    wss_email = f"{wss_proto.email_prefix}{name}"
-                    for client in wss_inbound.clients:
-                        if client.get("email") == wss_email:
-                            wss_uuid = client.get("id", "")
-                            break
-
-            # Sync back to credentials
-            client_entry = ClientEntry(
-                name=name,
-                added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                reality_uuid=reality_uuid,
-                wss_uuid=wss_uuid,
-            )
-            creds.clients.append(client_entry)
-            _save_credentials_with_sync(
-                resolved,
-                creds,
-                recovery_hint=(
-                    f"The client was found on the panel but Meridian could not publish refreshed credentials. "
-                    f"Once SSH/SCP works, run: meridian client show {name} --server {resolved.ip}"
-                ),
-            )
-            warn(f"Client '{name}' recovered from panel (credentials synced)")
-
-    # Build protocol URLs
-    protocol_urls = build_protocol_urls(
-        name=name,
-        reality_uuid=client_entry.reality_uuid,
-        wss_uuid=client_entry.wss_uuid,
-        creds=creds,
-        server_name=creds.branding.server_name,
-    )
-
-    # Build relay URL sets (if exit has relays)
-    relay_url_sets = build_all_relay_urls(
-        name,
-        client_entry.reality_uuid,
-        client_entry.wss_uuid,
-        creds,
-        server_name=creds.branding.server_name,
-    )
-
-    server_ip = creds.server.ip or resolved.ip
-
-    # Check for hosted page URL
-    hosted_page_url = ""
-    if creds.server.hosted_page and creds.panel.info_page_path and client_entry.reality_uuid:
-        host = creds.server.domain or server_ip
-        hosted_page_url = f"https://{host}/{creds.panel.info_page_path}/{client_entry.reality_uuid}/"
-
-    # Print terminal output
-    print_terminal_output(
-        protocol_urls,
-        resolved.creds_dir,
-        server_ip,
-        hosted_page_url=hosted_page_url,
-        relay_entries=relay_url_sets or None,
-        header_verb="connection info",
-    )
-
-    err_console.print(f"  [dim]Test reachability: meridian test {resolved.ip}[/dim]")
-    err_console.print("  [dim]View all clients:  meridian client list[/dim]\n")
+    operation = OperationContext()
+    with error_context("client.show", timer=operation.timer):
+        _run_show(name=name, repair_page=repair_page, operation=operation)
 
 
-# -- Client List --
-
-
-def run_list(
-    user: str = "root",
-    requested_server: str = "",
-) -> None:
-    """List all clients via direct panel API query."""
-    registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, user=user)
-
-    resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
-
-    creds = _load_creds(resolved.creds_dir)
-    panel = _make_panel(creds, resolved.conn)
-    with panel:
-        try:
-            inbounds = panel.list_inbounds()
-        except PanelError as e:
-            fail(f"Could not retrieve server configuration: {e}", hint_type="system")
-
-        _display_client_list_from_inbounds(inbounds)
-
-
-# -- Client Remove --
-
-
-def run_remove(
+def _run_show(
+    *,
     name: str,
-    user: str = "root",
-    requested_server: str = "",
+    repair_page: bool = False,
+    operation: OperationContext,
 ) -> None:
-    """Remove a client from the proxy server via direct panel API calls."""
+    """Implementation for client show with command metadata attached."""
     _validate_client_name(name)
+    cluster = load_cluster()
+    repaired = False
+    repair_persistence_error = ""
 
-    registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, user=user)
-    resolved = ensure_server_connection(resolved)
-    _refresh_credentials_or_fail(resolved, action=f"removing client '{name}'")
+    def share_url(panel_user: PanelUserLike) -> str:
+        nonlocal repair_persistence_error, repaired
+        resolution = _resolve_page_url(cluster, panel_user, repair=repair_page)
+        repaired = repaired or resolution.repaired
+        repair_persistence_error = resolution.persistence_error or repair_persistence_error
+        return resolution.url
 
-    creds = _load_creds(resolved.creds_dir)
-    info(f"Removing client '{name}'...")
-    tracked_client = next((c for c in creds.clients if c.name == name), None)
-
-    panel = _make_panel(creds, resolved.conn)
-    with panel:
-        try:
-            inbounds = panel.list_inbounds()
-        except PanelError as e:
-            fail(f"Could not retrieve server configuration: {e}", hint_type="system")
-
-        # Verify client exists in Reality inbound (canonical)
-        reality_proto = get_protocol("reality")
-        if reality_proto is None:
-            raise ValueError("Reality protocol not registered -- this is a bug")
-        reality_inbound = reality_proto.find_inbound(inbounds)
-
-        if reality_inbound is None:
-            fail("No Reality inbound found on the server", hint_type="system")
-
-        # Find client by email in Reality inbound
-        client_email = f"{reality_proto.email_prefix}{name}"
-        client_found = False
-        removed_reality_uuid = tracked_client.reality_uuid if tracked_client else ""
-        for client in reality_inbound.clients:
-            if client.get("email") == client_email:
-                client_found = True
-                removed_reality_uuid = client.get("id", "") or removed_reality_uuid
-                break
-
-        if not client_found:
-            if tracked_client is None:
-                fail(
-                    f"Client '{name}' not found",
-                    hint="Check client name with: meridian client list",
-                    hint_type="user",
-                )
-            warn(f"Client '{name}' is already absent from the panel — syncing credentials only")
-
-        # Remove from each active protocol's inbound
-        for proto in PROTOCOLS.values():
-            email = f"{proto.email_prefix}{name}"
-            ib = proto.find_inbound(inbounds)
-            if ib is None:
-                continue
-            # Find client UUID by email
-            for client in ib.clients:
-                if client.get("email") == email:
-                    client_uuid = client.get("id", "")
-                    if client_uuid:
-                        try:
-                            panel.remove_client(ib.id, client_uuid)
-                        except PanelError as e:
-                            warn(f"Failed to remove from {proto.remark}: {e}")
-
-        if client_found:
-            ok(f"Client '{name}' removed from panel")
-
-        # Remove from relay-specific inbounds (per-relay SNI)
-        for relay in creds.relays:
-            if not relay.sni:
-                continue
-            from meridian.commands.relay import _relay_inbound_remark, _relay_label
-
-            remark = _relay_inbound_remark(relay)
-            relay_ib = panel.find_inbound(remark)
-            if relay_ib is None:
-                continue
-            relay_email = f"relay-{_relay_label(relay)}-{name}"
-            for client in relay_ib.clients:
-                if client.get("email") == relay_email:
-                    client_uuid = client.get("id", "")
-                    if client_uuid:
-                        try:
-                            panel.remove_client(relay_ib.id, client_uuid)
-                        except PanelError:
-                            pass  # best-effort
-                    break
-
-        # Update credentials file
-        creds.clients = [c for c in creds.clients if c.name != name]
-        _save_credentials_with_sync(
-            resolved,
-            creds,
-            recovery_hint=(
-                f"The client may already be removed on the panel. Once SSH/SCP works, rerun: "
-                f"meridian client remove {name} --server {resolved.ip}"
-            ),
+    try:
+        result = collect_client_show(
+            make_panel(cluster),
+            name,
+            build_share_url=share_url,
+            allowed_usernames=(cluster.topology_intent.access.users if cluster.topology_intent is not None else None),
+        )
+    except ClientNotFoundError:
+        fail(
+            f"Client '{name}' not found",
+            hint="Check client name with: meridian client list",
+            hint_type="user",
+        )
+    except RemnawaveError as e:
+        fail(
+            f"Could not show client: {e}",
+            hint=e.hint or "Check panel connectivity",
+            hint_type=e.category,
         )
 
-        # Delete local output files
-        for pattern in [
-            f"*-{name}-connection-info.html",
-        ]:
-            for f in resolved.creds_dir.glob(pattern):
-                f.unlink(missing_ok=True)
+    detail = result.client.client
+    repair_warnings: list[MeridianError] = []
+    if repair_page and not result.share_url:
+        repair_warnings.append(
+            MeridianError(
+                code="MERIDIAN_CLIENT_PAGE_REPAIR_FAILED",
+                category="system",
+                message=f"Client '{detail.username}' is available, but its connection page could not be repaired.",
+                hint="Check panel-host SSH and page deployment state, then retry --repair-page.",
+                retryable=True,
+                exit_code=3,
+                details={"client": detail.username},
+            )
+        )
+    if repair_persistence_error:
+        repair_warnings.append(
+            _build_client_persistence_warning(
+                operation="recording connection-page evidence for client",
+                client=detail.username,
+                reason=repair_persistence_error,
+                remote_state_changed=repaired or repair_page,
+            )
+        )
+    exit_code = 3 if repair_warnings else 0
+    if is_json_mode():
+        emit_json(
+            command_envelope(
+                command="client.show",
+                data=result.client.to_data(),
+                summary=Summary(text=f"Client {detail.username}", changed=repaired, counts={"clients": 1}),
+                exit_code=exit_code,
+                warnings=repair_warnings,
+                timer=operation.timer,
+            )
+        )
+        if exit_code:
+            raise typer.Exit(exit_code)
+        return
 
-        # Remove server-hosted connection page (if enabled)
-        if creds.server.hosted_page and removed_reality_uuid:
-            _remove_client_page(resolved, removed_reality_uuid)
+    # Print connection page URL + subscription
+    _print_handoff_links(result.subscription_url, page_url=result.share_url)
 
-        err_console.print(f"\n  Client '{name}' has been removed from all active inbounds.\n")
+    # Print traffic stats
+    err_console.print()
+    err_console.print(f"  [bold]Status[/bold]    {_format_status(detail.status)}")
+    traffic = format_traffic(detail.traffic_used_bytes, detail.traffic_limit_bytes)
+    err_console.print(f"  [bold]Traffic[/bold]   {traffic}")
+    if detail.last_seen:
+        err_console.print(f"  [bold]Last seen[/bold] {escape(detail.last_seen)}")
+
+    err_console.print()
+    if cluster.panel.url:
+        err_console.print(f"  [dim]Remnawave panel:   {escape(public_url(cluster.panel.display_url))}[/dim]")
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+    if repair_warnings:
+        warn(repair_warnings[0].message)
+        raise typer.Exit(3)
 
 
-# -- Display --
+def run_list() -> None:
+    """List all clients from the Remnawave panel."""
+    operation = OperationContext()
+    with error_context("client.list", timer=operation.timer):
+        _run_list(operation=operation)
 
 
-def _display_client_list_from_inbounds(inbounds: list[Inbound]) -> None:
-    """Display client list from parsed Inbound objects."""
+def _run_list(
+    *,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client list with command metadata attached."""
     from rich.box import ROUNDED
     from rich.table import Table
 
-    # Build lookup: remark -> set of client emails
-    clients_by_remark: dict[str, set[str]] = {}
-    for ib in inbounds:
-        emails = {c.get("email", "") for c in ib.clients}
-        clients_by_remark[ib.remark] = emails
+    cluster = load_cluster()
+    try:
+        result = collect_client_list(
+            make_panel(cluster),
+            allowed_usernames=(cluster.topology_intent.access.users if cluster.topology_intent is not None else None),
+        )
+    except RemnawaveError as e:
+        fail(
+            f"Could not list clients: {e}",
+            hint=e.hint or "Check panel connectivity",
+            hint_type=e.category,
+        )
 
-    # Reality is the canonical protocol
-    reality_proto = get_protocol("reality")
-    if reality_proto is None:
-        raise ValueError("Reality protocol not registered -- this is a bug")
-    reality_clients: list[dict] = []
-    reality_ib = reality_proto.find_inbound(inbounds)
-    if reality_ib is not None:
-        reality_clients = reality_ib.clients
-
-    # Build email sets for non-canonical protocols
-    other_protocols = [p for p in PROTOCOLS.values() if p.key != "reality"]
-    other_emails: dict[str, set[str]] = {p.key: clients_by_remark.get(p.remark, set()) for p in other_protocols}
+    if is_json_mode():
+        data = result.clients.to_data()
+        emit_json(
+            command_envelope(
+                command="client.list",
+                data=data,
+                summary=Summary(
+                    text=result.clients.summary.text,
+                    changed=False,
+                    counts=result.clients.summary.model_dump(),
+                ),
+                timer=operation.timer,
+            )
+        )
+        return
 
     table = Table(
         title="Proxy Clients",
@@ -703,19 +479,18 @@ def _display_client_list_from_inbounds(inbounds: list[Inbound]) -> None:
     )
     table.add_column("Name", style="bold cyan")
     table.add_column("Status", justify="center")
-    table.add_column("Protocols", style="dim")
+    table.add_column("Traffic", style="dim")
+    table.add_column("Last seen", style="dim")
 
-    for c in reality_clients:
-        email = c.get("email", "")
-        name = email.removeprefix(reality_proto.email_prefix) if email.startswith(reality_proto.email_prefix) else email
-        status = "[green]● active[/green]" if c.get("enable", True) else "[dim]● disabled[/dim]"
-        protos = ["Reality"]
-        for p in other_protocols:
-            if f"{p.email_prefix}{name}" in other_emails[p.key]:
-                protos.append(p.key.upper())
-        table.add_row(name, status, " + ".join(protos))
+    for client in result.clients.clients:
+        table.add_row(
+            escape(client.username),
+            _format_status(client.status),
+            format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
+            escape(client.last_seen or "-"),
+        )
 
-    count = len(reality_clients)
+    count = result.clients.summary.clients
     suffix = "s" if count != 1 else ""
 
     err_console.print()
@@ -724,4 +499,279 @@ def _display_client_list_from_inbounds(inbounds: list[Inbound]) -> None:
     err_console.print(f"  [dim]Total: {count} client{suffix}[/dim]")
     err_console.print()
     err_console.print("  [dim]Add: meridian client add NAME  |  Remove: meridian client remove NAME[/dim]")
+    err_console.print()
+
+
+# -- Client Remove --
+
+
+def run_remove(
+    name: str,
+    yes: bool = False,
+    json_mode: bool = False,
+) -> None:
+    """Remove a client from the proxy cluster."""
+    operation = OperationContext()
+    with error_context("client.remove", timer=operation.timer):
+        _run_remove(name=name, yes=yes, operation=operation)
+
+
+def _run_remove(
+    *,
+    name: str,
+    yes: bool = False,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client remove with command metadata attached."""
+    _validate_client_name(name)
+    if is_json_mode() and not yes:
+        fail(
+            "Client removal requires explicit confirmation in JSON mode",
+            hint="Pass --yes to confirm the mutation.",
+            hint_type="user",
+        )
+    cluster = load_cluster()
+    if cluster.topology_intent is not None:
+        fail(
+            f"Client '{name}' is managed by V4 access intent",
+            hint=(
+                "Safe V4 access-user retirement is not available yet. Use `meridian client disable` for an "
+                "immediate temporary revocation; do not delete the panel user directly."
+            ),
+            hint_type="user",
+        )
+    panel = make_panel(cluster)
+
+    with panel:
+        client = _get_user_or_fail(panel, name, action="load")
+        if client is None:
+            fail(
+                f"Client '{name}' not found",
+                hint="Check client name with: meridian client list",
+                hint_type="user",
+            )
+
+        if not yes and not confirm(f"Remove client '{name}'?"):
+            raise typer.Exit(1)
+
+        try:
+            success = panel.delete_user(client.uuid)
+        except RemnawaveError as exc:
+            fail(
+                f"Could not remove client '{name}': {exc}",
+                hint=exc.hint or "Check panel connectivity",
+                hint_type=exc.category,
+            )
+        if not success:
+            fail(
+                f"Could not remove client '{name}'",
+                hint="The panel may be unreachable. Try again.",
+                hint_type="system",
+            )
+
+        # Hybrid sync — drop from desired_clients (if managed declaratively)
+        # so the next `meridian apply` does not re-create the just-removed user.
+        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_remove
+
+        persistence_error = _capture_client_state_failure(lambda: hybrid_sync_desired_clients_remove(cluster, name))
+
+        page_cleanup = _cleanup_client_page(client, cluster)
+        if page_cleanup.state_changed or persistence_error:
+            persistence_error = _persist_client_state(cluster)
+        partial_warnings: list[MeridianError] = []
+        if persistence_error:
+            partial_warnings.append(
+                _build_client_persistence_warning(
+                    operation="removing client",
+                    client=name,
+                    reason=persistence_error,
+                )
+            )
+        if page_cleanup.error:
+            partial_warnings.append(
+                MeridianError(
+                    code="MERIDIAN_CLIENT_PAGE_CLEANUP_FAILED",
+                    category="system",
+                    message=(
+                        f"Client '{name}' was removed from the panel, but legacy connection-page cleanup "
+                        f"could not be confirmed: {page_cleanup.error}"
+                    ),
+                    hint="Restore panel-host SSH access, remove the stale page, then verify local page evidence.",
+                    retryable=True,
+                    exit_code=3,
+                    details={"client": name, "remote_state_changed": True},
+                )
+            )
+
+        result = build_client_remove_result(name)
+        if is_json_mode():
+            emit_json(
+                command_envelope(
+                    command="client.remove",
+                    data=result.to_data(),
+                    summary=Summary(text=f"Removed client '{name}'", changed=True),
+                    exit_code=3 if partial_warnings else 0,
+                    warnings=partial_warnings,
+                    timer=operation.timer,
+                )
+            )
+            if partial_warnings:
+                raise typer.Exit(3)
+            return
+
+        ok(f"Client '{name}' removed")
+        if partial_warnings:
+            for warning in partial_warnings:
+                warn(warning.message)
+            raise typer.Exit(3)
+
+    err_console.print()
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+
+
+# -- Client Enable --
+
+
+def run_enable(
+    name: str,
+    json_mode: bool = False,
+) -> None:
+    """Re-enable a suspended client so they can connect again."""
+    operation = OperationContext()
+    with error_context("client.enable", timer=operation.timer):
+        _run_enable(name=name, operation=operation)
+
+
+def _run_enable(
+    *,
+    name: str,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client enable with command metadata attached."""
+    _validate_client_name(name)
+    cluster = load_cluster()
+    _require_v4_access_user(cluster, name)
+    panel = make_panel(cluster)
+
+    with panel:
+        client = _get_user_or_fail(panel, name, action="load")
+        if client is None:
+            fail(
+                f"Client '{name}' not found",
+                hint="Check client name with: meridian client list",
+                hint_type="user",
+            )
+
+        try:
+            panel.enable_user(client.uuid)
+        except RemnawaveError as e:
+            fail(
+                f"Could not enable client '{name}': {e}",
+                hint=e.hint or "Check panel connectivity",
+                hint_type=e.category,
+            )
+
+        if is_json_mode():
+            result = build_client_status_result(name, "active")
+            emit_json(
+                command_envelope(
+                    command="client.enable",
+                    data=result.to_data(),
+                    summary=Summary(text=f"Enabled client '{name}'", changed=True),
+                    timer=operation.timer,
+                )
+            )
+            return
+
+        ok(f"Client '{name}' enabled")
+
+    err_console.print()
+    err_console.print("  [dim]Show client:       meridian client show " + escape(name) + "[/dim]")
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
+    err_console.print()
+
+
+# -- Client Disable --
+
+
+def run_disable(
+    name: str,
+    json_mode: bool = False,
+) -> None:
+    """Temporarily suspend a client — they cannot connect until re-enabled."""
+    operation = OperationContext()
+    with error_context("client.disable", timer=operation.timer):
+        _run_disable(name=name, operation=operation)
+
+
+def _run_disable(
+    *,
+    name: str,
+    operation: OperationContext,
+) -> None:
+    """Implementation for client disable with command metadata attached."""
+    _validate_client_name(name)
+    cluster = load_cluster()
+    temporary_v4_disable = _require_v4_access_user(cluster, name)
+    panel = make_panel(cluster)
+
+    with panel:
+        client = _get_user_or_fail(panel, name, action="load")
+        if client is None:
+            fail(
+                f"Client '{name}' not found",
+                hint="Check client name with: meridian client list",
+                hint_type="user",
+            )
+
+        try:
+            panel.disable_user(client.uuid)
+        except RemnawaveError as e:
+            fail(
+                f"Could not disable client '{name}': {e}",
+                hint=e.hint or "Check panel connectivity",
+                hint_type=e.category,
+            )
+
+        if is_json_mode():
+            result = build_client_status_result(name, "disabled")
+            warnings = (
+                [
+                    MeridianError(
+                        code="MERIDIAN_V4_CLIENT_DISABLE_TEMPORARY",
+                        category="user",
+                        message=f"Client '{name}' is disabled only until the next V4 apply.",
+                        hint="V4 access intent declares managed users active.",
+                        exit_code=0,
+                    )
+                ]
+                if temporary_v4_disable
+                else []
+            )
+            emit_json(
+                command_envelope(
+                    command="client.disable",
+                    data=result.to_data(),
+                    summary=Summary(
+                        text=(
+                            f"Temporarily disabled V4 client '{name}'"
+                            if temporary_v4_disable
+                            else f"Disabled client '{name}'"
+                        ),
+                        changed=True,
+                    ),
+                    warnings=warnings,
+                    timer=operation.timer,
+                )
+            )
+            return
+
+        ok(f"Client '{name}' disabled")
+        if temporary_v4_disable:
+            warn("This V4 client is disabled only until the next `meridian apply`")
+
+    err_console.print()
+    err_console.print("  [dim]Re-enable:         meridian client enable " + escape(name) + "[/dim]")
+    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
     err_console.print()

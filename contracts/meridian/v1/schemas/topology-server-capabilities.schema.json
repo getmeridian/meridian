@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "Capabilities a saved server can provide to topology and routing plans.",
+  "properties": {
+    "capabilities": {
+      "items": {
+        "enum": [
+          "panel",
+          "exit",
+          "relay",
+          "routing_gateway"
+        ],
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "region": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "server_ref",
+    "capabilities"
+  ],
+  "title": "TopologyServerCapabilities",
+  "type": "object"
+}

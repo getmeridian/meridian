@@ -1,12 +1,13 @@
 """Relay node provisioner — deploys Realm TCP relay via SSH.
 
-A relay node is a lightweight TCP forwarder (no Docker, no 3x-ui, no panel).
+A relay node is a lightweight TCP forwarder with no Docker or panel.
 It runs Realm to forward port 443 to an exit server, preserving end-to-end
 VLESS+Reality encryption between the client and the exit.
 """
 
 from __future__ import annotations
 
+import re
 import shlex
 import time
 from dataclasses import dataclass, field
@@ -19,11 +20,16 @@ from meridian.config import (
     RELAY_SERVICE_NAME,
 )
 from meridian.provision.common import detect_ssh_ports
+from meridian.provision.recipe import Operation, Recipe, Resource, op
 from meridian.provision.steps import StepResult
 from meridian.ssh import ServerConnection
 
 # Minimal packages needed on a relay node
 _RELAY_PACKAGES = ["curl", "wget", "ufw", "ca-certificates"]
+_REALM_VERSION_RE = re.compile(
+    r"^\s*Realm\s+(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?=\s|$)",
+    re.IGNORECASE,
+)
 
 # Realm systemd service template
 _SYSTEMD_UNIT = """\
@@ -71,6 +77,12 @@ class RelayContext:
         for field_name, port in [("exit_port", self.exit_port), ("listen_port", self.listen_port)]:
             if not isinstance(port, int) or not (1 <= port <= 65535):
                 raise ValueError(f"Invalid port for {field_name}: {port!r} (must be 1-65535)")
+
+
+def parse_realm_version(output: str) -> str:
+    """Extract Realm's semver without mistaking feature suffixes for it."""
+    match = _REALM_VERSION_RE.match(output)
+    return match.group(1) if match is not None else ""
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +163,7 @@ class InstallRealm:
         # Check if Realm is already installed at the right version
         check = conn.run("realm --version 2>/dev/null", timeout=15)
         if check.returncode == 0:
-            # Parse version from output like "realm 2.9.3"
-            installed_version = check.stdout.strip().split()[-1] if check.stdout.strip() else ""
+            installed_version = parse_realm_version(check.stdout)
             if installed_version == ctx.realm_version:
                 return StepResult(name=self.name, status="ok", detail=f"v{ctx.realm_version} already installed")
 
@@ -213,8 +224,8 @@ class InstallRealm:
 
         # Verify
         verify = conn.run("realm --version", timeout=15)
-        if verify.returncode != 0:
-            return StepResult(name=self.name, status="failed", detail="realm binary not working after install")
+        if verify.returncode != 0 or parse_realm_version(verify.stdout) != ctx.realm_version:
+            return StepResult(name=self.name, status="failed", detail="realm binary version mismatch after install")
 
         return StepResult(name=self.name, status="changed", detail=f"installed v{ctx.realm_version}")
 
@@ -252,10 +263,13 @@ class ConfigureRealm:
 
         conn.run("mkdir -p /etc/meridian", timeout=15)
 
-        q_config = shlex.quote(config_content)
-        write_config = conn.run(
-            f"printf '%s' {q_config} > {RELAY_CONFIG_PATH}.tmp && mv {RELAY_CONFIG_PATH}.tmp {RELAY_CONFIG_PATH}",
+        write_config = conn.put_text(
+            RELAY_CONFIG_PATH,
+            config_content,
+            mode="600",
+            sensitive=True,
             timeout=15,
+            operation_name="write realm config",
         )
         if write_config.returncode != 0:
             return StepResult(
@@ -263,27 +277,29 @@ class ConfigureRealm:
                 status="failed",
                 detail=f"failed to write config: {write_config.stderr.strip()[:200]}",
             )
-        conn.run(f"chmod 600 {RELAY_CONFIG_PATH}", timeout=15)
 
         # Write relay metadata
         relay_meta = (
             f"role: relay\nexit_ip: {ctx.exit_ip}\nexit_port: {ctx.exit_port}\nlisten_port: {ctx.listen_port}\n"
         )
-        q_meta = shlex.quote(relay_meta)
-        conn.run(
-            f"printf '%s' {q_meta} > /etc/meridian/relay.yml.tmp && "
-            "mv /etc/meridian/relay.yml.tmp /etc/meridian/relay.yml",
+        conn.put_text(
+            "/etc/meridian/relay.yml",
+            relay_meta,
+            mode="600",
+            sensitive=True,
             timeout=15,
+            operation_name="write relay metadata",
         )
-        conn.run("chmod 600 /etc/meridian/relay.yml", timeout=15)
 
         # Write systemd service
         unit_content = _SYSTEMD_UNIT.format(config_path=RELAY_CONFIG_PATH)
-        q_unit = shlex.quote(unit_content)
         service_path = f"/etc/systemd/system/{RELAY_SERVICE_NAME}.service"
-        write_service = conn.run(
-            f"printf '%s' {q_unit} > {service_path}.tmp && mv {service_path}.tmp {service_path}",
+        write_service = conn.put_text(
+            service_path,
+            unit_content,
+            mode="644",
             timeout=15,
+            operation_name="write realm service",
         )
         if write_service.returncode != 0:
             return StepResult(
@@ -370,15 +386,20 @@ class VerifyRelay:
 # ---------------------------------------------------------------------------
 
 
-def build_relay_steps(ctx: RelayContext) -> list:
+def build_relay_steps(ctx: RelayContext) -> list[Operation]:
     """Assemble the relay deployment step pipeline."""
     from meridian.provision.common import ConfigureBBR, InstallPackages
 
-    return [
-        InstallPackages(packages=_RELAY_PACKAGES),
-        ConfigureBBR(),
-        ConfigureRelayFirewall(),
-        InstallRealm(),
-        ConfigureRealm(),
-        VerifyRelay(),
+    operations = [
+        op(InstallPackages(packages=_RELAY_PACKAGES), provides=[Resource.RELAY_PACKAGES, Resource.SYSTEM_PACKAGES]),
+        op(ConfigureBBR(), requires=[Resource.RELAY_PACKAGES], provides=[Resource.BBR_ENABLED]),
+        op(ConfigureRelayFirewall(), requires=[Resource.RELAY_PACKAGES], provides=[Resource.RELAY_FIREWALL]),
+        op(InstallRealm(), requires=[Resource.RELAY_PACKAGES], provides=[Resource.REALM_INSTALLED]),
+        op(
+            ConfigureRealm(),
+            requires=[Resource.REALM_INSTALLED, Resource.RELAY_FIREWALL],
+            provides=[Resource.REALM_CONFIGURED],
+        ),
+        op(VerifyRelay(), requires=[Resource.REALM_CONFIGURED], provides=[Resource.RELAY_VERIFIED]),
     ]
+    return Recipe(tuple(operations)).steps(ctx)

@@ -10,13 +10,13 @@ This guide covers every deployment option. If you're deploying for the first tim
 ## Basic deployment
 
 ```
-meridian deploy 1.2.3.4
+meridian deploy 198.51.100.10
 ```
 
 The wizard guides you through configuration. Or specify everything upfront:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 198.51.100.10 --sni www.microsoft.com --client-name alice --yes
 ```
 
 ## All flags
@@ -35,30 +35,29 @@ meridian deploy 1.2.3.4 --sni www.microsoft.com --client-name alice --yes
 | `--yes` | | Skip confirmation prompts |
 | `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
 | `--geo-block / --no-geo-block` | enabled | Block `.ru` domains and Russian IPs through the proxy |
-| `--pq / --no-pq` | disabled | Post-quantum encryption — ML-KEM-768 hybrid (experimental) |
 
 ## Branding
 
 Personalize connection pages so recipients know who set up their VPN:
 
 ```
-meridian deploy 1.2.3.4 --display-name "Alice's VPN" --icon 🚀 --color sunset
+meridian deploy 198.51.100.10 --display-name "Alice's VPN" --icon 🚀 --color sunset
 ```
 
 - **`--display-name`** — appears in the trust bar and page title. Use your name or a friendly label.
 - **`--icon`** — an emoji or image URL shown at the top of the connection page.
 - **`--color`** — sets the accent color palette. Options: `ocean` (default), `sunset`, `forest`, `lavender`, `rose`, `slate`.
 
-These settings are stored in server credentials and apply to all client connection pages.
+These settings are stored in `cluster.yml` and apply to all client connection pages.
 
 ## Choosing an SNI target
 
 The SNI (Server Name Indication) target is the domain your server impersonates. This is **not** a domain you own — it's any popular website with TLS. When a censor probes your server, they see that real site's certificate, making your server indistinguishable from normal traffic.
 
-The default (`www.microsoft.com`) works well for most cases. For optimal stealth, scan your server's network for same-ASN targets — these are harder to detect because the IP range matches:
+The default (`www.microsoft.com`) works well for most cases. To discover alternatives near the server, scan its IPv4 subnet with the pinned, checksum-verified RealiTLScanner build:
 
 ```
-meridian scan 1.2.3.4
+meridian scan 198.51.100.10
 ```
 
 **Good targets** (global CDN):
@@ -67,7 +66,7 @@ meridian scan 1.2.3.4
 - `dl.google.com` — Google CDN, global
 - `github.com` — Fastly CDN, global
 
-**Avoid** `apple.com` and `icloud.com` — Apple controls its own ASN ranges, making the IP/ASN mismatch instantly detectable.
+Use a stable hostname that resolves and completes a TLS handshake from the server. `meridian scan` validates observed certificate domains; `meridian preflight --sni HOST` checks a manual choice without sending the server address to an ASN service.
 
 ### Camouflage target vs. domain
 
@@ -83,22 +82,22 @@ You can't use your own domain as a camouflage target — the certificate would m
 Not sure if your server is compatible?
 
 ```
-meridian preflight 1.2.3.4
+meridian preflight 198.51.100.10
 ```
 
-Tests SNI target reachability, ASN match, port availability, DNS, OS compatibility, and disk space — without installing anything.
+Tests SNI reachability and DNS, port availability and external reachability, optional domain DNS, OS compatibility, disk space, and clock skew — without installing anything. Exit `0` means ready, `4` means actionable findings, and `3` means required evidence was unavailable.
 
 ## Re-running deploy
 
 It's safe to re-run `meridian deploy` at any time. The provisioner is fully idempotent:
-- Credentials are loaded from cache, not regenerated
+- Existing topology and secrets are loaded from `cluster.yml`, not regenerated
 - Steps check existing state before acting
 - No duplicate work
 
 ## Non-root deployment
 
 ```
-meridian deploy 1.2.3.4 --user ubuntu
+meridian deploy 198.51.100.10 --user ubuntu
 ```
 
 Non-root users get `sudo` automatically. The user must have passwordless sudo access.
@@ -111,12 +110,12 @@ If you're running Meridian directly on the server (e.g. logged in via SSH as roo
 meridian deploy local
 ```
 
-This skips SSH entirely and runs all commands locally. The `local` keyword works with all commands:
+This skips SSH entirely and runs server-touching commands locally:
 
 ```
-meridian client add alice --server local
 meridian preflight local
 meridian scan local
+meridian doctor local
 ```
 
 Useful when SSH to self doesn't work (missing keys, firewall rules), for re-deploying on the same server, or in cloud-init startup scripts.
@@ -126,7 +125,7 @@ Useful when SSH to self doesn't work (missing keys, firewall rules), for re-depl
 WARP routes your server's outgoing traffic through Cloudflare's network. Destination websites see a Cloudflare IP address instead of your VPS IP.
 
 ```
-meridian deploy 1.2.3.4 --warp
+meridian deploy 198.51.100.10 --warp
 ```
 
 The interactive wizard also offers this option.
@@ -146,7 +145,7 @@ The interactive wizard also offers this option.
 By default, Meridian blocks `.ru` domains and Russian IP ranges through the proxy:
 
 ```bash
-meridian deploy 1.2.3.4 --no-geo-block
+meridian deploy 198.51.100.10 --no-geo-block
 ```
 
 This is intentional. It keeps Russian destinations off the proxy path, which reduces the chance of your VPS IP appearing in Russian-service logs and later getting blocked.
@@ -171,26 +170,28 @@ meridian relay deploy RELAY_IP --exit YOUR_EXIT_IP
 
 ## Management panel
 
-Meridian deploys [3x-ui](https://github.com/MHSanaei/3x-ui) as the web management panel for Xray. You can access it directly in your browser to monitor traffic, view inbound configs, and check server status.
+Meridian deploys [Remnawave](https://remna.st/) as the management stack — a modern panel (backend) plus independent node service, both reverse-proxied by nginx at a random secret path. The panel UI lets you monitor traffic, view inbound configs, manage users and hosts, and check server status directly in a browser.
 
-The panel URL and credentials are stored in your local credentials file:
+The panel URL and credentials are stored in your local `cluster.yml`:
 
 ```
-cat ~/.meridian/credentials/<IP>/proxy.yml
+cat ~/.meridian/cluster.yml
 ```
 
 The `panel` section contains everything you need:
 
 ```yaml
 panel:
-  username: a1b2c3d4e5f6
-  password: Xk9mP2qR7vW4nL8jF3hT6yBs
-  web_base_path: n7kx2m9qp4wj8vh3rf6tby5e
-  url: https://198.51.100.1/n7kx2m9qp4wj8vh3rf6tby5e/
+  url: https://198.51.100.10/n7kx2m9qp4wj8vh3rf6tby5e/
+  api_token: <JWT token>
+  admin_user: admin
+  admin_pass: <generated>
+  secret_path: n7kx2m9qp4wj8vh3rf6tby5e
+  sub_path: <subscription page path>
 ```
 
-Open the `url` in your browser and log in with the username and password.
+Open the `url` in your browser and log in with the admin credentials.
 
-The panel path is randomized for security — treat it like a password. All `meridian` CLI commands use this same panel API under the hood, so anything you can do in the CLI is also visible in the panel.
+The panel path is randomized for security — treat it like a password. All `meridian` CLI commands use this same panel API under the hood, so anything you do via the CLI is also visible in the panel, and vice versa (drift is surfaced by `meridian plan`).
 
 > **Note:** If you modify settings directly in the panel, they may be overwritten on the next `meridian deploy`.
