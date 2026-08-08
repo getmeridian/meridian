@@ -82,7 +82,7 @@ meridian relay check RELAY_IP [--exit EXIT]
 Pre-flight server validation. Tests SNI, ports, DNS, OS, disk, ASN without installing anything.
 
 ```
-meridian preflight [IP] [--ai] [--server NAME]
+meridian preflight [IP] [--ai] [--server NAME] [--ssh-port PORT]
 ```
 
 ### meridian scan
