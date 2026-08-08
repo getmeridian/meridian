@@ -27,6 +27,7 @@ meridian deploy [IP] [flags]
 | `--harden / --no-harden` | enabled | Harden SSH + firewall |
 | `--pq / --no-pq` | disabled | Post-quantum encryption — ML-KEM-768 hybrid (experimental) |
 | `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
+| `--geo-block / --no-geo-block` | enabled | Block Russian domains and IPs (geosite:category-ru + geoip:ru) |
 | `--server NAME` | | Target server (name or IP) |
 | `--decoy MODE` | none | Decoy response for unknown paths (`none` / `403`) |
 | `--yes` | | Skip confirmation prompts |
@@ -82,7 +83,7 @@ meridian relay check RELAY_IP [--exit EXIT]
 Pre-flight server validation. Tests SNI, ports, DNS, OS, disk, ASN without installing anything.
 
 ```
-meridian preflight [IP] [--ai] [--server NAME]
+meridian preflight [IP] [--ai] [--server NAME] [--ssh-port PORT]
 ```
 
 ### meridian scan
@@ -154,6 +155,7 @@ These flags are available on most commands that interact with a server:
 |------|-------------|
 | `--server NAME` | Target a specific named server |
 | `--user/-u USER` | SSH user (default: root, non-root gets sudo automatically) |
+| `--ssh-port PORT` | SSH port (if non-standard). 0 = use port from server registry, or 22 if not registered |
 | `--sni HOST` | TLS camouflage target (used by deploy, preflight, test, doctor) |
 | `--domain DOMAIN` | Cloudflare CDN fallback domain (used by deploy, preflight, test) |
 

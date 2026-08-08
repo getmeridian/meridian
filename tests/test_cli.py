@@ -64,6 +64,7 @@ class TestSubcommandHelp:
         result = runner.invoke(app, ["preflight", "--help"])
         assert result.exit_code == 0
         assert "--ai" in _strip_ansi(result.output)
+        assert "--ssh-port" in _strip_ansi(result.output)
 
     def test_doctor_help(self) -> None:
         result = runner.invoke(app, ["doctor", "--help"])
