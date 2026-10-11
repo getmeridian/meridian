@@ -20,7 +20,7 @@ git clone https://github.com/getmeridian/meridian.git && cd meridian
 # Install CLI in editable mode with dev dependencies
 make install
 
-# Install pre-push hook (11 fast checks before every push)
+# Install the pre-push hook (fast checks before every push)
 make hooks
 
 # Run full CI locally
@@ -43,7 +43,10 @@ Key modules:
 - `commands/` — one module per subcommand
 - `cluster.py` + `cluster_persistence.py` — typed `cluster.yml` state and persistence
 - `servers.py` — `ServerRegistry` for known servers
-- `provision/` — idempotent step pipeline
+- `setup/` — `meridian setup` wizard state and the shared runtime behind deploy, setup, and apply
+- `compiler/` — turns the topology into a reviewed, hash-identified list of resources (no I/O)
+- `reconciler/` — observes and applies those resources with checkpoints
+- `provision/` — server preparation steps (packages, hardening, Docker, Realm)
 
 ## Pull requests
 
@@ -57,7 +60,7 @@ Key modules:
 
 - **Shell values use `shlex.quote()`** — never interpolate unsanitized values
 - **PWA assets must stay in sync** (`templates/pwa/` and the application catalog)
-- **nginx config** uses `/etc/nginx/stream.d/meridian.conf` plus `/etc/nginx/conf.d/meridian-http.conf`
+- **nginx config** is written per resource as `meridian-v4-*.conf` files under `/etc/nginx/stream.d/` and `/etc/nginx/sites-available/`
 - **Provisioner steps** return `StepResult` (ok/changed/skipped/failed)
 
 ## Testing
