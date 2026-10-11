@@ -171,7 +171,7 @@ class ServerConnection(_FileTransferMixin):
         # SSH ControlMaster (multiplex) layer manages its own connection
         # lifetime, so __enter__/__exit__ are no-ops; defining them prevents
         # AttributeError that was silently swallowed by surrounding try/except
-        # in commands/client.py and commands/recover.py.
+        # in commands/client.py.
         return self
 
     def __exit__(self, *_exc_info: object) -> None:

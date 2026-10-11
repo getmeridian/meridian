@@ -7,16 +7,12 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 import typer
 
-from meridian.commands.setup import (
-    _build_redeploy_command,
-    run,
-)
+from meridian.commands.deploy import run
 from meridian.resolve import detect_public_ip
 
 
@@ -100,66 +96,3 @@ class TestRunWithExplicitIP:
         """--server with unknown name and non-IP string should fail."""
         with pytest.raises(typer.Exit):
             run(requested_server="nonexistent", yes=True)
-
-
-class TestBuildRedeployCommand:
-    def test_minimal_defaults(self) -> None:
-        resolved = SimpleNamespace(ip="198.51.100.10", user="root")
-        cmd = _build_redeploy_command(
-            resolved,
-            sni="",
-            domain="",
-            client_name="default",
-            harden=True,
-            server_name="",
-            icon="",
-            color="",
-            warp=False,
-            geo_block=True,
-        )
-        assert cmd == "meridian deploy 198.51.100.10 --yes"
-
-    def test_full_options(self) -> None:
-        resolved = SimpleNamespace(ip="198.51.100.1", user="armenqa")
-        cmd = _build_redeploy_command(
-            resolved,
-            sni="cdn.example.net",
-            domain="vpn.example.com",
-            client_name="ARMIK",
-            harden=False,
-            server_name="My VPN",
-            icon="",
-            color="sunset",
-            warp=True,
-            geo_block=False,
-        )
-        assert "198.51.100.1" in cmd
-        assert "--user armenqa" in cmd
-        assert "--sni cdn.example.net" in cmd
-        assert "--domain vpn.example.com" in cmd
-        assert "--client-name ARMIK" in cmd
-        assert "--no-harden" in cmd
-        assert "--warp" in cmd
-        assert "--no-geo-block" in cmd
-        assert "--display-name 'My VPN'" in cmd
-        assert "--color sunset" in cmd
-        assert "--yes" in cmd
-
-    def test_default_sni_omitted(self) -> None:
-        from meridian.config import DEFAULT_SNI
-
-        resolved = SimpleNamespace(ip="198.51.100.10", user="root")
-        cmd = _build_redeploy_command(
-            resolved,
-            sni=DEFAULT_SNI,
-            domain="",
-            client_name="",
-            harden=True,
-            server_name="",
-            icon="",
-            color="ocean",
-            warp=False,
-            geo_block=True,
-        )
-        assert "--sni" not in cmd
-        assert "--color" not in cmd

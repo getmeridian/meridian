@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import typer
 
@@ -842,50 +841,6 @@ def fleet_inventory_cmd(
     if json_mode:
         _enable_json_output()
     run_inventory()
-
-
-@fleet_app.command("recover")
-def fleet_recover_cmd(
-    panel_url: str = typer.Option(..., "--panel-url", help="Panel HTTPS URL"),
-    api_token_file: str = typer.Option(
-        "",
-        "--api-token-file",
-        help="Mode-600 file containing the token; defaults to MERIDIAN_API_TOKEN or a secure prompt",
-    ),
-    profile: str = typer.Option("", "--profile", help="Legacy config profile name or UUID when ambiguous"),
-    squad: str = typer.Option("", "--squad", help="Legacy client access squad name or UUID when ambiguous"),
-    panel_node: str = typer.Option("", "--panel-node", help="Panel-host node name, UUID, or address when ambiguous"),
-    panel_server: str = typer.Option("", "--panel-server", help="Public SSH IP of the Remnawave host for domain URLs"),
-    user: str = typer.Option("root", "--user", "-u", help="SSH user for the panel server"),
-    ssh_port: int = typer.Option(22, "--ssh-port", min=1, max=65535, help="SSH port for the panel server"),
-    legacy: bool = typer.Option(False, "--legacy", help="Confirm this is a legacy shared-profile deployment"),
-    force: bool = typer.Option(False, "--force", help="Back up and replace an existing cluster.yml"),
-) -> None:
-    """Recover legacy-compatible cluster state from the panel API.
-
-    V4 topology intent cannot be reconstructed from Remnawave alone. Restore a
-    cluster.yml backup or rerun setup for V4 deployments.
-
-    [dim]Examples:[/dim]
-      [cyan]meridian fleet recover --legacy --panel-url https://198.51.100.10/panel[/cyan]
-    """
-    from meridian.commands.recover import load_api_token, require_legacy_recovery, run_recover
-
-    require_legacy_recovery(legacy)
-    token_path = Path(api_token_file).expanduser() if api_token_file else None
-    api_token = load_api_token(token_path)
-    run_recover(
-        panel_url,
-        api_token,
-        profile=profile,
-        squad=squad,
-        panel_node=panel_node,
-        panel_server=panel_server,
-        user=user,
-        ssh_port=ssh_port,
-        legacy=legacy,
-        force=force,
-    )
 
 
 # =============================================================================

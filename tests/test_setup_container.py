@@ -17,9 +17,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.commands.setup import _check_ports
+from meridian.commands.port_check import check_ports as _check_ports
 from meridian.node_deploy import check_panel_api_ready
-from meridian.panel_bootstrap import deploy_node_container as _deploy_node_container
+from meridian.node_deploy import deploy_node_container as _deploy_node_container
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -439,8 +439,8 @@ class TestCheckPortsHappyPath:
 class TestCheckPortsConflict:
     """Non-Meridian process on a port causes failure or prompt."""
 
-    @patch("meridian.commands.setup.err_console")
-    @patch("meridian.commands.setup.fail")
+    @patch("meridian.commands.port_check.err_console")
+    @patch("meridian.commands.port_check.fail")
     def test_non_meridian_process_in_yes_mode_calls_fail(
         self, mock_fail: MagicMock, mock_err_console: MagicMock
     ) -> None:
@@ -453,8 +453,8 @@ class TestCheckPortsConflict:
         mock_fail.assert_called_once()
         assert "apache2" in mock_fail.call_args[0][0]
 
-    @patch("meridian.commands.setup.err_console")
-    @patch("meridian.commands.setup.fail")
+    @patch("meridian.commands.port_check.err_console")
+    @patch("meridian.commands.port_check.fail")
     def test_operators_own_caddy_is_a_conflict(self, mock_fail: MagicMock, mock_err_console: MagicMock) -> None:
         mock_fail.side_effect = typer.Exit(2)
         conn = MagicMock()
@@ -466,9 +466,9 @@ class TestCheckPortsConflict:
             _check_ports(conn, _IP, yes=True)
         assert "caddy" in mock_fail.call_args[0][0]
 
-    @patch("meridian.commands.setup.err_console")
-    @patch("meridian.commands.setup.choose", return_value=2)
-    @patch("meridian.commands.setup.fail")
+    @patch("meridian.commands.port_check.err_console")
+    @patch("meridian.commands.port_check.choose", return_value=2)
+    @patch("meridian.commands.port_check.fail")
     def test_non_meridian_process_interactive_abort(
         self,
         mock_fail: MagicMock,
@@ -483,8 +483,8 @@ class TestCheckPortsConflict:
             _check_ports(conn, _IP, yes=False)
         mock_fail.assert_called_once()
 
-    @patch("meridian.commands.setup.err_console")
-    @patch("meridian.commands.setup.choose", return_value=1)
+    @patch("meridian.commands.port_check.err_console")
+    @patch("meridian.commands.port_check.choose", return_value=1)
     def test_non_meridian_process_interactive_retry_then_free(
         self,
         mock_choose: MagicMock,
@@ -501,8 +501,8 @@ class TestCheckPortsConflict:
         _check_ports(conn, _IP, yes=False)
         mock_choose.assert_called_once()
 
-    @patch("meridian.commands.setup.err_console")
-    @patch("meridian.commands.setup.fail")
+    @patch("meridian.commands.port_check.err_console")
+    @patch("meridian.commands.port_check.fail")
     def test_unknown_process_treated_as_conflict(self, mock_fail: MagicMock, mock_err_console: MagicMock) -> None:
         """When regex can't extract process name, 'unknown' is not in allowed set."""
         mock_fail.side_effect = typer.Exit(2)

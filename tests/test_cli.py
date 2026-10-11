@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -171,14 +170,6 @@ class TestSubcommandHelp:
         result = runner.invoke(app, ["fleet", "status", "--help"])
         assert result.exit_code == 0
         assert "--json" in _strip_ansi(result.output)
-
-    def test_fleet_recover_rejects_before_reading_token_without_legacy(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        with patch("meridian.commands.recover.load_api_token") as load_token:
-            result = runner.invoke(app, ["fleet", "recover", "--panel-url", "https://198.51.100.10/panel"])
-
-        assert result.exit_code == 2
-        load_token.assert_not_called()
 
     def test_fleet_inventory_accepts_command_json(self, monkeypatch) -> None:
         called: dict[str, bool] = {}
