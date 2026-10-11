@@ -17,7 +17,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Declarative `cluster.yml` + `meridian plan / apply` reconcile desired state. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan / apply` compile it and reconcile resource drivers. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 
@@ -42,19 +42,16 @@ SECURITY.md / CONTRIBUTING.md           — public policies
 scripts/CLAUDE.md                       — repository automation and contract export
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
-├── operations.py                       — client/node/relay CRUD orchestration
-├── panel_bootstrap.py                  — panel setup orchestration (first deploy, redeploy)
-├── node_deploy.py                      — node container deployment, host creation, panel API helpers
-├── relay_ops.py                        — relay infrastructure operations
+├── panel_bootstrap.py                  — SSH provisioner run + control-plane credential bootstrap
+├── node_deploy.py                      — node container rollout, panel readiness, API tokens
+├── reality_keys.py                     — Reality x25519 keypair generation
 ├── resolve.py                          — ResolvedServer, ensure_server_connection
-├── xray_config.py                      — Xray inbound/outbound config generation
 ├── cluster_persistence.py              — cluster.yml serialization/deserialization
 ├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
 ├── core/CLAUDE.md                      — transport-neutral API contracts
 │   ├── defaults.py                     — core-owned constants (DEFAULT_SNI)
 │   └── errors.py                       — shared error base types
 ├── commands/CLAUDE.md                  — per-subcommand pattern
-│   └── wizard.py                       — interactive deploy wizard
 ├── setup/CLAUDE.md                     — resumable setup draft + server shelf
 ├── compiler/CLAUDE.md                  — pure finite topology compiler
 ├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
@@ -63,9 +60,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
-├── reconciler/CLAUDE.md                — compute_plan purity + executor ordering
-│   ├── prepare.py                      — shared plan computation entry point
-│   └── snapshots.py                    — applied-state snapshots + hybrid sync
+├── reconciler/CLAUDE.md                — checkpointed compiled-resource drivers
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
 tests/CLAUDE.md                         — testing philosophy, MockConnection

@@ -22,7 +22,7 @@
 
 **Executor bridge** — deploy provisioning enters through `RemoteExecutorConnection`; steps can keep `conn.run()` while transports move behind core executor contracts.
 
-**Relay pipeline is separate** — uses `RelayContext` and Realm TCP forwarding. Panel-agnostic.
+**Relay steps are separate** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver; no command runs `build_relay_steps` directly anymore. Panel-agnostic.
 ## What's done well
 - **Idempotent containers** — panel/node steps check `docker inspect` before deploying.
 - **Health polling** — panel step waits for `/api/health`, node step waits for port binding.

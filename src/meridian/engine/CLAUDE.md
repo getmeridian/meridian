@@ -17,3 +17,4 @@
 - Keep localhost security hostile-by-default: Host/Origin checks, CSRF, no permissive CORS.
 - Keep password bootstrap one-time only: no generated contracts, logs, events, browser storage, or profile persistence.
 - `EngineBootstrapKeyRequest` lives in `routes.py`, not `api.py` -- it is only used by route handlers.
+- Deploy dry-run compiles through `setup/single_server.py::preview_single_server_deploy()`, the same preview `deploy --dry-run` uses; never reintroduce a parallel deploy planner.

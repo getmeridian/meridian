@@ -11,7 +11,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 | Layer | What | Where | Speed |
 |-------|------|-------|-------|
 | **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` (pytest) | ~22s |
-| **Deploy** | Mock-based deploy pipeline tests (setup.py orchestration, hosts, container, redeploy) | `tests/test_setup_*.py` (pytest) | <1s |
+| **Deploy** | Mock-based topology setup tests (runtime, editor, persistence, node container) | `tests/test_setup_*.py` (pytest) | <1s |
 | **Command** | Mock-based command tests (node, fleet, client, recover) | `tests/test_*_commands.py` (pytest) | <1s |
 | **System lab** | Real multi-node deploy via Docker: Remnawave panel+node, relay, connection tests | `tests/systemlab/` | ~15 min |
 
