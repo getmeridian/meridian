@@ -5,87 +5,107 @@ order: 3
 section: guides
 ---
 
-## 基本部署
+本指南涵盖 `meridian deploy` 的每个选项。如果这是你的第一次部署，从[快速开始](/docs/zh/getting-started/)开始。
 
-本页描述直接的旧版 `meridian deploy` 路径。新的托管 V4 拓扑请使用 `meridian setup`；后续变更以其 `topology_intent` 为权威来源。
+## 基本部署
 
 ```
 meridian deploy 198.51.100.10
 ```
 
-向导会指导您完成配置。或者预先指定所有内容：
+一个服务器既是控制平面（Remnawave 面板）又是出口。Meridian 构建 [`meridian setup`](/docs/zh/cli-reference/#meridian-setup) 生成的同样已审核拓扑，并用检查点应用它。在打印"完成"之前，它会通过交付的订阅推送真实流量。
+
+不指定 IP 直接运行 `meridian deploy`，它会提示。添加 `--yes` 跳过确认：
 
 ```
-meridian deploy 198.51.100.10 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 198.51.100.10 --client-name alice --yes
 ```
 
 ## 所有标志
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | Reality 伪装的站点 |
-| `--domain DOMAIN` | （无） | 启用带有 CDN 回退的域名模式 |
+| `--sni HOST` | (自动) | 伪装目标。不指定时，服务器从 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 中尝试，使用第一个可达的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
+| `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名，带 Cloudflare CDN 回退 |
+| `--hysteria2` | 关 | 在 UDP/443 上也提供 Hysteria2。需要 `--domain`；QUIC 在某些地区被限制 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
-| `--display-name NAME` | （无） | 连接页面上的显示名称（如 "Alice 的 VPN"） |
-| `--icon EMOJI_OR_URL` | （无） | 服务器图标 — 表情符号或图片 URL |
-| `--color PALETTE` | ocean | 颜色方案（ocean/sunset/forest/lavender/rose/slate） |
-| `--user USER` | root | SSH 用户（非 root 用户自动获得 sudo） |
-| `--harden / --no-harden` | 启用 | 加固 SSH + 防火墙（如果其他服务共享该服务器则禁用） |
-| `--server NAME` | | 目标服务器（名称或 IP） |
+| `--display-name NAME` | (无) | 连接页面的标签 |
+| `--icon EMOJI_OR_URL` | (无) | 页面图标 — 表情符号或图片 URL |
+| `--color PALETTE` | ocean | 页面色彩主题 (ocean/sunset/forest/lavender/rose/slate) |
+| `--user USER` | root | SSH 用户（非 root 用户需无密码 sudo） |
+| `--ssh-port PORT` | 22 | SSH 端口（如果不是 22） |
+| `--server NAME` | | 保存的服务器来部署到（名称或 IP） |
+| `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
+| `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
+| `--geo-block / --no-geo-block` | 启 | 通过代理阻止俄罗斯域名和 IP |
 | `--yes` | | 跳过确认提示 |
-| `--warp / --no-warp` | 禁用 | 通过 Cloudflare WARP 路由出站流量 |
-| `--geo-block / --no-geo-block` | 启用 | 通过代理阻止 `.ru` 域名和俄罗斯 IP |
 
-## 品牌定制
+脚本和 UI 的标志（`--json`、`--events`、`--request`、`--dry-run`）在 [CLI 参考](/docs/zh/cli-reference/#meridian-deploy)中描述。
 
-个性化连接页面，让接收者知道谁设置了 VPN：
+## 选择伪装目标
 
-```
-meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color sunset
-```
+伪装目标（SNI）是你的服务器所模仿的网站。它**不是**你拥有的域名 — 它是具有 TLS 1.3 的热门网站。任何探测你的服务器的人都会看到该网站的真实证书。
 
-- **`--display-name`** — 显示在信任栏和页面标题中。使用您的名字或友好的标签。
-- **`--icon`** — 连接页面顶部显示的表情符号或图片 URL。
-- **`--color`** — 设置强调色方案。选项：`ocean`（默认）、`sunset`、`forest`、`lavender`、`rose`、`slate`。
+不指定 `--sni`，服务器本身会按顺序尝试 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`，使用第一个可达的。如果真实流量随后无法通过该目标，Meridian 在完成之前切换到下一个。用 `--sni` 传递的目标永不被交换；如果流量失败，部署停止并告诉你。
 
-这些设置只用于旧版 PWA 页面，并保存在 `cluster.yml` 中。V4 提供规范 Remnawave 订阅，不创建独立自定义 PWA 页面。
-
-## 选择 SNI 目标
-
-SNI（服务器名称指示）目标是 Reality 伪装的域。默认值（`www.microsoft.com`）对大多数情况都适用。
-
-如需发现服务器附近的备选目标，请使用固定版本且经过校验和验证的 RealiTLScanner 扫描其 IPv4 子网：
+要找到与服务器同网络的目标，扫描其 IPv4 邻域：
 
 ```
 meridian scan 198.51.100.10
 ```
 
-RealiTLScanner 仅支持 IPv4；仅 IPv6 的服务器应明确传入 `--sni`，否则 `scan` 返回 `3`。选择只会保存到已跟踪的旧版节点；V4 只显示结果，intent 必须通过 `meridian setup` 修改。
+扫描在服务器上运行固定的、校验和验证的 RealiTLScanner 构建，列出它找到的附近的证书域。然后用你的选择部署：
 
-**良好的目标**（全球 CDN）：
-- `www.microsoft.com` — Azure CDN，全球
-- `www.twitch.tv` — Fastly CDN，全球
-- `dl.google.com` — Google CDN，全球
-- `github.com` — Fastly CDN，全球
+```
+meridian deploy 198.51.100.10 --sni dl.google.com
+```
 
-请选择能够从服务器解析并完成 TLS 握手的稳定主机名。`meridian scan` 会验证实际证书中观察到的域名；`meridian preflight --sni HOST` 可检查手动选择，且不会把服务器地址发送给 ASN 服务。
+要手动检查一个目标，运行 `meridian preflight 198.51.100.10 --sni HOST`。避免 `apple.com` 和 `icloud.com` — 它们的网络与 VPS 提供商不匹配。
+
+### 伪装目标 vs 域名
+
+- **伪装目标** (`--sni`) — 你**不**拥有的热门网站。Reality 模仿它。
+- **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。它添加 XHTTP 和通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/docs/zh/domain-mode/)。
+
+## Hysteria2
+
+```
+meridian deploy 198.51.100.10 --domain vpn.example.com --hysteria2
+```
+
+在 UDP/443 上使用你域名的证书添加 Hysteria2。它可以在有损或高延迟网络上有帮助，但 QUIC 在某些地区被限制或阻止，所以它是可选的。Hysteria2 不通过中继。
+
+## 品牌定制
+
+个性化连接页面，让接收者知道谁设置了他们的 VPN：
+
+```
+meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color sunset
+```
+
+- **`--display-name`** — 显示在页面标题和标题中
+- **`--icon`** — 显示在页面顶部的表情符号或图片 URL
+- **`--color`** — 强调色盘：`ocean`（默认）、`sunset`、`forest`、`lavender`、`rose`、`slate`
+
+品牌定制保存在 `cluster.yml` 中，应用于每个客户端的连接页面。
+
+## 重新部署
+
+要重新部署，运行相同的命令。Meridian 保持保存的路径、密钥和用户，所以现有链接继续工作。不指定 `--sni` 的重新部署保持保存的伪装目标。
+
+在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。保存它：目前变更是增量的。你可以添加域名、Hysteria2 或用户，但删除已部署的东西（例如，去掉 `--domain`）被拒绝。
+
+`meridian deploy` 仅重新部署已经是你舰队中出口的服务器。要添加另一个服务器，使用 `meridian node add NEW_IP`。
 
 ## 部署前检查
 
-不确定您的服务器是否兼容？
+不确定服务器是否合适？
 
 ```
 meridian preflight 198.51.100.10
 ```
 
-无需安装即可测试 SNI 可达性与 DNS、端口本地和外部可达性、可选域名 DNS、操作系统兼容性、磁盘空间和时钟偏差。退出码 `0` 表示就绪，`4` 表示有可处理发现，`3` 表示所需证据不可用。
-
-## 重新运行部署
-
-随时重新运行 `meridian deploy` 是安全的。预配程序是完全幂等的：
-- 现有拓扑和密钥从 `cluster.yml` 加载，不会重新生成
-- 步骤在执行前检查现有状态
-- 没有重复工作
+检查伪装目标、端口 443 是否空闲且可从外部访问、可选的域名 DNS、OS、磁盘空间和时钟偏差，无需安装任何东西。
 
 ## 非 root 部署
 
@@ -93,60 +113,56 @@ meridian preflight 198.51.100.10
 meridian deploy 198.51.100.10 --user ubuntu
 ```
 
-非 root 用户会自动获得 `sudo`。用户必须有无密码 sudo 访问权限。
+命令通过 `sudo` 运行，所以用户需要无密码 sudo。
+
+## 本地部署
+
+如果你以 root 身份登录到服务器：
+
+```
+meridian deploy local
+```
+
+这跳过 SSH。`preflight local`、`scan local` 和 `doctor local` 工作方式相同。仍然建议从你自己的机器运行 Meridian，因为 `meridian test` 需要外部角度。
+
+## Cloudflare WARP
+
+WARP 通过 Cloudflare 发送你的服务器的出站流量，所以网站看到 Cloudflare 地址而不是你的 VPS IP。
+
+```
+meridian deploy 198.51.100.10 --warp
+```
+
+**WARP 有帮助时：** 网站阻止数据中心 IP 范围，或当你想隐藏 VPS 地址不被目标网站看到。
+
+**你不需要它时：** 大多数网站无需它也能正常工作，它添加一个跳跃（VPS → Cloudflare → 目标）。
+
+Meridian 在代理模式下安装 `cloudflare-warp` 客户端（SOCKS5 在 `127.0.0.1:40000`），使其成为 Xray 的出站。传入连接不受影响。WARP 免费且不需要 Cloudflare 账户。
 
 ## 地理封锁
 
-默认情况下，Meridian 会通过代理阻止 `.ru` 域名和俄罗斯 IP 段：
+默认情况下，服务器通过代理阻止俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 范围（`geoip:ru`）。这让你的 VPS IP 远离俄罗斯服务日志，降低被发现和阻止的机会。
 
-```bash
+如果你的用户需要通过 Meridian 访问这些网站，关闭它：
+
+```
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-这是有意的。这样可以让俄罗斯目的地不经过代理路径，降低您的 VPS IP 出现在俄罗斯服务日志中、随后被封锁的概率。
+要在保持阻止的同时打开俄罗斯网站直接访问，详见[分流路由](/docs/zh/split-routing/)。
 
-在以下情况下保持启用：
-- 俄罗斯网站本来就无需 VPN 也能正常访问
-- 您希望共享服务器使用更安全的默认值
+## 添加中继
 
-在以下情况下关闭：
-- 您需要通过 Meridian 访问 `.ru` 网站
-- 您希望所有流量都毫无例外地经过 VPN
+出口运行后，在国内服务器上添加中继，这样如果出口 IP 被阻止，用户保持有访问方式。详见[中继指南](/docs/zh/relay/)。
 
-交互式向导会明确询问这一项。对应的 Xray 规则是 `geosite:category-ru` 和 `geoip:ru`。
-
-## 添加中继节点
-
-部署出口服务器后，添加中继节点以在出口 IP 被阻止时增强抗阻挡能力。有关完整的设置说明，请参阅[中继指南](/docs/zh/relay/)。
-
-```bash
-meridian relay deploy RELAY_IP --exit YOUR_EXIT_IP
+```
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10
 ```
 
 ## 管理面板
 
-Meridian 部署 [Remnawave](https://remna.st/) 管理栈，包括现代化面板后端和独立节点服务；两者都由 nginx 通过随机的秘密路径反向代理。您可以直接在浏览器中监控流量、查看入站配置、管理用户和主机，以及检查服务器状态。
+Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx 在随机秘密路径上反向代理，与连接页面路径分开，所以你分享的链接永不显示它。部署打印面板 URL 为"Remnawave 面板（高级）"；URL 和管理员登录在 `~/.meridian/cluster.yml` 的 `panel` 部分。
 
-面板 URL 和凭据存储在本地 `cluster.yml` 中：
+像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。
 
-```
-cat ~/.meridian/cluster.yml
-```
-
-`panel` 部分包含所有必要信息：
-
-```yaml
-panel:
-  url: https://198.51.100.10/n7kx2m9qp4wj8vh3rf6tby5e/
-  api_token: <JWT token>
-  admin_user: admin
-  admin_pass: <generated>
-  secret_path: n7kx2m9qp4wj8vh3rf6tby5e
-  sub_path: <subscription page path>
-```
-
-在浏览器中打开 `url`，使用管理员凭据登录。
-
-面板路径是随机生成的安全措施——请像对待密码一样保护它。所有 `meridian` CLI 命令底层使用相同的面板 API，因此 CLI 中的操作也会显示在面板中，反之亦然（`meridian plan` 会显示状态漂移）。
-
-> **注意：** 如果您直接在面板中修改设置，下次运行 `meridian deploy` 时可能会被覆盖。
+Meridian 固定了它已测试的 Remnawave 版本。如果你自己升级 Remnawave，Meridian 不会降级它。

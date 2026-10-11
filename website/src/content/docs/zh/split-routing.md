@@ -1,152 +1,58 @@
 ---
 title: 分流（俄罗斯）
-description: 让俄罗斯流量直连，其他流量走代理——既保护 VPS IP，又确保俄罗斯网站正常访问。
+description: 俄罗斯流量直接路由，其他流量通过代理 — 保持 VPS IP 受保护且俄罗斯网站工作。
 order: 6.5
 section: guides
 ---
 
 ## 问题
 
-Meridian 默认启用**服务器端地理封锁**：Xray 服务器会丢弃发往俄罗斯域名和 IP 的流量（通过 `geosite:category-ru` + `geoip:ru` 路由规则）。这样可以防止您的 VPS IP 出现在俄罗斯服务的日志中。
+Meridian 默认启用**服务器端地理封锁**：出口丢弃发往俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 范围（`geoip:ru`）的流量。这保持你的 VPS IP 远离俄罗斯服务日志，在那里它可能被发现和阻止。
 
-但这也意味着俄罗斯网站无法通过 VPN 访问。用户必须断开 VPN，才能访问 Yandex、VK、Gosuslugi 及其他俄罗斯本地服务。
+问题是：使用 VPN 时俄罗斯网站无法打开。用户必须断开连接才能访问 Yandex、VK、Gosuslugi 和其他国内服务。
 
-## 解决方案：客户端分流
+## 解决方案：设备上的分流路由
 
-分流会让俄罗斯流量从客户端**直接连接**（绕过代理），其他所有流量则通过 VPN：
+分流从设备**直接**发送俄罗斯流量，其他所有通过 VPN：
 
 ```
-Russian sites  → Client → Direct → Internet (via local ISP)
-Everything else → Client → Proxy → VPS → Internet
+俄罗斯网站   → 设备 → 直接 → 互联网 (本地 ISP)
+其他所有内容 → 设备 → 代理 → VPS → 互联网
 ```
 
-这样可以兼得：
-- **VPS 保护**——服务器端地理封锁继续作为安全网
-- **正常访问俄罗斯网站**——客户端让这些流量直连，完全不经过代理
+你同时得到：
+- **VPS 保护** — 服务器端阻止保持作为安全网
+- **工作的俄罗斯网站** — 设备直接发送它们，从不通过代理
 
-## 配置方法
+## 如何设置
 
-Meridian 使用 Remnawave 的订阅模板系统。订阅模板决定客户端导入连接时会收到哪些路由规则。
+分流在客户端应用中配置。Meridian 还未在其订阅中提供分流。
 
-### 步骤 1：打开 Remnawave 面板
-
-前往您的面板 URL（`meridian deploy` 完成后会显示）并登录。
-
-### 步骤 2：编辑订阅模板
-
-1. 前往**订阅设置** → **模板**
-2. 找到 **Xray JSON** 模板（或新建一个）
-3. 用下方分流配置替换其中的路由/DNS 部分
-
-### Xray JSON 模板
-
-将以下部分添加到 Xray JSON 订阅模板中。`dns` 块确保俄罗斯域名通过本地 DNS 服务器解析，`routing` 块则让俄罗斯流量直连：
-
-```json
-{
-    "log": {
-        "loglevel": "warning"
-    },
-    "dns": {
-        "servers": [
-            {
-                "address": "https://dns.google/dns-query",
-                "domains": ["geosite:geolocation-!cn"]
-            },
-            "8.8.8.8",
-            {
-                "address": "localhost",
-                "domains": [
-                    "geosite:category-ru",
-                    "domain:.ru",
-                    "domain:.su",
-                    "domain:.рф"
-                ],
-                "expectIPs": ["geoip:ru"]
-            }
-        ]
-    },
-    "routing": {
-        "domainStrategy": "IPIfNonMatch",
-        "rules": [
-            {
-                "type": "field",
-                "domain": ["geosite:private"],
-                "outboundTag": "direct"
-            },
-            {
-                "type": "field",
-                "ip": ["geoip:private"],
-                "outboundTag": "direct"
-            },
-            {
-                "type": "field",
-                "domain": [
-                    "geosite:category-ru",
-                    "domain:.ru",
-                    "domain:.su",
-                    "domain:.рф"
-                ],
-                "outboundTag": "direct"
-            },
-            {
-                "type": "field",
-                "ip": ["geoip:ru"],
-                "outboundTag": "direct"
-            }
-        ]
-    }
-}
-```
-
-此模板的参考副本已包含在 Meridian 源代码中：`src/meridian/data/subscription-templates/xray-split-ru.json`。
-
-### Mihomo / Clash 模板
-
-对于使用 Mihomo（Clash Meta）的客户端，请将以下规则添加到订阅模板：
-
-```yaml
-rules:
-  - DOMAIN-SUFFIX,.ru,DIRECT
-  - DOMAIN-SUFFIX,.su,DIRECT
-  - DOMAIN-SUFFIX,.рф,DIRECT
+- **Hiddify** — 在设置中，将地区设置为**俄罗斯**。Hiddify 随后直接发送俄罗斯网站。
+- **v2rayNG、v2RayTun、v2rayN 和其他 Xray 应用** — 打开应用的路由设置并为 `geosite:category-ru` 和 `geoip:ru` 添加**直接**规则。
+- **Mihomo / Clash Meta 应用** — 订阅刷新替换配置，所以通过应用的覆盖或合并功能在最终 `MATCH` 规则上方添加这些规则：
+  ```yaml
   - GEOSITE,category-ru,DIRECT
   - GEOIP,RU,DIRECT
-  - MATCH,PROXY
-```
+  ```
 
-参考副本：`src/meridian/data/subscription-templates/mihomo-split-ru.yaml`。
+菜单名称在应用和版本间不同；寻找"路由"、"地区"或"旁路"。
 
-## 协同工作原理
+### 为什么不在面板中编辑模板？
 
-这两层机制相互补充：
+Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板 — 它们承载出口和中继间的自动回退。Meridian 在每次应用上恢复它们（包括重新部署和 `client add`、`node add`、`relay deploy`），所以在面板中添加的规则不会持续。替换它们的路由部分也可能破坏自动回退。
 
-| 层级 | 作用 | 防范风险 |
-|-------|-------------|-----------------|
-| **服务器端地理封锁**（Xray 路由） | 在服务器端丢弃发往俄罗斯的流量 | VPS IP 出现在俄罗斯服务日志中 |
-| **客户端分流**（订阅模板） | 让俄罗斯流量直连并绕过代理 | 俄罗斯网站无法访问、不必要的代理负载 |
+## 层如何配合工作
 
-如果已配置分流，俄罗斯流量不会到达服务器——客户端会将其直接发送到目的地。服务器端地理封锁充当安全网：如果客户端没有应用模板（例如旧版应用或手动配置），服务器仍会阻止访问俄罗斯目的地。
+| 层 | 它做什么 | 防护对抗 |
+|------|-------------|-----------------|
+| **服务器端地理封锁** | 在出口丢弃俄罗斯目标流量 | VPS IP 出现在俄罗斯服务日志中 |
+| **设备上的分流路由** | 直接发送俄罗斯流量 | 破损的俄罗斯网站、不必要的代理负载 |
 
-## 客户端兼容性
+启用分流时，俄罗斯流量永不到达服务器。如果设备没有规则（旧应用、新手机），服务器仍阻止俄罗斯目标，所以 VPS IP 保持受保护。
 
-分流要求客户端支持 Xray 路由规则：
+如果你的用户需要通过 VPN 的俄罗斯网站，用 `--no-geo-block` 部署。
 
-| 客户端 | 平台 | 分流支持 |
-|--------|----------|----------------------|
-| v2rayNG | Android | 支持（Xray JSON） |
-| Hiddify | Android, iOS | 支持（Xray JSON） |
-| Streisand | iOS | 支持（Xray JSON） |
-| V2Box | iOS | 支持（Xray JSON） |
-| Nekoray / Nekobox | 桌面端 | 支持（Xray JSON） |
-| Clash Meta / Mihomo | 全平台 | 支持（Mihomo YAML，格式不同） |
+## DNS 考虑
 
-不解析路由规则的客户端会代理所有流量。俄罗斯网站无法通过代理访问（服务器端地理封锁会丢弃这些流量），但 VPS IP 仍受保护。
-
-## DNS 泄漏注意事项
-
-一些客户端默认不会通过代理发送 DNS 查询。启用分流时，这对俄罗斯域名反而正合适——它们应通过本地 DNS 解析。但非俄罗斯域名的 DNS 查询应通过代理侧的 DNS，以避免泄漏。
-
-上面的模板通过 `dns` 部分实现这一点：俄罗斯域名在本地解析（`address: "localhost"`），其他域名全部使用 DNS-over-HTTPS（`dns.google`）。
-
-如果您的客户端忽略 `dns` 部分（某些精简客户端确实如此），建议为非俄罗斯流量启用客户端内置的 DNS 防泄漏功能。
+通过分流，俄罗斯域名应通过本地 DNS 解析，其他所有通过代理，以避免泄露。具有地区或旁路预设的应用通常处理这个。如果你的应用有单独的 DNS 设置，为代理流量启用其 DNS 泄露保护。

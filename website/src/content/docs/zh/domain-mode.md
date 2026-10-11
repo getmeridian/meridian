@@ -1,48 +1,56 @@
 ---
 title: 域名模式
-description: 通过 Cloudflare 添加 CDN 回退以实现 IP 阻断弹性。
+description: 通过 Cloudflare 添加 CDN 回退以增强对 IP 阻止的抗性。
 order: 4
 section: guides
 ---
 
 ## 域名模式添加的内容
 
-域名模式用三个组件扩展独立设置：
-
-1. **nginx stream SNI 路由**——将域名流量路由到 nginx http，将 Reality 流量路由到 Xray
-2. **nginx TLS**——证书由 acme.sh (Let's Encrypt) 管理
-3. **VLESS+WSS 入站**——通过 Cloudflare 的旧版 CDN 回退（次要传输方式优先使用 XHTTP）
-
-WSS 连接通过 Cloudflare 的 CDN 路由，即使您的服务器 IP 被阻断也能工作——Cloudflare 的 IP 范围用途广泛，难以整体封锁。WSS 仅为向后兼容而保留；新部署应优先使用 XHTTP 作为备用传输方式。
-
-## 使用域名部署
-
 ```
-meridian deploy 198.51.100.10 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain vpn.example.com
 ```
+
+拥有自己的域名，出口在 Reality 旁边提供两个额外的方式：
+
+- **XHTTP** 和 **WSS** 在您的域名上，带 Meridian 颁发和续期的 Let's Encrypt 证书（acme.sh）
+- 一旦域名通过 Cloudflare 代理，两条路径都通过 Cloudflare 的 CDN 传输 — 所以即使您的服务器 IP 被阻止它们也继续工作
+
+面板和连接页面保持在服务器的 IP 证书上；域名仅承载代理路径。
+
+添加 `--hysteria2` 也在 UDP/443 上提供 Hysteria2，带域名的证书（见 [Hysteria2 和 Cloudflare](#hysteria2-and-cloudflare)）。
 
 ## Cloudflare 设置
 
-**按照此确切顺序**以避免 TLS 证书问题：
+**按此顺序**避免证书问题：
 
-1. 在 Cloudflare 中添加您的域名，创建指向您的服务器 IP 的 **A 记录**
-2. 保持云图标为**灰色**（"仅 DNS"）——暂时不启用代理
-3. 运行 `meridian deploy`——acme.sh 自动获取 TLS 证书
-4. 切换为**橙色云**（已代理）
-5. 配置 SSL/TLS → **完整（严格）**和网络 → **启用 WebSocket**
+1. 在 Cloudflare 中添加您的域并创建指向您的服务器 IP 的 **A 记录**
+2. 保持云图标**灰色**（"仅 DNS"）
+3. 运行 `meridian deploy 198.51.100.10 --domain vpn.example.com` — Meridian 获取证书
+4. 将记录切换到**橙色云**（代理）
+5. 将 SSL/TLS 设置为 **Full (Strict)** 并打开 **WebSockets**（网络设置）
 
-> **重要：** acme.sh 通过端口 80 上的 HTTP-01 挑战获取证书。如果启用了 Cloudflare 的"始终使用 HTTPS"，会破坏挑战。禁用它或为 `/.well-known/acme-challenge/*` 添加页面规则。
+部署完成时再打印这些步骤。
 
-> **还要注意：** 在域名模式下，托管的连接页面、隐藏的 Remnawave 管理 UI 和 subscription-page 路径都使用这个 hostname。把记录切换到橙云后，这些页面也会经过 Cloudflare。请在这个 hostname 上关闭会注入脚本或修改 HTML 的 Cloudflare 功能（例如 Website Analytics / RUM），因为 Meridian 的连接页面刻意使用严格的 self-hosted CSP。如果页面在开启代理后开始失败，先临时切回 DNS only，以确认问题是否来自 Cloudflare 这一侧。
+> **重要：** 证书使用端口 80 上的 HTTP 挑战颁发。Cloudflare 的 "Always Use HTTPS" 破坏该挑战 — 关闭它，或豁免 `/.well-known/acme-challenge/*`。
 
 ## 连接链接
 
-使用域名模式，用户获得三个连接选项：
+每个客户端的订阅和连接页面列出每条路径：
 
-| 协议 | 优先级 | 路由 |
-|----------|----------|-------|
-| Reality | 主要 | 直接到服务器 IP |
-| XHTTP | 替代 | 通过端口 443 上的 nginx |
-| WSS | 旧版后备 | 通过 Cloudflare CDN |
+| 路径 | 路由 | 何时有帮助 |
+|------|-------|---------------|
+| Reality | 直接到服务器 IP | 主要 — 最快 |
+| XHTTP | 您的域名（代理时通过 Cloudflare） | Reality 被阻止或节流 |
+| WSS | 您的域名（代理时通过 Cloudflare） | 服务器 IP 被阻止 |
+| Hysteria2（可选） | 您的域名 UDP/443 上 | 丢包或高延迟网络 |
 
-用户应首先尝试 Reality（最快），其次是 XHTTP，仅当两者都失败时才把 WSS 作为最后手段（例如 IP 被阻止）。
+导入 Xray JSON 或 Mihomo 订阅的应用在一条路径停止工作时自动在路径间切换。其他应用将每条路径显示为单独条目。
+
+## Hysteria2 和 Cloudflare
+
+Hysteria2 在 UDP 上使用 QUIC，Cloudflare 的代理不承载。使用橙色云记录，Hysteria2 客户端到达 Cloudflare 而不是您的服务器且不会连接；TCP 路径不受影响。QUIC 在某些地区也被节流。仅在您的用户需要它并可以通过 UDP 到达服务器时启用 `--hysteria2`。
+
+## 稍后添加域名
+
+使用添加的 `--domain` 再次运行您的部署命令。现有 Reality 链接保持工作。一旦部署了域名，在以后的重新部署中保持传递相同的 `--domain` — 从运行中的服务器移除路径尚不支持。

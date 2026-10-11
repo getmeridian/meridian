@@ -39,11 +39,14 @@ make templates         # Jinja2 模板验证
 CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-vpn`。
 
 关键模块：
-- `cli.py`——Typer 应用、子命令注册
-- `commands/`——每个子命令一个模块
-- `cluster.py` + `cluster_persistence.py`——类型化的 `cluster.yml` 状态与持久化
-- `servers.py`——`ServerRegistry` 用于已知服务器
-- `provision/`——幂等步骤管道
+- `cli.py` — Typer 应用、子命令注册
+- `commands/` — 每个子命令一个模块
+- `cluster.py` + `cluster_persistence.py` — 类型化的 `cluster.yml` 状态和持久化
+- `servers.py` — `ServerRegistry` 用于已知服务器
+- `setup/` — `meridian setup` 向导状态和部署、设置和应用背后的共享运行时
+- `compiler/` — 将拓扑变成已审核、哈希标识的资源列表（无 I/O）
+- `reconciler/` — 带检查点观察和应用这些资源
+- `provision/` — 服务器准备步骤（包、加固、Docker、Realm）
 
 ## Pull Requests
 
@@ -55,9 +58,9 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 
 ## 关键约定
 
-- **Shell 值使用 `shlex.quote()`**——不要插入未清理的值
+- **Shell 值使用 `shlex.quote()`** — 永不插入未消毒的值
 - **PWA 资产必须保持同步**（`templates/pwa/` 和应用目录）
-- **nginx 配置**使用 `/etc/nginx/stream.d/meridian.conf` 和 `/etc/nginx/conf.d/meridian-http.conf`
+- **nginx 配置**作为每个资源的 `meridian-v4-*.conf` 文件写在 `/etc/nginx/stream.d/` 和 `/etc/nginx/sites-available/` 下
 - **配置程序步骤**返回 `StepResult`（ok/changed/skipped/failed）
 
 ## 测试
