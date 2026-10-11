@@ -5,7 +5,7 @@ order: 3
 section: guides
 ---
 
-This guide covers every deployment option. If you're deploying for the first time, start with [Getting Started](/docs/en/getting-started/) — it walks through the basics in five minutes.
+This guide covers every option of `meridian deploy`. If this is your first deployment, start with [Getting Started](/docs/en/getting-started/).
 
 ## Basic deployment
 
@@ -13,28 +13,67 @@ This guide covers every deployment option. If you're deploying for the first tim
 meridian deploy 198.51.100.10
 ```
 
-The wizard guides you through configuration. Or specify everything upfront:
+One server becomes both the control plane (the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/docs/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
+
+Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip confirmations:
 
 ```
-meridian deploy 198.51.100.10 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 198.51.100.10 --client-name alice --yes
 ```
 
 ## All flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | TLS camouflage target |
-| `--domain DOMAIN` | (none) | Cloudflare CDN fallback domain |
-| `--client-name NAME` | default | Name for the first client |
+| `--sni HOST` | (auto) | Camouflage target. Without it, the server picks the first working target from `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
+| `--domain DOMAIN` | (none) | Your domain for XHTTP and WSS, with Cloudflare CDN fallback |
+| `--hysteria2` | off | Also offer Hysteria2 on UDP/443 (needs `--domain`) |
+| `--client-name NAME` | default | Name of the first client |
 | `--display-name NAME` | (none) | Label for connection pages (e.g. "Alice's VPN") |
 | `--icon EMOJI_OR_URL` | (none) | Page icon — emoji or image URL |
 | `--color PALETTE` | ocean | Page color theme (ocean/sunset/forest/lavender/rose/slate) |
-| `--user USER` | root | SSH user (non-root gets sudo automatically) |
-| `--harden / --no-harden` | enabled | Harden SSH + firewall (disable with `--no-harden` if other services share the server) |
-| `--server NAME` | | Target server (name or IP) |
+| `--user USER` | root | SSH user (non-root users need passwordless sudo) |
+| `--ssh-port PORT` | 22 | SSH port, if not 22 |
+| `--server NAME` | | Saved server to deploy to (name or IP) |
+| `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. Use `--no-harden` on a server shared with other services |
+| `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
+| `--geo-block / --no-geo-block` | on | Block Russian domains and IPs on the server |
 | `--yes` | | Skip confirmation prompts |
-| `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
-| `--geo-block / --no-geo-block` | enabled | Block `.ru` domains and Russian IPs through the proxy |
+
+Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are described in the [CLI reference](/docs/en/cli-reference/#meridian-deploy).
+
+## Choosing a camouflage target
+
+The camouflage target (SNI) is the website your server impersonates. It is **not** a domain you own — it is a popular site with TLS 1.3. Anyone who probes your server sees that site's real certificate.
+
+Without `--sni`, the server itself tries `www.google.com`, `dl.google.com`, and `www.cloudflare.com` in order and uses the first one it can reach. If real traffic then fails through that target, Meridian moves on to the next one before finishing. A target you pass with `--sni` is never swapped; if traffic fails, deploy stops and tells you.
+
+To find a target on the same network as your server, scan its IPv4 neighborhood:
+
+```
+meridian scan 198.51.100.10
+```
+
+The scan runs a pinned, checksum-verified build of RealiTLScanner on the server and lists certificate domains it found nearby. Then deploy with your pick:
+
+```
+meridian deploy 198.51.100.10 --sni dl.google.com
+```
+
+To check one target by hand, run `meridian preflight 198.51.100.10 --sni HOST`. Avoid `apple.com` and `icloud.com` — their networks don't match VPS providers.
+
+### Camouflage target vs. domain
+
+- **Camouflage target** (`--sni`) — a popular website you **don't** own. Reality impersonates it.
+- **Domain** (`--domain`) — a domain you **do** own, pointed at your server. It adds XHTTP and a WSS path through Cloudflare's CDN. See [Domain mode](/docs/en/domain-mode/).
+
+## Hysteria2
+
+```
+meridian deploy 198.51.100.10 --domain vpn.example.com --hysteria2
+```
+
+Adds Hysteria2 on UDP/443 using your domain's certificate. It can help on lossy or high-latency networks, but QUIC is throttled or blocked in some regions, so it is opt-in. Hysteria2 doesn't pass through relays.
 
 ## Branding
 
@@ -44,55 +83,29 @@ Personalize connection pages so recipients know who set up their VPN:
 meridian deploy 198.51.100.10 --display-name "Alice's VPN" --icon 🚀 --color sunset
 ```
 
-- **`--display-name`** — appears in the trust bar and page title. Use your name or a friendly label.
-- **`--icon`** — an emoji or image URL shown at the top of the connection page.
-- **`--color`** — sets the accent color palette. Options: `ocean` (default), `sunset`, `forest`, `lavender`, `rose`, `slate`.
+- **`--display-name`** — shown in the page header and title
+- **`--icon`** — an emoji or image URL shown at the top of the page
+- **`--color`** — accent palette: `ocean` (default), `sunset`, `forest`, `lavender`, `rose`, `slate`
 
-These settings are stored in `cluster.yml` and apply to all client connection pages.
+Branding is saved in `cluster.yml` and applies to every client's connection page.
 
-## Choosing an SNI target
+## Redeploying
 
-The SNI (Server Name Indication) target is the domain your server impersonates. This is **not** a domain you own — it's any popular website with TLS. When a censor probes your server, they see that real site's certificate, making your server indistinguishable from normal traffic.
+To redeploy, run the same command again. Meridian keeps the saved paths, keys, and users, so existing links keep working. A redeploy without `--sni` keeps the saved camouflage target.
 
-The default (`www.microsoft.com`) works well for most cases. To discover alternatives near the server, scan its IPv4 subnet with the pinned, checksum-verified RealiTLScanner build:
+At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Keep it: changes are additive for now. You can add a domain, Hysteria2, or users, but removing something that is already deployed (for example, dropping `--domain`) is refused.
 
-```
-meridian scan 198.51.100.10
-```
-
-**Good targets** (global CDN):
-- `www.microsoft.com` — Azure CDN, global
-- `www.twitch.tv` — Fastly CDN, global
-- `dl.google.com` — Google CDN, global
-- `github.com` — Fastly CDN, global
-
-Use a stable hostname that resolves and completes a TLS handshake from the server. `meridian scan` validates observed certificate domains; `meridian preflight --sni HOST` checks a manual choice without sending the server address to an ASN service.
-
-### Camouflage target vs. domain
-
-These are two different things:
-
-- **Camouflage target** (`--sni`) — any popular website you **don't** own. Reality impersonates it so your traffic looks like normal HTTPS to that site. Censors probing see the real site's certificate.
-- **Domain** (`--domain`) — a domain you **do** own, pointed to your server via Cloudflare. Adds a CDN fallback connection path. See [Domain mode](/docs/en/domain-mode/).
-
-You can't use your own domain as a camouflage target — the certificate would match your server, not an unrelated site, which defeats the impersonation.
+`meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
 
 ## Pre-flight check
 
-Not sure if your server is compatible?
+Not sure a server is suitable?
 
 ```
 meridian preflight 198.51.100.10
 ```
 
-Tests SNI reachability and DNS, port availability and external reachability, optional domain DNS, OS compatibility, disk space, and clock skew — without installing anything. Exit `0` means ready, `4` means actionable findings, and `3` means required evidence was unavailable.
-
-## Re-running deploy
-
-It's safe to re-run `meridian deploy` at any time. The provisioner is fully idempotent:
-- Existing topology and secrets are loaded from `cluster.yml`, not regenerated
-- Steps check existing state before acting
-- No duplicate work
+Checks the camouflage target, whether port 443 is free and reachable from outside, optional domain DNS, OS, disk space, and clock skew, without installing anything.
 
 ## Non-root deployment
 
@@ -100,98 +113,56 @@ It's safe to re-run `meridian deploy` at any time. The provisioner is fully idem
 meridian deploy 198.51.100.10 --user ubuntu
 ```
 
-Non-root users get `sudo` automatically. The user must have passwordless sudo access.
+Commands run through `sudo`, so the user needs passwordless sudo.
 
 ## Local deployment
 
-If you're running Meridian directly on the server (e.g. logged in via SSH as root):
+If you are logged into the server as root:
 
 ```
 meridian deploy local
 ```
 
-This skips SSH entirely and runs server-touching commands locally:
-
-```
-meridian preflight local
-meridian scan local
-meridian doctor local
-```
-
-Useful when SSH to self doesn't work (missing keys, firewall rules), for re-deploying on the same server, or in cloud-init startup scripts.
+This skips SSH. `preflight local`, `scan local`, and `doctor local` work the same way. Running Meridian from your own machine is still recommended, because `meridian test` needs an outside vantage point.
 
 ## Cloudflare WARP
 
-WARP routes your server's outgoing traffic through Cloudflare's network. Destination websites see a Cloudflare IP address instead of your VPS IP.
+WARP sends your server's outgoing traffic through Cloudflare, so websites see a Cloudflare address instead of your VPS IP.
 
 ```
 meridian deploy 198.51.100.10 --warp
 ```
 
-The interactive wizard also offers this option.
+**When WARP helps:** sites that block datacenter IP ranges, or when you want to hide the VPS address from destination sites.
 
-**When WARP helps:**
-- Websites block your VPS provider's IP range (common with datacenter IPs on ChatGPT, Netflix, etc.)
-- You want to hide the VPS IP from destination sites
+**When you don't need it:** most sites work fine without it, and it adds one hop (VPS → Cloudflare → destination).
 
-**When you don't need WARP:**
-- Normal browsing works fine through the proxy — most sites don't block VPS IPs
-- You want maximum speed — WARP adds one extra hop (VPS → Cloudflare → destination)
-
-**How it works technically:** Meridian installs the `cloudflare-warp` client on the server in SOCKS5 proxy mode (listening on `127.0.0.1:40000`). Xray uses this as its default outbound — all proxy egress goes through Cloudflare. Incoming connections (SSH, nginx, Xray inbound) are completely unaffected. WARP is free and doesn't require a Cloudflare account.
+Meridian installs the `cloudflare-warp` client in proxy mode (SOCKS5 on `127.0.0.1:40000`) and makes it Xray's outbound. Incoming connections are not affected. WARP is free and needs no Cloudflare account.
 
 ## Geo-blocking
 
-By default, Meridian blocks `.ru` domains and Russian IP ranges through the proxy:
+By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the proxy. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.
 
-```bash
+Turn it off if your users need those sites through Meridian:
+
+```
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-This is intentional. It keeps Russian destinations off the proxy path, which reduces the chance of your VPS IP appearing in Russian-service logs and later getting blocked.
+For a way to open Russian sites directly while keeping the block, see [Split routing](/docs/en/split-routing/).
 
-Leave it enabled if:
-- Russian sites already work normally without the VPN
-- You want the safer default for a shared server
+## Adding a relay
 
-Disable it if:
-- You need `.ru` sites to open through Meridian
-- You want all traffic to go through the VPN with no exceptions
+After the exit is running, add a relay on a domestic server so users keep a way in if the exit IP gets blocked. See the [Relay guide](/docs/en/relay/).
 
-The interactive wizard asks about this explicitly. The equivalent Xray rules are `geosite:category-ru` and `geoip:ru`.
-
-## Adding a relay node
-
-After deploying your exit server, add a relay node for resilience when the exit IP gets blocked. See the [Relay guide](/docs/en/relay/) for full setup instructions.
-
-```bash
-meridian relay deploy RELAY_IP --exit YOUR_EXIT_IP
+```
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10
 ```
 
 ## Management panel
 
-Meridian deploys [Remnawave](https://remna.st/) as the management stack — a modern panel (backend) plus independent node service, both reverse-proxied by nginx at a random secret path. The panel UI lets you monitor traffic, view inbound configs, manage users and hosts, and check server status directly in a browser.
+Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. Deploy prints the panel URL as "Remnawave panel (advanced)"; the URL and admin login are in the `panel` section of `~/.meridian/cluster.yml`.
 
-The panel URL and credentials are stored in your local `cluster.yml`:
+Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version.
 
-```
-cat ~/.meridian/cluster.yml
-```
-
-The `panel` section contains everything you need:
-
-```yaml
-panel:
-  url: https://198.51.100.10/n7kx2m9qp4wj8vh3rf6tby5e/
-  api_token: <JWT token>
-  admin_user: admin
-  admin_pass: <generated>
-  secret_path: n7kx2m9qp4wj8vh3rf6tby5e
-  sub_path: <subscription page path>
-```
-
-Open the `url` in your browser and log in with the admin credentials.
-
-The panel path is randomized for security — treat it like a password. All `meridian` CLI commands use this same panel API under the hood, so anything you do via the CLI is also visible in the panel, and vice versa (drift is surfaced by `meridian plan`).
-
-> **Note:** If you modify settings directly in the panel, they may be overwritten on the next `meridian deploy`.
+Meridian pins the Remnawave versions it has tested. If you upgrade Remnawave yourself, Meridian does not downgrade it.

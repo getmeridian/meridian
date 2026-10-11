@@ -7,42 +7,50 @@ section: guides
 
 ## What domain mode adds
 
-Domain mode extends the standalone setup with three components:
-
-1. **nginx stream SNI routing** — routes domain traffic to nginx http alongside Reality traffic to Xray
-2. **nginx TLS** — certificates managed by acme.sh (Let's Encrypt) for your domain
-3. **VLESS+WSS inbound** — legacy CDN fallback through Cloudflare (prefer XHTTP as the secondary transport)
-
-The WSS connection routes through Cloudflare's CDN, making it work even if your server's IP is blocked — Cloudflare's IP ranges are too widely used to block. WSS is maintained for backward compatibility; XHTTP is the preferred alternative transport for new deployments.
-
-## Deploy with domain
-
 ```
-meridian deploy 198.51.100.10 --domain proxy.example.com
+meridian deploy 198.51.100.10 --domain vpn.example.com
 ```
+
+With your own domain, the exit offers two more ways in next to Reality:
+
+- **XHTTP** and **WSS** on your domain, with a Let's Encrypt certificate that Meridian issues and renews (acme.sh)
+- Once the domain is proxied through Cloudflare, both paths travel through Cloudflare's CDN — so they keep working even if your server's IP gets blocked
+
+The panel and the connection pages stay on the server's IP certificate; the domain carries only the proxy paths.
+
+Add `--hysteria2` to also offer Hysteria2 on UDP/443 with the domain's certificate (see [Hysteria2 and Cloudflare](#hysteria2-and-cloudflare)).
 
 ## Cloudflare setup
 
-**Follow this exact order** to avoid TLS certificate issues:
+**Follow this order** to avoid certificate problems:
 
-1. Add your domain in Cloudflare, create an **A record** pointing to your server IP
-2. Keep the cloud icon **grey** ("DNS only") — don't enable proxying yet
-3. Run `meridian deploy` — acme.sh obtains the TLS certificate automatically
-4. Switch to **orange cloud** (Proxied)
-5. Configure SSL/TLS → **Full (Strict)** and Network → **Enable WebSockets**
+1. Add your domain in Cloudflare and create an **A record** pointing to your server IP
+2. Keep the cloud icon **grey** ("DNS only")
+3. Run `meridian deploy 198.51.100.10 --domain vpn.example.com` — Meridian obtains the certificate
+4. Switch the record to **orange cloud** (Proxied)
+5. Set SSL/TLS to **Full (Strict)** and turn on **WebSockets** (Network settings)
 
-> **Important:** acme.sh obtains certificates via HTTP-01 challenge on port 80. If Cloudflare's "Always Use HTTPS" is active, it breaks the challenge. Disable it or add a page rule for `/.well-known/acme-challenge/*`.
+Deploy prints these steps again when it finishes.
 
-> **Also important:** in domain mode, the hosted connection page and the hidden Remnawave admin UI + subscription-page paths are served on this same hostname. Once you switch the record to orange-cloud, those pages go through Cloudflare too. Disable Cloudflare features that inject scripts or modify HTML on this hostname (for example Website Analytics / RUM), because Meridian's connection page intentionally uses a strict self-hosted CSP. If the page starts failing while proxied, temporarily switch the record back to DNS only to confirm it is a Cloudflare-side issue.
+> **Important:** the certificate is issued with an HTTP challenge on port 80. Cloudflare's "Always Use HTTPS" breaks that challenge — turn it off, or exempt `/.well-known/acme-challenge/*`.
 
 ## Connection links
 
-With domain mode, users get three connection options:
+Each client's subscription and connection page list every path:
 
-| Protocol | Priority | Route |
-|----------|----------|-------|
-| Reality | Primary | Direct to server IP |
-| XHTTP | Alternative | Through nginx on port 443 |
-| WSS | Legacy backup | Through Cloudflare CDN |
+| Path | Route | When it helps |
+|------|-------|---------------|
+| Reality | Direct to the server IP | Primary — fastest |
+| XHTTP | Your domain (through Cloudflare when proxied) | Reality is blocked or throttled |
+| WSS | Your domain (through Cloudflare when proxied) | Server IP is blocked |
+| Hysteria2 (opt-in) | Your domain over UDP/443 | Lossy or high-latency networks |
 
-Users should try Reality first (fastest), XHTTP second, and WSS only as a last resort if both fail (e.g. IP is blocked).
+Apps that import the Xray JSON or Mihomo subscription switch between paths automatically when one stops working. Other apps show each path as a separate entry.
+
+## Hysteria2 and Cloudflare
+
+Hysteria2 uses QUIC over UDP, which Cloudflare's proxy does not carry. With an orange-cloud record, Hysteria2 clients reach Cloudflare instead of your server and won't connect; the TCP paths are unaffected. QUIC is also throttled in some regions. Only enable `--hysteria2` if your users need it and can reach the server over UDP.
+
+## Adding a domain later
+
+Run your deploy command again with `--domain` added. Existing Reality links keep working. Once a domain is deployed, keep passing the same `--domain` on later redeploys — removing paths from a running server isn't supported yet.

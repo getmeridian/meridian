@@ -35,14 +35,34 @@ pipx install meridian-vpn
 meridian update
 ```
 
-Meridian periodically checks PyPI before interactive commands and prints a notice when a newer version exists. It never installs updates automatically. `meridian update` explicitly upgrades through the available package manager; review release notes before a major update. Set `MERIDIAN_DISABLE_UPDATE_CHECK=1` to disable background version checks in automation.
+Meridian checks PyPI now and then before interactive commands and prints a notice when a newer version exists. It never installs updates on its own. `meridian update` upgrades through whichever package manager installed it and confirms that the active `meridian` command reports the new version. Set `MERIDIAN_DISABLE_UPDATE_CHECK=1` to turn off the background check in automation.
+
+Updating the CLI changes nothing on your servers. If a server works, there is no rush; read the [release notes](https://github.com/getmeridian/meridian/releases), then run the same `meridian deploy` command (or `meridian apply`) when you are ready to apply the new version.
+
+## Upgrading from 3.x
+
+Meridian 4.0 is **not an in-place upgrade**. It replaces the 3x-ui panel with Remnawave, and links from a 3.x server cannot carry over: every user needs a new link.
+
+Your 3.x servers keep working. You have two choices:
+
+- **Keep managing them with 3.x.** Reinstall the 3.x CLI:
+  ```
+  uv tool install 'meridian-vpn<4'
+  ```
+  (or `pipx install 'meridian-vpn<4'`). Meridian 3.17.3 and later stay on 3.x when you run `meridian update`, unless you pass `--major`.
+- **Move to 4.0.**
+  1. Deploy a fresh server with 4.0: `meridian deploy NEW_IP`
+  2. Give your users their new connection pages (`meridian client add NAME` for each person)
+  3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — 4.0's teardown also removes 3x-ui
+
+Meridian 4.0 does not read or change 3.x state in `~/.meridian/`; fleet commands that find it explain these options instead.
 
 ## Requirements
 
-- **Python 3.11+** (the project minimum; uv can install and manage it automatically)
-- **SSH access** to your target server. Terminal commands require key access; Studio can use the password once to install a key
+- **Python 3.11+** (uv installs and manages it for you)
+- **SSH key access** to your server, as root or a user with passwordless sudo
 
-Terminal QR codes are rendered by the bundled `segno` Python package — no system dependency required.
+Terminal QR codes are rendered by the bundled `segno` package; no system dependency is required.
 
 ## Verify installation
 

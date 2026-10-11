@@ -7,93 +7,71 @@ section: guides
 
 ## Diagnose
 
-Run from your local machine (no SSH needed):
+Run from your own machine (no SSH needed):
 
 ```
-meridian test IP
+meridian test 198.51.100.10
 ```
 
-If the TCP port 443 check fails, the IP is likely blocked by your ISP or government. This is the most common issue in censored regions.
+If the TCP check on port 443 fails from your network but works from elsewhere (another network, a VPN, the [ping tool](https://getmeridian.org/ping)), the IP is most likely blocked. A TCP failure everywhere usually means a cloud firewall or a server that is down.
 
 ## Immediate relief
 
-If you deployed with **domain mode** (`--domain`), your WSS/CDN connection still works — it routes through Cloudflare's CDN, bypassing the IP block entirely. Tell your users to switch to the WSS connection link on their connection page.
+If you deployed with a **domain** (`--domain`) and the record is proxied through Cloudflare, the XHTTP and WSS paths still work — they reach Cloudflare, not your blocked IP. Apps using the Xray JSON or Mihomo subscription switch over on their own; others can pick the XHTTP or WSS entry by hand.
 
-If you have a **relay** deployed, clients connecting through the relay are unaffected — they're connecting to the relay's domestic IP, not the blocked exit IP.
+If you have a **relay**, clients connecting through it are unaffected as long as the relay itself can still reach the exit.
 
 ## Recovery options
 
-### Option A: Add a replacement exit
+### Add a replacement exit
 
-The fastest path while the existing panel is still reachable:
+The fastest path, as long as your control-plane server (the one running the panel) is still reachable from your machine:
 
 ```bash
 # 1. Get a new VPS from your provider (new IP)
-# 2. Add it to the existing fleet
-meridian node add NEW_IP --name replacement
+# 2. Add it to the fleet
+meridian node add 198.51.100.20 --name replacement
 ```
 
-Existing clients receive the replacement exit on their next subscription refresh; their accounts do not need to be recreated.
+Clients keep their accounts. They receive the new exit on their next subscription refresh — ask them to refresh in their app if it doesn't happen on its own.
 
-### Option B: New exit server + existing relay
+### Add a domain for CDN fallback
 
-On a legacy deployment, an existing relay can be removed and redeployed against the new exit:
+If you weren't using a domain, add one to the new exit:
 
 ```bash
-# 1. Deploy new exit server
-meridian node add NEW_EXIT_IP --name replacement
-
-# 2. Switch relay to new exit
-meridian relay remove RELAY_IP --exit OLD_EXIT_IP
-meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
-
-# Clients reconnect automatically — relay IP unchanged
+meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-V4 relay chains cannot be mutated with `relay remove`. Open `meridian setup`, replace the exit/chain references, review the plan, and apply it. Use `meridian test` to verify the resulting route.
+See [Domain mode](/docs/en/domain-mode/) for the Cloudflare steps.
 
-### Option C: Add domain mode for CDN fallback
+### Add a relay
 
-If you weren't using domain mode before, add it now to prevent future disruption:
+A relay on a domestic server gives users an entry point that stays reachable when foreign IPs are blocked:
 
 ```bash
-meridian node add NEW_IP --domain proxy.example.com
+meridian relay deploy 203.0.113.10 --exit 198.51.100.20
 ```
 
-With domain mode, the WSS/CDN connection works even when the server IP is blocked — traffic routes through Cloudflare. See the [Domain mode guide](/docs/en/domain-mode/) for Cloudflare setup.
+Moving an existing relay to a different exit isn't available yet; deploy a new relay against the new exit instead.
 
-`meridian node add` requires the current Remnawave panel to remain reachable. If the lost server also hosted the panel, restore that host first; automatic panel migration is not available yet.
+### If the control-plane server is lost
 
-## Proactive defense
+`node add` and `relay deploy` need the panel. If the server that hosted it is gone and cannot be restored, there is no automatic migration yet: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
 
-Set up resilience **before** your IP gets blocked:
+## Prepare before a block
 
-1. **Deploy a relay** — gives clients a domestic entry point. When the exit IP is blocked, swap the exit behind the relay without touching clients:
-   ```bash
-   meridian relay deploy RELAY_IP --exit EXIT_IP
-   ```
+1. **Add a relay** on a domestic server: `meridian relay deploy RELAY_IP --exit EXIT_IP`
+2. **Use a domain** for CDN fallback: deploy with `--domain vpn.example.com`
+3. **Both** — clients then have three ways in: relay (domestic), CDN (Cloudflare), and direct
+4. **Back up `~/.meridian/`** — it is what lets you manage the fleet from another machine
 
-2. **Enable domain mode** — adds WSS/CDN fallback that works even if the IP is blocked:
-   ```bash
-   meridian deploy EXIT_IP --domain proxy.example.com
-   ```
+## Keep the old server
 
-3. **Both** — maximum resilience. Clients have three paths: relay (domestic), CDN (Cloudflare), and direct (if unblocked).
-
-## Clients and subscriptions
-
-Clients belong to the Remnawave panel, not to an individual exit node. `meridian node add` and `meridian relay deploy` add hosts to existing subscriptions, so clients do not need to be recreated.
-
-Ask users to refresh their subscription. Run `meridian client show NAME` for the canonical subscription. A legacy page is shown only when its deployment is evidenced; repair a missing one with `--repair-page`.
-
-If the panel database itself is lost and cannot be restored from backup, you must create a new cluster and recreate each client; automatic cross-panel migration is not available.
-
-## Keep your old server
-
-Don't tear down the old server immediately — it may become unblocked after days or weeks. You can check periodically:
+Don't tear down the blocked server right away — blocks are sometimes lifted after days or weeks. Check now and then:
 
 ```bash
-meridian test OLD_IP
+meridian test 198.51.100.10
 ```
 
-If it comes back, you have a spare exit server ready to go.
+Retiring a single exit from a multi-server fleet isn't available yet, so a blocked exit stays in the topology for now.

@@ -14,7 +14,7 @@ BEFORE INSTALL           → meridian preflight IP
 
 AFTER INSTALL, CAN'T CONNECT → meridian test IP
   "Is the proxy reachable from where I am right now?"
-  Tests: configured listeners, TLS/SNI, canonical subscription and proxy traffic.
+  Tests: configured listeners, TLS/SNI, the delivered subscription, and real proxy traffic.
   No SSH needed — runs from the client device.
 
 AFTER INSTALL, CHECK EXPOSURE → meridian probe IP
@@ -67,7 +67,7 @@ Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Check DNS: `dig +short yourdomain.com @8.8.8.8`
 2. Check nginx: `systemctl status nginx`
-3. Check nginx config: `/etc/nginx/stream.d/meridian.conf`
+3. Check the nginx routing files: `ls /etc/nginx/stream.d/ /etc/nginx/sites-enabled/` (Meridian's files start with `meridian-v4-`) and `nginx -t`
 
 ## Connection drops after seconds
 
@@ -79,9 +79,21 @@ Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Server: `timedatectl set-ntp true`. Client: enable automatic date/time
 2. Try a different network
-3. Use WSS/CDN connection (domain mode)
+3. Use the XHTTP or WSS path (domain mode)
 
-## Setup fails
+## Deploy fails
+
+### "No traffic passes through it"
+
+The server deployed, but real traffic didn't flow through the camouflage target you chose with `--sni`. Pick another target — `meridian scan IP` finds ones on the server's own network — and run the deploy command again with the new `--sni`. Without `--sni`, Meridian already tries `www.google.com`, `dl.google.com`, and `www.cloudflare.com` in turn.
+
+### "The server cannot reach any Reality camouflage target"
+
+The server has no working outbound HTTPS to any default target. Check the provider's outbound firewall, or pass a reachable target with `--sni`.
+
+### Interrupted or failed deploy
+
+Deploys and applies are checkpointed. Fix the reported cause and run the same command again; finished steps are skipped.
 
 ### Port 443 conflict
 
@@ -101,33 +113,29 @@ Check the container: `docker logs remnawave-node --tail 50`. Common causes are a
 
 **Fix:** run `meridian node check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
 
-### XHTTP inbound creation fails (port conflict)
-
-Older Meridian versions (pre-v3.6.0) tried to put both Reality and XHTTP on port 443. v4 allocates deterministic per-node XHTTP/Reality/WSS ports (see [Architecture → Port assignments](/docs/en/architecture/#port-assignments)) and reverse-proxies through nginx, so the conflict cannot recur.
-
 ### Disk space insufficient
 
 Less than 2GB free. Free up space: `docker system prune -af`, `journalctl --vacuum-time=1d`, check `/var/log/`.
 
 ### DNS resolution fails (domain mode)
 
-Domain doesn't resolve to server IP yet. Update the DNS A record. Propagation is usually 5-15 minutes (up to 48 hours). Meridian warns if DNS doesn't resolve but lets you proceed.
+The certificate for your domain can only be issued once the domain's A record points at the server (grey cloud while deploying). Update the record, wait for it to propagate (usually 5–15 minutes), then run the same deploy command again. `meridian preflight IP --domain DOMAIN` checks this before you deploy.
 
 ## Was working, now stopped
 
 **Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and proxy execution failures. A TCP failure can also mean a cloud firewall or an offline server.
 
-See the [IP Blocked Recovery guide](/docs/en/recovery/) for step-by-step recovery options (new server, relay swap, CDN fallback).
+See the [IP Blocked Recovery guide](/docs/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
 
 Other causes:
-- Server rebooted and services didn't auto-start → run `docker compose up -d` in `/opt/remnawave` and `/opt/remnanode`, then `systemctl restart nginx`
+- Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/remnawave` and `/opt/remnanode`, then `systemctl restart nginx`
 - Disk full → `df -h /`, `docker system prune -af`
 
 ## Slow speeds
 
 1. Choose a server geographically closer (Finland, Netherlands, Sweden for Europe/Middle East)
 2. Check server load: `htop` or `uptime`
-3. Try WSS/CDN link — may have better routing through Cloudflare
+3. Try the XHTTP or WSS path (domain mode) — routing through Cloudflare is sometimes better
 4. Verify BBR is enabled: `sysctl net.ipv4.tcp_congestion_control`
 
 **Do NOT** run other protocols (OpenVPN, WireGuard) on the same server — it flags the IP.
@@ -182,7 +190,7 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 | TCP reachability | Every configured public TCP listener is reachable | Firewall, ISP block, server down, or wrong topology |
 | TLS/SNI camouflage | The target presents the expected camouflage identity | TLS routing, certificate, DNS, or SNI mismatch |
 | Domain root | Hardened `403`/`404` response is reachable | DNS/nginx failure or unintended public content |
-| Canonical subscription | Remnawave delivered valid Xray JSON for an active client | Missing/inactive client, panel failure, or broken template |
+| Subscription | Remnawave delivered valid Xray JSON for an active client | Missing/inactive client, panel failure, or broken template |
 | Automatic fallback | The delivered policy carried real traffic | Balancer, routing, credential, or endpoint failure |
 | Protocol checks | Each target outbound carried real traffic | Protocol-specific listener, firewall, or delivered config failure |
 
