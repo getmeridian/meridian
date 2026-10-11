@@ -749,6 +749,14 @@ class TestCompilerFailures:
         with pytest.raises(TopologyCompileError, match="own server"):
             compile_topology(intent)
 
+    def test_relay_hop_cannot_take_an_nginx_stream_port(self) -> None:
+        original = _intent()
+        relay = original.transparent_relays[0].model_copy(update={"hop_server_refs": ["srv-exit-b"]})
+        intent = original.model_copy(update={"transparent_relays": [relay]})
+
+        with pytest.raises(TopologyCompileError, match=r"srv-exit-b:443; nginx already owns"):
+            compile_topology(intent)
+
     def test_hysteria_cannot_advertise_an_unforwarded_udp_port(self) -> None:
         original = _intent()
         exit_b = original.exits[1]

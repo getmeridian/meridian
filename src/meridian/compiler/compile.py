@@ -626,6 +626,11 @@ def _compile_relays(
                 raise TopologyCompileError(
                     f"Relay listener {server_ref}:{relay.listen_port} is assigned more than once."
                 )
+            if listener in stream_ids:
+                raise TopologyCompileError(
+                    f"Relay {relay.id} cannot listen on {server_ref}:{relay.listen_port}; "
+                    "nginx already owns that port there. Choose another listen port or relay server."
+                )
             relay_listeners.add(listener)
             firewall_id = add_firewall(
                 builder,
