@@ -749,6 +749,18 @@ class TestCompilerFailures:
         with pytest.raises(TopologyCompileError, match="own server"):
             compile_topology(intent)
 
+    def test_hysteria2_dials_the_server_not_a_possibly_proxied_domain(self) -> None:
+        from meridian.compiler.models import HostPayload
+
+        hosts = {
+            r.payload.protocol: r.payload
+            for r in compile_topology(_intent()).resources
+            if isinstance(r.payload, HostPayload) and r.payload.owner_ref == "exit-b" and r.logical_id.endswith("direct")
+        }
+
+        assert hosts["hysteria2"].address == "" and hosts["hysteria2"].sni == "vpn-b.example.com"
+        assert hosts["wss"].address == "vpn-b.example.com"
+
     def test_relay_hop_cannot_take_an_nginx_stream_port(self) -> None:
         original = _intent()
         relay = original.transparent_relays[0].model_copy(update={"hop_server_refs": ["srv-exit-b"]})

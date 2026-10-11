@@ -526,6 +526,10 @@ def _compile_exit_endpoints(
         host_id = f"host:{exit_.id}:{path.id}:direct"
         dependencies = [runtime_id, inbound_id, *direct_dependencies[path.id]]
         is_tls = path.protocol in {"xhttp", "wss", "hysteria2"}
+        # XHTTP/WSS may ride a CDN, so they dial the domain. Hysteria2 is UDP,
+        # which a proxied (orange-cloud) record cannot carry: it dials the
+        # server itself and keeps the domain only as its TLS SNI.
+        cdn_capable = path.protocol in {"xhttp", "wss"}
         direct_host_ids.append(
             builder.add(
                 host_id,
@@ -535,7 +539,7 @@ def _compile_exit_endpoints(
                     node_ref=runtime_id,
                     inbound_ref=inbound_id,
                     address_server_ref=exit_.server_ref,
-                    address=(path.host or path.tls_sni) if is_tls else "",
+                    address=(path.host or path.tls_sni) if cdn_capable else "",
                     public_port=path.public_port,
                     protocol=path.protocol,
                     sni=path.reality_sni or path.tls_sni,
