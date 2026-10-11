@@ -35,7 +35,20 @@ assert [entry["url"] for entry in page.json()["protocols"]] == [link.url for lin
 PYEOF
 pass "public subscription and connection page serve the deployed Reality link"
 
-meridian test "$EXIT_B_IP"
+dump_single_server_diagnostics() {
+  ssh root@"$EXIT_B_IP" '
+    echo "--- listeners"; ss -tlnp | grep -E ":(443|8443|10[0-9]{3}|3010) " || true
+    echo "--- nginx stream"; cat /etc/nginx/stream.d/*.conf 2>/dev/null | grep -vE "^\s*(#|$)" | head -60
+    echo "--- node"; docker logs --tail 60 remnawave-node 2>&1 | tail -60
+  ' || true
+}
+
+if ! meridian test "$EXIT_B_IP"; then
+  dump_single_server_diagnostics
+  echo "    retrying meridian test after 20s to separate timing from configuration" >&2
+  sleep 20
+  meridian test "$EXIT_B_IP"
+fi
 pass "meridian test verified the live proxy"
 
 meridian deploy "$EXIT_B_IP" --client-name solo --yes
