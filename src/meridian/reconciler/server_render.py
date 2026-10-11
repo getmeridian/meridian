@@ -6,7 +6,13 @@ import hashlib
 import shlex
 from collections.abc import Mapping
 
-from meridian.compiler.models import FirewallRulePayload, NginxArtifactPayload, NginxRouteSpec, RealmHopPayload
+from meridian.compiler.models import (
+    FirewallRulePayload,
+    NginxArtifactPayload,
+    NginxRouteSpec,
+    RealmHopPayload,
+    certificate_directory,
+)
 from meridian.core.errors import MeridianError
 
 
@@ -94,11 +100,6 @@ def nginx_artifact_path(logical_id: str, layer: str) -> str:
     if layer == "stream":
         return f"/etc/nginx/stream.d/meridian-v4-{token}.conf"
     return f"/etc/nginx/sites-available/meridian-v4-{token}.conf"
-
-
-def certificate_directory(hostname: str) -> str:
-    token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
-    return f"/etc/ssl/meridian/certs/{token}"
 
 
 def render_nginx_artifact(

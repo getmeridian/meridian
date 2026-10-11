@@ -11,6 +11,7 @@ from meridian.compiler.models import (
     InboundPayload,
     ServiceOutboundSpec,
     WorkloadRouteSpec,
+    certificate_directory,
 )
 from meridian.core.errors import MeridianError
 from meridian.provision.warp import WARP_PROXY_PORT
@@ -177,6 +178,9 @@ def _render_inbound(
             "settings": {"clients": [], "decryption": "none"},
             "streamSettings": stream,
         }
+    if not inbound.tls_sni:
+        raise WorkloadConfigError(f"Hysteria2 inbound {inbound.tag} has no TLS hostname.")
+    certificate_dir = certificate_directory(inbound.tls_sni)
     return {
         "tag": inbound.tag,
         "protocol": "hysteria",
@@ -190,8 +194,8 @@ def _render_inbound(
             "tlsSettings": {
                 "certificates": [
                     {
-                        "certificateFile": "/etc/ssl/meridian/fullchain.pem",
-                        "keyFile": "/etc/ssl/meridian/key.pem",
+                        "certificateFile": f"{certificate_dir}/fullchain.pem",
+                        "keyFile": f"{certificate_dir}/key.pem",
                     }
                 ],
                 "alpn": ["h3"],

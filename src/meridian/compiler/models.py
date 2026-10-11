@@ -326,6 +326,12 @@ class CertificatePayload(CoreModel):
     hostname: str
 
 
+def certificate_directory(hostname: str) -> str:
+    """Return the on-server directory holding the issued certificate for ``hostname``."""
+    token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
+    return f"/etc/ssl/meridian/certs/{token}"
+
+
 class RoutingGatewayPayload(CoreModel):
     kind: Literal["routing_gateway"] = "routing_gateway"
     gateway_id: str

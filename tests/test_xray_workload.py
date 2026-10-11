@@ -11,6 +11,7 @@ from meridian.compiler.models import (
     InboundPayload,
     ServiceOutboundSpec,
     WorkloadRouteSpec,
+    certificate_directory,
 )
 from meridian.xray_workload import (
     ServiceRouteCredential,
@@ -103,7 +104,13 @@ def test_renders_exact_reviewed_protocols_and_paths() -> None:
     }
     assert config["inbounds"][1]["streamSettings"]["xhttpSettings"]["path"] == "/xhttp-a"
     assert config["inbounds"][2]["streamSettings"]["wsSettings"]["path"] == "/ws-a"
-    assert config["inbounds"][3]["streamSettings"]["tlsSettings"]["alpn"] == ["h3"]
+    hysteria_tls = config["inbounds"][3]["streamSettings"]["tlsSettings"]
+    assert hysteria_tls["alpn"] == ["h3"]
+    # Must match where the certificate resource issues the Hysteria2 hostname.
+    cert_dir = certificate_directory("vpn-a.example.com")
+    assert hysteria_tls["certificates"] == [
+        {"certificateFile": f"{cert_dir}/fullchain.pem", "keyFile": f"{cert_dir}/key.pem"}
+    ]
     assert [outbound["tag"] for outbound in config["outbounds"]] == ["direct", "block"]
 
 
