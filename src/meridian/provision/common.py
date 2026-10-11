@@ -54,8 +54,17 @@ DebianBanner no
 
 
 def detect_ssh_ports(conn: ServerConnection) -> list[int]:
-    """Detect effective sshd listen ports, falling back to 22."""
-    return ServerFacts(conn).ssh_ports()
+    """Detect effective sshd listen ports plus the port this session arrived on.
+
+    ``sshd -T`` misses socket-activated overrides (``ssh.socket``) and
+    ``ListenAddress host:port`` forms; the live session port is the one port
+    we know works, so it must never be firewalled before ``ufw enable``.
+    """
+    ports = set(ServerFacts(conn).ssh_ports())
+    connected = getattr(conn, "port", None)
+    if not getattr(conn, "local_mode", False) and isinstance(connected, int) and 0 < connected < 65536:
+        ports.add(connected)
+    return sorted(ports)
 
 
 class CheckDiskSpace:
@@ -353,10 +362,10 @@ class EnsurePort443:
         if result.changed:
             detail_parts.append("opened 443/tcp")
 
-        # Hysteria2 UDP (always open — Hysteria2 is enabled by default)
-        udp_result = ensure_ufw_rule(conn, "allow 443/udp")
-        if udp_result.changed:
-            detail_parts.append("opened 443/udp (Hysteria2)")
+        if ctx.hysteria2:
+            udp_result = ensure_ufw_rule(conn, "allow 443/udp")
+            if udp_result.changed:
+                detail_parts.append("opened 443/udp (Hysteria2)")
 
         return StepResult(
             name=self.name,
@@ -433,16 +442,17 @@ class ConfigureFirewall:
             if result.changed:
                 changed = True
 
-            result = ensure_ufw_rule(conn, "allow 443/udp")
-            if not result.ok:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to allow UDP/443: {result.detail}",
-                    commands=commands,
-                )
-            if result.changed:
-                changed = True
+            if ctx.hysteria2:
+                result = ensure_ufw_rule(conn, "allow 443/udp")
+                if not result.ok:
+                    return StepResult(
+                        name=self.name,
+                        status="failed",
+                        detail=f"failed to allow UDP/443: {result.detail}",
+                        commands=commands,
+                    )
+                if result.changed:
+                    changed = True
 
             # Domain mode or hosted page: allow port 80 for ACME challenges.
             if ctx.needs_web_server:

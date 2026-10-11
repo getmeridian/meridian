@@ -18,6 +18,7 @@ from meridian.provision.common import (
     InstallPackages,
     SetTimezone,
 )
+from meridian.provision.steps import ProvisionContext
 from tests.support.mock_connection import MockConnection
 
 # ---------------------------------------------------------------------------
@@ -316,6 +317,38 @@ class TestConfigureFirewall:
 
         assert result.status == "changed"
         mock_conn.assert_called_with_pattern("apt-get install")
+
+    def test_allows_the_live_session_port_even_when_sshd_reports_another(self, mock_conn: MockConnection, base_ctx):
+        """A socket-activated or NAT-mapped SSH port must never be locked out."""
+        mock_conn.port = 2222
+        mock_conn.when("which ufw", rc=0)
+        mock_conn.when("ufw status", stdout="Status: inactive")
+        mock_conn.when("sshd -T", stdout="port 22\n")
+        mock_conn.when("ufw allow", stdout="Rule added")
+        mock_conn.when("ufw delete", rc=0, stdout="Could not")
+        mock_conn.when("ufw default", rc=0)
+        mock_conn.when("ufw enable", stdout="Firewall is active")
+
+        ConfigureFirewall().run(mock_conn, base_ctx)
+
+        allows = [call for call in mock_conn.calls if "ufw allow" in call]
+        assert any("22/tcp" in call and "2222" not in call for call in allows)
+        assert any("2222/tcp" in call for call in allows)
+        enable_index = next(i for i, call in enumerate(mock_conn.calls) if "ufw" in call and "enable" in call)
+        port_index = next(i for i, call in enumerate(mock_conn.calls) if "2222/tcp" in call)
+        assert port_index < enable_index
+
+    def test_udp_443_stays_closed_without_hysteria2(self, mock_conn: MockConnection):
+        mock_conn.when("which ufw", rc=0)
+        mock_conn.when("ufw status", stdout="Status: inactive")
+        mock_conn.when("ufw allow", stdout="Rule added")
+        mock_conn.when("ufw delete", rc=0, stdout="Could not")
+        mock_conn.when("ufw default", rc=0)
+        mock_conn.when("ufw enable", stdout="Firewall is active")
+
+        ConfigureFirewall().run(mock_conn, ProvisionContext(ip="198.51.100.1", hysteria2=False))
+
+        assert not any("443/udp" in call for call in mock_conn.calls)
 
     def test_already_active_returns_ok(self, mock_conn: MockConnection, base_ctx):
         """When ufw is active and rules already exist, status is ok."""
