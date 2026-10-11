@@ -666,7 +666,8 @@ def _save_locked(cfg: ClusterConfig, path: Path | None = None) -> None:
     # Guard against clobbering external edits made during a long apply.
     if cfg._loaded_mtime_ns is not None and path.exists():
         current_mtime_ns = path.stat().st_mtime_ns
-        if current_mtime_ns > cfg._loaded_mtime_ns:
+        # Any change counts: a restored backup or copied file can carry an older mtime.
+        if current_mtime_ns != cfg._loaded_mtime_ns:
             raise ClusterConfigExternallyModifiedError(
                 f"Refusing to save {path}: file was modified externally since we "
                 f"loaded it (loaded={cfg._loaded_mtime_ns}, now={current_mtime_ns}). "
