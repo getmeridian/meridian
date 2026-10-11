@@ -12,6 +12,7 @@ export type Title = string;
  * @minItems 1
  */
 export type Exits = [SetupExitRole, ...SetupExitRole[]];
+export type GeoBlock = boolean;
 export type Id = string;
 export type Region = string;
 export type ServerRef1 = string;
@@ -52,6 +53,7 @@ export interface ControlPlaneIntent {
  * One saved server assigned an exit workload ID.
  */
 export interface SetupExitRole {
+  geo_block?: GeoBlock;
   id: Id;
   region?: Region;
   server_ref: ServerRef1;

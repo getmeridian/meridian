@@ -114,6 +114,18 @@ def test_renders_exact_reviewed_protocols_and_paths() -> None:
     assert [outbound["tag"] for outbound in config["outbounds"]] == ["direct", "block"]
 
 
+def test_geo_block_refuses_russian_destinations_only_when_reviewed() -> None:
+    plain = render_workload_config(_profile(), reality_keys=_keys())
+    blocked = render_workload_config(_profile().model_copy(update={"geo_block": True}), reality_keys=_keys())
+
+    geo_rules = [
+        {"type": "field", "domain": ["geosite:category-ru"], "outboundTag": "block"},
+        {"type": "field", "ip": ["geoip:ru"], "outboundTag": "block"},
+    ]
+    assert not any(rule in plain["routing"]["rules"] for rule in geo_rules)
+    assert all(rule in blocked["routing"]["rules"] for rule in geo_rules)
+
+
 def test_warp_is_preferred_without_removing_direct_or_block() -> None:
     config = render_workload_config(_profile(warp=True), reality_keys=_keys())
     assert [outbound["tag"] for outbound in config["outbounds"]] == [

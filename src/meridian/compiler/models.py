@@ -175,6 +175,7 @@ class ConfigProfilePayload(CoreModel):
     inbound_refs: list[str]
     inbounds: list[InboundPayload]
     outbound_tags: list[str] = Field(default_factory=list)
+    geo_block: bool = False
     service_outbounds: list[ServiceOutboundSpec] = Field(default_factory=list)
     egress_balancers: list[EgressBalancerSpec] = Field(default_factory=list)
     routing_rules: list[WorkloadRouteSpec] = Field(default_factory=list)

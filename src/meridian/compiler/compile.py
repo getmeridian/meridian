@@ -198,6 +198,7 @@ def compile_topology(
                 inbound_refs=path_refs,
                 inbounds=inbound_specs,
                 outbound_tags=["warp"] if exit_.warp else ["direct"],
+                geo_block=exit_.geo_block,
             ),
             dependencies=[control_id, *(item[2] for item in bridge_specs)],
         )

@@ -49,6 +49,7 @@ class SetupExitRole(CoreModel):
     server_ref: ServerReferenceValue
     region: OptionalCountryCodeValue = ""
     warp: bool = False
+    geo_block: bool = False
 
 
 class SetupRelayRole(CoreModel):
@@ -174,6 +175,7 @@ class SetupDraft(CoreModel):
                     server_ref=exit_.server_ref,
                     region=exit_.region,
                     warp=exit_.warp,
+                    geo_block=exit_.geo_block,
                 )
                 for exit_ in intent.exits
             ],
@@ -305,6 +307,7 @@ class SetupDraft(CoreModel):
                 region=exit_.region,
                 paths=paths_by_exit[exit_.id],
                 warp=exit_.warp,
+                geo_block=exit_.geo_block,
             )
             for exit_ in self.roles.exits
         ]

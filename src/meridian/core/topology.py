@@ -87,6 +87,7 @@ class ExitIntent(CoreModel):
     region: OptionalCountryCodeValue = ""
     paths: list[ProtocolPathIntent] = Field(min_length=1)
     warp: bool = False
+    geo_block: bool = False  # refuse Russian destinations (geosite:category-ru, geoip:ru)
 
     @model_validator(mode="after")
     def validate_paths(self) -> Self:

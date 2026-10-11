@@ -162,6 +162,11 @@
       "additionalProperties": false,
       "description": "One independent Xray exit workload and its public protocol paths.",
       "properties": {
+        "geo_block": {
+          "default": false,
+          "title": "Geo Block",
+          "type": "boolean"
+        },
         "id": {
           "maxLength": 48,
           "minLength": 1,

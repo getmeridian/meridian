@@ -82,6 +82,13 @@ def render_workload_config(
             }
         ],
     }
+    if profile.geo_block:
+        routing["rules"].extend(
+            [
+                {"type": "field", "domain": ["geosite:category-ru"], "outboundTag": "block"},
+                {"type": "field", "ip": ["geoip:ru"], "outboundTag": "block"},
+            ]
+        )
     for rule in profile.routing_rules:
         routing["rules"].extend(_render_route(rule))
     if profile.egress_balancers:

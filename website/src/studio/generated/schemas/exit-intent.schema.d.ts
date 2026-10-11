@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type GeoBlock = boolean;
 export type Id = string;
 /**
  * @minItems 1
@@ -26,6 +27,7 @@ export type Warp = boolean;
  * One independent Xray exit workload and its public protocol paths.
  */
 export interface ExitIntent {
+  geo_block?: GeoBlock;
   id: Id;
   paths: Paths;
   region?: Region;

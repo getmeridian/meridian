@@ -265,12 +265,18 @@ class SetupWizard:
                 default=False,
                 stage="roles",
             )
+            geo_block = self._yes_no(
+                f"Block Russian sites and IPs on {exit_id}?",
+                default=True,
+                stage="roles",
+            )
             exits.append(
                 SetupExitRole(
                     id=exit_id,
                     server_ref=item.server_ref,
                     region=region,
                     warp=warp,
+                    geo_block=geo_block,
                 )
             )
 

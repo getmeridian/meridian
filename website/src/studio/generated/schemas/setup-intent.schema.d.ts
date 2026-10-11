@@ -33,6 +33,7 @@ export type EgressPools = EgressPoolIntent[];
  * @minItems 1
  */
 export type Exits = [ExitIntent, ...ExitIntent[]];
+export type GeoBlock = boolean;
 export type Id1 = string;
 /**
  * @minItems 1
@@ -124,6 +125,7 @@ export interface EgressPoolIntent {
  * One independent Xray exit workload and its public protocol paths.
  */
 export interface ExitIntent {
+  geo_block?: GeoBlock;
   id: Id1;
   paths: Paths;
   region?: Region;

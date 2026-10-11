@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type GeoBlock = boolean;
 export type Id = string;
 export type Region = string;
 export type ServerRef = string;
@@ -14,6 +15,7 @@ export type Warp = boolean;
  * One saved server assigned an exit workload ID.
  */
 export interface SetupExitRole {
+  geo_block?: GeoBlock;
   id: Id;
   region?: Region;
   server_ref: ServerRef;

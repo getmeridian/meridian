@@ -46,6 +46,11 @@
       "additionalProperties": false,
       "description": "One saved server assigned an exit workload ID.",
       "properties": {
+        "geo_block": {
+          "default": false,
+          "title": "Geo Block",
+          "type": "boolean"
+        },
         "id": {
           "maxLength": 48,
           "minLength": 1,

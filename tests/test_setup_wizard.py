@@ -107,6 +107,7 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
             "",
             "",
             "",
+            "",
             "yes",
             "yes",
         ]
@@ -126,6 +127,7 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
     draft = store.load()
     assert draft is not None
     assert draft.current_stage == "handoff"
+    assert draft.roles is not None and all(exit_.geo_block for exit_ in draft.roles.exits)
     assert draft.completed_stages == list(
         (
             "servers",
@@ -170,6 +172,7 @@ def test_back_from_review_invalidates_access_and_review_hash(
             "all",
             "1",
             "2",
+            "",
             "",
             "",
             "",
