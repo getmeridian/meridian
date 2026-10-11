@@ -199,6 +199,7 @@ def _make_command_envelope(
     cmd_literal = Literal[command]  # type: ignore[valid-type]
     if success_statuses is None:
         success_statuses = Literal["ok"]
+    failed_status: Any = Literal["failed"]
 
     success_cls = create_model(
         f"_{prefix}SuccessEnvelope",
@@ -213,7 +214,7 @@ def _make_command_envelope(
         f"_{prefix}TerminalEnvelope",
         __base__=_ContractEnvelope,
         command=(cmd_literal, ...),
-        status=(Literal["failed"], ...),
+        status=(failed_status, ...),
         data=(failure_data_type, ...),
         errors=(list[MeridianError], Field(min_length=1)),
     )
