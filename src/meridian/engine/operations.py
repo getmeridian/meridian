@@ -224,6 +224,8 @@ class OperationManager:
         if operation is None:
             return None
         state = operation.cancel()
+        if state not in ("cancelled", "cancel_requested"):
+            return state
         operation.emit_status(
             level="warning",
             message=(
