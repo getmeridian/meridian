@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Iterable
 if TYPE_CHECKING:
     from meridian.core.execution import RemoteCommandResult
 
+from meridian.config import MERIDIAN_HOME
 from meridian.core.errors import MeridianError
 from meridian.ssh_auth import (
     _DEFAULT_UI,
@@ -129,7 +130,7 @@ SSH_MULTIPLEX_OPTS: list[str] = [
     "-o",
     "ControlMaster=auto",
     "-o",
-    "ControlPath=~/.meridian/ssh/%r@%h:%p",
+    f"ControlPath={MERIDIAN_HOME / 'ssh'}/%r@%h:%p",
     "-o",
     "ControlPersist=300",
 ]

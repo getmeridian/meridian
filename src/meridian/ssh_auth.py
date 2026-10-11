@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import Protocol
 
+from meridian import config
 from meridian.ssh_keys import host_key_known
 
 logger = logging.getLogger("meridian.ssh")
@@ -101,13 +102,13 @@ _DEFAULT_UI = _LogUI()
 
 def ensure_multiplex_dir() -> None:
     """Create the SSH control socket directory if it doesn't exist."""
-    sock_dir = Path.home() / ".meridian" / "ssh"
+    sock_dir = config.MERIDIAN_HOME / "ssh"
     sock_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
 
 def ensure_askpass_script() -> Path:
     """Create the local askpass helper used for short-lived password SSH."""
-    script = Path.home() / ".meridian" / "ssh" / "askpass.sh"
+    script = config.MERIDIAN_HOME / "ssh" / "askpass.sh"
     script.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     script.write_text("#!/bin/sh\nprintf '%s\\n' \"$MERIDIAN_SSH_PASSWORD\"\n", encoding="utf-8")
     script.chmod(0o700)
