@@ -351,7 +351,7 @@ def _run_enable(
             )
 
         try:
-            panel.enable_user(client.uuid)
+            panel.enable_user(client.id)
         except RemnawaveError as e:
             fail(
                 f"Could not enable client '{name}': {e}",
@@ -413,7 +413,7 @@ def _run_disable(
             )
 
         try:
-            panel.disable_user(client.uuid)
+            panel.disable_user(client.id)
         except RemnawaveError as e:
             fail(
                 f"Could not disable client '{name}': {e}",

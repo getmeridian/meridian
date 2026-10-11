@@ -1,4 +1,4 @@
-"""Typed synchronous facade over the official Remnawave SDK."""
+"""Typed synchronous facade over the Remnawave REST API."""
 
 from __future__ import annotations
 
@@ -7,13 +7,9 @@ import random
 import ssl
 import time
 from typing import Any
-from uuid import UUID
+from urllib.parse import quote
 
 import httpx
-from remnawave import RemnawaveSDK
-from remnawave.models.config_profiles import CreateConfigProfileRequestDto
-from remnawave.models.nodes import CreateNodeRequestDto, NodeConfigProfileRequestDto
-from remnawave.models.users import CreateUserRequestDto
 
 from .control_plane import ControlPlaneMixin
 from .models import (
@@ -24,43 +20,48 @@ from .models import (
     Node,
     NodeCredentials,
     User,
-    config_profile_from_sdk,
-    host_from_sdk,
-    inbound_from_sdk,
-    node_from_sdk,
+    is_user_id,
+    parse_config_profile,
     parse_host,
-    sdk_items,
-    sdk_to_dict,
-    user_from_sdk,
+    parse_inbound,
+    parse_node,
+    parse_user,
+    response_items,
 )
 from .runtime import (
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
     RemnawaveNotFoundError,
-    sdk_call,
 )
 
 logger = logging.getLogger("meridian.api")
 
+_EMPTY_BODY_STATUSES = frozenset({202, 204})
+_USERS_PAGE_SIZE = 1000  # Remnawave rejects larger pages
+
+
+def _segment(value: str) -> str:
+    return quote(str(value), safe="")
+
 
 class MeridianPanel(ControlPlaneMixin):
-    """Remnawave API client — sync facade over the official SDK.
+    """Remnawave API client — sync facade over raw REST calls.
 
-    Uses the official ``remnawave`` SDK for panel operations and falls
-    back to raw httpx only for auth helpers and generic low-level access.
+    Every request goes through ``_request`` (retry, typed errors, envelope
+    unwrapping) and every payload is parsed into a stable model in
+    ``models.py`` before it leaves this package.
 
     Domain groups (natural extraction boundaries):
-      - Auth (login, register_admin) — classmethods, no SDK instance
-      - Users — CRUD for Meridian clients (= Remnawave users)
+      - Auth (login, register_admin) — classmethods, no client instance
+      - System — version metadata and reachability
+      - Users — CRUD for Meridian clients (= Remnawave users, numeric ``id``)
       - Nodes — register, list, enable/disable, delete proxy nodes
       - Hosts — direct addresses and relay entries in subscriptions
       - Config Profiles — Xray configuration templates
       - Inbounds — protocol definitions within config profiles
       - Internal Squads — user-to-inbound access control groups
       - Keygen — node mTLS secret bundles
-      - Subscriptions — subscription URL building
-      - Xray Config — global DNS/routing configuration
 
     Usage:
         panel = MeridianPanel("https://panel.example.com", "jwt-token")
@@ -83,15 +84,6 @@ class MeridianPanel(ControlPlaneMixin):
         self._max_retries = max_retries
 
         authorization = api_token if api_token.startswith("Bearer ") else f"Bearer {api_token}"
-        self._sdk_client = httpx.AsyncClient(
-            base_url=f"{self._base}/api",
-            headers={"Authorization": authorization},
-            timeout=timeout,
-            verify=verify,
-        )
-        self._sdk = RemnawaveSDK(client=self._sdk_client)
-
-        # Raw httpx client for endpoints the SDK doesn't cover
         self._client = httpx.Client(
             base_url=self._base + "/",
             headers={
@@ -103,11 +95,8 @@ class MeridianPanel(ControlPlaneMixin):
         )
 
     def close(self) -> None:
-        """Close the underlying HTTP clients."""
+        """Close the underlying HTTP client."""
         self._client.close()
-        sdk_client = getattr(self, "_sdk_client", None)
-        if sdk_client is not None:
-            sdk_call(sdk_client.aclose())
 
     def __enter__(self) -> MeridianPanel:
         return self
@@ -115,12 +104,15 @@ class MeridianPanel(ControlPlaneMixin):
     def __exit__(self, *args: Any) -> None:
         self.close()
 
-    # --- Low-level raw request (for endpoints not in SDK) ---
+    # --- Low-level raw request ---
 
     def _request(self, method: str, path: str, *, json: Any = None, params: dict[str, Any] | None = None) -> Any:
-        """Make a raw API request with retry logic (for SDK gaps)."""
-        import httpx
+        """Make an API request with retry logic.
 
+        Returns the unwrapped ``response`` envelope, or ``None`` for empty
+        2xx bodies (Remnawave 3.x answers DELETE/bulk calls with 204 and
+        node restarts with 202).
+        """
         path = path.lstrip("/")
         logger.debug("%s %s", method, path)
         last_error: Exception | None = None
@@ -148,6 +140,8 @@ class MeridianPanel(ControlPlaneMixin):
                         continue
                     raise last_error
                 resp.raise_for_status()
+                if resp.status_code in _EMPTY_BODY_STATUSES or not resp.content.strip():
+                    return None
                 try:
                     data = resp.json()
                 except (ValueError, UnicodeDecodeError) as e:
@@ -190,12 +184,24 @@ class MeridianPanel(ControlPlaneMixin):
     def _patch(self, path: str, json: Any = None) -> Any:
         return self._request("PATCH", path, json=json)
 
-    # --- Health ---
+    # --- System ---
+
+    def get_version(self) -> str:
+        """Return the running Remnawave backend version (``/api/system/metadata``)."""
+        data = self._request("GET", "/api/system/metadata")
+        version = data.get("version") if isinstance(data, dict) else None
+        if not isinstance(version, str) or not version.strip():
+            raise RemnawaveError(
+                "Panel metadata did not include a version",
+                hint="Is this a Remnawave panel? GET /api/system/metadata returned no version.",
+                category="system",
+            )
+        return version.strip()
 
     def ping(self) -> bool:
         """Check if the panel is reachable and authenticated."""
         try:
-            sdk_call(self._sdk.users.get_all_users(start=0, size=1))
+            self.get_version()
             return True
         except RemnawaveAuthError:
             raise
@@ -212,67 +218,66 @@ class MeridianPanel(ControlPlaneMixin):
         expire_at: str = "",
         squad_uuids: list[str] | None = None,
     ) -> User:
-        """Create a new user in Remnawave.
-
-        SDK v2 supports ``active_internal_squads`` directly.
-        """
-        body = CreateUserRequestDto(
-            username=username,
-            expire_at=expire_at or "2099-12-31T23:59:59.000Z",
-            traffic_limit_bytes=traffic_limit_bytes if traffic_limit_bytes > 0 else None,
-            active_internal_squads=squad_uuids or None,
-        )
-        resp = sdk_call(self._sdk.users.create_user(body))
-        return user_from_sdk(resp)
+        """Create a new user in Remnawave."""
+        body: dict[str, Any] = {
+            "username": username,
+            "expireAt": expire_at or "2099-12-31T23:59:59.000Z",
+        }
+        if traffic_limit_bytes > 0:
+            body["trafficLimitBytes"] = traffic_limit_bytes
+        if squad_uuids:
+            body["activeInternalSquads"] = squad_uuids
+        return parse_user(self._post("/api/users", json=body))
 
     def get_user(self, username: str) -> User | None:
         """Find a user by username. Returns None only if not found (404)."""
         try:
-            resp = sdk_call(self._sdk.users.get_user_by_username(username))
-            return user_from_sdk(resp)
+            data = self._request("GET", f"/api/users/by-username/{_segment(username)}")
         except RemnawaveNotFoundError:
             return None
+        return parse_user(data)
 
-    def get_user_by_uuid(self, uuid: str) -> User | None:
-        """Find a user by UUID. Returns None only if not found (404)."""
+    def get_user_by_id(self, user_id: str) -> User | None:
+        """Find a user by numeric id. Returns None if not found.
+
+        Pre-3.x bindings stored the removed user ``uuid``; such identities
+        are not addressable any more, so they resolve to None and callers
+        fall back to the username.
+        """
+        if not is_user_id(user_id):
+            return None
         try:
-            resp = sdk_call(self._sdk.users.get_user_by_uuid(uuid))
-            return user_from_sdk(resp)
+            data = self._request("GET", f"/api/users/{_segment(user_id)}")
         except RemnawaveNotFoundError:
             return None
+        return parse_user(data)
 
     def list_users(self) -> list[User]:
         """List all users."""
-        # Panel limits max size per page; paginate if needed
         all_users: list[User] = []
         start = 0
-        page_size = 1000
         while True:
-            resp = sdk_call(self._sdk.users.get_all_users(start=start, size=page_size))
-            users_list = getattr(resp, "users", []) or []
+            data = self._request("GET", "/api/users", params={"start": start, "size": _USERS_PAGE_SIZE})
+            users_list = response_items(data, "users")
             if not users_list:
                 break
-            all_users.extend(user_from_sdk(u) for u in users_list)
-            if len(users_list) < page_size:
+            all_users.extend(parse_user(u) for u in users_list)
+            if len(users_list) < _USERS_PAGE_SIZE:
                 break
-            start += page_size
+            start += _USERS_PAGE_SIZE
         return all_users
 
-    def delete_user(self, uuid: str) -> bool:
-        """Delete a user by UUID. Returns False only if not found."""
-        try:
-            sdk_call(self._sdk.users.delete_user(uuid))
-            return True
-        except RemnawaveNotFoundError:
-            return False
+    def delete_user(self, user_id: str) -> bool:
+        """Delete a user by id. Returns False only if not found."""
+        return self._delete(f"/api/users/{_segment(user_id)}")
 
-    def enable_user(self, uuid: str) -> None:
+    def enable_user(self, user_id: str) -> None:
         """Enable a disabled user."""
-        sdk_call(self._sdk.users.enable_user(uuid))
+        self._post(f"/api/users/{_segment(user_id)}/actions/enable")
 
-    def disable_user(self, uuid: str) -> None:
+    def disable_user(self, user_id: str) -> None:
         """Disable a user."""
-        sdk_call(self._sdk.users.disable_user(uuid))
+        self._post(f"/api/users/{_segment(user_id)}/actions/disable")
 
     # --- Nodes ---
 
@@ -290,27 +295,25 @@ class MeridianPanel(ControlPlaneMixin):
 
         Returns credentials including the SECRET_KEY for the node container.
         """
-        body = CreateNodeRequestDto(
-            name=name,
-            address=address,
-            port=port,
-            country_code=country_code,
-            config_profile=NodeConfigProfileRequestDto(
-                activeConfigProfileUuid=config_profile_uuid,
-                activeInbounds=inbound_uuids or [],
-            ),
+        data = self._post(
+            "/api/nodes",
+            json={
+                "name": name,
+                "address": address,
+                "port": port,
+                "countryCode": country_code,
+                "configProfile": {
+                    "activeConfigProfileUuid": config_profile_uuid,
+                    "activeInbounds": inbound_uuids or [],
+                },
+            },
         )
-        resp = sdk_call(self._sdk.nodes.create_node(body))
-        data = sdk_to_dict(resp)
-        node_uuid = str(getattr(resp, "uuid", ""))
-
-        return NodeCredentials(uuid=node_uuid, secret_key=self.get_node_secret_key(), _raw=data)
+        node = parse_node(data)
+        return NodeCredentials(uuid=node.uuid, secret_key=self.get_node_secret_key(), _raw=node._raw)
 
     def list_nodes(self) -> list[Node]:
         """List all registered nodes."""
-        resp = sdk_call(self._sdk.nodes.get_all_nodes())
-        nodes_list = sdk_items(resp)
-        return [node_from_sdk(n) for n in nodes_list]
+        return [parse_node(n) for n in response_items(self._request("GET", "/api/nodes"), "nodes")]
 
     def find_node_by_address(self, address: str) -> Node | None:
         """Find a node by its address. Returns None if not found."""
@@ -322,33 +325,30 @@ class MeridianPanel(ControlPlaneMixin):
     def get_node(self, uuid: str) -> Node | None:
         """Get a node by UUID. Returns None only if not found (404)."""
         try:
-            resp = sdk_call(self._sdk.nodes.get_one_node(uuid))
-            return node_from_sdk(resp)
+            data = self._request("GET", f"/api/nodes/{_segment(uuid)}")
         except RemnawaveNotFoundError:
             return None
+        return parse_node(data)
 
     def enable_node(self, uuid: str) -> None:
         """Enable a disabled node."""
-        sdk_call(self._sdk.nodes.enable_node(uuid))
+        self._post(f"/api/nodes/{_segment(uuid)}/actions/enable")
 
     def disable_node(self, uuid: str) -> None:
         """Disable a node."""
-        sdk_call(self._sdk.nodes.disable_node(uuid))
+        self._post(f"/api/nodes/{_segment(uuid)}/actions/disable")
 
     def restart_node(self, uuid: str) -> None:
-        """Restart Xray on a node."""
-        sdk_call(self._sdk.nodes.restart_node(uuid))
+        """Restart Xray on a node (graceful; Remnawave answers 202)."""
+        self._post(f"/api/nodes/{_segment(uuid)}/actions/restart", json={"forceRestart": False})
 
     def delete_node(self, uuid: str) -> None:
         """Deregister a node."""
-        sdk_call(self._sdk.nodes.delete_node(uuid))
+        self._request("DELETE", f"/api/nodes/{_segment(uuid)}")
 
     def update_node_name(self, uuid: str, name: str) -> None:
         """Update a node's name in the panel."""
-        from remnawave.models.nodes import UpdateNodeRequestDto
-
-        body = UpdateNodeRequestDto(uuid=UUID(uuid), name=name)
-        sdk_call(self._sdk.nodes.update_node(body))
+        self._patch("/api/nodes", json={"uuid": uuid, "name": name})
 
     # --- Hosts (relays map here) ---
 
@@ -374,8 +374,8 @@ class MeridianPanel(ControlPlaneMixin):
     ) -> Host:
         """Create a host entry (direct address or relay).
 
-        Uses raw httpx so nullable and complete Host fields remain under
-        Meridian's explicit wire control. Reality inherits from the Inbound
+        Nullable and complete Host fields remain under Meridian's explicit
+        wire control. Reality inherits from the Inbound
         when the Host security layer is DEFAULT.
         """
         body: dict[str, Any] = {
@@ -414,9 +414,7 @@ class MeridianPanel(ControlPlaneMixin):
 
     def list_hosts(self) -> list[Host]:
         """List all host entries."""
-        resp = sdk_call(self._sdk.hosts.get_all_hosts())
-        hosts_list = sdk_items(resp)
-        return [host_from_sdk(h) for h in hosts_list]
+        return [parse_host(h) for h in response_items(self._request("GET", "/api/hosts"), "hosts")]
 
     def update_host(
         self,
@@ -478,46 +476,39 @@ class MeridianPanel(ControlPlaneMixin):
         ensures safest-first ordering (Reality → XHTTP → WSS) regardless
         of creation order or manual panel UI reordering.
         """
-        from remnawave.models.hosts import ReorderHostItem, ReorderHostRequestDto
-
-        items = [ReorderHostItem(uuid=host_uuid, view_position=i) for i, host_uuid in enumerate(ordered_uuids)]
-        sdk_call(self._sdk.hosts.reorder_hosts(ReorderHostRequestDto(hosts=items)))
+        items = [{"uuid": host_uuid, "viewPosition": i} for i, host_uuid in enumerate(ordered_uuids)]
+        self._post("/api/hosts/actions/reorder", json={"hosts": items})
 
     def enable_host(self, uuid: str) -> None:
         """Enable a disabled host."""
-        sdk_call(self._sdk.hosts_bulk_actions.enable_hosts([UUID(uuid)]))
+        self._post("/api/hosts/bulk/enable", json={"uuids": [uuid]})
 
     def disable_host(self, uuid: str) -> None:
         """Disable a host (subscriptions auto-exclude)."""
-        sdk_call(self._sdk.hosts_bulk_actions.disable_hosts([UUID(uuid)]))
+        self._post("/api/hosts/bulk/disable", json={"uuids": [uuid]})
 
     def delete_host(self, uuid: str) -> None:
         """Delete a host entry."""
-        sdk_call(self._sdk.hosts.delete_host(uuid))
+        self._request("DELETE", f"/api/hosts/{_segment(uuid)}")
 
     # --- Config Profiles ---
 
     def create_config_profile(self, name: str, config: dict[str, Any]) -> ConfigProfile:
         """Create a new config profile with Xray configuration."""
-        body = CreateConfigProfileRequestDto(name=name, config=config)
-        resp = sdk_call(self._sdk.config_profiles.create_config_profile(body))
-        return config_profile_from_sdk(resp)
+        return parse_config_profile(self._post("/api/config-profiles", json={"name": name, "config": config}))
 
     def get_config_profile(self, uuid: str) -> ConfigProfile | None:
         """Get a config profile by UUID. Returns None only if not found."""
         try:
-            resp = sdk_call(self._sdk.config_profiles.get_config_profile_by_uuid(uuid))
-            return config_profile_from_sdk(resp)
+            data = self._request("GET", f"/api/config-profiles/{_segment(uuid)}")
         except RemnawaveNotFoundError:
             return None
+        return parse_config_profile(data)
 
     def list_config_profiles(self) -> list[ConfigProfile]:
         """List all config profiles."""
-        resp = sdk_call(self._sdk.config_profiles.get_config_profiles())
-        # SDK 2.7.x: GetAllConfigProfilesResponseDto.config_profiles
-        # (Pydantic snake_case attribute, not the camelCase serialization alias)
-        items = getattr(resp, "config_profiles", []) or []
-        return [config_profile_from_sdk(profile) for profile in items]
+        data = self._request("GET", "/api/config-profiles")
+        return [parse_config_profile(profile) for profile in response_items(data, "configProfiles")]
 
     def find_config_profile_by_name(self, name: str) -> ConfigProfile | None:
         """Find a config profile by name. Returns None if not found."""
@@ -530,24 +521,22 @@ class MeridianPanel(ControlPlaneMixin):
 
     def list_inbounds(self) -> list[Inbound]:
         """List all inbounds across config profiles."""
-        resp = sdk_call(self._sdk.inbounds.get_all_inbounds())
-        inbounds_list = getattr(resp, "inbounds", []) or []
-        return [inbound_from_sdk(ib) for ib in inbounds_list]
+        data = self._request("GET", "/api/config-profiles/inbounds")
+        return [parse_inbound(ib) for ib in response_items(data, "inbounds")]
 
     # --- Keygen ---
 
     def get_node_secret_key(self) -> str:
         """Fetch the node mTLS secret bundle from the keygen controller.
 
-        SDK 2.7.x: GetPubKeyResponseDto.pub_key (snake_case attribute, with
-        camelCase serialization alias). Reading ``getattr(resp, "pubKey", ...)``
-        returns the default empty string and silently breaks node container
-        deployment for re-registers.
+        Remnawave 3.x names it ``secretKey``; 2.x called it ``pubKey``.
+        Callers must treat an empty value as a failed node deployment.
         """
-        resp = sdk_call(self._sdk.keygen.generate_key())
-        return str(getattr(resp, "pub_key", "") or "")
+        data = self._request("GET", "/api/keygen")
+        raw = data if isinstance(data, dict) else {}
+        return str(raw.get("secretKey") or raw.get("pubKey") or "")
 
-    # --- Auth (for initial setup — raw httpx, no SDK instance yet) ---
+    # --- Auth (for initial setup — no authenticated client yet) ---
 
     @classmethod
     def _auth_request(
@@ -566,8 +555,6 @@ class MeridianPanel(ControlPlaneMixin):
 
         Both ``login`` and ``register_admin`` are thin wrappers around this.
         """
-        import httpx
-
         url = f"{base_url.rstrip('/')}{path}"
         try:
             resp = httpx.post(

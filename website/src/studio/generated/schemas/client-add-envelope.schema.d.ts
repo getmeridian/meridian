@@ -10,9 +10,9 @@
  */
 export type ClientAddOutputEnvelope = _ClientAddSuccessEnvelope | _ClientAddTerminalEnvelope;
 export type Command = "client.add";
+export type Id = string;
 export type Status = string;
 export type Username = string;
-export type Uuid = string;
 export type Clients = ClientCreated[];
 export type DurationMs = number;
 /**
@@ -72,9 +72,9 @@ export interface ClientAddResult {
  * Client metadata returned after creation.
  */
 export interface ClientCreated {
+  id: Id;
   status: Status;
   username: Username;
-  uuid: Uuid;
 }
 /**
  * Structured summary shown in JSON envelopes and UI dashboards.

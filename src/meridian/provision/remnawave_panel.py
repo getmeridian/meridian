@@ -177,8 +177,7 @@ volumes:
 def _render_panel_env(
     panel_port: int,
     db_password: str,
-    jwt_auth_secret: str,
-    jwt_api_secret: str,
+    app_secret: str,
     front_end_domain: str,
     sub_public_domain: str,
     metrics_password: str,
@@ -200,8 +199,7 @@ DATABASE_URL=postgresql://meridian:{db_password}@remnawave-db:5432/remnawave
 
 REDIS_SOCKET=/var/run/valkey/valkey.sock
 
-JWT_AUTH_SECRET={jwt_auth_secret}
-JWT_API_TOKENS_SECRET={jwt_api_secret}
+APP_SECRET={app_secret}
 
 PANEL_DOMAIN={front_end_domain}
 FRONT_END_DOMAIN=*
@@ -211,9 +209,6 @@ METRICS_USER=meridian
 METRICS_PASS={metrics_password}
 
 IS_TELEGRAM_NOTIFICATIONS_ENABLED={str(tg_enabled).lower()}
-IS_DOCS_ENABLED=false
-SWAGGER_PATH=/docs
-SCALAR_PATH=/scalar
 
 WEBHOOK_ENABLED=false
 
@@ -236,14 +231,16 @@ POSTGRES_DB=remnawave
     return lines
 
 
-_PERSISTENT_PANEL_SECRETS = ("POSTGRES_PASSWORD", "JWT_AUTH_SECRET", "JWT_API_TOKENS_SECRET", "METRICS_PASS")
+_PERSISTENT_PANEL_SECRETS = ("POSTGRES_PASSWORD", "APP_SECRET", "METRICS_PASS")
 
 
 def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict[str, str] | StepResult | None:
     """Return secrets from an existing panel ``.env`` so restarts never rotate them.
 
     PostgreSQL keeps the password it was initialised with and every API token is
-    signed with the JWT secrets, so regenerating them orphans the database.
+    signed with ``APP_SECRET``, so regenerating them orphans the database.
+    Remnawave 2.x signed tokens with ``JWT_AUTH_SECRET``; it becomes
+    ``APP_SECRET`` so existing API tokens stay valid across the upgrade.
     Returns None for a genuinely fresh install, or a failed StepResult when
     panel data exists but its secrets cannot be recovered.
     """
@@ -269,6 +266,8 @@ def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict
             key, sep, value = line.partition("=")
             if sep and not key.lstrip().startswith("#"):
                 values[key.strip()] = value.strip()
+    if not values.get("APP_SECRET") and values.get("JWT_AUTH_SECRET"):
+        values["APP_SECRET"] = values["JWT_AUTH_SECRET"]
     missing = [key for key in _PERSISTENT_PANEL_SECRETS if not values.get(key)]
     if missing:
         return StepResult(
@@ -454,20 +453,17 @@ class DeployRemnawavePanel:
             return existing
         if existing is None:
             db_password = secrets.token_hex(16)
-            jwt_auth_secret = secrets.token_hex(32)
-            jwt_api_secret = secrets.token_hex(32)
+            app_secret = secrets.token_hex(32)
             metrics_password = secrets.token_hex(8)
         else:
             db_password = existing["POSTGRES_PASSWORD"]
-            jwt_auth_secret = existing["JWT_AUTH_SECRET"]
-            jwt_api_secret = existing["JWT_API_TOKENS_SECRET"]
+            app_secret = existing["APP_SECRET"]
             metrics_password = existing["METRICS_PASS"]
 
         env_content = _render_panel_env(
             panel_port=panel_port,
             db_password=db_password,
-            jwt_auth_secret=jwt_auth_secret,
-            jwt_api_secret=jwt_api_secret,
+            app_secret=app_secret,
             front_end_domain=front_end_domain,
             sub_public_domain=sub_public_domain,
             metrics_password=metrics_password,

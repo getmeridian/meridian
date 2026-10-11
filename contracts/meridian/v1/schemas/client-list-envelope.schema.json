@@ -69,6 +69,10 @@
           "title": "Created At",
           "type": "string"
         },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
         "last_seen": {
           "title": "Last Seen",
           "type": "string"
@@ -88,15 +92,11 @@
         "username": {
           "title": "Username",
           "type": "string"
-        },
-        "uuid": {
-          "title": "Uuid",
-          "type": "string"
         }
       },
       "required": [
         "username",
-        "uuid",
+        "id",
         "status",
         "traffic_used_bytes",
         "traffic_limit_bytes",

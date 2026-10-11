@@ -1,18 +1,47 @@
-"""Stable internal models and SDK response conversion."""
+"""Stable internal models and REST payload conversion."""
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 HostSecurityLayer = Literal["DEFAULT", "TLS", "NONE"]
 
+# Remnawave 3.x moved the subscription title into custom response headers.
+# ``rwEncodeBase64:`` makes the panel emit ``base64:<b64(rendered text)>`` so
+# non-ASCII titles survive HTTP headers; the text after it is plain.
+PROFILE_TITLE_HEADER = "profile-title"
+_RW_ENCODE_BASE64 = "rwEncodeBase64:"
+_BASE64_RESULT = "base64:"
+
+
+def encode_profile_title(title: str) -> str:
+    """Render a profile title as the panel's ``profile-title`` header template."""
+    return f"{_RW_ENCODE_BASE64}{title}"
+
+
+def decode_profile_title(value: str) -> str:
+    """Recover the plain title from a ``profile-title`` header template or value."""
+    if value.startswith(_RW_ENCODE_BASE64):
+        return value[len(_RW_ENCODE_BASE64) :]
+    if value.startswith(_BASE64_RESULT):
+        try:
+            return base64.b64decode(value[len(_BASE64_RESULT) :], validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):  # binascii.Error is a ValueError
+            return value
+    return value
+
 
 @dataclass
 class User:
-    """A Remnawave user (= Meridian client)."""
+    """A Remnawave user (= Meridian client).
 
-    uuid: str = ""
+    ``id`` is Remnawave 3.x's numeric user identity, kept as a string so it
+    can travel through bindings and URLs unchanged.
+    """
+
+    id: str = ""
     short_uuid: str = ""
     username: str = ""
     vless_uuid: str = ""  # VLESS protocol UUID (used by Xray, differs from account UUID)
@@ -145,14 +174,16 @@ class SubscriptionSettings:
     """Panel-wide subscription delivery settings."""
 
     uuid: str = ""
-    profile_title: str = ""
-    support_link: str = ""
-    profile_update_interval: int = 0
     serve_json_at_base_subscription: bool = False
     randomize_hosts: bool = False
     response_rules: dict[str, Any] | None = None
     custom_response_headers: dict[str, str] = field(default_factory=dict)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    @property
+    def profile_title(self) -> str:
+        """Profile title as clients see it (Remnawave 3.x ``profile-title`` header)."""
+        return decode_profile_title(self.custom_response_headers.get(PROFILE_TITLE_HEADER, ""))
 
 
 @dataclass(frozen=True)
@@ -163,141 +194,6 @@ class SubscriptionDocument:
     content: str
     client_type: str = ""
     content_type: str = ""
-
-
-# ---------------------------------------------------------------------------
-# SDK ↔ dataclass converters
-# ---------------------------------------------------------------------------
-
-
-def user_from_sdk(obj: Any) -> User:
-    """Convert SDK UserResponseDto to our User dataclass.
-
-    SDK Pydantic models declare fields as ``snake_case = Field(alias="camelCase")`` —
-    Python attribute access requires snake_case. Reading the camelCase alias via
-    ``getattr`` returns the default and silently drops data.
-    """
-    traffic = getattr(obj, "user_traffic", None)
-    squads = getattr(obj, "active_internal_squads", None) or []
-    return User(
-        uuid=str(getattr(obj, "uuid", "")),
-        short_uuid=str(getattr(obj, "short_uuid", "") or ""),
-        username=getattr(obj, "username", "") or "",
-        vless_uuid=str(getattr(obj, "vless_uuid", "") or ""),
-        status=str(getattr(obj, "status", "") or ""),
-        used_traffic_bytes=int(getattr(traffic, "used_traffic_bytes", 0) or 0),
-        traffic_limit_bytes=int(getattr(obj, "traffic_limit_bytes", 0) or 0),
-        created_at=str(getattr(obj, "created_at", "") or ""),
-        online_at=str(getattr(traffic, "online_at", "") or ""),
-        sub_revoked_at=str(getattr(obj, "sub_revoked_at", "") or ""),
-        subscription_url=str(getattr(obj, "subscription_url", "") or ""),
-        active_internal_squad_uuids=[str(getattr(squad, "uuid", squad)) for squad in squads],
-        external_squad_uuid=str(getattr(obj, "external_squad_uuid", "") or ""),
-        description=str(getattr(obj, "description", "") or ""),
-    )
-
-
-def node_from_sdk(obj: Any) -> Node:
-    """Convert SDK NodeResponseDto to our Node dataclass."""
-    profile = getattr(obj, "config_profile", None)
-    active_inbounds = getattr(profile, "active_inbounds", None) or []
-    return Node(
-        uuid=str(getattr(obj, "uuid", "")),
-        name=getattr(obj, "name", "") or "",
-        address=getattr(obj, "address", "") or "",
-        port=int(getattr(obj, "port", 0) or 0),
-        is_connected=bool(getattr(obj, "is_connected", False)),
-        is_disabled=bool(getattr(obj, "is_disabled", False)),
-        xray_version=getattr(obj, "xray_version", "") or "",
-        traffic_used=int(getattr(obj, "traffic_used_bytes", 0) or 0),
-        country_code=str(getattr(obj, "country_code", "") or ""),
-        active_config_profile_uuid=str(getattr(profile, "active_config_profile_uuid", "") or ""),
-        active_inbound_uuids=[str(getattr(inbound, "uuid", inbound)) for inbound in active_inbounds],
-    )
-
-
-def host_from_sdk(obj: Any) -> Host:
-    """Convert SDK HostResponseDto to our Host dataclass."""
-    inbound = getattr(obj, "inbound", None)
-    return Host(
-        uuid=str(getattr(obj, "uuid", "")),
-        remark=getattr(obj, "remark", "") or "",
-        address=getattr(obj, "address", "") or "",
-        port=int(getattr(obj, "port", 0) or 0),
-        sni=getattr(obj, "sni", "") or "",
-        host=getattr(obj, "host", "") or "",
-        path=getattr(obj, "path", "") or "",
-        alpn=str(getattr(obj, "alpn", "") or ""),
-        fingerprint=getattr(obj, "fingerprint", "") or "",
-        security_layer=enum_string(getattr(obj, "security_layer", "DEFAULT")),
-        config_profile_uuid=str(getattr(inbound, "config_profile_uuid", "") or ""),
-        # SDK field is `config_profile_inbound_uuid` (Pydantic snake_case for
-        # the JSON alias `configProfileInboundUuid`). Mapped to our simpler
-        # `inbound_uuid`. If a future SDK bump renames this field, the getattr
-        # silently returns "" — keep this comment as a breadcrumb.
-        inbound_uuid=str(getattr(inbound, "config_profile_inbound_uuid", "") or ""),
-        is_disabled=bool(getattr(obj, "is_disabled", False)),
-        tags=[str(value) for value in (getattr(obj, "tags", None) or [])],
-        is_hidden=bool(getattr(obj, "is_hidden", False)),
-        xray_json_template_uuid=str(getattr(obj, "xray_json_template_uuid", "") or ""),
-        exclude_from_subscription_types=[
-            enum_string(value) for value in (getattr(obj, "exclude_from_subscription_types", None) or [])
-        ],
-        _raw=sdk_to_dict(obj) if obj is not None else {},
-    )
-
-
-def inbound_from_sdk(obj: Any) -> Inbound:
-    """Convert SDK inbound DTO to our Inbound dataclass."""
-    return Inbound(
-        uuid=str(getattr(obj, "uuid", "")),
-        tag=getattr(obj, "tag", ""),
-        type=getattr(obj, "type", ""),
-        network=getattr(obj, "network", "") or "",
-        security=getattr(obj, "security", "") or "",
-        profile_uuid=str(getattr(obj, "profile_uuid", "") or ""),
-        port=int(getattr(obj, "port", 0) or 0),
-    )
-
-
-def config_profile_from_sdk(obj: Any) -> ConfigProfile:
-    """Convert SDK ConfigProfileDto to our ConfigProfile dataclass."""
-    return ConfigProfile(
-        uuid=str(getattr(obj, "uuid", "")),
-        name=getattr(obj, "name", ""),
-        config=sdk_to_dict(getattr(obj, "config", {}) or {}),
-        inbounds=[inbound_from_sdk(inbound) for inbound in (getattr(obj, "inbounds", None) or [])],
-        _raw=sdk_to_dict(obj) if obj is not None else {},
-    )
-
-
-def sdk_items(resp: Any, *, attr: str | None = None) -> list[Any]:
-    """Extract list payloads from SDK responses with mixed shapes."""
-    if resp is None:
-        return []
-    if attr:
-        items = getattr(resp, attr, None)
-        if isinstance(items, list):
-            return items
-    root = getattr(resp, "root", None)
-    if isinstance(root, list):
-        return root
-    if isinstance(resp, list):
-        return resp
-    return []
-
-
-def sdk_to_dict(obj: Any) -> Any:
-    """Recursively convert SDK models to plain Python containers."""
-    if hasattr(obj, "model_dump"):
-        return obj.model_dump(mode="python")
-    if isinstance(obj, list):
-        return [sdk_to_dict(item) for item in obj]
-    if isinstance(obj, tuple):
-        return [sdk_to_dict(item) for item in obj]
-    if isinstance(obj, dict):
-        return {key: sdk_to_dict(value) for key, value in obj.items()}
-    return obj
 
 
 def enum_string(value: Any) -> str:
@@ -334,6 +230,11 @@ def parse_host(data: Any) -> Host:
     )
 
 
+def is_user_id(value: str) -> bool:
+    """Return whether ``value`` is a Remnawave 3.x numeric user id (not a legacy uuid)."""
+    return bool(value) and value.isascii() and value.isdigit()
+
+
 def parse_user(data: Any) -> User:
     """Parse a raw API user payload into the stable model."""
     raw = data if isinstance(data, dict) else {}
@@ -342,7 +243,7 @@ def parse_user(data: Any) -> User:
     squads = raw.get("activeInternalSquads")
     squads = squads if isinstance(squads, list) else []
     return User(
-        uuid=str(raw.get("uuid") or ""),
+        id=str(raw.get("id") if raw.get("id") is not None else ""),
         short_uuid=str(raw.get("shortUuid") or ""),
         username=str(raw.get("username") or ""),
         vless_uuid=str(raw.get("vlessUuid") or ""),
@@ -365,6 +266,8 @@ def parse_node(data: Any) -> Node:
     raw = data if isinstance(data, dict) else {}
     profile = raw.get("configProfile")
     profile = profile if isinstance(profile, dict) else {}
+    versions = raw.get("versions")
+    versions = versions if isinstance(versions, dict) else {}
     active_inbounds = profile.get("activeInbounds")
     active_inbounds = active_inbounds if isinstance(active_inbounds, list) else []
     return Node(
@@ -374,7 +277,7 @@ def parse_node(data: Any) -> Node:
         port=int(raw.get("port") or 0),
         is_connected=bool(raw.get("isConnected", False)),
         is_disabled=bool(raw.get("isDisabled", False)),
-        xray_version=str(raw.get("xrayVersion") or ""),
+        xray_version=str(versions.get("xray") or ""),
         traffic_used=int(raw.get("trafficUsedBytes") or 0),
         country_code=str(raw.get("countryCode") or ""),
         active_config_profile_uuid=str(profile.get("activeConfigProfileUuid") or ""),
@@ -393,20 +296,22 @@ def parse_config_profile(data: Any) -> ConfigProfile:
         uuid=str(raw.get("uuid") or ""),
         name=str(raw.get("name") or ""),
         config=raw_config if isinstance(raw_config, dict) else {},
-        inbounds=[
-            Inbound(
-                uuid=str(item.get("uuid") or ""),
-                tag=str(item.get("tag") or ""),
-                type=str(item.get("type") or ""),
-                network=str(item.get("network") or ""),
-                security=str(item.get("security") or ""),
-                profile_uuid=str(item.get("profileUuid") or ""),
-                port=int(item.get("port") or 0),
-                _raw=item,
-            )
-            for item in raw_inbounds
-            if isinstance(item, dict)
-        ],
+        inbounds=[parse_inbound(item) for item in raw_inbounds if isinstance(item, dict)],
+        _raw=raw,
+    )
+
+
+def parse_inbound(data: Any) -> Inbound:
+    """Parse a raw config-profile inbound payload."""
+    raw = data if isinstance(data, dict) else {}
+    return Inbound(
+        uuid=str(raw.get("uuid") or ""),
+        tag=str(raw.get("tag") or ""),
+        type=str(raw.get("type") or ""),
+        network=str(raw.get("network") or ""),
+        security=str(raw.get("security") or ""),
+        profile_uuid=str(raw.get("profileUuid") or ""),
+        port=int(raw.get("port") or 0),
         _raw=raw,
     )
 
@@ -433,7 +338,7 @@ def parse_external_squad(data: Any) -> ExternalSquad:
     templates = raw.get("templates")
     templates = templates if isinstance(templates, list) else []
     settings = raw.get("subscriptionSettings")
-    headers = raw.get("responseHeaders")
+    headers = raw.get("responseHeadersAdd")
     return ExternalSquad(
         uuid=str(raw.get("uuid") or ""),
         name=str(raw.get("name") or ""),
@@ -472,9 +377,6 @@ def parse_subscription_settings(data: Any) -> SubscriptionSettings:
     headers = raw.get("customResponseHeaders")
     return SubscriptionSettings(
         uuid=str(raw.get("uuid") or ""),
-        profile_title=str(raw.get("profileTitle") or ""),
-        support_link=str(raw.get("supportLink") or ""),
-        profile_update_interval=int(raw.get("profileUpdateInterval") or 0),
         serve_json_at_base_subscription=bool(raw.get("serveJsonAtBaseSubscription", False)),
         randomize_hosts=bool(raw.get("randomizeHosts", False)),
         response_rules=response_rules if isinstance(response_rules, dict) else None,

@@ -29,6 +29,7 @@ from meridian.remnawave import (
     SubscriptionTemplate,
     User,
 )
+from meridian.remnawave.models import is_user_id
 
 ValueT = TypeVar("ValueT")
 
@@ -70,7 +71,7 @@ class AccessUserDriver:
             and sorted(user.active_internal_squad_uuids) == sorted(squads)
             and user.external_squad_uuid == external
         )
-        return _observed(action, user.uuid, matches, _user_projection(user))
+        return _observed(action, user.id, matches, _user_projection(user))
 
     def apply(
         self,
@@ -98,7 +99,7 @@ class AccessUserDriver:
             if (
                 binding is None
                 and existing.description != "Managed by Meridian access"
-                and not self.context.was_managed(action.resource.logical_id, existing.uuid)
+                and not self.context.was_managed(action.resource.logical_id, existing.id)
             ):
                 raise ResourceReconcileError(
                     f"Unmanaged User collides with requested username {payload.username!r}.",
@@ -107,18 +108,18 @@ class AccessUserDriver:
                 )
             if existing.status != "ACTIVE":
                 _mutation(
-                    lambda: self.context.panel.enable_user(existing.uuid),
+                    lambda: self.context.panel.enable_user(existing.id),
                     f"enable access User {payload.username}",
                 )
             user = _mutation(
                 lambda: self.context.panel.update_access_user(
-                    existing.uuid,
+                    existing.id,
                     squad_uuids=squads,
                     external_squad_uuid=external,
                 ),
                 f"update access User {payload.username}",
             )
-        return ResourceApplyReceipt(remote_id=user.uuid)
+        return ResourceApplyReceipt(remote_id=user.id)
 
 
 class SubscriptionTemplateDriver:
@@ -265,6 +266,9 @@ class SubscriptionSettingsDriver:
                 settings.uuid,
                 profile_title=payload.profile_title,
                 randomize_hosts=payload.randomize_hosts,
+                # Merge the title into the record just read; the panel
+                # replaces customResponseHeaders wholesale.
+                custom_response_headers=settings.custom_response_headers,
             ),
             "update managed subscription title",
         )
@@ -342,8 +346,9 @@ def _bound_or_named_user(
     username: str,
     binding: ManagedResourceBinding | None,
 ) -> User | None:
-    if binding is not None and binding.remote_id:
-        return context.panel.get_user_by_uuid(binding.remote_id)
+    if binding is not None and is_user_id(binding.remote_id):
+        return context.panel.get_user_by_id(binding.remote_id)
+    # Pre-3.x bindings hold the removed user uuid; re-resolve by username.
     return context.panel.get_user(username)
 
 

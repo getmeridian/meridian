@@ -18,7 +18,7 @@ from meridian.core.services.clients import ClientNotFoundError, collect_client_l
 
 @dataclass
 class PanelUser:
-    uuid: str = "user-uuid"
+    id: str = "17"
     short_uuid: str = "short-uuid"
     username: str = "alice"
     vless_uuid: str = "vless-uuid"
@@ -96,7 +96,7 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     enabled = build_client_status_result("alice", "active")
     disabled = build_client_status_result("alice", "disabled")
 
-    assert added.to_data() == {"clients": [{"username": "alice", "uuid": "user-uuid", "status": "active"}]}
+    assert added.to_data() == {"clients": [{"username": "alice", "id": "17", "status": "active"}]}
     assert removed.to_data() == {"client": {"username": "alice"}}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
     assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}

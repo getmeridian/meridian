@@ -11,12 +11,12 @@
 export type ClientShowOutputEnvelope = _ClientShowSuccessEnvelope | _ClientShowTerminalEnvelope;
 export type Command = "client.show";
 export type CreatedAt = string;
+export type Id = string;
 export type LastSeen = string;
 export type Status = string;
 export type TrafficLimitBytes = number;
 export type TrafficUsedBytes = number;
 export type Username = string;
-export type Uuid = string;
 export type Redacted = boolean;
 export type ShareAvailable = boolean;
 export type SubscriptionAvailable = boolean;
@@ -80,12 +80,12 @@ export interface ClientShowResult {
  */
 export interface ClientDetail {
   created_at: CreatedAt;
+  id: Id;
   last_seen: LastSeen;
   status: Status;
   traffic_limit_bytes: TrafficLimitBytes;
   traffic_used_bytes: TrafficUsedBytes;
   username: Username;
-  uuid: Uuid;
 }
 /**
  * Availability metadata for client handoff links in redacted JSON.

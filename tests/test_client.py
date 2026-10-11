@@ -66,7 +66,7 @@ def _make_cluster(tmp_path: Path) -> ClusterConfig:
 
 def _make_user(name: str = "alice", status: str = "ACTIVE") -> User:
     return User(
-        uuid="550e8400-e29b-41d4-a716-446655440000",
+        id="101",
         short_uuid="abc123",
         vless_uuid="550e8400-e29b-41d4-a716-446655440099",
         username=name,
@@ -556,7 +556,7 @@ class TestRunEnable:
             run_enable(name="alice")
 
         panel.get_user.assert_called_once_with("alice")
-        panel.enable_user.assert_called_once_with("550e8400-e29b-41d4-a716-446655440000")
+        panel.enable_user.assert_called_once_with("101")
 
     def test_enable_nonexistent_client_fails(self, tmp_home: Path) -> None:
         """Enabling a non-existent client should fail with user hint."""
@@ -628,7 +628,7 @@ class TestRunDisable:
             run_disable(name="alice")
 
         panel.get_user.assert_called_once_with("alice")
-        panel.disable_user.assert_called_once_with("550e8400-e29b-41d4-a716-446655440000")
+        panel.disable_user.assert_called_once_with("101")
 
     def test_disable_nonexistent_client_fails(self, tmp_home: Path) -> None:
         """Disabling a non-existent client should fail with user hint."""

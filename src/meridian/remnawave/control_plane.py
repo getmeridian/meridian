@@ -8,6 +8,7 @@ from urllib.parse import quote
 import httpx
 
 from .models import (
+    PROFILE_TITLE_HEADER,
     ConfigProfile,
     ExternalSquad,
     Host,
@@ -17,6 +18,7 @@ from .models import (
     SubscriptionSettings,
     SubscriptionTemplate,
     User,
+    encode_profile_title,
     parse_config_profile,
     parse_external_squad,
     parse_host,
@@ -53,6 +55,14 @@ class ControlPlaneMixin:
     ) -> Any:
         raise NotImplementedError
 
+    def _delete(self, path: str) -> bool:
+        """DELETE a resource; any 2xx (3.x answers 204) is success, 404 is already gone."""
+        try:
+            self._request("DELETE", path)
+        except RemnawaveNotFoundError:
+            return False
+        return True
+
     # --- Config profiles and node bindings ---
 
     def update_config_profile(
@@ -70,8 +80,7 @@ class ControlPlaneMixin:
         return parse_config_profile(self._request("PATCH", "/api/config-profiles", json=body))
 
     def delete_config_profile(self, uuid: str) -> bool:
-        data = self._request("DELETE", f"/api/config-profiles/{quote(uuid, safe='')}")
-        return bool(data.get("isDeleted")) if isinstance(data, dict) else False
+        return self._delete(f"/api/config-profiles/{quote(uuid, safe='')}")
 
     def bind_node_profile(
         self,
@@ -140,8 +149,7 @@ class ControlPlaneMixin:
         self.update_internal_squad(squad_uuid, inbound_uuids=inbound_uuids)
 
     def delete_internal_squad(self, uuid: str) -> bool:
-        data = self._request("DELETE", f"/api/internal-squads/{quote(uuid, safe='')}")
-        return bool(data.get("isDeleted")) if isinstance(data, dict) else False
+        return self._delete(f"/api/internal-squads/{quote(uuid, safe='')}")
 
     # --- External squads ---
 
@@ -167,6 +175,7 @@ class ControlPlaneMixin:
         templates: list[dict[str, str]] | None = None,
         subscription_settings: dict[str, Any] | None = None,
         response_headers: dict[str, str] | None = None,
+        remove_response_headers: list[str] | None = None,
     ) -> ExternalSquad:
         body: dict[str, Any] = {"uuid": uuid}
         if name is not None:
@@ -182,12 +191,13 @@ class ControlPlaneMixin:
         if subscription_settings is not None:
             body["subscriptionSettings"] = subscription_settings
         if response_headers is not None:
-            body["responseHeaders"] = response_headers
+            body["responseHeadersAdd"] = response_headers
+        if remove_response_headers is not None:
+            body["responseHeadersRemove"] = remove_response_headers
         return parse_external_squad(self._request("PATCH", "/api/external-squads", json=body))
 
     def delete_external_squad(self, uuid: str) -> bool:
-        data = self._request("DELETE", f"/api/external-squads/{quote(uuid, safe='')}")
-        return bool(data.get("isDeleted")) if isinstance(data, dict) else False
+        return self._delete(f"/api/external-squads/{quote(uuid, safe='')}")
 
     # --- Managed access and service users ---
 
@@ -212,7 +222,7 @@ class ControlPlaneMixin:
 
     def update_access_user(
         self,
-        uuid: str,
+        user_id: str,
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
@@ -222,7 +232,7 @@ class ControlPlaneMixin:
                 "PATCH",
                 "/api/users",
                 json={
-                    "uuid": uuid,
+                    "id": int(user_id),
                     "activeInternalSquads": squad_uuids,
                     "externalSquadUuid": external_squad_uuid or None,
                 },
@@ -250,21 +260,20 @@ class ControlPlaneMixin:
 
     def update_service_user(
         self,
-        uuid: str,
+        user_id: str,
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
     ) -> User:
         body: dict[str, Any] = {
-            "uuid": uuid,
+            "id": int(user_id),
             "activeInternalSquads": squad_uuids,
             "externalSquadUuid": external_squad_uuid or None,
         }
         return parse_user(self._request("PATCH", "/api/users", json=body))
 
-    def delete_service_user(self, uuid: str) -> bool:
-        data = self._request("DELETE", f"/api/users/{quote(uuid, safe='')}")
-        return bool(data.get("isDeleted")) if isinstance(data, dict) else False
+    def delete_service_user(self, user_id: str) -> bool:
+        return self._delete(f"/api/users/{quote(user_id, safe='')}")
 
     # --- Subscription templates ---
 
@@ -312,11 +321,7 @@ class ControlPlaneMixin:
         return parse_subscription_template(self._request("PATCH", "/api/subscription-templates", json=body))
 
     def delete_subscription_template(self, uuid: str) -> bool:
-        data = self._request(
-            "DELETE",
-            f"/api/subscription-templates/{quote(uuid, safe='')}",
-        )
-        return bool(data.get("isDeleted")) if isinstance(data, dict) else False
+        return self._delete(f"/api/subscription-templates/{quote(uuid, safe='')}")
 
     # --- Subscription settings and canonical content ---
 
@@ -328,18 +333,28 @@ class ControlPlaneMixin:
         uuid: str,
         *,
         profile_title: str | None = None,
-        support_link: str | None = None,
-        profile_update_interval: int | None = None,
         serve_json_at_base_subscription: bool | None = None,
         randomize_hosts: bool | None = None,
         response_rules: dict[str, Any] | None = None,
         custom_response_headers: dict[str, str] | None = None,
     ) -> SubscriptionSettings:
+        """PATCH panel-wide subscription settings, omitting unmanaged fields.
+
+        Remnawave 3.x dropped ``profileTitle``; the title is the
+        ``profile-title`` custom response header. The panel replaces the
+        header record wholesale, so a title change re-reads the current
+        record (unless the caller supplies it) and writes it back merged.
+        """
+        if profile_title is not None:
+            headers = (
+                dict(custom_response_headers)
+                if custom_response_headers is not None
+                else dict(self.get_subscription_settings().custom_response_headers)
+            )
+            headers[PROFILE_TITLE_HEADER] = encode_profile_title(profile_title)
+            custom_response_headers = headers
         body: dict[str, Any] = {"uuid": uuid}
         optional_fields: tuple[tuple[str, Any], ...] = (
-            ("profileTitle", profile_title),
-            ("supportLink", support_link),
-            ("profileUpdateInterval", profile_update_interval),
             ("serveJsonAtBaseSubscription", serve_json_at_base_subscription),
             ("randomizeHosts", randomize_hosts),
             ("responseRules", response_rules),

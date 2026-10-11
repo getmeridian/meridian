@@ -18,7 +18,7 @@ from meridian.remnawave.models import (
     parse_user,
 )
 
-_FIXTURE = Path(__file__).parent / "fixtures" / "remnawave" / "2.8.0.json"
+_FIXTURE = Path(__file__).parent / "fixtures" / "remnawave" / "3.4.5.json"
 
 
 def _panel() -> MeridianPanel:
@@ -28,7 +28,6 @@ def _panel() -> MeridianPanel:
     panel._timeout = 30
     panel._max_retries = 1
     panel._client = MagicMock()
-    panel._sdk = MagicMock()
     panel._request = MagicMock()
     return panel
 
@@ -51,6 +50,9 @@ def test_current_tuple_fixture_round_trips_stable_models() -> None:
     assert squad.inbound_uuids == [profile.inbounds[0].uuid]
     assert user.active_internal_squad_uuids == [squad.uuid]
     assert user.subscription_url.endswith("/api/sub/service-short")
+    assert user.id == "7"
+    assert node.xray_version == "26.7.28"
+    assert settings.profile_title == "Family VPN"
     assert settings.response_rules == {
         "rules": [{"enabled": True, "name": "keep-unmanaged"}],
         "version": "1",
@@ -66,7 +68,7 @@ def test_profile_update_and_delete_use_exact_rest_shapes() -> None:
             "config": {"inbounds": []},
             "inbounds": [],
         },
-        {"isDeleted": True},
+        None,  # Remnawave 3.x answers DELETE with 204 and no body
     ]
 
     profile = panel.update_config_profile(
@@ -133,13 +135,15 @@ def test_external_squad_update_uses_template_wire_aliases() -> None:
             }
         ],
         response_headers={"X-Meridian": "managed"},
+        remove_response_headers=["X-Old"],
     )
 
     assert squad.templates == [{"template_uuid": "template-1", "template_type": "XRAY_JSON"}]
     assert panel._request.call_args.kwargs["json"] == {
         "uuid": "external-1",
         "templates": [{"templateUuid": "template-1", "templateType": "XRAY_JSON"}],
-        "responseHeaders": {"X-Meridian": "managed"},
+        "responseHeadersAdd": {"X-Meridian": "managed"},
+        "responseHeadersRemove": ["X-Old"],
     }
 
 
@@ -206,7 +210,7 @@ def test_template_crud_keeps_content_typed() -> None:
             "templateType": "XRAY_JSON",
             "templateJson": {"outbounds": []},
         },
-        {"isDeleted": True},
+        None,
     ]
 
     created = panel.create_subscription_template("Meridian Xray", "XRAY_JSON")
@@ -228,8 +232,7 @@ def test_settings_update_preserves_response_rules_when_unmanaged() -> None:
     panel = _panel()
     panel._request.return_value = {
         "uuid": "settings-1",
-        "profileTitle": "Family VPN",
-        "profileUpdateInterval": 12,
+        "customResponseHeaders": {"profile-title": "rwEncodeBase64:Family VPN"},
         "responseRules": {
             "version": "1",
             "rules": [{"name": "unmanaged", "enabled": True}],
@@ -240,17 +243,87 @@ def test_settings_update_preserves_response_rules_when_unmanaged() -> None:
         "settings-1",
         profile_title="Family VPN",
         randomize_hosts=False,
+        custom_response_headers={"support-url": "https://support.example.com"},
     )
 
     body = panel._request.call_args.kwargs["json"]
     assert "responseRules" not in body
     assert body == {
         "uuid": "settings-1",
-        "profileTitle": "Family VPN",
         "randomizeHosts": False,
+        "customResponseHeaders": {
+            "support-url": "https://support.example.com",
+            "profile-title": "rwEncodeBase64:Family VPN",
+        },
     }
+    assert settings.profile_title == "Family VPN"
     assert settings.response_rules is not None
     assert settings.response_rules["rules"][0]["name"] == "unmanaged"
+
+
+def test_profile_title_change_reads_and_merges_the_whole_header_record() -> None:
+    panel = _panel()
+    panel._request.side_effect = [
+        {
+            "uuid": "settings-1",
+            "customResponseHeaders": {
+                "profile-title": "rwEncodeBase64:Old",
+                "profile-update-interval": "12",
+                "announce": "rwEncodeBase64:operator notice",
+            },
+        },
+        {"uuid": "settings-1", "customResponseHeaders": {}},
+    ]
+
+    panel.update_subscription_settings("settings-1", profile_title="Семья")
+
+    assert panel._request.call_args_list[0].args == ("GET", "/api/subscription-settings")
+    assert panel._request.call_args_list[1].kwargs["json"] == {
+        "uuid": "settings-1",
+        "customResponseHeaders": {
+            "profile-title": "rwEncodeBase64:Семья",
+            "profile-update-interval": "12",
+            "announce": "rwEncodeBase64:operator notice",
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("header", "title"),
+    [
+        ("rwEncodeBase64:Family VPN", "Family VPN"),
+        ("base64:RmFtaWx5IFZQTg==", "Family VPN"),
+        ("Plain Title", "Plain Title"),
+        ("", ""),
+    ],
+)
+def test_profile_title_header_decoding(header: str, title: str) -> None:
+    settings = parse_subscription_settings({"customResponseHeaders": {"profile-title": header} if header else None})
+    assert settings.profile_title == title
+
+
+def test_user_updates_and_deletes_address_numeric_ids() -> None:
+    panel = _panel()
+    panel._request.side_effect = [{"id": 9, "username": "a"}, {"id": 10, "username": "b"}, None]
+
+    panel.update_access_user("9", squad_uuids=["squad-1"])
+    panel.update_service_user("10", squad_uuids=["squad-2"])
+    deleted = panel.delete_service_user("10")
+
+    assert panel._request.call_args_list[0].kwargs["json"]["id"] == 9
+    assert "uuid" not in panel._request.call_args_list[0].kwargs["json"]
+    assert panel._request.call_args_list[1].kwargs["json"]["id"] == 10
+    assert panel._request.call_args_list[2].args == ("DELETE", "/api/users/10")
+    assert deleted is True
+
+
+def test_delete_reports_already_absent_resources() -> None:
+    from meridian.remnawave import RemnawaveNotFoundError
+
+    panel = _panel()
+    panel._request.side_effect = RemnawaveNotFoundError("gone")
+
+    assert panel.delete_internal_squad("squad-1") is False
 
 
 def test_fetch_subscription_returns_canonical_content_and_type() -> None:

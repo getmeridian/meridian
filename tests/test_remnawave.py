@@ -1,15 +1,11 @@
-"""Tests for Remnawave API client — finders, SDK converters, retry, auth."""
+"""Tests for the Remnawave REST client — finders, parsers, retry, auth, wire shapes."""
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+import json
+from unittest.mock import MagicMock, patch
 
-import httpx
 import pytest
-from remnawave.models.config_profiles import CreateConfigProfileRequestDto
-from remnawave.models.nodes import CreateNodeRequestDto
-from remnawave.models.users import CreateUserRequestDto
 
 from meridian.remnawave import (
     ConfigProfile,
@@ -20,11 +16,8 @@ from meridian.remnawave import (
     RemnawaveError,
     RemnawaveNetworkError,
     RemnawaveNotFoundError,
-    host_from_sdk,
-    inbound_from_sdk,
-    node_from_sdk,
-    user_from_sdk,
 )
+from meridian.remnawave.models import parse_host, parse_inbound, parse_node, parse_user
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,15 +28,23 @@ def _mock_response(status_code: int = 200, json_data: dict | list | None = None)
     """Create a mock httpx.Response."""
     resp = MagicMock()
     resp.status_code = status_code
-    resp.json.return_value = json_data if json_data is not None else {}
+    payload = json_data if json_data is not None else {}
+    resp.json.return_value = payload
     resp.text = ""
-    resp.content = b""
+    resp.content = json.dumps(payload).encode()
     resp.raise_for_status = MagicMock()
     return resp
 
 
+def _empty_response(status_code: int) -> MagicMock:
+    resp = _mock_response(status_code)
+    resp.content = b""
+    resp.json.side_effect = ValueError("no body")
+    return resp
+
+
 def _make_panel(mock_client: MagicMock | None = None) -> MeridianPanel:
-    """Create a MeridianPanel with a mocked httpx.Client and SDK bypassed."""
+    """Create a MeridianPanel with a mocked httpx.Client."""
     client = mock_client or MagicMock()
     panel = MeridianPanel.__new__(MeridianPanel)
     panel._base = "https://198.51.100.1/panel"
@@ -51,13 +52,18 @@ def _make_panel(mock_client: MagicMock | None = None) -> MeridianPanel:
     panel._timeout = 30
     panel._max_retries = 3
     panel._client = client
-    panel._sdk = MagicMock()
     return panel
 
 
-def _ns(**kwargs: object) -> SimpleNamespace:
-    """Create a SimpleNamespace for mocking SDK response objects."""
-    return SimpleNamespace(**kwargs)
+def _wired_panel(*responses: MagicMock) -> tuple[MeridianPanel, MagicMock]:
+    client = MagicMock()
+    client.request.side_effect = list(responses)
+    return _make_panel(client), client
+
+
+def _call(client: MagicMock, index: int = 0) -> tuple[str, str, object]:
+    call = client.request.call_args_list[index]
+    return call.args[0], call.args[1], call.kwargs.get("json")
 
 
 # ---------------------------------------------------------------------------
@@ -66,25 +72,12 @@ def _ns(**kwargs: object) -> SimpleNamespace:
 
 
 class TestClientConstruction:
-    def test_enables_tls_verification_and_applies_timeout_to_both_clients(self) -> None:
-        sdk_http = MagicMock()
+    def test_enables_tls_verification_and_applies_timeout(self) -> None:
         raw_http = MagicMock()
-        sdk = MagicMock()
 
-        with (
-            patch("meridian.remnawave.client.httpx.AsyncClient", return_value=sdk_http) as async_client,
-            patch("meridian.remnawave.client.httpx.Client", return_value=raw_http) as raw_client,
-            patch("meridian.remnawave.client.RemnawaveSDK", return_value=sdk) as sdk_factory,
-        ):
+        with patch("meridian.remnawave.client.httpx.Client", return_value=raw_http) as raw_client:
             panel = MeridianPanel("https://panel.example/secret/", "test-token", timeout=7.5)
 
-        async_client.assert_called_once_with(
-            base_url="https://panel.example/secret/api",
-            headers={"Authorization": "Bearer test-token"},
-            timeout=7.5,
-            verify=True,
-        )
-        sdk_factory.assert_called_once_with(client=sdk_http)
         raw_client.assert_called_once_with(
             base_url="https://panel.example/secret/",
             headers={
@@ -94,20 +87,13 @@ class TestClientConstruction:
             timeout=7.5,
             verify=True,
         )
-        assert panel._sdk is sdk
         assert panel._client is raw_http
 
-    def test_explicit_tls_override_is_shared_by_both_clients(self) -> None:
-        with (
-            patch("meridian.remnawave.client.httpx.AsyncClient") as async_client,
-            patch("meridian.remnawave.client.httpx.Client") as raw_client,
-            patch("meridian.remnawave.client.RemnawaveSDK"),
-        ):
+    def test_explicit_tls_override_and_bearer_prefix_are_kept(self) -> None:
+        with patch("meridian.remnawave.client.httpx.Client") as raw_client:
             MeridianPanel("https://panel.example", "Bearer test-token", verify=False)
 
-        assert async_client.call_args.kwargs["verify"] is False
         assert raw_client.call_args.kwargs["verify"] is False
-        assert async_client.call_args.kwargs["headers"]["Authorization"] == "Bearer test-token"
         assert raw_client.call_args.kwargs["headers"]["Authorization"] == "Bearer test-token"
 
 
@@ -193,217 +179,97 @@ class TestFindConfigProfileByName:
 # ---------------------------------------------------------------------------
 
 
-class TestUserFromSdk:
-    """Tests use snake_case field names because real SDK Pydantic models expose
-    Python attributes in snake_case (camelCase is only the JSON serialization alias).
-    Reading via camelCase silently returns defaults — see user_from_sdk docstring.
-    """
+# ---------------------------------------------------------------------------
+# REST payload parsers (Remnawave 3.4 shapes)
+# ---------------------------------------------------------------------------
 
-    def test_converts_all_fields(self) -> None:
-        # Real shape: traffic counters live on the nested user_traffic sub-model;
-        # built top-level user fields are short_uuid, traffic_limit_bytes, etc.
-        obj = _ns(
-            uuid="u-1",
-            short_uuid="abc",
-            username="alice",
-            vless_uuid="vl-1",
-            status="ACTIVE",
-            traffic_limit_bytes=2048,
-            created_at="2026-01-01",
-            sub_revoked_at="",
-            user_traffic=_ns(used_traffic_bytes=1024, online_at="2026-04-01"),
+
+class TestParseUser:
+    def test_reads_numeric_id_and_nested_traffic(self) -> None:
+        user = parse_user(
+            {
+                "id": 42,
+                "shortUuid": "short_42",
+                "username": "alice",
+                "vlessUuid": "00000000-0000-0000-0000-000000000002",
+                "status": "ACTIVE",
+                "trafficLimitBytes": 5000,
+                "createdAt": "2026-01-01T00:00:00Z",
+                "subscriptionUrl": "https://panel/api/sub/short_42",
+                "activeInternalSquads": [{"uuid": "sq-1", "name": "Meridian-Access"}],
+                "userTraffic": {"usedTrafficBytes": 1234, "onlineAt": "2026-04-15T10:00:00Z"},
+            }
         )
-        user = user_from_sdk(obj)
-        assert user.uuid == "u-1"
-        assert user.short_uuid == "abc"
-        assert user.username == "alice"
-        assert user.status == "ACTIVE"
-        assert user.used_traffic_bytes == 1024
-        assert user.traffic_limit_bytes == 2048
-        assert user.online_at == "2026-04-01"
-
-    def test_handles_missing_fields(self) -> None:
-        user = user_from_sdk(_ns(uuid="u-1"))
-        assert user.uuid == "u-1"
-        assert user.username == ""
-        assert user.used_traffic_bytes == 0
-
-    def test_handles_none_traffic(self) -> None:
-        user = user_from_sdk(_ns(traffic_limit_bytes=None, user_traffic=None))
-        assert user.used_traffic_bytes == 0
-        assert user.traffic_limit_bytes == 0
-
-    def test_reads_nested_user_traffic_fields(self) -> None:
-        user = user_from_sdk(_ns(user_traffic=_ns(used_traffic_bytes=4096, online_at="2026-04-02")))
-        assert user.used_traffic_bytes == 4096
-        assert user.online_at == "2026-04-02"
-
-    def test_camelcase_attributes_silently_drop_data(self) -> None:
-        # Regression: SDK 2.7.x Pydantic models do not expose camelCase aliases as
-        # Python attributes. If we ever revert to getattr(..., "shortUuid", ...) the
-        # field will become empty without any error.
-        obj = _ns(uuid="u-1", shortUuid="WRONG_CAMEL", short_uuid="right_snake")
-        user = user_from_sdk(obj)
-        assert user.short_uuid == "right_snake"
-
-
-class TestUserFromRealSdkModel:
-    """Round-trip parsing through actual SDK Pydantic models — catches any future
-    SDK upgrade that renames fields or changes alias mapping."""
-
-    def test_parses_real_user_response_dto(self) -> None:
-        from remnawave.models.users import GetUserByUsernameResponseDto
-
-        # JSON-shaped payload (camelCase) — what the panel returns and what
-        # the SDK consumes through Field(alias=...).
-        payload = {
-            "uuid": "00000000-0000-0000-0000-000000000001",
-            "id": 1,
-            "shortUuid": "short_42",
-            "username": "alice",
-            "vlessUuid": "00000000-0000-0000-0000-000000000002",
-            "trojanPassword": "trojanpwd_long",
-            "ssPassword": "sspwd_long",
-            "lastTriggeredThreshold": 0,
-            "trafficLimitBytes": 5000,
-            "expireAt": "2099-01-01T00:00:00Z",
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-02T00:00:00Z",
-            "activeInternalSquads": [],
-            "userTraffic": {
-                "usedTrafficBytes": 1234,
-                "lifetimeUsedTrafficBytes": 9999,
-                "onlineAt": "2026-04-15T10:00:00Z",
-            },
-            "subscriptionUrl": "https://panel/api/sub/short_42",
-        }
-        sdk_obj = GetUserByUsernameResponseDto.model_validate(payload)
-        user = user_from_sdk(sdk_obj)
-        # All these would be defaults if we read camelCase aliases via getattr.
+        assert user.id == "42"
         assert user.short_uuid == "short_42"
         assert user.vless_uuid == "00000000-0000-0000-0000-000000000002"
         assert user.traffic_limit_bytes == 5000
         assert user.used_traffic_bytes == 1234
         assert user.online_at.startswith("2026-04-15")
-        assert user.created_at.startswith("2026-01-01")
+        assert user.active_internal_squad_uuids == ["sq-1"]
 
-
-class TestNodeFromSdk:
-    def test_converts_all_fields(self) -> None:
-        obj = _ns(
-            uuid="n-1",
-            name="finland",
-            address="198.51.100.1",
-            port=3010,
-            is_connected=True,
-            is_disabled=False,
-            xray_version="26.2.6",
-            traffic_used_bytes=5000,
-        )
-        node = node_from_sdk(obj)
-        assert node.uuid == "n-1"
-        assert node.name == "finland"
-        assert node.address == "198.51.100.1"
-        assert node.port == 3010
-        assert node.is_connected is True
-        assert node.traffic_used == 5000
+    def test_id_zero_is_preserved(self) -> None:
+        assert parse_user({"id": 0}).id == "0"
 
     def test_handles_missing_fields(self) -> None:
-        node = node_from_sdk(_ns())
+        user = parse_user({})
+        assert user.id == ""
+        assert user.username == ""
+        assert user.used_traffic_bytes == 0
+
+
+class TestParseNode:
+    def test_reads_xray_version_from_versions_object(self) -> None:
+        node = parse_node(
+            {
+                "uuid": "n-1",
+                "name": "finland",
+                "address": "198.51.100.1",
+                "port": 3010,
+                "isConnected": True,
+                "isDisabled": False,
+                "versions": {"xray": "26.7.28", "node": "3.4.2"},
+                "trafficUsedBytes": 5000,
+                "configProfile": {"activeConfigProfileUuid": "cp-1", "activeInbounds": [{"uuid": "ib-1"}]},
+            }
+        )
+        assert node.uuid == "n-1"
+        assert node.is_connected is True
+        assert node.xray_version == "26.7.28"
+        assert node.traffic_used == 5000
+        assert node.active_config_profile_uuid == "cp-1"
+        assert node.active_inbound_uuids == ["ib-1"]
+
+    def test_null_versions_and_missing_fields(self) -> None:
+        node = parse_node({"versions": None})
         assert node.uuid == ""
+        assert node.xray_version == ""
         assert node.is_connected is False
 
 
-class TestNodeFromRealSdkModel:
-    def test_parses_real_node_response_dto(self) -> None:
-        from remnawave.models.nodes import NodeResponseDto
-
-        payload = {
-            "uuid": "00000000-0000-0000-0000-0000000000ab",
-            "name": "finland",
-            "address": "198.51.100.1",
-            "port": 3010,
-            "isConnected": True,
-            "isDisabled": False,
-            "isConnecting": False,
-            "xrayVersion": "26.2.6",
-            "trafficUsedBytes": 5000,
-            "isTrafficTrackingActive": False,
-            "trafficResetDay": 1,
-            "notifyPercent": 80,
-            "usersOnline": 0,
-            "viewPosition": 0,
-            "countryCode": "FI",
-            "consumptionMultiplier": 1,
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-01T00:00:00Z",
-            "configProfile": {
-                "activeConfigProfileUuid": "00000000-0000-0000-0000-0000000000aa",
-                "activeInbounds": [],
-            },
-        }
-        sdk_obj = NodeResponseDto.model_validate(payload)
-        node = node_from_sdk(sdk_obj)
-        assert node.is_connected is True
-        assert node.xray_version == "26.2.6"
-        assert node.traffic_used == 5000
-
-
-class TestHostFromSdk:
-    def test_converts_all_fields(self) -> None:
-        # Real SDK Host uses nested inbound.config_profile_inbound_uuid;
-        # there is no top-level inbound_uuid attribute.
-        obj = _ns(
-            uuid="h-1",
-            remark="reality-198.51.100.1",
-            address="198.51.100.1",
-            port=443,
-            sni="www.google.com",
-            host="vpn.example.com",
-            path="/connect",
-            fingerprint="chrome",
-            security_layer="TLS",
-            is_disabled=False,
-            inbound=_ns(config_profile_uuid="profile-1", config_profile_inbound_uuid="ib-1"),
+class TestParseHostAndInbound:
+    def test_host_reads_nested_inbound(self) -> None:
+        host = parse_host(
+            {
+                "uuid": "h-1",
+                "remark": "reality-198.51.100.1",
+                "sni": "www.google.com",
+                "securityLayer": "TLS",
+                "inbound": {"configProfileUuid": "profile-1", "configProfileInboundUuid": "ib-1"},
+            }
         )
-        host = host_from_sdk(obj)
-        assert host.uuid == "h-1"
-        assert host.remark == "reality-198.51.100.1"
-        assert host.sni == "www.google.com"
-        assert host.host == "vpn.example.com"
-        assert host.path == "/connect"
-        assert host.fingerprint == "chrome"
-        assert host.security_layer == "TLS"
         assert host.config_profile_uuid == "profile-1"
         assert host.inbound_uuid == "ib-1"
+        assert host.security_layer == "TLS"
 
-    def test_handles_missing_fields(self) -> None:
-        host = host_from_sdk(_ns())
-        assert host.uuid == ""
-        assert host.sni == ""
-
-    def test_reads_nested_inbound_uuid(self) -> None:
-        host = host_from_sdk(_ns(inbound=_ns(config_profile_inbound_uuid="ib-2")))
-        assert host.inbound_uuid == "ib-2"
-
-
-class TestInboundFromSdk:
-    def test_converts_all_fields(self) -> None:
-        obj = _ns(uuid="ib-1", tag="vless-reality", type="vless", network="tcp", security="reality")
-        ib = inbound_from_sdk(obj)
-        assert ib.uuid == "ib-1"
-        assert ib.tag == "vless-reality"
-        assert ib.type == "vless"
-        assert ib.security == "reality"
-
-    def test_handles_empty(self) -> None:
-        ib = inbound_from_sdk(_ns())
-        assert ib.uuid == ""
-        assert ib.tag == ""
+    def test_inbound_converts_all_fields(self) -> None:
+        ib = parse_inbound({"uuid": "ib-1", "tag": "vless-reality", "type": "vless", "security": "reality"})
+        assert (ib.uuid, ib.tag, ib.type, ib.security) == ("ib-1", "vless-reality", "vless", "reality")
+        assert parse_inbound({}).uuid == ""
 
 
 # ---------------------------------------------------------------------------
-# Retry Logic (raw httpx path — used by config profiles, squads)
+# Retry Logic
 # ---------------------------------------------------------------------------
 
 
@@ -484,57 +350,17 @@ class TestRetryLogic:
         assert result == [{"uuid": "u-1"}]
 
 
-# ---------------------------------------------------------------------------
-# Ping
-# ---------------------------------------------------------------------------
+class TestEmptyBodies:
+    @pytest.mark.parametrize("status_code", [202, 204])
+    def test_empty_success_returns_none(self, status_code: int) -> None:
+        panel, _ = _wired_panel(_empty_response(status_code))
+        assert panel._request("DELETE", "/api/test") is None
+
+    def test_empty_200_body_returns_none(self) -> None:
+        panel, _ = _wired_panel(_empty_response(200))
+        assert panel._request("POST", "/api/test") is None
 
 
-class TestPing:
-    def test_ping_returns_true_on_success(self) -> None:
-        panel = _make_panel()
-        # Mock the SDK users call used by ping
-        panel.ping = MagicMock(return_value=True)
-        assert panel.ping() is True
-
-    def test_ping_returns_false_on_error(self) -> None:
-        panel = _make_panel()
-        panel.ping = MagicMock(return_value=False)
-        assert panel.ping() is False
-
-
-# ---------------------------------------------------------------------------
-# Context Manager
-# ---------------------------------------------------------------------------
-
-
-class TestContextManager:
-    def test_closes_on_exit(self) -> None:
-        mock_client = MagicMock()
-        panel = _make_panel(mock_client)
-        with panel:
-            pass
-        mock_client.close.assert_called_once()
-
-    def test_usable_as_context_manager(self) -> None:
-        panel = _make_panel()
-        panel.ping = MagicMock(return_value=True)
-        with panel:
-            assert panel.ping() is True
-
-    def test_closes_sdk_and_raw_clients(self) -> None:
-        raw_client = MagicMock()
-        sdk_client = MagicMock()
-        sdk_client.aclose = AsyncMock()
-        panel = _make_panel(raw_client)
-        panel._sdk_client = sdk_client
-
-        panel.close()
-
-        raw_client.close.assert_called_once_with()
-        sdk_client.aclose.assert_awaited_once_with()
-
-
-# ---------------------------------------------------------------------------
 # Auth Methods
 # ---------------------------------------------------------------------------
 
@@ -607,95 +433,142 @@ class TestAuth:
 
 
 # ---------------------------------------------------------------------------
-# API Methods (SDK-backed create_user, create_node, create_host)
+
+# ---------------------------------------------------------------------------
+# Users (numeric id) and nodes
 # ---------------------------------------------------------------------------
 
 
-class TestCreateUser:
-    def test_create_user_calls_api(self) -> None:
-        panel = _make_panel()
-        panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch(
-            "meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", shortUuid="abc", username="alice")
-        ):
-            user = panel.create_user("alice")
-        assert user.uuid == "u-1"
-        assert user.username == "alice"
-        panel._sdk.users.create_user.assert_called_once()
-        body = panel._sdk.users.create_user.call_args[0][0]
-        assert isinstance(body, CreateUserRequestDto)
-        assert body.username == "alice"
-        assert str(body.expire_at) == "2099-12-31 23:59:59+00:00"
+class TestUsers:
+    def test_create_user_posts_minimal_body(self) -> None:
+        panel, client = _wired_panel(_mock_response(201, {"response": {"id": 7, "username": "alice"}}))
+        user = panel.create_user("alice")
+        assert user.id == "7"
+        method, path, body = _call(client)
+        assert (method, path) == ("POST", "api/users")
+        assert body == {"username": "alice", "expireAt": "2099-12-31T23:59:59.000Z"}
 
-    def test_create_user_with_squad_uuids(self) -> None:
-        panel = _make_panel()
-        panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", username="bob")):
-            panel.create_user(
-                "bob",
-                squad_uuids=[
-                    "00000000-0000-0000-0000-000000000001",
-                    "00000000-0000-0000-0000-000000000002",
-                ],
-            )
-        body = panel._sdk.users.create_user.call_args[0][0]
-        assert [str(uuid) for uuid in body.active_internal_squads] == [
-            "00000000-0000-0000-0000-000000000001",
-            "00000000-0000-0000-0000-000000000002",
+    def test_create_user_with_squads_and_traffic_limit(self) -> None:
+        panel, client = _wired_panel(_mock_response(201, {"response": {"id": 8, "username": "bob"}}))
+        panel.create_user("bob", traffic_limit_bytes=1073741824, squad_uuids=["sq-1", "sq-2"])
+        body = _call(client)[2]
+        assert body["trafficLimitBytes"] == 1073741824
+        assert body["activeInternalSquads"] == ["sq-1", "sq-2"]
+
+    def test_get_user_by_username_and_not_found(self) -> None:
+        panel, client = _wired_panel(
+            _mock_response(200, {"response": {"id": 1, "username": "alice"}}),
+            _mock_response(404),
+        )
+        user = panel.get_user("alice")
+        assert user is not None and user.id == "1"
+        assert _call(client)[1] == "api/users/by-username/alice"
+        assert panel.get_user("ghost") is None
+
+    def test_get_user_by_id_uses_numeric_route(self) -> None:
+        panel, client = _wired_panel(_mock_response(200, {"response": {"id": 12, "username": "alice"}}))
+        user = panel.get_user_by_id("12")
+        assert user is not None and user.username == "alice"
+        assert _call(client)[1] == "api/users/12"
+
+    def test_get_user_by_id_never_sends_legacy_uuid(self) -> None:
+        panel, client = _wired_panel()
+        assert panel.get_user_by_id("00000000-0000-0000-0000-000000000007") is None
+        client.request.assert_not_called()
+
+    def test_enable_disable_use_id_action_routes(self) -> None:
+        panel, client = _wired_panel(_mock_response(200, {"response": {}}), _mock_response(200, {"response": {}}))
+        panel.enable_user("5")
+        panel.disable_user("5")
+        assert _call(client, 0)[:2] == ("POST", "api/users/5/actions/enable")
+        assert _call(client, 1)[:2] == ("POST", "api/users/5/actions/disable")
+
+    def test_delete_user_accepts_204_and_reports_missing(self) -> None:
+        panel, client = _wired_panel(_empty_response(204), _mock_response(404))
+        assert panel.delete_user("5") is True
+        assert _call(client)[:2] == ("DELETE", "api/users/5")
+        assert panel.delete_user("6") is False
+
+
+class TestListUsersPagination:
+    """The panel rejects page sizes >1000. Pagination must iterate until a short page."""
+
+    def test_paginates_until_partial_page(self) -> None:
+        pages = [
+            _mock_response(200, {"response": {"users": [{"id": i, "username": f"u{i}"} for i in range(lo, hi)]}})
+            for lo, hi in ((0, 1000), (1000, 2000), (2000, 2500))
         ]
+        panel, client = _wired_panel(*pages)
+        users = panel.list_users()
+        assert len(users) == 2500
+        assert users[0].id == "0"
+        assert users[2499].id == "2499"
+        assert client.request.call_args_list[1].kwargs["params"] == {"start": 1000, "size": 1000}
 
-    def test_create_user_with_traffic_limit(self) -> None:
-        panel = _make_panel()
-        panel._sdk.users.create_user = MagicMock(return_value="sdk-coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="u-1", username="bob")):
-            panel.create_user("bob", traffic_limit_bytes=1073741824)
-        body = panel._sdk.users.create_user.call_args[0][0]
-        assert body.traffic_limit_bytes == 1073741824
+    def test_stops_on_first_empty_page(self) -> None:
+        panel, client = _wired_panel(_mock_response(200, {"response": {"users": [], "total": 0}}))
+        assert panel.list_users() == []
+        assert client.request.call_args.kwargs["params"]["size"] <= 1000
 
 
-class TestCreateNode:
-    def test_create_node_returns_credentials(self) -> None:
-        panel = _make_panel()
-        panel._sdk.nodes.create_node = MagicMock(return_value="create-node-coro")
-        panel._sdk.keygen.generate_key = MagicMock(return_value="keygen-coro")
-        with patch(
-            "meridian.remnawave.client.sdk_call",
-            side_effect=[_ns(uuid="n-1"), _ns(pub_key="secret-key-data")],
-        ):
-            creds = panel.create_node(
-                "node-1",
-                "198.51.100.1",
-                3010,
-                config_profile_uuid="00000000-0000-0000-0000-0000000000aa",
-            )
+class TestNodes:
+    def test_create_node_returns_credentials_from_secret_key(self) -> None:
+        panel, client = _wired_panel(
+            _mock_response(201, {"response": {"uuid": "n-1", "name": "node-1"}}),
+            _mock_response(200, {"response": {"secretKey": "secret-key-data"}}),
+        )
+        creds = panel.create_node(
+            "node-1",
+            "198.51.100.1",
+            3010,
+            config_profile_uuid="cp-1",
+            inbound_uuids=["ib-1", "ib-2"],
+        )
         assert creds.uuid == "n-1"
         assert creds.secret_key == "secret-key-data"
+        method, path, body = _call(client)
+        assert (method, path) == ("POST", "api/nodes")
+        assert body["configProfile"] == {"activeConfigProfileUuid": "cp-1", "activeInbounds": ["ib-1", "ib-2"]}
+        assert body["countryCode"] == "XX"
+        assert _call(client, 1)[:2] == ("GET", "api/keygen")
 
-    def test_create_node_with_config_profile(self) -> None:
-        panel = _make_panel()
-        panel._sdk.nodes.create_node = MagicMock(return_value="create-node-coro")
-        panel._sdk.keygen.generate_key = MagicMock(return_value="keygen-coro")
-        with patch(
-            "meridian.remnawave.client.sdk_call",
-            side_effect=[_ns(uuid="n-2"), _ns(pubKey="secret-key-data")],
-        ):
-            panel.create_node(
-                "node-2",
-                "198.51.100.2",
-                3010,
-                config_profile_uuid="00000000-0000-0000-0000-0000000000bb",
-                inbound_uuids=[
-                    "00000000-0000-0000-0000-0000000000c1",
-                    "00000000-0000-0000-0000-0000000000c2",
-                ],
-            )
-        body = panel._sdk.nodes.create_node.call_args[0][0]
-        assert isinstance(body, CreateNodeRequestDto)
-        assert str(body.config_profile.active_config_profile_uuid) == "00000000-0000-0000-0000-0000000000bb"
-        assert [str(uuid) for uuid in body.config_profile.active_inbounds] == [
-            "00000000-0000-0000-0000-0000000000c1",
-            "00000000-0000-0000-0000-0000000000c2",
-        ]
+    def test_keygen_accepts_legacy_pub_key(self) -> None:
+        panel, _ = _wired_panel(_mock_response(200, {"response": {"pubKey": "legacy"}}))
+        assert panel.get_node_secret_key() == "legacy"
+
+    def test_list_nodes_reads_bare_array(self) -> None:
+        panel, _ = _wired_panel(_mock_response(200, {"response": [{"uuid": "n-1"}, {"uuid": "n-2"}]}))
+        assert [node.uuid for node in panel.list_nodes()] == ["n-1", "n-2"]
+
+    def test_restart_sends_force_restart_and_accepts_202(self) -> None:
+        panel, client = _wired_panel(_empty_response(202))
+        panel.restart_node("n-1")
+        assert _call(client) == ("POST", "api/nodes/n-1/actions/restart", {"forceRestart": False})
+
+    def test_delete_node_accepts_204(self) -> None:
+        panel, client = _wired_panel(_empty_response(204))
+        panel.delete_node("n-1")
+        assert _call(client)[:2] == ("DELETE", "api/nodes/n-1")
+
+
+class TestHostActions:
+    def test_bulk_enable_disable_and_delete_accept_204(self) -> None:
+        panel, client = _wired_panel(_empty_response(204), _empty_response(204), _empty_response(204))
+        panel.enable_host("h-1")
+        panel.disable_host("h-1")
+        panel.delete_host("h-1")
+        assert _call(client, 0) == ("POST", "api/hosts/bulk/enable", {"uuids": ["h-1"]})
+        assert _call(client, 1) == ("POST", "api/hosts/bulk/disable", {"uuids": ["h-1"]})
+        assert _call(client, 2)[:2] == ("DELETE", "api/hosts/h-1")
+
+    def test_reorder_hosts_sends_view_positions(self) -> None:
+        panel, client = _wired_panel(_mock_response(200, {"response": {"isUpdated": True}}))
+        panel.reorder_hosts(["h-2", "h-1"])
+        assert _call(client)[2] == {"hosts": [{"uuid": "h-2", "viewPosition": 0}, {"uuid": "h-1", "viewPosition": 1}]}
+
+    def test_list_hosts_reads_bare_array(self) -> None:
+        panel, _ = _wired_panel(_mock_response(200, {"response": [{"uuid": "h-1", "remark": "r"}]}))
+        assert [host.remark for host in panel.list_hosts()] == ["r"]
 
 
 class TestCreateHost:
@@ -795,90 +668,53 @@ class TestCreateHost:
 
 
 # ---------------------------------------------------------------------------
-# Config Profiles (SDK path)
+
+# ---------------------------------------------------------------------------
+# Config Profiles and inbounds
 # ---------------------------------------------------------------------------
 
 
 class TestConfigProfiles:
     def test_create_config_profile(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.create_config_profile = MagicMock(return_value="create-config-profile-coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="cp-1", name="meridian-default")):
-            profile = panel.create_config_profile("meridian-default", {"inbounds": []})
-        assert profile.uuid == "cp-1"
-        assert profile.name == "meridian-default"
-        body = panel._sdk.config_profiles.create_config_profile.call_args[0][0]
-        assert isinstance(body, CreateConfigProfileRequestDto)
-        assert body.name == "meridian-default"
+        panel, client = _wired_panel(_mock_response(201, {"response": {"uuid": "cp-1", "name": "meridian-default"}}))
+        profile = panel.create_config_profile("meridian-default", {"inbounds": []})
+        assert (profile.uuid, profile.name) == ("cp-1", "meridian-default")
+        assert _call(client) == (
+            "POST",
+            "api/config-profiles",
+            {"name": "meridian-default", "config": {"inbounds": []}},
+        )
 
-    def test_get_config_profile_found(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=_ns(uuid="cp-1", name="test")):
-            profile = panel.get_config_profile("cp-1")
-            assert profile is not None
-            assert profile.name == "test"
+    def test_get_config_profile_found_and_not_found(self) -> None:
+        panel, _ = _wired_panel(
+            _mock_response(200, {"response": {"uuid": "cp-1", "name": "test"}}), _mock_response(404)
+        )
+        profile = panel.get_config_profile("cp-1")
+        assert profile is not None and profile.name == "test"
+        assert panel.get_config_profile("nonexistent") is None
 
-    def test_get_config_profile_not_found(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveNotFoundError("404")):
-            assert panel.get_config_profile("nonexistent") is None
+    def test_get_config_profile_auth_error_propagates(self) -> None:
+        panel, _ = _wired_panel(_mock_response(401))
+        with pytest.raises(RemnawaveAuthError):
+            panel.get_config_profile("cp-1")
 
     def test_list_config_profiles(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profiles = MagicMock(return_value="list-config-profiles-coro")
-        with patch(
-            "meridian.remnawave.client.sdk_call",
-            return_value=_ns(
-                config_profiles=[
-                    _ns(uuid="cp-1", name="default"),
-                    _ns(uuid="cp-2", name="other"),
-                ]
-            ),
-        ):
-            profiles = panel.list_config_profiles()
-        assert len(profiles) == 2
+        panel, _ = _wired_panel(
+            _mock_response(
+                200,
+                {"response": {"total": 2, "configProfiles": [{"uuid": "cp-1", "name": "default"}, {"name": "other"}]}},
+            )
+        )
+        assert [p.name for p in panel.list_config_profiles()] == ["default", "other"]
 
-    def test_list_config_profiles_real_sdk_dto(self) -> None:
-        # Round-trip through real SDK Pydantic model — guards against
-        # camelCase regression in attribute access.
-        from remnawave.models.config_profiles import GetAllConfigProfilesResponseDto
-
-        payload = {
-            "total": 2,
-            "configProfiles": [
-                {
-                    "uuid": "00000000-0000-0000-0000-000000000aa1",
-                    "name": "default",
-                    "viewPosition": 0,
-                    "config": {},
-                    "inbounds": [],
-                    "nodes": [],
-                    "createdAt": "2026-01-01T00:00:00Z",
-                    "updatedAt": "2026-01-01T00:00:00Z",
-                },
-                {
-                    "uuid": "00000000-0000-0000-0000-000000000aa2",
-                    "name": "other",
-                    "viewPosition": 0,
-                    "config": {},
-                    "inbounds": [],
-                    "nodes": [],
-                    "createdAt": "2026-01-01T00:00:00Z",
-                    "updatedAt": "2026-01-01T00:00:00Z",
-                },
-            ],
-        }
-        sdk_resp = GetAllConfigProfilesResponseDto.model_validate(payload)
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profiles = MagicMock(return_value="coro")
-        with patch("meridian.remnawave.client.sdk_call", return_value=sdk_resp):
-            profiles = panel.list_config_profiles()
-        assert [p.name for p in profiles] == ["default", "other"]
+    def test_list_inbounds(self) -> None:
+        panel, client = _wired_panel(
+            _mock_response(200, {"response": {"total": 1, "inbounds": [{"uuid": "ib-1", "tag": "vless-reality"}]}})
+        )
+        assert [ib.tag for ib in panel.list_inbounds()] == ["vless-reality"]
+        assert _call(client)[1] == "api/config-profiles/inbounds"
 
 
-# ---------------------------------------------------------------------------
 # Internal Squads (SDK path)
 # ---------------------------------------------------------------------------
 
@@ -984,201 +820,3 @@ class TestErrorSubclasses:
         panel = _make_panel(mock_client)
         with pytest.raises(RemnawaveError, match="invalid JSON"):
             panel._request("GET", "/api/test")
-
-
-class TestGetMethodErrorPropagation:
-    def test_get_config_profile_not_found_returns_none(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveNotFoundError("404")):
-            assert panel.get_config_profile("cp-1") is None
-
-    def test_get_config_profile_auth_error_propagates(self) -> None:
-        panel = _make_panel()
-        panel._sdk.config_profiles.get_config_profile_by_uuid = MagicMock(return_value="get-config-profile-coro")
-        with patch("meridian.remnawave.client.sdk_call", side_effect=RemnawaveAuthError("expired")):
-            with pytest.raises(RemnawaveAuthError):
-                panel.get_config_profile("cp-1")
-
-
-class TestListUsersPagination:
-    """The panel rejects page sizes >1000 with a 400. Pagination logic must
-    iterate until a short page is returned, not stop at the first page."""
-
-    def test_paginates_until_partial_page(self) -> None:
-        panel = _make_panel()
-        panel._sdk.users.get_all_users = MagicMock(return_value="coro")
-
-        # Build 2.5 pages worth of fake users (2500 users).
-        # sdk_call return values, one per loop iteration.
-        page1 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(1000)])
-        page2 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(1000, 2000)])
-        page3 = _ns(users=[_ns(uuid=f"u-{i}", username=f"u{i}") for i in range(2000, 2500)])
-
-        with patch("meridian.remnawave.client.sdk_call", side_effect=[page1, page2, page3]):
-            users = panel.list_users()
-
-        assert len(users) == 2500
-        assert users[0].uuid == "u-0"
-        assert users[2499].uuid == "u-2499"
-
-    def test_stops_on_first_empty_page(self) -> None:
-        panel = _make_panel()
-        panel._sdk.users.get_all_users = MagicMock(return_value="coro")
-
-        with patch("meridian.remnawave.client.sdk_call", side_effect=[_ns(users=[])]):
-            users = panel.list_users()
-
-        assert users == []
-
-    def test_uses_max_page_size_within_panel_limit(self) -> None:
-        """Panel rejects size > 1000 — we must pass exactly 1000 (or less)."""
-        panel = _make_panel()
-        panel._sdk.users.get_all_users = MagicMock(return_value="coro")
-
-        with patch("meridian.remnawave.client.sdk_call", side_effect=[_ns(users=[])]):
-            panel.list_users()
-        kwargs = panel._sdk.users.get_all_users.call_args.kwargs
-        assert kwargs.get("size", 0) <= 1000
-
-
-class TestSdkExceptionTranslation:
-    """sdk_call must convert the official SDK's exception hierarchy into our
-    RemnawaveError types. The handlers in commands/ rely on RemnawaveNotFoundError
-    vs RemnawaveAuthError vs RemnawaveError to decide what to do — if SDK
-    upgrades change exception types we must trip these tests, not silently
-    let bare exceptions bubble up."""
-
-    def test_remnawave_errors_pass_through_unchanged(self) -> None:
-        from meridian.remnawave import sdk_call
-
-        original = RemnawaveAuthError("token expired")
-
-        async def coro() -> None:
-            raise original
-
-        with pytest.raises(RemnawaveAuthError) as exc_info:
-            sdk_call(coro())
-        # Identity is preserved; we did not double-wrap.
-        assert exc_info.value is original
-
-    def _api_err(self, msg: str):
-        from remnawave.exceptions.general import ApiErrorResponse
-
-        return ApiErrorResponse(message=msg)
-
-    def test_sdk_not_found_becomes_remnawave_not_found(self) -> None:
-        from remnawave.exceptions import NotFoundError
-
-        from meridian.remnawave import sdk_call
-
-        err = self._api_err("user does not exist")
-
-        async def coro() -> None:
-            raise NotFoundError(404, err)
-
-        with pytest.raises(RemnawaveNotFoundError):
-            sdk_call(coro())
-
-    def test_sdk_unauthorized_becomes_remnawave_auth_error(self) -> None:
-        from remnawave.exceptions import UnauthorizedError
-
-        from meridian.remnawave import sdk_call
-
-        err = self._api_err("bad token")
-
-        async def coro() -> None:
-            raise UnauthorizedError(401, err)
-
-        with pytest.raises(RemnawaveAuthError):
-            sdk_call(coro())
-
-    def test_sdk_forbidden_becomes_remnawave_auth_error(self) -> None:
-        from remnawave.exceptions import ForbiddenError
-
-        from meridian.remnawave import sdk_call
-
-        err = self._api_err("scope insufficient")
-
-        async def coro() -> None:
-            raise ForbiddenError(403, err)
-
-        with pytest.raises(RemnawaveAuthError):
-            sdk_call(coro())
-
-    def test_sdk_network_error_becomes_remnawave_network_error(self) -> None:
-        from remnawave.exceptions import NetworkError
-
-        from meridian.remnawave import sdk_call
-
-        err = self._api_err("connection refused")
-
-        async def coro() -> None:
-            raise NetworkError(0, err)
-
-        with pytest.raises(RemnawaveNetworkError):
-            sdk_call(coro())
-
-    def test_sdk_httpx_timeout_becomes_remnawave_network_error(self) -> None:
-        from meridian.remnawave import sdk_call
-
-        async def coro() -> None:
-            raise httpx.ReadTimeout("slow")
-
-        with pytest.raises(RemnawaveNetworkError) as exc_info:
-            sdk_call(coro())
-
-        assert exc_info.value.category == "system"
-
-    def _http_status_error(self, status_code: int) -> httpx.HTTPStatusError:
-        request = httpx.Request("GET", "https://panel.example/api")
-        response = httpx.Response(status_code, request=request)
-        return httpx.HTTPStatusError(f"status {status_code}", request=request, response=response)
-
-    @pytest.mark.parametrize(
-        ("status_code", "expected"),
-        [
-            (401, RemnawaveAuthError),
-            (403, RemnawaveAuthError),
-            (404, RemnawaveNotFoundError),
-            (500, RemnawaveError),
-        ],
-    )
-    def test_sdk_httpx_status_errors_keep_semantics(
-        self,
-        status_code: int,
-        expected: type[RemnawaveError],
-    ) -> None:
-        from meridian.remnawave import sdk_call
-
-        async def coro() -> None:
-            raise self._http_status_error(status_code)
-
-        with pytest.raises(expected) as exc_info:
-            sdk_call(coro())
-
-        assert not isinstance(exc_info.value, RemnawaveNetworkError)
-
-    def test_sdk_api_error_becomes_remnawave_error(self) -> None:
-        from remnawave.exceptions import ApiError
-
-        from meridian.remnawave import sdk_call
-
-        err = self._api_err("server exploded")
-
-        async def coro() -> None:
-            raise ApiError(500, err)
-
-        with pytest.raises(RemnawaveError):
-            sdk_call(coro())
-
-    def test_unknown_exception_bubbles_up_unchanged(self) -> None:
-        """An unrelated exception (programmer error, attribute error, etc.)
-        must not be silently wrapped — that would hide bugs."""
-        from meridian.remnawave import sdk_call
-
-        async def coro() -> None:
-            raise AttributeError("some_attr")
-
-        with pytest.raises(AttributeError):
-            sdk_call(coro())

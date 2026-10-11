@@ -106,7 +106,7 @@ def _api_node(uuid: str, *, connected: bool = True, disabled: bool = False, addr
 
 def _api_user(name: str = "alice", status: str = "ACTIVE") -> User:
     return User(
-        uuid="u-" + name,
+        id=str(len(name)),
         short_uuid="s-" + name,
         username=name,
         status=status,
@@ -119,6 +119,7 @@ def _make_panel_mock(*, ping_ok: bool = True) -> MagicMock:
     panel.__enter__ = MagicMock(return_value=panel)
     panel.__exit__ = MagicMock(return_value=False)
     panel.ping.return_value = ping_ok
+    panel.get_version.return_value = "3.4.5"
     panel.list_nodes.return_value = []
     panel.list_users.return_value = []
     return panel

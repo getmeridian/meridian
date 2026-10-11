@@ -25,6 +25,7 @@ from meridian.reconciler.resources import (
 )
 from meridian.reconciler.routing_credentials import resolve_service_credentials
 from meridian.remnawave import RemnawaveNetworkError, User
+from meridian.remnawave.models import is_user_id
 from meridian.xray_workload import render_workload_config
 
 ValueT = TypeVar("ValueT")
@@ -51,7 +52,7 @@ class ServiceUserDriver:
             and user.description == "Managed by Meridian service routing"
             and bool(user.vless_uuid)
         )
-        return _observed(action, user.uuid, matches, _user_projection(user))
+        return _observed(action, user.id, matches, _user_projection(user))
 
     def apply(
         self,
@@ -72,7 +73,7 @@ class ServiceUserDriver:
         else:
             owned = (
                 binding is not None
-                or self.context.was_managed(action.resource.logical_id, existing.uuid)
+                or self.context.was_managed(action.resource.logical_id, existing.id)
                 or existing.description == "Managed by Meridian service routing"
             )
             if not owned:
@@ -83,12 +84,12 @@ class ServiceUserDriver:
                 )
             user = _mutation(
                 lambda: self.context.panel.update_service_user(
-                    existing.uuid,
+                    existing.id,
                     squad_uuids=squad_uuids,
                 ),
                 f"update service User {payload.username}",
             )
-        return ResourceApplyReceipt(remote_id=user.uuid)
+        return ResourceApplyReceipt(remote_id=user.id)
 
 
 class ProfileProjectionDriver:
@@ -170,8 +171,9 @@ def _bound_or_named_user(
     payload: ServiceUserPayload,
     binding: ManagedResourceBinding | None,
 ) -> User | None:
-    if binding is not None and binding.remote_id:
-        return context.panel.get_user_by_uuid(binding.remote_id)
+    if binding is not None and is_user_id(binding.remote_id):
+        return context.panel.get_user_by_id(binding.remote_id)
+    # Pre-3.x bindings hold the removed user uuid; re-resolve by username.
     return context.panel.get_user(payload.username)
 
 

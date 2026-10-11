@@ -11,7 +11,7 @@ from meridian.core.models import CoreModel
 
 class PanelUserLike(Protocol):
     @property
-    def uuid(self) -> str: ...
+    def id(self) -> str: ...
 
     @property
     def short_uuid(self) -> str: ...
@@ -42,7 +42,7 @@ class ClientRecord(CoreModel):
     """Redacted client metadata suitable for list views."""
 
     username: str
-    uuid: str
+    id: str
     status: str
     traffic_used_bytes: int
     traffic_limit_bytes: int
@@ -106,7 +106,7 @@ class ClientCreated(CoreModel):
     """Client metadata returned after creation."""
 
     username: str
-    uuid: str
+    id: str
     status: str
 
 
@@ -163,7 +163,7 @@ def build_client_record(user: PanelUserLike) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
         username=user.username,
-        uuid=user.uuid,
+        id=user.id,
         status=user.status,
         traffic_used_bytes=user.used_traffic_bytes,
         traffic_limit_bytes=user.traffic_limit_bytes,
@@ -219,9 +219,7 @@ def build_client_show_result(
 def build_client_add_result(users: Sequence[tuple[str, PanelUserLike]]) -> ClientAddResult:
     """Build the stable result returned for a successful client add batch."""
     return ClientAddResult(
-        clients=[
-            ClientCreated(username=username, uuid=user.uuid, status=user.status.lower()) for username, user in users
-        ]
+        clients=[ClientCreated(username=username, id=user.id, status=user.status.lower()) for username, user in users]
     )
 
 

@@ -5,9 +5,9 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type Id = string;
 export type Status = string;
 export type Username = string;
-export type Uuid = string;
 export type Clients = ClientCreated[];
 
 /**
@@ -20,7 +20,7 @@ export interface ClientAddResult {
  * Client metadata returned after creation.
  */
 export interface ClientCreated {
+  id: Id;
   status: Status;
   username: Username;
-  uuid: Uuid;
 }

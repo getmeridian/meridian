@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
+
+import pytest
 
 import meridian.config as config
 from meridian.config import is_ip
@@ -40,12 +42,16 @@ class TestIsIp:
 
 
 class TestPinnedRemnawaveTuple:
-    def test_runtime_components_match_tested_2_8_tuple(self) -> None:
-        assert config.REMNAWAVE_BACKEND_IMAGE == "remnawave/backend:2.8.0"
-        assert config.REMNAWAVE_NODE_IMAGE == "remnawave/node:2.8.0"
-        assert config.REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE == "remnawave/subscription-page:7.2.6"
-        assert config.XRAY_VERSION == "26.6.27"
-        assert version("remnawave") == "2.8.0"
+    def test_runtime_components_match_tested_3_4_tuple(self) -> None:
+        assert config.REMNAWAVE_BACKEND_IMAGE == "remnawave/backend:3.4.5"
+        assert config.REMNAWAVE_NODE_IMAGE == "remnawave/node:3.4.2"
+        assert config.REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE == "remnawave/subscription-page:8.0.0"
+        assert config.REMNAWAVE_MIN_VERSION == "3.4.0"
+        assert config.XRAY_VERSION == "26.7.28"
+
+    def test_remnawave_sdk_is_not_a_dependency(self) -> None:
+        with pytest.raises(PackageNotFoundError):
+            version("remnawave")
 
 
 class TestEnvOverrides:

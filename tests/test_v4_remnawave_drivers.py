@@ -77,10 +77,16 @@ class StatefulPanel:
         self.users: dict[str, User] = {}
         self.calls: Counter[str] = Counter()
         self._next_id = 1
+        self._next_user_id = 1
         self.subscription_settings = SubscriptionSettings(
             uuid=self._uuid(),
-            profile_title="",
+            custom_response_headers={"profile-update-interval": "12"},
         )
+
+    def _user_id(self) -> str:
+        value = str(self._next_user_id)
+        self._next_user_id += 1
+        return value
 
     def _uuid(self) -> str:
         value = str(UUID(int=self._next_id))
@@ -348,7 +354,7 @@ class StatefulPanel:
         _assert_username(username)
         self.calls["create_access_user"] += 1
         user = User(
-            uuid=self._uuid(),
+            id=self._user_id(),
             username=username,
             vless_uuid=self._uuid(),
             status="ACTIVE",
@@ -356,24 +362,24 @@ class StatefulPanel:
             external_squad_uuid=external_squad_uuid,
             description="Managed by Meridian access",
         )
-        self.users[user.uuid] = user
+        self.users[user.id] = user
         return user
 
     def update_access_user(
         self,
-        uuid: str,
+        user_id: str,
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
     ) -> User:
         self.calls["update_access_user"] += 1
-        self.users[uuid].active_internal_squad_uuids = list(squad_uuids)
-        self.users[uuid].external_squad_uuid = external_squad_uuid
-        return self.users[uuid]
+        self.users[user_id].active_internal_squad_uuids = list(squad_uuids)
+        self.users[user_id].external_squad_uuid = external_squad_uuid
+        return self.users[user_id]
 
-    def enable_user(self, uuid: str) -> None:
+    def enable_user(self, user_id: str) -> None:
         self.calls["enable_user"] += 1
-        self.users[uuid].status = "ACTIVE"
+        self.users[user_id].status = "ACTIVE"
 
     def get_subscription_settings(self) -> SubscriptionSettings:
         return self.subscription_settings
@@ -386,12 +392,20 @@ class StatefulPanel:
         response_rules: list[dict] | None = None,
         serve_json_at_base_subscription: bool | None = None,
         randomize_hosts: bool | None = None,
+        custom_response_headers: dict[str, str] | None = None,
     ) -> SubscriptionSettings:
         self.calls["update_subscription_settings"] += 1
         assert uuid == self.subscription_settings.uuid
         assert response_rules is None
         if profile_title is not None:
-            self.subscription_settings.profile_title = profile_title
+            # Mirror the adapter: the header record is replaced wholesale.
+            headers = dict(
+                custom_response_headers
+                if custom_response_headers is not None
+                else self.subscription_settings.custom_response_headers
+            )
+            headers["profile-title"] = f"rwEncodeBase64:{profile_title}"
+            self.subscription_settings.custom_response_headers = headers
         if randomize_hosts is not None:
             self.subscription_settings.randomize_hosts = randomize_hosts
         return self.subscription_settings
@@ -406,31 +420,32 @@ class StatefulPanel:
     ) -> User:
         _assert_username(username)
         self.calls["create_service_user"] += 1
-        uuid = self._uuid()
+        user_id = self._user_id()
         user = User(
-            uuid=uuid,
+            id=user_id,
             username=username,
             vless_uuid=self._uuid(),
             status="ACTIVE",
             active_internal_squad_uuids=list(squad_uuids),
             description="Managed by Meridian service routing",
         )
-        self.users[uuid] = user
+        self.users[user_id] = user
         return user
 
     def update_service_user(
         self,
-        uuid: str,
+        user_id: str,
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
     ) -> User:
         self.calls["update_service_user"] += 1
-        self.users[uuid].active_internal_squad_uuids = list(squad_uuids)
-        return self.users[uuid]
+        self.users[user_id].active_internal_squad_uuids = list(squad_uuids)
+        return self.users[user_id]
 
-    def get_user_by_uuid(self, uuid: str) -> User | None:
-        return self.users.get(uuid)
+    def get_user_by_id(self, user_id: str) -> User | None:
+        assert user_id.isdigit(), "legacy uuid identities must never reach the 3.x user route"
+        return self.users.get(user_id)
 
     def get_user(self, username: str) -> User | None:
         return next(
@@ -827,6 +842,23 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
     assert second.all_succeeded
     assert not second.changed
     assert panel.calls == mutation_counts
+
+    # Remnawave 2.x bindings stored user uuids; 3.x users are addressed by id.
+    user_kinds = {"access_user", "service_user"}
+    user_bindings = [binding for binding in cluster.managed_bindings.values() if binding.resource_kind in user_kinds]
+    assert len(user_bindings) == 3
+    for index, binding in enumerate(user_bindings):
+        binding.remote_id = str(UUID(int=10_000 + index))
+    migrated = execute_resource_plan(
+        plan,
+        cluster,
+        drivers,
+        persist=lambda _state: None,
+    )
+    assert migrated.all_succeeded
+    assert panel.calls == mutation_counts
+    rebound = [binding for binding in cluster.managed_bindings.values() if binding.resource_kind in user_kinds]
+    assert sorted(binding.remote_id for binding in rebound) == sorted(panel.users)
 
 
 def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:

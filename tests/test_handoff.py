@@ -24,7 +24,7 @@ def _subscription() -> str:
 
 
 def _user() -> User:
-    return User(uuid="id-1", short_uuid="short1", vless_uuid="vless-1", username="alice", status="ACTIVE")
+    return User(id="1", short_uuid="short1", vless_uuid="vless-1", username="alice", status="ACTIVE")
 
 
 def test_protocol_keys_follow_link_parameters() -> None:

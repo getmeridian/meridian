@@ -6,12 +6,12 @@
  */
 
 export type CreatedAt = string;
+export type Id = string;
 export type LastSeen = string;
 export type Status = string;
 export type TrafficLimitBytes = number;
 export type TrafficUsedBytes = number;
 export type Username = string;
-export type Uuid = string;
 export type Clients = ClientRecord[];
 export type Active = number;
 export type Clients1 = number;
@@ -32,12 +32,12 @@ export interface ClientListResult {
  */
 export interface ClientRecord {
   created_at: CreatedAt;
+  id: Id;
   last_seen: LastSeen;
   status: Status;
   traffic_limit_bytes: TrafficLimitBytes;
   traffic_used_bytes: TrafficUsedBytes;
   username: Username;
-  uuid: Uuid;
 }
 /**
  * Aggregate client counts for dashboards.
