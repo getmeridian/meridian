@@ -111,7 +111,24 @@ def validate_resource_plan_transition(
     plan: ResourcePlan,
     cluster: ClusterConfig,
 ) -> None:
-    """Reject intent shrink until owned resources can be retired safely."""
+    """Reject transitions that cannot run safely, before any state is written.
+
+    Callers persist the new intent right after this check, so every refusal
+    must happen here rather than once execution starts.
+    """
+    if cluster.pending_plan_hash and cluster.pending_plan_hash != plan.plan_hash:
+        ambiguous = [
+            checkpoint.resource_id
+            for checkpoint in cluster.action_checkpoints.values()
+            if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
+        ]
+        if ambiguous:
+            resources = ", ".join(sorted(ambiguous))
+            raise PendingPlanConflictError(
+                f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
+                f"remote outcome is unresolved for: {resources}."
+            )
+
     desired_ids = {resource.logical_id for resource in plan.resources}
     retired_ids = sorted(
         {
@@ -184,19 +201,6 @@ def _begin_apply(
     cluster: ClusterConfig,
     persist: PersistCluster,
 ) -> int:
-    if cluster.pending_plan_hash and cluster.pending_plan_hash != plan.plan_hash:
-        ambiguous = [
-            checkpoint.resource_id
-            for checkpoint in cluster.action_checkpoints.values()
-            if checkpoint.generation == cluster.pending_generation and checkpoint.status in {"running", "unknown"}
-        ]
-        if ambiguous:
-            resources = ", ".join(sorted(ambiguous))
-            raise PendingPlanConflictError(
-                f"Cannot replace pending plan {cluster.pending_plan_hash[:12]}; "
-                f"remote outcome is unresolved for: {resources}."
-            )
-
     if cluster.pending_plan_hash == plan.plan_hash and cluster.pending_generation > 0:
         generation = cluster.pending_generation
     elif cluster.active_plan_hash == plan.plan_hash and cluster.active_generation > 0:

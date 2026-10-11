@@ -20,6 +20,7 @@ from meridian.reconciler.resource_executor import (
     environment_after_apply_barrier,
     execute_resource_plan,
     inspect_resource_plan,
+    validate_resource_plan_transition,
 )
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
@@ -561,3 +562,7 @@ class TestPendingPlanSafety:
                 persist=lambda _state: None,
                 clock=_clock,
             )
+        # Setup persists the new intent right after this pre-flight check, so the
+        # conflict must surface there, while the pending intent is still saved.
+        with pytest.raises(PendingPlanConflictError, match="unresolved"):
+            validate_resource_plan_transition(plan, cluster)
