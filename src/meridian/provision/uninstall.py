@@ -5,6 +5,7 @@ Removes proxy components but leaves Docker engine and system packages intact.
 
 from __future__ import annotations
 
+from meridian.provision.nginx import LEGACY_PROXY_CLEANUP
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -57,15 +58,8 @@ class Uninstall:
             "rm -rf /etc/systemd/system/nginx.service.d",
             # TLS certificates
             "rm -rf /etc/ssl/meridian",
-            # Legacy: HAProxy (from older deployments)
-            "systemctl stop haproxy 2>/dev/null; systemctl disable haproxy 2>/dev/null; true",
-            "rm -f /etc/haproxy/haproxy.cfg",
-            "rm -rf /etc/systemd/system/haproxy.service.d",
-            # Legacy: Caddy (from older deployments)
-            "systemctl stop caddy 2>/dev/null; systemctl disable caddy 2>/dev/null; true",
-            "rm -f /etc/caddy/conf.d/meridian.caddy /etc/caddy/Caddyfile",
-            "rm -rf /etc/systemd/system/caddy.service.d",
-            "rm -rf /var/lib/caddy/.local/share/caddy",
+            # HAProxy/Caddy from older Meridian releases (marker-gated)
+            LEGACY_PROXY_CLEANUP,
             # Web files
             "rm -rf /var/www/private /var/www/acme",
             # Cron jobs (stats + health watchdog + acme.sh renewal)

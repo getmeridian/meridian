@@ -24,6 +24,22 @@ from meridian.ssh import ServerConnection
 # ---------------------------------------------------------------------------
 
 
+# Older Meridian releases fronted 443 with HAProxy (+ Caddy). Only retire them
+# when Meridian's own markers are present: an operator's unrelated HAProxy or
+# Caddy must never be stopped or have its config and certificates deleted.
+LEGACY_PROXY_CLEANUP = (
+    # Remove the old watchdog first so cron cannot restart haproxy/caddy mid-deploy.
+    "rm -f /etc/meridian/health-check.sh; "
+    "if grep -qs '^# HAProxy SNI Router' /etc/haproxy/haproxy.cfg; then "
+    "systemctl stop haproxy 2>/dev/null; systemctl disable haproxy 2>/dev/null; "
+    "rm -f /etc/haproxy/haproxy.cfg; rm -rf /etc/systemd/system/haproxy.service.d; fi; "
+    "if [ -e /etc/caddy/conf.d/meridian.caddy ]; then "
+    "systemctl stop caddy 2>/dev/null; systemctl disable caddy 2>/dev/null; "
+    "rm -f /etc/caddy/conf.d/meridian.caddy; rm -rf /etc/systemd/system/caddy.service.d; fi; "
+    "systemctl daemon-reload 2>/dev/null; true"
+)
+
+
 class InstallNginx:
     """Install nginx, stream module, and acme.sh.
 
@@ -39,26 +55,8 @@ class InstallNginx:
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         changed = False
 
-        # -- Upgrade path: stop old HAProxy and Caddy if present --
-        conn.run(
-            "systemctl stop haproxy 2>/dev/null; systemctl disable haproxy 2>/dev/null; true",
-            timeout=15,
-        )
-        conn.run(
-            "systemctl stop caddy 2>/dev/null; systemctl disable caddy 2>/dev/null; true",
-            timeout=15,
-        )
-        # Remove old watchdog immediately to prevent it from restarting
-        # haproxy/caddy during the deploy (cron runs every 5 min)
-        conn.run("rm -f /etc/meridian/health-check.sh", timeout=15)
-        # Clean up old config files and cert storage
-        conn.run(
-            "rm -f /etc/haproxy/haproxy.cfg /etc/caddy/conf.d/meridian.caddy /etc/caddy/Caddyfile && "
-            "rm -rf /etc/systemd/system/haproxy.service.d /etc/systemd/system/caddy.service.d "
-            "/var/lib/caddy/.local/share/caddy && "
-            "systemctl daemon-reload 2>/dev/null; true",
-            timeout=15,
-        )
+        # -- Upgrade path: retire the HAProxy/Caddy stack of older Meridian releases --
+        conn.run(LEGACY_PROXY_CLEANUP, timeout=30)
 
         # -- Check if nginx is already installed and meets version requirement --
         check = conn.run("dpkg -l nginx 2>/dev/null | grep -q '^ii'", timeout=15)

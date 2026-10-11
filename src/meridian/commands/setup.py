@@ -511,7 +511,12 @@ def _check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
     Allows re-deploy over existing Meridian processes.
     Loops with retry prompt if a non-Meridian process holds a port.
     """
-    allowed = {"nginx", "xray", "haproxy", "caddy", "remnawave", "remnawave-node", "docker-proxy"}
+    allowed = {"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"}
+    # HAProxy/Caddy count as ours only when an older Meridian release installed them.
+    legacy_markers = {
+        "haproxy": "grep -qs '^# HAProxy SNI Router' /etc/haproxy/haproxy.cfg",
+        "caddy": "test -e /etc/caddy/conf.d/meridian.caddy",
+    }
 
     for port in (443, 80):
         while True:
@@ -524,6 +529,8 @@ def _check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
             proc = match.group(1) if match else "unknown"
             if proc in allowed:
                 break  # Meridian's own process -- OK for re-deploy
+            if proc in legacy_markers and conn.run(legacy_markers[proc], timeout=10).returncode == 0:
+                break  # retired by InstallNginx
 
             warn(f"Port {port} is in use by {proc}")
             if not is_quiet_mode():

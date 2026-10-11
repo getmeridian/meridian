@@ -47,3 +47,16 @@ def test_tagged_ufw_rule_numbers_are_extracted_highest_first() -> None:
 
     assert out.split() == ["10", "3", "2"]
     assert not re.search(r"\b1\b", out)
+
+
+def test_legacy_proxy_cleanup_only_touches_meridian_owned_configs(tmp_path) -> None:
+    from meridian.provision.nginx import LEGACY_PROXY_CLEANUP
+
+    assert "/etc/caddy/Caddyfile" not in LEGACY_PROXY_CLEANUP
+    assert "/var/lib/caddy" not in LEGACY_PROXY_CLEANUP
+    # Every stop/delete sits behind a Meridian marker check.
+    haproxy, caddy = LEGACY_PROXY_CLEANUP.split("if ")[1:3]
+    assert haproxy.startswith("grep -qs '^# HAProxy SNI Router' /etc/haproxy/haproxy.cfg")
+    assert "systemctl stop haproxy" in haproxy
+    assert caddy.startswith("[ -e /etc/caddy/conf.d/meridian.caddy ]")
+    assert "systemctl stop caddy" in caddy

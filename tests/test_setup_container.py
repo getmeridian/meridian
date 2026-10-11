@@ -10,6 +10,7 @@ Covers:
 from __future__ import annotations
 
 import logging
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -419,6 +420,16 @@ class TestCheckPortsHappyPath:
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:80 *:* users:(("remnawave-node",pid=444,fd=3))\n')
         _check_ports(conn, _IP, yes=True)
 
+    def test_caddy_from_an_older_meridian_release_is_allowed(self) -> None:
+        conn = MagicMock()
+        conn.run.side_effect = [
+            _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("caddy",pid=77,fd=3))\n'),
+            _ok_result(),  # test -e /etc/caddy/conf.d/meridian.caddy
+            _ok_result(stdout=""),  # port 80 free
+        ]
+        _check_ports(conn, _IP, yes=True)
+        assert "meridian.caddy" in conn.run.call_args_list[1].args[0]
+
 
 # ---------------------------------------------------------------------------
 # _check_ports — conflict
@@ -441,6 +452,19 @@ class TestCheckPortsConflict:
             _check_ports(conn, _IP, yes=True)
         mock_fail.assert_called_once()
         assert "apache2" in mock_fail.call_args[0][0]
+
+    @patch("meridian.commands.setup.err_console")
+    @patch("meridian.commands.setup.fail")
+    def test_operators_own_caddy_is_a_conflict(self, mock_fail: MagicMock, mock_err_console: MagicMock) -> None:
+        mock_fail.side_effect = typer.Exit(2)
+        conn = MagicMock()
+        conn.run.side_effect = [
+            _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("caddy",pid=77,fd=3))\n'),
+            subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=""),
+        ]
+        with pytest.raises(typer.Exit):
+            _check_ports(conn, _IP, yes=True)
+        assert "caddy" in mock_fail.call_args[0][0]
 
     @patch("meridian.commands.setup.err_console")
     @patch("meridian.commands.setup.choose", return_value=2)
