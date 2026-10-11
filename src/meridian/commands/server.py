@@ -8,6 +8,7 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
 from meridian.commands._validation import validate_command_input
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
@@ -72,6 +73,8 @@ def run_list() -> None:
         fail(exc)
 
     if not entries:
+        if has_meridian_v3_state():
+            fail_meridian_v3_state()
         info("No servers configured. Run: meridian deploy IP")
         return
 

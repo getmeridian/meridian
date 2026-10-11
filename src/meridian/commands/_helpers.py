@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import NoReturn
 
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.console import fail
@@ -24,6 +25,27 @@ _REVIEWED_APPLY_RECOVERY = (
 )
 
 
+def has_meridian_v3_state() -> bool:
+    """Return True when ~/.meridian still holds Meridian 3.x local state."""
+    from meridian import config
+
+    return (config.MERIDIAN_HOME / "credentials").is_dir() or (config.MERIDIAN_HOME / "servers").is_file()
+
+
+def fail_meridian_v3_state() -> NoReturn:
+    """Explain that 3.x deployments are not managed by 4.0, without touching them."""
+    fail(
+        "Found Meridian 3.x servers, which Meridian 4 cannot manage",
+        hint=(
+            "Your 3.x servers keep working. To keep managing them, reinstall 3.x: "
+            "uv tool install 'meridian-vpn<4' (or pipx install 'meridian-vpn<4'). "
+            "Moving to 4.0 needs a fresh deploy, and every client gets a new link: "
+            "https://github.com/getmeridian/meridian/releases"
+        ),
+        hint_type="user",
+    )
+
+
 def load_cluster(*, require_configured: bool = True) -> ClusterConfig:
     """Load local cluster state through the CLI error boundary."""
     try:
@@ -31,6 +53,8 @@ def load_cluster(*, require_configured: bool = True) -> ClusterConfig:
     except LocalStateError as exc:
         fail(exc)
     if require_configured and not cluster.is_configured:
+        if has_meridian_v3_state():
+            fail_meridian_v3_state()
         fail(
             "No cluster configured",
             hint="Deploy first: meridian deploy",

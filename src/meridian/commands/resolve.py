@@ -11,6 +11,7 @@ import typer
 from rich.markup import escape
 
 from meridian import resolve as _resolve_lib
+from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
 from meridian.config import is_ip
 from meridian.console import err_console, fail, info
 from meridian.core.errors import LocalStateError
@@ -138,6 +139,8 @@ def _resolve_server(
                 )
 
             else:
+                if has_meridian_v3_state():
+                    fail_meridian_v3_state()
                 fail("No servers configured", hint="Deploy a server first: meridian deploy IP", hint_type="user")
 
     # Resolve user: explicit flag > registry > default root
