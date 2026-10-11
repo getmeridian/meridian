@@ -2,29 +2,22 @@
 
 from __future__ import annotations
 
-import secrets
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
 from meridian.cluster import ClusterConfig
 from meridian.core.deploy import DeployRequest
-from meridian.core.deploy_planning import (
-    DeployClusterState,
-    DeployNodeState,
-    DeployPlan,
-    DeployPlanningError,
-    build_deploy_plan,
-)
+from meridian.core.deploy_planning import DeployPlan
 from meridian.core.deploy_validation import (
     DeployValidationError,
     normalize_deploy_request,
     validate_deploy_target,
 )
-from meridian.core.errors import EngineError
+from meridian.core.errors import EngineError, MeridianError
 from meridian.core.inputs import is_ip_deploy_target, is_local_deploy_target
 from meridian.core.servers import ServerProfile
 from meridian.servers import ServerEntry
+from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_server_deploy
 
 
 @dataclass(frozen=True)
@@ -43,7 +36,7 @@ class ServerLookup(Protocol):
         """Return a registered server by host/name, if known."""
 
 
-def _user_error(exc: DeployPlanningError | DeployValidationError) -> EngineError:
+def _user_error(exc: DeployValidationError) -> EngineError:
     return EngineError(str(exc), hint=exc.hint, category="user")
 
 
@@ -81,51 +74,29 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
     return ResolvedDeployTarget(server_ip=server_ip, ssh_user=ssh_user, ssh_port=ssh_port)
 
 
-def project_deploy_cluster_state(cluster: ClusterConfig, server_ip: str) -> DeployClusterState:
-    """Project persistent cluster config into the pure core deploy planner state."""
-    existing_node = cluster.find_node(server_ip)
-    return DeployClusterState(
-        is_configured=cluster.is_configured,
-        panel_secret_path=cluster.panel.secret_path,
-        panel_sub_path=cluster.panel.sub_path,
-        existing_node=(
-            DeployNodeState(
-                ip=existing_node.ip,
-                xhttp_path=existing_node.xhttp_path,
-                ws_path=existing_node.ws_path,
-            )
-            if existing_node is not None
-            else None
-        ),
-        node_count=len(cluster.nodes),
-        relay_count=len(cluster.relays),
-    )
-
-
-def plan_deploy_request(
-    request: DeployRequest,
-    *,
-    cluster: ClusterConfig,
-    registry: ServerLookup,
-    token_hex: Callable[[int], str] = secrets.token_hex,
-) -> DeployPlan:
-    """Validate, resolve, and plan a deploy request without SSH or panel I/O."""
-    target = resolve_deploy_target(request, registry)
-    try:
-        return build_deploy_plan(
-            target.server_ip,
-            project_deploy_cluster_state(cluster, target.server_ip),
-            token_hex=token_hex,
-        )
-    except DeployPlanningError as exc:
-        raise _user_error(exc) from exc
-
-
 def dry_run_deploy_request(
     request: DeployRequest,
     *,
     cluster: ClusterConfig,
     registry: ServerLookup,
 ) -> DeployPlan:
-    """Build a deterministic deploy plan for process/API dry-run output."""
-    return plan_deploy_request(request, cluster=cluster, registry=registry, token_hex=lambda n: "0" * (n * 2))
+    """Compile the single-server topology a deploy would apply, without SSH or writes."""
+    target = resolve_deploy_target(request, registry)
+    if cluster.is_configured and cluster.topology_intent is None:
+        raise EngineError(
+            "This cluster.yml was written by a Meridian 4.0 development build",
+            hint="Move ~/.meridian/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            category="user",
+        )
+    entry = registry.find(target.server_ip)
+    try:
+        return preview_single_server_deploy(
+            cluster.topology_intent,
+            normalize_deploy_request(request),
+            server_ref=entry.id if entry is not None and entry.id else PENDING_SERVER_REF,
+            server_ip=target.server_ip,
+            panel_secret_path=cluster.panel.secret_path,
+            panel_sub_path=cluster.panel.sub_path,
+        )
+    except MeridianError as exc:
+        raise EngineError(str(exc), hint=exc.hint, category=exc.category) from exc

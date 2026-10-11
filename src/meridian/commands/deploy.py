@@ -23,8 +23,6 @@ from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_re
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.compiler import compile_topology
-from meridian.compiler.models import ConfigProfilePayload
 from meridian.config import SERVER_PROFILES_FILE, is_ip
 from meridian.console import (
     err_console,
@@ -40,7 +38,7 @@ from meridian.console import (
 )
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployRequest, DeployResult, build_deploy_workflow
-from meridian.core.deploy_planning import DeployPlan, DeployPorts
+from meridian.core.deploy_planning import DeployPlan
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import EngineError, MeridianError
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
@@ -55,10 +53,13 @@ from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.renderers import emit_json
 from meridian.servers import ServerEntry, ServerRegistry
-from meridian.setup.single_server import DEFAULT_CLIENT, single_server_intent
+from meridian.setup.single_server import (
+    DEFAULT_CLIENT,
+    PENDING_SERVER_REF,
+    preview_single_server_deploy,
+    single_server_intent,
+)
 from meridian.ssh import ServerConnection
-
-_PENDING_SERVER_REF = "srv-pending"
 
 
 def run(
@@ -349,31 +350,17 @@ def _dry_run(request: DeployRequest) -> DeployPlan:
     cluster = ClusterConfig.load()
     _refuse_pre_topology_cluster(cluster)
     entry = registry.find(target.server_ip)
-    server_ref = entry.id if entry and entry.id else _PENDING_SERVER_REF
-    intent = _intent_or_fail(cluster.topology_intent, server_ref, request)
-    plan = compile_topology(intent)
-    ports = {
-        inbound.protocol: inbound.listen_port
-        for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id
-        for inbound in resource.payload.inbounds
-    }
-    paths = {path.protocol: path.path for item in intent.exits if item.server_ref == server_ref for path in item.paths}
-    return DeployPlan(
-        mode="first_deploy" if cluster.topology_intent is None else "redeploy",
-        server_ip=target.server_ip,
-        ports=DeployPorts(
-            reality_port=ports.get("reality", 0),
-            xhttp_port=ports.get("xhttp", 0),
-            wss_port=ports.get("wss", 0),
-        ),
-        secret_path=cluster.panel.secret_path,
-        xhttp_path=paths.get("xhttp", ""),
-        ws_path=paths.get("wss", ""),
-        info_page_path=cluster.panel.sub_path,
-        node_count=len(intent.exits),
-        relay_count=len(intent.transparent_relays),
-    )
+    try:
+        return preview_single_server_deploy(
+            cluster.topology_intent,
+            request,
+            server_ref=entry.id if entry and entry.id else PENDING_SERVER_REF,
+            server_ip=target.server_ip,
+            panel_secret_path=cluster.panel.secret_path,
+            panel_sub_path=cluster.panel.sub_path,
+        )
+    except MeridianError as exc:
+        fail(exc)
 
 
 def _intent_or_fail(existing: SetupIntent | None, server_ref: str, request: DeployRequest) -> SetupIntent:

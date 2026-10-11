@@ -1,19 +1,19 @@
 {
   "command": "deploy",
   "data": {
-    "info_page_path": "0000000000000000",
+    "info_page_path": "",
     "mode": "first_deploy",
-    "node_count": 0,
+    "node_count": 1,
     "ports": {
-      "reality_port": 10790,
-      "wss_port": 21790,
-      "xhttp_port": 31790
+      "reality_port": 10746,
+      "wss_port": 0,
+      "xhttp_port": 0
     },
     "relay_count": 0,
     "secret_path": "[redacted]",
     "server_ip": "198.51.100.10",
-    "ws_path": "0000000000000000",
-    "xhttp_path": "0000000000000000"
+    "ws_path": "",
+    "xhttp_path": ""
   },
   "duration_ms": 0,
   "errors": [],
@@ -26,7 +26,7 @@
   "summary": {
     "changed": false,
     "counts": {
-      "nodes": 0,
+      "nodes": 1,
       "relays": 0
     },
     "text": "Deploy plan: first_deploy for 198.51.100.10"

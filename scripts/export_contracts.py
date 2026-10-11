@@ -10,8 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from meridian import __version__
-from meridian.core.deploy import DeployResult
-from meridian.core.deploy_planning import DeployClusterState, build_deploy_plan
+from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import Event, MeridianError, OutputEnvelope, OutputStatus, Summary
 from meridian.core.output import EVENT_SCHEMA, OUTPUT_SCHEMA, json_dumps, jsonl_dumps
 from meridian.core.schema import (
@@ -22,6 +21,7 @@ from meridian.core.schema import (
     validate_command_envelope,
 )
 from meridian.core.services import collect_workflow, workflow_catalog
+from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_server_deploy
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "contracts" / "meridian" / "v1"
@@ -64,16 +64,11 @@ def _envelope(
 
 
 def _deploy_dry_run_fixture() -> OutputEnvelope:
-    plan = build_deploy_plan(
-        "198.51.100.10",
-        DeployClusterState(
-            is_configured=False,
-            panel_secret_path="",
-            panel_sub_path="",
-            node_count=0,
-            relay_count=0,
-        ),
-        token_hex=lambda n: "0" * (n * 2),
+    plan = preview_single_server_deploy(
+        None,
+        DeployRequest(ip="198.51.100.10"),
+        server_ref=PENDING_SERVER_REF,
+        server_ip="198.51.100.10",
     )
     return _envelope(
         command="deploy",

@@ -10,7 +10,11 @@ from __future__ import annotations
 import secrets
 from typing import Literal
 
+from meridian.compiler import compile_topology
+from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.defaults import DEFAULT_SNI
+from meridian.core.deploy import DeployRequest
+from meridian.core.deploy_planning import DeployPlan, DeployPorts
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
     AccessIntent,
@@ -22,6 +26,8 @@ from meridian.core.topology import (
 
 DEFAULT_EXIT_ID = "main"
 DEFAULT_CLIENT = "default"
+# Stands in for a server that has no saved profile yet (dry runs only).
+PENDING_SERVER_REF = "srv-pending"
 
 
 def single_server_intent(
@@ -84,6 +90,54 @@ def single_server_intent(
             "exits": [updated if item.id == current.id else item for item in existing.exits],
             "access": existing.access.model_copy(update={"users": users}),
         }
+    )
+
+
+def preview_single_server_deploy(
+    existing: SetupIntent | None,
+    request: DeployRequest,
+    *,
+    server_ref: str,
+    server_ip: str,
+    panel_secret_path: str = "",
+    panel_sub_path: str = "",
+) -> DeployPlan:
+    """Compile the intent a deploy would apply, without SSH or local writes.
+
+    Raises :class:`LocalStateError` when the request cannot target this fleet.
+    """
+    intent = single_server_intent(
+        existing,
+        server_ref=server_ref,
+        sni=request.sni,
+        domain=request.domain,
+        client_name=request.client_name,
+        warp=request.warp,
+        geo_block=request.geo_block,
+        hysteria2=request.hysteria2,
+    ).model_copy(update={"harden": request.harden})
+    plan = compile_topology(intent)
+    ports = {
+        inbound.protocol: inbound.listen_port
+        for resource in plan.resources
+        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id
+        for inbound in resource.payload.inbounds
+    }
+    paths = {path.protocol: path.path for item in intent.exits if item.server_ref == server_ref for path in item.paths}
+    return DeployPlan(
+        mode="first_deploy" if existing is None else "redeploy",
+        server_ip=server_ip,
+        ports=DeployPorts(
+            reality_port=ports.get("reality", 0),
+            xhttp_port=ports.get("xhttp", 0),
+            wss_port=ports.get("wss", 0),
+        ),
+        secret_path=panel_secret_path,
+        xhttp_path=paths.get("xhttp", ""),
+        ws_path=paths.get("wss", ""),
+        info_page_path=panel_sub_path,
+        node_count=len(intent.exits),
+        relay_count=len(intent.transparent_relays),
     )
 
 

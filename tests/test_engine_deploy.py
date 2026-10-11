@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.cluster import ClusterConfig, NodeEntry, PanelConfig, RelayEntry
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.core.deploy import DeployRequest
 from meridian.core.servers import ServerConnectionDraft, ServerProfile, profile_from_draft
 from meridian.engine.deploy import (
     EngineError,
     dry_run_deploy_request,
-    plan_deploy_request,
     resolve_deploy_target,
 )
 from meridian.servers import ServerEntry
+from meridian.setup.single_server import single_server_intent
 
 _IP_A = "198.51.100.10"
 _IP_B = "198.51.100.20"
@@ -30,38 +30,43 @@ class FakeRegistry:
         return None
 
 
-def _configured_cluster(ip: str = _IP_A) -> ClusterConfig:
+def _configured_cluster(entry: ServerEntry) -> ClusterConfig:
     return ClusterConfig(
         panel=PanelConfig(
-            url=f"https://{ip}/panel",
+            url=f"https://{entry.host}/panel",
             api_token="test-token",
-            server_ip=ip,
+            server_ip=entry.host,
             secret_path="existing-secret-path",
             sub_path="existing-info-page",
         ),
-        nodes=[
-            NodeEntry(
-                ip=ip,
-                uuid="550e8400-e29b-41d4-a716-446655440000",
-                xhttp_path="existing-xhttp-path",
-                ws_path="existing-ws-path",
-                is_panel_host=True,
-            )
-        ],
-        relays=[RelayEntry(ip=_IP_B, exit_node_ip=ip)],
+        topology_intent=single_server_intent(None, server_ref=entry.id, domain="proxy.example.com"),
     )
 
 
-def test_dry_run_explicit_ip_builds_deterministic_first_deploy_plan() -> None:
+def test_dry_run_explicit_ip_compiles_a_first_deploy_plan() -> None:
     plan = dry_run_deploy_request(DeployRequest(ip=_IP_A), cluster=ClusterConfig(), registry=FakeRegistry())
 
     assert plan.mode == "first_deploy"
     assert plan.server_ip == _IP_A
-    assert plan.secret_path == "0" * 24
-    assert plan.xhttp_path == "0" * 16
-    assert plan.ws_path == "0" * 16
-    assert plan.info_page_path == "0" * 16
-    assert 30000 <= plan.ports.xhttp_port < 40000
+    assert plan.secret_path == ""
+    assert plan.info_page_path == ""
+    assert plan.xhttp_path == ""
+    assert plan.ports.reality_port > 0
+    assert plan.node_count == 1
+    assert plan.relay_count == 0
+
+
+def test_dry_run_with_domain_plans_tls_transport_paths() -> None:
+    plan = dry_run_deploy_request(
+        DeployRequest(ip=_IP_A, domain="proxy.example.com"),
+        cluster=ClusterConfig(),
+        registry=FakeRegistry(),
+    )
+
+    assert plan.xhttp_path
+    assert plan.ws_path
+    assert plan.ports.xhttp_port > 0
+    assert plan.ports.wss_port > 0
 
 
 def test_resolve_registered_server_uses_registry_user_when_request_user_is_root() -> None:
@@ -119,41 +124,45 @@ def test_unknown_registered_server_raises_user_error_with_hint() -> None:
     assert exc_info.value.hint == "See registered servers: meridian server list"
 
 
-def test_redeploy_reuses_existing_cluster_paths_and_counts() -> None:
+def test_redeploy_reuses_saved_panel_paths_and_transport_paths() -> None:
+    entry = ServerEntry(host=_IP_A, user="root", name="main", id="srv-0a1b2c3d4e5f")
+    cluster = _configured_cluster(entry)
+    assert cluster.topology_intent is not None
+    saved_paths = {path.protocol: path.path for path in cluster.topology_intent.exits[0].paths}
+
     plan = dry_run_deploy_request(
-        DeployRequest(ip=_IP_A),
-        cluster=_configured_cluster(_IP_A),
-        registry=FakeRegistry(),
+        DeployRequest(ip=_IP_A, domain="proxy.example.com"),
+        cluster=cluster,
+        registry=FakeRegistry([entry]),
     )
 
     assert plan.mode == "redeploy"
     assert plan.secret_path == "existing-secret-path"
-    assert plan.xhttp_path == "existing-xhttp-path"
-    assert plan.ws_path == "existing-ws-path"
     assert plan.info_page_path == "existing-info-page"
+    assert plan.xhttp_path == saved_paths["xhttp"]
+    assert plan.ws_path == saved_paths["wss"]
     assert plan.node_count == 1
-    assert plan.relay_count == 1
 
 
-def test_configured_cluster_rejects_new_ip_with_node_add_hint() -> None:
+def test_existing_fleet_rejects_a_server_that_is_not_an_exit() -> None:
+    entry = ServerEntry(host=_IP_A, user="root", name="main", id="srv-0a1b2c3d4e5f")
+
     with pytest.raises(EngineError) as exc_info:
-        dry_run_deploy_request(DeployRequest(ip=_IP_B), cluster=_configured_cluster(_IP_A), registry=FakeRegistry())
+        dry_run_deploy_request(
+            DeployRequest(ip=_IP_B),
+            cluster=_configured_cluster(entry),
+            registry=FakeRegistry([entry]),
+        )
 
-    assert "Cluster already configured" in str(exc_info.value)
+    assert exc_info.value.category == "user"
     assert "meridian node add" in exc_info.value.hint
 
 
-def test_plan_deploy_request_accepts_injected_token_generator() -> None:
-    tokens = iter(["panel-secret", "xhttp-path", "ws-path", "info-page"])
+def test_cluster_without_topology_is_refused_with_rebuild_guidance() -> None:
+    cluster = ClusterConfig(panel=PanelConfig(url=f"https://{_IP_A}/panel", api_token="test-token"))
 
-    plan = plan_deploy_request(
-        DeployRequest(ip=_IP_A),
-        cluster=ClusterConfig(),
-        registry=FakeRegistry(),
-        token_hex=lambda _size: next(tokens),
-    )
+    with pytest.raises(EngineError) as exc_info:
+        dry_run_deploy_request(DeployRequest(ip=_IP_A), cluster=cluster, registry=FakeRegistry())
 
-    assert plan.secret_path == "panel-secret"
-    assert plan.xhttp_path == "xhttp-path"
-    assert plan.ws_path == "ws-path"
-    assert plan.info_page_path == "info-page"
+    assert "development build" in str(exc_info.value)
+    assert "cluster.yml aside" in exc_info.value.hint
