@@ -418,6 +418,34 @@ class TestCheckpointedExecution:
         assert cluster.managed_bindings["firewall:srv-exit:tcp:443@2"].active
         assert "firewall:srv-exit:tcp:443@1" in cluster.managed_bindings
 
+    def test_earlier_failed_runs_do_not_exhaust_the_retry_budget(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=1)[0]
+        cluster = ClusterConfig()
+        for _ in range(3):
+            failing = ScriptedDriver([_missing()], [OSError("acme: DNS not propagated")])
+            result = execute_resource_plan(
+                plan,
+                cluster,
+                {"firewall_rule": failing},
+                persist=lambda _state: None,
+                clock=_clock,
+            )
+            assert result.results[0].status == "failed"
+            assert "apply failed" in (result.results[0].error or "")
+
+        fixed = ScriptedDriver([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="firewall-1")])
+        result = execute_resource_plan(
+            plan,
+            cluster,
+            {"firewall_rule": fixed},
+            persist=lambda _state: None,
+            clock=_clock,
+        )
+
+        assert result.all_succeeded
+        assert len(fixed.apply_calls) == 1
+
 
 class TestUnknownOutcomeRecovery:
     def test_unknown_outcome_is_observed_before_being_accepted(self) -> None:

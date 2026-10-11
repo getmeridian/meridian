@@ -231,7 +231,12 @@ def _execute_action(
         _record_success(action, observation, binding, cluster, persist, clock)
         return ResourceActionResult(action=action, status="converged")
 
-    while checkpoint.attempts < max_unknown_attempts:
+    # The retry budget is per run: checkpoint.attempts is a lifetime counter, and
+    # an earlier failed run (e.g. ACME before DNS propagated) must not block the
+    # operator's retry once the cause is fixed.
+    run_attempts = 0
+    while run_attempts < max_unknown_attempts:
+        run_attempts += 1
         checkpoint.status = "running"
         checkpoint.attempts += 1
         checkpoint.last_error = ""
@@ -252,7 +257,7 @@ def _execute_action(
             if observation_converges(action, observed):
                 _record_success(action, observed, binding, cluster, persist, clock, receipt=receipt)
                 return ResourceActionResult(action=action, status="applied", changed=True)
-            if checkpoint.attempts < max_unknown_attempts:
+            if run_attempts < max_unknown_attempts:
                 continue
             return _record_failure(
                 action,
