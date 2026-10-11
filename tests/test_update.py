@@ -91,3 +91,45 @@ class TestCheckForUpdate:
         monkeypatch.setenv("MERIDIAN_DISABLE_UPDATE_CHECK", "1")
         importlib.reload(config)
         assert config.DISABLE_UPDATE_CHECK is True
+
+
+class TestMajorReleaseGuard:
+    """`meridian update` must never cross into a new major version by itself."""
+
+    def _run(self, current: str, latest: str, releases: list[str], *, major: bool = False):
+        from packaging.version import Version
+
+        from meridian import update
+
+        with (
+            patch("meridian.__version__", current),
+            patch.object(update, "get_pypi_latest", return_value=latest),
+            patch.object(update, "get_pypi_releases", return_value=[Version(v) for v in releases]),
+            patch.object(update, "do_upgrade", return_value=True) as do_upgrade,
+            patch.object(update, "err_console"),
+        ):
+            update.run_self_update(major=major)
+        return do_upgrade
+
+    def test_stays_on_the_current_major_line(self) -> None:
+        do_upgrade = self._run("3.17.2", "4.0.0", ["3.17.2", "3.17.3", "4.0.0"])
+
+        do_upgrade.assert_called_once_with("3.17.3")
+
+    def test_already_latest_in_major_does_not_upgrade(self) -> None:
+        do_upgrade = self._run("3.17.3", "4.0.0", ["3.17.3", "4.0.0"])
+
+        do_upgrade.assert_not_called()
+
+    def test_major_flag_moves_to_the_new_major(self) -> None:
+        do_upgrade = self._run("3.17.3", "4.0.0", ["3.17.3", "4.0.0"], major=True)
+
+        do_upgrade.assert_called_once_with("")
+
+    def test_latest_in_major_ignores_other_majors(self) -> None:
+        from packaging.version import Version
+
+        from meridian.update import latest_in_major
+
+        assert latest_in_major([Version("3.1.0"), Version("3.17.3"), Version("4.0.0")], 3) == Version("3.17.3")
+        assert latest_in_major([Version("4.0.0")], 3) is None

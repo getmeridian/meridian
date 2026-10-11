@@ -345,11 +345,13 @@ def teardown_cmd(
 
 
 @app.command("update")
-def update_cmd() -> None:
-    """Update meridian to the latest version."""
+def update_cmd(
+    major: bool = typer.Option(False, "--major", help="Also move to a new major version (not an in-place upgrade)"),
+) -> None:
+    """Update meridian to the latest release of your current major version."""
     from meridian.update import run_self_update
 
-    run_self_update()
+    run_self_update(major=major)
 
 
 # =============================================================================

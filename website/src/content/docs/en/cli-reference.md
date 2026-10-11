@@ -27,6 +27,8 @@ meridian deploy [IP] [flags]
 | `--harden / --no-harden` | enabled | Harden SSH + firewall |
 | `--pq / --no-pq` | disabled | Post-quantum encryption — ML-KEM-768 hybrid (experimental) |
 | `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
+| `--geo-block / --no-geo-block` | enabled | Block Russian domains and IPs on the server |
+| `--ssh-port PORT` | 22 | SSH port if non-standard |
 | `--server NAME` | | Target server (name or IP) |
 | `--decoy MODE` | none | Decoy response for unknown paths (`none` / `403`) |
 | `--yes` | | Skip confirmation prompts |
@@ -73,6 +75,7 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--name NAME` | (auto) | Friendly name for the relay (e.g., "ru-moscow") |
 | `--port/-p PORT` | 443 | Listen port on relay server |
 | `--user/-u USER` | root | SSH user on relay |
+| `--ssh-port PORT` | 22 | SSH port on relay if non-standard |
 | `--yes/-y` | | Skip confirmation prompts |
 
 **How relays work**: Client connects to the relay's domestic IP. Relay forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext. All protocols (Reality, XHTTP, WSS) work through the relay.
@@ -131,11 +134,16 @@ meridian teardown [IP] [--server NAME] [--yes]
 
 ### meridian update
 
-Update CLI to latest version.
+Update the CLI to the latest release of your current major version.
 
 ```
 meridian update
+meridian update --major
 ```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--major` | | Also move to a new major version. Meridian 4 is not an in-place upgrade: it cannot manage servers deployed by 3.x, so moving means a fresh deploy and new links for every user |
 
 ### meridian --version
 

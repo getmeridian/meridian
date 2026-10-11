@@ -35,6 +35,32 @@ def get_pypi_latest() -> str | None:
         return None
 
 
+def get_pypi_releases() -> list[Version]:
+    """Fetch every published, non-prerelease version from PyPI (empty on failure)."""
+    try:
+        req = urllib.request.Request(PYPI_JSON_URL, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read())
+    except (OSError, ValueError):
+        return []
+    versions: list[Version] = []
+    for raw, files in data.get("releases", {}).items():
+        try:
+            version = Version(raw)
+        except InvalidVersion:
+            continue
+        if version.is_prerelease or (files and all(item.get("yanked") for item in files)):
+            continue
+        versions.append(version)
+    return sorted(versions)
+
+
+def latest_in_major(releases: list[Version], major: int) -> Version | None:
+    """Return the newest release that keeps the given major version."""
+    candidates = [version for version in releases if version.major == major]
+    return candidates[-1] if candidates else None
+
+
 def _should_check() -> bool:
     """Return True if enough time has passed since last check."""
     check_file = CACHE_DIR / "last_update_check"
@@ -78,10 +104,13 @@ def check_for_update(current_version: str) -> None:
             "[bold]meridian deploy[/bold] [dim]to apply[/dim]\n"
         )
     elif current.major != remote.major:
-        # Major: review before updating
-        err_console.print(f"\n  [bold red]v{latest} available (major release)[/bold red]")
-        err_console.print(f"  [dim]Review changes before updating: {_RELEASES_URL}[/dim]")
-        err_console.print("  [dim]After updating, run[/dim] [bold]meridian deploy[/bold] [dim]to apply[/dim]\n")
+        # Major: not an in-place upgrade; existing servers keep working.
+        err_console.print(f"\n  [warn]Meridian {remote.major} is available[/warn] [dim](major release)[/dim]")
+        err_console.print("  [dim]It is not an in-place upgrade; your servers keep working on this version.[/dim]")
+        err_console.print(
+            f"  [dim]Meridian {current.major}.x will eventually stop receiving updates, so plan your move.[/dim]"
+        )
+        err_console.print(f"  [dim]Read before moving: {_RELEASES_URL}[/dim]\n")
     else:
         # Minor: inform, link to changelog
         err_console.print(f"\n  [warn]v{latest} available[/warn]")
@@ -92,25 +121,20 @@ def check_for_update(current_version: str) -> None:
         )
 
 
-def do_upgrade() -> bool:
-    """Upgrade via uv > pipx > pip3."""
+def do_upgrade(version: str = "") -> bool:
+    """Upgrade via uv > pipx > pip3, to ``version`` when given, else the latest."""
     success = False
+    spec = f"{PYPI_PACKAGE}=={version}" if version else PYPI_PACKAGE
 
     if shutil.which("uv"):
-        result = subprocess.run(
-            ["uv", "tool", "upgrade", PYPI_PACKAGE],
-            capture_output=True,
-            text=True,
-        )
+        command = ["uv", "tool", "install", "--force", spec] if version else ["uv", "tool", "upgrade", PYPI_PACKAGE]
+        result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             success = True
 
     if not success and shutil.which("pipx"):
-        result = subprocess.run(
-            ["pipx", "upgrade", PYPI_PACKAGE],
-            capture_output=True,
-            text=True,
-        )
+        command = ["pipx", "install", "--force", spec] if version else ["pipx", "upgrade", PYPI_PACKAGE]
+        result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             success = True
 
@@ -118,7 +142,7 @@ def do_upgrade() -> bool:
         # Try --user first, then --break-system-packages for PEP 668
         for extra_args in [["--user"], ["--user", "--break-system-packages"]]:
             result = subprocess.run(
-                ["pip3", "install", "--upgrade", *extra_args, PYPI_PACKAGE],
+                ["pip3", "install", "--upgrade", *extra_args, spec],
                 capture_output=True,
                 text=True,
             )
@@ -130,6 +154,14 @@ def do_upgrade() -> bool:
         _refresh_symlink()
 
     return success
+
+
+def _explain_major_release(current: Version, remote: Version) -> None:
+    warn(f"Meridian {remote.major} is available, but it is not an in-place upgrade.")
+    info("Your servers keep working on this version. Meridian 4 uses a new panel,")
+    info("so moving means a fresh deploy and new connection links for every user.")
+    info(f"Meridian {current.major}.x will eventually stop receiving updates, so plan your move.")
+    info(f"Read the release notes, then run `meridian update --major`: {_RELEASES_URL}")
 
 
 def _refresh_symlink() -> None:
@@ -151,8 +183,8 @@ def _refresh_symlink() -> None:
         pass
 
 
-def run_self_update() -> None:
-    """Explicit self-update command."""
+def run_self_update(major: bool = False) -> None:
+    """Explicit self-update command; stays on the current major unless ``major``."""
     info("Checking for updates...")
     latest = get_pypi_latest()
 
@@ -173,17 +205,28 @@ def run_self_update() -> None:
         ok(f"Already on the latest version (v{__version__})")
         return
 
-    # Version-level context
-    if current.major != remote.major:
-        warn(f"Major release v{latest} — review changes before redeploying:")
+    target = ""
+    if remote.major > current.major and not major:
+        same_major = latest_in_major(get_pypi_releases(), current.major)
+        _explain_major_release(current, remote)
+        if same_major is None or same_major <= current:
+            ok(f"You are on the latest {current.major}.x release (v{__version__})")
+            return
+        target = str(same_major)
+        remote = same_major
+        latest = target
+    elif remote.major > current.major:
+        warn(f"Moving to Meridian {remote.major}. It cannot manage servers deployed by this version:")
+        info("deploy a fresh server, give your users the new links, then tear down the old server.")
         info(_RELEASES_URL)
     elif current.minor != remote.minor:
         info(f"v{latest} available. What's new: {_RELEASES_URL}")
 
     info(f"Updating v{__version__} → v{latest}...")
-    if do_upgrade():
+    if do_upgrade(target):
         ok(f"Updated to v{latest}")
-        info("Run `meridian deploy` to apply changes to your servers")
+        if remote.major == current.major:
+            info("Run `meridian deploy` to apply changes to your servers")
     else:
         warn("Could not upgrade automatically. Try reinstalling:")
         info(_INSTALL_CMD)
