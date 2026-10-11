@@ -86,6 +86,30 @@ class WorkloadStateManager:
         self._persist(self.cluster)
         return workload
 
+    def carry_forward(
+        self,
+        profile: ConfigProfilePayload,
+        *,
+        generation: int,
+        desired_hash: str,
+        server_ref: str,
+    ) -> WorkloadBinding | None:
+        """Seed a new generation from an earlier one without allocating secrets.
+
+        A changed intent compiles to a new generation whose Profile already
+        exists remotely; observation must render it with the inherited keys.
+        Returns None when no earlier generation exists for this workload.
+        """
+        existing = self.find(profile.workload_id, generation)
+        if existing is not None:
+            return existing
+        if not any(
+            item.id == profile.workload_id and item.generation < generation and item.reality_keys.get(server_ref)
+            for item in self.cluster.workloads
+        ):
+            return None
+        return self.ensure(profile, generation=generation, desired_hash=desired_hash, server_ref=server_ref)
+
     def find(self, workload_id: str, generation: int) -> WorkloadBinding | None:
         return next(
             (

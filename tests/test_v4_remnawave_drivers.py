@@ -11,7 +11,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding, WorkloadBinding
 from meridian.compiler import compile_topology
-from meridian.compiler.models import ConfigProfilePayload
+from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
 from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
     AccessIntent,
@@ -863,3 +863,50 @@ def test_unbound_mismatched_profile_name_collision_is_not_adopted() -> None:
 
     with pytest.raises(ResourceReconcileError, match="Unmanaged"):
         driver.apply(action, None)
+
+
+def test_intent_change_after_first_apply_converges_with_the_same_keys() -> None:
+    first_plan = compile_topology(_intent())
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    key_calls: list[str] = []
+    workloads = WorkloadStateManager(
+        cluster,
+        persist=lambda _state: None,
+        key_factory=lambda server_ref: (key_calls.append(server_ref), _keys(server_ref))[1],
+    )
+    addresses = {
+        "srv-control": "198.51.100.10",
+        "srv-exit-a": "198.51.100.20",
+        "srv-exit-b": "198.51.100.30",
+    }
+
+    def drivers_for(plan: ResourcePlan) -> dict[str, object]:
+        context = RemnawaveDriverContext(
+            panel=cast(MeridianPanel, panel),
+            plan=plan,
+            cluster=cluster,
+            workloads=workloads,
+            server_addresses=addresses,
+        )
+        fallback = AlreadyConvergedDriver()
+        drivers: dict[str, object] = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+        drivers.update(build_remnawave_drivers(context))
+        return drivers
+
+    assert execute_resource_plan(
+        first_plan, cluster, drivers_for(first_plan), persist=lambda _state: None
+    ).all_succeeded
+
+    grown = _intent().model_copy(update={"access": AccessIntent(users=["default", "zed"])})
+    second_plan = compile_topology(grown)
+    assert second_plan.plan_hash != first_plan.plan_hash
+
+    result = execute_resource_plan(second_plan, cluster, drivers_for(second_plan), persist=lambda _state: None)
+
+    assert result.all_succeeded, [item.error for item in result.results if item.error]
+    assert cluster.active_generation == 2
+    assert sorted(key_calls) == ["srv-exit-a", "srv-exit-b"]
+    second_gen = {item.id: item for item in cluster.workloads if item.generation == 2}
+    assert second_gen["exit-a"].reality_keys["srv-exit-a"].private_key == "private-exit-a"
+    assert second_gen["exit-b"].reality_keys["srv-exit-b"].private_key == "private-exit-b"

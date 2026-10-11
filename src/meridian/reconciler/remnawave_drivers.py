@@ -145,7 +145,12 @@ class ConfigProfileDriver:
         if profile is None:
             return ResourceObservation(exists=False)
         server_ref = _profile_server_ref(self.context, payload)
-        workload = self.context.workloads.require(payload.workload_id, action.generation)
+        workload = self.context.workloads.carry_forward(
+            payload,
+            generation=action.generation,
+            desired_hash=action.expected_hash,
+            server_ref=server_ref,
+        ) or self.context.workloads.require(payload.workload_id, action.generation)
         expected_config = render_workload_config(
             payload,
             reality_keys=workload.reality_keys.get(server_ref),
