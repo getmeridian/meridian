@@ -19,6 +19,7 @@ from meridian.commands.client import run_add, run_disable, run_enable, run_list,
 from meridian.commands.client_handoff import PageCleanup, cleanup_client_page, print_handoff_links
 from meridian.console import set_json_mode
 from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+from meridian.handoff import HandoffLinks
 from meridian.remnawave import RemnawaveError, User
 
 # ---------------------------------------------------------------------------
@@ -106,14 +107,17 @@ class TestRunAdd:
             patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
-            patch("meridian.commands.client._print_subscription") as print_subscription,
+            patch(
+                "meridian.commands.client._publish_handoff",
+                return_value=[HandoffLinks("alice", subscription_url="https://198.51.100.1/pages/sub/abc123")],
+            ) as publish_handoff,
         ):
             run_add(names=["alice"])
 
         updated = runtime.apply_intent.call_args.args[0]
         assert updated.access.users == ["default", "alice"]
         panel.create_user.assert_not_called()
-        print_subscription.assert_called_once()
+        publish_handoff.assert_called_once_with(cluster, ["alice"])
 
     def test_v4_add_save_failure_returns_observed_partial_json(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]

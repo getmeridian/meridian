@@ -8,9 +8,9 @@ from typing import NoReturn
 import typer
 from rich.markup import escape
 
-from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, make_panel, persist_reviewed_apply
-from meridian.commands.client_handoff import get_user_or_fail
+from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
 from meridian.core.clients import build_client_add_result
@@ -18,6 +18,7 @@ from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import redact_string
+from meridian.handoff import HandoffLinks
 from meridian.remnawave import User
 from meridian.renderers import emit_json
 
@@ -27,7 +28,7 @@ def run_add_v4(
     cluster: ClusterConfig,
     operation: OperationContext,
     *,
-    print_subscription: Callable[[PanelConfig, User], str],
+    publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
 ) -> None:
     """Add access users through the reviewed V4 compiler and resource drivers."""
     from meridian.config import SERVER_PROFILES_FILE
@@ -103,16 +104,19 @@ def run_add_v4(
             )
             return
 
-        ok(f"Added {len(succeeded)} V4 client(s): {', '.join(names)}")
-        handoff_failed = False
-        for name, user in succeeded:
-            if len(succeeded) > 1:
-                err_console.print()
-                err_console.print(f"  [bold]— {escape(name)} —[/bold]")
-            handoff_error = print_subscription(cluster.panel, user)
-            if isinstance(handoff_error, str) and handoff_error:
-                handoff_failed = True
-                warn(f"Client '{name}' was added, but its subscription handoff is unavailable: {handoff_error}")
+        ok(f"Added {len(succeeded)} client(s): {', '.join(names)}")
+    handoff_failed = False
+    for links in publish_handoff(cluster, [name for name, _user in succeeded]):
+        if len(succeeded) > 1:
+            err_console.print()
+            err_console.print(f"  [bold]— {escape(links.username)} —[/bold]")
+        if not links.subscription_url:
+            handoff_failed = True
+            warn(f"Client '{links.username}' was added, but its links are unavailable: {links.error}")
+            continue
+        if links.error:
+            warn(f"Connection page for '{links.username}' is unavailable: {links.error}")
+        print_handoff_links(links.subscription_url, page_url=links.page_url)
 
     err_console.print()
     err_console.print("  [dim]View all clients:  meridian client list[/dim]")

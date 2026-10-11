@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -38,6 +38,7 @@ from meridian.config import (
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
+from meridian.handoff import HandoffLinks, publish_connection_pages
 from meridian.panel_bootstrap import (
     ensure_control_plane_access,
     run_provisioner,
@@ -436,6 +437,10 @@ class SetupRuntime:
             node_count=len(observed_nodes),
             subscription_urls=subscription_urls,
         )
+
+    def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
+        """Publish connection pages for verified users and return their links."""
+        return publish_connection_pages(self._cluster_loader(), usernames)
 
     def _entries(
         self,

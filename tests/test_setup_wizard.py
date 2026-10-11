@@ -9,6 +9,7 @@ from typing import cast
 from meridian.commands.setup_wizard import SetupWizard
 from meridian.compiler import compile_topology
 from meridian.core.setup import SetupDraft
+from meridian.handoff import HandoffLinks
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.persistence import SetupDraftStore
 from meridian.setup.runtime import (
@@ -58,8 +59,18 @@ class _Runtime:
         return SetupVerification(
             plan_hash=draft.applied_plan_hash,
             node_count=1,
-            subscription_urls={"default": "https://panel.example/api/sub/default"},
+            subscription_urls={"default": "https://panel.example/pages/sub/default"},
         )
+
+    def publish_handoff(self, usernames):
+        return [
+            HandoffLinks(
+                name,
+                subscription_url=f"https://panel.example/pages/sub/{name}",
+                page_url=f"https://panel.example/pages/{name}-uuid/",
+            )
+            for name in usernames
+        ]
 
 
 def _services(tmp_path):
@@ -142,7 +153,8 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
         )
     )
     assert draft.review_hash == draft.applied_plan_hash
-    assert any("https://panel.example/api/sub/default" in line for line in io.output)
+    assert any("https://panel.example/pages/default-uuid/" in line for line in io.output)
+    assert any("https://panel.example/pages/sub/default" in line for line in io.output)
 
 
 def test_details_repeats_prompt_and_quit_keeps_progress_file_untouched(

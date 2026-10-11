@@ -59,6 +59,7 @@ from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import redact_string
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
+from meridian.handoff import publish_connection_pages as _publish_handoff
 from meridian.remnawave import RemnawaveError, User
 from meridian.renderers import emit_json
 from meridian.ssh import SSHError
@@ -101,7 +102,7 @@ def _run_add(
 
     cluster = load_cluster()
     if cluster.topology_intent is not None:
-        _run_add_v4(names, cluster, operation, print_subscription=_print_subscription)
+        _run_add_v4(names, cluster, operation, publish_handoff=_publish_handoff)
         return
     panel = make_panel(cluster)
 

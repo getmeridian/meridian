@@ -68,6 +68,15 @@ public = httpx.get(public_url, timeout=20)
 assert public.status_code == 200, (public.status_code, public.text[:200])
 assert set(parse_base64_subscription(public.text)) == set(base64_urls)
 assert cluster.panel.secret_path not in str(public.headers), dict(public.headers)
+
+# Setup's handoff published a connection page listing the same links.
+from meridian.handoff import page_url
+
+page_config = httpx.get(page_url(cluster, user) + "config.json", timeout=20)
+assert page_config.status_code == 200, (page_config.status_code, page_config.text[:200])
+page = page_config.json()
+assert page["subscription_url"] == public_url
+assert {entry["url"] for entry in page["protocols"]} == set(base64_urls)
 addresses_by_format = {
     "base64": base64_endpoint_addresses(base64_urls),
     "xray-json": endpoint_addresses(xray_config),

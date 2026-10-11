@@ -599,12 +599,14 @@ class SetupWizard:
     def _handoff(self, draft: SetupDraft) -> WizardOutcome:
         verification = self._verification or self.runtime.verify(draft)
         self.io.write("[bold green]Meridian is ready.[/bold green]")
-        for username, url in sorted(verification.subscription_urls.items()):
-            self.io.write(f"  {username}: [bold]{url}[/bold]")
-        self.io.write(
-            "[dim]Import this URL in a supported app. Remnawave serves "
-            "the correct client format from the canonical subscription.[/dim]"
-        )
+        for links in self.runtime.publish_handoff(sorted(verification.subscription_urls)):
+            self.io.write(f"  [bold]{links.username}[/bold]")
+            if links.page_url:
+                self.io.write(f"    Share this page: [bold]{links.page_url}[/bold]")
+            else:
+                self.io.write(f"    [warn]Connection page unavailable: {links.error}[/warn]")
+            self.io.write(f"    Or import this subscription: {links.subscription_url}")
+        self.io.write("[dim]The page has QR codes and app links; the subscription keeps apps up to date.[/dim]")
         self.service.complete_handoff()
         return "completed"
 
