@@ -13,10 +13,11 @@ class Uninstall:
     """Remove all Meridian proxy components from the server.
 
     Removes: Remnawave containers (panel, node, db, redis), Docker volumes,
-    nginx Meridian configs, TLS certificates, web files, cron jobs,
-    server credentials, CLI symlink, UFW rules.
+    nginx Meridian configs, Realm units, TLS certificates, web files, cron
+    jobs, server credentials, CLI symlink, UFW rules (including tagged V4
+    rules).
 
-    Also cleans up HAProxy/Caddy configs from earlier Meridian deployments.
+    Also cleans up 3x-ui and HAProxy/Caddy from earlier Meridian deployments.
 
     Does NOT remove: Docker engine, system packages, SSH settings.
     """
@@ -31,15 +32,28 @@ class Uninstall:
             # Remnawave node
             "cd /opt/remnanode && docker compose down --rmi all -v 2>/dev/null; true",
             "rm -rf /opt/remnanode",
-            # Realm transparent relay
+            # Meridian 3.x panel (3x-ui), so teardown also clears pre-4.0 deployments
+            "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
+            "rm -rf /opt/3x-ui",
+            # Realm transparent relay (single relay and per-hop V4 units)
             "systemctl stop meridian-relay 2>/dev/null; systemctl disable meridian-relay 2>/dev/null; true",
             "rm -f /etc/systemd/system/meridian-relay.service /usr/local/bin/realm /etc/meridian/realm.toml",
+            (
+                "for unit in /etc/systemd/system/meridian-realm-*.service; do"
+                ' [ -e "$unit" ] || continue; name=$(basename "$unit" .service);'
+                ' systemctl stop "$name" 2>/dev/null; systemctl disable "$name" 2>/dev/null; rm -f "$unit";'
+                " done; true"
+            ),
             # Docker volumes (may remain after compose down)
             "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
             # nginx (+ systemd restart override)
             "systemctl stop nginx 2>/dev/null; systemctl disable nginx 2>/dev/null; true",
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",
             "rm -rf /etc/nginx/stream.d/relay-maps",
+            (
+                "rm -f /etc/nginx/stream.d/meridian-v4-*.conf"
+                " /etc/nginx/sites-available/meridian-v4-*.conf /etc/nginx/sites-enabled/meridian-v4-*.conf"
+            ),
             "rm -rf /etc/systemd/system/nginx.service.d",
             # TLS certificates
             "rm -rf /etc/ssl/meridian",
@@ -62,8 +76,8 @@ class Uninstall:
                 " | grep -v 'acme.sh'"
                 " | crontab - 2>/dev/null; true"
             ),
-            # Server credentials and scripts
-            "rm -rf /etc/meridian /root/meridian",
+            # Server credentials, scripts, and V4 baseline attestations
+            "rm -rf /etc/meridian /root/meridian /var/lib/meridian",
             # CLI symlink
             "rm -f /usr/local/bin/meridian",
             # Systemd daemon-reload after removing units and overrides
@@ -71,6 +85,14 @@ class Uninstall:
             # UFW rules
             "ufw delete allow 443/tcp 2>/dev/null; true",
             "ufw delete allow 80/tcp 2>/dev/null; true",
+            "ufw delete allow 443/udp 2>/dev/null; true",
+            # V4 rules carry a meridian-v4-* comment; delete highest number first so
+            # numbering stays valid. SSH rules come from the baseline and are untagged.
+            (
+                "ufw status numbered 2>/dev/null"
+                r" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*# meridian-v4-.*/\1/p'"
+                ' | sort -rn | while read -r rule; do ufw --force delete "$rule"; done; true'
+            ),
             # fail2ban
             "systemctl stop fail2ban 2>/dev/null; systemctl disable fail2ban 2>/dev/null; true",
         ]
