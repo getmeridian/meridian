@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import shlex
 import sys
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -282,8 +283,27 @@ def _reachable_reality_targets(conn: ServerConnection) -> list[str]:
     return reachable
 
 
-def _verify_traffic(server_ip: str, client: str) -> tuple[TrafficOutcome, str]:
-    """Push real traffic through the delivered subscription, as `meridian test` does."""
+def _verify_traffic(
+    server_ip: str,
+    client: str,
+    *,
+    attempts: int = 4,
+    delay: float = 10,
+) -> tuple[TrafficOutcome, str]:
+    """Push real traffic through the delivered subscription, allowing node warm-up.
+
+    The node restarts Xray when its profile changes, so a check right after
+    apply can fail before the new inbound accepts connections.
+    """
+    for attempt in range(attempts):
+        outcome, detail = _traffic_once(server_ip, client)
+        if outcome != "failed" or attempt + 1 == attempts:
+            return outcome, detail
+        time.sleep(delay)
+    return "inconclusive", "no traffic check ran"
+
+
+def _traffic_once(server_ip: str, client: str) -> tuple[TrafficOutcome, str]:
     from meridian.commands.test import collect_test_result
 
     try:

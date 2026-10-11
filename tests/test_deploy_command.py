@@ -155,3 +155,13 @@ def test_probe_keeps_candidate_order_and_drops_unreachable_targets() -> None:
     conn.when("https://www.cloudflare.com/", stdout="1.1")  # no HTTP/2
 
     assert _reachable_reality_targets(conn) == ["dl.google.com"]
+
+
+def test_traffic_check_waits_for_node_warm_up_before_declaring_failure(monkeypatch) -> None:
+    from meridian.commands import deploy
+
+    outcomes = iter([("failed", "broken pipe"), ("failed", "broken pipe"), ("ok", "exit IP 198.51.100.10")])
+    monkeypatch.setattr(deploy, "_traffic_once", lambda *_args: next(outcomes))
+    monkeypatch.setattr(deploy.time, "sleep", lambda _seconds: None)
+
+    assert deploy._verify_traffic("198.51.100.10", "default") == ("ok", "exit IP 198.51.100.10")
