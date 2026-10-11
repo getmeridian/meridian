@@ -266,7 +266,8 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         machine_flags=["--json", "--include-schemas"],
         stability="stable",
         description=(
-            "List migrated command contracts; with --include-schemas, embed envelope, data, error, and failure schemas."
+            "List machine-readable command contracts; with --include-schemas, "
+            "embed envelope, data, error, and failure schemas."
         ),
     ),
     "api.schema": CommandContract(

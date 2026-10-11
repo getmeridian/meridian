@@ -36,7 +36,7 @@ def run_schemas(*, json_output: bool = False, include_schemas: bool = False) -> 
 
 
 def run_commands(*, json_output: bool = False, include_schemas: bool = False) -> None:
-    """List migrated meridian-core command contracts."""
+    """List machine-readable command contracts."""
     operation = OperationContext()
     with error_context("api.commands", timer=operation.timer):
         catalog = command_catalog(include_schemas=include_schemas and (json_output or is_json_mode()))

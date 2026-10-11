@@ -9,7 +9,7 @@ export const commandCatalog = {
       ],
       "command": "api.commands",
       "data_schema": "api-commands",
-      "description": "List migrated command contracts; with --include-schemas, embed envelope, data, error, and failure schemas.",
+      "description": "List machine-readable command contracts; with --include-schemas, embed envelope, data, error, and failure schemas.",
       "envelope_schema": "api-commands-envelope",
       "error_schema": "error",
       "exit_codes": {

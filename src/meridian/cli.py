@@ -174,7 +174,7 @@ def _argv_command_name(args: list[str] | None = None) -> str:
 
 
 def _argv_supports_global_json(args: list[str] | None = None) -> bool:
-    """Return True when global --json maps to a migrated command envelope."""
+    """Return True when global --json maps to a command envelope."""
     positionals = _argv_positionals(args)
     if not positionals:
         return False
@@ -927,7 +927,7 @@ def api_commands_cmd(
     json_mode: bool = typer.Option(False, "--json", help="Output command catalog as JSON envelope"),
     include_schemas: bool = typer.Option(False, "--include-schemas", help="Include envelope and data schemas"),
 ) -> None:
-    """List migrated meridian-core command contracts"""
+    """List machine-readable command contracts"""
     from meridian.commands.api import run_commands
 
     if json_mode or include_schemas:
