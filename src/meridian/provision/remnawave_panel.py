@@ -236,6 +236,49 @@ POSTGRES_DB=remnawave
     return lines
 
 
+_PERSISTENT_PANEL_SECRETS = ("POSTGRES_PASSWORD", "JWT_AUTH_SECRET", "JWT_API_TOKENS_SECRET", "METRICS_PASS")
+
+
+def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict[str, str] | StepResult | None:
+    """Return secrets from an existing panel ``.env`` so restarts never rotate them.
+
+    PostgreSQL keeps the password it was initialised with and every API token is
+    signed with the JWT secrets, so regenerating them orphans the database.
+    Returns None for a genuinely fresh install, or a failed StepResult when
+    panel data exists but its secrets cannot be recovered.
+    """
+    env_path = f"{panel_dir}/.env"
+    if conn.run(f"test -f {shlex.quote(env_path)}", timeout=15).returncode != 0:
+        data_dir = shlex.quote(f"{panel_dir}/data")
+        has_data = conn.run(f'test -d {data_dir} && test -n "$(ls -A {data_dir})"', timeout=15)
+        if has_data.returncode == 0:
+            return StepResult(
+                name=DeployRemnawavePanel.name,
+                status="failed",
+                detail=(
+                    f"{panel_dir}/data exists but {env_path} is missing; refusing to create new "
+                    f"database credentials. Restore {env_path}, or remove {panel_dir} to start fresh."
+                ),
+            )
+        return None
+
+    current = conn.get_text(env_path, timeout=15)
+    values: dict[str, str] = {}
+    if current.returncode == 0:
+        for line in current.stdout.splitlines():
+            key, sep, value = line.partition("=")
+            if sep and not key.lstrip().startswith("#"):
+                values[key.strip()] = value.strip()
+    missing = [key for key in _PERSISTENT_PANEL_SECRETS if not values.get(key)]
+    if missing:
+        return StepResult(
+            name=DeployRemnawavePanel.name,
+            status="failed",
+            detail=f"{env_path} is unreadable or missing {', '.join(missing)}; refusing to rotate panel secrets.",
+        )
+    return values
+
+
 def render_subscription_env(
     panel_url: str = "http://remnawave:3000",
     api_token: str = "",
@@ -297,7 +340,9 @@ class DeployRemnawavePanel:
     """Deploy Remnawave panel stack as Docker containers.
 
     Includes backend, PostgreSQL, Valkey, and subscription page.
-    Idempotency: skipped when all core containers are already running.
+    Idempotency: skipped when all core containers are already running. When
+    restarting a stopped or broken stack, secrets from the existing ``.env``
+    are reused, never regenerated.
     """
 
     name = "Deploy Remnawave panel"
@@ -401,11 +446,20 @@ class DeployRemnawavePanel:
                 detail="added subscription page to existing panel",
             )
 
-        # -- Fresh deploy via deploy_compose_stack --
-        db_password = secrets.token_hex(16)
-        jwt_auth_secret = secrets.token_hex(32)
-        jwt_api_secret = secrets.token_hex(32)
-        metrics_password = secrets.token_hex(8)
+        # -- (Re)start via deploy_compose_stack, never rotating existing secrets --
+        existing = _load_existing_panel_secrets(conn, panel_dir)
+        if isinstance(existing, StepResult):
+            return existing
+        if existing is None:
+            db_password = secrets.token_hex(16)
+            jwt_auth_secret = secrets.token_hex(32)
+            jwt_api_secret = secrets.token_hex(32)
+            metrics_password = secrets.token_hex(8)
+        else:
+            db_password = existing["POSTGRES_PASSWORD"]
+            jwt_auth_secret = existing["JWT_AUTH_SECRET"]
+            jwt_api_secret = existing["JWT_API_TOKENS_SECRET"]
+            metrics_password = existing["METRICS_PASS"]
 
         env_content = _render_panel_env(
             panel_port=panel_port,
@@ -417,7 +471,12 @@ class DeployRemnawavePanel:
             metrics_password=metrics_password,
             telegram=ctx.cluster.telegram if ctx.cluster else None,
         )
+        # Keep the subscription page's real API token if bootstrap already wrote one.
         sub_env_content = render_subscription_env()
+        if existing is not None:
+            current_sub_env = conn.get_text(f"{panel_dir}/.env.subscription", timeout=15)
+            if current_sub_env.returncode == 0 and current_sub_env.stdout.strip():
+                sub_env_content = current_sub_env.stdout
         compose_content = render_panel_compose(
             image=image,
             panel_port=panel_port,

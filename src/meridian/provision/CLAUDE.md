@@ -12,7 +12,7 @@
 
 **Post-provisioner API setup** — Container deployment is SSH-based (provisioner steps). Panel/user/profile configuration happens via direct REST API calls AFTER containers are running. This separates infrastructure (SSH) from configuration (REST).
 
-**nginx + TLS extracted** — `nginx_render.py` owns pure config string rendering (stream SNI, http server blocks). `nginx.py` owns step classes (InstallNginx, ConfigureNginx, DeployPWAAssets) that call `conn.run()`. `tls.py` owns acme.sh cert issuance. Connection page deployment stays in `services.py`.
+**nginx + TLS extracted** — `nginx_render.py` owns pure config string rendering (stream SNI, http server blocks). `nginx.py` owns step classes (InstallNginx, ConfigureNginx, DeployPWAAssets) that call `conn.run()`. `tls.py` owns acme.sh cert issuance.
 
 **Semantic ensure helpers** — `ensure.py` wraps package, file, service, and UFW operations. Prefer these helpers plus `ServerFacts` for idempotency checks instead of duplicating check/act shell snippets.
 
@@ -26,7 +26,7 @@
 ## What's done well
 - **Idempotent containers** — panel/node steps check `docker inspect` before deploying.
 - **Health polling** — panel step waits for `/api/health`, node step waits for port binding.
-- **Secret generation** — PostgreSQL password, JWT secrets generated per deploy via `secrets.token_hex`.
+- **Secrets generated once** — PostgreSQL password and JWT secrets come from `secrets.token_hex` on first install only; restarts reuse `.env` (Postgres keeps its init password, API tokens depend on the JWT secrets).
 
 ## Pitfalls
 
