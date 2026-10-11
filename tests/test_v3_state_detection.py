@@ -24,7 +24,8 @@ def test_client_list_explains_meridian_3_state(tmp_home: Path) -> None:
     assert "No cluster configured" not in output
 
 
-def test_server_list_explains_meridian_3_registry(tmp_home: Path) -> None:
+def test_server_list_explains_meridian_3_registry(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr("meridian.commands.server.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     (tmp_home / "servers").write_text("198.51.100.7 root\n")
 
     result = runner.invoke(app, ["server", "list"])

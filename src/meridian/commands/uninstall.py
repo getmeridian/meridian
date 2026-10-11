@@ -10,6 +10,7 @@ from meridian.commands.resolve import (
     ensure_server_connection,
     resolve_server,
 )
+from meridian.compiler.deployment import deployment_server_refs
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError
@@ -83,7 +84,10 @@ def run(
                 hint_type="user",
             )
         references = _v4_target_references(cluster, saved_server)
-        if references:
+        # Tearing down the only server of a fleet removes the whole deployment;
+        # otherwise roles must first be removed through the reviewed topology.
+        entire_fleet = deployment_server_refs(cluster.topology_intent) == {saved_server.id}
+        if references and not entire_fleet:
             fail(
                 f"Server {resolved.ip} is still managed by V4 topology: {', '.join(references)}",
                 hint="Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown.",
@@ -204,7 +208,7 @@ def run(
     # Reconcile panel and local topology only after remote uninstall succeeds.
     # A failed panel delete leaves the local node entry as the retry record;
     # rerunning the remote uninstall is idempotent.
-    from meridian.config import CLUSTER_CONFIG
+    from meridian.config import CLUSTER_CONFIG, SETUP_DRAFT_FILE
 
     if cluster.is_configured:
         if is_panel_host:
@@ -212,6 +216,7 @@ def run(
             try:
                 cluster.backup()
                 CLUSTER_CONFIG.unlink(missing_ok=True)
+                SETUP_DRAFT_FILE.unlink(missing_ok=True)
             except (LocalStateError, OSError) as exc:
                 fail(
                     "Remote panel-host teardown completed, but cluster.yml could not be archived or removed",

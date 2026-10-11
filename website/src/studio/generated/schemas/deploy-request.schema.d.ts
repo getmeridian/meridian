@@ -10,6 +10,7 @@ export type Color = string;
 export type Domain = "" | string;
 export type GeoBlock = boolean;
 export type Harden = boolean;
+export type Hysteria2 = boolean;
 export type Icon = string;
 export type Ip = string;
 export type RequestedServer = string;
@@ -29,6 +30,7 @@ export interface DeployRequest {
   domain?: Domain;
   geo_block?: GeoBlock;
   harden?: Harden;
+  hysteria2?: Hysteria2;
   icon?: Icon;
   ip?: Ip;
   requested_server?: RequestedServer;

@@ -33,6 +33,7 @@ run_stage 00-bootstrap.sh
 bash "$SCRIPT_DIR/stages/90-cleanup.sh"
 
 for stage in \
+  05-single-deploy.sh \
   10-deploy.sh \
   20-subscriptions.sh \
   30-resilience.sh

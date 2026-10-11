@@ -277,6 +277,37 @@ def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
     registry.remove.assert_not_called()
 
 
+def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> None:
+    from meridian.setup.single_server import single_server_intent
+
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.2/panel", api_token="token", server_ip="198.51.100.2"),
+        topology_intent=single_server_intent(None, server_ref="srv-only"),
+    )
+    (tmp_home / "cluster.yml").write_text("version: 3\n")
+    (tmp_home / "setup.json").write_text("{}")
+    registry = MagicMock()
+    registry.find.return_value = ServerEntry(id="srv-only", host="198.51.100.2")
+    resolved = SimpleNamespace(ip="198.51.100.2", user="root", conn=MagicMock())
+    provisioner = MagicMock()
+    provisioner.return_value.run.return_value = [SimpleNamespace(status="changed", detail="")]
+
+    with (
+        patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
+        patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
+        patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
+        patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
+        patch.object(cluster, "backup"),
+        patch("meridian.provision.steps.Provisioner", provisioner),
+    ):
+        run(ip=resolved.ip, yes=True)
+
+    provisioner.return_value.run.assert_called_once()
+    assert not (tmp_home / "cluster.yml").exists()
+    assert not (tmp_home / "setup.json").exists()
+    registry.remove.assert_called_once_with(resolved.ip)
+
+
 def test_v4_teardown_allows_server_after_role_and_workload_are_retired() -> None:
     cluster = ClusterConfig(
         topology_intent=SetupIntent(

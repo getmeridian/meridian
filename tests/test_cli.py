@@ -98,26 +98,13 @@ class TestSubcommandHelp:
             "yes": True,
         }
 
-    def test_bare_deploy_is_a_compatibility_alias_for_setup(
-        self,
-        monkeypatch,
-    ) -> None:
-        called = False
-
-        def fake_setup(**_kwargs: object) -> None:
-            nonlocal called
-            called = True
-
+    def test_bare_deploy_asks_for_a_server_and_gives_up_without_one(self, monkeypatch) -> None:
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(
-            "meridian.commands.setup_v4.run",
-            fake_setup,
-        )
 
-        result = runner.invoke(app, ["deploy"])
+        result = runner.invoke(app, ["deploy"], input="\n\n\n")
 
-        assert result.exit_code == 0
-        assert called is True
+        assert result.exit_code == 2
+        assert "No server IP given" in _strip_ansi(result.output)
 
     def test_studio_help(self) -> None:
         result = runner.invoke(app, ["studio", "--help"])
@@ -257,7 +244,7 @@ class TestSubcommandHelp:
         set_json_mode(False)
         set_quiet_mode(False)
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.setup.run", fake_run)
+        monkeypatch.setattr("meridian.commands.deploy.run", fake_run)
 
         result = runner.invoke(
             app,
@@ -282,7 +269,7 @@ class TestSubcommandHelp:
         set_json_mode(False)
         set_quiet_mode(False)
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.setup.run", fake_run)
+        monkeypatch.setattr("meridian.commands.deploy.run", fake_run)
 
         result = runner.invoke(app, ["--json", "deploy", "198.51.100.10", "--yes"])
 

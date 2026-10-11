@@ -331,7 +331,7 @@ def deploy_cmd(
         "",
         "--domain",
         "-d",
-        help="Cloudflare CDN fallback domain",
+        help="Domain for XHTTP/WSS (and Cloudflare CDN fallback)",
     ),
     sni: str = typer.Option(
         "",
@@ -368,47 +368,30 @@ def deploy_cmd(
         "--geo-block/--no-geo-block",
         help="Block Russian domains and IPs (geosite:category-ru + geoip:ru)",
     ),
+    hysteria2: bool = typer.Option(
+        False,
+        "--hysteria2",
+        help="Also offer Hysteria2 over UDP/443 (needs --domain; QUIC is throttled in some regions)",
+    ),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port if non-standard"),
     json_output: bool = typer.Option(False, "--json", help="Emit final deploy result as JSON"),
     events: str = typer.Option("", "--events", help="Stream progress events as JSONL (use: jsonl)"),
     request_path: str = typer.Option("", "--request", help="Deploy-request JSON file or '-' for stdin"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate and plan without SSH changes"),
 ) -> None:
-    """Deploy a VLESS+Reality proxy server
+    """Deploy one server and get a shareable connection link
 
-    Interactive wizard if no IP provided.
+    Asks for the server IP if none is given. For several servers, relays, or
+    routing, use [cyan]meridian setup[/cyan].
 
     [dim]Examples:[/dim]
-      [cyan]meridian deploy[/cyan]                          Interactive wizard
+      [cyan]meridian deploy[/cyan]                          Ask for the server IP
       [cyan]meridian deploy 198.51.100.10[/cyan]            Deploy with defaults
       [cyan]meridian deploy 198.51.100.10 --domain vpn.example[/cyan]  CDN fallback via Cloudflare
       [cyan]meridian deploy 198.51.100.10 --no-harden[/cyan]  Skip SSH and firewall hardening
       [cyan]meridian deploy --request deploy.json --json --events=jsonl[/cyan]
     """
-    if (
-        not ip
-        and not server
-        and not request_path
-        and not dry_run
-        and not json_output
-        and not events
-        and not domain
-        and not sni
-        and not client_name
-        and not display_name
-        and not icon
-        and not color
-        and not warp
-        and geo_block
-        and harden
-        and not yes
-    ):
-        from meridian.commands.setup_v4 import run as run_setup
-
-        run_setup()
-        return
-
-    from meridian.commands.setup import run
+    from meridian.commands.deploy import run
     from meridian.console import is_json_mode
 
     json_enabled = json_output or is_json_mode() or bool(events)
@@ -428,6 +411,7 @@ def deploy_cmd(
         color=color,
         warp=warp,
         geo_block=geo_block,
+        hysteria2=hysteria2,
         ssh_port=ssh_port,
         request_path=request_path,
         json_output=json_enabled,

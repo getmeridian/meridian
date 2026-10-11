@@ -37,6 +37,7 @@ class DeployRequest(CoreModel):
     color: str = ""
     warp: bool = False
     geo_block: bool = True
+    hysteria2: bool = False
     ssh_port: int = Field(default=22, ge=1, le=65535)
 
 

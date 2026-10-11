@@ -41,6 +41,11 @@ export const deployRequestSchema = {
       "title": "Harden",
       "type": "boolean"
     },
+    "hysteria2": {
+      "default": false,
+      "title": "Hysteria2",
+      "type": "boolean"
+    },
     "icon": {
       "default": "",
       "title": "Icon",

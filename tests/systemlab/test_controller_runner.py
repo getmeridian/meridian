@@ -10,6 +10,7 @@ _ROOT = Path(__file__).parents[2]
 _RUNNER = _ROOT / "tests/systemlab/scripts/controller-run.sh"
 _STAGES = (
     "00-bootstrap.sh",
+    "05-single-deploy.sh",
     "10-deploy.sh",
     "20-subscriptions.sh",
     "30-resilience.sh",
