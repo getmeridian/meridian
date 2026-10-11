@@ -1,4 +1,4 @@
-"""Cluster schema V3 workload bindings, migration, and wire conversion."""
+"""Cluster schema V3 topology intent, workload bindings, and wire conversion."""
 
 from __future__ import annotations
 
@@ -8,12 +8,8 @@ from typing import Any
 from meridian.cluster import (
     ActionCheckpoint,
     ClusterConfig,
-    InboundRef,
     ManagedResourceBinding,
-    NodeEntry,
-    PanelConfig,
     RealityKeyBinding,
-    RelayEntry,
     ResourceAllocation,
     WorkloadBinding,
 )
@@ -63,15 +59,8 @@ def serialize_cluster_v3(config: ClusterConfig) -> dict[str, Any]:
     return output
 
 
-def load_cluster_v3(
-    data: dict[str, Any],
-    *,
-    panel: PanelConfig,
-    nodes: list[NodeEntry],
-    inbounds: dict[str, InboundRef],
-    relays: list[RelayEntry],
-) -> LoadedClusterV3:
-    """Load V3 state and conservatively adopt a V2 global workload."""
+def load_cluster_v3(data: dict[str, Any]) -> LoadedClusterV3:
+    """Load the topology intent and its durable compiled-resource state."""
     topology_intent = None
     if data.get("topology_intent") is not None:
         topology_intent = SetupIntent.model_validate(data["topology_intent"])
@@ -82,25 +71,6 @@ def load_cluster_v3(
     )
     allocations = _load_map(data.get("allocations", {}), ResourceAllocation)
     checkpoints = _load_map(data.get("action_checkpoints", {}), ActionCheckpoint)
-
-    source_version = data.get("version", 3)
-    if isinstance(source_version, int) and source_version < 3:
-        if not workloads:
-            workloads = _migrate_v2_workload(
-                panel=panel,
-                profile_uuid=str(data.get("config_profile_uuid", "")),
-                profile_name=str(data.get("config_profile_name", "")),
-                nodes=nodes,
-                inbounds=inbounds,
-            )
-        if not managed_bindings:
-            managed_bindings = _migrate_v2_bindings(
-                profile_uuid=str(data.get("config_profile_uuid", "")),
-                nodes=nodes,
-                inbounds=inbounds,
-                relays=relays,
-                squad_uuid=str(data.get("squad_uuid", "")),
-            )
 
     return LoadedClusterV3(
         topology_intent=topology_intent,
@@ -218,79 +188,6 @@ def _load_map(raw: Any, cls: type[Any]) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {}
     return {str(key): _load_dataclass(value, cls) for key, value in raw.items()}
-
-
-def _migrate_v2_workload(
-    *,
-    panel: PanelConfig,
-    profile_uuid: str,
-    profile_name: str,
-    nodes: list[NodeEntry],
-    inbounds: dict[str, InboundRef],
-) -> list[WorkloadBinding]:
-    if not profile_uuid and not profile_name and not nodes and not inbounds:
-        return []
-    server_refs = [node.ip for node in nodes if node.ip]
-    if not server_refs and panel.server_ip:
-        server_refs = [panel.server_ip]
-    reality_keys = {
-        node.ip: RealityKeyBinding(
-            public_key=node.reality_public_key,
-            private_key=node.reality_private_key,
-            short_id=node.reality_short_id,
-        )
-        for node in nodes
-        if node.ip and (node.reality_public_key or node.reality_private_key or node.reality_short_id)
-    }
-    return [
-        WorkloadBinding(
-            id="legacy-exit",
-            generation=0,
-            active=True,
-            server_refs=server_refs,
-            config_profile_uuid=profile_uuid,
-            config_profile_name=profile_name or "Meridian Legacy",
-            node_uuids={node.ip: node.uuid for node in nodes if node.ip and node.uuid},
-            inbound_uuids={str(protocol): ref.uuid for protocol, ref in inbounds.items() if ref.uuid},
-            reality_keys=reality_keys,
-            adopted=True,
-        )
-    ]
-
-
-def _migrate_v2_bindings(
-    *,
-    profile_uuid: str,
-    nodes: list[NodeEntry],
-    inbounds: dict[str, InboundRef],
-    relays: list[RelayEntry],
-    squad_uuid: str,
-) -> dict[str, ManagedResourceBinding]:
-    bindings: dict[str, ManagedResourceBinding] = {}
-
-    def adopt(logical_id: str, resource_kind: str, remote_id: str) -> None:
-        if remote_id:
-            key = f"{logical_id}@0"
-            bindings[key] = ManagedResourceBinding(
-                logical_id=logical_id,
-                resource_kind=resource_kind,
-                generation=0,
-                remote_id=remote_id,
-                active=True,
-                adopted=True,
-            )
-
-    adopt("profile:legacy-exit", "config_profile", profile_uuid)
-    for protocol, ref in inbounds.items():
-        adopt(f"inbound:legacy-exit:{protocol}", "inbound", ref.uuid)
-    for node in nodes:
-        adopt(f"binding:legacy-exit:{node.name or node.ip}", "node_binding", node.uuid)
-    for relay_index, relay in enumerate(relays):
-        relay_id = relay.name or f"relay-{relay_index}"
-        for protocol, host_uuid in relay.host_uuids.items():
-            adopt(f"host:{relay_id}:{protocol}", "host", host_uuid)
-    adopt("squad:access", "internal_squad", squad_uuid)
-    return bindings
 
 
 def _require_mapping_values(data: dict[str, Any], key: str) -> None:

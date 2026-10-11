@@ -25,11 +25,12 @@ def test_cluster_example_yml_loads_without_error() -> None:
     # The file is a documentation example; it must populate the major
     # sections so users see what each looks like.
     assert cfg.panel.url
-    assert len(cfg.nodes) >= 1
-    assert cfg.desired_nodes is not None and len(cfg.desired_nodes) >= 1
-    assert cfg.desired_clients is not None
-    assert cfg.desired_relays is not None
+    assert cfg.topology_intent is not None
+    assert len(cfg.topology_intent.exits) >= 1
+    assert len(cfg.topology_intent.transparent_relays) >= 1
+    assert cfg.topology_intent.access.users
     assert cfg.subscription_page is not None
+    assert cfg._extra == {}
 
 
 def test_cluster_example_yml_validates() -> None:

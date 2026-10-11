@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from meridian.cluster import (
-    CURRENT_CLUSTER_VERSION,
     ActionCheckpoint,
     ClusterConfig,
     ManagedResourceBinding,
@@ -52,73 +51,6 @@ def _intent() -> SetupIntent:
         default_egress_ref="exit-a",
         access=AccessIntent(users=["default"]),
     )
-
-
-class TestV2Migration:
-    def test_global_profile_is_adopted_as_one_generation_zero_workload(self, tmp_path: Path) -> None:
-        path = tmp_path / "cluster.yml"
-        path.write_text(
-            "version: 2\n"
-            "panel:\n"
-            "  server_ip: 198.51.100.10\n"
-            f"config_profile_uuid: {_PROFILE_UUID}\n"
-            "config_profile_name: Meridian Default\n"
-            f"squad_uuid: {_SQUAD_UUID}\n"
-            "nodes:\n"
-            "  - ip: 198.51.100.20\n"
-            f"    uuid: {_NODE_UUID}\n"
-            "    name: exit-a\n"
-            "    reality_public_key: public\n"
-            "    reality_private_key: private\n"
-            "    reality_short_id: abcdef0123456789\n"
-            "inbounds:\n"
-            "  reality:\n"
-            f"    uuid: {_INBOUND_UUID}\n"
-            "    tag: VLESS_REALITY\n"
-            "relays:\n"
-            "  - ip: 198.51.100.30\n"
-            "    name: relay-a\n"
-            "    exit_node_ip: 198.51.100.20\n"
-            "    host_uuids:\n"
-            f"      reality: {_HOST_UUID}\n"
-        )
-
-        cluster = ClusterConfig.load(path)
-
-        assert cluster.version == CURRENT_CLUSTER_VERSION == 3
-        assert len(cluster.workloads) == 1
-        workload = cluster.workloads[0]
-        assert workload.id == "legacy-exit"
-        assert workload.generation == 0
-        assert workload.active is True
-        assert workload.adopted is True
-        assert workload.config_profile_uuid == _PROFILE_UUID
-        assert workload.node_uuids == {"198.51.100.20": _NODE_UUID}
-        assert workload.inbound_uuids == {"reality": _INBOUND_UUID}
-        assert workload.reality_keys["198.51.100.20"] == RealityKeyBinding(
-            public_key="public",
-            private_key="private",
-            short_id="abcdef0123456789",
-        )
-        assert cluster.managed_bindings["profile:legacy-exit@0"].remote_id == _PROFILE_UUID
-        assert cluster.managed_bindings["host:relay-a:reality@0"].remote_id == _HOST_UUID
-        assert cluster.managed_bindings["squad:access@0"].remote_id == _SQUAD_UUID
-
-        cluster.save(path)
-        reloaded = ClusterConfig.load(path)
-
-        assert reloaded.workloads == cluster.workloads
-        assert reloaded.managed_bindings == cluster.managed_bindings
-        assert "version: 3" in path.read_text()
-
-    def test_partial_v2_reality_keys_fail_closed_instead_of_rotating(self, tmp_path: Path) -> None:
-        path = tmp_path / "cluster.yml"
-        path.write_text(
-            f"version: 2\nnodes:\n  - ip: 198.51.100.20\n    uuid: {_NODE_UUID}\n    reality_public_key: public-only\n"
-        )
-
-        with pytest.raises(LocalStateCorruptedError, match="must contain public, private, and short-ID"):
-            ClusterConfig.load(path)
 
 
 class TestV3RoundTrip:

@@ -12,12 +12,11 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
 from urllib.parse import quote, urlsplit
 
-from meridian.core.inputs import validate_hostname_value, validate_optional_transport_path_value
+from meridian.core.inputs import validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
 
 logger = logging.getLogger("meridian.cluster")
@@ -41,15 +40,6 @@ class ClusterConfigExternallyModifiedError(RuntimeError):
     process's) writes. Most callers should surface the error and ask
     the user to retry after reloading.
     """
-
-
-class ProtocolKey(StrEnum):
-    """Protocol identifiers — single source of truth for string keys."""
-
-    REALITY = "reality"
-    XHTTP = "xhttp"
-    WSS = "wss"
-    HYSTERIA2 = "hysteria2"
 
 
 # ---------------------------------------------------------------------------
@@ -93,59 +83,12 @@ class PanelConfig:
 
 
 @dataclass
-class NodeEntry:
-    """A proxy node running Remnawave node + Xray."""
-
-    ip: str = ""
-    uuid: str = ""  # Remnawave node UUID
-    name: str = ""  # friendly name (e.g., "finland")
-    ssh_user: str = "root"
-    ssh_port: int = 22
-    sni: str = ""  # Reality SNI target
-    domain: str = ""  # optional domain for WSS/XHTTP
-    is_panel_host: bool = False  # panel runs on this node too
-    deployed_with: str = ""  # Meridian CLI version
-    xhttp_path: str = ""  # persisted XHTTP path (reused across redeploys)
-    ws_path: str = ""  # persisted WebSocket path (reused across redeploys)
-    reality_public_key: str = ""  # Reality public key (for test command)
-    reality_short_id: str = ""  # Reality short ID
-    reality_private_key: str = field(default="", repr=False)  # Reality private key (for redeploy config rebuild)
-    warp: bool = False  # Cloudflare WARP outbound enabled
-    hysteria2: bool = True  # Hysteria2 UDP/443 fallback enabled
-    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class RelayEntry:
-    """A Realm TCP relay forwarding traffic to an exit node."""
-
-    ip: str = ""
-    name: str = ""  # friendly name (e.g., "ru-moscow")
-    port: int = 443  # relay listen port
-    exit_node_ip: str = ""  # which node this relay forwards to
-    host_uuids: dict[str, str] = field(default_factory=dict)  # protocol key → Remnawave host UUID
-    sni: str = ""  # relay-specific SNI target
-    ssh_user: str = "root"
-    ssh_port: int = 22
-    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
 class BrandingConfig:
     """Server branding for connection pages."""
 
     server_name: str = ""  # display name (e.g., "Alice's VPN")
     icon: str = ""  # emoji or data URI
     color: str = ""  # palette name (ocean, sunset, forest, lavender, rose, slate)
-    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class InboundRef:
-    """Cached reference to a Remnawave inbound."""
-
-    uuid: str = ""
-    tag: str = ""
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -175,61 +118,6 @@ class TelegramConfig:
     notify_service: str = ""
     notify_tblocker: str = ""
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class DesiredNode:
-    """A node that should exist in the fleet (desired state for plan/apply).
-
-    ``warp`` uses ``None`` as "not specified — keep whatever the server has".
-    ``False`` means "explicitly disable WARP". This matches the name/sni/domain
-    sentinel pattern and prevents a desired node that omits warp from
-    spuriously triggering an UPDATE_NODE that disables WARP on every apply.
-    """
-
-    host: str = ""  # IP address
-    name: str = ""  # friendly name (e.g., "de-fra-1")
-    ssh_user: str = "root"
-    ssh_port: int = 22
-    domain: str = ""  # optional domain for WSS/XHTTP
-    sni: str = ""  # Reality SNI target
-    warp: bool | None = None  # None = keep current; False = explicitly disable
-    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class DesiredRelay:
-    """A relay that should exist in the fleet (desired state for plan/apply)."""
-
-    host: str = ""  # IP address
-    name: str = ""  # friendly name (e.g., "relay-msk")
-    exit_node: str = ""  # name or IP of the exit node
-    sni: str = ""  # camouflage target (empty = use DEFAULT_SNI)
-    ssh_user: str = "root"
-    ssh_port: int = 22
-    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
-
-
-@dataclass
-class AppliedState:
-    """Reconciler snapshot of the last successfully applied desired state.
-
-    Tracks which resources were present in the desired declaration at the
-    time of the last successful ``meridian apply``. This lets ``compute_plan``
-    distinguish intentional removal (resource was in applied, user removed
-    it from desired) from drift (resource exists in panel but was never in
-    desired).
-
-    Semantics of None vs empty list:
-    - ``None``  = no history (first apply, or category unmanaged). compute_plan
-      treats every actual-not-desired resource as drift (conservative).
-    - ``[]``    = managed and converged to zero. compute_plan treats
-      actual-not-desired resources as intentional removals.
-    """
-
-    nodes: list[str] | None = None  # applied node host IPs
-    clients: list[str] | None = None  # applied client usernames
-    relays: list[str] | None = None  # applied relay host IPs
 
 
 @dataclass
@@ -320,32 +208,18 @@ class ClusterConfig:
 
     version: int = CURRENT_CLUSTER_VERSION
     panel: PanelConfig = field(default_factory=PanelConfig)
-    config_profile_uuid: str = ""
-    config_profile_name: str = ""
-    squad_uuid: str = ""  # Remnawave internal squad for user-inbound access control
-    nodes: list[NodeEntry] = field(default_factory=list)
-    relays: list[RelayEntry] = field(default_factory=list)
     branding: BrandingConfig = field(default_factory=BrandingConfig)
-    inbounds: dict[str, InboundRef] = field(default_factory=dict)
-    # v2: subscription page config (None = not declared, don't manage)
+    # Subscription page container path and deployment evidence (set by provisioning).
     subscription_page: SubscriptionPageConfig | None = None
-    # v2: Telegram notifications (None = not configured, disable in panel)
+    # Telegram notifications (None = not configured, disable in panel)
     telegram: TelegramConfig | None = None
-    # v2: desired state for declarative plan/apply workflow
-    # None = not declared (don't manage). [] = declared empty (manage, want zero).
-    desired_nodes: list[DesiredNode] | None = None
-    desired_clients: list[str] | None = None
-    desired_relays: list[DesiredRelay] | None = None
-    # v2: reconciler applied-state snapshot (last successful apply)
-    applied_state: AppliedState = field(default_factory=AppliedState)
-    # v3: workload-scoped topology and durable compiled-resource state.
+    # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
     workloads: list[WorkloadBinding] = field(default_factory=list)
     managed_bindings: dict[str, ManagedResourceBinding] = field(default_factory=dict)
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
     connection_page_markers: list[str] = field(default_factory=list)
-    connection_page_failures: list[str] = field(default_factory=list)
     active_generation: int = 0
     active_plan_hash: str = ""
     pending_generation: int = 0
@@ -413,64 +287,6 @@ class ClusterConfig:
         if not _is_valid_port(self.panel.ssh_port):
             errors.append(f"panel.ssh_port is out of range: {self.panel.ssh_port}")
 
-        # Node validations
-        node_ips: list[str] = []
-        node_names: list[str] = []
-        for i, node in enumerate(self.nodes):
-            label = f"nodes[{i}]"
-            if node.ip:
-                if not _is_valid_ip(node.ip):
-                    errors.append(f"{label}.ip is not a valid IP: {node.ip}")
-                if node.ip in node_ips:
-                    errors.append(f"{label}.ip is a duplicate: {node.ip}")
-                node_ips.append(node.ip)
-            if node.name:
-                # Duplicate node names silently misroute relay exit_node lookups —
-                # compute_plan uses a last-wins name→IP map while cluster.find_node
-                # returns first match. Disallow at validation time.
-                if node.name in node_names:
-                    errors.append(f"{label}.name is a duplicate: {node.name}")
-                node_names.append(node.name)
-            if node.uuid and not _is_valid_uuid(node.uuid):
-                errors.append(f"{label}.uuid is not a valid UUID: {node.uuid}")
-            if not _is_valid_port(node.ssh_port):
-                errors.append(f"{label}.ssh_port is out of range: {node.ssh_port}")
-            _append_hostname_error(errors, f"{label}.sni", node.sni)
-            _append_hostname_error(errors, f"{label}.domain", node.domain)
-            _append_path_error(errors, f"{label}.xhttp_path", node.xhttp_path)
-            _append_path_error(errors, f"{label}.ws_path", node.ws_path)
-
-        # Relay validations
-        relay_endpoints: set[tuple[str, int]] = set()
-        relay_labels: set[str] = set()
-        for i, relay in enumerate(self.relays):
-            label = f"relays[{i}]"
-            if relay.ip and not _is_valid_ip(relay.ip):
-                errors.append(f"{label}.ip is not a valid IP: {relay.ip}")
-            if not _is_valid_port(relay.port):
-                errors.append(f"{label}.port is out of range: {relay.port}")
-            if not _is_valid_port(relay.ssh_port):
-                errors.append(f"{label}.ssh_port is out of range: {relay.ssh_port}")
-            _append_hostname_error(errors, f"{label}.sni", relay.sni)
-            if relay.exit_node_ip and node_ips and relay.exit_node_ip not in node_ips:
-                errors.append(f"{label}.exit_node_ip references unknown node: {relay.exit_node_ip}")
-            # Relay endpoint uniqueness
-            if relay.ip:
-                endpoint = (relay.ip, relay.port)
-                if endpoint in relay_endpoints:
-                    errors.append(f"{label}: duplicate relay endpoint {relay.ip}:{relay.port}")
-                relay_endpoints.add(endpoint)
-            relay_label = _relay_label_value(relay.name, relay.ip)
-            if relay_label:
-                if relay_label in relay_labels:
-                    errors.append(f"{label}.name creates a duplicate relay identity: {relay_label}")
-                relay_labels.add(relay_label)
-
-        # Panel host uniqueness — at most one node can be panel host
-        panel_hosts = [i for i, n in enumerate(self.nodes) if n.is_panel_host]
-        if len(panel_hosts) > 1:
-            errors.append(f"Multiple panel hosts detected: nodes[{panel_hosts[0]}] and nodes[{panel_hosts[1]}]")
-
         # Panel URL format
         if self.panel.url:
             from urllib.parse import urlparse
@@ -478,48 +294,6 @@ class ClusterConfig:
             parsed = urlparse(self.panel.url)
             if parsed.scheme not in ("http", "https") or not parsed.netloc:
                 errors.append(f"panel.url is not a valid HTTP(S) URL: {self.panel.url}")
-
-        # Inbound ref UUIDs
-        for key, ref in self.inbounds.items():
-            if hasattr(ref, "uuid") and ref.uuid and not _is_valid_uuid(ref.uuid):
-                errors.append(f"inbounds[{key}].uuid is not a valid UUID: {ref.uuid}")
-
-        # Desired state: duplicate host AND name detection
-        if self.desired_nodes is not None:
-            desired_node_hosts: list[str] = []
-            desired_node_names: list[str] = []
-            for i, dn in enumerate(self.desired_nodes):
-                if dn.host:
-                    if dn.host in desired_node_hosts:
-                        errors.append(f"desired_nodes[{i}].host is a duplicate: {dn.host}")
-                    desired_node_hosts.append(dn.host)
-                if dn.name:
-                    if dn.name in desired_node_names:
-                        errors.append(f"desired_nodes[{i}].name is a duplicate: {dn.name}")
-                    desired_node_names.append(dn.name)
-                _append_hostname_error(errors, f"desired_nodes[{i}].sni", dn.sni)
-                _append_hostname_error(errors, f"desired_nodes[{i}].domain", dn.domain)
-
-        if self.desired_relays is not None:
-            desired_relay_hosts: list[str] = []
-            desired_relay_labels: set[str] = set()
-            desired_node_host_set = {node.host for node in self.desired_nodes or [] if node.host}
-            for i, dr in enumerate(self.desired_relays):
-                if dr.host:
-                    if dr.host in desired_relay_hosts:
-                        errors.append(f"desired_relays[{i}].host is a duplicate: {dr.host}")
-                    desired_relay_hosts.append(dr.host)
-                    if dr.host in desired_node_host_set:
-                        errors.append(
-                            f"desired_relays[{i}].host also appears in desired_nodes: {dr.host}. "
-                            "Use capability routing for same-server relay+exit designs."
-                        )
-                relay_label = _relay_label_value(dr.name, dr.host)
-                _append_hostname_error(errors, f"desired_relays[{i}].sni", dr.sni)
-                if relay_label:
-                    if relay_label in desired_relay_labels:
-                        errors.append(f"desired_relays[{i}].name creates a duplicate relay identity: {relay_label}")
-                    desired_relay_labels.add(relay_label)
 
         workload_keys: set[tuple[str, int]] = set()
         active_workloads: set[str] = set()
@@ -579,19 +353,11 @@ class ClusterConfig:
             if checkpoint.attempts < 0:
                 errors.append(f"action_checkpoints[{key}].attempts cannot be negative")
 
-        page_marker_fields = (
-            ("connection_page_markers", self.connection_page_markers),
-            ("connection_page_failures", self.connection_page_failures),
-        )
-        for field_name, markers in page_marker_fields:
-            if len(markers) != len(set(markers)):
-                errors.append(f"{field_name} contains duplicate markers")
-            for marker in markers:
-                if re.fullmatch(r"[0-9a-f]{64}", marker) is None:
-                    errors.append(f"{field_name} contains an invalid SHA-256 marker")
-                    break
-        if set(self.connection_page_markers) & set(self.connection_page_failures):
-            errors.append("connection page markers cannot be both deployed and failed")
+        markers = self.connection_page_markers
+        if len(markers) != len(set(markers)):
+            errors.append("connection_page_markers contains duplicate markers")
+        if any(re.fullmatch(r"[0-9a-f]{64}", marker) is None for marker in markers):
+            errors.append("connection_page_markers contains an invalid SHA-256 marker")
 
         for field_name, value in (
             ("active_plan_hash", self.active_plan_hash),
@@ -614,49 +380,6 @@ class ClusterConfig:
     def is_configured(self) -> bool:
         """Whether the cluster has a panel configured."""
         return bool(self.panel.url and self.panel.api_token)
-
-    @property
-    def panel_node(self) -> NodeEntry | None:
-        """Return the node that hosts the panel, if any."""
-        for node in self.nodes:
-            if node.is_panel_host:
-                return node
-        return None
-
-    def find_node(self, query: str) -> NodeEntry | None:
-        """Find a node by IP or name."""
-        for node in self.nodes:
-            if node.ip == query or node.name == query:
-                return node
-        return None
-
-    def remove_node(self, ip_or_name: str) -> bool:
-        """Remove a node by IP or name. Returns True if found and removed."""
-        for i, node in enumerate(self.nodes):
-            if node.ip == ip_or_name or node.name == ip_or_name:
-                self.nodes.pop(i)
-                return True
-        return False
-
-    def find_relay(self, query: str) -> RelayEntry | None:
-        """Find a relay by IP or name."""
-        for relay in self.relays:
-            if relay.ip == query or relay.name == query:
-                return relay
-        return None
-
-    def get_inbound(self, key: str | ProtocolKey) -> InboundRef | None:
-        """Get a cached inbound reference by protocol key."""
-        k = str(key)
-        ref = self.inbounds.get(k)
-        if ref is None:
-            return None
-        if isinstance(ref, dict):
-            from meridian.cluster_persistence import _INBOUND_REF_FIELDS, _load_dataclass
-
-            self.inbounds[k] = _load_dataclass(ref, InboundRef, _INBOUND_REF_FIELDS)
-            return self.inbounds[k]
-        return ref
 
 
 # ---------------------------------------------------------------------------
@@ -691,24 +414,6 @@ def _is_valid_uuid(s: str) -> bool:
 def _is_valid_port(port: int) -> bool:
     """Check if a port number is in the valid range."""
     return isinstance(port, int) and 1 <= port <= 65535
-
-
-def _relay_label_value(name: str, ip: str) -> str:
-    """Return the relay identity used by nginx/Remnawave remark names."""
-    value = name or ip
-    return re.sub(r"[^a-zA-Z0-9_-]", "-", value) if value else ""
-
-
-def _append_hostname_error(errors: list[str], field_name: str, value: str) -> None:
-    if not value:
-        return
-    try:
-        normalized = validate_hostname_value(value)
-    except ValueError as exc:
-        errors.append(f"{field_name} is invalid: {exc}")
-        return
-    if normalized != value:
-        errors.append(f"{field_name} must use canonical form: {normalized}")
 
 
 def _append_path_error(errors: list[str], field_name: str, value: str) -> None:

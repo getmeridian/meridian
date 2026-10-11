@@ -18,16 +18,10 @@ import yaml
 
 from meridian.cluster import (
     CURRENT_CLUSTER_VERSION,
-    AppliedState,
     BrandingConfig,
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
-    DesiredNode,
-    DesiredRelay,
-    InboundRef,
-    NodeEntry,
     PanelConfig,
-    RelayEntry,
     SubscriptionPageConfig,
     TelegramConfig,
     _load_warning,
@@ -49,23 +43,13 @@ def _public_fields(cls: type) -> set[str]:
 
 
 _PANEL_FIELDS = _public_fields(PanelConfig)
-_NODE_FIELDS = _public_fields(NodeEntry)
-_RELAY_FIELDS = _public_fields(RelayEntry)
 _BRANDING_FIELDS = _public_fields(BrandingConfig)
-_INBOUND_REF_FIELDS = _public_fields(InboundRef)
 _SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
-_DESIRED_NODE_FIELDS = _public_fields(DesiredNode)
-_DESIRED_RELAY_FIELDS = _public_fields(DesiredRelay)
-_PRE_V4_1_APPLIED_KEYS = {
-    "desired_clients_applied",
-    "desired_nodes_applied",
-    "desired_relays_applied",
-}
-_KNOWN_TOP = _public_fields(ClusterConfig) | _PRE_V4_1_APPLIED_KEYS
+_KNOWN_TOP = _public_fields(ClusterConfig)
 
 
 _SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
-"""Default SSH credentials — shared by panel, node, relay, and desired-state entries."""
+"""Default panel SSH credentials, omitted from YAML when unchanged."""
 
 
 # ---------------------------------------------------------------------------
@@ -120,48 +104,6 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     if panel_dict:
         out["panel"] = panel_dict
 
-    # Config profile
-    if cfg.config_profile_uuid:
-        out["config_profile_uuid"] = cfg.config_profile_uuid
-    if cfg.config_profile_name:
-        out["config_profile_name"] = cfg.config_profile_name
-    if cfg.squad_uuid:
-        out["squad_uuid"] = cfg.squad_uuid
-
-    # Nodes
-    if cfg.nodes:
-        nodes_out = []
-        for node in cfg.nodes:
-            d = _serialize_dataclass(node)
-            _strip_ssh_defaults(d)
-            if not d.get("is_panel_host"):
-                d.pop("is_panel_host", None)
-            if not d.get("xhttp_path"):
-                d.pop("xhttp_path", None)
-            if not d.get("ws_path"):
-                d.pop("ws_path", None)
-            if not d.get("reality_public_key"):
-                d.pop("reality_public_key", None)
-            if not d.get("reality_short_id"):
-                d.pop("reality_short_id", None)
-            if not d.get("reality_private_key"):
-                d.pop("reality_private_key", None)
-            if not d.get("warp"):
-                d.pop("warp", None)
-            if d.get("hysteria2", True):
-                d.pop("hysteria2", None)
-            nodes_out.append(d)
-        out["nodes"] = nodes_out
-
-    # Relays
-    if cfg.relays:
-        relays_out = []
-        for relay in cfg.relays:
-            d = _serialize_dataclass(relay)
-            _strip_ssh_defaults(d)
-            relays_out.append(d)
-        out["relays"] = relays_out
-
     # Branding
     branding_dict = _serialize_dataclass(cfg.branding)
     for f in ("server_name", "icon", "color"):
@@ -170,21 +112,7 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
     if branding_dict:
         out["branding"] = branding_dict
 
-    # Inbounds
-    if cfg.inbounds:
-        inbounds_out: dict[str, Any] = {}
-        for key, ref in cfg.inbounds.items():
-            str_key = str(key)  # ProtocolKey → plain string
-            if hasattr(ref, "__dataclass_fields__"):
-                inbounds_out[str_key] = _serialize_dataclass(ref)
-            elif isinstance(ref, dict):
-                inbounds_out[str_key] = _strip_none(ref)
-            else:
-                inbounds_out[str_key] = ref
-        if inbounds_out:
-            out["inbounds"] = inbounds_out
-
-    # Subscription page (v2 — only serialize if explicitly declared)
+    # Subscription page (only serialized once provisioning records it)
     if cfg.subscription_page is not None:
         sub_page_dict = _serialize_dataclass(cfg.subscription_page)
         # Only include deployed if True (keep YAML clean)
@@ -193,51 +121,14 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         if sub_page_dict:
             out["subscription_page"] = sub_page_dict
 
-    # Telegram notifications (v2 — only serialize if configured)
+    # Telegram notifications (only serialized if configured)
     if cfg.telegram is not None:
         tg_dict = _serialize_dataclass(cfg.telegram)
         if tg_dict:
             out["telegram"] = tg_dict
 
-    # Desired state (v2 — serialize if present in config, even if empty)
-    # An explicit empty list means "manage this type, want zero" vs absent = "don't manage".
-    if cfg.desired_nodes is not None:
-        desired_nodes_out = []
-        for dn in cfg.desired_nodes:
-            d = _serialize_dataclass(dn)
-            _strip_ssh_defaults(d)
-            # Preserve warp: None → YAML null, False, True are all meaningful.
-            # _serialize_dataclass strips None via _strip_none, so re-add it.
-            d["warp"] = dn.warp
-            desired_nodes_out.append(d)
-        out["desired_nodes"] = desired_nodes_out
-
-    if cfg.desired_clients is not None:
-        out["desired_clients"] = list(cfg.desired_clients)
-
-    if cfg.desired_relays is not None:
-        desired_relays_out = []
-        for dr in cfg.desired_relays:
-            d = _serialize_dataclass(dr)
-            _strip_ssh_defaults(d)
-            desired_relays_out.append(d)
-        out["desired_relays"] = desired_relays_out
-
-    # Applied state (v2 — reconciler snapshot, only serialize non-None fields)
-    applied_dict: dict[str, Any] = {}
-    if cfg.applied_state.nodes is not None:
-        applied_dict["nodes"] = list(cfg.applied_state.nodes)
-    if cfg.applied_state.clients is not None:
-        applied_dict["clients"] = list(cfg.applied_state.clients)
-    if cfg.applied_state.relays is not None:
-        applied_dict["relays"] = list(cfg.applied_state.relays)
-    if applied_dict:
-        out["applied_state"] = applied_dict
-
     if cfg.connection_page_markers:
         out["connection_page_markers"] = list(cfg.connection_page_markers)
-    if cfg.connection_page_failures:
-        out["connection_page_failures"] = list(cfg.connection_page_failures)
 
     out.update(serialize_cluster_v3(cfg))
 
@@ -298,44 +189,12 @@ def _load_dataclass(
     return cls(**values, _extra=extra)
 
 
-def _load_applied_list(raw: Any) -> list[str] | None:
-    """Parse an applied-state list from YAML, coercing to list[str] | None.
-
-    Returns None for absent/non-list values (no history).
-    Empty list is preserved (managed, converged to zero).
-    Filters non-string items defensively.
-    """
-    if not isinstance(raw, list):
-        return None
-    # Preserve empty list — it means "managed, converged to zero" (distinct
-    # from None which means "no history"). Filtering non-strings is defensive.
-    return [item for item in raw if isinstance(item, str)]
-
-
-def _load_applied_state(raw: dict[str, Any]) -> AppliedState:
-    """Load AppliedState from a parsed YAML mapping."""
-    return AppliedState(
-        nodes=_load_applied_list(raw.get("nodes")),
-        clients=_load_applied_list(raw.get("clients")),
-        relays=_load_applied_list(raw.get("relays")),
-    )
-
-
 def _load_string_list(data: dict[str, Any], key: str) -> list[str]:
     """Load one required string-list shape from typed cluster state."""
     raw = data.get(key, [])
     if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
         raise ValueError(f"{key} must be a list of strings")
     return list(raw)
-
-
-def _migrate_pre_v4_1_applied_state(data: dict[str, Any]) -> AppliedState:
-    """Load v4.0 top-level applied snapshots into the typed v4.1 shape."""
-    return AppliedState(
-        nodes=_load_applied_list(data.get("desired_nodes_applied")),
-        clients=_load_applied_list(data.get("desired_clients_applied")),
-        relays=_load_applied_list(data.get("desired_relays_applied")),
-    )
 
 
 def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
@@ -348,31 +207,6 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         defaults={**_SSH_DEFAULTS},
     )
 
-    # Nodes
-    nodes: list[NodeEntry] = []
-    for n in data.get("nodes", []):
-        nodes.append(
-            _load_dataclass(
-                n,
-                NodeEntry,
-                _NODE_FIELDS,
-                defaults={**_SSH_DEFAULTS, "is_panel_host": False, "warp": False, "hysteria2": True},
-                transforms={"is_panel_host": bool, "warp": bool, "hysteria2": bool},
-            )
-        )
-
-    # Relays
-    relays: list[RelayEntry] = []
-    for r in data.get("relays", []):
-        relays.append(
-            _load_dataclass(
-                r,
-                RelayEntry,
-                _RELAY_FIELDS,
-                defaults={**_SSH_DEFAULTS, "port": 443},
-            )
-        )
-
     # Branding
     branding = _load_dataclass(
         data.get("branding", {}),
@@ -381,14 +215,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         defaults={"server_name": "", "icon": "", "color": ""},
     )
 
-    # Inbounds
-    inbounds: dict[str, InboundRef] = {}
-    for key, ref_data in data.get("inbounds", {}).items():
-        inbounds[key] = _load_dataclass(ref_data, InboundRef, _INBOUND_REF_FIELDS)
-
-    # Subscription page (v2) — tri-state:
-    #   key absent OR explicit `null` → None (unmanaged, do nothing)
-    #   mapping (even `{}`) → load as managed config
+    # Subscription page — absent or `null` means provisioning has not recorded it yet.
     subscription_page: SubscriptionPageConfig | None = None
     if data.get("subscription_page") is not None:
         subscription_page = _load_dataclass(
@@ -399,7 +226,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             transforms={"enabled": bool},
         )
 
-    # Telegram notifications (v2) — None = unconfigured (disabled in panel)
+    # Telegram notifications — None = unconfigured (disabled in panel)
     telegram: TelegramConfig | None = None
     if data.get("telegram") is not None:
         telegram = _load_dataclass(
@@ -408,95 +235,24 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             _public_fields(TelegramConfig),
         )
 
-    # Desired state (v2) — tri-state semantics per cluster.example.yml:
-    #   key absent OR explicit `null` → None (unmanaged)
-    #   `[]` → managed, want zero
-    #   `[...]` → managed, want these
-    desired_nodes: list[DesiredNode] | None = None
-    _desired_nodes_raw = data.get("desired_nodes")
-    if _desired_nodes_raw is not None:
-        if not isinstance(_desired_nodes_raw, list):
-            raise ValueError(f"desired_nodes must be a list or null, got {type(_desired_nodes_raw).__name__}")
-        desired_nodes = []
-        for dn in _desired_nodes_raw:
-            desired_nodes.append(
-                _load_dataclass(
-                    dn,
-                    DesiredNode,
-                    _DESIRED_NODE_FIELDS,
-                    defaults={**_SSH_DEFAULTS, "warp": None},
-                )
-            )
-
-    desired_clients: list[str] | None = None
-    _desired_clients_raw = data.get("desired_clients")
-    if _desired_clients_raw is not None:
-        if not isinstance(_desired_clients_raw, list):
-            raise ValueError(f"desired_clients must be a list or null, got {type(_desired_clients_raw).__name__}")
-        desired_clients = [str(c) for c in _desired_clients_raw]
-
-    desired_relays: list[DesiredRelay] | None = None
-    _desired_relays_raw = data.get("desired_relays")
-    if _desired_relays_raw is not None:
-        if not isinstance(_desired_relays_raw, list):
-            raise ValueError(f"desired_relays must be a list or null, got {type(_desired_relays_raw).__name__}")
-        desired_relays = []
-        for dr in _desired_relays_raw:
-            desired_relays.append(
-                _load_dataclass(
-                    dr,
-                    DesiredRelay,
-                    _DESIRED_RELAY_FIELDS,
-                    defaults={**_SSH_DEFAULTS},
-                )
-            )
-
-    # Applied state (v2): v4.0 stored snapshots as top-level keys.
-    _applied_raw = data.get("applied_state")
-    applied_state = (
-        _load_applied_state(_applied_raw) if isinstance(_applied_raw, dict) else _migrate_pre_v4_1_applied_state(data)
-    )
     connection_page_markers = _load_string_list(data, "connection_page_markers")
-    connection_page_failures = _load_string_list(data, "connection_page_failures")
-
-    source_version = data.get("version", CURRENT_CLUSTER_VERSION)
-    profile_uuid = data.get("config_profile_uuid", "")
-    profile_name = data.get("config_profile_name", "")
-    squad_uuid = data.get("squad_uuid", "")
-    v3 = load_cluster_v3(
-        data,
-        panel=panel,
-        nodes=nodes,
-        inbounds=inbounds,
-        relays=relays,
-    )
+    v3 = load_cluster_v3(data)
 
     # Extra fields
     extra = {k: v for k, v in data.items() if k not in _KNOWN_TOP}
 
     return ClusterConfig(
-        version=CURRENT_CLUSTER_VERSION if isinstance(source_version, int) and source_version < 3 else source_version,
+        version=max(data.get("version", CURRENT_CLUSTER_VERSION), CURRENT_CLUSTER_VERSION),
         panel=panel,
-        config_profile_uuid=profile_uuid,
-        config_profile_name=profile_name,
-        squad_uuid=squad_uuid,
-        nodes=nodes,
-        relays=relays,
         branding=branding,
-        inbounds=inbounds,
         subscription_page=subscription_page,
         telegram=telegram,
-        desired_nodes=desired_nodes,
-        desired_clients=desired_clients,
-        desired_relays=desired_relays,
-        applied_state=applied_state,
         topology_intent=v3.topology_intent,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
         allocations=v3.allocations,
         action_checkpoints=v3.action_checkpoints,
         connection_page_markers=connection_page_markers,
-        connection_page_failures=connection_page_failures,
         active_generation=v3.active_generation,
         active_plan_hash=v3.active_plan_hash,
         pending_generation=v3.pending_generation,
@@ -530,50 +286,16 @@ def _require_mapping(data: dict[str, Any], key: str, *, nullable: bool = False) 
         raise ValueError(f"{key} must be {expected}, got {type(value).__name__}")
 
 
-def _require_object_list(data: dict[str, Any], key: str, *, nullable: bool = False) -> None:
-    value = data.get(key)
-    if value is None and nullable:
-        return
-    if key not in data:
-        return
-    if not isinstance(value, list):
-        expected = "a list or null" if nullable else "a list"
-        raise ValueError(f"{key} must be {expected}, got {type(value).__name__}")
-    for index, item in enumerate(value):
-        if not isinstance(item, dict):
-            raise ValueError(f"{key}[{index}] must be a mapping, got {type(item).__name__}")
-
-
 def _validate_cluster_structure(data: dict[str, Any]) -> None:
     """Reject malformed known fields instead of coercing them into empty state."""
     version = data.get("version", CURRENT_CLUSTER_VERSION)
     if not isinstance(version, int) or isinstance(version, bool):
         raise ValueError(f"version must be an integer, got {type(version).__name__}")
 
-    for key in ("panel", "branding", "inbounds", "applied_state"):
+    for key in ("panel", "branding"):
         _require_mapping(data, key)
     for key in ("subscription_page", "telegram"):
         _require_mapping(data, key, nullable=True)
-    for key in ("nodes", "relays"):
-        _require_object_list(data, key)
-    for key in ("desired_nodes", "desired_relays"):
-        _require_object_list(data, key, nullable=True)
-
-    desired_clients = data.get("desired_clients")
-    if desired_clients is not None:
-        if not isinstance(desired_clients, list):
-            raise ValueError(f"desired_clients must be a list or null, got {type(desired_clients).__name__}")
-        for index, item in enumerate(desired_clients):
-            if not isinstance(item, str):
-                raise ValueError(f"desired_clients[{index}] must be a string, got {type(item).__name__}")
-
-    inbounds = data.get("inbounds", {})
-    if isinstance(inbounds, dict):
-        for key, value in inbounds.items():
-            if not isinstance(key, str):
-                raise ValueError("inbounds keys must be strings")
-            if not isinstance(value, dict):
-                raise ValueError(f"inbounds[{key}] must be a mapping, got {type(value).__name__}")
 
     validate_cluster_v3_structure(data)
 
