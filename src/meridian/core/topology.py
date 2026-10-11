@@ -238,6 +238,7 @@ class SetupIntent(CoreModel):
     default_egress_ref: TopologyIdValue
     access: AccessIntent
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
+    harden: bool = True  # SSH key-only auth + fail2ban; off when other services share the servers
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:

@@ -48,6 +48,7 @@ def compile_server_baselines(
             ServerBaselinePayload(
                 server_ref=server_ref,
                 install_docker=server_ref in docker_servers,
+                harden=intent.harden,
             ),
         )
     return baseline_ids

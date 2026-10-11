@@ -517,6 +517,11 @@
       "title": "Exits",
       "type": "array"
     },
+    "harden": {
+      "default": true,
+      "title": "Harden",
+      "type": "boolean"
+    },
     "routes": {
       "items": {
         "$ref": "#/$defs/OrderedRouteIntent"

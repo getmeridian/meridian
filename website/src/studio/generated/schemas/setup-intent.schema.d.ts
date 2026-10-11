@@ -50,6 +50,7 @@ export type TlsSni = "" | string;
 export type Region = string;
 export type ServerRef1 = string;
 export type Warp = boolean;
+export type Harden = boolean;
 export type Action = "route" | "block";
 export type Enabled = boolean;
 export type Id3 = string;
@@ -84,6 +85,7 @@ export interface SetupIntent {
   delivery?: DeliveryIntent;
   egress_pools?: EgressPools;
   exits: Exits;
+  harden?: Harden;
   routes?: Routes;
   routing_gateways?: RoutingGateways;
   transparent_relays?: TransparentRelays;

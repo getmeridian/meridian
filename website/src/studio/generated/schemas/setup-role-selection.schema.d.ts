@@ -17,6 +17,7 @@ export type Id = string;
 export type Region = string;
 export type ServerRef1 = string;
 export type Warp = boolean;
+export type Harden = boolean;
 export type BridgePathRef = string;
 export type Id1 = string;
 export type ServerRef2 = string;
@@ -38,6 +39,7 @@ export type TransparentRelays = SetupRelayRole[];
 export interface SetupRoleSelection {
   control: ControlPlaneIntent;
   exits: Exits;
+  harden?: Harden;
   routing_gateways?: RoutingGateways;
   transparent_relays?: TransparentRelays;
 }

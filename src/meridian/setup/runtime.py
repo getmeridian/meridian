@@ -21,6 +21,7 @@ from meridian.compiler.models import (
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
     ResourcePlan,
+    ServerBaselinePayload,
     canonical_hash,
 )
 from meridian.config import (
@@ -608,7 +609,7 @@ def _bootstrap_control_plane(
         cluster=cluster,
         domain=payload.public_hostname,
         sni=reality_sni,
-        harden=True,
+        harden=_plan_harden(plan, payload.server_ref),
         is_panel_host=True,
         secret_path=secret_path,
         xhttp_port=ports["xhttp"],
@@ -623,6 +624,18 @@ def _bootstrap_control_plane(
         secret_path=secret_path,
         info_page_path=info_page_path,
         version=__version__,
+    )
+
+
+def _plan_harden(plan: ResourcePlan, server_ref: str) -> bool:
+    """Whether the reviewed baseline hardens this server (SSH key-only, fail2ban)."""
+    return next(
+        (
+            resource.payload.harden
+            for resource in plan.resources
+            if isinstance(resource.payload, ServerBaselinePayload) and resource.payload.server_ref == server_ref
+        ),
+        True,
     )
 
 

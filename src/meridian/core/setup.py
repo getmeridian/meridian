@@ -85,6 +85,7 @@ class SetupRoleSelection(CoreModel):
     exits: list[SetupExitRole] = Field(min_length=1)
     transparent_relays: list[SetupRelayRole] = Field(default_factory=list)
     routing_gateways: list[SetupGatewayRole] = Field(default_factory=list)
+    harden: bool = True
 
     @model_validator(mode="after")
     def reject_duplicate_ids(self) -> Self:
@@ -169,6 +170,7 @@ class SetupDraft(CoreModel):
         )
         roles = SetupRoleSelection(
             control=intent.control,
+            harden=intent.harden,
             exits=[
                 SetupExitRole(
                     id=exit_.id,
@@ -340,6 +342,7 @@ class SetupDraft(CoreModel):
             default_egress_ref=self.routing.default_egress_ref,
             access=self.access.access,
             delivery=self.access.delivery,
+            harden=self.roles.harden,
         )
 
     def _require_current_stage_data(self) -> None:

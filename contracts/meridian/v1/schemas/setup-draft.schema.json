@@ -551,6 +551,11 @@
           "title": "Exits",
           "type": "array"
         },
+        "harden": {
+          "default": true,
+          "title": "Harden",
+          "type": "boolean"
+        },
         "routing_gateways": {
           "items": {
             "$ref": "#/$defs/SetupGatewayRole"
