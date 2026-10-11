@@ -1,40 +1,5 @@
-"""Reconciler — compare desired state with actual state and produce a plan.
+"""Reconciler: observe-then-converge execution of compiled topology resources.
 
-The reconciler is the engine behind ``meridian plan`` and ``meridian apply``.
-It compares the desired topology declared in ``cluster.yml`` (v2) with the
-actual state fetched from the Remnawave panel API and SSH, then produces a
-typed list of actions to converge them.
-
-Key principle: ``compute_plan()`` is a pure function — no I/O, no side
-effects, fully unit-testable. The executor runs the plan by calling into
-existing provisioning code.
+Import submodules directly; this package stays empty to avoid import cycles
+and loading every driver for one command.
 """
-
-from meridian.reconciler.diff import Plan, PlanAction, PlanActionKind, compute_plan
-from meridian.reconciler.executor import ActionHandler
-from meridian.reconciler.resource_executor import execute_resource_plan
-from meridian.reconciler.resources import (
-    ResourceAction,
-    ResourceActionResult,
-    ResourceExecutionResult,
-    UnknownResourceOutcome,
-)
-from meridian.reconciler.server_drivers import ServerDriverContext, build_server_drivers
-from meridian.reconciler.state import ActualState, DesiredState
-
-__all__ = [
-    "ActionHandler",
-    "ActualState",
-    "DesiredState",
-    "Plan",
-    "PlanAction",
-    "PlanActionKind",
-    "ResourceAction",
-    "ResourceActionResult",
-    "ResourceExecutionResult",
-    "ServerDriverContext",
-    "UnknownResourceOutcome",
-    "build_server_drivers",
-    "compute_plan",
-    "execute_resource_plan",
-]

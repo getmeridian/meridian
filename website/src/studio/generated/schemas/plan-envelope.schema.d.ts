@@ -10,62 +10,16 @@
  */
 export type PlanOutputEnvelope = _PlanSuccessEnvelope | _PlanTerminalEnvelope;
 export type Command = "plan";
-/**
- * Success data returned by legacy and V4 plan execution.
- */
-export type PlanCommandData = PlanResult | CompiledPlanResult;
-export type CanRunParallel = boolean;
-export type After = string;
-export type Before = string;
-export type Field = string;
-export type ChangeSet = PlanChange[];
-export type Destructive = boolean;
-export type DestructiveReason = string;
-export type Detail = string;
-export type ExecutionOrder = number;
-export type FromExtras = boolean;
-export type Kind =
-  | "add_node"
-  | "update_node"
-  | "remove_node"
-  | "add_client"
-  | "remove_client"
-  | "add_relay"
-  | "update_relay"
-  | "remove_relay"
-  | "add_subscription_page"
-  | "remove_subscription_page";
-export type Operation = "add" | "update" | "remove" | "replace";
-export type Phase = "provision" | "configure" | "deprovision" | "replace";
-export type PlanIndex = number;
-export type Replacement = boolean;
-export type ReplacementStrategy = "none" | "delete_then_create";
-export type RequiresConfirmation = boolean;
-export type ResourceId = string;
-export type ResourceType = "node" | "client" | "relay" | "subscription_page";
-export type Symbol = "+" | "~" | "-";
-export type Target = string;
-export type Actions = PlanActionResult[];
 export type Converged = boolean;
-export type Actions1 = number;
-export type Adds = number;
-export type Destructive1 = number;
-export type FromExtras1 = number;
-export type Removes = number;
-export type Replacements = number;
-export type Updates = number;
-export type ExitCode = number;
-export type Summary = string;
-export type Converged1 = boolean;
 export type Error = string;
 export type LogicalId = string;
 export type DriftedResources = CompiledPlanDriftResult[];
-export type ExitCode1 = number;
+export type ExitCode = number;
 export type ObservationErrors = CompiledPlanDriftResult[];
 export type PlanHash = string;
 export type Dependencies = string[];
 export type DesiredHash = string;
-export type Kind1 =
+export type Kind =
   | "server_baseline"
   | "control_plane_runtime"
   | "config_profile"
@@ -90,13 +44,13 @@ export type Kind1 =
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
 export type StateChanges = string[];
-export type Summary1 = string;
+export type Summary = string;
 export type DurationMs = number;
 /**
  * @maxItems 0
  */
 export type Errors = [];
-export type ExitCode2 = number;
+export type ExitCode1 = number;
 export type MeridianVersion = string;
 export type OperationId = string;
 export type Schema = "meridian.output/v1";
@@ -106,13 +60,21 @@ export type Changed = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
 export type Code = string;
-export type ExitCode3 = number;
+export type ExitCode2 = number;
 export type Hint = string;
 export type Message = string;
 export type Retryable = boolean;
 export type Warnings = MeridianError[];
 export type Command1 = "plan";
-export type Data = PlanResult | CompiledPlanResult | EmptyData;
+export type Data = CompiledPlanResult | EmptyData;
+export type Converged1 = boolean;
+export type DriftedResources1 = CompiledPlanDriftResult[];
+export type ExitCode3 = number;
+export type ObservationErrors1 = CompiledPlanDriftResult[];
+export type PlanHash1 = string;
+export type Resources1 = CompiledPlanResourceResult[];
+export type StateChanges1 = string[];
+export type Summary2 = string;
 export type DurationMs1 = number;
 /**
  * @minItems 1
@@ -131,68 +93,27 @@ export interface _PlanSuccessEnvelope {
   data: PlanCommandData;
   duration_ms: DurationMs;
   errors: Errors;
-  exit_code: ExitCode2;
+  exit_code: ExitCode1;
   meridian_version: MeridianVersion;
   operation_id: OperationId;
   schema: Schema;
   started_at: StartedAt;
   status: Status;
-  summary: Summary2;
+  summary: Summary1;
   warnings: Warnings;
 }
-export interface PlanResult {
-  actions?: Actions;
-  converged: Converged;
-  counts: PlanCounts;
-  exit_code: ExitCode;
-  summary: Summary;
-}
-export interface PlanActionResult {
-  can_run_parallel?: CanRunParallel;
-  change_set?: ChangeSet;
-  destructive: Destructive;
-  destructive_reason: DestructiveReason;
-  detail: Detail;
-  execution_order: ExecutionOrder;
-  from_extras: FromExtras;
-  kind: Kind;
-  operation: Operation;
-  phase: Phase;
-  plan_index: PlanIndex;
-  replacement: Replacement;
-  replacement_strategy: ReplacementStrategy;
-  requires_confirmation: RequiresConfirmation;
-  resource_id: ResourceId;
-  resource_type: ResourceType;
-  symbol: Symbol;
-  target: Target;
-}
-export interface PlanChange {
-  after: After;
-  before: Before;
-  field: Field;
-}
-export interface PlanCounts {
-  actions: Actions1;
-  adds: Adds;
-  destructive: Destructive1;
-  from_extras: FromExtras1;
-  removes: Removes;
-  replacements: Replacements;
-  updates: Updates;
-}
 /**
- * Read-only drift result for a V4 compiler plan.
+ * Success data returned by plan execution.
  */
-export interface CompiledPlanResult {
-  converged: Converged1;
+export interface PlanCommandData {
+  converged: Converged;
   drifted_resources?: DriftedResources;
-  exit_code: ExitCode1;
+  exit_code: ExitCode;
   observation_errors?: ObservationErrors;
   plan_hash: PlanHash;
   resources?: Resources;
   state_changes?: StateChanges;
-  summary: Summary1;
+  summary: Summary;
 }
 /**
  * One V4 compiler resource that does not match remote state.
@@ -207,13 +128,13 @@ export interface CompiledPlanDriftResult {
 export interface CompiledPlanResourceResult {
   dependencies?: Dependencies;
   desired_hash: DesiredHash;
-  kind: Kind1;
+  kind: Kind;
   logical_id: LogicalId1;
 }
 /**
  * Structured summary shown in JSON envelopes and UI dashboards.
  */
-export interface Summary2 {
+export interface Summary1 {
   changed?: Changed;
   counts?: Counts;
   text: Text;
@@ -229,7 +150,7 @@ export interface MeridianError {
   cause?: Cause;
   code: Code;
   details?: Details;
-  exit_code?: ExitCode3;
+  exit_code?: ExitCode2;
   hint?: Hint;
   message: Message;
   retryable?: Retryable;
@@ -251,8 +172,21 @@ export interface _PlanTerminalEnvelope {
   schema: Schema1;
   started_at: StartedAt1;
   status: Status1;
-  summary: Summary2;
+  summary: Summary1;
   warnings: Warnings1;
+}
+/**
+ * Read-only drift result for a V4 compiler plan.
+ */
+export interface CompiledPlanResult {
+  converged: Converged1;
+  drifted_resources?: DriftedResources1;
+  exit_code: ExitCode3;
+  observation_errors?: ObservationErrors1;
+  plan_hash: PlanHash1;
+  resources?: Resources1;
+  state_changes?: StateChanges1;
+  summary: Summary2;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

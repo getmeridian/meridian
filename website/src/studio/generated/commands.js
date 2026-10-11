@@ -229,7 +229,7 @@ export const commandCatalog = {
       ],
       "command": "apply",
       "data_schema": "apply-command-data",
-      "description": "Converge desired state and emit typed action execution results.",
+      "description": "Apply the reviewed topology and emit typed per-resource results.",
       "envelope_schema": "apply-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -888,13 +888,13 @@ export const commandCatalog = {
       ],
       "command": "plan",
       "data_schema": "plan-command-data",
-      "description": "Compute the desired-state reconciliation plan without applying it.",
+      "description": "Show what apply would change for the reviewed topology, without applying it.",
       "envelope_schema": "plan-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "desired state already matches actual state",
-        "1": "unexpected Meridian bug",
-        "2": "changes pending; user/config errors also use category=user in the error envelope",
+        "1": "user/config error (category=user) or unexpected Meridian bug (category=bug)",
+        "2": "changes pending",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -918,7 +918,7 @@ export const commandCatalog = {
         },
         {
           "category": "user",
-          "exit_code": 2,
+          "exit_code": 1,
           "meaning": "user or configuration error",
           "status": "failed"
         },

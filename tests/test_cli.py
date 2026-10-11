@@ -386,15 +386,15 @@ class TestApiContractCLI:
         set_quiet_mode(False)
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
 
-        result = runner.invoke(app, ["api", "schema", "plan-result", "--json"])
+        result = runner.invoke(app, ["api", "schema", "compiled-plan-result", "--json"])
 
         _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.schema"
         assert payload["status"] == "ok"
-        assert payload["data"]["name"] == "plan-result"
-        assert payload["data"]["schema"]["title"] == "PlanResult"
+        assert payload["data"]["name"] == "compiled-plan-result"
+        assert payload["data"]["schema"]["title"] == "CompiledPlanResult"
 
     def test_api_schema_raw_schema_preserves_sensitive_property_names(self, monkeypatch) -> None:
         set_json_mode(False)

@@ -59,7 +59,7 @@ def _plan_outcomes() -> list[CommandOutcome]:
     return [
         CommandOutcome(status="no_changes", exit_code=0, category="none", meaning="desired state already matches"),
         CommandOutcome(status="changed", exit_code=2, category="none", meaning="changes pending"),
-        CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
+        CommandOutcome(status="failed", exit_code=1, category="user", meaning="user or configuration error"),
         CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
         CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
     ]
@@ -225,7 +225,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         },
         machine_flags=["--json"],
         stability="preview",
-        description="Converge desired state and emit typed action execution results.",
+        description="Apply the reviewed topology and emit typed per-resource results.",
     ),
     "deploy": CommandContract(
         command="deploy",
@@ -522,14 +522,14 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         outcomes=_plan_outcomes(),
         exit_codes={
             "0": "desired state already matches actual state",
-            "1": "unexpected Meridian bug",
-            "2": "changes pending; user/config errors also use category=user in the error envelope",
+            "1": "user/config error (category=user) or unexpected Meridian bug (category=bug)",
+            "2": "changes pending",
             "3": "system or infrastructure failure",
             "130": _INTERRUPT_EXIT_MEANING,
         },
         machine_flags=["--json"],
         stability="preview",
-        description="Compute the desired-state reconciliation plan without applying it.",
+        description="Show what apply would change for the reviewed topology, without applying it.",
     ),
     "fleet.status": CommandContract(
         command="fleet.status",

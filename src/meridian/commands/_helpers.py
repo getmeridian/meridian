@@ -46,6 +46,26 @@ def fail_meridian_v3_state() -> NoReturn:
     )
 
 
+def load_topology_cluster() -> ClusterConfig:
+    """Load a cluster that has a reviewed topology, or explain how to get one."""
+    cluster = load_cluster(require_configured=False)
+    if cluster.topology_intent is not None:
+        return cluster
+    if has_meridian_v3_state():
+        fail_meridian_v3_state()
+    if cluster.is_configured:
+        fail(
+            "This cluster.yml was written by a Meridian 4.0 development build",
+            hint="Move ~/.meridian/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint_type="user",
+        )
+    fail(
+        "No fleet yet",
+        hint="Deploy one server with `meridian deploy IP`, or several with `meridian setup`.",
+        hint_type="user",
+    )
+
+
 def load_cluster(*, require_configured: bool = True) -> ClusterConfig:
     """Load local cluster state through the CLI error boundary."""
     try:

@@ -7,10 +7,8 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import BaseModel, Field, RootModel, create_model
 
 from meridian.core.apply import (
-    ApplyActionResult,
     ApplyCommandData,
     ApplyCounts,
-    ApplyResult,
     CompiledApplyActionResult,
     CompiledApplyPreview,
     CompiledApplyResult,
@@ -70,10 +68,7 @@ from meridian.core.plan import (
     CompiledPlanDriftResult,
     CompiledPlanResourceResult,
     CompiledPlanResult,
-    PlanActionResult,
     PlanCommandData,
-    PlanCounts,
-    PlanResult,
 )
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
@@ -231,12 +226,12 @@ _PlanSuccessEnvelope, _PlanTerminalEnvelope, PlanOutputEnvelope = _make_command_
     "plan",
     PlanCommandData,
     success_statuses=Literal["changed", "no_changes"],
-    failure_data_type=PlanResult | CompiledPlanResult | EmptyData,
+    failure_data_type=CompiledPlanResult | EmptyData,
     doc="Envelope schema for `meridian plan --json`.",
 )
 
 
-class PlanFailureData(RootModel[PlanResult | CompiledPlanResult | EmptyData]):
+class PlanFailureData(RootModel[CompiledPlanResult | EmptyData]):
     """Failure data schema for `meridian plan --json`."""
 
 
@@ -246,12 +241,12 @@ _ApplySuccessEnvelope, _ApplyTerminalEnvelope, ApplyOutputEnvelope = _make_comma
     "apply",
     ApplyCommandData,
     success_statuses=Literal["changed", "no_changes"],
-    failure_data_type=ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData,
+    failure_data_type=CompiledApplyResult | CompiledApplyPreview | EmptyData,
     doc="Envelope schema for `meridian apply --json`.",
 )
 
 
-class ApplyFailureData(RootModel[ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData]):
+class ApplyFailureData(RootModel[CompiledApplyResult | CompiledApplyPreview | EmptyData]):
     """Failure data schema for `meridian apply --json`."""
 
 
@@ -421,9 +416,7 @@ _, _, ApiWorkflowOutputEnvelope = _make_command_envelope(
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
     "output-envelope": OutputEnvelope,
-    "apply": ApplyResult,
     "apply-command-data": ApplyCommandData,
-    "apply-action": ApplyActionResult,
     "apply-counts": ApplyCounts,
     "apply-envelope": ApplyOutputEnvelope,
     "apply-failure": ApplyFailureData,
@@ -517,10 +510,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "event-type-catalog": EventTypeCatalog,
     "schema-catalog-entry": SchemaCatalogEntry,
     "empty-data": EmptyData,
-    "plan-result": PlanResult,
     "plan-command-data": PlanCommandData,
-    "plan-action": PlanActionResult,
-    "plan-counts": PlanCounts,
     "compiled-plan-drift": CompiledPlanDriftResult,
     "compiled-plan-resource": CompiledPlanResourceResult,
     "compiled-plan-result": CompiledPlanResult,

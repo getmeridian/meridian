@@ -229,13 +229,11 @@ def studio_cmd(
 def plan_cmd(
     json_output: bool = typer.Option(False, "--json", help="Emit plan as JSON for CI consumption"),
 ) -> None:
-    """Show what would change — compare desired state with actual.
-
-    V4 inspects compiled resources and saved generation state. Legacy mode
-    compares desired_* fields with live panel state.
+    """Show what apply would change, comparing the topology with live servers.
 
     [dim]Exit codes:[/dim]
       [green]0[/green] = already converged
+      [yellow]1[/yellow] = nothing to plan (no fleet or unusable local state)
       [yellow]2[/yellow] = changes pending
       [yellow]3[/yellow] = required observation evidence unavailable
     """
@@ -250,47 +248,28 @@ def plan_cmd(
 @app.command("apply")
 def apply_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    prune_extras: str = typer.Option(
-        "ask",
-        "--prune-extras",
-        help="Legacy only. How to handle extras (panel-side resources not in cluster.yml): "
-        "ask (interactive prompt), yes (auto-remove), no (skip removal). "
-        "Defaults to 'ask' interactively or 'no' under --yes for safety",
-    ),
-    parallel: int = typer.Option(
-        4,
-        "--parallel",
-        min=1,
-        max=32,
-        help="Legacy only. Max parallel node provisioning threads",
-    ),
     json_output: bool = typer.Option(False, "--json", help="Emit final apply result as JSON"),
 ) -> None:
-    """Apply desired state — converge infrastructure to cluster.yml.
+    """Apply the reviewed topology in cluster.yml to your servers.
 
-    Computes a plan, shows it, asks for confirmation, then executes.
+    Shows the compiled changes, asks for confirmation, then applies them
+    with checkpoints; an interrupted apply resumes where it stopped.
 
     [dim]Examples:[/dim]
-      [cyan]meridian apply[/cyan]              Show plan and confirm
+      [cyan]meridian apply[/cyan]              Show changes and confirm
       [cyan]meridian apply --yes[/cyan]        Apply without confirmation
-      [cyan]meridian apply --prune-extras=yes[/cyan]   Legacy: remove panel-only resources
     """
     from meridian.commands.apply import run
     from meridian.console import is_json_mode
 
-    if prune_extras not in ("ask", "yes", "no"):
-        from meridian.console import fail
-
-        fail(f"Invalid --prune-extras value: {prune_extras!r}", hint="Use ask, yes, or no", hint_type="user")
-
     json_enabled = json_output or is_json_mode()
     if json_enabled:
         _enable_json_output()
-    run(yes=yes, parallel=parallel, prune_extras=prune_extras, json_output=json_enabled)
+    run(yes=yes, json_output=json_enabled)
 
 
 # =============================================================================
-# Setup and legacy deploy
+# Setup and deploy
 # =============================================================================
 
 

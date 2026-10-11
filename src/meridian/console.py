@@ -43,6 +43,7 @@ err_console = _state.err_console
 
 _error_command: ContextVar[str] = ContextVar("meridian_error_command", default="cli.error")
 _error_timer: ContextVar[Any | None] = ContextVar("meridian_error_timer", default=None)
+_user_error_exit: ContextVar[int | None] = ContextVar("meridian_user_error_exit", default=None)
 
 
 def set_json_mode(enabled: bool) -> None:
@@ -66,15 +67,26 @@ def is_quiet_mode() -> bool:
 
 
 @contextmanager
-def error_context(command: str, *, timer: Any | None = None) -> Iterator[None]:
-    """Attach command metadata to JSON errors emitted by fail()."""
+def error_context(
+    command: str,
+    *,
+    timer: Any | None = None,
+    user_error_exit_code: int | None = None,
+) -> Iterator[None]:
+    """Attach command metadata to JSON errors emitted by fail().
+
+    ``user_error_exit_code`` remaps user errors for commands whose exit 2 means
+    something else (``plan`` uses 2 for "changes pending").
+    """
     command_token = _error_command.set(command)
     timer_token = _error_timer.set(timer)
+    exit_token = _user_error_exit.set(user_error_exit_code)
     try:
         yield
     finally:
         _error_command.reset(command_token)
         _error_timer.reset(timer_token)
+        _user_error_exit.reset(exit_token)
 
 
 def info(msg: str) -> None:
@@ -124,6 +136,9 @@ def fail(
         exit_code = msg.exit_code
     message = str(msg)
     code = exit_code if exit_code is not None else _EXIT_CODES.get(hint_type, 1)
+    user_override = _user_error_exit.get()
+    if hint_type == "user" and user_override is not None and code == _EXIT_CODES["user"]:
+        code = user_override
     if _state.json_mode:
         from meridian.core.models import ErrorCategory, MeridianError
         from meridian.core.output import command_envelope

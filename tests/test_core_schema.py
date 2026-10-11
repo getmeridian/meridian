@@ -45,7 +45,6 @@ def test_schema_catalog_lists_public_contracts() -> None:
     names = schema_names()
 
     assert "output-envelope" in names
-    assert "apply" in names
     assert "apply-envelope" in names
     assert "apply-failure" in names
     assert "compiled-apply-result" in names
@@ -126,7 +125,6 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "command-contract" in names
     assert "command-catalog-entry" in names
     assert "empty-data" in names
-    assert "plan-result" in names
     assert "fleet-status" in names
     assert "fleet-inventory" in names
     assert "client-add" in names
@@ -298,7 +296,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     ]["outcomes"]
     assert {
         "status": "failed",
-        "exit_code": 2,
+        "exit_code": 1,
         "category": "user",
         "meaning": "user or configuration error",
     } in by_command["plan"]["outcomes"]
@@ -356,8 +354,8 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
         "category": "system",
         "meaning": "test failed or was inconclusive",
     } in by_command["test"]["outcomes"]
-    for contract in by_command.values():
-        assert contract["exit_codes"]["1"] == "unexpected Meridian bug"
+    for name, contract in by_command.items():
+        assert "unexpected Meridian bug" in contract["exit_codes"]["1"], name
 
 
 def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -> None:
@@ -420,12 +418,7 @@ def test_command_catalog_can_embed_command_schemas() -> None:
     success = plan["envelope"]["$defs"][success_ref.rsplit("/", 1)[-1]]
     assert success["properties"]["command"]["const"] == "plan"
     assert plan["data"]["title"] == "PlanCommandData"
-    assert len(plan["data"]["anyOf"]) == 2
-    compiled_plan_ref = next(
-        item["$ref"] for item in plan["data"]["anyOf"] if item["$ref"].endswith("CompiledPlanResult")
-    )
-    compiled_plan = plan["data"]["$defs"][compiled_plan_ref.rsplit("/", 1)[-1]]
-    resource_ref = compiled_plan["properties"]["resources"]["items"]["$ref"]
+    resource_ref = plan["data"]["properties"]["resources"]["items"]["$ref"]
     resource = plan["data"]["$defs"][resource_ref.rsplit("/", 1)[-1]]
     assert set(resource["properties"]["kind"]["enum"]) >= {"node_runtime", "probe"}
     assert plan["failure_data"]["title"] == "PlanFailureData"

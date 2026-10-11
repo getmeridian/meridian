@@ -171,7 +171,7 @@ def test_v4_apply_json_confirmation_returns_typed_preview() -> None:
 )
 def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error: Exception) -> None:
     output = io.StringIO()
-    target = f"meridian.commands.{command}._run_v4_{'topology' if command == 'apply' else 'plan'}"
+    target = f"meridian.commands.{command}.run_v4_{command}"
     kwargs = {"yes": True, "json_output": True} if command == "apply" else {"json_output": True}
     runner = run_apply_command if command == "apply" else run_plan_command
     set_json_mode(True)
@@ -187,7 +187,8 @@ def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error
         set_json_mode(False)
 
     payload = json.loads(output.getvalue())
-    assert exc_info.value.exit_code == 2
+    # plan reserves exit 2 for "changes pending", so its user errors exit 1.
+    assert exc_info.value.exit_code == (2 if command == "apply" else 1)
     assert payload["command"] == command
     assert payload["status"] == "failed"
     assert payload["data"] == {}
@@ -219,30 +220,6 @@ def test_v4_apply_persistence_failure_is_typed_system_error() -> None:
     assert payload["status"] == "failed"
     assert payload["errors"][0]["category"] == "system"
     assert "remote state may have changed" in payload["errors"][0]["message"]
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"parallel": 8, "prune_extras": "ask"},
-        {"parallel": 4, "prune_extras": "yes"},
-    ],
-)
-def test_v4_apply_rejects_legacy_only_flags(kwargs: dict[str, object]) -> None:
-    output = io.StringIO()
-    with (
-        patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
-        patch("meridian.commands.apply._run_v4_topology") as apply_v4,
-        redirect_stdout(output),
-        pytest.raises(typer.Exit) as exc_info,
-    ):
-        run_apply_command(yes=True, json_output=True, **kwargs)
-
-    payload = json.loads(output.getvalue())
-    assert exc_info.value.exit_code == 2
-    assert payload["status"] == "failed"
-    assert "legacy apply options" in payload["errors"][0]["message"]
-    apply_v4.assert_not_called()
 
 
 def test_v4_plan_json_uses_typed_compiled_result() -> None:

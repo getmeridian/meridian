@@ -10,110 +10,64 @@
  */
 export type ApplyOutputEnvelope = _ApplySuccessEnvelope | _ApplyTerminalEnvelope;
 export type Command = "apply";
-/**
- * Success data returned by legacy and V4 apply execution.
- */
-export type ApplyCommandData = ApplyResult | CompiledApplyResult;
-export type CanRunParallel = boolean;
-export type After = string;
-export type Before = string;
-export type Field = string;
-export type ChangeSet = PlanChange[];
-export type Destructive = boolean;
-export type DestructiveReason = string;
-export type Detail = string;
-export type ExecutionOrder = number;
-export type FromExtras = boolean;
-export type Kind =
-  | "add_node"
-  | "update_node"
-  | "remove_node"
-  | "add_client"
-  | "remove_client"
-  | "add_relay"
-  | "update_relay"
-  | "remove_relay"
-  | "add_subscription_page"
-  | "remove_subscription_page";
-export type Operation = "add" | "update" | "remove" | "replace";
-export type Phase = "provision" | "configure" | "deprovision" | "replace";
-export type PlanIndex = number;
-export type Replacement = boolean;
-export type ReplacementStrategy = "none" | "delete_then_create";
-export type RequiresConfirmation = boolean;
-export type ResourceId = string;
-export type ResourceType = "node" | "client" | "relay" | "subscription_page";
-export type Symbol = "+" | "~" | "-";
-export type Target = string;
+export type Changed = boolean;
 export type Error = string;
-export type Status = "succeeded" | "failed" | "skipped";
+export type ResourceId = string;
+export type Status = "converged" | "applied" | "failed" | "unknown" | "skipped";
 export type Success = boolean;
-export type Actions = ApplyActionResult[];
+export type Actions = CompiledApplyActionResult[];
 export type AllSucceeded = boolean;
+export type Changed1 = boolean;
 export type Actions1 = number;
 export type Failed = number;
 export type Skipped = number;
 export type Succeeded = number;
 export type ExitCode = number;
-export type Actions2 = PlanActionResult[];
-export type Converged = boolean;
-export type Actions3 = number;
-export type Adds = number;
-export type Destructive1 = number;
-export type FromExtras1 = number;
-export type Removes = number;
-export type Replacements = number;
-export type Updates = number;
-export type ExitCode1 = number;
-export type Summary = string;
-export type Summary1 = string;
-export type Changed = boolean;
-export type Error1 = string;
-export type ResourceId1 = string;
-export type Status1 = "converged" | "applied" | "failed" | "unknown" | "skipped";
-export type Success1 = boolean;
-export type Actions4 = CompiledApplyActionResult[];
-export type AllSucceeded1 = boolean;
-export type Changed1 = boolean;
-export type ExitCode2 = number;
 export type Generation = number;
 export type PlanHash = string;
-export type Summary2 = string;
+export type Summary = string;
 export type DurationMs = number;
 /**
  * @maxItems 0
  */
 export type Errors = [];
-export type ExitCode3 = number;
+export type ExitCode1 = number;
 export type MeridianVersion = string;
 export type OperationId = string;
 export type Schema = "meridian.output/v1";
 export type StartedAt = string;
-export type Status2 = "changed" | "no_changes";
+export type Status1 = "changed" | "no_changes";
 export type Changed2 = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
 export type Code = string;
-export type ExitCode4 = number;
+export type ExitCode2 = number;
 export type Hint = string;
 export type Message = string;
 export type Retryable = boolean;
 export type Warnings = MeridianError[];
 export type Command1 = "apply";
-export type Data = ApplyResult | CompiledApplyResult | CompiledApplyPreview | EmptyData;
+export type Data = CompiledApplyResult | CompiledApplyPreview | EmptyData;
+export type Actions2 = CompiledApplyActionResult[];
+export type AllSucceeded1 = boolean;
+export type Changed3 = boolean;
+export type ExitCode3 = number;
+export type Generation1 = number;
 export type PlanHash1 = string;
+export type Summary2 = string;
+export type PlanHash2 = string;
 export type ResourceCount = number;
 export type DurationMs1 = number;
 /**
  * @minItems 1
  */
 export type Errors1 = [MeridianError, ...MeridianError[]];
-export type ExitCode5 = number;
+export type ExitCode4 = number;
 export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
-export type Status3 = "failed";
+export type Status2 = "failed";
 export type Warnings1 = MeridianError[];
 
 export interface _ApplySuccessEnvelope {
@@ -121,59 +75,37 @@ export interface _ApplySuccessEnvelope {
   data: ApplyCommandData;
   duration_ms: DurationMs;
   errors: Errors;
-  exit_code: ExitCode3;
+  exit_code: ExitCode1;
   meridian_version: MeridianVersion;
   operation_id: OperationId;
   schema: Schema;
   started_at: StartedAt;
-  status: Status2;
-  summary: Summary3;
+  status: Status1;
+  summary: Summary1;
   warnings: Warnings;
 }
 /**
- * Final apply result for process/API clients.
+ * Success data returned by apply execution.
  */
-export interface ApplyResult {
+export interface ApplyCommandData {
   actions?: Actions;
   all_succeeded: AllSucceeded;
+  changed: Changed1;
   counts: ApplyCounts;
   exit_code: ExitCode;
-  plan: PlanResult;
-  summary: Summary1;
+  generation: Generation;
+  plan_hash: PlanHash;
+  summary: Summary;
 }
 /**
- * Execution result for one plan action.
+ * Execution result for one V4 compiler resource.
  */
-export interface ApplyActionResult {
-  action: PlanActionResult;
+export interface CompiledApplyActionResult {
+  changed: Changed;
   error?: Error;
+  resource_id: ResourceId;
   status: Status;
   success: Success;
-}
-export interface PlanActionResult {
-  can_run_parallel?: CanRunParallel;
-  change_set?: ChangeSet;
-  destructive: Destructive;
-  destructive_reason: DestructiveReason;
-  detail: Detail;
-  execution_order: ExecutionOrder;
-  from_extras: FromExtras;
-  kind: Kind;
-  operation: Operation;
-  phase: Phase;
-  plan_index: PlanIndex;
-  replacement: Replacement;
-  replacement_strategy: ReplacementStrategy;
-  requires_confirmation: RequiresConfirmation;
-  resource_id: ResourceId;
-  resource_type: ResourceType;
-  symbol: Symbol;
-  target: Target;
-}
-export interface PlanChange {
-  after: After;
-  before: Before;
-  field: Field;
 }
 /**
  * Aggregate counts for apply execution.
@@ -184,49 +116,10 @@ export interface ApplyCounts {
   skipped: Skipped;
   succeeded: Succeeded;
 }
-export interface PlanResult {
-  actions?: Actions2;
-  converged: Converged;
-  counts: PlanCounts;
-  exit_code: ExitCode1;
-  summary: Summary;
-}
-export interface PlanCounts {
-  actions: Actions3;
-  adds: Adds;
-  destructive: Destructive1;
-  from_extras: FromExtras1;
-  removes: Removes;
-  replacements: Replacements;
-  updates: Updates;
-}
-/**
- * Apply result for one generation-scoped V4 compiler plan.
- */
-export interface CompiledApplyResult {
-  actions?: Actions4;
-  all_succeeded: AllSucceeded1;
-  changed: Changed1;
-  counts: ApplyCounts;
-  exit_code: ExitCode2;
-  generation: Generation;
-  plan_hash: PlanHash;
-  summary: Summary2;
-}
-/**
- * Execution result for one V4 compiler resource.
- */
-export interface CompiledApplyActionResult {
-  changed: Changed;
-  error?: Error1;
-  resource_id: ResourceId1;
-  status: Status1;
-  success: Success1;
-}
 /**
  * Structured summary shown in JSON envelopes and UI dashboards.
  */
-export interface Summary3 {
+export interface Summary1 {
   changed?: Changed2;
   counts?: Counts;
   text: Text;
@@ -242,7 +135,7 @@ export interface MeridianError {
   cause?: Cause;
   code: Code;
   details?: Details;
-  exit_code?: ExitCode4;
+  exit_code?: ExitCode2;
   hint?: Hint;
   message: Message;
   retryable?: Retryable;
@@ -258,20 +151,33 @@ export interface _ApplyTerminalEnvelope {
   data: Data;
   duration_ms: DurationMs1;
   errors: Errors1;
-  exit_code: ExitCode5;
+  exit_code: ExitCode4;
   meridian_version: MeridianVersion1;
   operation_id: OperationId1;
   schema: Schema1;
   started_at: StartedAt1;
-  status: Status3;
-  summary: Summary3;
+  status: Status2;
+  summary: Summary1;
   warnings: Warnings1;
+}
+/**
+ * Apply result for one generation-scoped V4 compiler plan.
+ */
+export interface CompiledApplyResult {
+  actions?: Actions2;
+  all_succeeded: AllSucceeded1;
+  changed: Changed3;
+  counts: ApplyCounts;
+  exit_code: ExitCode3;
+  generation: Generation1;
+  plan_hash: PlanHash1;
+  summary: Summary2;
 }
 /**
  * Reviewed V4 compiler-plan metadata returned before confirmation.
  */
 export interface CompiledApplyPreview {
-  plan_hash: PlanHash1;
+  plan_hash: PlanHash2;
   resource_count: ResourceCount;
 }
 /**
