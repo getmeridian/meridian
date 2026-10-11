@@ -198,6 +198,7 @@ def test_inspect_intent_reports_unavailable_control_ssh_as_observation_error(
             url="https://panel.example",
             api_token="token",
             server_ip="198.51.100.10",
+            sub_path="pages",
         )
     )
     panel = _Panel()
@@ -243,6 +244,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
             url="https://panel.example",
             api_token="token",
             server_ip="198.51.100.10",
+            sub_path="pages",
         )
     )
     panel = _Panel()
@@ -334,7 +336,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     applied = draft.model_copy(update={"applied_plan_hash": plan_hash})
     verification = runtime.verify(applied)
     assert verification.node_count == 1
-    assert verification.subscription_urls == {"default": "https://panel.example/api/sub/short-default/json"}
+    assert verification.subscription_urls == {"default": "https://panel.example/pages/sub/short-default"}
     assert persists
 
     cluster.panel.server_ip = "198.51.100.99"

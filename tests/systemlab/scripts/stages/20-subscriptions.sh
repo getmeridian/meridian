@@ -57,6 +57,17 @@ with MeridianPanel(
 base64_urls = parse_base64_subscription(base64_document.content)
 xray_config = parse_xray_subscription(xray_document.content)
 mihomo_config = parse_mihomo_subscription(mihomo_document.content)
+
+# The link handed to end users must serve the same subscription without
+# revealing the admin panel's secret path (in the URL or response headers).
+import httpx
+
+public_url = cluster.panel.subscription_url(user.short_uuid)
+assert public_url and cluster.panel.secret_path not in public_url, public_url
+public = httpx.get(public_url, timeout=20)
+assert public.status_code == 200, (public.status_code, public.text[:200])
+assert set(parse_base64_subscription(public.text)) == set(base64_urls)
+assert cluster.panel.secret_path not in str(public.headers), dict(public.headers)
 addresses_by_format = {
     "base64": base64_endpoint_addresses(base64_urls),
     "xray-json": endpoint_addresses(xray_config),

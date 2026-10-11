@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
+from urllib.parse import quote, urlsplit
 
 from meridian.core.inputs import validate_hostname_value, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
@@ -71,6 +72,17 @@ class PanelConfig:
     sub_path: str = ""  # subscription endpoint path
     deployed_with: str = ""  # Meridian CLI version
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def subscription_url(self, short_uuid: str) -> str:
+        """Public subscription URL for a user; empty when it cannot be built.
+
+        Lives under the connection-page path (``sub_path``) so links shared
+        with end users never reveal the admin panel's secret path.
+        """
+        if not self.url or not self.sub_path or not short_uuid:
+            return ""
+        parsed = urlsplit(self.url)
+        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/sub/{quote(short_uuid, safe='')}"
 
     @property
     def display_url(self) -> str:

@@ -124,7 +124,6 @@ class TestSetupFirstDeployHappyPath:
             vless_uuid="550e8400-e29b-41d4-a716-446655440000",
             short_uuid="short-user",
         )
-        panel.get_subscription_url.return_value = "https://panel.example/api/sub/short-user"
         save_calls: list[str] = []
 
         with (
@@ -174,7 +173,9 @@ class TestSetupFirstDeployHappyPath:
         # Admin creds set before first save
         assert cluster.panel.admin_user != ""
         assert handoff.connection_page_url == "https://198.51.100.1/share/client/"
-        assert handoff.subscription_url == "https://panel.example/api/sub/short-user"
+        # Shared links live under the connection-page path, never the admin path.
+        assert handoff.subscription_url == f"https://198.51.100.1/{cluster.panel.sub_path}/sub/short-user"
+        assert _SECRET_PATH not in handoff.subscription_url
         assert "_page_url" not in cluster._extra
         assert "_subscription_url" not in cluster._extra
 

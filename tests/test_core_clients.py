@@ -47,9 +47,6 @@ class PanelClient:
     def list_users(self) -> list[PanelUser]:
         return self.users
 
-    def get_subscription_url(self, short_uuid: str) -> str:
-        return f"https://198.51.100.1/api/sub/{short_uuid}"
-
 
 def test_client_list_result_counts_statuses() -> None:
     result = build_client_list_result(
@@ -127,13 +124,14 @@ def test_collect_client_show_builds_subscription_and_share_urls() -> None:
         PanelClient([PanelUser(username="alice")]),
         "alice",
         build_share_url=lambda user: f"https://example.org/connect/{user.vless_uuid}/",
+        build_subscription_url=lambda short_uuid: f"https://198.51.100.1/pages/sub/{short_uuid}",
     )
 
     assert result.client.client.username == "alice"
     assert result.client.handoff.share_available is True
     assert result.client.handoff.subscription_available is True
     assert result.share_url == "https://example.org/connect/vless-uuid/"
-    assert result.subscription_url == "https://198.51.100.1/api/sub/short-uuid"
+    assert result.subscription_url == "https://198.51.100.1/pages/sub/short-uuid"
 
 
 def test_collect_client_show_raises_not_found() -> None:

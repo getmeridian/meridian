@@ -176,7 +176,7 @@ def _run_add(
                     try:
                         from meridian.pwa import deploy_client_page, mark_connection_page_failed
 
-                        sub_url = panel.get_subscription_url(new_user.short_uuid) if new_user.short_uuid else ""
+                        sub_url = cluster.panel.subscription_url(new_user.short_uuid)
                         deployed_url = deploy_client_page(
                             _conn,
                             cluster,
@@ -299,7 +299,7 @@ def _run_add(
             if len(succeeded) > 1:
                 err_console.print()
                 err_console.print(f"  [bold]— {escape(name)} —[/bold]")
-            handoff_error = _print_subscription(panel, new_user, page_url=page_url)
+            handoff_error = _print_subscription(cluster.panel, new_user, page_url=page_url)
             if isinstance(handoff_error, str) and handoff_error:
                 handoff_failures.append((name, handoff_error))
                 warn(f"Client '{name}' was added, but its subscription handoff is unavailable: {handoff_error}")
@@ -351,6 +351,7 @@ def _run_show(
             make_panel(cluster),
             name,
             build_share_url=share_url,
+            build_subscription_url=cluster.panel.subscription_url,
             allowed_usernames=(cluster.topology_intent.access.users if cluster.topology_intent is not None else None),
         )
     except ClientNotFoundError:

@@ -8,7 +8,7 @@ from typing import NoReturn
 import typer
 from rich.markup import escape
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, make_panel, persist_reviewed_apply
 from meridian.commands.client_handoff import get_user_or_fail
 from meridian.commands.client_state import build_client_persistence_warning
@@ -18,7 +18,7 @@ from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import redact_string
-from meridian.remnawave import MeridianPanel, User
+from meridian.remnawave import User
 from meridian.renderers import emit_json
 
 
@@ -27,7 +27,7 @@ def run_add_v4(
     cluster: ClusterConfig,
     operation: OperationContext,
     *,
-    print_subscription: Callable[[MeridianPanel, User], str],
+    print_subscription: Callable[[PanelConfig, User], str],
 ) -> None:
     """Add access users through the reviewed V4 compiler and resource drivers."""
     from meridian.config import SERVER_PROFILES_FILE
@@ -109,7 +109,7 @@ def run_add_v4(
             if len(succeeded) > 1:
                 err_console.print()
                 err_console.print(f"  [bold]— {escape(name)} —[/bold]")
-            handoff_error = print_subscription(refreshed_panel, user)
+            handoff_error = print_subscription(cluster.panel, user)
             if isinstance(handoff_error, str) and handoff_error:
                 handoff_failed = True
                 warn(f"Client '{name}' was added, but its subscription handoff is unavailable: {handoff_error}")

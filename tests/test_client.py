@@ -33,6 +33,7 @@ def _make_cluster(tmp_path: Path) -> ClusterConfig:
             url="https://198.51.100.1/panel",
             api_token="test-jwt-token",
             server_ip="198.51.100.1",
+            sub_path="pages",
         ),
     )
     cluster.save(tmp_path / "cluster.yml")
@@ -83,7 +84,6 @@ def _make_panel_mock() -> MagicMock:
     panel.get_user.return_value = _make_user()
     panel.list_users.return_value = [_make_user("alice"), _make_user("bob")]
     panel.delete_user.return_value = True
-    panel.get_subscription_url.return_value = "https://198.51.100.1/api/sub/abc123"
     panel.ping.return_value = True
     return panel
 
@@ -803,10 +803,11 @@ class TestPanelAPIErrors:
     def test_add_handoff_failure_keeps_created_user_and_returns_partial(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
-        panel.get_subscription_url.side_effect = RemnawaveError("handoff unavailable")
+        cluster = _make_cluster(tmp_home)
+        cluster.panel.sub_path = ""  # no public path, so no shareable subscription link
 
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=_make_cluster(tmp_home)),
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
             patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
             pytest.raises(typer.Exit) as exc_info,
         ):

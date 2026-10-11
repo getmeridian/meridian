@@ -619,7 +619,7 @@ def _print_success(
             with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
                 user = panel.get_user(client_label)
                 if user and user.short_uuid:
-                    sub_url = panel.get_subscription_url(user.short_uuid)
+                    sub_url = cluster.panel.subscription_url(user.short_uuid)
                 # Build connection page URL from cluster data
                 if user and user.vless_uuid:
                     node = cluster.panel_node

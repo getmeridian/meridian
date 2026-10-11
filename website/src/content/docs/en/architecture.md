@@ -144,6 +144,7 @@ nginx handles:
 - Reverse proxy for the Remnawave admin UI (`/<panel.secret_path>/` → `127.0.0.1:3000`)
 - Reverse proxy for the Remnawave subscription page (`/<subscription_page.path>/` → `127.0.0.1:3020`)
 - Connection info page serving (hosted pages with shareable URLs)
+- Client subscriptions at `/<connection-page path>/sub/<id>`, proxied to the panel's `/api/sub/` only — links shared with users never contain the admin path
 - Reverse proxy for XHTTP traffic to Xray (path-based routing, all modes when XHTTP enabled)
 - Reverse proxy for WSS traffic to Xray (domain mode only)
 

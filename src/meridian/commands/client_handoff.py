@@ -7,8 +7,7 @@ from dataclasses import dataclass
 
 from rich.markup import escape
 
-from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import make_panel
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._validation import validate_command_input
 from meridian.commands.client_state import persist_client_state
 from meridian.console import err_console, fail
@@ -149,8 +148,7 @@ def resolve_page_url(
             user=cluster.panel.ssh_user or "root",
             port=getattr(cluster.panel, "ssh_port", 22) or 22,
         ) as conn:
-            with make_panel(cluster) as panel:
-                subscription_url = panel.get_subscription_url(user.short_uuid) if user.short_uuid else ""
+            subscription_url = cluster.panel.subscription_url(user.short_uuid)
             repaired_url = deploy_client_page(
                 conn,
                 cluster,
@@ -210,12 +208,11 @@ def cleanup_client_page(client: User, cluster: ClusterConfig) -> PageCleanup:
         return PageCleanup(error=redact_string(str(exc)) or type(exc).__name__)
 
 
-def print_subscription(panel: MeridianPanel, user: User, *, page_url: str = "") -> str:
-    """Print a handoff, returning a redacted error after successful mutation."""
-    try:
-        subscription_url = panel.get_subscription_url(user.short_uuid)
-    except RemnawaveError as exc:
-        return redact_string(str(exc))
+def print_subscription(panel_config: PanelConfig, user: User, *, page_url: str = "") -> str:
+    """Print a handoff, returning an error when no public link can be built."""
+    subscription_url = panel_config.subscription_url(user.short_uuid)
+    if not subscription_url:
+        return "the panel URL or connection-page path is missing from cluster.yml"
     print_handoff_links(subscription_url, page_url=page_url)
     return ""
 

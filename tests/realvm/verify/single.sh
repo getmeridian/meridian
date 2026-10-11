@@ -186,7 +186,7 @@ print(url)
 " 2>/dev/null || true)
 # Fallback: grep the text output with charset that includes URL-safe punctuation.
 if [ -z "$SUB_URL" ]; then
-  SUB_URL=$(uv run meridian client show default 2>&1 | grep -oE 'https://[^ ]*api/sub/[A-Za-z0-9_.-]+' | head -1 || true)
+  SUB_URL=$(uv run meridian client show default 2>&1 | grep -oE 'https://[^ ]*/sub/[A-Za-z0-9_.-]+' | head -1 || true)
 fi
 echo "    extracted: $SUB_URL"
 if [ -n "$SUB_URL" ]; then

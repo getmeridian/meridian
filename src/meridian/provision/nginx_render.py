@@ -410,6 +410,19 @@ def render_nginx_server_block(
 
     {subscription_block}
 
+            # --- Client subscriptions (raw configs for VPN apps) ---
+            # Public under the connection-page path, never the admin path:
+            # only the panel's /api/sub/ route is reachable from here.
+            location /{info_page_path}/sub/ {{
+                proxy_pass http://127.0.0.1:{panel_internal_port}/api/sub/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $remote_addr;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                add_header Referrer-Policy "no-referrer" always;
+            }}
+
             # --- Connection Info Pages (PWA with per-client config) ---
             # alias strips the location prefix (like Caddy's handle_path).
             location /{info_page_path}/ {{

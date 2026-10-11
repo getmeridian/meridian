@@ -435,7 +435,7 @@ def setup_first_deploy(
             # Deploy connection page for this client
             if user and isinstance(getattr(user, "vless_uuid", None), str) and user.vless_uuid:
                 try:
-                    sub_url = panel.get_subscription_url(user.short_uuid) if user.short_uuid else ""
+                    sub_url = cluster.panel.subscription_url(user.short_uuid)
                     handoff = PanelHandoff(subscription_url=sub_url)
                     page_url = pwa.deploy_client_page(
                         resolved.conn, cluster, node_entry, user.vless_uuid, client_name, sub_url

@@ -364,13 +364,15 @@ class DeployRemnawavePanel:
 
         front_end_domain = self.front_end_domain or ctx.domain or ctx.ip
         host = ctx.domain or ctx.ip
-        # Include the secret path so Remnawave's UI subscription URLs
-        # route through the nginx panel location (not exposed at root).
-        web_base_path = ctx.web_base_path
-        if web_base_path:
-            sub_public_domain = self.sub_public_domain or f"{host}/{web_base_path}/api/sub"
+        # Subscription links are handed to end users, so they live under the
+        # connection-page path (nginx proxies only /api/sub/ there), never
+        # under the admin panel's secret path.
+        if self.sub_public_domain:
+            sub_public_domain = self.sub_public_domain
+        elif ctx.info_page_path:
+            sub_public_domain = f"{host}/{ctx.info_page_path}/sub"
         else:
-            sub_public_domain = self.sub_public_domain or host
+            sub_public_domain = host
 
         # -- Idempotency: are all core containers already running? --
         core_running = True

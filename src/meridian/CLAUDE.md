@@ -25,9 +25,9 @@
 - **Topology deletion is last** — node, relay, and teardown operations retain registry/topology state until every required API and SSH cleanup succeeds or is confirmed already absent.
 - **Rendered inputs are typed** — validate and canonicalize hostname, SNI, port, and transport path values before nginx, Xray, or Remnawave serialization.
 - **Published Hosts are assertions** — reconcile complete protocol fields against public listeners; observation or mutation failure must stop apply.
-- **Shell injection**: ALL `conn.run()` interpolated values MUST use `shlex.quote()`.
 - **ProtocolKey is StrEnum** — works as dict key but YAML serialization needs `_stringify_keys()` to avoid Python-tagged output.
 - **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.
+- **Shared links never use the panel path** — build subscription URLs with `PanelConfig.subscription_url()` (connection-page path + `/sub/`); `SUB_PUBLIC_DOMAIN` matches it.
 - **Local mode**: detection is file-based only — `/etc/meridian/node.yml` or dir existence.
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
 - **Do not call `console.fail()` from library modules** (operations, relay_ops, resolve, xray_config, provision/, panel_bootstrap). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.

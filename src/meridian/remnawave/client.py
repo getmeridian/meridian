@@ -7,7 +7,6 @@ import random
 import ssl
 import time
 from typing import Any
-from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -547,12 +546,6 @@ class MeridianPanel(ControlPlaneMixin):
         """
         resp = sdk_call(self._sdk.keygen.generate_key())
         return str(getattr(resp, "pub_key", "") or "")
-
-    # --- Subscriptions ---
-
-    def get_subscription_url(self, short_uuid: str) -> str:
-        """Build the subscription URL for a user."""
-        return f"{self._base}/api/sub/{quote(short_uuid, safe='')}"
 
     # --- Auth (for initial setup — raw httpx, no SDK instance yet) ---
 

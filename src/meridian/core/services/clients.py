@@ -36,10 +36,9 @@ class ClientPanelClient(Protocol):
 
     def list_users(self) -> Sequence[PanelUserLike]: ...
 
-    def get_subscription_url(self, short_uuid: str) -> str: ...
-
 
 ShareUrlBuilder = Callable[[PanelUserLike], str]
+SubscriptionUrlBuilder = Callable[[str], str]
 
 
 class ClientListServiceResult(CoreModel):
@@ -75,6 +74,7 @@ def collect_client_show(
     username: str,
     *,
     build_share_url: ShareUrlBuilder | None = None,
+    build_subscription_url: SubscriptionUrlBuilder | None = None,
     allowed_usernames: Collection[str] | None = None,
 ) -> ClientShowServiceResult:
     """Collect one client plus deterministic handoff links."""
@@ -85,7 +85,7 @@ def collect_client_show(
         if user is None:
             raise ClientNotFoundError(username)
         share_url = build_share_url(user) if build_share_url else ""
-        subscription_url = panel.get_subscription_url(user.short_uuid) if user.short_uuid else ""
+        subscription_url = build_subscription_url(user.short_uuid) if build_subscription_url and user.short_uuid else ""
     return ClientShowServiceResult(
         client=build_client_show_result(user, share_url=share_url, subscription_url=subscription_url),
         share_url=share_url,

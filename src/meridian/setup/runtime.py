@@ -427,7 +427,7 @@ class SetupRuntime:
                 document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
                 if not xray_subscription_is_valid(document):
                     raise ResourceReconcileError(f"Canonical subscription for {payload.username!r} is invalid.")
-                subscription_urls[payload.username] = document.url
+                subscription_urls[payload.username] = cluster.panel.subscription_url(user.short_uuid)
         finally:
             panel.close()
 
