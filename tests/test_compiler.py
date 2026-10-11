@@ -755,7 +755,9 @@ class TestCompilerFailures:
         hosts = {
             r.payload.protocol: r.payload
             for r in compile_topology(_intent()).resources
-            if isinstance(r.payload, HostPayload) and r.payload.owner_ref == "exit-b" and r.logical_id.endswith("direct")
+            if isinstance(r.payload, HostPayload)
+            and r.payload.owner_ref == "exit-b"
+            and r.logical_id.endswith("direct")
         }
 
         assert hosts["hysteria2"].address == "" and hosts["hysteria2"].sni == "vpn-b.example.com"
