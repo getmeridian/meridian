@@ -200,6 +200,11 @@ class ServerBaselineDriver:
         return ResourceApplyReceipt(remote_id=payload.server_ref)
 
 
+# Teardown stops and disables nginx but leaves it installed, and plain
+# `reload` fails on an inactive unit; start it if it is not running.
+NGINX_ENABLE_AND_RELOAD = "systemctl enable nginx >/dev/null 2>&1; systemctl reload-or-restart nginx"
+
+
 class FirewallRuleDriver:
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
@@ -331,7 +336,7 @@ class CertificateDriver:
         if linked.returncode != 0 or validation.returncode != 0:
             _raise_if_timeout(action, linked)
             raise ResourceReconcileError("Could not start the ACME HTTP-01 challenge listener.")
-        reload_result = conn.run("systemctl reload nginx", timeout=15)
+        reload_result = conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
         if reload_result.returncode != 0:
             _raise_if_timeout(action, reload_result)
             raise ResourceReconcileError("Could not start the ACME HTTP-01 challenge listener.")
@@ -478,13 +483,13 @@ class NginxArtifactDriver:
             raise ResourceReconcileError(
                 f"nginx rejected {path}: {(validation.stderr or validation.stdout).strip()[:200]}"
             )
-        reload_result = conn.run("systemctl reload nginx", timeout=15)
+        reload_result = conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
         if reload_result.returncode != 0:
             _raise_if_timeout(action, reload_result)
             self._restore_artifact(conn, path, previous_content, enabled)
             if owns_legacy_stream:
                 self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
-            conn.run("systemctl reload nginx", timeout=15)
+            conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
             raise ResourceReconcileError(f"nginx reload failed for {path}.")
         return ResourceApplyReceipt(remote_id=path)
 
