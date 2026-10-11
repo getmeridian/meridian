@@ -309,7 +309,7 @@ def render_nginx_server_block(
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-For $remote_addr;
                 proxy_set_header X-Forwarded-Proto $scheme;
                 proxy_set_header X-Forwarded-Host $host;
                 proxy_set_header X-Forwarded-Port $server_port;
@@ -358,13 +358,6 @@ def render_nginx_server_block(
             ssl_session_cache shared:MozSSL:10m;
             ssl_session_tickets off;
 
-            # OCSP stapling — clients skip separate CA check, critical in censored regions
-            ssl_stapling on;
-            ssl_stapling_verify on;
-            ssl_trusted_certificate /etc/ssl/meridian/fullchain.pem;
-            resolver 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 valid=60s;
-            resolver_timeout 2s;
-
             # Gzip — reduces bandwidth for panel UI, API responses, subscription page
             gzip on;
             gzip_vary on;
@@ -382,7 +375,7 @@ def render_nginx_server_block(
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-For $remote_addr;
                 proxy_set_header X-Forwarded-Proto $scheme;
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection $connection_upgrade;
@@ -442,7 +435,9 @@ def render_nginx_server_block(
                 {default_action}
             }}
 
-            access_log /var/log/nginx/meridian.log;
+            # Request paths carry the panel secret and subscription UUIDs; a
+            # seized server must not hold a record of who fetched what.
+            access_log off;
         }}
 
         # --- HTTP: ACME challenge{" + redirect" if redirect_http else " only (no redirect)"} ---

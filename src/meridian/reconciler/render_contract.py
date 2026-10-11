@@ -8,7 +8,7 @@ _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
     "firewall": "ufw-comment-v1",
-    "nginx": "per-resource-v2",
+    "nginx": "per-resource-v3",
     "node-compose": "remnawave-node-v1",
     "realm": "hashed-systemd-v1",
     "xray-workload": "routing-vision-v2",
