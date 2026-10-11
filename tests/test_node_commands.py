@@ -1,7 +1,7 @@
 """Tests for node add/check/list/remove commands.
 
-Nodes are proxy servers running Remnawave node + Xray.
-Commands manage nodes via panel API and cluster.yml topology.
+Nodes are the exits and routing gateways of the saved topology; add applies
+a reviewed intent change, check/list read the projected topology.
 """
 
 from __future__ import annotations
@@ -15,14 +15,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import typer
 
-from meridian.cluster import (
-    ClusterConfig,
-    InboundRef,
-    NodeEntry,
-    PanelConfig,
-    ProtocolKey,
-    RelayEntry,
-)
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.node import _render_check, run_add, run_check, run_list, run_remove
 from meridian.console import set_json_mode
@@ -38,7 +31,7 @@ from meridian.remnawave import Node, RemnawaveError
 
 
 def _configured_cluster() -> ClusterConfig:
-    """Create a cluster with a panel node and an exit node."""
+    """Create a configured cluster whose topology projects a panel node and an exit node."""
     return ClusterConfig(
         panel=PanelConfig(
             url="https://198.51.100.1/panel",
@@ -46,26 +39,22 @@ def _configured_cluster() -> ClusterConfig:
             server_ip="198.51.100.1",
             secret_path="/secret",
         ),
-        nodes=[
-            NodeEntry(
-                ip="198.51.100.1",
-                uuid="550e8400-e29b-41d4-a716-446655440001",
-                is_panel_host=True,
-                name="panel-node",
-            ),
-            NodeEntry(
-                ip="198.51.100.2",
-                uuid="550e8400-e29b-41d4-a716-446655440002",
-                is_panel_host=False,
-                name="exit-node",
-            ),
-        ],
-        inbounds={
-            ProtocolKey.REALITY: InboundRef(
-                uuid="550e8400-e29b-41d4-a716-446655440010",
-                tag="vless-reality",
-            ),
-        },
+        topology_intent=_minimal_v4_intent(),
+    )
+
+
+def _topology_node(ip: str, uuid: str, name: str, *, is_panel_host: bool = False) -> TopologyNode:
+    return TopologyNode(
+        ip=ip,
+        name=name,
+        uuid=uuid,
+        is_panel_host=is_panel_host,
+        ssh_user="root",
+        ssh_port=22,
+        domain="",
+        sni="www.example.com",
+        xhttp_path="",
+        ws_path="",
     )
 
 
@@ -102,19 +91,6 @@ def _projected_topology(*nodes: TopologyNode) -> FleetTopology:
         ),
         nodes=list(nodes),
     )
-
-
-def _cluster_with_relay() -> ClusterConfig:
-    """Cluster with a relay that depends on the exit node."""
-    c = _configured_cluster()
-    c.relays = [
-        RelayEntry(
-            ip="198.51.100.3",
-            exit_node_ip="198.51.100.2",
-            name="relay",
-        ),
-    ]
-    return c
 
 
 def _make_api_node(
@@ -155,15 +131,26 @@ def _ssh_result(stdout: str = "", rc: int = 0) -> subprocess.CompletedProcess[st
     return subprocess.CompletedProcess(args=[], returncode=rc, stdout=stdout, stderr="")
 
 
-@pytest.fixture
-def _patch_cluster_config(tmp_home: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Ensure CLUSTER_CONFIG points into the tmp home directory."""
-    import meridian.config as cfg
-
-    cluster_path = tmp_home / "cluster.yml"
-    monkeypatch.setattr(cfg, "CLUSTER_CONFIG", cluster_path)
-    monkeypatch.setattr(cfg, "CLUSTER_BACKUP", tmp_home / "cluster.yml.bak")
-    return cluster_path
+@pytest.fixture(autouse=True)
+def _projected_fleet() -> object:
+    """Project the configured cluster into two nodes with 443 listener evidence."""
+    topology = _projected_topology(
+        _topology_node("198.51.100.1", "550e8400-e29b-41d4-a716-446655440001", "panel-node", is_panel_host=True),
+        _topology_node("198.51.100.2", "550e8400-e29b-41d4-a716-446655440002", "exit-node"),
+    )
+    deployment = SimpleNamespace(
+        kind="v4",
+        public_tcp_ports=(443,),
+        public_udp_ports=(),
+        internal_ports={},
+        public_tls_ports=(443,),
+        https_routes=(),
+    )
+    with (
+        patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
+        patch("meridian.verification.deployment_verification_context", return_value=deployment),
+    ):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +177,7 @@ class TestNodeAdd:
         resolved = SimpleNamespace(ip="198.51.100.5", user="root")
 
         with (
-            patch("meridian.commands.node.load_cluster", return_value=cluster),
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
@@ -215,7 +202,7 @@ class TestNodeAdd:
         resolved = SimpleNamespace(ip="198.51.100.5", user="root")
 
         with (
-            patch("meridian.commands.node.load_cluster", return_value=cluster),
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
@@ -235,112 +222,6 @@ class TestNodeAdd:
         assert "Remote state may have changed" in output
         assert "meridian plan" in output
         assert "meridian apply" in output
-
-    def test_add_duplicate_ip_fails(self, tmp_home: Path) -> None:
-        """Adding a node whose IP already exists in the cluster should fail."""
-        cluster = _configured_cluster()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            # 198.51.100.2 is already the exit-node
-            run_add(ip="198.51.100.2", yes=True)
-
-    def test_add_calls_provisioner(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """Adding a new node should call _run_provisioner with the resolved server."""
-        cluster = _configured_cluster()
-        resolved = MagicMock()
-        resolved.ip = "198.51.100.5"
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
-            patch("meridian.commands.resolve._ensure_server_connection", return_value=resolved),
-            patch("meridian.panel_bootstrap.run_provisioner") as mock_prov,
-            patch("meridian.panel_bootstrap.setup_new_node"),
-        ):
-            mock_load.return_value = cluster
-            run_add(ip="198.51.100.5", yes=True)
-
-        mock_prov.assert_called_once()
-        call_kwargs = mock_prov.call_args
-        assert call_kwargs.kwargs["resolved"] is resolved
-        assert call_kwargs.kwargs["is_panel_host"] is False
-
-    def test_add_calls_setup_new_node(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """Adding a new node should call _setup_new_node after provisioning."""
-        cluster = _configured_cluster()
-        resolved = MagicMock()
-        resolved.ip = "198.51.100.5"
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
-            patch("meridian.commands.resolve._ensure_server_connection", return_value=resolved),
-            patch("meridian.panel_bootstrap.run_provisioner"),
-            patch("meridian.panel_bootstrap.setup_new_node") as mock_setup,
-        ):
-            mock_load.return_value = cluster
-            run_add(ip="198.51.100.5", name="new-node", yes=True)
-
-        mock_setup.assert_called_once()
-        call_kwargs = mock_setup.call_args
-        assert call_kwargs.kwargs["resolved"] is resolved
-
-    def test_add_reports_remote_change_when_setup_state_cannot_be_saved(
-        self,
-        tmp_home: Path,
-        _patch_cluster_config: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        cluster = _configured_cluster()
-        resolved = MagicMock(ip="198.51.100.5", user="root")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
-            patch("meridian.commands.resolve._ensure_server_connection", return_value=resolved),
-            patch("meridian.panel_bootstrap.run_provisioner"),
-            patch("meridian.panel_bootstrap.setup_new_node", side_effect=OSError("disk full")),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_add(ip="198.51.100.5", yes=True)
-
-        assert exc_info.value.exit_code == 3
-        output = capsys.readouterr().err
-        assert "provisioned remotely" in output
-        assert "Remote state changed" in output
-
-    def test_add_reports_remote_change_when_desired_state_mirror_cannot_be_saved(
-        self,
-        tmp_home: Path,
-        _patch_cluster_config: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        cluster = _configured_cluster()
-        cluster.desired_nodes = []
-        resolved = MagicMock(ip="198.51.100.5", user="root")
-
-        def add_remote_node(**_kwargs: object) -> None:
-            cluster.nodes.append(NodeEntry(ip="198.51.100.5", name="new-node"))
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
-            patch("meridian.commands.resolve._ensure_server_connection", return_value=resolved),
-            patch("meridian.panel_bootstrap.run_provisioner"),
-            patch("meridian.panel_bootstrap.setup_new_node", side_effect=add_remote_node),
-            patch.object(cluster, "save", side_effect=OSError("read-only filesystem")),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_add(ip="198.51.100.5", name="new-node", yes=True)
-
-        assert exc_info.value.exit_code == 3
-        output = capsys.readouterr().err
-        assert "provisioned remotely" in output
-        assert "read-only filesystem" in output
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +261,7 @@ class TestNodeCheck:
         )
 
         with (
-            patch("meridian.commands.node.load_cluster", return_value=cluster),
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
             patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
             patch("meridian.commands.node.make_panel", return_value=panel),
             patch("meridian.ssh.ServerConnection", return_value=connection),
@@ -427,7 +308,7 @@ class TestNodeCheck:
         )
 
         with (
-            patch("meridian.commands.node.load_cluster", return_value=cluster),
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
             patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
             patch("meridian.commands.node.make_panel", return_value=panel),
             patch("meridian.ssh.ServerConnection", return_value=connection),
@@ -563,7 +444,7 @@ class TestNodeRemove:
         )
 
         with (
-            patch("meridian.commands.node.load_cluster", return_value=cluster),
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
             patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
             patch("meridian.commands.node.make_panel") as make_panel,
             pytest.raises(typer.Exit) as exc_info,
@@ -572,23 +453,6 @@ class TestNodeRemove:
 
         assert exc_info.value.exit_code == 2
         make_panel.assert_not_called()
-
-    def test_remove_existing_node(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """Removing a valid exit node should disable + delete from panel and save cluster."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.commands.node._stop_node_containers", return_value=True),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        panel.disable_node.assert_called_once_with("550e8400-e29b-41d4-a716-446655440002")
-        panel.delete_node.assert_called_once_with("550e8400-e29b-41d4-a716-446655440002")
 
     def test_remove_node_not_found_fails(self, tmp_home: Path) -> None:
         """Removing a node that doesn't exist should fail."""
@@ -600,118 +464,6 @@ class TestNodeRemove:
         ):
             mock_load.return_value = cluster
             run_remove(ip_or_name="198.51.100.99")
-
-    def test_remove_panel_node_blocked(self, tmp_home: Path) -> None:
-        """Cannot remove the panel host node — should fail."""
-        cluster = _configured_cluster()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.1")
-
-    def test_remove_with_dependent_relays_blocked(self, tmp_home: Path) -> None:
-        """Node with dependent relays cannot be removed without --force."""
-        cluster = _cluster_with_relay()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-    def test_remove_with_dependent_relays_force_warns(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """Node with dependent relays can be removed with --force (warns)."""
-        cluster = _cluster_with_relay()
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.commands.node.warn") as mock_warn,
-            patch("meridian.commands.node._stop_node_containers", return_value=True),
-            patch(
-                "meridian.operations.remove_relay",
-                side_effect=lambda target, _panel, *, relay_ip: target.relays.clear(),
-            ),
-            patch.object(ClusterConfig, "save"),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2", force=True)
-
-        # Should have warned about dependent relays
-        mock_warn.assert_any_call("Force-removing 1 dependent relay(s) before node removal: relay")
-        # Should still proceed with panel deletion
-        panel.delete_node.assert_called_once()
-
-    def test_remove_saves_cluster_without_node(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """After removal, the cluster should be saved without the removed node."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.commands.node._stop_node_containers", return_value=True),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        # Only the panel node should remain
-        assert len(cluster.nodes) == 1
-        assert cluster.nodes[0].ip == "198.51.100.1"
-
-    def test_remove_panel_api_error_retains_node(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """A failed panel delete retains local state for a retry."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-        panel.disable_node.side_effect = RemnawaveError("Panel down")
-        panel.delete_node.side_effect = RemnawaveError("Panel down")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.commands.node._stop_node_containers", return_value=True),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        assert len(cluster.nodes) == 2
-        assert cluster.find_node("198.51.100.2") is not None
-
-    def test_remove_reports_remote_change_when_local_state_cannot_be_saved(
-        self,
-        tmp_home: Path,
-        _patch_cluster_config: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        def remove_then_fail(_cluster: ClusterConfig, remote_panel: MagicMock, **_kwargs: object) -> None:
-            remote_panel.delete_node("550e8400-e29b-41d4-a716-446655440002")
-            raise OSError("disk full")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.operations.remove_node", side_effect=remove_then_fail),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_remove(ip_or_name="198.51.100.2", yes=True)
-
-        assert exc_info.value.exit_code == 3
-        panel.delete_node.assert_called_once()
-        output = capsys.readouterr().err
-        assert "removed remotely" in output
-        assert "Remote state changed" in output
 
 
 # ---------------------------------------------------------------------------
@@ -809,7 +561,6 @@ class TestNodeList:
         from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel
 
         cluster = _configured_cluster()
-        cluster.nodes = []
         topology = FleetTopology(
             panel=TopologyPanel(
                 url=cluster.panel.url,
@@ -953,87 +704,3 @@ class TestRenderCheck:
 # ---------------------------------------------------------------------------
 # TestNodeRemoveContainerCleanup
 # ---------------------------------------------------------------------------
-
-
-class TestNodeRemoveContainerCleanup:
-    def test_remove_stops_containers_via_ssh(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """Node remove should SSH into the node and stop containers."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.return_value = None
-        mock_conn.run.return_value = _ssh_result()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn) as mock_sc,
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        # SSH connection was created for the node
-        mock_sc.assert_called_once_with(ip="198.51.100.2", user="root", port=22)
-        mock_conn.check_ssh.assert_called_once()
-
-        # docker compose down was called for the node
-        run_calls = [str(c) for c in mock_conn.run.call_args_list]
-        assert any(
-            "docker compose" in call and "/opt/remnanode/docker-compose.yml" in call and "down" in call
-            for call in run_calls
-        )
-        assert not any("/opt/remnawave-node" in c for c in run_calls)
-
-    def test_remove_retains_state_if_ssh_fails(self, tmp_home: Path, _patch_cluster_config: Path) -> None:
-        """If SSH is unreachable, node remove should fail with retry state intact."""
-        from meridian.ssh import SSHError
-
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.side_effect = SSHError("Connection refused")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
-            patch("meridian.commands.node.warn") as mock_warn,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        # Warned about SSH failure
-        mock_warn.assert_any_call("Could not stop containers on 198.51.100.2 (SSH unreachable)")
-
-        assert len(cluster.nodes) == 2
-        assert cluster.find_node("198.51.100.2") is not None
-
-    def test_remove_does_not_stop_panel_containers_for_non_panel_node(
-        self, tmp_home: Path, _patch_cluster_config: Path
-    ) -> None:
-        """Non-panel nodes should only stop the node container, not panel containers."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.return_value = None
-        mock_conn.run.return_value = _ssh_result()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.node.confirm", return_value=True),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.2")
-
-        # Only one docker compose down call (for the node)
-        run_calls = [str(c) for c in mock_conn.run.call_args_list]
-        assert any("/opt/remnanode/docker-compose.yml" in c for c in run_calls)
-        assert not any("'/opt/remnawave/docker-compose.yml'" in c for c in run_calls)

@@ -142,7 +142,6 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
         "--ssh-port",
         "--port",
         "--assets-dir",
-        "--prune-extras",
         "--parallel",
         "--request",
         "--events",
@@ -425,7 +424,7 @@ def client_add(
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
-    repair_page: bool = typer.Option(False, "--repair-page", help="Regenerate a missing legacy connection page"),
+    repair_page: bool = typer.Option(False, "--repair-page", help="Republish the client's connection page"),
 ) -> None:
     """Show connection info for a managed access client.
 
@@ -457,7 +456,7 @@ def client_remove(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Remove a legacy client (V4 removal is managed through setup)"""
+    """Remove a client (not available yet; use client disable)"""
     from meridian.commands.client import run_remove
 
     if json_mode:
@@ -670,7 +669,7 @@ def relay_deploy_cmd(
     sni: str = typer.Option(
         "",
         "--sni",
-        help="Reality SNI (legacy auto-scans; V4 inherits the exit path when omitted)",
+        help="Reality SNI (inherits the exit path's when omitted)",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port on the relay server"),
@@ -707,7 +706,7 @@ def relay_remove_cmd(
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Remove a legacy relay node (edit V4 chains with setup)"""
+    """Remove a relay (not available yet; edit relay chains with setup)"""
     from meridian.commands.relay import run_remove
 
     run_remove(relay_ip, exit, user, yes)
@@ -719,7 +718,7 @@ def relay_check_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Exit server IP or name"),
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
 ) -> None:
-    """Check a legacy relay (use test for a V4 chain)"""
+    """Check a relay (not available yet; use test for relay chains)"""
     from meridian.commands.relay import run_check
 
     run_check(relay_ip, exit, user)
@@ -738,13 +737,13 @@ def node_add_cmd(
     sni: str = typer.Option("", "--sni", help="Reality SNI target"),
     domain: str = typer.Option("", "--domain", help="Domain for WSS/XHTTP (Cloudflare CDN)"),
     ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port"),
-    harden: bool = typer.Option(True, help="Apply OS hardening; V4 rejects --no-harden"),
+    harden: bool = typer.Option(True, help="Apply OS hardening (fleet servers require it)"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Provision a legacy node or add a reviewed V4 exit.
+    """Add an exit server to the fleet.
 
-    Connects via SSH, hardens the server, installs Docker and Xray,
-    registers with the panel, and creates host entries.
+    Connects via SSH, adds the server as an exit in your topology, and
+    applies the reviewed plan (hardening, Docker, Xray, panel registration).
 
     [dim]Examples:[/dim]
       [cyan]meridian node add 198.51.100.10[/cyan]
@@ -785,7 +784,7 @@ def node_remove_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     force: bool = typer.Option(False, "--force", help="Remove even if relays depend on this node"),
 ) -> None:
-    """Remove a legacy node (edit V4 exits with setup)"""
+    """Remove a node (not available yet; edit exits with setup)"""
     from meridian.commands.node import run_remove
 
     run_remove(node, yes=yes, force=force)

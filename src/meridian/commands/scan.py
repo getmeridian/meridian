@@ -202,27 +202,16 @@ def run(
         if 1 <= idx <= len(domains):
             selected = domains[idx - 1]
 
-            # Legacy nodes can store the selection directly. V4 intent is a
-            # reviewed contract and must only change through setup/apply.
+            # A saved topology is a reviewed contract: it only changes through setup/apply.
             cluster = load_cluster(require_configured=False)
-            saved = False
             if cluster.topology_intent is not None:
-                warn("V4 topology intent is review-managed; the selected SNI was not saved")
-            elif (node := cluster.find_node(resolved.ip)) is not None:
-                node.sni = selected
-                cluster.save()
-                saved = True
-            else:
-                warn(f"Node {resolved.ip} not found in cluster.yml; SNI was not saved")
-
+                warn("Your topology is review-managed; the selected SNI was not saved")
             err_console.print()
-            ok(f"{'Saved' if saved else 'Selected'}: {selected}")
+            ok(f"Selected: {selected}")
             if cluster.topology_intent is not None:
                 err_console.print("  [dim]Update the reviewed Reality SNI through: meridian setup[/dim]")
             else:
                 err_console.print(f"  [dim]Use it: meridian deploy {resolved.ip} --sni {selected}[/dim]")
-            if saved:
-                err_console.print("  [dim]Or it will be suggested automatically during deploy.[/dim]")
             err_console.print("  [dim]Tip: with --domain, your own domain works as SNI too (self-steal).[/dim]\n")
             return
 

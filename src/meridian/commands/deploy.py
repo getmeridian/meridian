@@ -37,8 +37,7 @@ from meridian.console import (
     warn,
 )
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
-from meridian.core.deploy import DeployRequest, DeployResult, build_deploy_workflow
-from meridian.core.deploy_planning import DeployPlan
+from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import EngineError, MeridianError
 from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED

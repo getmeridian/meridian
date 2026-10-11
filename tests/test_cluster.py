@@ -305,40 +305,6 @@ class TestClusterYAMLRoundTrip:
 
         assert loaded.nodes[0].hysteria2 is True
 
-    def test_v4_0_applied_snapshots_migrate_to_typed_state(self, tmp_path: Path) -> None:
-        from meridian.reconciler.snapshots import load_applied_snapshot
-
-        p = tmp_path / "cluster.yml"
-        p.write_text(
-            "version: 2\n"
-            "desired_nodes_applied:\n"
-            f"  - {_IP_A}\n"
-            "desired_clients_applied:\n"
-            "  - alice\n"
-            "desired_relays_applied: []\n"
-        )
-
-        loaded = ClusterConfig.load(p)
-
-        assert loaded.applied_state.nodes == [_IP_A]
-        assert loaded.applied_state.clients == ["alice"]
-        assert loaded.applied_state.relays == []
-        assert load_applied_snapshot(loaded, "nodes") == {_IP_A}
-        assert load_applied_snapshot(loaded, "clients") == {"alice"}
-        assert load_applied_snapshot(loaded, "relays") == set()
-        assert not loaded._extra.keys() & {
-            "desired_nodes_applied",
-            "desired_clients_applied",
-            "desired_relays_applied",
-        }
-
-        loaded.save(p)
-        saved = p.read_text()
-        assert "applied_state:" in saved
-        assert "desired_nodes_applied" not in saved
-        assert "desired_clients_applied" not in saved
-        assert "desired_relays_applied" not in saved
-
     def test_save_and_load_preserves_strenum_keys(self, tmp_path: Path) -> None:
         cfg = ClusterConfig(
             inbounds={

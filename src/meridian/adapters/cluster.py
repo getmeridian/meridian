@@ -1,14 +1,12 @@
-"""ClusterConfig adapter for meridian-core topology models."""
+"""Project the saved topology intent into meridian-core fleet models."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from meridian.cluster import ClusterConfig, NodeEntry, RelayEntry, WorkloadBinding
+from meridian.cluster import ClusterConfig, WorkloadBinding
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
-    DesiredNodeSpec,
-    DesiredRelaySpec,
     FleetTopology,
     RelayHopMembership,
     RelayHostRef,
@@ -23,10 +21,10 @@ from meridian.servers import ServerEntry, ServerRegistry
 
 
 def topology_from_local_cluster(cluster: ClusterConfig) -> FleetTopology:
-    """Convert cluster state, resolving V4 server references from local state."""
+    """Project the topology, resolving its server references from local state."""
     from meridian.config import SERVER_PROFILES_FILE
 
-    servers = ServerRegistry(SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else None
+    servers = ServerRegistry(SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else []
     return topology_from_cluster(cluster, servers=servers)
 
 
@@ -35,27 +33,31 @@ def topology_from_cluster(
     *,
     servers: Sequence[ServerEntry] | None = None,
 ) -> FleetTopology:
-    """Convert the current YAML-backed cluster model into core topology.
+    """Project the saved topology intent into core fleet views.
 
-    V4 intent stores stable server references instead of duplicating addresses
-    in ``cluster.yml``. Callers that project V4 state therefore provide the
-    saved server registry (or use :func:`topology_from_local_cluster`).
+    The intent stores stable server references instead of duplicating
+    addresses in ``cluster.yml``, so callers provide the saved server
+    registry (or use :func:`topology_from_local_cluster`). A cluster without
+    an intent projects only its panel.
     """
-    nodes = cluster.nodes
-    relays = cluster.relays
+    intent = cluster.topology_intent
     panel_server_ip = cluster.panel.server_ip
     panel_ssh_user = cluster.panel.ssh_user
     panel_ssh_port = cluster.panel.ssh_port
-    if cluster.topology_intent is not None:
+    nodes: list[TopologyNode] = []
+    relays: list[TopologyRelay] = []
+    members: list[TopologyServerMember] = []
+    if intent is not None:
         if servers is None:
             raise LocalStateError(
-                "Saved server profiles are required to read the V4 topology.",
+                "Saved server profiles are required to read the topology.",
                 hint="Restore ~/.meridian/servers.json, then retry.",
             )
         server_map = _v4_server_map(cluster, servers)
         nodes = _v4_nodes(cluster, server_map)
         relays = _v4_relays(cluster, server_map)
-        control = server_map[cluster.topology_intent.control.server_ref]
+        members = _v4_members(cluster, server_map)
+        control = server_map[intent.control.server_ref]
         if not panel_server_ip:
             panel_server_ip = control.host
             panel_ssh_user = control.user
@@ -78,92 +80,29 @@ def topology_from_cluster(
             if cluster.subscription_page
             else None
         ),
-        nodes=[
-            TopologyNode(
-                ip=node.ip,
-                name=node.name,
-                uuid=node.uuid,
-                is_panel_host=node.is_panel_host,
-                ssh_user=node.ssh_user,
-                ssh_port=node.ssh_port,
-                domain=node.domain,
-                sni=node.sni,
-                xhttp_path=node.xhttp_path,
-                ws_path=node.ws_path,
-                role=(
-                    "routing_gateway"
-                    if cluster.topology_intent is not None
-                    and node.name in {gateway.id for gateway in cluster.topology_intent.routing_gateways}
-                    else "exit"
-                ),
-                protocols=_projected_protocols(
-                    node,
-                    assume_reality=cluster.topology_intent is None,
-                ),
-            )
-            for node in nodes
-        ],
-        relays=[
-            TopologyRelay(
-                ip=relay.ip,
-                name=relay.name,
-                port=relay.port,
-                ssh_user=relay.ssh_user,
-                ssh_port=relay.ssh_port,
-                exit_node_ip=relay.exit_node_ip,
-                sni=relay.sni,
-                host_refs=[
-                    RelayHostRef(protocol=str(protocol), uuid=uuid)
-                    for protocol, uuid in sorted(relay.host_uuids.items())
-                ],
-            )
-            for relay in relays
-        ],
-        servers=_v4_members(cluster, server_map) if cluster.topology_intent is not None else [],
-        access_users=(list(cluster.topology_intent.access.users) if cluster.topology_intent is not None else None),
-        desired_nodes=(
-            [
-                DesiredNodeSpec(
-                    host=desired.host,
-                    name=desired.name,
-                    ssh_user=desired.ssh_user,
-                    ssh_port=desired.ssh_port,
-                    domain=desired.domain,
-                    sni=desired.sni,
-                    warp=desired.warp,
-                )
-                for desired in cluster.desired_nodes
-            ]
-            if cluster.desired_nodes is not None
-            else None
-        ),
-        desired_relays=(
-            [
-                DesiredRelaySpec(
-                    host=desired.host,
-                    name=desired.name,
-                    ssh_user=desired.ssh_user,
-                    ssh_port=desired.ssh_port,
-                    exit_node=desired.exit_node,
-                    sni=desired.sni,
-                )
-                for desired in cluster.desired_relays
-            ]
-            if cluster.desired_relays is not None
-            else None
-        ),
+        nodes=nodes,
+        relays=relays,
+        servers=members,
+        access_users=list(intent.access.users) if intent is not None else None,
     )
 
 
-def _projected_protocols(node: NodeEntry, *, assume_reality: bool) -> list[ProtocolKind]:
+def _projected_protocols(
+    *,
+    sni: str = "",
+    domain: str = "",
+    xhttp_path: str = "",
+    ws_path: str = "",
+    hysteria2: bool = False,
+) -> list[ProtocolKind]:
     protocols: list[ProtocolKind] = []
-    if assume_reality or node.reality_public_key or node.sni:
+    if sni:
         protocols.append("reality")
-    if node.xhttp_path:
+    if xhttp_path:
         protocols.append("xhttp")
-    if node.domain and node.ws_path:
+    if domain and ws_path:
         protocols.append("wss")
-    if node.hysteria2:
+    if hysteria2:
         protocols.append("hysteria2")
     return protocols
 
@@ -205,11 +144,11 @@ def _active_workload(cluster: ClusterConfig, workload_id: str) -> WorkloadBindin
 def _v4_nodes(
     cluster: ClusterConfig,
     servers: dict[str, ServerEntry],
-) -> list[NodeEntry]:
+) -> list[TopologyNode]:
     intent = cluster.topology_intent
     if intent is None:
         return []
-    nodes: list[NodeEntry] = []
+    nodes: list[TopologyNode] = []
     for exit_ in intent.exits:
         server = servers[exit_.server_ref]
         workload = _active_workload(cluster, exit_.id)
@@ -217,20 +156,30 @@ def _v4_nodes(
         xhttp = next((path for path in exit_.paths if path.protocol == "xhttp"), None)
         wss = next((path for path in exit_.paths if path.protocol == "wss"), None)
         tls_path = next((path for path in exit_.paths if path.tls_sni), None)
+        sni = reality.reality_sni if reality else ""
+        domain = tls_path.tls_sni if tls_path else ""
+        xhttp_path = xhttp.path if xhttp else ""
+        ws_path = wss.path if wss else ""
         nodes.append(
-            NodeEntry(
+            TopologyNode(
                 ip=server.host,
                 uuid=workload.node_uuids.get(exit_.server_ref, "") if workload else "",
                 name=exit_.id,
                 ssh_user=server.user,
                 ssh_port=server.port,
-                sni=reality.reality_sni if reality else "",
-                domain=tls_path.tls_sni if tls_path else "",
+                sni=sni,
+                domain=domain,
                 is_panel_host=exit_.server_ref == intent.control.server_ref,
-                xhttp_path=xhttp.path if xhttp else "",
-                ws_path=wss.path if wss else "",
-                warp=exit_.warp,
-                hysteria2=any(path.protocol == "hysteria2" for path in exit_.paths),
+                xhttp_path=xhttp_path,
+                ws_path=ws_path,
+                role="exit",
+                protocols=_projected_protocols(
+                    sni=sni,
+                    domain=domain,
+                    xhttp_path=xhttp_path,
+                    ws_path=ws_path,
+                    hysteria2=any(path.protocol == "hysteria2" for path in exit_.paths),
+                ),
             )
         )
     paths_by_id = {path.id: path for exit_ in intent.exits for path in exit_.paths}
@@ -239,15 +188,19 @@ def _v4_nodes(
         workload = _active_workload(cluster, gateway.id)
         bridge_path = paths_by_id[gateway.bridge_path_ref]
         nodes.append(
-            NodeEntry(
+            TopologyNode(
                 ip=server.host,
                 uuid=workload.node_uuids.get(gateway.server_ref, "") if workload else "",
                 name=gateway.id,
                 ssh_user=server.user,
                 ssh_port=server.port,
                 sni=bridge_path.reality_sni,
+                domain="",
                 is_panel_host=gateway.server_ref == intent.control.server_ref,
-                hysteria2=False,
+                xhttp_path="",
+                ws_path="",
+                role="routing_gateway",
+                protocols=_projected_protocols(sni=bridge_path.reality_sni),
             )
         )
     return nodes
@@ -256,12 +209,12 @@ def _v4_nodes(
 def _v4_relays(
     cluster: ClusterConfig,
     servers: dict[str, ServerEntry],
-) -> list[RelayEntry]:
+) -> list[TopologyRelay]:
     intent = cluster.topology_intent
     if intent is None:
         return []
     exits = {exit_.id: exit_ for exit_ in intent.exits}
-    relays: list[RelayEntry] = []
+    relays: list[TopologyRelay] = []
     for relay in intent.transparent_relays:
         exit_ = exits[relay.exit_ref]
         path = next(path for path in exit_.paths if path.id == relay.protocol_path_ref)
@@ -271,12 +224,12 @@ def _v4_relays(
         host_ref = f"host:{relay.id}:{path.id}"
         host_uuid = workload.host_uuids.get(host_ref, "") if workload else ""
         relays.append(
-            RelayEntry(
+            TopologyRelay(
                 ip=first_hop.host,
                 name=relay.id,
                 port=relay.listen_port,
                 exit_node_ip=exit_server.host,
-                host_uuids={path.protocol: host_uuid} if host_uuid else {},
+                host_refs=[RelayHostRef(protocol=path.protocol, uuid=host_uuid)] if host_uuid else [],
                 sni=relay.reality_sni or path.reality_sni or path.tls_sni,
                 ssh_user=first_hop.user,
                 ssh_port=first_hop.port,

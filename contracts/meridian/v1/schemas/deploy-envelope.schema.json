@@ -2,7 +2,7 @@
   "$defs": {
     "DeployPlan": {
       "additionalProperties": false,
-      "description": "Core-owned deploy plan consumed by provisioning and panel adapters.",
+      "description": "Dry-run preview of what `meridian deploy` would apply.",
       "properties": {
         "info_page_path": {
           "title": "Info Page Path",
@@ -60,7 +60,7 @@
     },
     "DeployPorts": {
       "additionalProperties": false,
-      "description": "Deterministic per-node port layout.",
+      "description": "Compiled listener ports for the deployed exit.",
       "properties": {
         "reality_port": {
           "title": "Reality Port",

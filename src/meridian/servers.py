@@ -340,23 +340,6 @@ def _cluster_references(profile: ServerProfile, cluster: ClusterConfig) -> list[
 
     if cluster.panel.server_ip == profile.host:
         add("the control plane")
-    for node in cluster.nodes:
-        if node.ip == profile.host:
-            add(f"node '{node.name or node.ip}'")
-    for relay in cluster.relays:
-        if relay.ip == profile.host:
-            add(f"relay '{relay.name or relay.ip}'")
-    for desired_node in cluster.desired_nodes or []:
-        if desired_node.host == profile.host:
-            add(f"desired node '{desired_node.name or desired_node.host}'")
-    for desired_relay in cluster.desired_relays or []:
-        if desired_relay.host == profile.host:
-            add(f"desired relay '{desired_relay.name or desired_relay.host}'")
-    if profile.host in (cluster.applied_state.nodes or []):
-        add("the applied node snapshot")
-    if profile.host in (cluster.applied_state.relays or []):
-        add("the applied relay snapshot")
-
     intent = cluster.topology_intent
     if intent is not None:
         if intent.control.server_ref in identities:

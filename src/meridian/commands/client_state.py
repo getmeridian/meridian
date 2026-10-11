@@ -2,21 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.console import fail
 from meridian.core.models import MeridianError
 from meridian.core.redaction import redact_string
-
-
-def capture_client_state_failure(update: Callable[[], None]) -> str:
-    """Run a local client-state update and return a redacted failure."""
-    try:
-        update()
-    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
-        return _failure_text(exc)
-    return ""
 
 
 def persist_client_state(cluster: ClusterConfig) -> str:
@@ -65,18 +54,15 @@ def build_client_persistence_warning(
     )
 
 
-def require_v4_access_user(cluster: ClusterConfig, name: str) -> bool:
-    """Require V4 mutations to target a declared access user."""
+def require_access_user(cluster: ClusterConfig, name: str) -> None:
+    """Require client mutations to target a user declared in the topology."""
     intent = cluster.topology_intent
-    if intent is None:
-        return False
-    if name not in intent.access.users:
+    if intent is None or name not in intent.access.users:
         fail(
-            f"Client '{name}' is not managed by the V4 access intent",
-            hint="Only declared V4 access users may be changed by this command.",
+            f"Client '{name}' is not one of your fleet's clients",
+            hint="Only clients added with `meridian client add` can be changed by this command.",
             hint_type="user",
         )
-    return True
 
 
 def _failure_text(exc: Exception) -> str:

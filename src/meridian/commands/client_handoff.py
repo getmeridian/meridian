@@ -1,22 +1,19 @@
-"""Evidence-backed subscription and legacy connection-page handoff."""
+"""Evidence-backed subscription and connection-page handoff for client commands."""
 
 from __future__ import annotations
 
-import shlex
 from dataclasses import dataclass
 
 from rich.markup import escape
 
-from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.cluster import ClusterConfig
 from meridian.commands._validation import validate_command_input
 from meridian.commands.client_state import persist_client_state
 from meridian.console import err_console, fail
 from meridian.core.clients import PanelUserLike
 from meridian.core.command_inputs import ClientNameRequest
-from meridian.core.redaction import redact_string
-from meridian.diagnostics import command_evidence_unavailable
 from meridian.remnawave import MeridianPanel, RemnawaveError, User
-from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh import SSHError
 
 
 @dataclass(frozen=True)
@@ -26,14 +23,6 @@ class PageResolution:
     url: str = ""
     repaired: bool = False
     persistence_error: str = ""
-
-
-@dataclass(frozen=True)
-class PageCleanup:
-    """Outcome of removing a legacy page after its panel user was deleted."""
-
-    state_changed: bool = False
-    error: str = ""
 
 
 def format_status(status: str) -> str:
@@ -67,154 +56,32 @@ def get_user_or_fail(panel: MeridianPanel, name: str, *, action: str) -> User | 
         )
 
 
-def build_page_url(cluster: ClusterConfig, vless_uuid: str, *, require_deployed: bool = True) -> str:
-    """Build a connection-page URL only when its required evidence exists."""
-    from meridian.pwa import connection_page_deployed
-
-    info_page_path = cluster.panel.sub_path or ""
-    if not info_page_path or not vless_uuid:
-        return ""
-    if require_deployed and not connection_page_deployed(cluster, vless_uuid):
-        return ""
-    node = cluster.panel_node
-    if not node:
-        return ""
-    host = node.domain or node.ip
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-    return f"https://{host}/{info_page_path}/{vless_uuid}/"
-
-
 def resolve_page_url(
     cluster: ClusterConfig,
     user: PanelUserLike,
     *,
     repair: bool,
 ) -> PageResolution:
-    """Return an evidenced page URL and whether this call regenerated it."""
-    from meridian.pwa import (
-        connection_page_deployed,
-        connection_page_failed,
-        mark_connection_page_deployed,
-        mark_connection_page_failed,
-    )
+    """Return an evidenced connection-page URL, republishing it when asked."""
+    from meridian.handoff import page_url, publish_connection_pages
+    from meridian.pwa import connection_page_deployed
 
-    vless_uuid = user.vless_uuid
-    candidate = build_page_url(cluster, vless_uuid, require_deployed=False)
-    failed = connection_page_failed(cluster, vless_uuid)
+    candidate = page_url(cluster, user)
     if not candidate:
         return PageResolution()
-    if connection_page_deployed(cluster, vless_uuid) and not repair:
-        return PageResolution(url=candidate)
-    if failed and not repair:
-        return PageResolution()
-    if not cluster.panel.server_ip:
-        return PageResolution()
-    panel_node = cluster.panel_node
-    if panel_node is None:
-        return PageResolution()
-    persistence_error = ""
-    if not failed:
-        try:
-            with ServerConnection(
-                cluster.panel.server_ip,
-                user=cluster.panel.ssh_user or "root",
-                port=getattr(cluster.panel, "ssh_port", 22) or 22,
-            ) as conn:
-                result = conn.run(
-                    f"test -f /var/www/private/{shlex.quote(vless_uuid)}/index.html",
-                    timeout=10,
-                )
-            if result.returncode == 0:
-                mark_connection_page_deployed(cluster, vless_uuid)
-                persistence_error = persist_client_state(cluster)
-                return PageResolution(url=candidate, persistence_error=persistence_error)
-            if command_evidence_unavailable(result.returncode):
-                if not repair:
-                    return PageResolution()
-            else:
-                mark_connection_page_failed(cluster, vless_uuid)
-                persistence_error = persist_client_state(cluster)
-        except (OSError, RuntimeError, SSHError):
-            if not repair:
-                return PageResolution()
     if not repair:
-        return PageResolution(persistence_error=persistence_error)
+        return PageResolution(url=candidate if connection_page_deployed(cluster, user.vless_uuid) else "")
     try:
-        from meridian.pwa import deploy_client_page
-
-        with ServerConnection(
-            cluster.panel.server_ip,
-            user=cluster.panel.ssh_user or "root",
-            port=getattr(cluster.panel, "ssh_port", 22) or 22,
-        ) as conn:
-            subscription_url = cluster.panel.subscription_url(user.short_uuid)
-            repaired_url = deploy_client_page(
-                conn,
-                cluster,
-                panel_node,
-                vless_uuid,
-                user.username,
-                subscription_url,
-            )
-        if repaired_url:
-            mark_connection_page_deployed(cluster, vless_uuid)
-            persistence_error = persist_client_state(cluster)
-            return PageResolution(
-                url=repaired_url,
-                repaired=True,
-                persistence_error=persistence_error,
-            )
-        mark_connection_page_failed(cluster, vless_uuid)
-        persistence_error = persist_client_state(cluster)
+        links = publish_connection_pages(cluster, [user.username])
     except (OSError, RuntimeError, SSHError, RemnawaveError):
-        return PageResolution(persistence_error=persistence_error)
-    return PageResolution(persistence_error=persistence_error)
-
-
-def cleanup_client_page(client: User, cluster: ClusterConfig) -> PageCleanup:
-    """Remove legacy page files without hiding an unconfirmed cleanup."""
-    if not client.vless_uuid:
-        return PageCleanup()
-    from meridian.pwa import connection_page_deployed, connection_page_failed
-
-    page_configured = bool(
-        cluster.panel.sub_path
-        or connection_page_deployed(cluster, client.vless_uuid)
-        or connection_page_failed(cluster, client.vless_uuid)
+        return PageResolution()
+    if not links or not links[0].page_url:
+        return PageResolution()
+    return PageResolution(
+        url=links[0].page_url,
+        repaired=True,
+        persistence_error=persist_client_state(cluster),
     )
-    if not page_configured:
-        return PageCleanup()
-    if not cluster.panel.server_ip:
-        return PageCleanup(error="panel server address is unavailable")
-    try:
-        with ServerConnection(
-            cluster.panel.server_ip,
-            user=cluster.panel.ssh_user or "root",
-            port=getattr(cluster.panel, "ssh_port", 22) or 22,
-        ) as conn:
-            result = conn.run(
-                f"rm -rf /var/www/private/{shlex.quote(client.vless_uuid)}",
-                timeout=15,
-            )
-        if result.returncode == 0:
-            from meridian.pwa import forget_connection_page
-
-            forget_connection_page(cluster, client.vless_uuid)
-            return PageCleanup(state_changed=True)
-        detail = redact_string(result.stderr.strip() or result.stdout.strip())
-        return PageCleanup(error=detail or f"remote cleanup exited {result.returncode}")
-    except (OSError, RuntimeError, SSHError) as exc:
-        return PageCleanup(error=redact_string(str(exc)) or type(exc).__name__)
-
-
-def print_subscription(panel_config: PanelConfig, user: User, *, page_url: str = "") -> str:
-    """Print a handoff, returning an error when no public link can be built."""
-    subscription_url = panel_config.subscription_url(user.short_uuid)
-    if not subscription_url:
-        return "the panel URL or connection-page path is missing from cluster.yml"
-    print_handoff_links(subscription_url, page_url=page_url)
-    return ""
 
 
 def print_handoff_links(subscription_url: str, *, page_url: str = "") -> None:

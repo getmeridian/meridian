@@ -13,8 +13,7 @@ from typing import Literal
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.defaults import DEFAULT_SNI
-from meridian.core.deploy import DeployRequest
-from meridian.core.deploy_planning import DeployPlan, DeployPorts
+from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
     AccessIntent,

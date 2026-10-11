@@ -12,8 +12,7 @@ from meridian.core.command_catalog import (
     command_contracts,
     command_schema_bindings,
 )
-from meridian.core.deploy import DeployResult
-from meridian.core.deploy_planning import DeployClusterState, build_deploy_plan
+from meridian.core.deploy import DeployPlan, DeployPorts, DeployResult
 from meridian.core.models import MeridianError
 from meridian.core.output import OperationTimer, command_envelope, envelope
 from meridian.core.schema import (
@@ -89,8 +88,8 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "relay-deploy-request" in names
     assert "deploy-plan" in names
     assert "deploy-ports" in names
-    assert "deploy-cluster-state" in names
-    assert "deploy-node-state" in names
+    assert "deploy-cluster-state" not in names
+    assert "deploy-node-state" not in names
     assert "workflow-plan" in names
     assert "input-field" in names
     assert "input-option" in names
@@ -640,16 +639,16 @@ def test_deploy_command_envelope_accepts_result_and_dry_run_plan() -> None:
     assert parsed_result.root.status == "changed"
     assert parsed_result.root.data.server_ip == "198.51.100.10"
 
-    plan = build_deploy_plan(
-        "198.51.100.10",
-        DeployClusterState(
-            is_configured=False,
-            panel_secret_path="",
-            panel_sub_path="",
-            node_count=0,
-            relay_count=0,
-        ),
-        token_hex=lambda n: "0" * (n * 2),
+    plan = DeployPlan(
+        mode="first_deploy",
+        server_ip="198.51.100.10",
+        ports=DeployPorts(xhttp_port=0, reality_port=10443, wss_port=0),
+        secret_path="",
+        xhttp_path="",
+        ws_path="",
+        info_page_path="",
+        node_count=1,
+        relay_count=0,
     )
     planned = command_envelope(
         command="deploy",

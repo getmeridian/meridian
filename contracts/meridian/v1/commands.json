@@ -514,7 +514,7 @@
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Remove one legacy client; V4 managed-user retirement is not yet supported.",
+      "description": "Permanent client removal is not available yet; use client disable to revoke access.",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {

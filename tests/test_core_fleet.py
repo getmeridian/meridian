@@ -10,17 +10,19 @@ import pytest
 from meridian.adapters.cluster import topology_from_cluster, topology_from_local_cluster
 from meridian.cluster import (
     ClusterConfig,
-    DesiredNode,
-    DesiredRelay,
-    NodeEntry,
     PanelConfig,
-    RelayEntry,
-    SubscriptionPageConfig,
     WorkloadBinding,
 )
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
+    DesiredNodeSpec,
+    DesiredRelaySpec,
     FleetSources,
+    FleetTopology,
+    TopologyNode,
+    TopologyPanel,
+    TopologyRelay,
+    TopologySubscriptionPage,
     build_fleet_inventory,
     build_fleet_status,
     build_node_list_result,
@@ -51,6 +53,54 @@ class ApiNode:
 class ApiUser:
     username: str
     status: str = "ACTIVE"
+
+
+def _node(ip: str, *, uuid: str = "", name: str = "", is_panel_host: bool = False, **fields: object) -> TopologyNode:
+    values: dict[str, object] = {
+        "ssh_user": "root",
+        "ssh_port": 22,
+        "domain": "",
+        "sni": "",
+        "xhttp_path": "",
+        "ws_path": "",
+        "protocols": ["reality"],
+    }
+    values.update(fields)
+    return TopologyNode(ip=ip, uuid=uuid, name=name, is_panel_host=is_panel_host, **values)  # type: ignore[arg-type]
+
+
+def _relay(ip: str, *, name: str = "", exit_node_ip: str = "", port: int = 443, sni: str = "") -> TopologyRelay:
+    return TopologyRelay(
+        ip=ip,
+        name=name,
+        port=port,
+        ssh_user="root",
+        ssh_port=22,
+        exit_node_ip=exit_node_ip,
+        sni=sni,
+    )
+
+
+def _topology(
+    *,
+    nodes: list[TopologyNode] | None = None,
+    relays: list[TopologyRelay] | None = None,
+    server_ip: str = "",
+    **fields: object,
+) -> FleetTopology:
+    return FleetTopology(
+        panel=TopologyPanel(
+            url="https://198.51.100.1/panel",
+            display_url="https://198.51.100.1/panel/",
+            server_ip=server_ip,
+            ssh_user="root",
+            ssh_port=22,
+            deployed_with="",
+        ),
+        nodes=nodes or [],
+        relays=relays or [],
+        **fields,  # type: ignore[arg-type]
+    )
 
 
 def _v4_cluster() -> ClusterConfig:
@@ -232,30 +282,30 @@ def test_v4_local_projection_reads_saved_server_registry(tmp_home: Path) -> None
 
 
 def test_inventory_is_redacted_and_role_protocol_aware() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(
+    topology = FleetTopology(
+        panel=TopologyPanel(
             url="https://198.51.100.1/secret-panel",
-            api_token="secret-token",
+            display_url="https://198.51.100.1/secret-panel/",
             server_ip="198.51.100.1",
+            ssh_user="root",
+            ssh_port=22,
+            deployed_with="",
         ),
+        subscription_page=TopologySubscriptionPage(enabled=True, path="secret-subscription-path"),
         nodes=[
-            NodeEntry(
-                ip="198.51.100.1",
+            _node(
+                "198.51.100.1",
                 uuid="node-a",
                 name="exit-a",
                 is_panel_host=True,
                 xhttp_path="xhttp-a",
+                protocols=["reality", "xhttp", "hysteria2"],
             )
         ],
-        relays=[RelayEntry(ip="198.51.100.2", name="relay-a", exit_node_ip="198.51.100.1")],
-        subscription_page=SubscriptionPageConfig(enabled=True, path="secret-subscription-path"),
-        desired_nodes=[DesiredNode(host="198.51.100.1", name="exit-a")],
-        desired_relays=[DesiredRelay(host="198.51.100.2", name="relay-a", exit_node="exit-a")],
+        relays=[_relay("198.51.100.2", name="relay-a", exit_node_ip="198.51.100.1")],
     )
 
-    inventory = build_fleet_inventory(
-        topology_from_cluster(cluster), panel_healthy=True, api_nodes=[ApiNode(uuid="node-a")]
-    )
+    inventory = build_fleet_inventory(topology, panel_healthy=True, api_nodes=[ApiNode(uuid="node-a")])
     data = inventory.to_data()
 
     assert "api_token" not in data["panel"]
@@ -267,28 +317,7 @@ def test_inventory_is_redacted_and_role_protocol_aware() -> None:
     assert data["nodes"][0]["protocols"] == ["reality", "xhttp", "hysteria2"]
     assert data["nodes"][0]["panel_status"] == "connected"
     assert data["relays"][0]["exit_node_name"] == "exit-a"
-    assert data["summary"]["unapplied_desired_nodes"] == 0
-    assert data["summary"]["unapplied_desired_relays"] == 0
-
-
-def test_cluster_adapter_preserves_relay_host_protocol_refs() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        relays=[
-            RelayEntry(
-                ip="198.51.100.2",
-                name="relay-a",
-                host_uuids={"reality": "host-reality", "wss": "host-wss"},
-            )
-        ],
-    )
-
-    topology = topology_from_cluster(cluster)
-
-    assert [ref.model_dump() for ref in topology.relays[0].host_refs] == [
-        {"protocol": "reality", "uuid": "host-reality"},
-        {"protocol": "wss", "uuid": "host-wss"},
-    ]
+    assert data["summary"]["pending_desired_resources"] == 0
 
 
 def test_server_inventory_includes_panel_only_host() -> None:
@@ -298,8 +327,6 @@ def test_server_inventory_includes_panel_only_host() -> None:
             api_token="secret-token",
             server_ip="198.51.100.1",
         ),
-        nodes=[],
-        relays=[],
     )
 
     inventory = build_fleet_inventory(topology_from_cluster(cluster), panel_healthy=True)
@@ -319,15 +346,22 @@ def test_server_inventory_includes_panel_only_host() -> None:
 
 
 def test_inventory_desired_matching_uses_host_identity() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="reused-name")],
-        relays=[RelayEntry(ip="198.51.100.2", name="reused-relay")],
-        desired_nodes=[DesiredNode(host="198.51.100.9", name="reused-name")],
-        desired_relays=[DesiredRelay(host="198.51.100.8", name="reused-relay", exit_node="reused-name")],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="reused-name")],
+        relays=[_relay("198.51.100.2", name="reused-relay")],
+        desired_nodes=[
+            DesiredNodeSpec(
+                host="198.51.100.9", name="reused-name", ssh_user="root", ssh_port=22, domain="", sni="", warp=None
+            )
+        ],
+        desired_relays=[
+            DesiredRelaySpec(
+                host="198.51.100.8", name="reused-relay", ssh_user="root", ssh_port=22, exit_node="reused-name", sni=""
+            )
+        ],
     )
 
-    inventory = build_fleet_inventory(topology_from_cluster(cluster), panel_healthy=False)
+    inventory = build_fleet_inventory(topology, panel_healthy=False)
     data = inventory.to_data()
 
     assert data["nodes"][0]["desired"] is False
@@ -340,17 +374,16 @@ def test_inventory_desired_matching_uses_host_identity() -> None:
 
 
 def test_status_summarizes_nodes_relays_and_users() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
+    topology = _topology(
         nodes=[
-            NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True),
-            NodeEntry(ip="198.51.100.2", uuid="node-b", name="exit-b"),
+            _node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True),
+            _node("198.51.100.2", uuid="node-b", name="exit-b"),
         ],
-        relays=[RelayEntry(ip="198.51.100.3", name="relay-a", exit_node_ip="198.51.100.1")],
+        relays=[_relay("198.51.100.3", name="relay-a", exit_node_ip="198.51.100.1")],
     )
 
     status = build_fleet_status(
-        topology_from_cluster(cluster),
+        topology,
         panel_healthy=True,
         api_nodes=[ApiNode(uuid="node-a", is_connected=True)],
         api_users=[ApiUser(username="alice"), ApiUser(username="bob", status="DISABLED")],
@@ -374,14 +407,13 @@ def test_status_summarizes_nodes_relays_and_users() -> None:
 
 
 def test_reachable_relay_listener_does_not_certify_route_health() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
-        relays=[RelayEntry(ip="198.51.100.3", name="relay-a", exit_node_ip="198.51.100.1")],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+        relays=[_relay("198.51.100.3", name="relay-a", exit_node_ip="198.51.100.1")],
     )
 
     status = build_fleet_status(
-        topology_from_cluster(cluster),
+        topology,
         panel_healthy=True,
         api_nodes=[ApiNode(uuid="node-a", is_connected=True)],
         api_users=[ApiUser(username="alice")],
@@ -404,11 +436,10 @@ def test_v4_declared_access_user_defects_degrade_fleet(
     missing: int,
     nonactive: int,
 ) -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
     )
-    topology = topology_from_cluster(cluster).model_copy(update={"access_users": ["alice"]})
+    topology = topology.model_copy(update={"access_users": ["alice"]})
 
     status = build_fleet_status(
         topology,
@@ -424,13 +455,12 @@ def test_v4_declared_access_user_defects_degrade_fleet(
 
 
 def test_status_marks_health_unknown_when_required_node_source_unavailable() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
     )
 
     status = build_fleet_status(
-        topology_from_cluster(cluster),
+        topology,
         panel_healthy=True,
         api_nodes=[],
         api_users=[],
@@ -445,13 +475,12 @@ def test_status_marks_health_unknown_when_required_node_source_unavailable() -> 
 
 
 def test_status_marks_health_unknown_when_user_source_unavailable() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
     )
 
     status = build_fleet_status(
-        topology_from_cluster(cluster),
+        topology,
         panel_healthy=True,
         api_nodes=[ApiNode(uuid="node-a", is_connected=True)],
         api_users=[],
@@ -464,13 +493,12 @@ def test_status_marks_health_unknown_when_user_source_unavailable() -> None:
 
 
 def test_status_treats_disabled_node_as_degraded_even_if_connected() -> None:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="secret-token"),
-        nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
     )
 
     status = build_fleet_status(
-        topology_from_cluster(cluster),
+        topology,
         panel_healthy=True,
         api_nodes=[ApiNode(uuid="node-a", is_connected=True, is_disabled=True)],
         api_users=[],
@@ -484,19 +512,9 @@ def test_status_treats_disabled_node_as_degraded_even_if_connected() -> None:
 
 
 def test_node_and_relay_list_results_preserve_command_wire_shapes() -> None:
-    topology = topology_from_cluster(
-        ClusterConfig(
-            nodes=[NodeEntry(ip="198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
-            relays=[
-                RelayEntry(
-                    ip="198.51.100.2",
-                    name="relay-a",
-                    exit_node_ip="198.51.100.1",
-                    port=8443,
-                    sni="www.example.com",
-                )
-            ],
-        )
+    topology = _topology(
+        nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
+        relays=[_relay("198.51.100.2", name="relay-a", exit_node_ip="198.51.100.1", port=8443, sni="www.example.com")],
     )
 
     nodes = build_node_list_result(topology.nodes, [ApiNode(uuid="node-a")])

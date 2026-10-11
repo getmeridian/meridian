@@ -428,7 +428,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         },
         machine_flags=["--json", "--yes"],
         stability="stable",
-        description="Remove one legacy client; V4 managed-user retirement is not yet supported.",
+        description="Permanent client removal is not available yet; use client disable to revoke access.",
     ),
     "client.show": CommandContract(
         command="client.show",

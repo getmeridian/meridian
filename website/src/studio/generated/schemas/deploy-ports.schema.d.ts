@@ -10,7 +10,7 @@ export type WssPort = number;
 export type XhttpPort = number;
 
 /**
- * Deterministic per-node port layout.
+ * Compiled listener ports for the deployed exit.
  */
 export interface DeployPorts {
   reality_port: RealityPort;

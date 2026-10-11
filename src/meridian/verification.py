@@ -77,7 +77,7 @@ class VerificationHttpsRoute:
 class DeploymentVerificationContext:
     """Secret-free deployment facts needed by external checks."""
 
-    kind: Literal["external", "legacy", "v4"] = "external"
+    kind: Literal["external", "v4"] = "external"
     roles: tuple[str, ...] = ()
     protocols: tuple[ProtocolKind, ...] = ()
     reality_snis: tuple[str, ...] = ()
@@ -307,116 +307,8 @@ def deployment_verification_context(
     registry: ServerRegistry,
     target_ip: str,
 ) -> DeploymentVerificationContext:
-    """Return V4 facts first, falling back to legacy node metadata."""
-    target_ip = canonical_endpoint_address(target_ip)
-    if cluster.topology_intent is not None:
-        context = _v4_context(cluster, registry, target_ip)
-        if context.kind == "v4":
-            return context
-    node = next(
-        (candidate for candidate in cluster.nodes if canonical_endpoint_address(candidate.ip) == target_ip), None
-    )
-    if node is None:
-        relay = next(
-            (candidate for candidate in cluster.relays if canonical_endpoint_address(candidate.ip) == target_ip),
-            None,
-        )
-        exit_node = (
-            next(
-                (
-                    candidate
-                    for candidate in cluster.nodes
-                    if canonical_endpoint_address(candidate.ip) == canonical_endpoint_address(relay.exit_node_ip)
-                ),
-                None,
-            )
-            if relay is not None
-            else None
-        )
-        if relay is not None and exit_node is not None:
-            exit_context = deployment_verification_context(cluster, registry, exit_node.ip)
-            relay_sni = relay.sni or exit_node.sni
-            advertised_protocols: list[ProtocolKind] = ["reality"]
-            relay_routes = [VerificationHttpsRoute(kind="camouflage", port=relay.port, tls_sni=relay_sni)]
-            if "xhttp" in relay.host_uuids:
-                advertised_protocols.append("xhttp")
-                relay_routes.append(
-                    VerificationHttpsRoute(
-                        kind="managed",
-                        port=relay.port,
-                        tls_sni=relay_sni,
-                        host_header=relay_sni,
-                    )
-                )
-            return replace(
-                exit_context,
-                roles=("relay",),
-                protocols=tuple(advertised_protocols),
-                reality_snis=(relay_sni,) if relay_sni else (),
-                reality_sni_ports={relay_sni: relay.port} if relay_sni else {},
-                domains=(relay_sni,) if "xhttp" in relay.host_uuids and relay_sni else (),
-                domain_ports={relay_sni: relay.port} if "xhttp" in relay.host_uuids and relay_sni else {},
-                public_tcp_ports=(relay.port,),
-                public_tls_ports=(relay.port,),
-                public_udp_ports=(),
-                https_routes=tuple(relay_routes) if relay_sni else (),
-                internal_ports={},
-                endpoint_addresses=(canonical_endpoint_address(relay.ip),),
-                panel_secret_path="",
-            )
-        return DeploymentVerificationContext(endpoint_addresses=(target_ip,))
-
-    from meridian.core.deploy_planning import compute_deploy_ports
-
-    ports = compute_deploy_ports(node.ip)
-    internal = {"xhttp": ports.xhttp_port, "reality": ports.reality_port}
-    if node.domain:
-        internal["wss"] = ports.wss_port
-    endpoint_addresses = {canonical_endpoint_address(node.ip)}
-    if node.domain:
-        endpoint_addresses.add(node.domain)
-    for relay in cluster.relays:
-        if not relay.exit_node_ip or canonical_endpoint_address(relay.exit_node_ip) == canonical_endpoint_address(
-            node.ip
-        ):
-            endpoint_addresses.add(canonical_endpoint_address(relay.ip))
-    protocols: list[ProtocolKind] = []
-    if node.reality_public_key or node.sni:
-        protocols.append("reality")
-    if node.xhttp_path:
-        protocols.append("xhttp")
-    if node.domain and node.ws_path:
-        protocols.append("wss")
-    if node.hysteria2:
-        protocols.append("hysteria2")
-    https_routes = [
-        VerificationHttpsRoute(
-            kind="managed",
-            port=443,
-            tls_sni=node.domain,
-            host_header=node.domain,
-            panel=node.is_panel_host,
-        )
-    ]
-    if node.sni:
-        https_routes.append(VerificationHttpsRoute(kind="camouflage", port=443, tls_sni=node.sni))
-    return DeploymentVerificationContext(
-        kind="legacy",
-        roles=("exit",),
-        protocols=tuple(protocols),
-        reality_snis=(node.sni,) if node.sni else (),
-        reality_sni_ports={node.sni: 443} if node.sni else {},
-        domains=(node.domain,) if node.domain else (),
-        domain_ports={node.domain: 443} if node.domain else {},
-        internal_ports=internal,
-        public_tcp_ports=(443,),
-        public_tls_ports=(443,),
-        public_udp_ports=(443,) if node.hysteria2 else (),
-        https_routes=tuple(https_routes),
-        endpoint_addresses=tuple(sorted(endpoint_addresses)),
-        panel_secret_path=cluster.panel.secret_path if node.is_panel_host else "",
-        expected_egress_ip="" if node.warp else canonical_endpoint_address(node.ip),
-    )
+    """Return the topology facts that describe ``target_ip``."""
+    return _v4_context(cluster, registry, canonical_endpoint_address(target_ip))
 
 
 def resolve_deployment_verification_context(

@@ -93,12 +93,7 @@ def run(
 
     # Check deployed version
     cluster = load_cluster(require_configured=False)
-    legacy_node = cluster.find_node(resolved.ip)
-    deployed_with = (
-        (legacy_node.deployed_with if legacy_node else "")
-        or (cluster.panel.deployed_with if cluster.panel.server_ip == resolved.ip else "")
-        or "unknown"
-    )
+    deployed_with = (cluster.panel.deployed_with if cluster.panel.server_ip == resolved.ip else "") or "unknown"
 
     local_info = f"OS: {local_os}\nMeridian: {__version__}\nServer deployed with: {deployed_with}"
 
@@ -110,13 +105,13 @@ def run(
     )
 
     # --- Deployment context (for AI enrichment) ---
-    domain = (legacy_node.domain if legacy_node else "") or ""
-    saved_sni = (legacy_node.sni if legacy_node else "") or ""
+    domain = ""
+    saved_sni = ""
     roles: set[str] = set()
     protocols: set[str] = set()
-    relay_count = len(cluster.relays)
+    relay_count = 0
     relay_ports: set[int] = set()
-    xray_expected = legacy_node is not None
+    xray_expected = False
     topology_error = ""
     deployment: DeploymentVerificationContext | None = None
 
@@ -140,7 +135,7 @@ def run(
     except LocalStateError as exc:
         topology_error = str(exc)
 
-    # V4 intent identifies internal relay hops that are not public endpoints.
+    # The intent also identifies internal relay hops that are not public endpoints.
     intent = cluster.topology_intent
     try:
         server = registry.find(resolved.ip)

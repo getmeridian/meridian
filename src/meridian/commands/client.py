@@ -9,13 +9,8 @@ from __future__ import annotations
 import typer
 from rich.markup import escape
 
-from meridian.commands._helpers import format_traffic, load_cluster, make_panel
-from meridian.commands.client_handoff import (
-    build_page_url as _build_page_url,
-)
-from meridian.commands.client_handoff import (
-    cleanup_client_page as _cleanup_client_page,
-)
+from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
 from meridian.commands.client_handoff import (
     format_status as _format_status,
 )
@@ -24,9 +19,6 @@ from meridian.commands.client_handoff import (
 )
 from meridian.commands.client_handoff import (
     print_handoff_links as _print_handoff_links,
-)
-from meridian.commands.client_handoff import (
-    print_subscription as _print_subscription,
 )
 from meridian.commands.client_handoff import (
     resolve_page_url as _resolve_page_url,
@@ -38,31 +30,30 @@ from meridian.commands.client_state import (
     build_client_persistence_warning as _build_client_persistence_warning,
 )
 from meridian.commands.client_state import (
-    capture_client_state_failure as _capture_client_state_failure,
-)
-from meridian.commands.client_state import (
-    persist_client_state as _persist_client_state,
-)
-from meridian.commands.client_state import (
-    require_v4_access_user as _require_v4_access_user,
+    require_access_user as _require_access_user,
 )
 from meridian.commands.client_v4 import run_add_v4 as _run_add_v4
-from meridian.console import confirm, err_console, error_context, fail, info, is_json_mode, ok, warn
+from meridian.console import err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.core.clients import (
     PanelUserLike,
-    build_client_add_result,
-    build_client_remove_result,
     build_client_status_result,
 )
 from meridian.core.fleet import public_url
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import redact_string
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
 from meridian.handoff import publish_connection_pages as _publish_handoff
-from meridian.remnawave import RemnawaveError, User
+from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
-from meridian.ssh import SSHError
+
+
+def _access_users(cluster: ClusterConfig) -> list[str]:
+    """Return the declared access users; panel-wide service users stay hidden."""
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("Topology intent is missing")
+    return list(intent.access.users)
+
 
 # -- Client Add --
 
@@ -100,219 +91,7 @@ def _run_add(
             )
         seen.add(lower)
 
-    cluster = load_cluster()
-    if cluster.topology_intent is not None:
-        _run_add_v4(names, cluster, operation, publish_handoff=_publish_handoff)
-        return
-    panel = make_panel(cluster)
-
-    with panel:
-        # Check for conflicts with existing users
-        for name in names:
-            existing = _get_user_or_fail(panel, name, action="check")
-            if existing is not None:
-                fail(
-                    f"Client '{name}' already exists",
-                    hint="Use: meridian client show " + name,
-                    hint_type="user",
-                )
-
-        # --- Best-effort creation ---
-        succeeded: list[tuple[str, User]] = []
-        failed: list[tuple[str, str]] = []
-
-        squad_uuids = [cluster.squad_uuid] if cluster.squad_uuid else None
-        for name in names:
-            info(f"Adding client '{name}'...")
-            try:
-                new_user = panel.create_user(name, squad_uuids=squad_uuids)
-            except RemnawaveError as e:
-                failed.append((name, str(e)))
-                continue
-            succeeded.append((name, new_user))
-
-        # If everything failed, exit with the first error
-        if not succeeded:
-            first_name, first_err = failed[0]
-            fail(
-                f"Could not create client '{first_name}': {first_err}",
-                hint="Check panel connectivity",
-                hint_type="system",
-            )
-
-        # Hybrid sync + page deploy for each successful client
-        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_add
-
-        # Open one SSH connection for all page deployments
-        _conn = None
-        panel_node = cluster.panel_node
-        deploy_pages = bool(cluster.panel.server_ip and panel_node)
-        deployed_page_urls: dict[str, str] = {}
-        page_failures: list[tuple[str, str]] = []
-        page_state_changed = False
-        persistence_error = ""
-
-        if deploy_pages:
-            try:
-                from meridian.ssh import ServerConnection
-
-                _conn = ServerConnection(
-                    cluster.panel.server_ip,
-                    user=cluster.panel.ssh_user or "root",
-                    port=getattr(cluster.panel, "ssh_port", 22) or 22,
-                )
-                _conn.__enter__()
-            except (OSError, RuntimeError, SSHError):
-                _conn = None  # Non-fatal
-
-        try:
-            for name, new_user in succeeded:
-                state_error = _capture_client_state_failure(lambda: hybrid_sync_desired_clients_add(cluster, name))
-                persistence_error = state_error or persistence_error
-
-                page_url = _build_page_url(cluster, new_user.vless_uuid, require_deployed=False)
-
-                # Deploy connection page files
-                if deploy_pages and _conn is not None and page_url and panel_node:
-                    try:
-                        from meridian.pwa import deploy_client_page, mark_connection_page_failed
-
-                        sub_url = cluster.panel.subscription_url(new_user.short_uuid)
-                        deployed_url = deploy_client_page(
-                            _conn,
-                            cluster,
-                            panel_node,
-                            new_user.vless_uuid,
-                            name,
-                            sub_url,
-                        )
-                        if deployed_url:
-                            deployed_page_urls[name] = deployed_url
-                            page_state_changed = True
-                        else:
-                            mark_connection_page_failed(cluster, new_user.vless_uuid)
-                            page_state_changed = True
-                            page_failures.append((name, "page upload did not complete"))
-                    except (OSError, RuntimeError, SSHError, RemnawaveError) as exc:
-                        from meridian.pwa import mark_connection_page_failed
-
-                        mark_connection_page_failed(cluster, new_user.vless_uuid)
-                        page_state_changed = True
-                        page_failures.append((name, redact_string(str(exc))))
-                elif page_url:
-                    from meridian.pwa import mark_connection_page_failed
-
-                    mark_connection_page_failed(cluster, new_user.vless_uuid)
-                    page_state_changed = True
-                    page_failures.append((name, "panel SSH connection is unavailable"))
-        finally:
-            if _conn is not None:
-                try:
-                    _conn.__exit__(None, None, None)
-                except (OSError, RuntimeError, SSHError):
-                    pass
-        if page_state_changed or persistence_error:
-            persistence_error = _persist_client_state(cluster)
-
-        # --- JSON output ---
-        partial_warnings = [
-            MeridianError(
-                code="MERIDIAN_CLIENT_ADD_PARTIAL_FAILURE",
-                category="system",
-                message=f"Could not add client '{name}': {redact_string(reason)}",
-                hint="Retry the failed client after checking panel connectivity.",
-                retryable=True,
-                exit_code=3,
-                details={"client": name},
-            )
-            for name, reason in failed
-        ]
-        partial_warnings.extend(
-            MeridianError(
-                code="MERIDIAN_CLIENT_PAGE_DEPLOY_FAILED",
-                category="system",
-                message=f"Client '{name}' was added, but its share page was not deployed: {reason}",
-                hint=(
-                    f"Use the subscription URL now. After restoring panel SSH, run "
-                    f"`meridian client show {name} --repair-page`."
-                ),
-                retryable=True,
-                exit_code=3,
-                details={"client": name},
-            )
-            for name, reason in page_failures
-        )
-        if persistence_error:
-            partial_warnings.append(
-                _build_client_persistence_warning(
-                    operation="adding clients",
-                    reason=persistence_error,
-                )
-            )
-        if is_json_mode():
-            result = build_client_add_result(succeeded)
-            count = len(succeeded)
-            exit_code = 3 if failed or page_failures or persistence_error else 0
-            counts = {
-                "added": count,
-                "failed": len(failed),
-                "page_deploy_failed": len(page_failures),
-            }
-            if persistence_error:
-                counts["state_save_failed"] = 1
-            emit_json(
-                command_envelope(
-                    command="client.add",
-                    data=result.to_data(),
-                    summary=Summary(
-                        text=f"Added {count} client(s); {len(failed)} failed",
-                        changed=True,
-                        counts=counts,
-                    ),
-                    exit_code=exit_code,
-                    warnings=partial_warnings,
-                    timer=operation.timer,
-                )
-            )
-            if exit_code:
-                raise typer.Exit(exit_code)
-            return
-
-        # --- Report results ---
-        succeeded_names = [n for n, _ in succeeded]
-        if failed:
-            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
-            for fail_name, fail_err in failed:
-                err_console.print(
-                    f"  [red]Failed to add '{escape(fail_name)}': {escape(redact_string(fail_err))}[/red]"
-                )
-        else:
-            ok(f"Added {len(succeeded)} client(s): {', '.join(succeeded_names)}")
-        for page_name, page_error in page_failures:
-            warn(f"Share page for '{page_name}' was not deployed: {page_error}")
-        if persistence_error:
-            warn(partial_warnings[-1].message)
-
-        # Show subscription info for each added client
-        handoff_failures: list[tuple[str, str]] = []
-        for name, new_user in succeeded:
-            page_url = deployed_page_urls.get(name, "")
-            if len(succeeded) > 1:
-                err_console.print()
-                err_console.print(f"  [bold]— {escape(name)} —[/bold]")
-            handoff_error = _print_subscription(cluster.panel, new_user, page_url=page_url)
-            if isinstance(handoff_error, str) and handoff_error:
-                handoff_failures.append((name, handoff_error))
-                warn(f"Client '{name}' was added, but its subscription handoff is unavailable: {handoff_error}")
-
-    err_console.print()
-    if len(succeeded) == 1:
-        only_name = succeeded[0][0]
-        err_console.print("  [dim]Show client:       meridian client show " + escape(only_name) + "[/dim]")
-    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
-    err_console.print()
-    if failed or page_failures or handoff_failures or persistence_error:
-        raise typer.Exit(3)
+    _run_add_v4(names, load_topology_cluster(), operation, publish_handoff=_publish_handoff)
 
 
 # -- Client Show --
@@ -336,7 +115,8 @@ def _run_show(
 ) -> None:
     """Implementation for client show with command metadata attached."""
     _validate_client_name(name)
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
+    access_users = _access_users(cluster)
     repaired = False
     repair_persistence_error = ""
 
@@ -353,7 +133,7 @@ def _run_show(
             name,
             build_share_url=share_url,
             build_subscription_url=cluster.panel.subscription_url,
-            allowed_usernames=(cluster.topology_intent.access.users if cluster.topology_intent is not None else None),
+            allowed_usernames=access_users,
         )
     except ClientNotFoundError:
         fail(
@@ -443,12 +223,9 @@ def _run_list(
     from rich.box import ROUNDED
     from rich.table import Table
 
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
     try:
-        result = collect_client_list(
-            make_panel(cluster),
-            allowed_usernames=(cluster.topology_intent.access.users if cluster.topology_intent is not None else None),
-        )
+        result = collect_client_list(make_panel(cluster), allowed_usernames=_access_users(cluster))
     except RemnawaveError as e:
         fail(
             f"Could not list clients: {e}",
@@ -532,104 +309,12 @@ def _run_remove(
             hint="Pass --yes to confirm the mutation.",
             hint_type="user",
         )
-    cluster = load_cluster()
-    if cluster.topology_intent is not None:
-        fail(
-            f"Client '{name}' is managed by V4 access intent",
-            hint=(
-                "Safe V4 access-user retirement is not available yet. Use `meridian client disable` for an "
-                "immediate temporary revocation; do not delete the panel user directly."
-            ),
-            hint_type="user",
-        )
-    panel = make_panel(cluster)
-
-    with panel:
-        client = _get_user_or_fail(panel, name, action="load")
-        if client is None:
-            fail(
-                f"Client '{name}' not found",
-                hint="Check client name with: meridian client list",
-                hint_type="user",
-            )
-
-        if not yes and not confirm(f"Remove client '{name}'?"):
-            raise typer.Exit(1)
-
-        try:
-            success = panel.delete_user(client.uuid)
-        except RemnawaveError as exc:
-            fail(
-                f"Could not remove client '{name}': {exc}",
-                hint=exc.hint or "Check panel connectivity",
-                hint_type=exc.category,
-            )
-        if not success:
-            fail(
-                f"Could not remove client '{name}'",
-                hint="The panel may be unreachable. Try again.",
-                hint_type="system",
-            )
-
-        # Hybrid sync — drop from desired_clients (if managed declaratively)
-        # so the next `meridian apply` does not re-create the just-removed user.
-        from meridian.reconciler.snapshots import hybrid_sync_desired_clients_remove
-
-        persistence_error = _capture_client_state_failure(lambda: hybrid_sync_desired_clients_remove(cluster, name))
-
-        page_cleanup = _cleanup_client_page(client, cluster)
-        if page_cleanup.state_changed or persistence_error:
-            persistence_error = _persist_client_state(cluster)
-        partial_warnings: list[MeridianError] = []
-        if persistence_error:
-            partial_warnings.append(
-                _build_client_persistence_warning(
-                    operation="removing client",
-                    client=name,
-                    reason=persistence_error,
-                )
-            )
-        if page_cleanup.error:
-            partial_warnings.append(
-                MeridianError(
-                    code="MERIDIAN_CLIENT_PAGE_CLEANUP_FAILED",
-                    category="system",
-                    message=(
-                        f"Client '{name}' was removed from the panel, but legacy connection-page cleanup "
-                        f"could not be confirmed: {page_cleanup.error}"
-                    ),
-                    hint="Restore panel-host SSH access, remove the stale page, then verify local page evidence.",
-                    retryable=True,
-                    exit_code=3,
-                    details={"client": name, "remote_state_changed": True},
-                )
-            )
-
-        result = build_client_remove_result(name)
-        if is_json_mode():
-            emit_json(
-                command_envelope(
-                    command="client.remove",
-                    data=result.to_data(),
-                    summary=Summary(text=f"Removed client '{name}'", changed=True),
-                    exit_code=3 if partial_warnings else 0,
-                    warnings=partial_warnings,
-                    timer=operation.timer,
-                )
-            )
-            if partial_warnings:
-                raise typer.Exit(3)
-            return
-
-        ok(f"Client '{name}' removed")
-        if partial_warnings:
-            for warning in partial_warnings:
-                warn(warning.message)
-            raise typer.Exit(3)
-
-    err_console.print()
-    err_console.print("  [dim]View all clients:  meridian client list[/dim]")
-    err_console.print()
+    load_topology_cluster()
+    fail(
+        f"Permanent removal of client '{name}' isn't available yet",
+        hint="Use `meridian client disable` to revoke access now; do not delete the panel user directly.",
+        hint_type="user",
+    )
 
 
 # -- Client Enable --
@@ -652,8 +337,8 @@ def _run_enable(
 ) -> None:
     """Implementation for client enable with command metadata attached."""
     _validate_client_name(name)
-    cluster = load_cluster()
-    _require_v4_access_user(cluster, name)
+    cluster = load_topology_cluster()
+    _require_access_user(cluster, name)
     panel = make_panel(cluster)
 
     with panel:
@@ -714,8 +399,8 @@ def _run_disable(
 ) -> None:
     """Implementation for client disable with command metadata attached."""
     _validate_client_name(name)
-    cluster = load_cluster()
-    temporary_v4_disable = _require_v4_access_user(cluster, name)
+    cluster = load_topology_cluster()
+    _require_access_user(cluster, name)
     panel = make_panel(cluster)
 
     with panel:
@@ -738,31 +423,20 @@ def _run_disable(
 
         if is_json_mode():
             result = build_client_status_result(name, "disabled")
-            warnings = (
-                [
-                    MeridianError(
-                        code="MERIDIAN_V4_CLIENT_DISABLE_TEMPORARY",
-                        category="user",
-                        message=f"Client '{name}' is disabled only until the next V4 apply.",
-                        hint="V4 access intent declares managed users active.",
-                        exit_code=0,
-                    )
-                ]
-                if temporary_v4_disable
-                else []
-            )
+            warnings = [
+                MeridianError(
+                    code="MERIDIAN_V4_CLIENT_DISABLE_TEMPORARY",
+                    category="user",
+                    message=f"Client '{name}' is disabled only until the next V4 apply.",
+                    hint="V4 access intent declares managed users active.",
+                    exit_code=0,
+                )
+            ]
             emit_json(
                 command_envelope(
                     command="client.disable",
                     data=result.to_data(),
-                    summary=Summary(
-                        text=(
-                            f"Temporarily disabled V4 client '{name}'"
-                            if temporary_v4_disable
-                            else f"Disabled client '{name}'"
-                        ),
-                        changed=True,
-                    ),
+                    summary=Summary(text=f"Temporarily disabled V4 client '{name}'", changed=True),
                     warnings=warnings,
                     timer=operation.timer,
                 )
@@ -770,8 +444,7 @@ def _run_disable(
             return
 
         ok(f"Client '{name}' disabled")
-        if temporary_v4_disable:
-            warn("This V4 client is disabled only until the next `meridian apply`")
+        warn("This V4 client is disabled only until the next `meridian apply`")
 
     err_console.print()
     err_console.print("  [dim]Re-enable:         meridian client enable " + escape(name) + "[/dim]")

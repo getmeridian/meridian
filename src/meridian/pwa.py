@@ -6,8 +6,8 @@ shared static assets (app.js, styles.css, sw.js, icon.svg).
 
 Called from:
 - ``DeployPWAAssets`` provisioner step (shared static assets)
-- ``commands/client.py`` (_deploy_client_page — per-client pages)
-- ``commands/relay.py`` (relay page regeneration)
+- ``meridian.handoff`` (per-client pages built from each subscription)
+- ``commands/dev.py`` (local preview)
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from meridian.render import (
 )
 
 if TYPE_CHECKING:
-    from meridian.cluster import ClusterConfig, NodeEntry
+    from meridian.cluster import ClusterConfig
     from meridian.models import ProtocolURL, RelayURLSet
     from meridian.ssh import ServerConnection
 
@@ -40,38 +40,9 @@ def connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> bool:
     return _page_marker(user_uuid) in cluster.connection_page_markers
 
 
-def connection_page_failed(cluster: ClusterConfig, user_uuid: str) -> bool:
-    """Return persisted evidence that the latest page deployment failed."""
-    return _page_marker(user_uuid) in cluster.connection_page_failures
-
-
 def mark_connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> None:
     """Record non-secret page deployment evidence in cluster state."""
-    marker = _page_marker(user_uuid)
-    markers = set(cluster.connection_page_markers)
-    markers.add(marker)
-    cluster.connection_page_markers = sorted(markers)
-    failures = set(cluster.connection_page_failures)
-    failures.discard(marker)
-    cluster.connection_page_failures = sorted(failures)
-
-
-def mark_connection_page_failed(cluster: ClusterConfig, user_uuid: str) -> None:
-    """Record a failed upload without persisting the client credential."""
-    marker = _page_marker(user_uuid)
-    failures = set(cluster.connection_page_failures)
-    failures.add(marker)
-    cluster.connection_page_failures = sorted(failures)
-    markers = set(cluster.connection_page_markers)
-    markers.discard(marker)
-    cluster.connection_page_markers = sorted(markers)
-
-
-def forget_connection_page(cluster: ClusterConfig, user_uuid: str) -> None:
-    """Remove persisted page evidence after confirmed cleanup."""
-    marker = _page_marker(user_uuid)
-    cluster.connection_page_markers = sorted(set(cluster.connection_page_markers) - {marker})
-    cluster.connection_page_failures = sorted(set(cluster.connection_page_failures) - {marker})
+    cluster.connection_page_markers = sorted({*cluster.connection_page_markers, _page_marker(user_uuid)})
 
 
 def generate_client_files(
@@ -197,106 +168,3 @@ def upload_pwa_assets(conn: ServerConnection) -> str:
         if result.returncode != 0:
             return f"Failed to upload pwa/{filename}: {result.stderr.strip()[:200]}"
     return ""
-
-
-def deploy_client_page(
-    conn: ServerConnection,
-    cluster: ClusterConfig,
-    node: NodeEntry,
-    user_uuid: str,
-    client_name: str,
-    sub_url: str = "",
-) -> str:
-    """Generate and upload a PWA connection page for a client.
-
-    Builds VLESS protocol URLs from cluster.yml node data + client UUID,
-    generates QR codes and PWA files, uploads to the server.
-
-    Returns the page URL on success, empty string on failure.
-    """
-    import logging
-
-    from meridian.models import ProtocolURL
-    from meridian.protocols import PROTOCOLS
-    from meridian.urls import generate_qr_base64
-
-    logger = logging.getLogger("meridian.pwa")
-
-    host = node.domain or node.ip
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-    info_page_path = cluster.panel.sub_path or ""
-    if not info_page_path:
-        return ""
-    if not sub_url:
-        logger.warning("Cannot deploy connection page without the canonical Remnawave subscription URL")
-        return ""
-
-    page_url = f"https://{host}/{info_page_path}/{user_uuid}/"
-
-    # Build protocol URLs using the protocol registry's build_url() methods
-    protocol_urls: list[ProtocolURL] = []
-
-    if node.reality_public_key:
-        reality = PROTOCOLS.get("reality")
-        if reality:
-            url = reality.build_url(
-                user_uuid,
-                client_name,
-                ip=node.ip,
-                sni=node.sni,
-                public_key=node.reality_public_key,
-                short_id=node.reality_short_id or "",
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="reality", label=reality.display_label, url=url, qr_b64=qr))
-
-    if node.xhttp_path:
-        xhttp = PROTOCOLS.get("xhttp")
-        if xhttp:
-            url = xhttp.build_url(
-                user_uuid,
-                client_name,
-                ip=node.ip,
-                xhttp_path=node.xhttp_path,
-                domain=node.domain or "",
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="xhttp", label=xhttp.display_label, url=url, qr_b64=qr))
-
-    if node.domain and node.ws_path:
-        wss = PROTOCOLS.get("wss")
-        if wss:
-            url = wss.build_url(
-                user_uuid,
-                client_name,
-                domain=node.domain,
-                ws_path=node.ws_path,
-                server_name=cluster.branding.server_name,
-            )
-            qr = generate_qr_base64(url)
-            protocol_urls.append(ProtocolURL(key="wss", label=wss.display_label, url=url, qr_b64=qr))
-
-    if not protocol_urls:
-        return ""
-
-    files = generate_client_files(
-        protocol_urls,
-        server_ip=node.ip,
-        domain=node.domain or "",
-        client_name=client_name,
-        server_name=cluster.branding.server_name,
-        server_icon=cluster.branding.icon,
-        color=cluster.branding.color,
-        subscription_url=sub_url,
-    )
-
-    error = upload_client_files(conn, user_uuid, files)
-    if error:
-        logger.warning("Could not deploy connection page: %s", error)
-        return ""
-
-    mark_connection_page_deployed(cluster, user_uuid)
-    return page_url

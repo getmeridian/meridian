@@ -37,4 +37,5 @@ def test_server_list_explains_meridian_3_registry(tmp_home: Path, monkeypatch) -
 def test_fresh_install_still_says_deploy_first(tmp_home: Path) -> None:
     result = runner.invoke(app, ["client", "list"])
 
-    assert "No cluster configured" in click.unstyle(result.output)
+    assert "No fleet yet" in click.unstyle(result.output)
+    assert "meridian deploy" in click.unstyle(result.output)

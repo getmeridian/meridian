@@ -1,4 +1,4 @@
-"""Tests for fleet status and cluster recovery commands.
+"""Tests for fleet status and inventory commands.
 
 Covers run_status() and run_inventory() from fleet.py.
 All mocks avoid real TCP/HTTPS connections. Uses RFC 5737 IPs (198.51.100.x).
@@ -6,19 +6,14 @@ All mocks avoid real TCP/HTTPS connections. Uses RFC 5737 IPs (198.51.100.x).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
-from meridian.cluster import (
-    ClusterConfig,
-    DesiredNode,
-    DesiredRelay,
-    NodeEntry,
-    PanelConfig,
-    RelayEntry,
-)
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.fleet import run_inventory, run_status
 from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel, TopologyRelay
 from meridian.remnawave import Node, RemnawaveAuthError, RemnawaveError, User
@@ -42,17 +37,58 @@ _SAMPLE_SNI = "www.example.com"
 # ---------------------------------------------------------------------------
 
 
-def _fleet_cluster() -> ClusterConfig:
-    return ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="tok"),
+def _node(ip: str, uuid: str, name: str, *, is_panel_host: bool = False) -> TopologyNode:
+    return TopologyNode(
+        ip=ip,
+        name=name,
+        uuid=uuid,
+        is_panel_host=is_panel_host,
+        ssh_user="root",
+        ssh_port=22,
+        domain="",
+        sni=_SAMPLE_SNI,
+        xhttp_path="",
+        ws_path="",
+        protocols=["reality"],
+    )
+
+
+def _fleet_topology() -> FleetTopology:
+    return FleetTopology(
+        panel=TopologyPanel(
+            url="https://198.51.100.1/panel",
+            display_url="https://198.51.100.1/panel/",
+            server_ip="198.51.100.1",
+            ssh_user="root",
+            ssh_port=22,
+            deployed_with="",
+        ),
         nodes=[
-            NodeEntry(ip="198.51.100.1", uuid=_UUID_A, is_panel_host=True, name="node-1"),
-            NodeEntry(ip="198.51.100.2", uuid=_UUID_B, is_panel_host=False, name="node-2"),
+            _node("198.51.100.1", _UUID_A, "node-1", is_panel_host=True),
+            _node("198.51.100.2", _UUID_B, "node-2"),
         ],
         relays=[
-            RelayEntry(ip="198.51.100.3", exit_node_ip="198.51.100.1", port=443, name="relay-1"),
+            TopologyRelay(
+                ip="198.51.100.3",
+                name="relay-1",
+                port=443,
+                ssh_user="root",
+                ssh_port=22,
+                exit_node_ip="198.51.100.1",
+                sni=_SAMPLE_SNI,
+            )
         ],
     )
+
+
+@contextmanager
+def _fleet_source(topology: FleetTopology) -> Iterator[None]:
+    """Serve a saved cluster plus its projected topology to the fleet command."""
+    cluster = ClusterConfig(panel=PanelConfig(url=topology.panel.url, api_token="tok"))
+    with ExitStack() as stack:
+        stack.enter_context(patch("meridian.commands.fleet.load_topology_cluster", return_value=cluster))
+        stack.enter_context(patch("meridian.commands.fleet.topology_from_local_cluster", return_value=topology))
+        yield
 
 
 def _api_node(uuid: str, *, connected: bool = True, disabled: bool = False, address: str = "") -> Node:
@@ -88,11 +124,11 @@ def _make_panel_mock(*, ping_ok: bool = True) -> MagicMock:
     return panel
 
 
-def _v4_projected_topology(cluster: ClusterConfig) -> FleetTopology:
+def _v4_projected_topology() -> FleetTopology:
     return FleetTopology(
         panel=TopologyPanel(
-            url=cluster.panel.url,
-            display_url=cluster.panel.display_url,
+            url="https://198.51.100.1/panel",
+            display_url="https://198.51.100.1/panel/",
             server_ip="198.51.100.10",
             ssh_user="root",
             ssh_port=22,
@@ -127,10 +163,10 @@ def _v4_projected_topology(cluster: ClusterConfig) -> FleetTopology:
     )
 
 
-def _status_patches(cluster: ClusterConfig, panel: MagicMock):
-    """Return a combined context manager that patches load_cluster, make_panel, and relay health."""
+def _status_patches(topology: FleetTopology, panel: MagicMock):
+    """Return context managers that patch the fleet source, make_panel, and relay health."""
     return (
-        patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+        _fleet_source(topology),
         patch("meridian.commands.fleet.make_panel", return_value=panel),
         patch("meridian.commands.fleet._check_relay_health", return_value=True),
         patch("meridian.commands.fleet.is_json_mode", return_value=False),
@@ -145,7 +181,7 @@ def _status_patches(cluster: ClusterConfig, panel: MagicMock):
 class TestFleetStatus:
     def test_status_healthy_panel(self) -> None:
         """Panel ping succeeds -- shows healthy status without raising."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
             _api_node(_UUID_A, connected=True),
@@ -153,7 +189,7 @@ class TestFleetStatus:
         ]
         panel.list_users.return_value = []
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             exit_code = run_status()
 
@@ -163,10 +199,10 @@ class TestFleetStatus:
 
     def test_status_unreachable_panel(self) -> None:
         """Panel ping fails -- still completes, shows UNREACHABLE."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=False)
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             exit_code = run_status()
 
@@ -177,7 +213,7 @@ class TestFleetStatus:
 
     def test_status_auth_error_exits_user_failure(self) -> None:
         """Authentication failures are not reported as partial healthy status."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=False)
         panel.ping.side_effect = RemnawaveAuthError(
             "Panel authentication failed",
@@ -186,7 +222,7 @@ class TestFleetStatus:
         )
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
         ):
@@ -197,11 +233,9 @@ class TestFleetStatus:
 
     def test_status_mixed_node_states(self) -> None:
         """Nodes in connected, disconnected, and disabled states."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         # Add a third node to the cluster for "disabled"
-        cluster.nodes.append(
-            NodeEntry(ip="198.51.100.4", uuid=_UUID_C, name="node-3"),
-        )
+        topology.nodes.append(_node("198.51.100.4", _UUID_C, "node-3"))
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
             _api_node(_UUID_A, connected=True),
@@ -210,7 +244,7 @@ class TestFleetStatus:
         ]
         panel.list_users.return_value = []
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             exit_code = run_status()
 
@@ -218,13 +252,13 @@ class TestFleetStatus:
 
     def test_status_relay_healthy(self) -> None:
         """Relay health check returns True."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True) as mock_health,
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
@@ -237,13 +271,13 @@ class TestFleetStatus:
 
     def test_status_relay_unreachable(self) -> None:
         """Relay health check returns False -- still completes."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=False) as mock_health,
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
@@ -255,7 +289,7 @@ class TestFleetStatus:
 
     def test_status_json_output_structure(self) -> None:
         """JSON mode outputs dict with panel/nodes/relays/users keys."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
             _api_node(_UUID_A, connected=True),
@@ -264,7 +298,7 @@ class TestFleetStatus:
         panel.list_users.return_value = [_api_user("alice"), _api_user("bob", "DISABLED")]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -300,7 +334,7 @@ class TestFleetStatus:
 
     def test_status_json_node_statuses(self) -> None:
         """JSON mode reports correct status strings for each node."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
             _api_node(_UUID_A, connected=True),
@@ -309,7 +343,7 @@ class TestFleetStatus:
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -324,22 +358,18 @@ class TestFleetStatus:
 
     def test_status_no_nodes(self) -> None:
         """Cluster with no nodes still runs without error."""
-        cluster = ClusterConfig(
-            panel=PanelConfig(url="https://198.51.100.1/panel", api_token="tok"),
-            nodes=[],
-            relays=[],
-        )
+        topology = _fleet_topology().model_copy(update={"nodes": [], "relays": []})
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
         panel.list_users.return_value = []
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             run_status()
 
     def test_status_with_users(self) -> None:
         """Users are fetched and counted when panel is healthy."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
         panel.list_users.return_value = [
@@ -348,7 +378,7 @@ class TestFleetStatus:
             _api_user("carol", "DISABLED"),
         ]
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             run_status()
 
@@ -356,14 +386,14 @@ class TestFleetStatus:
 
     def test_status_node_unknown_when_not_in_api(self) -> None:
         """Node present in cluster but missing from API is shown as unknown."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         # API returns only one of the two cluster nodes
         panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -377,24 +407,24 @@ class TestFleetStatus:
 
     def test_status_list_nodes_api_error_handled(self) -> None:
         """RemnawaveError from list_nodes is caught gracefully."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = RemnawaveError("API error")
         panel.list_users.return_value = []
 
-        p_load, p_panel, p_relay, p_json = _status_patches(cluster, panel)
+        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
         with p_load, p_panel, p_relay, p_json:
             run_status()  # should not raise
 
     def test_status_list_nodes_unexpected_error_is_bug(self) -> None:
         """Unexpected adapter bugs must not be reported as successful partial status."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = ValueError("bad adapter")
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
         ):
@@ -405,13 +435,13 @@ class TestFleetStatus:
 
     def test_status_json_preserves_partial_panel_failures(self) -> None:
         """JSON mode reports source availability and warnings for partial API failures."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = RemnawaveError("API error")
         panel.list_users.return_value = [_api_user("alice")]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -430,7 +460,7 @@ class TestFleetStatus:
         assert payload.data["summary"]["needs_attention"] is True
 
     def test_status_user_source_failure_returns_unknown_exit(self) -> None:
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
             _api_node(_UUID_A, connected=True),
@@ -439,7 +469,7 @@ class TestFleetStatus:
         panel.list_users.side_effect = RemnawaveError("users unavailable")
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -455,13 +485,13 @@ class TestFleetStatus:
 
     def test_status_json_preserves_relay_check_failure_as_warning(self) -> None:
         """Relay checker failures degrade relay source without failing panel data."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
         panel.list_users.return_value = [_api_user("alice")]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", side_effect=RuntimeError("probe crashed")),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -477,13 +507,13 @@ class TestFleetStatus:
 
     def test_status_json_relay_health(self) -> None:
         """JSON output includes relay health status."""
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
         panel.list_users.return_value = []
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet._check_relay_health", return_value=False),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
@@ -498,17 +528,13 @@ class TestFleetStatus:
         assert data["relays"][0]["ip"] == "198.51.100.3"
 
     def test_status_uses_v4_topology_projection(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.nodes = []
-        cluster.relays = []
-        topology = _v4_projected_topology(cluster)
+        topology = _v4_projected_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
         panel.list_users.return_value = [_api_user("alice"), _api_user("meridian-route-123")]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
-            patch("meridian.commands.fleet.topology_from_local_cluster", return_value=topology),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch(
                 "meridian.commands.fleet._check_relays_health",
@@ -534,16 +560,15 @@ class TestFleetStatus:
 
 class TestFleetInventory:
     def test_inventory_json_redacts_panel_token(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.nodes[0].xhttp_path = "xhttp-a"
-        cluster.nodes[0].ws_path = "ws-a"
-        cluster.desired_nodes = [DesiredNode(host="198.51.100.1", name="node-1")]
-        cluster.desired_relays = [DesiredRelay(host="198.51.100.3", name="relay-1", exit_node="node-1")]
+        topology = _fleet_topology()
+        topology.nodes[0] = topology.nodes[0].model_copy(
+            update={"xhttp_path": "xhttp-a", "ws_path": "ws-a", "protocols": ["reality", "xhttp", "hysteria2"]}
+        )
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
@@ -566,21 +591,17 @@ class TestFleetInventory:
         }
         assert data["servers"][0]["roles"] == ["panel", "exit"]
         assert data["nodes"][0]["panel_status"] == "connected"
-        assert data["nodes"][0]["desired"] is True
+        assert data["nodes"][0]["desired"] is None
         assert data["nodes"][0]["protocols"] == ["reality", "xhttp", "hysteria2"]
-        assert data["relays"][0]["desired"] is True
+        assert data["relays"][0]["desired"] is None
 
     def test_inventory_uses_v4_topology_projection(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.nodes = []
-        cluster.relays = []
-        topology = _v4_projected_topology(cluster)
+        topology = _v4_projected_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
-            patch("meridian.commands.fleet.topology_from_local_cluster", return_value=topology),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
@@ -595,13 +616,14 @@ class TestFleetInventory:
         assert data["relays"][0]["name"] == "relay-v4"
 
     def test_inventory_json_reports_ip_mode_xhttp_protocol(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.nodes[1].domain = ""
-        cluster.nodes[1].xhttp_path = "xhttp-b"
+        topology = _fleet_topology()
+        topology.nodes[1] = topology.nodes[1].model_copy(
+            update={"xhttp_path": "xhttp-b", "protocols": ["reality", "xhttp", "hysteria2"]}
+        )
         panel = _make_panel_mock(ping_ok=False)
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
@@ -614,64 +636,13 @@ class TestFleetInventory:
         node = next(n for n in data["nodes"] if n["ip"] == "198.51.100.2")
         assert node["protocols"] == ["reality", "xhttp", "hysteria2"]
 
-    def test_inventory_json_desired_matching_uses_host_not_name(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.desired_nodes = [DesiredNode(host="198.51.100.9", name="node-1")]
-        cluster.desired_relays = [DesiredRelay(host="198.51.100.8", name="relay-1", exit_node="node-1")]
-        panel = _make_panel_mock(ping_ok=False)
-
-        with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_inventory()
-
-        assert exc_info.value.exit_code == 3
-        data = mock_json.call_args[0][0].data
-        assert data["nodes"][0]["desired"] is False
-        assert data["relays"][0]["desired"] is False
-        assert data["desired_nodes"][0]["present"] is False
-        assert data["desired_relays"][0]["present"] is False
-        assert data["summary"]["unapplied_desired_nodes"] == 1
-        assert data["summary"]["unapplied_desired_relays"] == 1
-
-    def test_inventory_json_counts_pending_desired_entries(self) -> None:
-        cluster = _fleet_cluster()
-        cluster.desired_nodes = [DesiredNode(host="198.51.100.9", name="future-node")]
-        cluster.desired_relays = [DesiredRelay(host="198.51.100.8", name="future-relay", exit_node="node-1")]
-        panel = _make_panel_mock(ping_ok=False)
-
-        with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_inventory()
-
-        assert exc_info.value.exit_code == 3
-        data = mock_json.call_args[0][0].data
-        payload = mock_json.call_args[0][0]
-        assert payload.status == "ok"
-        assert payload.exit_code == 3
-        assert payload.warnings
-        assert payload.summary.changed is False
-        assert data["panel"]["healthy"] is False
-        assert data["summary"]["unapplied_desired_nodes"] == 1
-        assert data["summary"]["unapplied_desired_relays"] == 1
-        assert data["summary"]["pending_desired_resources"] == 2
-
     def test_inventory_text_handles_panel_api_error(self) -> None:
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = RemnawaveError("API error")
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
             pytest.raises(typer.Exit) as exc_info,
@@ -681,12 +652,12 @@ class TestFleetInventory:
         assert exc_info.value.exit_code == 3
 
     def test_inventory_unexpected_panel_error_is_bug(self) -> None:
-        cluster = _fleet_cluster()
+        topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = TypeError("adapter shape changed")
 
         with (
-            patch("meridian.commands.fleet.load_cluster", return_value=cluster),
+            _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
         ):
@@ -694,8 +665,3 @@ class TestFleetInventory:
                 run_inventory()
 
         assert exc_info.value.exit_code == 1
-
-
-# ---------------------------------------------------------------------------
-# TestFleetRecover
-# ---------------------------------------------------------------------------

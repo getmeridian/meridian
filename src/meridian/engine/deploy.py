@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from meridian.cluster import ClusterConfig
-from meridian.core.deploy import DeployRequest
-from meridian.core.deploy_planning import DeployPlan
+from meridian.core.deploy import DeployPlan, DeployRequest
 from meridian.core.deploy_validation import (
     DeployValidationError,
     normalize_deploy_request,

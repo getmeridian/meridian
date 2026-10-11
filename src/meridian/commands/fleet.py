@@ -14,7 +14,7 @@ import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.commands._helpers import format_traffic, load_cluster, make_panel
+from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetStatus, TopologyRelay
@@ -80,7 +80,7 @@ def run_inventory() -> None:
 
 def _run_inventory(*, operation: OperationContext) -> None:
     """Implementation for inventory with command metadata already attached."""
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)
     except LocalStateError as exc:
@@ -272,7 +272,7 @@ def run_status() -> int:
 
 def _run_status(*, operation: OperationContext) -> int:
     """Implementation for status with command metadata already attached."""
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)
     except LocalStateError as exc:

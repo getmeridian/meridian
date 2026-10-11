@@ -7,7 +7,7 @@ from subprocess import TimeoutExpired
 
 import pytest
 
-from meridian.cluster import ClusterConfig, NodeEntry, PanelConfig, RelayEntry, ResourceAllocation
+from meridian.cluster import ClusterConfig, PanelConfig, ResourceAllocation
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
     AccessIntent,
@@ -207,17 +207,6 @@ def test_v4_context_matches_canonical_ipv6_spelling(tmp_path: Path) -> None:
     assert "2001:db8::11" in context.endpoint_addresses
 
 
-def test_legacy_context_matches_canonical_ipv6_spelling(tmp_path: Path) -> None:
-    context = deployment_verification_context(
-        ClusterConfig(nodes=[NodeEntry(ip="2001:0DB8:0:0:0:0:0:11", sni="www.example.com")]),
-        ServerRegistry(tmp_path / "servers.json"),
-        "2001:db8::11",
-    )
-
-    assert context.kind == "legacy"
-    assert context.expected_egress_ip == "2001:db8::11"
-
-
 def test_v4_context_uses_persisted_allocations_and_related_relay(tmp_path: Path) -> None:
     cluster = ClusterConfig(
         topology_intent=_intent(),
@@ -387,52 +376,14 @@ def test_domain_resolution_honors_timeout(monkeypatch: pytest.MonkeyPatch) -> No
     assert result is None
 
 
-def test_legacy_context_remains_supported(tmp_path: Path) -> None:
-    cluster = ClusterConfig(
-        nodes=[
-            NodeEntry(
-                ip="198.51.100.11",
-                sni="www.example.com",
-                domain="edge.example.com",
-                hysteria2=True,
-            )
-        ]
-    )
+def test_target_outside_the_topology_is_checked_as_external(tmp_path: Path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    registry.add(ServerEntry(id="srv-control", host="198.51.100.10", name="control"))
+    registry.add(ServerEntry(id="srv-exit", host="198.51.100.11", name="exit"))
+    registry.add(ServerEntry(id="srv-relay", host="198.51.100.12", name="relay"))
 
-    context = deployment_verification_context(
-        cluster,
-        ServerRegistry(tmp_path / "missing.json"),
-        "198.51.100.11",
-    )
+    for cluster in (ClusterConfig(), ClusterConfig(topology_intent=_intent())):
+        context = deployment_verification_context(cluster, registry, "198.51.100.99")
 
-    assert context.kind == "legacy"
-    assert context.public_udp_ports == (443,)
-    assert context.reality_snis == ("www.example.com",)
-    assert "xhttp" in context.internal_ports
-    assert "reality" in context.internal_ports
-
-
-def test_legacy_relay_projects_stale_xhttp_host_for_verification(tmp_path: Path) -> None:
-    cluster = ClusterConfig(
-        nodes=[NodeEntry(ip="198.51.100.11", sni="www.example.com")],
-        relays=[
-            RelayEntry(
-                ip="198.51.100.12",
-                exit_node_ip="198.51.100.11",
-                sni="relay.test",
-                host_uuids={
-                    "reality": "550e8400-e29b-41d4-a716-446655440001",
-                    "xhttp": "550e8400-e29b-41d4-a716-446655440002",
-                },
-            )
-        ],
-    )
-
-    context = deployment_verification_context(
-        cluster,
-        ServerRegistry(tmp_path / "missing.json"),
-        "198.51.100.12",
-    )
-
-    assert context.protocols == ("reality", "xhttp")
-    assert any(route.kind == "managed" and route.tls_sni == "relay.test" for route in context.https_routes)
+        assert context.kind == "external"
+        assert context.endpoint_addresses == ("198.51.100.99",)

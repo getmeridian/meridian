@@ -1,15 +1,10 @@
-"""Tests for xray client config generation and utility functions."""
+"""Tests for xray client utility functions."""
 
 from __future__ import annotations
-
-import json
 
 from meridian.xray_client import (
     _parse_dgst,
     _resolve_asset_name,
-    build_reality_config,
-    build_wss_config,
-    build_xhttp_config,
 )
 
 
@@ -53,77 +48,3 @@ class TestDgstParsing:
 
     def test_parse_no_sha256(self) -> None:
         assert _parse_dgst("MD5= abc123\nSHA1= def456\n") == ""
-
-
-class TestRealityConfig:
-    def test_structure(self) -> None:
-        config = build_reality_config(
-            socks_port=10808,
-            server_ip="198.51.100.1",
-            uuid="test-uuid",
-            sni="www.microsoft.com",
-            public_key="testpbk",
-            short_id="abcd1234",
-        )
-        assert config["log"]["loglevel"] == "none"
-        assert config["inbounds"][0]["port"] == 10808
-        assert config["inbounds"][0]["protocol"] == "socks"
-        assert config["inbounds"][0]["listen"] == "127.0.0.1"
-
-        outbound = config["outbounds"][0]
-        assert outbound["protocol"] == "vless"
-        vnext = outbound["settings"]["vnext"][0]
-        assert vnext["address"] == "198.51.100.1"
-        assert vnext["port"] == 443
-        assert vnext["users"][0]["id"] == "test-uuid"
-        assert vnext["users"][0]["flow"] == "xtls-rprx-vision"
-        assert vnext["users"][0]["encryption"] == "none"
-
-        stream = outbound["streamSettings"]
-        assert stream["network"] == "tcp"
-        assert stream["security"] == "reality"
-        assert stream["realitySettings"]["publicKey"] == "testpbk"
-        assert stream["realitySettings"]["shortId"] == "abcd1234"
-        assert stream["realitySettings"]["serverName"] == "www.microsoft.com"
-
-    def test_is_valid_json(self) -> None:
-        config = build_reality_config(10808, "198.51.100.1", "uuid", "sni", "pbk", "sid")
-        # Roundtrip through JSON
-        assert json.loads(json.dumps(config)) == config
-
-
-class TestXHTTPConfig:
-    def test_structure(self) -> None:
-        config = build_xhttp_config(
-            socks_port=10809,
-            host="198.51.100.1",
-            uuid="test-uuid",
-            xhttp_path="myxhttp",
-        )
-        outbound = config["outbounds"][0]
-        stream = outbound["streamSettings"]
-        assert stream["network"] == "xhttp"
-        assert stream["security"] == "tls"
-        assert stream["tlsSettings"]["serverName"] == "198.51.100.1"
-        assert stream["xhttpSettings"]["path"] == "/myxhttp"
-        # XHTTP must NOT have flow
-        assert "flow" not in outbound["settings"]["vnext"][0]["users"][0]
-
-
-class TestWSSConfig:
-    def test_structure(self) -> None:
-        config = build_wss_config(
-            socks_port=10810,
-            domain="example.com",
-            uuid="wss-uuid",
-            ws_path="myws",
-        )
-        outbound = config["outbounds"][0]
-        stream = outbound["streamSettings"]
-        assert stream["network"] == "ws"
-        assert stream["security"] == "tls"
-        assert stream["tlsSettings"]["serverName"] == "example.com"
-        assert stream["wsSettings"]["path"] == "/myws"
-        assert stream["wsSettings"]["headers"]["Host"] == "example.com"
-        # WSS must NOT have flow
-        assert "flow" not in outbound["settings"]["vnext"][0]["users"][0]

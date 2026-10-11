@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from meridian.cluster import ClusterConfig
+from meridian.core.clients import PanelUserLike
 from meridian.models import ProtocolURL
 from meridian.protocols import get_protocol
 from meridian.remnawave import MeridianPanel, RemnawaveError, User
@@ -68,7 +69,7 @@ def subscription_protocol_urls(content: str) -> list[ProtocolURL]:
     return links
 
 
-def page_url(cluster: ClusterConfig, user: User) -> str:
+def page_url(cluster: ClusterConfig, user: PanelUserLike) -> str:
     """Public connection-page URL for a user, or empty when it cannot be built."""
     if not cluster.panel.url or not cluster.panel.sub_path or not user.vless_uuid:
         return ""

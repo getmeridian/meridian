@@ -7,26 +7,22 @@ reference and SSH access.
 
 from __future__ import annotations
 
-import secrets
 from typing import TYPE_CHECKING
 
 import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import (
     format_traffic,
-    load_cluster,
+    load_topology_cluster,
     make_panel,
     persist_reviewed_apply,
-    remote_mutation_persistence,
     reviewed_apply_persistence,
 )
 from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
-from meridian.core.deploy_planning import compute_deploy_ports
 from meridian.core.errors import LocalStateError
 from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.fleet import build_node_list_result
@@ -36,7 +32,6 @@ from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
 if TYPE_CHECKING:
-    from meridian.cluster import NodeEntry
     from meridian.diagnostics import CheckResult
 
 # -- Node Add --
@@ -65,113 +60,6 @@ def run_add(
         harden=harden,
         yes=yes,
     )
-    from meridian.commands.resolve import ensure_server_connection, resolve_server
-    from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
-    from meridian.core.errors import MeridianError
-    from meridian.panel_bootstrap import run_provisioner, setup_new_node
-    from meridian.servers import ServerRegistry
-
-    cluster = load_cluster()
-    if cluster.topology_intent is not None:
-        _run_add_v4(request, cluster)
-        return
-
-    # Check for duplicate
-    existing = cluster.find_node(request.ip)
-    if existing is not None:
-        fail(
-            f"Node {request.ip} already exists in cluster",
-            hint=f"Use: meridian deploy {request.ip} to redeploy",
-            hint_type="user",
-        )
-
-    # Resolve and connect
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
-    resolved = resolve_server(registry, explicit_ip=request.ip, user=request.user, port=request.ssh_port)
-    ensure_server_connection(resolved)
-
-    node_name = request.name or request.ip
-    effective_sni = request.sni or DEFAULT_SNI
-
-    info(f"Adding node {resolved.ip} ({node_name})...")
-
-    if not request.yes:
-        if not confirm(f"Provision and add node at {resolved.ip}?"):
-            raise typer.Exit(1)
-
-    ports = compute_deploy_ports(resolved.ip)
-
-    # Generate paths
-    xhttp_path = secrets.token_hex(8)
-    ws_path = secrets.token_hex(8)
-
-    # Run SSH provisioner pipeline (OS hardening, Docker, nginx, TLS)
-    try:
-        run_provisioner(
-            resolved=resolved,
-            cluster=cluster,
-            domain=request.domain,
-            sni=effective_sni,
-            harden=request.harden,
-            is_panel_host=False,
-            secret_path=cluster.panel.secret_path,
-            xhttp_port=ports.xhttp_port,
-            reality_port=ports.reality_port,
-            wss_port=ports.wss_port,
-            xhttp_path=xhttp_path,
-            ws_path=ws_path,
-        )
-
-    except MeridianError as exc:
-        fail(exc)
-
-    # Configure via panel API (register node, deploy container, create hosts).
-    from meridian import __version__
-
-    try:
-        with remote_mutation_persistence(f"Node {resolved.ip} was provisioned remotely"):
-            setup_new_node(
-                resolved=resolved,
-                cluster=cluster,
-                domain=request.domain,
-                sni=effective_sni,
-                reality_port=ports.reality_port,
-                xhttp_port=ports.xhttp_port,
-                wss_port=ports.wss_port,
-                version=__version__,
-                xhttp_path=xhttp_path,
-                ws_path=ws_path,
-            )
-    except MeridianError as exc:
-        fail(exc)
-
-    # Hybrid sync — when desired_nodes is non-None, mirror this imperative
-    # add into the desired list so a subsequent `meridian apply` does not
-    # see the newly provisioned node as drift and propose REMOVE_NODE.
-    with remote_mutation_persistence(f"Node {resolved.ip} was provisioned remotely"):
-        new_node = cluster.find_node(resolved.ip)
-        if new_node is not None:
-            # Apply the user-requested name override (matches reconciler semantics).
-            if request.name and new_node.name != request.name:
-                new_node.name = request.name
-                cluster.save()
-            from meridian.reconciler.snapshots import hybrid_sync_desired_nodes_add
-
-            hybrid_sync_desired_nodes_add(cluster, new_node, ssh_user=request.user, ssh_port=request.ssh_port)
-
-    ok(f"Node {resolved.ip} provisioned and added to cluster")
-
-    err_console.print()
-    err_console.print("  [dim]List nodes:     meridian node list[/dim]")
-    err_console.print("  [dim]Fleet status:   meridian fleet status[/dim]")
-    err_console.print()
-
-
-def _run_add_v4(
-    request: NodeAddRequest,
-    cluster: ClusterConfig,
-) -> None:
-    """Translate imperative node add into reviewed V4 topology intent."""
     from meridian.commands.resolve import (
         ensure_server_connection,
         resolve_server,
@@ -181,12 +69,13 @@ def _run_add_v4(
     from meridian.setup.editor import add_exit_to_intent
     from meridian.setup.runtime import SetupRuntime
 
+    cluster = load_topology_cluster()
     intent = cluster.topology_intent
     if intent is None:
-        raise RuntimeError("V4 topology intent is missing")
+        raise RuntimeError("Topology intent is missing")
     if not request.harden:
         fail(
-            "V4 topology keeps server hardening enabled.",
+            "Fleet servers always keep OS hardening enabled.",
             hint=("Use `meridian setup` to review topology-managed server choices."),
             hint_type="user",
         )
@@ -270,7 +159,7 @@ def run_check(ip_or_name: str, user: str = "") -> None:
     from meridian.verification import deployment_verification_context
 
     request = validate_command_input(NodeTargetRequest, "Invalid node check request", ip_or_name=ip_or_name, user=user)
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)
     except LocalStateError as exc:
@@ -288,16 +177,15 @@ def run_check(ip_or_name: str, user: str = "") -> None:
 
     exit_code = 0
     deployment = None
-    if cluster.topology_intent is not None:
-        try:
-            deployment = deployment_verification_context(
-                cluster,
-                ServerRegistry(SERVER_PROFILES_FILE),
-                node.ip,
-            )
-        except LocalStateError as exc:
-            warn(f"V4 listener evidence is unavailable: {exc}")
-            exit_code = 3
+    try:
+        deployment = deployment_verification_context(
+            cluster,
+            ServerRegistry(SERVER_PROFILES_FILE),
+            node.ip,
+        )
+    except LocalStateError as exc:
+        warn(f"V4 listener evidence is unavailable: {exc}")
+        exit_code = 3
 
     # 1. Panel heartbeat (command-specific — requires panel client)
     try:
@@ -356,10 +244,6 @@ def run_check(ip_or_name: str, user: str = "") -> None:
             host = (route.tls_sni or route.host_header) if route is not None else default_host
             result = check_tls_certificate(conn, host or default_host, port=port)
             exit_code = max(exit_code, _render_check(result, f"TLS cert on port {port}"))
-    elif cluster.topology_intent is None:
-        exit_code = max(exit_code, _render_check(check_port_listening(conn, 443), "Port 443"))
-        host = node.domain or node.sni or node.ip
-        exit_code = max(exit_code, _render_check(check_tls_certificate(conn, host), "TLS cert"))
     else:
         warn("V4 listener evidence is unavailable for this saved server")
         exit_code = max(exit_code, 3)
@@ -399,32 +283,6 @@ def _render_check(result: CheckResult, label: str) -> int:
     return 4
 
 
-# -- Node Container Cleanup --
-
-
-def _stop_node_containers(node: NodeEntry) -> bool:
-    """Stop node containers, retaining local state when cleanup cannot finish."""
-    from meridian.operations import stop_node_containers
-    from meridian.ssh import ServerConnection, SSHError
-    from meridian.ssh_ui import RichSSHUI
-
-    info(f"Stopping containers on {node.ip}...")
-
-    try:
-        conn = ServerConnection(ip=node.ip, user=node.ssh_user, port=node.ssh_port)
-        conn.check_ssh(ui=RichSSHUI())
-    except (OSError, SSHError):
-        warn(f"Could not stop containers on {node.ip} (SSH unreachable)")
-        return False
-
-    if not stop_node_containers(node, connection=conn):
-        warn(f"Could not stop containers on {node.ip}")
-        return False
-
-    ok("Containers stopped")
-    return True
-
-
 # -- Node List --
 
 
@@ -444,7 +302,7 @@ def _run_list(*, operation: OperationContext) -> None:
 
     from meridian.console import is_json_mode
 
-    cluster = load_cluster()
+    cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)
     except LocalStateError as exc:
@@ -550,83 +408,19 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
     """Remove a node from the fleet."""
     request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
 
-    cluster = load_cluster()
-
-    if cluster.topology_intent is not None:
-        try:
-            topology = topology_from_local_cluster(cluster)
-        except LocalStateError as exc:
-            fail(exc)
-        projected = next(
-            (item for item in topology.nodes if request.ip_or_name in {item.ip, item.name}),
-            None,
-        )
-        if projected is not None:
-            fail(
-                f"Node '{request.ip_or_name}' is managed by V4 topology",
-                hint="Remove its exit or routing-gateway role in `meridian setup`, then apply the reviewed plan.",
-                hint_type="user",
-            )
-
-    node = cluster.find_node(request.ip_or_name)
-    if node is None:
+    cluster = load_topology_cluster()
+    try:
+        topology = topology_from_local_cluster(cluster)
+    except LocalStateError as exc:
+        fail(exc)
+    if not any(request.ip_or_name in {item.ip, item.name} for item in topology.nodes):
         fail(
             f"Node '{request.ip_or_name}' not found",
             hint="Check node list with: meridian node list",
             hint_type="user",
         )
-
-    if node.is_panel_host:
-        fail(
-            "Cannot remove the panel node",
-            hint="The panel runs on this node. Use 'meridian teardown' instead.",
-            hint_type="user",
-        )
-
-    # Guard: check for relays that depend on this node as their exit
-    dependent_relays = [r for r in cluster.relays if r.exit_node_ip == node.ip]
-    if dependent_relays:
-        relay_names = ", ".join(r.name or r.ip for r in dependent_relays)
-        if not force:
-            fail(
-                f"Cannot remove node {node.ip} — {len(dependent_relays)} relay(s) depend on it: {relay_names}",
-                hint="Remove relays first, or use --force to remove the dependent relays before the node",
-                hint_type="user",
-            )
-        else:
-            warn(f"Force-removing {len(dependent_relays)} dependent relay(s) before node removal: {relay_names}")
-
-    if not yes:
-        if not confirm(f"Remove node {node.ip} ({node.name or 'unnamed'})?"):
-            raise typer.Exit(1)
-
-    from meridian.operations import remove_node
-
-    try:
-        with make_panel(cluster) as panel:
-            with remote_mutation_persistence(f"Node {node.ip} was removed remotely"):
-                remove_node(
-                    cluster,
-                    panel,
-                    node_ip=node.ip,
-                    force=force,
-                    cleanup=_stop_node_containers,
-                )
-    except RemnawaveError as exc:
-        fail(
-            f"Could not remove node {node.ip} from the panel",
-            hint=f"{exc} Cluster state was retained; retry when the panel is available.",
-            hint_type="system",
-        )
-    except RuntimeError as exc:
-        fail(
-            f"Node {node.ip} was not removed because remote cleanup failed",
-            hint=f"{exc} Restore SSH access and retry; cluster state was retained.",
-            hint_type="system",
-        )
-
-    ok(f"Node {node.ip} removed from cluster")
-
-    err_console.print()
-    err_console.print("  [dim]List nodes:   meridian node list[/dim]")
-    err_console.print()
+    fail(
+        f"Node '{request.ip_or_name}' is part of your topology",
+        hint="Remove its exit or routing-gateway role in `meridian setup`, then apply the reviewed plan.",
+        hint_type="user",
+    )

@@ -14,7 +14,7 @@ from meridian.cluster import (
 )
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.errors import LocalStateError
-from meridian.xray_config import generate_reality_keypair
+from meridian.reality_keys import generate_reality_keypair
 
 if TYPE_CHECKING:
     from meridian.ssh import ServerConnection

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from meridian.cluster import ClusterConfig, NodeEntry, ResourceAllocation, WorkloadBinding
+from meridian.cluster import ClusterConfig, PanelConfig, ResourceAllocation, WorkloadBinding
 from meridian.commands.server import run_add, run_list, run_remove
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError
@@ -178,9 +178,9 @@ class TestServerRegistry:
     def test_registry_remove_rejects_deployed_server(self, servers_file: Path) -> None:
         registry = ServerRegistry(servers_file)
         registry.add(ServerEntry("198.51.100.10", "root", "edge"))
-        cluster = ClusterConfig(nodes=[NodeEntry(ip="198.51.100.10", name="edge")])
+        cluster = ClusterConfig(panel=PanelConfig(server_ip="198.51.100.10"))
 
-        with pytest.raises(LocalStateError, match="still used by node"):
+        with pytest.raises(LocalStateError, match="still used by the control plane"):
             registry.remove("edge", cluster=cluster)
 
         assert registry.find("edge") is not None

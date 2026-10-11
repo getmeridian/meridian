@@ -18,7 +18,7 @@ export type WsPath = string;
 export type XhttpPath = string;
 
 /**
- * Core-owned deploy plan consumed by provisioning and panel adapters.
+ * Dry-run preview of what `meridian deploy` would apply.
  */
 export interface DeployPlan {
   info_page_path: InfoPagePath;
@@ -32,7 +32,7 @@ export interface DeployPlan {
   xhttp_path: XhttpPath;
 }
 /**
- * Deterministic per-node port layout.
+ * Compiled listener ports for the deployed exit.
  */
 export interface DeployPorts {
   reality_port: RealityPort;

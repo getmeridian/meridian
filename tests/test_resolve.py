@@ -7,11 +7,31 @@ from pathlib import Path
 import pytest
 import typer
 
-from meridian.cluster import ClusterConfig, NodeEntry, RelayEntry
+from meridian.cluster import ClusterConfig
 from meridian.commands.resolve import resolve_server, try_resolve_server
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
 from meridian.resolve import is_local_keyword
 from meridian.servers import ServerEntry, ServerProfileStore, ServerRegistry
+from meridian.setup.editor import add_exit_to_intent, add_relay_to_intent
+from meridian.setup.single_server import single_server_intent
+
+
+def _topology_cluster(reg: ServerRegistry, *, exits: list[str], relays: list[str]) -> ClusterConfig:
+    """Build a saved topology whose roles reference the registry's server IDs."""
+
+    def ref(host: str) -> str:
+        entry = reg.find(host)
+        assert entry is not None
+        return entry.id
+
+    intent = single_server_intent(None, server_ref=ref(exits[0]))
+    for index, host in enumerate(exits[1:], start=2):
+        intent = add_exit_to_intent(intent, server_ref=ref(host), title=f"exit-{index}", reality_sni="www.example.com")
+    for index, host in enumerate(relays, start=1):
+        intent = add_relay_to_intent(
+            intent, server_ref=ref(host), title=f"relay-{index}", exit_ref="main", listen_port=8443
+        )
+    return ClusterConfig(topology_intent=intent)
 
 
 def test_try_resolve_returns_none_for_cli_exit(servers_file: Path) -> None:
@@ -125,18 +145,12 @@ class TestSingleServerAutoSelect:
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
-        cluster = ClusterConfig(
-            nodes=[NodeEntry(ip="198.51.100.10")],
-            relays=[
-                RelayEntry(ip="203.0.113.10", exit_node_ip="198.51.100.10"),
-                RelayEntry(ip="203.0.113.11", exit_node_ip="198.51.100.10"),
-            ],
-        )
-        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "exit"))
         reg.add(ServerEntry("203.0.113.10", "root", "relay-a"))
         reg.add(ServerEntry("203.0.113.11", "root", "relay-b"))
+        cluster = _topology_cluster(reg, exits=["198.51.100.10"], relays=["203.0.113.10", "203.0.113.11"])
+        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
 
         result = resolve_server(reg)
         assert result.ip == "198.51.100.10"
@@ -146,13 +160,13 @@ class TestSingleServerAutoSelect:
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
-        cluster = ClusterConfig(
-            nodes=[NodeEntry(ip="198.51.100.10")],
-            relays=[RelayEntry(ip="198.51.100.10", exit_node_ip="198.51.100.10")],
-        )
-        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
         reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry("198.51.100.9", "root", "main-exit"))
         reg.add(ServerEntry("198.51.100.10", "root", "exit-relay"))
+        # 198.51.100.10 is an exit of its own and a relay hop in front of main.
+        cluster = _topology_cluster(reg, exits=["198.51.100.9", "198.51.100.10"], relays=["198.51.100.10"])
+        reg.remove("198.51.100.9")
+        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
 
         result = resolve_server(reg)
         assert result.ip == "198.51.100.10"
@@ -176,15 +190,12 @@ class TestMultipleServers:
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
-        cluster = ClusterConfig(
-            nodes=[NodeEntry(ip="198.51.100.10"), NodeEntry(ip="198.51.100.11")],
-            relays=[RelayEntry(ip="203.0.113.10", exit_node_ip="198.51.100.10")],
-        )
-        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "exit-a"))
         reg.add(ServerEntry("198.51.100.11", "root", "exit-b"))
         reg.add(ServerEntry("203.0.113.10", "root", "relay-a"))
+        cluster = _topology_cluster(reg, exits=["198.51.100.10", "198.51.100.11"], relays=["203.0.113.10"])
+        monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
 
         with pytest.raises(typer.Exit) as exc_info:
             resolve_server(reg)
@@ -292,3 +303,20 @@ class TestResolvedServer:
         assert result.conn.ip == "198.51.100.10"
         assert result.conn.user == "ubuntu"
         assert result.conn.local_mode is False
+
+
+def test_local_server_ip_comes_from_the_saved_control_plane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from meridian.cluster import PanelConfig
+    from meridian.resolve import detect_local_server_ip
+
+    marker = tmp_path / "node.yml"
+    monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", marker)
+    cluster = ClusterConfig(
+        panel=PanelConfig(server_ip="198.51.100.10"),
+        topology_intent=single_server_intent(None, server_ref="srv-0a1b2c3d4e5f"),
+    )
+    monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
+
+    assert detect_local_server_ip() is None
+    marker.write_text("server: true\n")
+    assert detect_local_server_ip() == "198.51.100.10"

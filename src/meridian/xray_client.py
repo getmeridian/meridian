@@ -29,18 +29,6 @@ from meridian.config import (
 )
 from meridian.core.errors import MeridianError
 from meridian.health import ReadinessTimeout, poll_until_ready
-from meridian.xray_configs import (
-    build_reality_config as build_reality_config,
-)
-from meridian.xray_configs import (
-    build_test_configs_from_cluster as build_test_configs_from_cluster,
-)
-from meridian.xray_configs import (
-    build_wss_config as build_wss_config,
-)
-from meridian.xray_configs import (
-    build_xhttp_config as build_xhttp_config,
-)
 
 _XRAY_RUNTIME_ASSETS = ("geoip.dat", "geosite.dat")
 _CONNECTION_ATTEMPTS = 3

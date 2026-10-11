@@ -89,22 +89,6 @@ def make_panel(cluster: ClusterConfig) -> MeridianPanel:
 
 
 @contextmanager
-def remote_mutation_persistence(operation: str) -> Iterator[None]:
-    """Render local persistence failures after a remote mutation as partial."""
-    try:
-        yield
-    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
-        fail(
-            f"{operation}, but Meridian could not save the matching local state",
-            hint=(
-                f"{exc} Remote state changed. Fix local state permissions or disk space, "
-                "review cluster.yml, then rerun the command to reconcile."
-            ),
-            hint_type="system",
-        )
-
-
-@contextmanager
 def reviewed_apply_persistence(operation: str) -> Iterator[None]:
     """Render ambiguous V4 checkpoint write failures at the CLI boundary."""
     try:

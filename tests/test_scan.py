@@ -135,7 +135,6 @@ def test_v4_scan_selection_does_not_mutate_reviewed_intent() -> None:
         run(ip="198.51.100.8")
 
     assert cluster.topology_intent is intent
-    cluster.find_node.assert_not_called()
     cluster.save.assert_not_called()
     rendered_ok.assert_called_once_with("Selected: cdn.test")
     assert any("review-managed" in str(call) for call in rendered_warn.call_args_list)

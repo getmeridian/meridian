@@ -6,13 +6,13 @@ import json
 
 import pytest
 
-from meridian.cluster import BrandingConfig, ClusterConfig, NodeEntry, PanelConfig
+from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.models import ProtocolURL, RelayURLSet
 from meridian.pwa import (
     connection_page_deployed,
-    deploy_client_page,
     generate_client_files,
     load_pwa_static_assets,
+    mark_connection_page_deployed,
     upload_client_files,
     upload_pwa_assets,
 )
@@ -77,81 +77,21 @@ class TestGenerateClientFiles:
         assert config["relays"][0]["name"] == "test-relay"
 
 
-class TestDeployClientPage:
-    def test_embeds_only_canonical_remnawave_subscription(self) -> None:
-        conn = MockConnection()
-        node = NodeEntry(
-            ip="198.51.100.1",
-            sni="www.microsoft.com",
-            reality_public_key="public-key",
-            reality_short_id="deadbeef",
-        )
-        cluster = ClusterConfig(
-            panel=PanelConfig(sub_path="connections"),
-            nodes=[node],
-            branding=BrandingConfig(server_name="Family VPN"),
-        )
-        canonical_url = "https://panel.example.com/api/sub/short-id"
-
-        page_url = deploy_client_page(
-            conn,
-            cluster,
-            node,
-            "550e8400-e29b-41d4-a716-446655440000",
-            "alice",
-            canonical_url,
-        )
-
-        config_path = "/var/www/private/550e8400-e29b-41d4-a716-446655440000/config.json"
-        config = json.loads(conn.write_map[config_path])
-        assert page_url == "https://198.51.100.1/connections/550e8400-e29b-41d4-a716-446655440000/"
-        assert connection_page_deployed(cluster, "550e8400-e29b-41d4-a716-446655440000") is True
-        assert config["subscription_url"] == canonical_url
-        assert not any(path.endswith("/sub.txt") for path in conn.write_map)
-
+class TestConnectionPageMarkers:
     def test_page_marker_survives_cluster_reload(self, tmp_path) -> None:
-        conn = MockConnection()
-        node = NodeEntry(
-            ip="198.51.100.1",
-            sni="www.example.com",
-            reality_public_key="public-key",
-        )
-        cluster = ClusterConfig(panel=PanelConfig(sub_path="connections"), nodes=[node])
+        cluster = ClusterConfig(panel=PanelConfig(sub_path="connections"))
         user_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
-        assert deploy_client_page(conn, cluster, node, user_uuid, "alice", "https://example.com/sub")
+        mark_connection_page_deployed(cluster, user_uuid)
+        mark_connection_page_deployed(cluster, user_uuid)
         path = tmp_path / "cluster.yml"
         cluster.save(path)
 
         loaded = ClusterConfig.load(path)
         assert connection_page_deployed(loaded, user_uuid) is True
-        assert loaded.connection_page_markers
+        assert len(loaded.connection_page_markers) == 1
+        assert user_uuid not in path.read_text()
         assert "connection_page_markers" not in loaded._extra
-
-    def test_refuses_page_without_canonical_subscription(self) -> None:
-        conn = MockConnection()
-        node = NodeEntry(
-            ip="198.51.100.1",
-            sni="www.microsoft.com",
-            reality_public_key="public-key",
-        )
-        cluster = ClusterConfig(
-            panel=PanelConfig(sub_path="connections"),
-            nodes=[node],
-        )
-
-        assert (
-            deploy_client_page(
-                conn,
-                cluster,
-                node,
-                "550e8400-e29b-41d4-a716-446655440000",
-                "alice",
-                "",
-            )
-            == ""
-        )
-        assert conn.writes == []
 
 
 class TestLoadPWAStaticAssets:

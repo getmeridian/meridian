@@ -1,6 +1,6 @@
 {
   "additionalProperties": false,
-  "description": "Deterministic per-node port layout.",
+  "description": "Compiled listener ports for the deployed exit.",
   "properties": {
     "reality_port": {
       "title": "Reality Port",

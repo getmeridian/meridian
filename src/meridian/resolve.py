@@ -73,7 +73,7 @@ class ResolvedServer:
 def detect_local_server_ip() -> str | None:
     """Check if we're running on a deployed server and extract its IP.
 
-    Requires the v4 server identity marker and a panel node in cluster.yml.
+    Requires the v4 server identity marker and a control-plane address in cluster.yml.
     """
     try:
         from meridian.cluster import ClusterConfig
@@ -81,9 +81,8 @@ def detect_local_server_ip() -> str | None:
 
         if SERVER_NODE_CONFIG.is_file():
             cluster = ClusterConfig.load()
-            panel_node = cluster.panel_node
-            if panel_node and panel_node.ip:
-                return panel_node.ip
+            if cluster.topology_intent is not None and cluster.panel.server_ip:
+                return cluster.panel.server_ip
     except (PermissionError, OSError):
         pass
     return None
@@ -92,23 +91,30 @@ def detect_local_server_ip() -> str | None:
 def auto_selectable_entries(registry: ServerRegistry) -> list[ServerEntry]:
     """Return the best registry subset for implicit server selection.
 
-    Relay-only hosts are excluded using cluster.yml. A server that is both an
-    exit node and a relay remains selectable.
+    Relay-only servers are excluded using the saved topology. A server that
+    is both an exit and a relay hop remains selectable.
     """
     entries = registry.list()
+    relay_only_refs: set[str] = set()
     try:
         from meridian.cluster import ClusterConfig
 
-        cluster = ClusterConfig.load()
-        node_hosts = {node.ip for node in cluster.nodes if node.ip}
-        relay_only_hosts = {relay.ip for relay in cluster.relays if relay.ip} - node_hosts
+        intent = ClusterConfig.load().topology_intent
     except (OSError, ValueError):
-        relay_only_hosts = set()
+        intent = None
+    if intent is not None:
+        relay_refs = {ref for relay in intent.transparent_relays for ref in relay.hop_server_refs}
+        role_refs = {
+            intent.control.server_ref,
+            *(exit_.server_ref for exit_ in intent.exits),
+            *(gateway.server_ref for gateway in intent.routing_gateways),
+        }
+        relay_only_refs = relay_refs - role_refs
 
-    exit_entries = [entry for entry in entries if entry.host not in relay_only_hosts]
+    exit_entries = [entry for entry in entries if entry.id not in relay_only_refs]
     if exit_entries:
         return exit_entries
-    if relay_only_hosts:
+    if relay_only_refs & {entry.id for entry in entries}:
         return []
     return entries
 

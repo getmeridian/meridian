@@ -58,6 +58,28 @@ class DeployWorkflowAnswers(CoreModel):
     confirm: bool = False
 
 
+class DeployPorts(CoreModel):
+    """Compiled listener ports for the deployed exit."""
+
+    xhttp_port: int
+    reality_port: int
+    wss_port: int
+
+
+class DeployPlan(CoreModel):
+    """Dry-run preview of what `meridian deploy` would apply."""
+
+    mode: DeployMode
+    server_ip: str
+    ports: DeployPorts
+    secret_path: str
+    xhttp_path: str
+    ws_path: str
+    info_page_path: str
+    node_count: int
+    relay_count: int
+
+
 class DeployResult(CoreModel):
     """Result returned after a deploy/redeploy operation completes."""
 

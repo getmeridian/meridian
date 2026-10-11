@@ -96,14 +96,13 @@ COMPILER_FORBIDDEN = (
     "secrets",
 )
 
-# operations.py + relay_ops.py + panel_bootstrap.py must not import
-# private (_-prefixed) symbols from commands/.
+# Shared library modules must not import private (_-prefixed) symbols
+# from commands/.
 LIBRARY_MODULES = [
-    SRC / "operations.py",
-    SRC / "relay_ops.py",
     SRC / "panel_bootstrap.py",
     SRC / "capabilities.py",
     SRC / "node_deploy.py",
+    SRC / "reality_keys.py",
 ]
 
 
@@ -132,7 +131,7 @@ class TestLayerBoundaries:
         assert violations == [], "compiler/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_library_modules_never_import_private_from_commands(self) -> None:
-        """operations.py and friends must not import _foo from commands/.
+        """panel_bootstrap.py and friends must not import _foo from commands/.
 
         These modules are shared business logic consumed by both CLI commands
         and the reconciler. Importing private command functions creates an
@@ -176,13 +175,9 @@ class TestContractDrift:
         from meridian.cluster import (
             ActionCheckpoint,
             ClusterConfig,
-            DesiredNode,
-            DesiredRelay,
             ManagedResourceBinding,
-            NodeEntry,
             PanelConfig,
             RealityKeyBinding,
-            RelayEntry,
             ResourceAllocation,
             SubscriptionPageConfig,
             TelegramConfig,
@@ -194,10 +189,6 @@ class TestContractDrift:
         # the derivation stays correct.
         for cls in (
             PanelConfig,
-            NodeEntry,
-            RelayEntry,
-            DesiredNode,
-            DesiredRelay,
             RealityKeyBinding,
             WorkloadBinding,
             ManagedResourceBinding,
@@ -242,39 +233,6 @@ class TestContractDrift:
             assert "OperationSnapshot" in ret
         elif ret is not inspect.Parameter.empty:
             assert ret is OperationSnapshot or (hasattr(ret, "__name__") and ret.__name__ == "OperationSnapshot")
-
-    def test_topology_mapper_covers_node_fields(self) -> None:
-        """topology_from_cluster must map all public NodeEntry fields to TopologyNode.
-
-        When a field is added to NodeEntry but not to the mapper, it silently
-        disappears from fleet inventory views.
-        """
-        from meridian.cluster import NodeEntry
-        from meridian.core.fleet import TopologyNode
-
-        node_fields = {f.name for f in dataclasses.fields(NodeEntry) if not f.name.startswith("_")}
-        topo_fields = set(TopologyNode.model_fields.keys())
-
-        # Fields intentionally excluded from topology (secrets, internal state)
-        EXCLUDED = {
-            "config_profile_uuid",
-            "uuid",
-            "host_uuids",
-            "reality_public_key",
-            "reality_private_key",
-            "reality_short_id",
-            "inbounds",
-            "ssh_user",
-            "ssh_port",
-            "deployed_with",
-            "warp",
-            "hysteria2",
-        }
-
-        unmapped = node_fields - topo_fields - EXCLUDED
-        assert unmapped == set(), (
-            f"NodeEntry fields not in TopologyNode: {unmapped}. Add them to TopologyNode or to EXCLUDED in this test."
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -362,16 +320,16 @@ class TestStructuralHealth:
         """Library modules must raise exceptions, not call console.fail().
 
         fail() exits the process — it belongs in CLI command entry points only.
-        Library modules (operations, relay_ops, resolve, panel_bootstrap,
-        xray_config, provision/) should raise typed exceptions that command
-        callers convert to fail() calls.
+        Library modules (resolve, panel_bootstrap, node_deploy, reality_keys,
+        provision/) should raise typed exceptions that command callers convert
+        to fail() calls.
         """
         # Modules that must not import fail from meridian.console
         library_files = [
-            SRC / "operations.py",
-            SRC / "relay_ops.py",
             SRC / "resolve.py",
-            SRC / "xray_config.py",
+            SRC / "panel_bootstrap.py",
+            SRC / "node_deploy.py",
+            SRC / "reality_keys.py",
         ]
         library_files.extend(sorted((SRC / "provision").rglob("*.py")))
 
@@ -390,27 +348,4 @@ class TestStructuralHealth:
             "Library modules must not import console.fail() — raise exceptions instead:\n"
             + "\n".join(violations)
             + "\nSee core/errors.py for MeridianError hierarchy."
-        )
-
-    def test_applied_state_not_in_extra(self) -> None:
-        """Reconciler state must use typed AppliedState, not cluster._extra.
-
-        The _extra dict is for forward-compat unknown YAML keys only.
-        Applied-state snapshots belong in cluster.applied_state.
-        """
-        APPLIED_KEYS = {
-            "desired_clients_applied",
-            "desired_nodes_applied",
-            "desired_relays_applied",
-            "desired_relay_hosts_applied",
-        }
-        violations = []
-        for path in sorted(SRC.rglob("*.py")):
-            text = path.read_text()
-            for key in APPLIED_KEYS:
-                if f'_extra["{key}"]' in text or f"_extra['{key}']" in text or f'_extra.get("{key}")' in text:
-                    violations.append(f"{path.relative_to(SRC)} accesses _extra['{key}'] directly")
-
-        assert violations == [], "Applied-state accessed via _extra instead of cluster.applied_state:\n" + "\n".join(
-            violations
         )

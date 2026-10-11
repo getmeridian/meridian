@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import load_cluster
+from meridian.commands._helpers import load_cluster, load_topology_cluster, make_panel
 from meridian.commands.resolve import (
     ensure_server_connection,
     resolve_server,
@@ -14,10 +14,8 @@ from meridian.compiler.deployment import deployment_server_refs
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError
-from meridian.remnawave import RemnawaveError
+from meridian.remnawave import RemnawaveError, RemnawaveNotFoundError
 from meridian.servers import ServerEntry, ServerRegistry
-from meridian.ssh import ServerConnection, SSHError
-from meridian.ssh_ui import RichSSHUI
 
 
 def _remove_saved_server_or_fail(registry: ServerRegistry, server_ip: str) -> None:
@@ -38,8 +36,8 @@ def _remove_saved_server_or_fail(registry: ServerRegistry, server_ip: str) -> No
         )
 
 
-def _v4_target_references(cluster: ClusterConfig, entry: ServerEntry) -> list[str]:
-    """Return current V4 roles that still require a saved server."""
+def _topology_references(cluster: ClusterConfig, entry: ServerEntry) -> list[str]:
+    """Return current topology roles that still require a saved server."""
     intent = cluster.topology_intent
     if intent is None:
         return []
@@ -58,6 +56,29 @@ def _v4_target_references(cluster: ClusterConfig, entry: ServerEntry) -> list[st
     return list(dict.fromkeys(references))
 
 
+def _deregister_panel_node(cluster: ClusterConfig, server_ip: str) -> None:
+    """Drop a role-less server's stale panel node after its remote uninstall."""
+    try:
+        with make_panel(cluster) as panel:
+            api_node = panel.find_node_by_address(server_ip)
+            if api_node is not None:
+                try:
+                    panel.disable_node(api_node.uuid)
+                except RemnawaveError:
+                    warn(f"Could not disable node {server_ip} in the panel; deleting it anyway")
+                try:
+                    panel.delete_node(api_node.uuid)
+                except RemnawaveNotFoundError:
+                    pass
+    except RemnawaveError as exc:
+        fail(
+            f"Remote uninstall completed, but panel cleanup failed: {exc}",
+            hint="Retry teardown when the panel is available; local state was retained.",
+            hint_type="system",
+        )
+    info(f"Removed node {server_ip} from the panel")
+
+
 def run(
     ip: str = "",
     user: str = "root",
@@ -69,9 +90,11 @@ def run(
 
     resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
 
-    # Teardown mutates legacy topology directly. V4 topology must be changed
-    # through its reviewed intent so saved roles cannot diverge from reality.
+    # Roles change only through the reviewed topology, so teardown refuses a
+    # server that still carries one -- unless it is the whole fleet.
     cluster = load_cluster(require_configured=False)
+    if cluster.is_configured and cluster.topology_intent is None:
+        load_topology_cluster()  # refuses with rebuild guidance
     if cluster.topology_intent is not None:
         try:
             saved_server = registry.find(resolved.ip)
@@ -79,42 +102,19 @@ def run(
             fail(exc)
         if saved_server is None:
             fail(
-                f"Cannot prove V4 role ownership for {resolved.ip}",
+                f"Cannot tell which roles {resolved.ip} has in your topology",
                 hint="Restore its saved server profile before attempting teardown.",
                 hint_type="user",
             )
-        references = _v4_target_references(cluster, saved_server)
-        # Tearing down the only server of a fleet removes the whole deployment;
-        # otherwise roles must first be removed through the reviewed topology.
+        references = _topology_references(cluster, saved_server)
         entire_fleet = deployment_server_refs(cluster.topology_intent) == {saved_server.id}
         if references and not entire_fleet:
             fail(
-                f"Server {resolved.ip} is still managed by V4 topology: {', '.join(references)}",
+                f"Server {resolved.ip} still has roles in your topology: {', '.join(references)}",
                 hint="Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown.",
                 hint_type="user",
             )
-
-    node = cluster.find_node(resolved.ip)
-    is_panel_host = cluster.panel.server_ip == resolved.ip or bool(node and node.is_panel_host)
-    relay_target = cluster.find_relay(resolved.ip)
-    if relay_target is not None and (node is not None or is_panel_host):
-        fail(
-            f"Server {resolved.ip} has both relay and node roles",
-            hint="Remove the relay role with `meridian relay remove`, then run teardown again for the node.",
-            hint_type="user",
-        )
-    remaining_nodes = [candidate for candidate in cluster.nodes if candidate.ip != resolved.ip]
-    remaining_relays = list(cluster.relays)
-    if is_panel_host and (remaining_nodes or remaining_relays):
-        dependents = [
-            *[candidate.name or candidate.ip for candidate in remaining_nodes],
-            *[relay.name or relay.ip for relay in remaining_relays],
-        ]
-        fail(
-            "Cannot teardown the panel while other deployed servers remain",
-            hint=f"Teardown or remove these deployments first: {', '.join(dependents)}.",
-            hint_type="user",
-        )
+    is_panel_host = bool(cluster.panel.server_ip) and cluster.panel.server_ip == resolved.ip
 
     # Confirm only after proving that ownership and dependency guards permit
     # the selected teardown.
@@ -126,67 +126,10 @@ def run(
         raise typer.Exit(1)
     err_console.print()
 
-    if relay_target is not None:
-        from meridian.commands.relay import run_remove as remove_relay_command
-
-        remove_relay_command(relay_target.ip, user=resolved.user, yes=True)
-        _remove_saved_server_or_fail(registry, resolved.ip)
-        err_console.print()
-        ok("Relay teardown complete.")
-        err_console.print()
-        return
-
     resolved = ensure_server_connection(resolved)
 
     info(f"Removing Meridian from {resolved.ip}...")
     err_console.print()
-
-    # Relays must stop advertising and forwarding to an exit before that exit
-    # disappears. When the panel itself is being removed, stopping Realm is
-    # sufficient because the control plane and its Host records disappear too.
-    relays_for_node = [r for r in cluster.relays if r.exit_node_ip == resolved.ip]
-    if relays_for_node and is_panel_host:
-        from meridian.relay_ops import stop_relay_service
-
-        info(f"Stopping {len(relays_for_node)} relay node(s)...")
-        failed_relays: list[str] = []
-        for relay in relays_for_node:
-            try:
-                relay_conn = ServerConnection(ip=relay.ip, user=relay.ssh_user, port=relay.ssh_port)
-                relay_conn.check_ssh(ui=RichSSHUI())
-                if stop_relay_service(relay_conn):
-                    ok(f"Relay {relay.ip} stopped")
-                else:
-                    failed_relays.append(relay.ip)
-                    warn(f"Could not stop relay {relay.ip}")
-            except (OSError, RuntimeError, SSHError):
-                failed_relays.append(relay.ip)
-                warn(f"Could not reach relay {relay.ip} — service may still be running")
-        err_console.print()
-        if failed_relays:
-            failed_text = ", ".join(failed_relays)
-            fail(
-                f"Teardown stopped because relay cleanup failed: {failed_text}",
-                hint="Restore relay SSH access and retry; local state and the exit deployment were retained.",
-                hint_type="system",
-            )
-    elif relays_for_node:
-        from meridian.commands._helpers import make_panel
-        from meridian.operations import remove_relay
-
-        info(f"Removing {len(relays_for_node)} dependent relay node(s)...")
-        try:
-            with make_panel(cluster) as panel:
-                for relay in relays_for_node:
-                    remove_relay(cluster, panel, relay_ip=relay.ip)
-                    ok(f"Relay {relay.ip} removed")
-        except (OSError, RuntimeError, SSHError, RemnawaveError) as exc:
-            fail(
-                f"Teardown stopped because relay cleanup failed: {exc}",
-                hint="Restore relay, exit, and panel access, then retry; unfinished topology state was retained.",
-                hint_type="system",
-            )
-        err_console.print()
 
     # Run uninstall via provisioner
     from meridian.provision.progress import RichStepRenderer
@@ -228,25 +171,7 @@ def run(
                 )
             info("Removed cluster.yml (panel host was torn down)")
         else:
-            from meridian.commands._helpers import make_panel
-            from meridian.operations import remove_node
-
-            try:
-                with make_panel(cluster) as panel:
-                    remove_node(
-                        cluster,
-                        panel,
-                        node_ip=resolved.ip,
-                        force=True,
-                        cleanup=lambda _node: True,
-                    )
-            except RemnawaveError as exc:
-                fail(
-                    f"Remote uninstall completed, but panel cleanup failed: {exc}",
-                    hint="Retry teardown when the panel is available; local state was retained.",
-                    hint_type="system",
-                )
-            info(f"Removed node {resolved.ip} from panel and cluster.yml")
+            _deregister_panel_node(cluster, resolved.ip)
 
     # Registry deletion is last: a stale saved connection is recoverable, but
     # deleting it before topology persistence would discard retry information.
