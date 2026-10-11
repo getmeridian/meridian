@@ -38,6 +38,7 @@ from meridian.verification import (
     canonical_endpoint_address,
 )
 from meridian.xray_client import (
+    EGRESS_MISMATCH_PREFIX,
     XrayStartupError,
     ensure_xray_binary,
     is_supported_proxy_outbound,
@@ -594,9 +595,15 @@ def execute_xray_config(
                 findings,
                 duration_ms=max(0, int((time.monotonic() - started) * 1000)),
             )
+        if success:
+            code = "PROTOCOL_TRAFFIC_OK"
+        elif detail.startswith(EGRESS_MISMATCH_PREFIX):
+            code = "PROTOCOL_EGRESS_MISMATCH"
+        else:
+            code = "PROTOCOL_TRAFFIC_FAILED"
         findings = [
             VerificationFinding(
-                code="PROTOCOL_TRAFFIC_OK" if success else "PROTOCOL_TRAFFIC_FAILED",
+                code=code,
                 status="passed" if success else "failed",
                 message=f"{label}: {detail}",
                 remediation=(

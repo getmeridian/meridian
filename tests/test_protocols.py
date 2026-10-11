@@ -93,7 +93,7 @@ class TestRealityBuildURL:
     def test_default_sni(self) -> None:
         proto = RealityProtocol()
         url = proto.build_url("uuid", "name", ip="198.51.100.10")
-        assert "sni=www.microsoft.com" in url
+        assert "sni=www.google.com" in url
 
     def test_different_sni(self) -> None:
         proto = RealityProtocol()

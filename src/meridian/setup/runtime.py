@@ -36,6 +36,7 @@ from meridian.config import (
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
     XRAY_VERSION,
 )
+from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -647,7 +648,7 @@ def _bootstrap_profile_values(
         "xhttp": 30443,
         "wss": 20443,
     }
-    reality_sni = "www.microsoft.com"
+    reality_sni = DEFAULT_SNI
     for resource in plan.resources:
         payload = resource.payload
         if not isinstance(payload, ConfigProfilePayload):

@@ -229,5 +229,5 @@ def run(
         warn(f"Enter a number from 1 to {len(domains)}, or press Enter to skip")
         raise typer.Exit(2)
 
-    info("No target selected. The default (www.microsoft.com) works well for most servers.")
+    info("No target selected. Deploy will pick a working default camouflage target.")
     err_console.print()

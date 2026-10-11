@@ -15,7 +15,7 @@ MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
 SERVER_CREDS_DIR = Path("/etc/meridian")
 SERVER_NODE_CONFIG = SERVER_CREDS_DIR / "node.yml"  # server-side identity
 
-DEFAULT_SNI = "www.microsoft.com"  # mirrored in meridian.core.defaults for core isolation
+DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
 DEFAULT_FINGERPRINT = "chrome"
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"
 

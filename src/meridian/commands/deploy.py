@@ -12,7 +12,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
@@ -25,8 +25,19 @@ from meridian.commands.resolve import ensure_server_connection, resolve_server
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.config import SERVER_PROFILES_FILE, is_ip
-from meridian.console import err_console, error_context, fail, info, is_quiet_mode, line, ok, prompt, set_quiet_mode
-from meridian.core.defaults import DEFAULT_SNI
+from meridian.console import (
+    err_console,
+    error_context,
+    fail,
+    info,
+    is_quiet_mode,
+    line,
+    ok,
+    prompt,
+    set_quiet_mode,
+    warn,
+)
+from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_planning import DeployPlan, DeployPorts
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
@@ -165,7 +176,12 @@ def _execute(request: DeployRequest) -> DeployResult:
         fail(
             "Could not save the server profile", hint="Check ~/.meridian/servers.json permissions.", hint_type="system"
         )
-    intent = _intent_or_fail(cluster.topology_intent, entry.id, request)
+    # Without --sni, a fresh deploy tries known-good camouflage targets in order;
+    # redeploys keep the saved target unless --sni changes it.
+    if request.sni or not first_deploy:
+        sni_candidates = [request.sni]
+    else:
+        sni_candidates = _reachable_reality_targets(resolved.conn)
 
     from meridian.setup.runtime import SetupRuntime
 
@@ -178,23 +194,35 @@ def _execute(request: DeployRequest) -> DeployResult:
     runtime = SetupRuntime(registry, persist=persist_reviewed_apply, connection_builder=connect)
     info("First deployment: installing the control plane and proxy" if first_deploy else "Redeploying")
     info("Applying the reviewed topology; this takes a few minutes on a fresh server...")
+    client = request.client_name or DEFAULT_CLIENT
     try:
-        applied = runtime.apply_intent(intent)
-        if not applied.all_succeeded:
-            failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in applied.failed)
-            fail(
-                "Deploy did not converge",
-                hint=f"{failures}. Fix the cause and run the same command again; finished steps are skipped.",
-                hint_type="system",
+        for attempt, sni in enumerate(sni_candidates):
+            intent = _intent_or_fail(
+                cluster.topology_intent if attempt == 0 else ClusterConfig.load().topology_intent,
+                entry.id,
+                _build_request(**{**request.model_dump(), "sni": sni}),
             )
-        ok("Server converged")
+            applied = runtime.apply_intent(intent)
+            if not applied.all_succeeded:
+                failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in applied.failed)
+                fail(
+                    "Deploy did not converge",
+                    hint=f"{failures}. Fix the cause and run the same command again; finished steps are skipped.",
+                    hint_type="system",
+                )
+            ok("Server converged")
+            draft = SetupDraft.from_intent(intent).model_copy(
+                update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
+            )
+            runtime.verify(draft)
+            ok("Verified the control plane, node, and subscription")
+            traffic, detail = _verify_traffic(resolved.ip, client)
+            if traffic == "failed" and attempt + 1 < len(sni_candidates):
+                warn(f"No traffic through camouflage target {sni or DEFAULT_SNI}; trying {sni_candidates[attempt + 1]}")
+                continue
+            _report_traffic(traffic, detail, resolved.ip)
+            break
         _save_branding(request)
-        draft = SetupDraft.from_intent(intent).model_copy(
-            update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
-        )
-        runtime.verify(draft)
-        ok("Verified the control plane, node, and subscription")
-        client = request.client_name or DEFAULT_CLIENT
         (links,) = runtime.publish_handoff([client])
     except ReviewedApplyPersistenceError as exc:
         fail("Deploy changed the server, but local state could not be saved", hint=str(exc), hint_type="system")
@@ -226,6 +254,69 @@ def _execute(request: DeployRequest) -> DeployResult:
         relay_count=len(intent.transparent_relays),
         summary=f"Deploy completed for {resolved.ip}",
     )
+
+
+TrafficOutcome = Literal["ok", "egress_mismatch", "failed", "inconclusive"]
+
+
+def _reachable_reality_targets(conn: ServerConnection) -> list[str]:
+    """Candidate camouflage targets the server itself can reach over TLS 1.3 + HTTP/2."""
+    reachable = []
+    for candidate in REALITY_SNI_CANDIDATES:
+        probe = conn.run(
+            f"curl -s -o /dev/null --max-time 8 --tlsv1.3 --http2 -w '%{{http_version}}' "
+            f"https://{shlex.quote(candidate)}/",
+            timeout=15,
+        )
+        if probe.returncode == 0 and probe.stdout.strip() == "2":
+            reachable.append(candidate)
+    if not reachable:
+        fail(
+            "The server cannot reach any Reality camouflage target over TLS 1.3",
+            hint=(
+                f"Tried {', '.join(REALITY_SNI_CANDIDATES)}. "
+                "Check outbound HTTPS from the server, or pass --sni (see `meridian scan`)."
+            ),
+            hint_type="system",
+        )
+    return reachable
+
+
+def _verify_traffic(server_ip: str, client: str) -> tuple[TrafficOutcome, str]:
+    """Push real traffic through the delivered subscription, as `meridian test` does."""
+    from meridian.commands.test import collect_test_result
+
+    try:
+        result = collect_test_result(server_ip, "", "", "", client=client, timeout=8)
+    except MeridianError as exc:
+        return "inconclusive", str(exc)
+    findings = [
+        finding for check in result.checks for finding in check.findings if finding.code.startswith("PROTOCOL_")
+    ]
+    by_code = {finding.code: finding.message for finding in findings}
+    for code in ("PROTOCOL_TRAFFIC_FAILED", "PROTOCOL_CONFIG_INVALID"):
+        if code in by_code:
+            return "failed", by_code[code]
+    if "PROTOCOL_EGRESS_MISMATCH" in by_code:
+        return "egress_mismatch", by_code["PROTOCOL_EGRESS_MISMATCH"]
+    if "PROTOCOL_TRAFFIC_OK" in by_code:
+        return "ok", by_code["PROTOCOL_TRAFFIC_OK"]
+    return "inconclusive", next(iter(by_code.values()), "no traffic evidence was collected")
+
+
+def _report_traffic(outcome: TrafficOutcome, detail: str, server_ip: str) -> None:
+    if outcome == "ok":
+        ok("Traffic verified end to end through the delivered subscription")
+    elif outcome == "egress_mismatch":
+        warn(f"Traffic works, but leaves through an unexpected address: {detail}")
+    elif outcome == "inconclusive":
+        warn(f"Could not verify traffic ({detail}). Check later with: meridian test {server_ip}")
+    else:
+        fail(
+            "The server deployed, but no traffic passes through it",
+            hint=f"{detail}. Try another camouflage target with --sni (see `meridian scan`).",
+            hint_type="system",
+        )
 
 
 def _dry_run(request: DeployRequest) -> DeployPlan:

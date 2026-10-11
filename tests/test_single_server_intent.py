@@ -17,7 +17,7 @@ def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
     (exit_,) = intent.exits
     assert exit_.server_ref == "srv-a" and exit_.geo_block is True
     assert [path.protocol for path in exit_.paths] == ["reality"]
-    assert exit_.paths[0].reality_sni == "www.microsoft.com"
+    assert exit_.paths[0].reality_sni == "www.google.com"
     assert intent.access.users == ["alice"]
     compile_topology(intent)
 

@@ -486,6 +486,22 @@ def test_unavailable_ip_observers_make_protocol_check_inconclusive(tmp_path: Pat
     assert result.findings[0].code == "PROTOCOL_TRAFFIC_INCONCLUSIVE"
 
 
+def test_unexpected_egress_is_a_distinct_failed_finding(tmp_path: Path) -> None:
+    result = execute_xray_config(
+        "protocol",
+        "Reality",
+        _canonical_config(),
+        tmp_path / "xray",
+        _IP,
+        lambda *_args, **_kwargs: (False, f"exit IP 203.0.113.9 does not match server {_IP}"),
+        expected_egress_ip=_IP,
+        timeout=5,
+    )
+
+    assert result.status == "failed"
+    assert result.findings[0].code == "PROTOCOL_EGRESS_MISMATCH"
+
+
 def test_invalid_canonical_routing_is_a_failed_protocol_check(tmp_path: Path) -> None:
     config = _canonical_config()
     config["routing"] = []

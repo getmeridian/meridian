@@ -61,6 +61,10 @@ class XrayConfigError(ValueError):
     """The delivered canonical config was rejected by the local Xray binary."""
 
 
+# Traffic flowed, but left through an unexpected IP (NAT, multi-IP hosts, misrouting).
+EGRESS_MISMATCH_PREFIX = "exit IP"
+
+
 def _xray_bin_path() -> Path:
     """Return the cached xray binary path."""
     return MERIDIAN_HOME / "bin" / f"xray-{XRAY_VERSION}"
@@ -506,7 +510,7 @@ def test_connection(
                         except ValueError:
                             return False, f"expected server IP {server_ip!r} is invalid"
                         if observed_ip != expected_ip:
-                            return False, f"exit IP {observed_ip} does not match server {expected_ip}"
+                            return False, f"{EGRESS_MISMATCH_PREFIX} {observed_ip} does not match server {expected_ip}"
                     elapsed = time.monotonic() - start
                     return True, f"exit IP {observed_ip} ({elapsed:.1f}s, attempt {attempt})"
             except subprocess.TimeoutExpired:

@@ -33,7 +33,7 @@ export const deployWorkflow = {
       "secret": false
     },
     {
-      "default": "www.microsoft.com",
+      "default": "www.google.com",
       "help_text": "A popular website that Reality can impersonate during probes.",
       "id": "sni",
       "kind": "text",
