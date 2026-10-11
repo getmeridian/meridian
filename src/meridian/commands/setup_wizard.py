@@ -74,7 +74,7 @@ _DETAILS: dict[SetupStage, str] = {
     ),
     "apply": (
         "Each remote action is observed, checkpointed, and safe to resume. "
-        "Prior generations stay active until the new generation converges."
+        "Resources are updated in place; a failed apply can be re-run."
     ),
     "verify": (
         "Verification checks the panel, managed nodes, and canonical Remnawave subscription content before handoff."
