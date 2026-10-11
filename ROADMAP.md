@@ -10,10 +10,16 @@ commitments; contributions in any theme are welcome.
 
 ## In flight
 
-**Declarative workflow + real-VM testing** (v4 — in development)
-Implemented in #28: `cluster.yml` desired state, `meridian plan / apply`,
-applied-state tracking, hybrid sync, parallel provisioning, and the Hetzner real-VM harness.
-Follow-up roadmap issues opened against upstream:
+**Meridian 4.0** (in development on the `v4` branch)
+Remnawave replaces 3x-ui; 4.0 is a fresh deploy, not an in-place upgrade.
+Every command now works on one reviewed topology in `cluster.yml`:
+`meridian deploy IP` builds a single-server topology, `meridian setup` is a
+resumable wizard for exits, Realm relay chains, routing gateways with failover
+pools, and users, and `meridian plan / apply` review and apply it with
+checkpoints. Deploy picks a working camouflage target and verifies real
+traffic before finishing; connection pages are built from each user's real
+subscription. Real-VM testing runs through the Hetzner harness.
+Related roadmap issues:
 
 - [#32](https://github.com/getmeridian/meridian/issues/32) — multi-hop chain topologies (arbitrary N ≥ 2)
 - [#33](https://github.com/getmeridian/meridian/issues/33) — multi-IP nodes (ingress IP ≠ egress IP)
@@ -22,14 +28,16 @@ Follow-up roadmap issues opened against upstream:
 - [#36](https://github.com/getmeridian/meridian/issues/36) — expand real-VM harness for existing features
 - [#37](https://github.com/getmeridian/meridian/issues/37) — real-VM harness: multi-topology + multi-provider + optional CI smoke
 
-### v4 release hardening
+### 4.0 release hardening
 
+- Safe retirement: `client remove`, `node remove`, `relay remove`, and
+  shrinking the topology (today apply is additive and refuses removals)
+- Per-hop relay health checks (`relay check`)
 - Complete typed process-API envelopes and generated clients across commands
 - Make operation state durable, cancellation real, and diagnostics redacted
-- Add post-deploy verification evidence with explicit recovery guidance
-- Bind apply to the reviewed plan and scan built artifacts for secrets
-- Finish safe node/profile lifecycle operations and Studio topology authoring
-- Add browser and accessibility coverage for Studio and connection handoff
+- Scan built artifacts for secrets
+- Studio topology authoring (Studio is experimental)
+- Browser and accessibility coverage for Studio and connection pages
 
 ## Near-term themes
 
@@ -104,7 +112,7 @@ Rotate Reality keys, JWT secrets, and subscription paths in place.
 
 Security / supply chain:
 - [#38](https://github.com/getmeridian/meridian/issues/38) — `install.sh` verify `SHA256SUMS` before exec
-- [#39](https://github.com/getmeridian/meridian/issues/39) — pin + verify `RealiTLScanner` binary
+- ~~[#39](https://github.com/getmeridian/meridian/issues/39) — pin + verify `RealiTLScanner` binary~~ — shipped: `meridian scan` runs a pinned, SHA-256-verified release
 
 Product:
 - [#42](https://github.com/getmeridian/meridian/issues/42) — `meridian deploy NEW_IP --from OLD_IP` fleet migration
@@ -112,4 +120,4 @@ Product:
 
 UX / docs:
 - [#44](https://github.com/getmeridian/meridian/issues/44) — WebRTC leak warning on connection page
-- [#45](https://github.com/getmeridian/meridian/issues/45) — Windows / WSL setup guide (good-first-issue)
+- ~~[#45](https://github.com/getmeridian/meridian/issues/45) — Windows / WSL setup guide~~ — shipped on `main`; carry it into 4.0 docs

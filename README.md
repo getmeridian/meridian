@@ -19,11 +19,11 @@
 
 ## What is this
 
-Most proxy setups leak — an open port here, a TLS mismatch there, a fingerprint that gives the server away. Meridian locks every layer down automatically: firewall, certificates, SNI routing, fingerprinting. You deploy in one command. Your people connect via QR code. That's it.
+Most proxy setups leak — an open port here, a TLS mismatch there, a fingerprint that gives the server away. Meridian locks every layer down automatically: firewall, certificates, SNI routing, fingerprinting. You deploy in one command. Your people connect by scanning a QR code. That's it.
 
-When your IP gets blocked, redeploy and be back in minutes.
+When an IP gets blocked, add a new server with one command; your users pick it up on their next subscription refresh.
 
-Whether you're the "tech friend" setting up VPN for people you care about, a power user managing multiple servers, or an NGO providing access in a censored region — Meridian handles the complexity so you can focus on staying connected.
+Whether you're the "tech friend" setting up a VPN for people you care about, a power user running several servers, or an NGO providing access in a censored region, Meridian handles the complexity so you can focus on staying connected.
 
 See [SECURITY.md](SECURITY.md) for the threat model and what Meridian protects against (and what it doesn't).
 
@@ -38,8 +38,6 @@ Meridian ships the strongest available protocol — today that's VLESS+Reality �
 | Architecture | nginx+Xray+Remnawave (hardened) | Remnawave panel+node | Xray+Nginx | Xray+Nginx |
 | Relay support | Built-in L4 relay | Manual | No | Manual |
 | Rebuild workflow | `node add NEW_IP` | Start over | Reconfigure | Reconfigure |
-
-Meridian is an **orchestrator** — it configures Docker, Xray, nginx, firewall, BBR, and TLS certificates automatically. You focus on deploying and sharing access, not debugging configs.
 
 ## Install
 
@@ -56,52 +54,49 @@ uv tool install meridian-vpn    # recommended
 pipx install meridian-vpn       # alternative
 ```
 
+> **Upgrading from 3.x?** Meridian 4.0 is not an in-place upgrade: it replaces 3x-ui with Remnawave, and every user needs a new link. Your 3.x servers keep working. See [Upgrading from 3.x](https://getmeridian.org/docs/en/installation/#upgrading-from-3x).
+
 ## Quick start
 
 ```bash
-meridian setup                        # resumable guided V4 topology setup
-meridian deploy                       # interactive wizard
-meridian deploy 198.51.100.10         # deploy to server
-meridian deploy local                 # deploy on this server (no SSH needed)
-meridian deploy 198.51.100.10 --domain d.io # with CDN fallback
+meridian deploy 198.51.100.10
 ```
 
-After setup, your server is a fully functional proxy. Share access:
-
-```bash
-meridian client add alice            # generate keys for a friend
-meridian client list                 # see all clients
-meridian client remove alice         # permanently revoke legacy access (V4 removal is not yet supported)
-```
-
-By default, the deploy wizard blocks `.ru` domains and Russian IPs through the proxy to reduce exposure of your VPS IP in Russian-service logs. If you need those sites over Meridian, deploy with `--no-geo-block`.
-
-Each client gets a canonical subscription. Legacy deploys also host a connection page with QR codes and one-tap links when its upload succeeds; V4 setup does not fabricate that legacy page.
-
-## How deployment works
-
-The typical workflow: run Meridian on **your machine** and it connects to the VPS via SSH. You can also run it directly on the VPS (`deploy local`).
-
-```
-Your machine                       VPS
-┌────────────────┐    SSH    ┌────────────────┐
-│  meridian CLI  │ ────────→ │  proxy server  │
-│  ~/.meridian/  │           │                │
-└────────────────┘           └────────────────┘
-```
-
-After `meridian deploy 198.51.100.10`, topology and panel credentials are stored in `~/.meridian/cluster.yml`. Later client commands use that panel directly — no server selector is needed.
-
-Add more exit nodes to the same fleet with names:
-
-```bash
-meridian deploy 198.51.100.10 --display-name finland
-meridian node add 198.51.100.11 --name germany
-```
+That's the whole setup. Meridian hardens the server, installs the Remnawave panel and Xray, picks a camouflage target that works from your server, verifies real traffic, and prints a **connection page** (QR codes, app links) plus a **subscription URL** to share.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/connection-page.png" width="360" alt="Connection page with QR codes">
 </p>
+
+Give more people access:
+
+```bash
+meridian client add alice            # her own connection page and subscription
+meridian client list                 # everyone, with status and traffic
+meridian client disable alice        # cut off access immediately
+```
+
+Options worth knowing:
+
+```bash
+meridian deploy 198.51.100.10 --domain vpn.example.com   # add a Cloudflare CDN fallback
+meridian deploy 198.51.100.10 --no-harden                # server shared with other services
+meridian deploy local                                    # run on the server itself
+```
+
+By default the server blocks Russian domains and IPs through the proxy, to keep your VPS IP out of Russian services' logs. Deploy with `--no-geo-block` if your users need those sites through Meridian.
+
+To redeploy, run the same command again — paths, keys, and users are kept.
+
+## More than one server
+
+```bash
+meridian setup                                          # guided wizard: exits, relays, routing, users
+meridian node add 198.51.100.11 --name germany          # another exit
+meridian relay deploy 203.0.113.10 --exit 198.51.100.10 # domestic entry point
+```
+
+Every change goes through one reviewed topology stored in `~/.meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies it with checkpoints, so an interrupted run resumes where it stopped.
 
 ## How it works
 
@@ -109,81 +104,45 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 
 | Censorship method | How Meridian beats it |
 |---|---|
-| **Deep Packet Inspection** | Traffic is byte-for-byte identical to normal HTTPS. No proxy signatures. |
-| **Active probing** | Censors connecting to your server get a real TLS certificate from microsoft.com. Only clients with your private key reach the proxy. |
-| **TLS fingerprinting** | uTLS impersonates Chrome's exact Client Hello, matching billions of real devices. |
-| **IP blocking** | Domain mode routes through Cloudflare CDN as a fallback — no direct IP exposure. |
-
-## Architecture
+| **Deep Packet Inspection** | Traffic looks like ordinary HTTPS. No proxy signatures. |
+| **Active probing** | Anyone probing your server sees the real certificate of a popular site (such as Google's). Only clients with your key reach the proxy. |
+| **TLS fingerprinting** | uTLS copies Chrome's exact Client Hello, matching billions of real devices. |
+| **IP blocking** | Domain mode adds XHTTP and WSS through Cloudflare's CDN; relays add a domestic entry point. |
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/architecture.svg" width="720" alt="Meridian architecture — nginx SNI routing, TLS, Xray Reality">
 </p>
 
-**Standalone mode** — nginx on port 443 routes Reality traffic to Xray via SNI inspection. nginx also provides TLS (Let's Encrypt IP certificate via acme.sh) for hosted connection pages, panel access, and XHTTP transport. No domain needed.
-
-**Domain mode** — Same architecture, plus nginx handles VLESS+WSS through Cloudflare CDN as a fallback when the server IP is blocked. XHTTP also benefits from the domain certificate for enhanced stealth.
-
-**Relay mode** — A lightweight TCP forwarder (Realm) on a domestic server forwards port 443 to the exit server abroad with end-to-end encryption. Legacy Realm relays advertise the dedicated Reality route; HTTP transports remain on direct/domain exits.
+- **Single server** — nginx on port 443 routes Reality traffic to Xray by SNI and serves the panel, connection pages, and subscriptions with a Let's Encrypt IP certificate. No domain needed.
+- **Domain mode** — adds XHTTP and WSS on your domain, carried by Cloudflare's CDN when the server IP is blocked. Hysteria2 over UDP/443 is available as an opt-in.
+- **Relays** — a lightweight TCP forwarder (Realm) on a domestic server passes Reality traffic to the exit abroad, encrypted end to end.
 
 ## What you need
 
-- A VPS (Debian/Ubuntu) with root SSH key access — $5/month from any provider
-- Recommended: Finland, Netherlands, Sweden, Germany (low latency, not flagged)
-- Optional: a domain pointed to the server (for CDN fallback via Cloudflare)
+- A VPS (Debian/Ubuntu) with SSH key access as root or a sudo user — about $5/month from most providers
+- Optional: a domain on Cloudflare for the CDN fallback
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `meridian setup` | Configure a complete V4 topology with a resumable guided wizard |
-| `meridian deploy [IP\|local]` | Deploy proxy server (interactive wizard if no IP) |
-| `meridian studio` | Open the localhost-only Studio and Engine API |
-| `meridian plan` | Show the reconciliation plan — diff between `cluster.yml` and actual panel state |
-| `meridian apply [--yes]` | Converge the cluster to the desired state in `cluster.yml` |
-| `meridian client add NAME` | Add a named client key |
-| `meridian client show NAME` | Show managed-client subscription and evidenced handoff links |
-| `meridian client list` | List managed access clients |
-| `meridian client remove NAME` | Remove a legacy client key; V4 managed-user retirement is not yet supported |
-| `meridian client enable NAME` | Resume a suspended client |
-| `meridian client disable NAME` | Suspend a client without deleting it |
-| `meridian server add IP` | Add a server to the local registry |
-| `meridian server list` | List known servers |
-| `meridian server remove NAME` | Remove an unused server profile |
-| `meridian node add IP` | Provision another exit node |
-| `meridian node list` | List exit nodes and live status |
-| `meridian node check NODE` | Check one node's panel, SSH, service, port, and TLS health |
-| `meridian node remove NODE` | Remove an exit node after dependency checks |
-| `meridian relay deploy RELAY_IP --exit EXIT` | Deploy a relay node (TCP forwarder) |
-| `meridian relay list` | List relay nodes |
-| `meridian relay remove RELAY_IP` | Remove a legacy relay; use setup for V4 chains |
-| `meridian relay check RELAY_IP` | Check legacy relay health; use test for V4 routes |
-| `meridian fleet status` | Collect live panel, node, relay, and client health |
-| `meridian fleet inventory` | Inspect configured and desired topology |
-| `meridian fleet recover` | Recover legacy-compatible local state from a live panel |
-| `meridian api schemas` | List meridian-core JSON schemas for automation/UI clients |
-| `meridian api commands` | List migrated command contracts and schema bindings |
-| `meridian api schema NAME` | Print one JSON Schema |
-| `meridian api workflow NAME` | Print a machine-renderable workflow contract |
-| `meridian preflight [IP]` | Pre-flight server validation (ports, SNI, OS, disk) |
-| `meridian scan [IP]` | Find optimal SNI targets on server's network |
-| `meridian test [IP\|DOMAIN] [--json]` | Execute the delivered subscription and verify actual proxy traffic |
-| `meridian probe [IP\|DOMAIN] [--json]` | Probe exposure and fingerprinting from a censor's perspective |
-| `meridian doctor [IP]` | Collect info for bug reports (alias: `rage`) |
-| `meridian teardown [IP]` | Remove an unreferenced deployment after dependency checks |
-| `meridian update` | Update Meridian to the latest version |
+| `meridian deploy [IP\|local]` | Deploy one server and get a shareable link |
+| `meridian setup` | Guided, resumable wizard for several servers |
+| `meridian plan` / `meridian apply` | Review and apply the topology in `cluster.yml` |
+| `meridian client add\|show\|list\|enable\|disable` | Manage the people who connect |
+| `meridian node add\|list\|check` | Manage exit servers |
+| `meridian relay deploy\|list` | Manage relays |
+| `meridian fleet status\|inventory` | Fleet health and inventory |
+| `meridian test [IP]` | Push real traffic through the delivered subscription (no SSH) |
+| `meridian probe [IP]` | Probe your server as a censor would |
+| `meridian preflight [IP]` / `meridian scan [IP]` | Check a server / find camouflage targets near it |
+| `meridian doctor [IP]` | Collect diagnostics for bug reports |
+| `meridian teardown [IP]` | Remove Meridian from a server |
+| `meridian update` | Update the CLI |
 
-## Automation contract
-
-Meridian is moving toward **meridian-core**: typed install/control APIs with the CLI as one client. Machine output is standardized around a Pydantic-backed `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). For example, `meridian plan --json`, `meridian apply --json`, `meridian test --json`, `meridian probe --json`, `meridian client list --json`, `meridian client show --json`, `meridian fleet status --json`, and `meridian fleet inventory --json` return the same top-level shape, with command-specific fields under `data`.
-
-Use top-level `status` for completed command execution, `summary.changed` for plan/apply changes, and command-specific health fields such as `data.summary.health` / `data.summary.needs_attention` for fleet state. Verification exits `0` on a complete pass, `4` on completed negative findings, and `3` when required evidence is unavailable; `fleet status` uses the same codes for healthy, degraded, and unknown. `fleet inventory` is topology inventory only; use `plan --json` as the drift authority and `apply --json` for execution results. Keep using process exit codes for shell control flow. Ctrl-C/SIGINT exits `130` and does not promise a JSON envelope on stdout; command catalog entries expose this as `interrupt_behavior: "exit_130_without_envelope"`. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover command contracts, and `meridian api schema plan-envelope --json` to inspect command-specific schemas.
-
-See the [full CLI reference](https://getmeridian.org/docs/en/cli-reference/) for all commands and flags.
+Removing a client, node, or relay isn't available yet; `client disable` revokes access immediately. Most commands support `--json` for scripting. See the [CLI reference](https://getmeridian.org/docs/en/cli-reference/) for every command and flag.
 
 ## Client apps
-
-After setup, connect with any of these apps:
 
 | Platform | App |
 |----------|-----|
@@ -192,25 +151,15 @@ After setup, connect with any of these apps:
 | Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
 | All platforms | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
 
-## Common scenarios
-
-**My IP got blocked** — Try the XHTTP fallback first. If the panel is still reachable, get a new VPS and run `meridian node add NEW_IP`; existing clients receive the new exit on their next subscription refresh. In domain mode, update the DNS A record. See the [recovery guide](https://getmeridian.org/docs/en/recovery/) for relay and panel-host cases.
-
-**Sharing with family** — After `meridian client add alice`, send the canonical subscription URL. Legacy deployments may also provide a verified self-hosted share page with a QR code.
-
-**First-time VPS setup** — Rent a VPS from any provider (DigitalOcean, Hetzner, Vultr — $4–6/month). Choose Debian 12 or Ubuntu 22.04+. Make sure you have SSH key access (not just password). Then run `meridian deploy YOUR_SERVER_IP`.
-
 ## Troubleshooting
 
-Not connecting? Run `meridian test` to check if the server is reachable, or use the [web-based ping tool](https://getmeridian.org/ping).
+Not connecting? Run `meridian test 198.51.100.10` from your machine, or use the [web-based ping tool](https://getmeridian.org/ping). IP blocked? See the [recovery guide](https://getmeridian.org/docs/en/recovery/).
 
-Something else not working? Get instant AI-powered help:
+Something else? Get AI-ready diagnostics:
 
 ```bash
-meridian doctor --ai        # copies an AI-ready prompt to clipboard
+meridian doctor --ai        # copies a redacted, AI-ready prompt to your clipboard
 ```
-
-Paste the prompt into ChatGPT, Claude, or any AI assistant for personalized troubleshooting.
 
 Or [open an issue](https://github.com/getmeridian/meridian/issues) with `meridian doctor` output.
 
