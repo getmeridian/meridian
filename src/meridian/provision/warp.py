@@ -44,7 +44,8 @@ class InstallWarp:
                 return StepResult(name=self.name, status="failed", detail="Failed to add GPG key")
 
             result = conn.run(
-                'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg]'
+                'echo "deb [arch=$(dpkg --print-architecture)'
+                " signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg]"
                 ' https://pkg.cloudflareclient.com/ $(lsb_release -cs) main"'
                 " | tee /etc/apt/sources.list.d/cloudflare-client.list",
                 timeout=15,
