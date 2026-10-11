@@ -9,6 +9,7 @@ import textwrap
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import click
 import pytest
 from typer.testing import CliRunner
 
@@ -658,8 +659,9 @@ def test_probe_json_inconclusive_is_a_typed_system_failure(monkeypatch: pytest.M
 
 def test_probe_help_documents_automation_controls() -> None:
     result = runner.invoke(app, ["probe", "--help"])
+    output = click.unstyle(result.output)
 
     assert result.exit_code == 0
-    assert "--json" in result.output
-    assert "--timeout" in result.output
-    assert "--sni" in result.output
+    assert "--json" in output
+    assert "--timeout" in output
+    assert "--sni" in output

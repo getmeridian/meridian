@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
+import click
 import pytest
 from typer.testing import CliRunner
 
@@ -246,10 +247,11 @@ def test_global_json_is_supported_for_test(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_test_help_documents_full_and_basic_controls() -> None:
     result = runner.invoke(app, ["test", "--help"])
+    output = click.unstyle(result.output)
 
     assert result.exit_code == 0
     for option in ("--json", "--timeout", "--client", "--basic", "--domain", "--sni"):
-        assert option in result.output
+        assert option in output
 
 
 def test_invalid_timeout_preserves_json_error_contract(monkeypatch: pytest.MonkeyPatch) -> None:
