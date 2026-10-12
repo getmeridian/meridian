@@ -35,7 +35,6 @@ from meridian.compiler.models import (
     NodeBindingPayload,
     NodeRuntimePayload,
     ProbePayload,
-    RealmHopPayload,
     ResourcePlan,
     ResourcePostcondition,
     SubscriptionSettingsPayload,
@@ -51,6 +50,7 @@ from meridian.compiler.names import (
     profile_name,
     subscription_template_name,
 )
+from meridian.compiler.relays import compile_relays, register_relay_ingress
 from meridian.compiler.routing import bridge_inbound_id, compile_gateway_routing
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
 
@@ -290,6 +290,17 @@ def compile_topology(
         stream_fallbacks=stream_fallbacks,
         direct_host_ids=direct_host_ids,
     )
+    relay_ingress = register_relay_ingress(
+        builder=builder,
+        ports=ports,
+        intent=intent,
+        runtime_by_exit=runtime_by_exit,
+        inbound_by_path=inbound_by_path,
+        allocated_path_ports=allocated_path_ports,
+        stream_routes=stream_routes,
+        stream_dependencies=stream_dependencies,
+        stream_fallbacks=stream_fallbacks,
+    )
     stream_ids = _compile_stream_artifacts(
         builder,
         stream_routes,
@@ -298,12 +309,13 @@ def compile_topology(
     )
     _attach_stream_dependencies(builder, direct_host_ids, stream_ids)
 
-    relay_host_ids = _compile_relays(
+    relay_host_ids = compile_relays(
         builder=builder,
         intent=intent,
         runtime_by_exit=runtime_by_exit,
         inbound_by_path=inbound_by_path,
         stream_ids=stream_ids,
+        relay_ingress=relay_ingress,
     )
 
     all_inbounds = sorted(inbound_by_path.values())
@@ -602,95 +614,6 @@ def _attach_stream_dependencies(
             dependencies=[*resource.dependencies, stream_id],
             postconditions=resource.postconditions,
         )
-
-
-def _compile_relays(
-    *,
-    builder: PlanBuilder,
-    intent: SetupIntent,
-    runtime_by_exit: dict[str, str],
-    inbound_by_path: dict[tuple[str, str], str],
-    stream_ids: dict[tuple[str, int], str],
-) -> list[str]:
-    exits = {exit_.id: exit_ for exit_ in intent.exits}
-    host_ids: list[str] = []
-    relay_listeners: set[tuple[str, int]] = set()
-    for relay in sorted(intent.transparent_relays, key=lambda item: item.id):
-        exit_ = exits[relay.exit_ref]
-        path = next(path for path in exit_.paths if path.id == relay.protocol_path_ref)
-        if path.protocol == "hysteria2":
-            raise TopologyCompileError(f"Relay {relay.id} cannot forward UDP Hysteria2.")
-        downstream_ref = exit_.server_ref
-        downstream_port = path.public_port
-        downstream_dependency = stream_ids[(exit_.server_ref, path.public_port)]
-        hop_ids: dict[int, str] = {}
-        for hop_index in reversed(range(len(relay.hop_server_refs))):
-            server_ref = relay.hop_server_refs[hop_index]
-            listener = (server_ref, relay.listen_port)
-            if listener in relay_listeners:
-                raise TopologyCompileError(
-                    f"Relay listener {server_ref}:{relay.listen_port} is assigned more than once."
-                )
-            if listener in stream_ids:
-                raise TopologyCompileError(
-                    f"Relay {relay.id} cannot listen on {server_ref}:{relay.listen_port}; "
-                    "nginx already owns that port there. Choose another listen port or relay server."
-                )
-            relay_listeners.add(listener)
-            firewall_id = add_firewall(
-                builder,
-                server_ref,
-                "tcp",
-                relay.listen_port,
-                source_server_refs=([] if hop_index == 0 else [relay.hop_server_refs[hop_index - 1]]),
-            )
-            hop_id = f"realm:{relay.id}:{hop_index}"
-            builder.add(
-                hop_id,
-                RealmHopPayload(
-                    chain_ref=relay.id,
-                    hop_index=hop_index,
-                    server_ref=server_ref,
-                    listen_port=relay.listen_port,
-                    target_server_ref=downstream_ref,
-                    target_port=downstream_port,
-                    advertised=hop_index == 0,
-                ),
-                dependencies=[downstream_dependency, firewall_id],
-                postconditions=[
-                    _exists(hop_id),
-                    ResourcePostcondition(kind="listening", target_ref=hop_id, detail=str(relay.listen_port)),
-                ],
-            )
-            hop_ids[hop_index] = hop_id
-            downstream_ref = server_ref
-            downstream_port = relay.listen_port
-            downstream_dependency = hop_id
-
-        first_hop_id = hop_ids[0]
-        inbound_id = inbound_by_path[(exit_.id, path.id)]
-        host_id = f"host:{relay.id}:{path.id}"
-        host_ids.append(
-            builder.add(
-                host_id,
-                HostPayload(
-                    owner_ref=relay.id,
-                    remark=f"Meridian v4 / {relay.id} / {path.id} / relay",
-                    node_ref=runtime_by_exit[exit_.id],
-                    inbound_ref=inbound_id,
-                    address_server_ref=relay.hop_server_refs[0],
-                    public_port=relay.listen_port,
-                    protocol=path.protocol,
-                    sni=relay.reality_sni or path.reality_sni or path.tls_sni,
-                    host=path.host,
-                    path=f"/{path.path}" if path.path else "",
-                    fingerprint="chrome" if path.protocol == "reality" else "",
-                    security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
-                ),
-                dependencies=[first_hop_id, inbound_id],
-            )
-        )
-    return host_ids
 
 
 def _compile_probes(

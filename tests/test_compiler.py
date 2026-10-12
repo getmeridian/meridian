@@ -749,6 +749,35 @@ class TestCompilerFailures:
         with pytest.raises(TopologyCompileError, match="own server"):
             compile_topology(intent)
 
+    def test_relay_lands_on_a_dedicated_ingress_that_cannot_reveal_the_exit(self) -> None:
+        from meridian.compiler.models import FirewallRulePayload, NginxArtifactPayload, RealmHopPayload
+
+        plan = compile_topology(_intent())
+        last_hop = next(
+            r.payload
+            for r in plan.resources
+            if isinstance(r.payload, RealmHopPayload) and r.payload.target_server_ref == "srv-exit-a"
+        )
+        assert last_hop.target_port != 443
+        ingress = next(
+            r.payload
+            for r in plan.resources
+            if isinstance(r.payload, NginxArtifactPayload)
+            and r.payload.server_ref == "srv-exit-a"
+            and r.payload.listener_port == last_hop.target_port
+        )
+        names = [name for route in ingress.routes for name in route.server_names]
+        assert names == ["relay-a.example.com"]  # no empty-SNI route to the control plane
+        assert ingress.fallback_server_name == "www.microsoft.com"
+        firewall = next(
+            r.payload
+            for r in plan.resources
+            if isinstance(r.payload, FirewallRulePayload)
+            and r.payload.server_ref == "srv-exit-a"
+            and r.payload.port == last_hop.target_port
+        )
+        assert firewall.source_server_refs == [last_hop.server_ref]
+
     def test_hysteria2_dials_the_server_not_a_possibly_proxied_domain(self) -> None:
         from meridian.compiler.models import HostPayload
 

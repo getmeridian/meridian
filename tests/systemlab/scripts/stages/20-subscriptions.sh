@@ -100,3 +100,14 @@ assert vless_ids_by_format["xray-json"]
 assert len({frozenset(ids) for ids in vless_ids_by_format.values()}) == 1, vless_ids_by_format
 PYEOF
 pass "Base64, Xray JSON, and Mihomo agree on endpoints and VLESS credentials"
+
+# A relay forwards raw TCP. A probe through it without SNI must land on the
+# camouflage site, never on the exit's own TLS server (its IP certificate).
+relay_cert=$(echo | openssl s_client -connect "$RELAY_A_IP:443" -noservername 2>/dev/null \
+  | openssl x509 -noout -text 2>/dev/null || true)
+test -n "$relay_cert"
+if printf '%s' "$relay_cert" | grep -qF "$EXIT_A_IP"; then
+  echo "relay $RELAY_A_IP revealed the exit certificate for $EXIT_A_IP" >&2
+  exit 1
+fi
+pass "relay without SNI shows the camouflage certificate, not the exit's"
