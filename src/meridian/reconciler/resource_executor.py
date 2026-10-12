@@ -16,6 +16,16 @@ from meridian.core.cancellation import (
     OperationCancelledError,
 )
 from meridian.core.errors import MeridianError
+from meridian.core.events import (
+    PLAN_ACTION_COMPLETED,
+    PLAN_ACTION_FAILED,
+    PLAN_ACTION_SKIPPED,
+    PLAN_ACTION_STARTED,
+    CoreEventType,
+)
+from meridian.core.models import EventLevel, ResourceRef
+from meridian.core.output import OperationContext
+from meridian.core.reporters import Reporter, emit_event
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -65,6 +75,8 @@ def execute_resource_plan(
     max_unknown_attempts: int = 2,
     after_apply: AfterApply | None = None,
     cancellation: CancellationToken | None = None,
+    reporter: Reporter | None = None,
+    operation: OperationContext | None = None,
 ) -> ResourceExecutionResult:
     """Apply a reviewed plan with durable checkpoints and mandatory observation.
 
@@ -72,6 +84,9 @@ def execute_resource_plan(
     steps inside an action). A started mutation always records its outcome
     first, so a cancelled apply leaves the generation pending with no
     ``running`` checkpoint, and re-running the same plan resumes it.
+
+    *reporter* receives ``plan.action.*`` events (with *operation* sequencing
+    them) so CLI, JSONL, and Engine clients can render progress.
     """
     if max_unknown_attempts < 1:
         raise ValueError("max_unknown_attempts must be at least 1")
@@ -83,13 +98,15 @@ def execute_resource_plan(
     results: list[ResourceActionResult] = []
     succeeded: set[str] = set()
 
-    for action in actions:
+    report = _ActionReporter(reporter, operation, total=len(actions))
+    for index, action in enumerate(actions, start=1):
         if cancellation is not None and cancellation.is_cancelled():
             raise _apply_cancelled(results, len(actions), f"Stopped before {action.resource.logical_id}.")
         blocked = [dependency for dependency in action.resource.dependencies if dependency not in succeeded]
         if blocked:
             result = _record_blocked(action, blocked, cluster, save, now)
         else:
+            report.started(action, index)
             driver = drivers.get(action.resource.payload.kind)
             if driver is None:
                 result = _record_failure(
@@ -118,6 +135,7 @@ def execute_resource_plan(
                         f"Stopped inside {action.resource.logical_id}: {exc}",
                         interrupted=True,
                     ) from exc
+        report.finished(result, index)
         results.append(result)
         if result.succeeded:
             succeeded.add(action.resource.logical_id)
@@ -137,6 +155,56 @@ def execute_resource_plan(
     if execution.all_succeeded:
         _commit_generation(plan, generation, cluster, save)
     return execution
+
+
+class _ActionReporter:
+    """Emit one started and one terminal event per executed action."""
+
+    def __init__(self, reporter: Reporter | None, operation: OperationContext | None, *, total: int) -> None:
+        self._reporter = reporter
+        self._operation = operation or OperationContext()
+        self._total = total
+
+    def started(self, action: ResourceAction, index: int) -> None:
+        self._emit(PLAN_ACTION_STARTED, action, index)
+
+    def finished(self, result: ResourceActionResult, index: int) -> None:
+        if result.succeeded:
+            self._emit(PLAN_ACTION_COMPLETED, result.action, index, result=result)
+        elif result.status == "skipped":
+            self._emit(PLAN_ACTION_SKIPPED, result.action, index, result=result, level="warning")
+        else:
+            self._emit(PLAN_ACTION_FAILED, result.action, index, result=result, level="error")
+
+    def _emit(
+        self,
+        event_type: CoreEventType,
+        action: ResourceAction,
+        index: int,
+        *,
+        result: ResourceActionResult | None = None,
+        level: EventLevel = "info",
+    ) -> None:
+        if self._reporter is None:
+            return
+        payload = action.resource.payload
+        data: dict[str, object] = {"index": index, "total": self._total}
+        if result is not None:
+            data.update({"status": result.status, "changed": result.changed})
+        emit_event(
+            self._reporter,
+            self._operation,
+            event_type,
+            level=level,
+            phase="apply",
+            resource=ResourceRef(
+                kind=payload.kind,
+                id=action.resource.logical_id,
+                name=getattr(payload, "server_ref", ""),
+            ),
+            message=result.error if result is not None else "",
+            data=data,
+        )
 
 
 def validate_resource_plan_transition(

@@ -13,6 +13,7 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
 from meridian.core.cancellation import CancellationFlag, OperationCancelledError
 from meridian.core.errors import LocalStateError, ProvisioningError
+from meridian.core.reporters import CaptureReporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
     AccessIntent,
@@ -510,7 +511,7 @@ def _relay_binding(server_ref: str = "srv-relay") -> ManagedResourceBinding:
     )
 
 
-def _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built) -> SetupRuntime:
+def _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built, reporter=None) -> SetupRuntime:
     registry = ServerRegistry(tmp_path / "servers.json")
     _add_servers(registry, relay=True)
     connection = MagicMock(spec=ServerConnection)
@@ -548,6 +549,7 @@ def _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built) -> SetupRu
     monkeypatch.setattr("meridian.setup.runtime.build_server_drivers", server_drivers)
     return SetupRuntime(
         registry,
+        reporter=reporter,
         cluster_loader=lambda: cluster,
         persist=lambda _state: None,
         panel_factory=lambda _url, _token: cast(MeridianPanel, _Panel()),
@@ -589,6 +591,20 @@ def test_apply_reaches_servers_that_only_retiring_resources_still_reference(tmp_
     after = runtime.review(SetupDraft.from_intent(_intent()))
     assert after.retiring == ()
     assert after.review_hash == after.plan.plan_hash == cluster.active_plan_hash
+
+
+def test_apply_streams_one_event_pair_per_action_to_the_runtime_reporter(tmp_path, monkeypatch) -> None:
+    cluster, _binding = _cluster_with_old_relay()
+    reporter = CaptureReporter()
+    runtime = _retiring_runtime(tmp_path, monkeypatch, cluster, [], {}, reporter=reporter)
+
+    review = runtime.review(SetupDraft.from_intent(_intent()))
+    runtime.apply_intent(_intent(), expected_plan_hash=review.review_hash)
+
+    started = [event for event in reporter.events if event.type == "plan.action.started"]
+    completed = [event for event in reporter.events if event.type == "plan.action.completed"]
+    assert len(started) == len(completed) == len(review.plan.resources)
+    assert {event.operation_id for event in reporter.events} == {started[0].operation_id}
 
 
 def test_a_review_that_did_not_see_the_retirement_set_is_refused(tmp_path, monkeypatch) -> None:

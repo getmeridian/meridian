@@ -11,7 +11,7 @@ import shlex
 import sys
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import Any, Literal, NoReturn
 
@@ -22,6 +22,7 @@ from meridian.adapters import JsonlReporter
 from meridian.adapters.cancellation import FileCancellationToken
 from meridian.cluster import BrandingConfig, ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
+from meridian.commands.apply_progress import apply_progress
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
@@ -160,7 +161,9 @@ def run(
             )
         cancellation = FileCancellationToken(Path(cancel_file)) if cancel_file else None
         try:
-            result = _execute(request, cancellation)
+            result = _execute(
+                request, cancellation, reporter=reporter if events == "jsonl" else None, operation=operation
+            )
         except OperationCancelledError as exc:
             _finish_cancelled(exc, reporter, operation, final_json=final_json)
         _emit_completed(reporter, operation, mode=result.mode, server_ip=result.server_ip, dry_run=False)
@@ -168,7 +171,13 @@ def run(
             _emit_json(result, operation=operation, status="changed")
 
 
-def _execute(request: DeployRequest, cancellation: CancellationToken | None = None) -> DeployResult:
+def _execute(
+    request: DeployRequest,
+    cancellation: CancellationToken | None = None,
+    *,
+    reporter: Reporter | None = None,
+    operation: OperationContext | None = None,
+) -> DeployResult:
     raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before connecting to the server.")
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     try:
@@ -207,11 +216,14 @@ def _execute(request: DeployRequest, cancellation: CancellationToken | None = No
             return resolved.conn
         return ServerConnection(candidate.host, candidate.user, port=candidate.port, identity_file=candidate.key_path)
 
+    progress = ExitStack()
     runtime = SetupRuntime(
         registry,
         persist=persist_reviewed_apply,
         connection_builder=connect,
         cancellation=cancellation,
+        reporter=reporter or progress.enter_context(apply_progress(registry=registry)),
+        operation=operation,
     )
     info("First deployment: installing the control plane and proxy" if first_deploy else "Redeploying")
     info("Applying the reviewed topology; this takes a few minutes on a fresh server...")
@@ -272,6 +284,8 @@ def _execute(request: DeployRequest, cancellation: CancellationToken | None = No
         raise
     except MeridianError as exc:
         fail(exc)
+    finally:
+        progress.close()
 
     cluster = ClusterConfig.load()
     _print_success(resolved.ip, cluster, request, links)

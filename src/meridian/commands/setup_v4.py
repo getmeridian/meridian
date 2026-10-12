@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from meridian.commands.apply_progress import apply_progress
 from meridian.commands.setup_wizard import SetupWizard
 from meridian.config import (
     SERVER_PROFILES_FILE,
@@ -49,14 +50,15 @@ def run(
                 )
             store.save(SetupDraft.from_intent(_load_intent(intent_path)))
 
-        wizard = SetupWizard(
-            service=service,
-            shelf=shelf,
-            runtime=SetupRuntime(registry),
-            register_server=_register_server,
-            auto_approve=yes,
-        )
-        wizard.run()
+        with apply_progress(registry=registry) as reporter:
+            wizard = SetupWizard(
+                service=service,
+                shelf=shelf,
+                runtime=SetupRuntime(registry, reporter=reporter),
+                register_server=_register_server,
+                auto_approve=yes,
+            )
+            wizard.run()
 
 
 def _load_intent(source: str) -> SetupIntent:

@@ -16,6 +16,7 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
+from meridian.core.reporters import CaptureReporter
 from meridian.reconciler.resource_executor import (
     environment_after_apply_barrier,
     execute_resource_plan,
@@ -27,6 +28,7 @@ from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
     ResourceObservation,
+    ResourceReconcileError,
     UnknownResourceOutcome,
     UnsupportedResourceRetirementError,
     build_resource_actions,
@@ -259,6 +261,51 @@ class TestCheckpointedExecution:
         assert driver.apply_calls == []
         assert saves == []
         assert cluster.pending_plan_hash == ""
+
+    def test_progress_events_report_each_action_and_skip_its_dependents(self) -> None:
+        plan = _plan(with_probe=True)
+        reporter = CaptureReporter()
+        firewall = ScriptedDriver([_missing()], [ResourceReconcileError("ufw refused the rule")])
+
+        result = execute_resource_plan(
+            plan,
+            ClusterConfig(),
+            {"firewall_rule": firewall, "probe": ScriptedDriver([])},
+            persist=lambda _state: None,
+            clock=_clock,
+            reporter=reporter,
+        )
+
+        assert not result.all_succeeded
+        assert [(event.type, event.resource.id if event.resource else "") for event in reporter.events] == [
+            ("plan.action.started", "firewall:srv-exit:tcp:443"),
+            ("plan.action.failed", "firewall:srv-exit:tcp:443"),
+            ("plan.action.skipped", "probe:firewall"),
+        ]
+        failed = reporter.events[1]
+        assert failed.resource is not None and failed.resource.name == "srv-exit"
+        assert failed.data == {"index": 1, "total": 2, "status": "failed", "changed": False}
+        assert "ufw refused the rule" in failed.message
+        assert [event.seq for event in reporter.events] == sorted({event.seq for event in reporter.events})
+
+    def test_progress_event_marks_an_applied_action_as_changed(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=1)[0]
+        reporter = CaptureReporter()
+        firewall = ScriptedDriver([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")])
+
+        execute_resource_plan(
+            plan,
+            ClusterConfig(),
+            {"firewall_rule": firewall},
+            persist=lambda _state: None,
+            clock=_clock,
+            reporter=reporter,
+        )
+
+        completed = reporter.events[-1]
+        assert completed.type == "plan.action.completed"
+        assert completed.data["changed"] is True
 
     def test_vanished_host_and_user_are_retired_after_convergence(self) -> None:
         plan = _plan()

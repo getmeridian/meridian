@@ -42,6 +42,8 @@ from meridian.config import (
 from meridian.core.cancellation import CancellationToken
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import LocalStateError
+from meridian.core.output import OperationContext
+from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.handoff import HandoffLinks, publish_connection_pages
@@ -177,6 +179,8 @@ class SetupRuntime:
         connection_builder: ConnectionBuilder | None = None,
         control_bootstrap: ControlBootstrap | None = None,
         cancellation: CancellationToken | None = None,
+        reporter: Reporter | None = None,
+        operation: OperationContext | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
@@ -184,7 +188,14 @@ class SetupRuntime:
         self._panel_factory = panel_factory
         self._connection_builder = connection_builder or _connection_for_entry
         self._cancellation = cancellation
-        self._control_bootstrap = control_bootstrap or partial(_bootstrap_control_plane, cancellation=cancellation)
+        self._reporter: Reporter = reporter or NoopReporter()
+        self._operation = operation or OperationContext()
+        self._control_bootstrap = control_bootstrap or partial(
+            _bootstrap_control_plane,
+            cancellation=cancellation,
+            reporter=self._reporter,
+            operation=self._operation,
+        )
 
     def review(self, draft: SetupDraft, *, cluster: ClusterConfig | None = None) -> SetupReview:
         """Compile the draft and list the saved resources the new plan would remove."""
@@ -351,6 +362,8 @@ class SetupRuntime:
                 persist=self._persist,
                 after_apply=environment_after_apply_barrier,
                 cancellation=self._cancellation,
+                reporter=self._reporter,
+                operation=self._operation,
             )
         finally:
             panel.close()
@@ -389,6 +402,8 @@ class SetupRuntime:
             server_addresses=addresses,
             node_secrets=shared_node_secrets,
             cancellation=self._cancellation,
+            reporter=self._reporter,
+            operation=self._operation,
         )
         drivers: ResourceDrivers = {}
         drivers.update(build_remnawave_drivers(remnawave))
@@ -646,6 +661,8 @@ def _bootstrap_control_plane(
     connection: ServerConnection,
     *,
     cancellation: CancellationToken | None = None,
+    reporter: Reporter | None = None,
+    operation: OperationContext | None = None,
 ) -> None:
     if cluster.panel.server_ip and cluster.panel.server_ip != entry.host and cluster.panel.api_token:
         raise LocalStateError(
@@ -681,6 +698,8 @@ def _bootstrap_control_plane(
         reality_port=ports["reality"],
         wss_port=ports["wss"],
         info_page_path=info_page_path,
+        reporter=reporter or NoopReporter(),
+        operation=operation,
         cancellation=cancellation,
     )
     ensure_control_plane_access(

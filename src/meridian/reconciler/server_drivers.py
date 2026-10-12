@@ -19,6 +19,8 @@ from meridian.compiler.models import (
 )
 from meridian.config import REALM_VERSION, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
+from meridian.core.output import OperationContext
+from meridian.core.reporters import NoopReporter, Reporter
 from meridian.node_deploy import deploy_node_container, render_node_compose, wait_for_node_connected
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
@@ -87,6 +89,8 @@ class ServerDriverContext:
     server_addresses: Mapping[str, str]
     node_secrets: dict[str, str] = field(default_factory=dict, repr=False)
     cancellation: CancellationToken | None = None
+    reporter: Reporter = field(default_factory=NoopReporter)
+    operation: OperationContext | None = None
 
     def connection(self, server_ref: str) -> ServerConnection:
         return self.connection_for(server_ref)
@@ -179,7 +183,13 @@ class ServerBaselineDriver:
                 install_docker=payload.install_docker,
                 manage_public_ports=False,
             )
-        ).run(conn, context, cancellation=self.context.cancellation)
+        ).run(
+            conn,
+            context,
+            reporter=self.context.reporter,
+            operation=self.context.operation,
+            cancellation=self.context.cancellation,
+        )
         failures = [result for result in results if result.status == "failed"]
         if failures:
             failure = failures[0]

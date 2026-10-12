@@ -14,6 +14,8 @@
 **Health process API** — completed negative evidence exits 4, unavailable required evidence exits 3, and only fully passed checks exit 0; panel/system failures are inconclusive, while `--basic` never accepts or selects `--client`.
 **Canonical connection test** — full `test` fetches one deterministic active client's delivered Xray JSON and executes its fallback plus each target outbound without rebuilding credentials or transports locally.
 
+**Apply progress** — every command that runs `SetupRuntime` wraps it in `apply_progress()` (`apply_progress.py`): a spinner for the running action plus one line per change or failure, silent under `--json`/quiet; `deploy --events=jsonl` passes its JSONL reporter instead.
+
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.

@@ -10,6 +10,7 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, make_panel, persist_reviewed_apply
+from meridian.commands.apply_progress import apply_progress
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
@@ -59,11 +60,14 @@ def run_add_v4(
 
     updated = add_access_users_to_intent(intent, names)
     try:
-        result = SetupRuntime(
-            ServerRegistry(SERVER_PROFILES_FILE),
-            cluster_loader=lambda: cluster,
-            persist=persist_reviewed_apply,
-        ).apply_intent(updated)
+        registry = ServerRegistry(SERVER_PROFILES_FILE)
+        with apply_progress(registry=registry) as reporter:
+            result = SetupRuntime(
+                registry,
+                cluster_loader=lambda: cluster,
+                persist=persist_reviewed_apply,
+                reporter=reporter,
+            ).apply_intent(updated)
     except MeridianError as exc:
         fail(exc)
     except ReviewedApplyPersistenceError as exc:
@@ -212,11 +216,14 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
     with make_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
     try:
-        result = SetupRuntime(
-            ServerRegistry(SERVER_PROFILES_FILE),
-            cluster_loader=lambda: cluster,
-            persist=persist_reviewed_apply,
-        ).apply_intent(updated)
+        registry = ServerRegistry(SERVER_PROFILES_FILE)
+        with apply_progress(registry=registry) as reporter:
+            result = SetupRuntime(
+                registry,
+                cluster_loader=lambda: cluster,
+                persist=persist_reviewed_apply,
+                reporter=reporter,
+            ).apply_intent(updated)
     except MeridianError as exc:
         fail(exc)
     except ReviewedApplyPersistenceError as exc:

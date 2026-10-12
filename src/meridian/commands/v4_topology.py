@@ -7,12 +7,14 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
+from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
 from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
+from meridian.core.reporters import Reporter
 from meridian.renderers import emit_json
 
 
@@ -32,13 +34,13 @@ def run_v4_apply(
     intent = cluster.topology_intent
     if intent is None:
         raise RuntimeError("V4 topology intent is missing")
-    runtime = SetupRuntime(
-        ServerRegistry(SERVER_PROFILES_FILE),
-        cluster_loader=lambda: cluster,
-        persist=persist_reviewed_apply,
-    )
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+
+    def runtime(reporter: Reporter | None = None) -> SetupRuntime:
+        return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
+
     draft = SetupDraft.from_intent(intent)
-    review = runtime.review(draft)
+    review = runtime().review(draft)
     if not yes:
         if json_output:
             error = MeridianError(
@@ -80,10 +82,11 @@ def run_v4_apply(
             raise typer.Exit(1)
 
     try:
-        result = runtime.apply_intent(
-            intent,
-            expected_plan_hash=review.review_hash,
-        )
+        with apply_progress(machine_output=json_output, registry=registry) as reporter:
+            result = runtime(reporter).apply_intent(
+                intent,
+                expected_plan_hash=review.review_hash,
+            )
     except ReviewedApplyPersistenceError as exc:
         raise MeridianException(
             "V4 apply could not save local convergence state; remote state may have changed.",

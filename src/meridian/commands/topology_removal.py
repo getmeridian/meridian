@@ -7,8 +7,10 @@ from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import persist_reviewed_apply, reviewed_apply_persistence
+from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok
 from meridian.core.errors import MeridianError
+from meridian.core.reporters import Reporter
 from meridian.core.topology import SetupIntent
 
 
@@ -30,13 +32,13 @@ def apply_topology_removal(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
-    runtime = SetupRuntime(
-        ServerRegistry(SERVER_PROFILES_FILE),
-        cluster_loader=lambda: cluster,
-        persist=persist_reviewed_apply,
-    )
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+
+    def runtime(reporter: Reporter | None = None) -> SetupRuntime:
+        return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
+
     try:
-        review = runtime.review(SetupDraft.from_intent(updated), cluster=cluster)
+        review = runtime().review(SetupDraft.from_intent(updated), cluster=cluster)
     except MeridianError as exc:
         fail(exc)
 
@@ -56,8 +58,8 @@ def apply_topology_removal(
         raise typer.Exit(1)
 
     try:
-        with reviewed_apply_persistence(f"Removing {subject}"):
-            result = runtime.apply_intent(updated, expected_plan_hash=review.review_hash)
+        with reviewed_apply_persistence(f"Removing {subject}"), apply_progress(registry=registry) as reporter:
+            result = runtime(reporter).apply_intent(updated, expected_plan_hash=review.review_hash)
     except MeridianError as exc:
         fail(exc)
     if not result.all_succeeded:

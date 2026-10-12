@@ -7,6 +7,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Compiled-resource apply is checkpointed** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
 - **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic wire-safe names recover unknown creates, mismatched collisions fail, and global settings updates preserve unmanaged Response Rules.
 - **Server artifacts are per-resource and rollback-safe** — Realm services and nginx files use hashed logical IDs; failed reloads restore previous files before the action fails.
+- **One progress stream** — `execute_resource_plan(reporter=, operation=)` emits `plan.action.started` then exactly one of completed/failed/skipped per action; `SetupRuntime` shares the same reporter and operation with baseline and control-plane provisioner steps, so Rich, JSONL, and Engine clients render one sequenced stream.
 - **Cancellation is cooperative** — the executor polls its token only between actions, before an unknown-outcome retry, and before retirement; the generation stays pending so re-running the same plan resumes from checkpoints.
 - **Server preparation is graph-owned** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; compiled rules alone open public ports.
 

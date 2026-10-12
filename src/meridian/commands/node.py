@@ -21,6 +21,7 @@ from meridian.commands._helpers import (
     reviewed_apply_persistence,
 )
 from meridian.commands._validation import validate_command_input
+from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
@@ -137,11 +138,12 @@ def run_add(
             )
         updated = intent
     try:
-        with reviewed_apply_persistence("V4 exit apply"):
+        with reviewed_apply_persistence("V4 exit apply"), apply_progress(registry=registry) as reporter:
             result = SetupRuntime(
                 registry,
                 cluster_loader=lambda: cluster,
                 persist=persist_reviewed_apply,
+                reporter=reporter,
             ).apply_intent(updated)
     except MeridianException as exc:
         fail(exc)
