@@ -368,6 +368,12 @@ class XHTTPProtocol(Protocol):
             return ""
         uuid = self._resolve_uuid(reality_uuid, wss_uuid)
         via = f"-via-{relay_name}" if relay_name else f"-via-{relay_ip}"
+        # relay_sni is intentionally ignored: the relay's per-relay SNI on the
+        # exit routes to a Reality-only Xray inbound (see commands/relay.py
+        # _deploy_relay_nginx). XHTTP terminates TLS at nginx, which serves
+        # the cert for server_name = exit domain/IP. Using relay_sni here would
+        # land XHTTP traffic on the Reality inbound and trigger its dest
+        # fallback (real upstream site returns 404 for the XHTTP path).
         return self.build_url(
             uuid,
             name,
@@ -375,7 +381,6 @@ class XHTTPProtocol(Protocol):
             port=relay_port,
             xhttp_path=xhttp_path,
             domain=creds.server.domain or "",
-            sni=relay_sni,
             connect_host=_bracket_ipv6(relay_ip),
             server_name=server_name,
             extra_suffix=via,
