@@ -28,7 +28,13 @@ from meridian.config import (
     REMNAWAVE_VALKEY_IMAGE,
 )
 from meridian.provision.steps import ProvisionContext, StepResult
-from meridian.remnawave.versions import effective_image, find_image, image_below_floor, parse_image
+from meridian.remnawave.versions import (
+    effective_image,
+    find_image,
+    image_below_floor,
+    parse_image,
+    resolve_data_image,
+)
 from meridian.ssh import ServerConnection
 
 if TYPE_CHECKING:
@@ -49,6 +55,8 @@ def render_panel_compose(
     panel_port: int,
     subscription_page_image: str,
     subscription_page_host_port: int,
+    postgres_image: str = REMNAWAVE_POSTGRES_IMAGE,
+    valkey_image: str = REMNAWAVE_VALKEY_IMAGE,
 ) -> str:
     """Render the docker-compose.yml for the Remnawave panel stack.
 
@@ -94,7 +102,7 @@ services:
         max-file: "5"
 
   remnawave-db:
-    image: {REMNAWAVE_POSTGRES_IMAGE}
+    image: {postgres_image}
     container_name: {_DB_CONTAINER}
     restart: always
     networks:
@@ -121,7 +129,7 @@ services:
         max-file: "5"
 
   remnawave-redis:
-    image: {REMNAWAVE_VALKEY_IMAGE}
+    image: {valkey_image}
     container_name: {_REDIS_CONTAINER}
     restart: always
     networks:
@@ -366,6 +374,16 @@ class DeployRemnawavePanel:
         compose_text = current_compose.stdout if current_compose.returncode == 0 else None
         image = effective_image(REMNAWAVE_BACKEND_IMAGE, compose_text)
         sub_page_image = effective_image(REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE, compose_text)
+        data_images = {
+            "postgres_image": resolve_data_image(
+                REMNAWAVE_POSTGRES_IMAGE,
+                find_image(compose_text, parse_image(REMNAWAVE_POSTGRES_IMAGE).repository),
+            ),
+            "valkey_image": resolve_data_image(
+                REMNAWAVE_VALKEY_IMAGE,
+                find_image(compose_text, parse_image(REMNAWAVE_VALKEY_IMAGE).repository),
+            ),
+        }
         below_floor = image_below_floor(find_image(compose_text, parse_image(REMNAWAVE_BACKEND_IMAGE).repository))
 
         front_end_domain = self.front_end_domain or ctx.domain or ctx.ip
@@ -413,6 +431,7 @@ class DeployRemnawavePanel:
                 panel_port=panel_port,
                 subscription_page_image=sub_page_image,
                 subscription_page_host_port=sub_page_host_port,
+                **data_images,
             )
             compose_path = f"{panel_dir}/docker-compose.yml"
             write_compose = conn.put_text(
@@ -489,6 +508,7 @@ class DeployRemnawavePanel:
             panel_port=panel_port,
             subscription_page_image=sub_page_image,
             subscription_page_host_port=sub_page_host_port,
+            **data_images,
         )
 
         from meridian.provision.containers import EnvFile, deploy_compose_stack

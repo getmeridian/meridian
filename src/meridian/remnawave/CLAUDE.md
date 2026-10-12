@@ -14,6 +14,7 @@
 
 ## Pitfalls
 
+- PostgreSQL and Valkey go through `resolve_data_image`: an older major cannot open a newer data directory, so a newer or unorderable operator tag is kept.
 - Users are addressed by numeric `id` (string in `User.id`); uuid-era bindings re-resolve by username, never hit `/api/users/{uuid}`.
 - 3.x answers DELETE and bulk host actions with 204 and node restart with 202: `_request` returns None; treat 2xx as success and 404 as already gone, never read `isDeleted`.
 - Remnawave's Zod pipe silently strips unknown body keys — a misspelled or removed field is a no-op, not an error. Check the contract before adding fields.

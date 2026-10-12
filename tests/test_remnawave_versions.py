@@ -13,6 +13,7 @@ from meridian.remnawave.versions import (
     image_below_floor,
     parse_image,
     parse_version,
+    resolve_data_image,
     resolve_image,
 )
 
@@ -161,3 +162,26 @@ def test_check_panel_version_refuses_below_floor(version: str) -> None:
     with pytest.raises(RemnawaveError, match="minimum supported 3.4.0") as exc_info:
         check_panel_version(version)
     assert exc_info.value.category == "user"
+
+
+_PG_PIN = "postgres:17.11-alpine@sha256:" + "b" * 64
+_PG_PIN_SPELLED_OUT = "docker.io/library/" + _PG_PIN
+
+
+@pytest.mark.parametrize(
+    ("existing", "expected"),
+    [
+        (None, _PG_PIN),
+        ("postgres:17-alpine", _PG_PIN),
+        ("postgres:17.10-alpine", _PG_PIN),
+        ("postgres:18-alpine", "postgres:18-alpine"),
+        ("postgres:17.12-alpine", "postgres:17.12-alpine"),
+        ("postgres:latest", "postgres:latest"),
+        (
+            "docker.io/library/postgres:17.11-alpine@sha256:" + "b" * 64,
+            "docker.io/library/postgres:17.11-alpine@sha256:" + "b" * 64,
+        ),
+    ],
+)
+def test_resolve_data_image_never_moves_a_database_to_an_older_version(existing: str | None, expected: str) -> None:
+    assert resolve_data_image(_PG_PIN, existing) == expected

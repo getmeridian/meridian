@@ -95,6 +95,34 @@ def resolve_image(pinned: str, existing: str | None) -> str:
     return pinned
 
 
+_DATA_TAG_RE = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-.*)?$")
+
+
+def resolve_data_image(pinned: str, existing: str | None) -> str:
+    """Choose a data-store image (PostgreSQL, Valkey) without moving data backwards.
+
+    Their tags look like ``17.11-alpine`` rather than X.Y.Z, and an older major
+    cannot open a newer major's data directory. Keep the existing reference
+    when it already names the pinned content, carries a newer numeric tag, or
+    has a non-numeric tag Meridian cannot order (``latest``); otherwise pin.
+    """
+    if not existing:
+        return pinned
+    current = parse_image(existing)
+    pin = parse_image(pinned)
+    if current.repository != pin.repository:
+        return pinned
+    if current.same_content(pin):
+        return existing
+    current_match = _DATA_TAG_RE.match(current.tag)
+    pin_match = _DATA_TAG_RE.match(pin.tag)
+    if current_match is None or pin_match is None:
+        return existing
+    current_version = tuple(int(part or 0) for part in current_match.groups())
+    pinned_version = tuple(int(part or 0) for part in pin_match.groups())
+    return existing if current_version > pinned_version else pinned
+
+
 def effective_image(pinned: str, compose: str | None) -> str:
     """Resolve the image for ``pinned``'s repository against an existing compose file."""
     return resolve_image(pinned, find_image(compose, parse_image(pinned).repository))
