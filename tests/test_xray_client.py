@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from meridian.config import XRAY_VERSION
+from meridian.config import CONNECT_TEST_URLS_IPV4, CONNECT_TEST_URLS_IPV6, XRAY_VERSION
 from meridian.health import ReadinessTimeout
 from meridian.xray_client import (
     XrayConfigError,
@@ -436,6 +436,33 @@ def test_connection_rejects_curl_failure_even_with_an_ip_body(tmp_path: Path) ->
     assert detail == "curl failed (HTTP 503) after 3 attempts; IP observers unavailable"
     assert curl.call_count == 6
     assert "--fail" in curl.call_args.args[0]
+
+
+@pytest.mark.parametrize(
+    ("server_ip", "observers"),
+    [("198.51.100.7", CONNECT_TEST_URLS_IPV4), ("2001:db8::7", CONNECT_TEST_URLS_IPV6)],
+)
+def test_connection_asks_observers_that_answer_only_over_the_server_family(
+    tmp_path: Path, server_ip: str, observers: tuple[str, ...]
+) -> None:
+    """A dual-stack exit must not reach an IPv4 server's observer over IPv6."""
+    proc = MagicMock()
+    proc.poll.return_value = None
+    proc.stdout = io.StringIO()
+    failure = SimpleNamespace(returncode=7, stdout="", stderr="")
+    exit_ip = SimpleNamespace(returncode=0, stdout=f"{server_ip}\n", stderr="")
+
+    with (
+        patch("meridian.xray_client._validate_xray_config"),
+        patch("meridian.xray_client.subprocess.Popen", return_value=proc),
+        patch("meridian.xray_client.poll_until_ready"),
+        patch("meridian.xray_client.subprocess.run", side_effect=[failure, exit_ip]) as curl,
+        patch("meridian.xray_client.time.sleep"),
+    ):
+        connected, _ = run_connection_test(tmp_path / "xray", {"inbounds": []}, server_ip, 10808, "reality")
+
+    assert connected is True
+    assert [call.args[0][-1] for call in curl.call_args_list] == list(observers[:2])
 
 
 def test_connection_requires_sustained_failure(tmp_path: Path) -> None:

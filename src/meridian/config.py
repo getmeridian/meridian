@@ -33,18 +33,29 @@ REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to 
 REMNAWAVE_PANEL_DIR = "/opt/remnawave"
 REMNAWAVE_NODE_DIR = "/opt/remnanode"
 
+# Exit-IP observers are single-stack: a dual-stack exit would otherwise answer
+# a dual-stack observer over IPv6 and fail the egress match against its IPv4.
 _CONNECT_TEST_URL_OVERRIDE = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "").strip()
-CONNECT_TEST_URLS = (
+CONNECT_TEST_URLS_IPV4 = (
     (_CONNECT_TEST_URL_OVERRIDE,)
     if _CONNECT_TEST_URL_OVERRIDE
     else (
-        "https://ifconfig.me/ip",
         "https://api.ipify.org",
-        "https://icanhazip.com",
+        "https://ipv4.icanhazip.com",
+        "https://v4.ident.me",
+    )
+)
+CONNECT_TEST_URLS_IPV6 = (
+    (_CONNECT_TEST_URL_OVERRIDE,)
+    if _CONNECT_TEST_URL_OVERRIDE
+    else (
+        "https://api6.ipify.org",
+        "https://ipv6.icanhazip.com",
+        "https://v6.ident.me",
     )
 )
 # Singular alias retained for callers that expose the configured primary observer.
-CONNECT_TEST_URL = CONNECT_TEST_URLS[0]
+CONNECT_TEST_URL = CONNECT_TEST_URLS_IPV4[0]
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
     "true",

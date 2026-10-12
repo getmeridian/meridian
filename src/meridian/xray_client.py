@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import Any
 
 from meridian.config import (
-    CONNECT_TEST_URLS,
+    CONNECT_TEST_URLS_IPV4,
+    CONNECT_TEST_URLS_IPV6,
     MERIDIAN_HOME,
     XRAY_ASSET_MAP,
     XRAY_GITHUB_URL,
@@ -412,6 +413,16 @@ def _validate_xray_config(xray_bin: Path, config_file: str, *, timeout: float) -
         raise XrayConfigError(f"Xray rejected the canonical config (exit {result.returncode})")
 
 
+def observer_urls(server_ip: str) -> tuple[str, ...]:
+    """Return exit-IP observers that answer only over the server's address family."""
+    try:
+        if ipaddress.ip_address(server_ip).version == 6:
+            return CONNECT_TEST_URLS_IPV6
+    except ValueError:
+        pass
+    return CONNECT_TEST_URLS_IPV4
+
+
 def test_connection(
     xray_bin: Path,
     config: dict[str, Any],
@@ -482,8 +493,9 @@ def test_connection(
         start = time.monotonic()
         last_detail = "no response"
         attempted_urls: list[str] = []
+        observers = observer_urls(server_ip)
         for attempt in range(1, _CONNECTION_ATTEMPTS + 1):
-            observer_url = CONNECT_TEST_URLS[(attempt - 1) % len(CONNECT_TEST_URLS)]
+            observer_url = observers[(attempt - 1) % len(observers)]
             attempted_urls.append(observer_url)
             try:
                 observed_ip, last_detail = _query_ip_observer(
