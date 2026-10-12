@@ -163,7 +163,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | `--domain DOMAIN` | (无) | 节点域；在其上添加 XHTTP、WSS 和 Hysteria2 路径 |
 | `--harden / --no-harden` | 启 | OS、SSH 和防火墙加固。舰队服务器总是保持它；`--no-harden` 被拒绝 |
 | `--yes` | | 跳过确认提示 |
-| `--force` | | `node remove` 接受，它还不可用 |
+| `--force` | | `node remove`：也删除路由到此出口的中继链 |
 | `--json` | | 将 `node list` 作为 `meridian.output/v1` 信封发出 |
 
 **`node add`** — 通过 SSH 连接，添加服务器作为拓扑中的出口，并应用已审核的计划（加固、Docker、Xray、面板注册）。现有客户端在下次订阅刷新时接收新出口。
@@ -172,7 +172,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node check`** — 检查面板连接、SSH、容器、节点的已配置公共端口、TLS 证书和磁盘空间，并为每个失败打印修复。退出 `0` 是健康，`4` 意味着发现问题，`3` 意味着需要的证据不可用。
 
-**`node remove`** — 还不可用。它拒绝并指向 `meridian setup`。
+**`node remove`** — 从拓扑中删除出口或路由网关。它列出将被删除的每个资源（面板节点和配置文件、节点容器、防火墙规则、已发布的主机），请求确认，并准确应用该审查；服务器留在保存的服务器中。对于控制服务器拒绝（使用 `meridian teardown`），而中继仍路由到出口（先删除它们或传递 `--force`），而路由网关通过它进入舰队，以及当结果会破坏拓扑时（例如空出口池或默认出口）。范围限定为已删除网关的路由规则与其一起删除。
 
 ### meridian relay
 
@@ -181,8 +181,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY_IP [--exit EXIT] [--user USER]
-meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
+meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
+meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -194,11 +194,13 @@ meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
 | `--user/-u USER` | root | 中继服务器上的 SSH 用户 |
 | `--ssh-port PORT` | 22 | 中继服务器的 SSH 端口 |
 | `--yes/-y` | | 跳过确认提示 |
-| `--json` | | 将 `relay list` 作为 `meridian.output/v1` 信封发出带 `data.relays[]` |
+| `--json` | | 将 `relay list`（`data.relays[]`）或 `relay check` 作为 `meridian.output/v1` 信封发出 |
 
 **`relay deploy`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
-**`relay check` / `relay remove`** — 还不可用。两者都拒绝；用 `meridian test` 端到端检查中继路由。
+**`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
+
+**`relay check`** — 检查中继服务器运行的每个 Realm 跳跃（或一条链的每个跳跃）：通过 SSH，跳跃的服务是否活跃以及它是否可以打开 TCP 到下一个跳跃；从您的机器，链的公共入口是否接受 TCP。退出 `0` 表示每个检查都通过，`4` 表示发现问题，`3` 表示无法检查跳跃。使用 `meridian test` 通过整条路由推动真实流量。
 
 ### meridian fleet
 

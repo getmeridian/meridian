@@ -163,7 +163,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | `--domain DOMAIN` | (هیچ) | دامنه گره؛ XHTTP، WSS و مسیرهای Hysteria2 را روی آن اضافه می‌کند |
 | `--harden / --no-harden` | فعال | تقویت سیستم‌عامل، SSH و firewall. سروری فلیت همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
 | `--yes` | | پرسش تأیید را رد کنید |
-| `--force` | | توسط `node remove` پذیرفته می‌شود، که هنوز دسترس نیست |
+| `--force` | | `node remove`: همچنین زنجیرهای relay که به این exit مسیریابی می‌کنند را بردارید |
 | `--json` | | `node list` را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
 **`node add`** — از طریق SSH متصل شده، سرور را به عنوان exit در topology شما اضافه کرده و برنامه بررسی‌شده را اعمال می‌کند (hardening، Docker، Xray، ثبت‌نام panel). کلاینت‌های موجود exit جدید را در بعدی تازه‌سازی اشتراک دریافت می‌کنند.
@@ -172,7 +172,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node check`** — اتصال panel، SSH، containers، پورت‌های عمومی پیکربندی‌شده گره، گواهینامه‌های TLS و فضای دیسک را بررسی کرده و برای هر شکست راه‌حل چاپ می‌کند. Exit `0` سالم است، `4` مسائل پیدا شده و `3` شواهد الزامی دسترس نبود.
 
-**`node remove`** — هنوز دسترس نیست. رد می‌کند و `meridian setup` را اشاره می‌کند.
+**`node remove`** — یک exit یا دروازه مسیریابی را از topology شما حذف می‌کند. هر منابعی را که حذف خواهد شد فهرست می‌کند (پنل node و profile، container node، قوانین firewall، منتشر شده Hosts)، تأیید می‌خواهد، و دقیقاً آن بررسی را اعمال می‌کند؛ سرور در سرورهای ذخیره‌شده باقی می‌ماند. برای سرور کنترل (از `meridian teardown` استفاده کنید) رد می‌شود، درحالی که relays هنوز به exit مسیریابی می‌کنند (ابتدا آنها را بردارید یا `--force` را منتقل کنید)، درحالی که یک دروازه مسیریابی از طریق آن وارد فلیت می‌شود، و وقتی نتیجه topology را می‌شکند (برای مثال یک حوزه egress خالی یا egress پیش‌فرض). قوانین مسیریابی محدود به یک دروازه حذف‌شده با آن حذف می‌شوند.
 
 ### meridian relay
 
@@ -181,8 +181,8 @@ relay را مدیریت کنید — Realm TCP forwarders که به کاربرا
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY_IP [--exit EXIT] [--user USER]
-meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
+meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
+meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -194,11 +194,13 @@ meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
 | `--user/-u USER` | root | کاربر SSH روی relay |
 | `--ssh-port PORT` | 22 | پورت SSH روی سرور relay |
 | `--yes/-y` | | پرسش تأیید را رد کنید |
-| `--json` | | `relay list` را به عنوان پاکت `meridian.output/v1` با `data.relays[]` ارسال کنید |
+| `--json` | | `relay list` (`data.relays[]`) یا `relay check` را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
 **`relay deploy`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.
 
-**`relay check` / `relay remove`** — هنوز دسترس نیست. هر دو رد می‌شوند؛ از `meridian test` برای بررسی مسیر relay انجام آخر استفاده کنید.
+**`relay remove`** — `RELAY` یک IP سرور relay یا نام ذخیره‌شده یا ID زنجیره relay است. هر زنجیره‌ای را از طریق آن سرور می‌اندازد (آن را با `--exit` محدود کنید)، فهرست می‌کند که چه چیزی حذف خواهد شد (واحدهای Realm، قوانین firewall، شنونده سمت exit، منتشر شده Hosts)، تأیید می‌کند و حذف بررسی‌شده را اعمال می‌کند. سرورها در سرورهای ذخیره‌شده باقی می‌مانند.
+
+**`relay check`** — هر hop Realm را که سرور relay اجرا می‌کند بررسی می‌کند (یا هر hop یک زنجیره): از طریق SSH، که سرویس hop فعال است و می‌تواند TCP را به hop بعدی باز کند؛ از دستگاه شما، که ورود عمومی زنجیره TCP را می‌پذیرد. Exit `0` به معنی هر بررسی پاس شده، `4` به معنی مسائل پیدا شده و `3` به معنی یک hop را نمی‌توان بررسی کرد. از `meridian test` برای فشار ترافیک واقعی از طریق کل مسیر استفاده کنید.
 
 ### meridian fleet
 

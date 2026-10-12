@@ -69,7 +69,18 @@ meridian relay list                       # 所有中继
 meridian relay list --exit 198.51.100.10  # 一个出口的中继
 ```
 
-要检查中继路由，用 `meridian test` 从您的机器测试整条路径。单个中继检查（`relay check`）和删除（`relay remove`）尚不可用；两个命令都拒绝并解释原因。
+检查中继的跳跃 — 每个 Realm 服务正在运行，每个跳跃到达下一个，公共入口接受连接 — 然后通过整条路由测试真实流量：
+
+```bash
+meridian relay check 203.0.113.10
+meridian test
+```
+
+要停用中继，删除通过它的链。Meridian 显示它将删除什么，请求确认并清理 Realm 服务、防火墙规则和已发布的入口点；现有客户端在下次订阅刷新时丢失中继：
+
+```bash
+meridian relay remove 203.0.113.10
+```
 
 ## 多个中继
 
