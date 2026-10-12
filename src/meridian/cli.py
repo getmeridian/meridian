@@ -721,12 +721,22 @@ def relay_list_cmd(
 
 @relay_app.command("remove")
 def relay_remove_cmd(
-    relay_ip: str = typer.Argument(..., help="Relay IP to remove"),
-    exit: str = typer.Option("", "--exit", "-e", help="Exit server IP or name"),
+    relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
+    exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Remove a relay (not available yet; edit relay chains with setup)"""
+    """Remove relay chains through a relay server.
+
+    Drops every chain that uses the server (or one chain by ID), shows what
+    will be deleted, and applies the reviewed removal: Realm units, firewall
+    rules, the exit-side listener, and the published Hosts. The server stays
+    in your saved servers.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian relay remove 198.51.100.20[/cyan]
+      [cyan]meridian relay remove relay-chain --yes[/cyan]
+    """
     from meridian.commands.relay import run_remove
 
     run_remove(relay_ip, exit, user, yes)
@@ -802,9 +812,19 @@ def node_check_cmd(
 def node_remove_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    force: bool = typer.Option(False, "--force", help="Remove even if relays depend on this node"),
+    force: bool = typer.Option(False, "--force", help="Also remove relay chains that route to this exit"),
 ) -> None:
-    """Remove a node (not available yet; edit exits with setup)"""
+    """Remove an exit or routing gateway from the fleet.
+
+    Edits the topology, shows every resource that will be deleted (panel
+    node, profile, node container, firewall rules, Hosts), and applies the
+    reviewed removal. The control server is removed only by teardown. The
+    server stays in your saved servers.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian node remove 198.51.100.11[/cyan]
+      [cyan]meridian node remove finland --force --yes[/cyan]
+    """
     from meridian.commands.node import run_remove
 
     run_remove(node, yes=yes, force=force)

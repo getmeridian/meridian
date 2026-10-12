@@ -73,7 +73,7 @@ class RelayDeployRequest(CoreModel):
 class RelayTargetRequest(CoreModel):
     """Request that targets an existing relay."""
 
-    relay_ip: IPAddressValue
+    relay_ip: SelectorValue
     exit_arg: OptionalSelectorValue = ""
     user: OptionalSshUserValue = ""
     yes: bool = False

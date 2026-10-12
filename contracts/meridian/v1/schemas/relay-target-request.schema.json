@@ -9,17 +9,10 @@
       "type": "string"
     },
     "relay_ip": {
-      "anyOf": [
-        {
-          "format": "ipv4",
-          "type": "string"
-        },
-        {
-          "format": "ipv6",
-          "type": "string"
-        }
-      ],
-      "title": "Relay Ip"
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Relay Ip",
+      "type": "string"
     },
     "user": {
       "default": "",

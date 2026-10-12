@@ -163,7 +163,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | `--domain DOMAIN` | (none) | Node domain; adds XHTTP, WSS, and Hysteria2 paths on it |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
 | `--yes` | | Skip confirmation prompts |
-| `--force` | | Accepted by `node remove`, which isn't available yet |
+| `--force` | | `node remove`: also remove the relay chains that route to this exit |
 | `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
 
 **`node add`** — connects over SSH, adds the server as an exit in your topology, and applies the reviewed plan (hardening, Docker, Xray, panel registration). Existing clients receive the new exit on their next subscription refresh.
@@ -172,7 +172,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node check`** — checks panel connection, SSH, containers, the node's configured public ports, TLS certificates, and disk space, and prints a fix for each failure. Exit `0` is healthy, `4` means problems were found, and `3` means required evidence was unavailable.
 
-**`node remove`** — not available yet. It refuses and points to `meridian setup`.
+**`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (panel node and profile, node container, firewall rules, published Hosts), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
 
 ### meridian relay
 
@@ -182,7 +182,7 @@ Manage relays — Realm TCP forwarders that give users a domestic entry point to
 meridian relay deploy RELAY_IP --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay check RELAY_IP [--exit EXIT] [--user USER]
-meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
+meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
 | Flag | Default | Description |
@@ -198,7 +198,9 @@ meridian relay remove RELAY_IP [--exit EXIT] [--user USER] [--yes]
 
 **`relay deploy`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
-**`relay check` / `relay remove`** — not available yet. Both refuse; use `meridian test` to check a relay route end to end.
+**`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
+
+**`relay check`** — not available yet. It refuses; use `meridian test` to check a relay route end to end.
 
 ### meridian fleet
 

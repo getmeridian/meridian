@@ -133,30 +133,6 @@ class TestRelayCLI:
         assert "meridian plan" in output
         assert "meridian apply" in output
 
-    @staticmethod
-    def _projected_relay() -> FleetTopology:
-        return FleetTopology(
-            panel=TopologyPanel(
-                url="https://198.51.100.1/panel",
-                display_url="https://198.51.100.1/panel",
-                server_ip="198.51.100.1",
-                ssh_user="root",
-                ssh_port=22,
-                deployed_with="v4",
-            ),
-            relays=[
-                TopologyRelay(
-                    ip="198.51.100.20",
-                    name="relay-a",
-                    port=443,
-                    ssh_user="root",
-                    ssh_port=22,
-                    exit_node_ip="198.51.100.10",
-                    sni="www.example.com",
-                )
-            ],
-        )
-
     def test_relay_help(self) -> None:
         from typer.testing import CliRunner
 
@@ -180,36 +156,6 @@ class TestRelayCLI:
         assert result.exit_code == 0
         assert "RELAY_IP" in result.output
         assert "Exit server" in result.output
-
-    def test_check_rejects_relay_chain_before_service_checks(self) -> None:
-        from meridian.commands.relay import run_check
-
-        cluster = ClusterConfig(topology_intent=self._v4_intent())
-        with (
-            patch("meridian.commands.relay.load_topology_cluster", return_value=cluster),
-            patch("meridian.commands.relay.topology_from_local_cluster", return_value=self._projected_relay()),
-            patch("meridian.commands.relay.ServerConnection") as connection,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_check("198.51.100.20")
-
-        assert exc_info.value.exit_code == 2
-        connection.assert_not_called()
-
-    def test_remove_rejects_relay_chain_before_cleanup(self) -> None:
-        from meridian.commands.relay import run_remove
-
-        cluster = ClusterConfig(topology_intent=self._v4_intent())
-        with (
-            patch("meridian.commands.relay.load_topology_cluster", return_value=cluster),
-            patch("meridian.commands.relay.topology_from_local_cluster", return_value=self._projected_relay()),
-            patch("meridian.commands.relay.ServerConnection") as connection,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_remove("198.51.100.20", yes=True)
-
-        assert exc_info.value.exit_code == 2
-        connection.assert_not_called()
 
 
 class TestNginxStreamRelay:

@@ -69,7 +69,13 @@ meridian relay list                       # all relays
 meridian relay list --exit 198.51.100.10  # relays for one exit
 ```
 
-To check a relay route, test the whole path from your machine with `meridian test`. Per-relay checks (`relay check`) and removal (`relay remove`) aren't available yet; both commands refuse and explain this.
+To check a relay route, test the whole path from your machine with `meridian test`. Per-relay checks (`relay check`) aren't available yet.
+
+To retire a relay, remove the chains through it. Meridian shows what it will delete, asks for confirmation, and cleans up the Realm service, firewall rules, and published entry points; existing clients lose the relay on their next subscription refresh:
+
+```bash
+meridian relay remove 203.0.113.10
+```
 
 ## Multiple relays
 

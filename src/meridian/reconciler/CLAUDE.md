@@ -19,7 +19,7 @@ Checkpointed reconciliation of compiled topology resources.
 
 ## Pitfalls
 
-- **Imperative commands are intent edits** — `client add`, `node add`, and `relay deploy` change `topology_intent` and apply it; never mutate panel or server state beside the compiled plan.
+- **Imperative commands are intent edits** — `client add|remove`, `node add|remove`, and `relay deploy|remove` change `topology_intent` and apply it (removals through reviewed retirement); never mutate panel or server state beside the compiled plan.
 - **Never catch an uncertain driver mutation as an ordinary failure** — raise `UnknownResourceOutcome` so the executor observes before any retry.
 - **Unavailable observation evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.

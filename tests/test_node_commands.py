@@ -17,7 +17,7 @@ import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
-from meridian.commands.node import _render_check, run_add, run_check, run_list, run_remove
+from meridian.commands.node import _render_check, run_add, run_check, run_list
 from meridian.console import set_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel
@@ -423,47 +423,6 @@ class TestNodeCheck:
 # ---------------------------------------------------------------------------
 # TestNodeRemove
 # ---------------------------------------------------------------------------
-
-
-class TestNodeRemove:
-    def test_remove_rejects_v4_projected_node(self) -> None:
-        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
-        topology = _projected_topology(
-            TopologyNode(
-                ip="198.51.100.20",
-                name="exit-a",
-                uuid="exit-a",
-                is_panel_host=False,
-                ssh_user="root",
-                ssh_port=22,
-                domain="",
-                sni="www.example.com",
-                xhttp_path="",
-                ws_path="",
-            )
-        )
-
-        with (
-            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
-            patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
-            patch("meridian.commands.node.make_panel") as make_panel,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_remove(ip_or_name="exit-a", yes=True)
-
-        assert exc_info.value.exit_code == 2
-        make_panel.assert_not_called()
-
-    def test_remove_node_not_found_fails(self, tmp_home: Path) -> None:
-        """Removing a node that doesn't exist should fail."""
-        cluster = _configured_cluster()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_remove(ip_or_name="198.51.100.99")
 
 
 # ---------------------------------------------------------------------------

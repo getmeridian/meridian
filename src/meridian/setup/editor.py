@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from typing import Any
+
+from pydantic import ValidationError
 
 from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
 from meridian.core.topology import (
@@ -145,6 +148,48 @@ def add_relay_to_intent(
         ).model_dump(mode="json"),
     ]
     return SetupIntent.model_validate(payload)
+
+
+def remove_exit_from_intent(intent: SetupIntent, exit_id: str) -> SetupIntent:
+    """Return validated intent without one exit; egress pools drop it, but none may become empty."""
+    if not any(exit_.id == exit_id for exit_ in intent.exits):
+        raise ValueError(f"Exit {exit_id!r} is not in the topology.")
+    payload = intent.model_dump(mode="json")
+    payload["exits"] = [exit_ for exit_ in payload["exits"] if exit_["id"] != exit_id]
+    for pool in payload["egress_pools"]:
+        pool["exit_refs"] = [ref for ref in pool["exit_refs"] if ref != exit_id]
+        if not pool["exit_refs"]:
+            raise ValueError(f"Egress pool {pool['id']!r} would have no exits left.")
+    return _validated(payload)
+
+
+def remove_routing_gateway_from_intent(intent: SetupIntent, gateway_id: str) -> SetupIntent:
+    """Return validated intent without one routing gateway and the rules scoped to it."""
+    if not any(gateway.id == gateway_id for gateway in intent.routing_gateways):
+        raise ValueError(f"Routing gateway {gateway_id!r} is not in the topology.")
+    payload = intent.model_dump(mode="json")
+    payload["routing_gateways"] = [item for item in payload["routing_gateways"] if item["id"] != gateway_id]
+    payload["routes"] = [route for route in payload["routes"] if route["source_gateway_ref"] != gateway_id]
+    return _validated(payload)
+
+
+def remove_relays_from_intent(intent: SetupIntent, relay_ids: set[str]) -> SetupIntent:
+    """Return validated intent without the named transparent relay chains."""
+    missing = sorted(relay_ids - {relay.id for relay in intent.transparent_relays})
+    if missing:
+        raise ValueError("Relay chains are not in the topology: " + ", ".join(missing))
+    payload = intent.model_dump(mode="json")
+    payload["transparent_relays"] = [relay for relay in payload["transparent_relays"] if relay["id"] not in relay_ids]
+    return _validated(payload)
+
+
+def _validated(payload: dict[str, Any]) -> SetupIntent:
+    """Validate an edited intent, surfacing the first rule it breaks as a plain message."""
+    try:
+        return SetupIntent.model_validate(payload)
+    except ValidationError as exc:
+        message = str(exc.errors()[0].get("msg", exc)).removeprefix("Value error, ")
+        raise ValueError(message) from exc
 
 
 def unique_resource_id(

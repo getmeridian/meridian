@@ -18,7 +18,7 @@
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove` edits the intent and lets retirement delete the user; `node remove`, `relay remove`, and `relay check` refuse until server retirement and per-hop checks exist.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay check` refuses until per-hop checks exist.
 
 ## What's done well
 
@@ -31,6 +31,7 @@
 - **`console.fail()` always exits** — raises `typer.Exit` with semantic codes (user=2, system=3, bug=1). Only call from command entry points.
 - **`confirm()` returns bool** — returns True on accept, False on reject. Callers must check `if not confirm(...): raise typer.Exit(1)`.
 - **Topology deletion is guarded** — teardown and server removal check intent roles, active workloads, and allocations; only a whole single-server fleet tears down in one step.
+- Removal commands refuse the control server and dependents (relays into an exit, gateways bridged through it) before review; `--force` on `node remove` only extends the edit to those relay chains.
 - Post-mutation local save failures exit 3, say remote state changed, and preserve typed partial data where the command contract supports it.
 - V4 client reads and connectivity tests expose only users declared in `topology_intent.access.users`; never fall back to panel-wide service users.
 - Never render saved panel administrator credentials. Handoff links (`HANDOFF_LINK_KEYS`) appear verbatim only in the final output of the command that produced them (`emit_json(..., reveal=...)`); logs, events, and errors stay redacted.

@@ -29,6 +29,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Optional paths** — `--domain` adds XHTTP and WSS (Cloudflare CDN fallback);
   `--hysteria2` adds Hysteria2 on UDP/443. Blocking Russian destinations stays on
   by default (`--no-geo-block` to turn it off).
+- **Shrink a running fleet** — `meridian node remove` and `meridian relay remove`
+  edit the topology, show every resource they will delete, and clean up the
+  panel node, node container, Realm units, firewall rules, and published Hosts.
+  `meridian plan` lists removals too, and the review covers them.
 
 ### Sharing
 - Connection pages are built from each user's real subscription, so relays and
@@ -65,8 +69,6 @@ running version is newer than the tested one.
 | RealiTLScanner (`meridian scan`) | `0.2.3` |
 
 ### Not yet available
-- Removing servers, relays, or routing gateways from a running fleet (users and
-  protocol paths can be removed).
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
 
 ### Removed

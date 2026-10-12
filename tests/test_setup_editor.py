@@ -14,6 +14,8 @@ from meridian.setup.editor import (
     add_access_users_to_intent,
     add_exit_to_intent,
     add_relay_to_intent,
+    remove_exit_from_intent,
+    remove_relays_from_intent,
 )
 
 
@@ -102,3 +104,47 @@ def test_add_relay_rejects_unknown_exit() -> None:
             exit_ref="missing",
             listen_port=443,
         )
+
+
+def _intent_with_pool() -> SetupIntent:
+    second = ExitIntent(
+        id="exit-second",
+        server_ref="srv-second",
+        paths=[ProtocolPathIntent(id="path-second", protocol="reality", reality_sni="www.example.org")],
+    )
+    payload = _intent().model_dump(mode="json")
+    payload["exits"].append(second.model_dump(mode="json"))
+    payload["egress_pools"] = [{"id": "pool", "exit_refs": ["exit-primary", "exit-second"]}]
+    payload["default_egress_ref"] = "pool"
+    return SetupIntent.model_validate(payload)
+
+
+def test_remove_exit_drops_it_from_egress_pools() -> None:
+    updated = remove_exit_from_intent(_intent_with_pool(), "exit-second")
+
+    assert [exit_.id for exit_ in updated.exits] == ["exit-primary"]
+    assert updated.egress_pools[0].exit_refs == ["exit-primary"]
+
+
+def test_remove_exit_refuses_to_empty_a_pool() -> None:
+    payload = remove_exit_from_intent(_intent_with_pool(), "exit-second").model_dump(mode="json")
+    payload["exits"].append({**payload["exits"][0], "id": "exit-third", "server_ref": "srv-third"})
+    payload["default_egress_ref"] = "exit-third"
+
+    with pytest.raises(ValueError, match="would have no exits left"):
+        remove_exit_from_intent(SetupIntent.model_validate(payload), "exit-primary")
+
+
+def test_remove_exit_surfaces_the_broken_rule_as_plain_text() -> None:
+    payload = _intent_with_pool().model_dump(mode="json")
+    payload["default_egress_ref"] = "exit-second"
+
+    with pytest.raises(ValueError) as exc_info:
+        remove_exit_from_intent(SetupIntent.model_validate(payload), "exit-second")
+    assert not str(exc_info.value).startswith("Value error")
+    assert "validation error" not in str(exc_info.value)
+
+
+def test_remove_relays_rejects_unknown_chain() -> None:
+    with pytest.raises(ValueError, match="not in the topology: relay-x"):
+        remove_relays_from_intent(_intent(), {"relay-x"})

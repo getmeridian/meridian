@@ -7,6 +7,8 @@ is persisted in cluster.yml.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 from rich.markup import escape
 
@@ -25,9 +27,13 @@ from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.fleet import build_relay_list_result
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.remnawave import RemnawaveError
 from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
+
+if TYPE_CHECKING:
+    from meridian.servers import ServerRegistry
 
 
 def run_deploy(
@@ -284,13 +290,50 @@ def _run_list(
         raise typer.Exit(3)
 
 
+def select_relay_chains(
+    intent: SetupIntent,
+    registry: ServerRegistry,
+    query: str,
+    exit_arg: str = "",
+) -> tuple[list[TransparentRelayIntent], str, str]:
+    """Resolve a relay server (IP or saved name) or chain ID to its chains, server ref, and label."""
+    try:
+        entry = registry.find(query)
+        exit_entries = {exit_.id: registry.find(exit_.server_ref) for exit_ in intent.exits} if exit_arg else {}
+    except LocalStateError as exc:
+        fail(exc)
+    server_ref = entry.id if entry is not None else ""
+    chains = [
+        relay
+        for relay in intent.transparent_relays
+        if relay.id == query or (server_ref and server_ref in relay.hop_server_refs)
+    ]
+    if exit_arg:
+        exits = {
+            exit_.id
+            for exit_ in intent.exits
+            if exit_arg
+            in {
+                exit_.id,
+                exit_.server_ref,
+                *({found.host, found.name} if (found := exit_entries.get(exit_.id)) is not None else set()),
+            }
+        }
+        chains = [relay for relay in chains if relay.exit_ref in exits]
+    if not chains:
+        scope = f" toward exit {exit_arg}" if exit_arg else ""
+        fail(f"Relay {query} not found in the topology{scope}", hint="Check: meridian relay list", hint_type="user")
+    label = (entry.name or entry.host) if entry is not None else query
+    return chains, server_ref, label
+
+
 def run_remove(
     relay_ip: str,
     exit_arg: str = "",
     user: str = "",
     yes: bool = False,
 ) -> None:
-    """Remove a relay node."""
+    """Drop every relay chain through a relay server (or one chain by ID), then apply the reviewed removal."""
     request = validate_command_input(
         RelayTargetRequest,
         "Invalid relay remove request",
@@ -299,19 +342,31 @@ def run_remove(
         user=user,
         yes=yes,
     )
+    from meridian.commands.topology_removal import apply_topology_removal
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.servers import ServerRegistry
+    from meridian.setup.editor import remove_relays_from_intent
 
     cluster = load_topology_cluster()
-    try:
-        topology = topology_from_local_cluster(cluster)
-    except LocalStateError as exc:
-        fail(exc)
-    if not any(relay.ip == request.relay_ip for relay in topology.relays):
-        fail(f"Relay {request.relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
-    fail(
-        f"Relay {request.relay_ip} is part of a relay chain in your topology",
-        hint="Remove the relay chain in `meridian setup`, then apply the reviewed plan.",
-        hint_type="user",
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("Topology intent is missing")
+    chains, _server_ref, label = select_relay_chains(
+        intent,
+        ServerRegistry(SERVER_PROFILES_FILE),
+        request.relay_ip,
+        request.exit_arg,
     )
+    chain_ids = sorted(relay.id for relay in chains)
+    try:
+        updated = remove_relays_from_intent(intent, set(chain_ids))
+    except ValueError as exc:
+        fail(str(exc), hint="Check: meridian relay list", hint_type="user")
+    noun = "relay chain" if len(chain_ids) == 1 else "relay chains"
+    subject = f"{noun} {', '.join(chain_ids)}" + (f" through {label}" if label not in chain_ids else "")
+    hop_counts = [len(relay.hop_server_refs) for relay in chains]
+    extra = (f"Every hop of the chain stops forwarding ({sum(hop_counts)} hops in total).",)
+    apply_topology_removal(cluster, updated, subject=subject, yes=request.yes, extra_lines=extra)
 
 
 def run_check(

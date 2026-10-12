@@ -28,6 +28,7 @@ from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.fleet import build_node_list_result
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.topology import ExitIntent, RoutingGatewayIntent, SetupIntent
 from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
@@ -405,22 +406,113 @@ def _run_list(*, operation: OperationContext) -> None:
 
 
 def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
-    """Remove a node from the fleet."""
+    """Remove a server's exit or routing-gateway role, then apply the reviewed removal."""
     request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
+    from meridian.commands.topology_removal import apply_topology_removal
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("Topology intent is missing")
     try:
-        topology = topology_from_local_cluster(cluster)
+        entry = ServerRegistry(SERVER_PROFILES_FILE).find(request.ip_or_name)
     except LocalStateError as exc:
         fail(exc)
-    if not any(request.ip_or_name in {item.ip, item.name} for item in topology.nodes):
+    server_ref = entry.id if entry is not None else ""
+    label = (entry.name or entry.host) if entry is not None else request.ip_or_name
+    exit_ = next(
+        (item for item in intent.exits if request.ip_or_name == item.id or item.server_ref == server_ref),
+        None,
+    )
+    gateway = next(
+        (item for item in intent.routing_gateways if request.ip_or_name == item.id or item.server_ref == server_ref),
+        None,
+    )
+    role = exit_ or gateway
+    server_ref = server_ref or (role.server_ref if role is not None else "")
+
+    if server_ref and server_ref == intent.control.server_ref:
         fail(
-            f"Node '{request.ip_or_name}' not found",
-            hint="Check node list with: meridian node list",
+            f"{label} runs the control plane, so it cannot leave the fleet on its own",
+            hint="Remove the other exits, relays, and gateways first; then `meridian teardown` removes the fleet.",
             hint_type="user",
         )
-    fail(
-        f"Node '{request.ip_or_name}' is part of your topology",
-        hint="Remove its exit or routing-gateway role in `meridian setup`, then apply the reviewed plan.",
-        hint_type="user",
-    )
+    if exit_ is not None:
+        updated, subject, extra_lines = _exit_removal(intent, exit_, label, force=force)
+    elif gateway is not None:
+        updated, subject, extra_lines = _gateway_removal(intent, gateway, label)
+    elif server_ref and any(server_ref in relay.hop_server_refs for relay in intent.transparent_relays):
+        fail(
+            f"{label} is a relay hop, not a node",
+            hint=f"Remove its relay chain with: meridian relay remove {request.ip_or_name}",
+            hint_type="user",
+        )
+    else:
+        fail(
+            f"Node '{request.ip_or_name}' not found", hint="Check node list with: meridian node list", hint_type="user"
+        )
+    apply_topology_removal(cluster, updated, subject=subject, yes=yes, extra_lines=extra_lines)
+
+
+def _exit_removal(
+    intent: SetupIntent,
+    exit_: ExitIntent,
+    label: str,
+    *,
+    force: bool,
+) -> tuple[SetupIntent, str, tuple[str, ...]]:
+    """Drop one exit (and, with --force, the relay chains into it) or explain what still depends on it."""
+    from meridian.setup.editor import remove_exit_from_intent, remove_relays_from_intent
+
+    relays = sorted(relay.id for relay in intent.transparent_relays if relay.exit_ref == exit_.id)
+    if relays and not force:
+        fail(
+            f"Relays still route to exit {exit_.id}: {', '.join(relays)}",
+            hint="Remove them first with `meridian relay remove RELAY`, or rerun with --force to remove them too.",
+            hint_type="user",
+        )
+    path_ids = {path.id for path in exit_.paths}
+    bridged = sorted(gateway.id for gateway in intent.routing_gateways if gateway.bridge_path_ref in path_ids)
+    if bridged:
+        fail(
+            f"Routing gateway {', '.join(bridged)} enters the fleet through exit {exit_.id}",
+            hint="Remove the gateway first with `meridian node remove GATEWAY`, or move its bridge path in setup.",
+            hint_type="user",
+        )
+    extra_lines: tuple[str, ...] = ()
+    try:
+        updated = intent
+        if relays:
+            updated = remove_relays_from_intent(updated, set(relays))
+            extra_lines = (f"Also removes relay chains: {', '.join(relays)}",)
+        updated = remove_exit_from_intent(updated, exit_.id)
+    except ValueError as exc:
+        fail(
+            f"Cannot remove exit {exit_.id}: {exc}",
+            hint="Adjust egress pools, routing rules, or the default egress in `meridian setup`, then retry.",
+            hint_type="user",
+        )
+    return updated, f"exit {exit_.id} on {label}", extra_lines
+
+
+def _gateway_removal(
+    intent: SetupIntent,
+    gateway: RoutingGatewayIntent,
+    label: str,
+) -> tuple[SetupIntent, str, tuple[str, ...]]:
+    """Drop one routing gateway and the routing rules scoped to it."""
+    from meridian.setup.editor import remove_routing_gateway_from_intent
+
+    scoped = sorted(route.id for route in intent.routes if route.source_gateway_ref == gateway.id)
+    try:
+        updated = remove_routing_gateway_from_intent(intent, gateway.id)
+    except ValueError as exc:
+        fail(
+            f"Cannot remove routing gateway {gateway.id}: {exc}",
+            hint="Remove or rescope the routing rules in `meridian setup`, then retry.",
+            hint_type="user",
+        )
+    extra_lines = (f"Also drops routing rules scoped to it: {', '.join(scoped)}",) if scoped else ()
+    return updated, f"routing gateway {gateway.id} on {label}", extra_lines
