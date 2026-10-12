@@ -577,3 +577,46 @@ def test_review_fails_closed_when_a_retiring_server_profile_is_gone(tmp_path) ->
 
     with pytest.raises(LocalStateError, match="saved profile is gone"):
         SetupRuntime(registry, cluster_loader=lambda: cluster).review(SetupDraft.from_intent(_intent()))
+
+
+def test_control_attestation_ignores_other_servers_but_tracks_runtime_pins(tmp_path) -> None:
+    from meridian.setup.runtime import _control_runtime_attestation
+
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry, relay=True)
+    runtime = SetupRuntime(registry, cluster_loader=ClusterConfig)
+    base = _intent()
+    with_relay = base.model_copy(
+        update={
+            "transparent_relays": [
+                TransparentRelayIntent(
+                    id="relay-a",
+                    hop_server_refs=["srv-relay"],
+                    exit_ref="exit-a",
+                    protocol_path_ref="exit-a-reality",
+                )
+            ]
+        }
+    )
+
+    def attestation(intent: SetupIntent) -> tuple[str, ResourcePlan]:
+        plan = runtime.review(SetupDraft.from_intent(intent)).plan
+        control = next(item for item in plan.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
+        return _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan), plan
+
+    relay_attestation, relay_plan = attestation(with_relay)
+    plain_attestation, _ = attestation(base)
+    assert "srv-relay" in relay_plan.deployment_contract.server_targets
+    assert relay_attestation == plain_attestation
+
+    contract = relay_plan.deployment_contract
+    bumped = relay_plan.model_copy(
+        update={
+            "deployment_contract": contract.model_copy(
+                update={"runtime_pins": {**contract.runtime_pins, "remnawave_backend": "9.9.9"}}
+            )
+        }
+    )
+    control = next(item for item in bumped.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
+    bumped_attestation = _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), bumped)
+    assert bumped_attestation != relay_attestation

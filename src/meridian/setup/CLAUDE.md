@@ -10,7 +10,7 @@
 
 **Retirement-bound review** — `SetupReview.review_hash` binds the plan hash to the exact retirement set and the SSH targets of every server it touches, including servers no longer in the intent (resolved from the shelf). The plan hash alone stays the persisted generation identity.
 
-**Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and deployment contract to a remote marker.
+**Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and only the bootstrap's own inputs (control target, runtime pins, renderer contract, profile ports/SNI, hardening) to a remote marker.
 
 ## What's done well
 - Downstream answers are invalidated whenever an earlier stage changes.
@@ -26,3 +26,4 @@
 - Inspect a cloned cluster through read-only drivers; cached plan hashes cannot detect managed remote drift.
 - Control readiness reports confirmed identity/artifact drift separately from unavailable SSH, socket-table, or panel evidence.
 - Approve and apply `review_hash`, never `plan.plan_hash`: a plan hash cannot see what the change removes; a missing shelf profile for a retiring server fails review.
+- Never attest the control bootstrap against the whole deployment contract: adding or removing any other server would re-run the full panel provisioner on the live control server.

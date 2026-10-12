@@ -585,10 +585,19 @@ def _write_control_runtime_attestation(
 
 
 def _control_runtime_attestation(action: ResourceAction, plan: ResourcePlan) -> str:
+    """Hash only what the bootstrap consumes, so other servers joining or leaving never re-run it."""
+    server_ref = _control_payload(plan).server_ref
+    contract = plan.deployment_contract
+    target = contract.server_targets.get(server_ref)
+    ports, reality_sni = _bootstrap_profile_values(plan)
     return canonical_hash(
         {
             "resource": action.expected_hash,
-            "deployment_contract": plan.deployment_contract.model_dump(mode="json"),
+            "control_target": target.model_dump(mode="json") if target is not None else None,
+            "runtime_pins": contract.runtime_pins,
+            "renderer_contract": contract.renderer_contract,
+            "bootstrap_profile": {"ports": ports, "reality_sni": reality_sni},
+            "harden": _plan_harden(plan, server_ref),
         }
     )
 
