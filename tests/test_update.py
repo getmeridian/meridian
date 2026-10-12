@@ -6,7 +6,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from meridian.update import _should_check, check_for_update, do_upgrade, run_self_update, verify_installed_version
+from packaging.version import Version
+
+from meridian.update import (
+    _should_check,
+    check_for_update,
+    do_upgrade,
+    newer_major,
+    run_self_update,
+    update_target,
+    verify_installed_version,
+)
 
 
 class TestShouldCheck:
@@ -29,46 +39,37 @@ class TestShouldCheck:
             assert _should_check() is False
 
 
-class TestVersionComparison:
-    def test_patch_bump_detected(self) -> None:
-        from packaging.version import Version
+def _v(*raw: str) -> list[Version]:
+    return sorted(Version(item) for item in raw)
 
-        current = Version("1.2.5")
-        remote = Version("1.2.6")
-        assert remote > current
-        assert current.major == remote.major
-        assert current.minor == remote.minor
 
-    def test_minor_bump_detected(self) -> None:
-        from packaging.version import Version
+class TestUpdateTarget:
+    def test_stays_on_the_current_major_line(self) -> None:
+        assert update_target(Version("4.0.0"), _v("4.0.1", "4.1.0", "5.0.0")) == Version("4.1.0")
 
-        current = Version("1.2.5")
-        remote = Version("1.3.0")
-        assert remote > current
-        assert current.major == remote.major
-        assert current.minor != remote.minor
+    def test_major_flag_moves_to_the_new_major(self) -> None:
+        assert update_target(Version("4.0.0"), _v("4.0.1", "5.0.0"), major=True) == Version("5.0.0")
 
-    def test_major_bump_detected(self) -> None:
-        from packaging.version import Version
+    def test_stable_builds_are_never_offered_prereleases(self) -> None:
+        assert update_target(Version("4.0.0"), _v("4.0.1b1", "5.0.0a1"), major=True) is None
 
-        current = Version("1.2.5")
-        remote = Version("2.0.0")
-        assert remote > current
-        assert current.major != remote.major
+    def test_beta_builds_follow_betas_then_the_stable_release(self) -> None:
+        assert update_target(Version("4.0.0b1"), _v("3.17.3", "4.0.0b2")) == Version("4.0.0b2")
+        assert update_target(Version("4.0.0b2"), _v("4.0.0b2", "4.0.0")) == Version("4.0.0")
 
-    def test_no_downgrade(self) -> None:
-        from packaging.version import Version
+    def test_beta_builds_never_jump_to_another_majors_prerelease(self) -> None:
+        assert update_target(Version("4.0.0b1"), _v("5.0.0a1")) is None
 
-        current = Version("2.0.0")
-        remote = Version("1.2.5")
-        assert remote <= current
+    def test_newer_major_ignores_prereleases(self) -> None:
+        assert newer_major(Version("4.0.0"), _v("4.0.1", "5.0.0a1")) is None
+        assert newer_major(Version("4.0.0"), _v("5.0.0", "5.1.0")) == Version("5.1.0")
 
 
 class TestCheckForUpdate:
     def test_patch_bump_does_not_auto_upgrade(self) -> None:
         with (
             patch("meridian.update._should_check", return_value=True),
-            patch("meridian.update.get_pypi_latest", return_value="1.2.6"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("1.2.5", "1.2.6")),
             patch("meridian.update.do_upgrade") as mock_upgrade,
             patch("meridian.update.err_console.print") as mock_print,
         ):
@@ -81,7 +82,7 @@ class TestCheckForUpdate:
     def test_same_version_no_output(self) -> None:
         with (
             patch("meridian.update._should_check", return_value=True),
-            patch("meridian.update.get_pypi_latest", return_value="1.2.5"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("1.2.5")),
             patch("meridian.update.err_console.print") as mock_print,
         ):
             check_for_update("1.2.5")
@@ -100,24 +101,46 @@ class TestCheckForUpdate:
 
 class TestRunSelfUpdate:
     def test_unavailable_pypi_returns_system_exit_code(self) -> None:
-        with patch("meridian.update.get_pypi_latest", return_value=None):
+        with patch("meridian.update.get_pypi_releases", return_value=None):
             assert run_self_update() == 3
 
-    def test_invalid_remote_version_returns_system_exit_code(self) -> None:
-        with patch("meridian.update.get_pypi_latest", return_value="not-a-version"):
+    def test_unparseable_local_version_returns_system_exit_code(self) -> None:
+        with (
+            patch("meridian.__version__", "not-a-version"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0")),
+        ):
             assert run_self_update() == 3
+
+    def test_newer_major_is_explained_not_installed(self) -> None:
+        with (
+            patch("meridian.__version__", "4.0.0"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0", "5.0.0")),
+            patch("meridian.update.do_upgrade") as upgrade,
+        ):
+            assert run_self_update() == 0
+        upgrade.assert_not_called()
+
+    def test_upgrade_pins_the_chosen_version(self) -> None:
+        with (
+            patch("meridian.__version__", "4.0.0"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.1", "5.0.0")),
+            patch("meridian.update.do_upgrade", return_value=True) as upgrade,
+            patch("meridian.update.verify_installed_version", return_value=True),
+        ):
+            assert run_self_update() == 0
+        upgrade.assert_called_once_with("4.0.1")
 
     def test_current_version_returns_success(self) -> None:
         with (
             patch("meridian.__version__", "4.0.0"),
-            patch("meridian.update.get_pypi_latest", return_value="4.0.0"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0")),
         ):
             assert run_self_update() == 0
 
     def test_upgrade_failure_returns_system_exit_code(self) -> None:
         with (
             patch("meridian.__version__", "4.0.0"),
-            patch("meridian.update.get_pypi_latest", return_value="4.0.1"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0", "4.0.1")),
             patch("meridian.update.do_upgrade", return_value=False),
         ):
             assert run_self_update() == 3
@@ -125,7 +148,7 @@ class TestRunSelfUpdate:
     def test_successful_upgrade_returns_success(self) -> None:
         with (
             patch("meridian.__version__", "4.0.0"),
-            patch("meridian.update.get_pypi_latest", return_value="4.0.1"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0", "4.0.1")),
             patch("meridian.update.do_upgrade", return_value=True),
             patch("meridian.update.verify_installed_version", return_value=True),
         ):
@@ -134,7 +157,7 @@ class TestRunSelfUpdate:
     def test_upgrade_execution_error_returns_system_exit_code(self) -> None:
         with (
             patch("meridian.__version__", "4.0.0"),
-            patch("meridian.update.get_pypi_latest", return_value="4.0.1"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0", "4.0.1")),
             patch("meridian.update.do_upgrade", side_effect=OSError("cannot execute")),
         ):
             assert run_self_update() == 3
@@ -142,7 +165,7 @@ class TestRunSelfUpdate:
     def test_installer_success_without_active_version_change_fails(self) -> None:
         with (
             patch("meridian.__version__", "4.0.0"),
-            patch("meridian.update.get_pypi_latest", return_value="4.0.1"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0", "4.0.1")),
             patch("meridian.update.do_upgrade", return_value=True),
             patch("meridian.update.verify_installed_version", return_value=False),
         ):

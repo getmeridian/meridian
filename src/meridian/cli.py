@@ -654,11 +654,13 @@ def teardown_cmd(
 
 
 @app.command("update")
-def update_cmd() -> None:
-    """Update meridian to the latest version"""
+def update_cmd(
+    major: bool = typer.Option(False, "--major", help="Also move to a newer major version"),
+) -> None:
+    """Update meridian to the latest release of its major version"""
     from meridian.update import run_self_update
 
-    exit_code = run_self_update()
+    exit_code = run_self_update(major=major)
     if exit_code:
         raise typer.Exit(exit_code)
 

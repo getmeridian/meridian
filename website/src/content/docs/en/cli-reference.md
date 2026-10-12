@@ -296,10 +296,10 @@ On a single-server deployment, teardown removes everything: the panel, node, ngi
 
 ### meridian update
 
-Update the CLI to the latest release on PyPI. Meridian tries uv, pipx, and pip, and only reports success when the active `meridian` command shows the new version. Exit `0` means already current or updated; `3` means the update or its verification failed. Updating the CLI does not change your servers.
+Update the CLI to the latest release of its major version on PyPI. A newer major version is only announced; `--major` moves to it after you have read the release notes. A beta build follows newer betas of its major version and then the stable release. Meridian tries uv, pipx, and pip, and only reports success when the active `meridian` command shows the new version. Exit `0` means already current or updated; `3` means the update or its verification failed. Updating the CLI does not change your servers.
 
 ```
-meridian update
+meridian update [--major]
 ```
 
 ### meridian studio

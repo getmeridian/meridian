@@ -25,15 +25,48 @@ _RELEASES_URL = f"{GITHUB_REPO}/releases"
 _INSTALL_CMD = "curl -sSf https://getmeridian.org/install.sh | bash"
 
 
-def get_pypi_latest() -> str | None:
-    """Fetch latest version from PyPI JSON API."""
+def get_pypi_releases() -> list[Version] | None:
+    """Fetch every published, not fully yanked version from PyPI (None when unreachable)."""
     try:
         req = urllib.request.Request(PYPI_JSON_URL, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read())
-            return data["info"]["version"]
-    except (OSError, ValueError, KeyError):
+        releases = data["releases"]
+    except (OSError, ValueError, KeyError, TypeError):
         return None
+    versions: list[Version] = []
+    for raw, files in releases.items():
+        try:
+            version = Version(raw)
+        except InvalidVersion:
+            continue
+        if files and all(item.get("yanked") for item in files):
+            continue
+        versions.append(version)
+    return sorted(versions)
+
+
+def update_target(current: Version, releases: list[Version], *, major: bool = False) -> Version | None:
+    """Return the newest release to move to, or None when already current.
+
+    Stays on the current major unless ``major``. Pre-releases are offered only
+    to a pre-release build, and only within its own major (the beta channel).
+    """
+
+    def eligible(version: Version) -> bool:
+        if version <= current:
+            return False
+        if version.is_prerelease:
+            return current.is_prerelease and version.major == current.major
+        return major or version.major == current.major
+
+    return max((version for version in releases if eligible(version)), default=None)
+
+
+def newer_major(current: Version, releases: list[Version]) -> Version | None:
+    """Return the newest stable release of a later major version, if any."""
+    later = [v for v in releases if v.major > current.major and not v.is_prerelease]
+    return max(later, default=None)
 
 
 def _should_check() -> bool:
@@ -62,53 +95,46 @@ def check_for_update(current_version: str) -> None:
     if not _should_check():
         return
 
-    latest = get_pypi_latest()
-    if not latest or latest == current_version:
+    releases = get_pypi_releases()
+    if not releases:
         return
-
     try:
         current = Version(current_version)
-        remote = Version(latest)
     except InvalidVersion:
         return
 
-    if remote <= current:
-        return  # running dev/pre-release, don't downgrade
-
-    if current.major == remote.major and current.minor == remote.minor:
-        err_console.print(f"\n  [warn]v{latest} available[/warn]")
-        err_console.print(f"  [dim]Patch release: {_RELEASES_URL}[/dim]")
+    target = update_target(current, releases)
+    if target is not None:
+        kind = "Patch release" if target.release[:2] == current.release[:2] else "See what's new"
+        err_console.print(f"\n  [warn]v{target} available[/warn]")
+        err_console.print(f"  [dim]{kind}: {_RELEASES_URL}[/dim]")
         err_console.print(
             "  [dim]Run[/dim] [bold]meridian update[/bold] [dim]when ready, then[/dim] "
             "[bold]meridian deploy[/bold] [dim]to apply[/dim]\n"
         )
-    elif current.major != remote.major:
-        # Major: review before updating
-        err_console.print(f"\n  [bold red]v{latest} available (major release)[/bold red]")
-        err_console.print(f"  [dim]Review changes before updating: {_RELEASES_URL}[/dim]")
-        err_console.print("  [dim]After updating, run[/dim] [bold]meridian deploy[/bold] [dim]to apply[/dim]\n")
-    else:
-        # Minor: inform, link to changelog
-        err_console.print(f"\n  [warn]v{latest} available[/warn]")
-        err_console.print(f"  [dim]See what's new: {_RELEASES_URL}[/dim]")
-        err_console.print(
-            "  [dim]Run[/dim] [bold]meridian update[/bold] [dim]then[/dim] "
-            "[bold]meridian deploy[/bold] [dim]to apply[/dim]\n"
-        )
+        return
+
+    later = newer_major(current, releases)
+    if later is not None:
+        err_console.print(f"\n  [warn]Meridian {later.major} is available[/warn] [dim](major release)[/dim]")
+        err_console.print(f"  [dim]Read the release notes before moving: {_RELEASES_URL}[/dim]")
+        err_console.print("  [dim]Then run[/dim] [bold]meridian update --major[/bold]\n")
 
 
 def do_upgrade(expected_version: str = "") -> bool:
     """Try each available installer until the active command is upgraded."""
+    # An exact pin keeps the chosen major and lets installers accept a pre-release.
+    spec = f"{PYPI_PACKAGE}=={expected_version}" if expected_version else PYPI_PACKAGE
     commands: list[list[str]] = []
     if shutil.which("uv"):
-        commands.append(["uv", "tool", "upgrade", PYPI_PACKAGE])
+        commands.append(["uv", "tool", "install", "--force", spec] if expected_version else ["uv", "tool", "upgrade", spec])
     if shutil.which("pipx"):
-        commands.append(["pipx", "upgrade", PYPI_PACKAGE])
+        commands.append(["pipx", "install", "--force", spec] if expected_version else ["pipx", "upgrade", spec])
     if shutil.which("pip3"):
         commands.extend(
             [
-                ["pip3", "install", "--upgrade", "--user", PYPI_PACKAGE],
-                ["pip3", "install", "--upgrade", "--user", "--break-system-packages", PYPI_PACKAGE],
+                ["pip3", "install", "--upgrade", "--user", spec],
+                ["pip3", "install", "--upgrade", "--user", "--break-system-packages", spec],
             ]
         )
 
@@ -175,12 +201,12 @@ def _refresh_symlink() -> None:
         pass
 
 
-def run_self_update() -> int:
-    """Explicit self-update command."""
+def run_self_update(major: bool = False) -> int:
+    """Explicit self-update command; stays on the current major unless ``major``."""
     info("Checking for updates...")
-    latest = get_pypi_latest()
+    releases = get_pypi_releases()
 
-    if not latest:
+    if not releases:
         warn("Could not reach PyPI to check for updates")
         return 3
 
@@ -188,22 +214,26 @@ def run_self_update() -> int:
 
     try:
         current = Version(__version__)
-        remote = Version(latest)
     except InvalidVersion:
         warn("Could not parse version numbers")
         return 3
 
-    if remote <= current:
-        ok(f"Already on the latest version (v{__version__})")
+    target = update_target(current, releases, major=major)
+    later = newer_major(current, releases)
+    if target is None:
+        ok(f"Already on the latest {current.major}.x version (v{__version__})")
+        if later is not None and not major:
+            info(f"Meridian {later.major} is available. Read the release notes first: {_RELEASES_URL}")
+            info("Then run `meridian update --major`")
         return 0
 
-    # Version-level context
-    if current.major != remote.major:
-        warn(f"Major release v{latest} — review changes before redeploying:")
+    if target.major != current.major:
+        warn(f"Moving to Meridian {target.major}. Review the release notes before redeploying:")
         info(_RELEASES_URL)
-    elif current.minor != remote.minor:
-        info(f"v{latest} available. What's new: {_RELEASES_URL}")
+    elif target.release[:2] != current.release[:2]:
+        info(f"v{target} available. What's new: {_RELEASES_URL}")
 
+    latest = str(target)
     info(f"Updating v{__version__} → v{latest}...")
     try:
         upgraded = do_upgrade(latest)

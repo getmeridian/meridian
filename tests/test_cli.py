@@ -291,7 +291,7 @@ class TestSubcommandHelp:
 
     def test_update_propagates_system_failure_exit(self, monkeypatch) -> None:
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.update.run_self_update", lambda: 3)
+        monkeypatch.setattr("meridian.update.run_self_update", lambda major=False: 3)
 
         result = runner.invoke(app, ["update"])
 
