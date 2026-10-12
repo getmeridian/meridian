@@ -30,7 +30,7 @@ from meridian.node_deploy import (
     panel_base_url,
 )
 from meridian.provision.progress import StepRenderer
-from meridian.remnawave import MeridianPanel, RemnawaveError
+from meridian.remnawave import MeridianPanel, RemnawaveAuthError, RemnawaveError
 from meridian.resolve import ResolvedServer
 from meridian.ssh import ServerConnection
 
@@ -210,7 +210,8 @@ def ensure_control_plane_access(
             ),
         )
 
-    if cluster.panel.admin_user and cluster.panel.admin_pass:
+    saved_admin = bool(cluster.panel.admin_user and cluster.panel.admin_pass)
+    if saved_admin:
         admin_user = cluster.panel.admin_user
         admin_pass = cluster.panel.admin_pass
     else:
@@ -231,6 +232,18 @@ def ensure_control_plane_access(
                 admin_pass,
             )
         except RemnawaveError as login_error:
+            if not saved_admin and isinstance(exc, RemnawaveAuthError) and isinstance(login_error, RemnawaveAuthError):
+                # Registration is refused once any admin exists; ours was never created.
+                raise PanelSetupError(
+                    f"{resolved.ip} already runs a Remnawave panel with an administrator Meridian doesn't know",
+                    hint=(
+                        "It is probably left from an earlier deploy whose ~/.meridian was lost or moved. "
+                        "To keep its users, restore that ~/.meridian/cluster.yml and run the command again. "
+                        f"To start over, wipe it with `meridian uninstall {resolved.ip}` "
+                        "(this deletes the panel and every user on it), then deploy again."
+                    ),
+                    category="user",
+                ) from login_error
             raise PanelSetupError(
                 f"Panel admin registration failed ({exc}), login also failed ({login_error})",
                 hint="Recover the saved panel credentials or redeploy the panel.",

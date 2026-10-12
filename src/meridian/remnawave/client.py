@@ -579,11 +579,9 @@ class MeridianPanel(ControlPlaneMixin):
             msg = f"Panel {error_label} failed ({resp.status_code})"
             if detail:
                 msg = f"{msg}: {detail}"
-            raise RemnawaveError(
-                msg,
-                hint="Check panel credentials" if resp.status_code in (401, 403) else "",
-                category="user" if resp.status_code in (401, 403) else "system",
-            )
+            if resp.status_code in (401, 403):
+                raise RemnawaveAuthError(msg, hint="Check panel credentials", category="user")
+            raise RemnawaveError(msg, category="system")
         try:
             data = resp.json()
         except (ValueError, TypeError) as e:

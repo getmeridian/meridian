@@ -15,6 +15,7 @@ from meridian.core.cancellation import (
     OperationCancellation,
     OperationCancelledError,
 )
+from meridian.core.errors import MeridianError
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -308,7 +309,10 @@ def _execute_action(
                 "unknown mutation was observed as not converged; retry limit reached",
             )
         except Exception as exc:
-            return _record_failure(action, cluster, persist, clock, f"apply failed: {exc}")
+            # Keep typed remediation: the failure summary is all the operator sees.
+            hint = exc.hint if isinstance(exc, MeridianError) and exc.hint else ""
+            detail = f"apply failed: {exc}" + (f" — {hint}" if hint else "")
+            return _record_failure(action, cluster, persist, clock, detail)
 
         if after_apply is not None:
             after_apply(action)
