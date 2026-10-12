@@ -75,6 +75,7 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--name NAME` | (auto) | Friendly name for the relay (e.g., "ru-moscow") |
 | `--port/-p PORT` | 443 | Listen port on relay server |
 | `--user/-u USER` | root | SSH user on relay |
+| `--exit-user USER` | registry or root | SSH user on the exit, when it differs from the relay's |
 | `--ssh-port PORT` | 22 | SSH port on relay if non-standard |
 | `--yes/-y` | | Skip confirmation prompts |
 

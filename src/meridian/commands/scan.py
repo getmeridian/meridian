@@ -15,6 +15,12 @@ from meridian.credentials import ServerCredentials
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 
+_SCANNER_VERSION = "0.2.3"
+_SCANNER_ASSETS: dict[str, tuple[str, str]] = {
+    "x86_64": ("RealiTLScanner-linux-amd64", "a55595446de9f1c2e6c5c3cd766a7320a11115947df48f101749bb62c8055592"),
+    "aarch64": ("RealiTLScanner-linux-arm64", "27bdd3e53d4391c66c8df3391d3c3fb5eb2dc356125f2fb33ac58fcaaf8f88b3"),
+}
+
 
 def _is_valid_hostname(value: str) -> bool:
     """Return True if value is a plausible DNS hostname.
@@ -55,17 +61,14 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     except Exception:
         return []
     raw_arch = arch_result.stdout.strip()
-    match raw_arch:
-        case "x86_64":
-            arch = "amd64"
-        case "aarch64":
-            arch = "arm64"
-        case _:
-            warn(f"Unsupported architecture for scanner: {raw_arch}")
-            return []
+    asset = _SCANNER_ASSETS.get(raw_arch)
+    if asset is None:
+        warn(f"Unsupported architecture for scanner: {raw_arch}")
+        return []
+    asset_name, expected_sha256 = asset
 
-    # Download RealiTLScanner to server
-    scanner_url = f"https://github.com/XTLS/RealiTLScanner/releases/latest/download/RealiTLScanner-linux-{arch}"
+    # Download a pinned RealiTLScanner release; "latest" broke when upstream renamed assets
+    scanner_url = f"https://github.com/XTLS/RealiTLScanner/releases/download/v{_SCANNER_VERSION}/{asset_name}"
     q_url = shlex.quote(scanner_url)
     from rich.status import Status
 
@@ -82,19 +85,15 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
         warn("Failed to download RealiTLScanner")
         return []
 
-    # Verify downloaded binary integrity (ELF header + minimum size)
-    try:
-        verify_result = conn.run(
-            "file /tmp/realitlscanner | grep -q 'ELF.*executable' && "
-            "test $(stat -c%s /tmp/realitlscanner 2>/dev/null || stat -f%z /tmp/realitlscanner) -gt 100000",
-            timeout=10,
-        )
-        if verify_result.returncode != 0:
-            warn("Downloaded scanner binary failed integrity check")
-            conn.run("rm -f /tmp/realitlscanner", timeout=5)
-            return []
-    except Exception:
-        pass  # verification is best-effort
+    # Verify the published SHA-256 before running anything
+    verify_result = conn.run(
+        f"printf '%s  %s\\n' {shlex.quote(expected_sha256)} /tmp/realitlscanner | sha256sum -c - >/dev/null",
+        timeout=10,
+    )
+    if verify_result.returncode != 0:
+        warn("Downloaded scanner binary failed checksum verification")
+        conn.run("rm -f /tmp/realitlscanner", timeout=5)
+        return []
 
     # Get server's subnet CIDR for scanning
     try:
