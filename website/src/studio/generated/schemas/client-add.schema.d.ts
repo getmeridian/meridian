@@ -6,7 +6,9 @@
  */
 
 export type Id = string;
+export type PageUrl = string;
 export type Status = string;
+export type SubscriptionUrl = string;
 export type Username = string;
 export type Clients = ClientCreated[];
 
@@ -17,10 +19,12 @@ export interface ClientAddResult {
   clients?: Clients;
 }
 /**
- * Client metadata returned after creation.
+ * Client metadata returned after creation, with their handoff links.
  */
 export interface ClientCreated {
   id: Id;
+  page_url?: PageUrl;
   status: Status;
+  subscription_url?: SubscriptionUrl;
   username: Username;
 }

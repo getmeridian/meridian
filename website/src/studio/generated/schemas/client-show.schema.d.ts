@@ -12,9 +12,10 @@ export type Status = string;
 export type TrafficLimitBytes = number;
 export type TrafficUsedBytes = number;
 export type Username = string;
-export type Redacted = boolean;
 export type ShareAvailable = boolean;
+export type ShareUrl = string;
 export type SubscriptionAvailable = boolean;
+export type SubscriptionUrl = string;
 
 /**
  * Result for showing one client.
@@ -36,10 +37,11 @@ export interface ClientDetail {
   username: Username;
 }
 /**
- * Availability metadata for client handoff links in redacted JSON.
+ * Handoff links for one client: a page to open and a subscription to import.
  */
 export interface ClientHandoff {
-  redacted?: Redacted;
   share_available: ShareAvailable;
+  share_url?: ShareUrl;
   subscription_available: SubscriptionAvailable;
+  subscription_url?: SubscriptionUrl;
 }

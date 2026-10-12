@@ -42,6 +42,7 @@ from meridian.core.clients import (
 from meridian.core.fleet import public_url
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
 from meridian.handoff import publish_connection_pages as _publish_handoff
 from meridian.remnawave import RemnawaveError
@@ -182,7 +183,8 @@ def _run_show(
                 exit_code=exit_code,
                 warnings=repair_warnings,
                 timer=operation.timer,
-            )
+            ),
+            reveal=HANDOFF_LINK_KEYS,
         )
         if exit_code:
             raise typer.Exit(exit_code)

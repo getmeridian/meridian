@@ -47,20 +47,25 @@
     },
     "ClientHandoff": {
       "additionalProperties": false,
-      "description": "Availability metadata for client handoff links in redacted JSON.",
+      "description": "Handoff links for one client: a page to open and a subscription to import.",
       "properties": {
-        "redacted": {
-          "default": true,
-          "title": "Redacted",
-          "type": "boolean"
-        },
         "share_available": {
           "title": "Share Available",
           "type": "boolean"
         },
+        "share_url": {
+          "default": "",
+          "title": "Share Url",
+          "type": "string"
+        },
         "subscription_available": {
           "title": "Subscription Available",
           "type": "boolean"
+        },
+        "subscription_url": {
+          "default": "",
+          "title": "Subscription Url",
+          "type": "string"
         }
       },
       "required": [

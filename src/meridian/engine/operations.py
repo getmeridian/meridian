@@ -15,7 +15,7 @@ from meridian.core.errors import EngineError
 from meridian.core.models import Event, EventLevel
 from meridian.core.operations import DeployOperationResult, OperationKind, OperationSnapshot, OperationState
 from meridian.core.output import now_iso
-from meridian.core.redaction import redact
+from meridian.core.redaction import HANDOFF_LINK_KEYS, redact
 
 OperationRunner = Callable[[DeployRequest, "EngineOperation"], dict[str, Any]]
 
@@ -142,11 +142,11 @@ class EngineOperation:
     def mark_succeeded(self, result: dict[str, Any]) -> None:
         with self._lock:
             if self.state == "cancel_requested":
-                self.result = redact(result)
+                self.result = redact(result, reveal=HANDOFF_LINK_KEYS)
                 self.state = "completed_after_cancel"
                 self.updated_at = now_iso()
                 return
-            self.result = redact(result)
+            self.result = redact(result, reveal=HANDOFF_LINK_KEYS)
             self.state = "succeeded"
             self.updated_at = now_iso()
 

@@ -11,7 +11,9 @@
 export type ClientAddOutputEnvelope = _ClientAddSuccessEnvelope | _ClientAddTerminalEnvelope;
 export type Command = "client.add";
 export type Id = string;
+export type PageUrl = string;
 export type Status = string;
+export type SubscriptionUrl = string;
 export type Username = string;
 export type Clients = ClientCreated[];
 export type DurationMs = number;
@@ -69,11 +71,13 @@ export interface ClientAddResult {
   clients?: Clients;
 }
 /**
- * Client metadata returned after creation.
+ * Client metadata returned after creation, with their handoff links.
  */
 export interface ClientCreated {
   id: Id;
+  page_url?: PageUrl;
   status: Status;
+  subscription_url?: SubscriptionUrl;
   username: Username;
 }
 /**

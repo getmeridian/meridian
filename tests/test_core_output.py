@@ -215,3 +215,24 @@ def test_jsonl_events_are_monotonic_and_redacted() -> None:
 
 def test_jsonl_dumps_writes_one_compact_record() -> None:
     assert jsonl_dumps({"b": 2, "a": 1}) == '{"a":1,"b":2}'
+
+
+def test_reveal_keeps_only_named_link_keys_verbatim() -> None:
+    from meridian.core.output import json_dumps
+    from meridian.core.redaction import HANDOFF_LINK_KEYS
+
+    payload = {
+        "connection_page_url": "https://198.51.100.1/pages/u1/",
+        "subscription_url": "https://198.51.100.1/pages/sub/s1",
+        "panel_url": "https://198.51.100.1/adminsecret/",
+        "api_token": "secret-token",
+    }
+
+    revealed = json.loads(json_dumps(payload, reveal=HANDOFF_LINK_KEYS))
+    default = json.loads(json_dumps(payload))
+
+    assert revealed["connection_page_url"] == payload["connection_page_url"]
+    assert revealed["subscription_url"] == payload["subscription_url"]
+    assert "adminsecret" not in revealed["panel_url"]
+    assert revealed["api_token"] == "[redacted]"
+    assert "s1" not in default["subscription_url"] and "u1" not in default["connection_page_url"]

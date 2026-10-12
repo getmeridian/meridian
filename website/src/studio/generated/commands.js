@@ -578,7 +578,7 @@ export const commandCatalog = {
       ],
       "command": "client.show",
       "data_schema": "client-show",
-      "description": "Return one managed access client and evidenced, redacted handoff links.",
+      "description": "Return one managed access client and their connection page and subscription links.",
       "envelope_schema": "client-show-envelope",
       "error_schema": "error",
       "exit_codes": {

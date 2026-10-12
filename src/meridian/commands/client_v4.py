@@ -17,7 +17,7 @@ from meridian.core.clients import build_client_add_result, build_client_remove_r
 from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import redact_string
+from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
 from meridian.handoff import HandoffLinks
 from meridian.remnawave import User
 from meridian.renderers import emit_json
@@ -88,25 +88,34 @@ def run_add_v4(
                 )
             succeeded.append((name, user))
 
-        if is_json_mode():
-            result_data = build_client_add_result(succeeded)
-            emit_json(
-                command_envelope(
-                    command="client.add",
-                    data=result_data.to_data(),
-                    summary=Summary(
-                        text=f"Added {len(succeeded)} V4 client(s)",
-                        changed=result.changed,
-                        counts={"added": len(succeeded), "failed": 0, "page_deploy_failed": 0},
-                    ),
-                    timer=operation.timer,
-                )
-            )
-            return
+    handoffs = publish_handoff(cluster, [name for name, _user in succeeded])
+    if is_json_mode():
+        result_data = build_client_add_result(
+            succeeded,
+            {links.username: (links.page_url, links.subscription_url) for links in handoffs},
+        )
+        emit_json(
+            command_envelope(
+                command="client.add",
+                data=result_data.to_data(),
+                summary=Summary(
+                    text=f"Added {len(succeeded)} client(s)",
+                    changed=result.changed,
+                    counts={
+                        "added": len(succeeded),
+                        "failed": 0,
+                        "page_deploy_failed": sum(1 for links in handoffs if not links.page_url),
+                    },
+                ),
+                timer=operation.timer,
+            ),
+            reveal=HANDOFF_LINK_KEYS,
+        )
+        return
 
-        ok(f"Added {len(succeeded)} client(s): {', '.join(names)}")
+    ok(f"Added {len(succeeded)} client(s): {', '.join(names)}")
     handoff_failed = False
-    for links in publish_handoff(cluster, [name for name, _user in succeeded]):
+    for links in handoffs:
         if len(succeeded) > 1:
             err_console.print()
             err_console.print(f"  [bold]— {escape(links.username)} —[/bold]")

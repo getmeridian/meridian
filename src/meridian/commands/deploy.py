@@ -44,6 +44,7 @@ from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.inputs import is_local_deploy_target
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
+from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.reporters import NoopReporter, Reporter, emit_event
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -517,7 +518,8 @@ def _emit_json(result: DeployResult | DeployPlan, *, operation: OperationContext
             status=status,
             exit_code=0,
             timer=operation.timer,
-        )
+        ),
+        reveal=HANDOFF_LINK_KEYS,
     )
 
 

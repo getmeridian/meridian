@@ -448,7 +448,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         },
         machine_flags=["--json", "--repair-page"],
         stability="stable",
-        description="Return one managed access client and evidenced, redacted handoff links.",
+        description="Return one managed access client and their connection page and subscription links.",
     ),
     "node.list": CommandContract(
         command="node.list",

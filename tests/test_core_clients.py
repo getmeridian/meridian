@@ -72,7 +72,7 @@ def test_client_list_result_counts_statuses() -> None:
     assert data["clients"][0]["last_seen"] == "2026-04-02T12:00:00Z"
 
 
-def test_client_show_result_reports_handoff_availability_without_links() -> None:
+def test_client_show_result_carries_handoff_links_outside_the_client_record() -> None:
     result = build_client_show_result(
         PanelUser(),
         share_url="https://example.org/private/vless-uuid/",
@@ -86,7 +86,8 @@ def test_client_show_result_reports_handoff_availability_without_links() -> None
     assert data["handoff"] == {
         "share_available": True,
         "subscription_available": True,
-        "redacted": True,
+        "share_url": "https://example.org/private/vless-uuid/",
+        "subscription_url": "https://198.51.100.1/api/sub/short-uuid",
     }
 
 
@@ -96,7 +97,9 @@ def test_client_mutation_results_preserve_public_wire_shapes() -> None:
     enabled = build_client_status_result("alice", "active")
     disabled = build_client_status_result("alice", "disabled")
 
-    assert added.to_data() == {"clients": [{"username": "alice", "id": "17", "status": "active"}]}
+    assert added.to_data() == {
+        "clients": [{"username": "alice", "id": "17", "status": "active", "page_url": "", "subscription_url": ""}]
+    }
     assert removed.to_data() == {"client": {"username": "alice"}}
     assert enabled.to_data() == {"client": {"username": "alice", "status": "active"}}
     assert disabled.to_data() == {"client": {"username": "alice", "status": "disabled"}}

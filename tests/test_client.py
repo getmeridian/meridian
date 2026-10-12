@@ -282,7 +282,9 @@ class TestRunShow:
             mock_load.return_value = _make_cluster(tmp_home)
             run_show(name="nonexistent")
 
-    def test_show_json_redacts_subscription_url(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_show_json_hands_over_the_public_subscription_url(
+        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Legacy JSON renderer must still apply central redaction."""
         panel = _make_panel_mock()
         set_json_mode(True)
@@ -300,9 +302,9 @@ class TestRunShow:
         assert payload["schema"] == "meridian.output/v1"
         assert payload["command"] == "client.show"
         assert payload["data"]["handoff"]["subscription_available"] is True
-        assert payload["data"]["handoff"]["redacted"] is True
+        assert payload["data"]["handoff"]["subscription_url"] == "https://198.51.100.1/pages/sub/abc123"
         assert "subscription_url" not in payload["data"]["client"]
-        assert "abc123" not in json.dumps(payload)
+        assert "test-jwt-token" not in json.dumps(payload)
 
 
 class TestShowConnectionPage:

@@ -33,7 +33,7 @@
 - **Topology deletion is guarded** — teardown and server removal check intent roles, active workloads, and allocations; only a whole single-server fleet tears down in one step.
 - Post-mutation local save failures exit 3, say remote state changed, and preserve typed partial data where the command contract supports it.
 - V4 client reads and connectivity tests expose only users declared in `topology_intent.access.users`; never fall back to panel-wide service users.
-- Never render saved panel administrator credentials; client handoff output is limited to redacted links and non-secret metadata.
+- Never render saved panel administrator credentials. Handoff links (`HANDOFF_LINK_KEYS`) appear verbatim only in the final output of the command that produced them (`emit_json(..., reveal=...)`); logs, events, and errors stay redacted.
 - Doctor reports pass every free-form line through `redact_string()` and render with Rich markup disabled before sharing.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
 - V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.

@@ -2,14 +2,24 @@
   "$defs": {
     "ClientCreated": {
       "additionalProperties": false,
-      "description": "Client metadata returned after creation.",
+      "description": "Client metadata returned after creation, with their handoff links.",
       "properties": {
         "id": {
           "title": "Id",
           "type": "string"
         },
+        "page_url": {
+          "default": "",
+          "title": "Page Url",
+          "type": "string"
+        },
         "status": {
           "title": "Status",
+          "type": "string"
+        },
+        "subscription_url": {
+          "default": "",
+          "title": "Subscription Url",
           "type": "string"
         },
         "username": {

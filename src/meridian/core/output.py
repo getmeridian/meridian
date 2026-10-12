@@ -119,9 +119,9 @@ def command_envelope(
     return validate_command_envelope(payload)
 
 
-def json_dumps(value: Any) -> str:
+def json_dumps(value: Any, *, reveal: frozenset[str] = frozenset()) -> str:
     """Return a redacted, formatted JSON string for a core model or plain value."""
-    return json.dumps(redact(to_plain(value)), indent=2, sort_keys=True)
+    return json.dumps(redact(to_plain(value), reveal=reveal), indent=2, sort_keys=True)
 
 
 def jsonl_dumps(value: Any) -> str:

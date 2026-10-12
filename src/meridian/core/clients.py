@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal, Protocol, Sequence
 
 from pydantic import Field
@@ -51,11 +52,12 @@ class ClientRecord(CoreModel):
 
 
 class ClientHandoff(CoreModel):
-    """Availability metadata for client handoff links in redacted JSON."""
+    """Handoff links for one client: a page to open and a subscription to import."""
 
     share_available: bool
     subscription_available: bool
-    redacted: bool = True
+    share_url: str = ""
+    subscription_url: str = ""
 
 
 class ClientDetail(ClientRecord):
@@ -103,11 +105,13 @@ class ClientShowResult(CoreModel):
 
 
 class ClientCreated(CoreModel):
-    """Client metadata returned after creation."""
+    """Client metadata returned after creation, with their handoff links."""
 
     username: str
     id: str
     status: str
+    page_url: str = ""
+    subscription_url: str = ""
 
 
 class ClientAddResult(CoreModel):
@@ -212,14 +216,29 @@ def build_client_show_result(
         handoff=ClientHandoff(
             share_available=bool(share_url),
             subscription_available=bool(subscription_url),
+            share_url=share_url,
+            subscription_url=subscription_url,
         ),
     )
 
 
-def build_client_add_result(users: Sequence[tuple[str, PanelUserLike]]) -> ClientAddResult:
-    """Build the stable result returned for a successful client add batch."""
+def build_client_add_result(
+    users: Sequence[tuple[str, PanelUserLike]],
+    links: Mapping[str, tuple[str, str]] | None = None,
+) -> ClientAddResult:
+    """Build the result for a client add batch; ``links`` maps username to (page, subscription)."""
+    known = links or {}
     return ClientAddResult(
-        clients=[ClientCreated(username=username, id=user.id, status=user.status.lower()) for username, user in users]
+        clients=[
+            ClientCreated(
+                username=username,
+                id=user.id,
+                status=user.status.lower(),
+                page_url=known.get(username, ("", ""))[0],
+                subscription_url=known.get(username, ("", ""))[1],
+            )
+            for username, user in users
+        ]
     )
 
 

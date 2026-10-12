@@ -11,6 +11,11 @@ from pydantic import BaseModel
 
 REDACTED = "[redacted]"
 
+# Links a command hands to its operator on purpose. They pass through only the
+# final output of the command that produced them (`reveal=`), never logs,
+# events, or errors.
+HANDOFF_LINK_KEYS: frozenset[str] = frozenset({"connection_page_url", "subscription_url", "share_url", "page_url"})
+
 _SENSITIVE_KEY_PARTS = (
     "api_token",
     "apikey",
@@ -149,27 +154,34 @@ def _is_safe_metadata_key(key: str, value: Any) -> bool:
     return key.lower().replace("-", "_") == "secret" and isinstance(value, bool)
 
 
-def redact(value: Any) -> Any:
-    """Return a JSON-safe structure with obvious secrets removed."""
+def redact(value: Any, *, reveal: frozenset[str] = frozenset()) -> Any:
+    """Return a JSON-safe structure with obvious secrets removed.
+
+    String values under a key in ``reveal`` are kept verbatim.
+    """
     if isinstance(value, BaseModel):
-        return redact(value.model_dump(mode="json", by_alias=True))
+        return redact(value.model_dump(mode="json", by_alias=True), reveal=reveal)
     if is_dataclass(value):
-        return {field.name: redact(getattr(value, field.name)) for field in fields(value)}
+        return {field.name: redact(getattr(value, field.name), reveal=reveal) for field in fields(value)}
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             key_str = str(key)
-            if key_str == "properties" and isinstance(item, dict) and _is_json_schema_property_map(item):
-                redacted[key_str] = {str(prop): redact(schema) for prop, schema in item.items()}
+            if key_str in reveal and isinstance(item, str):
+                redacted[key_str] = item
+            elif key_str == "properties" and isinstance(item, dict) and _is_json_schema_property_map(item):
+                redacted[key_str] = {str(prop): redact(schema, reveal=reveal) for prop, schema in item.items()}
             else:
                 redacted[key_str] = (
-                    REDACTED if is_sensitive_key(key_str) and not _is_safe_metadata_key(key_str, item) else redact(item)
+                    REDACTED
+                    if is_sensitive_key(key_str) and not _is_safe_metadata_key(key_str, item)
+                    else redact(item, reveal=reveal)
                 )
         return redacted
     if isinstance(value, list | tuple | set | frozenset):
-        return [redact(v) for v in value]
+        return [redact(v, reveal=reveal) for v in value]
     if isinstance(value, str):
         return redact_string(value)
     if value is None or isinstance(value, bool | int | float):
