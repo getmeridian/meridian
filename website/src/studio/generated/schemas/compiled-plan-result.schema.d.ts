@@ -39,6 +39,10 @@ export type Kind =
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
 export type RetiringResources = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash = string;
 export type StateChanges = string[];
 export type Summary = string;
 
@@ -53,6 +57,7 @@ export interface CompiledPlanResult {
   plan_hash: PlanHash;
   resources?: Resources;
   retiring_resources?: RetiringResources;
+  review_hash?: ReviewHash;
   state_changes?: StateChanges;
   summary: Summary;
 }

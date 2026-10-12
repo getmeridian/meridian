@@ -25,6 +25,8 @@ export type Succeeded = number;
 export type ExitCode = number;
 export type Generation = number;
 export type PlanHash = string;
+export type RetiredResources = string[];
+export type RetirementErrors = string[];
 export type Summary = string;
 export type DurationMs = number;
 /**
@@ -54,9 +56,16 @@ export type Changed3 = boolean;
 export type ExitCode3 = number;
 export type Generation1 = number;
 export type PlanHash1 = string;
+export type RetiredResources1 = string[];
+export type RetirementErrors1 = string[];
 export type Summary2 = string;
 export type PlanHash2 = string;
 export type ResourceCount = number;
+export type RetiringResources = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash = string;
 export type DurationMs1 = number;
 /**
  * @minItems 1
@@ -95,6 +104,8 @@ export interface ApplyCommandData {
   exit_code: ExitCode;
   generation: Generation;
   plan_hash: PlanHash;
+  retired_resources?: RetiredResources;
+  retirement_errors?: RetirementErrors;
   summary: Summary;
 }
 /**
@@ -171,6 +182,8 @@ export interface CompiledApplyResult {
   exit_code: ExitCode3;
   generation: Generation1;
   plan_hash: PlanHash1;
+  retired_resources?: RetiredResources1;
+  retirement_errors?: RetirementErrors1;
   summary: Summary2;
 }
 /**
@@ -179,6 +192,8 @@ export interface CompiledApplyResult {
 export interface CompiledApplyPreview {
   plan_hash: PlanHash2;
   resource_count: ResourceCount;
+  retiring_resources?: RetiringResources;
+  review_hash?: ReviewHash;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

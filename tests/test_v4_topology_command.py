@@ -94,7 +94,11 @@ def _execution(*results: SimpleNamespace) -> SimpleNamespace:
 
 def _runtime(result: SimpleNamespace) -> MagicMock:
     runtime = MagicMock()
-    runtime.review.return_value = SimpleNamespace(plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]))
+    runtime.review.return_value = SimpleNamespace(
+        plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]),
+        retiring=(),
+        review_hash=_PLAN_HASH,
+    )
     runtime.apply_intent.return_value = result
     return runtime
 
@@ -159,7 +163,12 @@ def test_v4_apply_json_confirmation_returns_typed_preview() -> None:
 
     assert exit_code == 2
     assert payload["status"] == "failed"
-    assert payload["data"] == {"plan_hash": _PLAN_HASH, "resource_count": 1}
+    assert payload["data"] == {
+        "plan_hash": _PLAN_HASH,
+        "resource_count": 1,
+        "review_hash": _PLAN_HASH,
+        "retiring_resources": [],
+    }
     assert payload["errors"][0]["code"] == "MERIDIAN_CONFIRMATION_REQUIRED"
 
 
@@ -228,6 +237,7 @@ def test_v4_plan_json_uses_typed_compiled_result() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
         retiring=[],
         converged=True,
         drifted=[],
@@ -266,6 +276,7 @@ def test_v4_plan_reports_generation_activation_when_resources_match() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
         retiring=[],
         converged=True,
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
@@ -295,6 +306,7 @@ def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
         retiring=[],
         converged=False,
         inspections=[
@@ -324,3 +336,81 @@ def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
     assert payload["errors"][0]["code"] == "MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE"
     assert payload["data"]["drifted_resources"] == []
     assert payload["data"]["observation_errors"][0]["logical_id"] == resource.logical_id
+
+
+_REVIEW_HASH = "c" * 64
+
+
+def test_v4_apply_preview_lists_retirements_and_applies_only_the_retirement_bound_hash() -> None:
+    result = _execution(_action_result(status="converged", changed=False))
+    result.retired = ["realm:relay-a:0"]
+    result.changed = True
+    runtime = _runtime(result)
+    runtime.review.return_value = SimpleNamespace(
+        plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]),
+        retiring=(SimpleNamespace(logical_id="realm:relay-a:0"),),
+        review_hash=_REVIEW_HASH,
+    )
+    preview = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(preview),
+        pytest.raises(typer.Exit),
+    ):
+        run_v4_apply(_cluster(), yes=False, json_output=True, operation=OperationContext())
+    applied = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(applied),
+    ):
+        run_v4_apply(_cluster(), yes=True, json_output=True, operation=OperationContext())
+
+    data = json.loads(preview.getvalue())["data"]
+    assert data["review_hash"] == _REVIEW_HASH
+    assert data["retiring_resources"] == ["realm:relay-a:0"]
+    runtime.apply_intent.assert_called_once_with(_cluster().topology_intent, expected_plan_hash=_REVIEW_HASH)
+    payload = json.loads(applied.getvalue())
+    assert payload["status"] == "changed"
+    assert payload["data"]["retired_resources"] == ["realm:relay-a:0"]
+    assert payload["data"]["retirement_errors"] == []
+
+
+def test_v4_plan_shows_resources_to_remove_and_the_hash_that_binds_them(capsys) -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_REVIEW_HASH,
+        retiring=["node:exit-b", "realm:relay-a:0"],
+        converged=False,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    cluster.active_plan_hash = _PLAN_HASH
+    output = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as json_exit,
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        pytest.raises(typer.Exit) as text_exit,
+    ):
+        run_v4_plan(cluster, json_output=False, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert json_exit.value.exit_code == text_exit.value.exit_code == 2
+    assert payload["status"] == "changed"
+    assert payload["data"]["review_hash"] == _REVIEW_HASH
+    assert payload["data"]["retiring_resources"] == ["node:exit-b", "realm:relay-a:0"]
+    assert payload["summary"]["text"] == "2 resources will be removed."
+    text = capsys.readouterr().err
+    assert _REVIEW_HASH in text
+    assert "remove node:exit-b" in text and "remove realm:relay-a:0" in text

@@ -41,6 +41,8 @@ class CompiledApplyResult(CoreModel):
     exit_code: int
     counts: ApplyCounts
     actions: list[CompiledApplyActionResult] = Field(default_factory=list)
+    retired_resources: list[str] = Field(default_factory=list)
+    retirement_errors: list[str] = Field(default_factory=list)
 
     def to_data(self) -> dict[str, Any]:
         from meridian.core.serde import to_plain
@@ -57,6 +59,10 @@ class CompiledApplyPreview(CoreModel):
 
     plan_hash: str
     resource_count: int = Field(ge=0)
+    review_hash: str = Field(
+        default="", description="Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed."
+    )
+    retiring_resources: list[str] = Field(default_factory=list)
 
     def to_data(self) -> dict[str, Any]:
         from meridian.core.serde import to_plain
@@ -96,4 +102,6 @@ def build_compiled_apply_result(
         exit_code=exit_code,
         counts=counts,
         actions=actions,
+        retired_resources=list(execution_result.retired),
+        retirement_errors=list(execution_result.retirement_errors),
     )

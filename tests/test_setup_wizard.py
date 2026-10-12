@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import cast
 
+from meridian.cluster import ManagedResourceBinding
 from meridian.commands.setup_wizard import SetupWizard
 from meridian.compiler import compile_topology
 from meridian.core.setup import SetupDraft
@@ -39,11 +40,15 @@ class _ScriptedIO:
 
 
 class _Runtime:
+    def __init__(self, retiring: tuple[ManagedResourceBinding, ...] = ()) -> None:
+        self.retiring = retiring
+
     def review(self, draft: SetupDraft) -> SetupReview:
         intent = draft.to_intent()
         return SetupReview(
             intent=intent,
             plan=compile_topology(intent),
+            retiring=self.retiring,
         )
 
     def apply(self, draft: SetupDraft) -> SimpleNamespace:
@@ -52,7 +57,8 @@ class _Runtime:
             changed=True,
             failed=[],
             results=[object()],
-            plan_hash=draft.review_hash,
+            plan_hash=self.review(draft).plan.plan_hash,
+            review_hash=draft.review_hash,
         )
 
     def verify(self, draft: SetupDraft) -> SetupVerification:
@@ -155,6 +161,37 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
     assert draft.review_hash == draft.applied_plan_hash
     assert any("https://panel.example/pages/default-uuid/" in line for line in io.output)
     assert any("https://panel.example/pages/sub/default" in line for line in io.output)
+
+
+def test_review_lists_removals_and_approves_the_retirement_bound_hash(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    retiring = (
+        ManagedResourceBinding(
+            logical_id="realm:old-relay:0",
+            resource_kind="realm_hop",
+            generation=1,
+            remote_id="meridian-realm-0123456789abcdef",
+            active=True,
+            server_ref="srv-old-relay",
+        ),
+    )
+    io = _ScriptedIO(["all", "1", "2", *[""] * 15, "yes", "yes"])
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime(retiring)),
+        register_server=lambda *_args: None,
+        io=io,
+    )
+
+    assert wizard.run() == "completed"
+
+    draft = store.load()
+    assert draft is not None
+    assert draft.review_hash != draft.applied_plan_hash
+    assert draft.applied_plan_hash == compile_topology(draft.to_intent()).plan_hash
+    assert any("Removes 1 resources" in line for line in io.output)
+    assert any("realm:old-relay:0" in line for line in io.output)
 
 
 def test_details_repeats_prompt_and_quit_keeps_progress_file_untouched(

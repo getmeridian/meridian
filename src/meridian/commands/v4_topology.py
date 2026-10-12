@@ -55,6 +55,8 @@ def run_v4_apply(
                     data=CompiledApplyPreview(
                         plan_hash=review.plan.plan_hash,
                         resource_count=len(review.plan.resources),
+                        review_hash=review.review_hash,
+                        retiring_resources=[binding.logical_id for binding in review.retiring],
                     ).to_data(),
                     summary=Summary(
                         text=error.message,
@@ -70,15 +72,17 @@ def run_v4_apply(
         err_console.print(
             f"  [bold]V4 topology[/bold]: "
             f"{len(review.plan.resources)} managed resources\n"
-            f"  [dim]{review.plan.plan_hash}[/dim]"
+            f"  [dim]{review.review_hash}[/dim]"
         )
+        for binding in review.retiring:
+            err_console.print(f"  [red]remove[/red] {escape(binding.logical_id)}")
         if not confirm("Apply this reviewed topology?"):
             raise typer.Exit(1)
 
     try:
         result = runtime.apply_intent(
             intent,
-            expected_plan_hash=review.plan.plan_hash,
+            expected_plan_hash=review.review_hash,
         )
     except ReviewedApplyPersistenceError as exc:
         raise MeridianException(
@@ -217,6 +221,7 @@ def run_v4_plan(
                 for item in drifted
             ],
             retiring_resources=inspection.retiring,
+            review_hash=inspection.review_hash or inspection.plan_hash,
             resources=[
                 CompiledPlanResourceResult(
                     logical_id=resource.logical_id,
@@ -256,7 +261,8 @@ def run_v4_plan(
         )
     else:
         state = "[green]converged[/green]" if converged else "[yellow]changes pending[/yellow]"
-        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{inspection.plan_hash}[/dim]\n")
+        reviewed = inspection.review_hash or inspection.plan_hash
+        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{reviewed}[/dim]\n")
         for kind_name, count in sorted(counts.items()):
             err_console.print(f"  {kind_name}: {count}")
         for item in drifted:

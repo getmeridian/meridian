@@ -79,9 +79,10 @@ class SetupDraftService:
             raise LocalStateError(str(exc), hint="Go back and complete the missing setup choices.") from exc
         return self._complete(draft, review_hash=review_hash)
 
-    def mark_applied(self, plan_hash: str) -> SetupDraft:
+    def mark_applied(self, plan_hash: str, *, review_hash: str = "") -> SetupDraft:
+        """Record the applied plan; ``review_hash`` binds it to the reviewed retirement set."""
         draft = self._prepare_stage("apply")
-        if not draft.review_hash or plan_hash != draft.review_hash:
+        if not draft.review_hash or (review_hash or plan_hash) != draft.review_hash:
             raise LocalStateError(
                 "The apply payload does not match the reviewed plan.",
                 hint="Review the newly compiled plan before applying it.",

@@ -20,6 +20,8 @@ export type Succeeded = number;
 export type ExitCode = number;
 export type Generation = number;
 export type PlanHash = string;
+export type RetiredResources = string[];
+export type RetirementErrors = string[];
 export type Summary = string;
 
 /**
@@ -33,6 +35,8 @@ export interface CompiledApplyResult {
   exit_code: ExitCode;
   generation: Generation;
   plan_hash: PlanHash;
+  retired_resources?: RetiredResources;
+  retirement_errors?: RetirementErrors;
   summary: Summary;
 }
 /**

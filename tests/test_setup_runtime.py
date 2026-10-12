@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
 from meridian.core.cancellation import CancellationFlag, OperationCancelledError
 from meridian.core.errors import LocalStateError
@@ -456,3 +456,124 @@ def test_cancelled_apply_stops_before_remote_work_and_threads_the_token(
     assert cluster.topology_intent == _intent()
     assert cluster.pending_plan_hash == draft.review_hash
     assert cluster.active_plan_hash == ""
+
+
+class _RetiringContractDriver(ContractResourceDriver):
+    def __init__(self, on_retire) -> None:
+        self.on_retire = on_retire
+
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        self.on_retire(binding)
+
+
+def _relay_binding(server_ref: str = "srv-relay") -> ManagedResourceBinding:
+    return ManagedResourceBinding(
+        logical_id="realm:relay-old:0",
+        resource_kind="realm_hop",
+        generation=1,
+        remote_id="meridian-realm-0123456789abcdef",
+        active=True,
+        server_ref=server_ref,
+    )
+
+
+def _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built) -> SetupRuntime:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry, relay=True)
+    connection = MagicMock(spec=ServerConnection)
+    remote_files: dict[str, str] = {}
+    connection.run.return_value = SimpleNamespace(
+        returncode=0,
+        stdout="LISTEN 0 4096 127.0.0.1:8443 0.0.0.0:*\nLISTEN 0 4096 0.0.0.0:443 0.0.0.0:*\n",
+        stderr="",
+    )
+    connection.get_text.side_effect = lambda path, **_kwargs: SimpleNamespace(
+        returncode=0 if path in remote_files else 1,
+        stdout=remote_files.get(path, ""),
+        stderr="" if path in remote_files else "cat: No such file or directory",
+    )
+
+    def put_text(path: str, content: str, **_kwargs):
+        remote_files[path] = content
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    connection.put_text.side_effect = put_text
+
+    def repair_control(_payload, _plan, state, entry, _connection) -> None:
+        state.panel.server_ip = entry.host
+        state.panel.ssh_user = entry.user
+        state.panel.ssh_port = entry.port
+
+    def server_drivers(context):
+        drivers = _drivers(context.plan)
+        drivers["realm_hop"] = _RetiringContractDriver(
+            lambda binding: retired.append((binding.logical_id, context.connection(binding.server_ref)))
+        )
+        return drivers
+
+    monkeypatch.setattr("meridian.setup.runtime.build_remnawave_drivers", lambda context: _drivers(context.plan))
+    monkeypatch.setattr("meridian.setup.runtime.build_server_drivers", server_drivers)
+    return SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+        persist=lambda _state: None,
+        panel_factory=lambda _url, _token: cast(MeridianPanel, _Panel()),
+        connection_builder=lambda entry: built.setdefault(entry.id, connection),
+        control_bootstrap=MagicMock(side_effect=repair_control),
+    )
+
+
+def _cluster_with_old_relay(server_ref: str = "srv-relay") -> tuple[ClusterConfig, ManagedResourceBinding]:
+    binding = _relay_binding(server_ref)
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://panel.example", api_token="token", server_ip="198.51.100.10"),
+        managed_bindings={"realm:relay-old:0@1": binding},
+        active_generation=1,
+        active_plan_hash="b" * 64,
+    )
+    return cluster, binding
+
+
+def test_apply_reaches_servers_that_only_retiring_resources_still_reference(tmp_path, monkeypatch) -> None:
+    cluster, binding = _cluster_with_old_relay()
+    retired: list[tuple[str, object]] = []
+    built: dict[str, object] = {}
+    runtime = _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built)
+
+    review = runtime.review(SetupDraft.from_intent(_intent()))
+    result = runtime.apply_intent(_intent(), expected_plan_hash=review.review_hash)
+
+    assert [item.logical_id for item in review.retiring] == ["realm:relay-old:0"]
+    assert review.review_hash != review.plan.plan_hash
+    assert "srv-relay" not in review.plan.deployment_contract.server_targets
+    assert review.retirement_targets["srv-relay"].host == "198.51.100.30"
+    assert result.all_succeeded, result.failure_summary
+    assert result.retired == ["realm:relay-old:0"]
+    assert result.review_hash == review.review_hash
+    assert retired == [("realm:relay-old:0", built["srv-relay"])]
+    assert not binding.active
+    assert cluster.active_plan_hash == review.plan.plan_hash
+    after = runtime.review(SetupDraft.from_intent(_intent()))
+    assert after.retiring == ()
+    assert after.review_hash == after.plan.plan_hash == cluster.active_plan_hash
+
+
+def test_a_review_that_did_not_see_the_retirement_set_is_refused(tmp_path, monkeypatch) -> None:
+    cluster, _binding = _cluster_with_old_relay()
+    retired: list[tuple[str, object]] = []
+    runtime = _retiring_runtime(tmp_path, monkeypatch, cluster, retired, {})
+    plan_hash = runtime.review(SetupDraft.from_intent(_intent())).plan.plan_hash
+
+    with pytest.raises(LocalStateError, match="changed after it was reviewed"):
+        runtime.apply_intent(_intent(), expected_plan_hash=plan_hash)
+    assert retired == []
+    assert cluster.topology_intent is None
+
+
+def test_review_fails_closed_when_a_retiring_server_profile_is_gone(tmp_path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    cluster, _binding = _cluster_with_old_relay("srv-forgotten")
+
+    with pytest.raises(LocalStateError, match="saved profile is gone"):
+        SetupRuntime(registry, cluster_loader=lambda: cluster).review(SetupDraft.from_intent(_intent()))

@@ -8,11 +8,11 @@ from datetime import UTC, datetime
 from typing import Literal, Protocol, cast
 
 from pydantic import ValidationError
+from rich.markup import escape
 
 from meridian.compiler.models import (
     ConfigProfilePayload,
     HostPayload,
-    ResourcePlan,
 )
 from meridian.config import DEFAULT_SNI
 from meridian.console import confirm, err_console, prompt
@@ -40,7 +40,7 @@ from meridian.core.topology import (
     ProtocolPathIntent,
     RouteMatchKind,
 )
-from meridian.setup.runtime import SetupRuntime, SetupVerification
+from meridian.setup.runtime import SetupReview, SetupRuntime, SetupVerification
 from meridian.setup.service import SetupDraftService
 from meridian.setup.shelf import ServerShelf
 
@@ -565,13 +565,13 @@ class SetupWizard:
 
     def _review(self, draft: SetupDraft) -> None:
         review = self.runtime.review(draft)
-        self._write_plan(review.plan)
+        self._write_plan(review)
         if not self.auto_approve and not self._approve(
             "Apply this exact reviewed topology?",
             stage="review",
         ):
             raise _Navigation("save")
-        self.service.mark_reviewed(review.plan.plan_hash)
+        self.service.mark_reviewed(review.review_hash)
 
     def _apply(self, draft: SetupDraft) -> None:
         if not self.auto_approve and not self._approve(
@@ -589,7 +589,7 @@ class SetupWizard:
         self.io.write(
             f"[ok]{'Applied' if result.changed else 'Already converged'}: {len(result.results)} resources.[/ok]"
         )
-        self.service.mark_applied(result.plan_hash)
+        self.service.mark_applied(result.plan_hash, review_hash=result.review_hash or result.plan_hash)
 
     def _verify(self, draft: SetupDraft) -> None:
         self._verification = self.runtime.verify(draft)
@@ -684,7 +684,8 @@ class SetupWizard:
             host = getattr(item, "host")
             self.io.write(f"  {index}. {title} — {host}")
 
-    def _write_plan(self, plan: ResourcePlan) -> None:
+    def _write_plan(self, review: SetupReview) -> None:
+        plan = review.plan
         profiles = [
             resource.payload for resource in plan.resources if isinstance(resource.payload, ConfigProfilePayload)
         ]
@@ -694,11 +695,15 @@ class SetupWizard:
             if isinstance(resource.payload, HostPayload) and not resource.payload.is_hidden
         ]
         self.io.write(
-            f"  Plan: [bold]{plan.plan_hash}[/bold]\n"
+            f"  Plan: [bold]{review.review_hash}[/bold]\n"
             f"  Workloads: {len(profiles)}\n"
             f"  Published paths: {len(hosts)}\n"
             f"  Managed resources: {len(plan.resources)}"
         )
+        if review.retiring:
+            self.io.write(f"  [warn]Removes {len(review.retiring)} resources:[/warn]")
+            for binding in review.retiring:
+                self.io.write(f"    - {escape(binding.logical_id)}")
 
 
 def _previous_stage(stage: SetupStage) -> SetupStage:

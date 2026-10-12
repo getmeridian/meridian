@@ -7,6 +7,11 @@
 
 export type PlanHash = string;
 export type ResourceCount = number;
+export type RetiringResources = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash = string;
 
 /**
  * Reviewed V4 compiler-plan metadata returned before confirmation.
@@ -14,4 +19,6 @@ export type ResourceCount = number;
 export interface CompiledApplyPreview {
   plan_hash: PlanHash;
   resource_count: ResourceCount;
+  retiring_resources?: RetiringResources;
+  review_hash?: ReviewHash;
 }

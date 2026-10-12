@@ -107,6 +107,20 @@
       "title": "Plan Hash",
       "type": "string"
     },
+    "retired_resources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Retired Resources",
+      "type": "array"
+    },
+    "retirement_errors": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Retirement Errors",
+      "type": "array"
+    },
     "summary": {
       "title": "Summary",
       "type": "string"

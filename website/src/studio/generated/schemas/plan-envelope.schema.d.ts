@@ -44,6 +44,10 @@ export type Kind =
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
 export type RetiringResources = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash = string;
 export type StateChanges = string[];
 export type Summary = string;
 export type DurationMs = number;
@@ -75,6 +79,10 @@ export type ObservationErrors1 = CompiledPlanDriftResult[];
 export type PlanHash1 = string;
 export type Resources1 = CompiledPlanResourceResult[];
 export type RetiringResources1 = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash1 = string;
 export type StateChanges1 = string[];
 export type Summary2 = string;
 export type DurationMs1 = number;
@@ -115,6 +123,7 @@ export interface PlanCommandData {
   plan_hash: PlanHash;
   resources?: Resources;
   retiring_resources?: RetiringResources;
+  review_hash?: ReviewHash;
   state_changes?: StateChanges;
   summary: Summary;
 }
@@ -189,6 +198,7 @@ export interface CompiledPlanResult {
   plan_hash: PlanHash1;
   resources?: Resources1;
   retiring_resources?: RetiringResources1;
+  review_hash?: ReviewHash1;
   state_changes?: StateChanges1;
   summary: Summary2;
 }

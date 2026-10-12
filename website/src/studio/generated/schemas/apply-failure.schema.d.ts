@@ -24,9 +24,16 @@ export type Succeeded = number;
 export type ExitCode = number;
 export type Generation = number;
 export type PlanHash = string;
+export type RetiredResources = string[];
+export type RetirementErrors = string[];
 export type Summary = string;
 export type PlanHash1 = string;
 export type ResourceCount = number;
+export type RetiringResources = string[];
+/**
+ * Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.
+ */
+export type ReviewHash = string;
 
 /**
  * Apply result for one generation-scoped V4 compiler plan.
@@ -39,6 +46,8 @@ export interface CompiledApplyResult {
   exit_code: ExitCode;
   generation: Generation;
   plan_hash: PlanHash;
+  retired_resources?: RetiredResources;
+  retirement_errors?: RetirementErrors;
   summary: Summary;
 }
 /**
@@ -66,6 +75,8 @@ export interface ApplyCounts {
 export interface CompiledApplyPreview {
   plan_hash: PlanHash1;
   resource_count: ResourceCount;
+  retiring_resources?: RetiringResources;
+  review_hash?: ReviewHash;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

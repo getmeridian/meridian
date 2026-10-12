@@ -8,6 +8,8 @@
 
 **Reviewed runtime** — setup hashes resolved targets and runtime pins, persists topology intent before mutation, shares runtime-only node secrets in memory, and verifies canonical subscriptions before handoff.
 
+**Retirement-bound review** — `SetupReview.review_hash` binds the plan hash to the exact retirement set and the SSH targets of every server it touches, including servers no longer in the intent (resolved from the shelf). The plan hash alone stays the persisted generation identity.
+
 **Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and deployment contract to a remote marker.
 
 ## What's done well
@@ -23,3 +25,4 @@
 - Keep remote action checkpoints in typed cluster state, not `setup.json`.
 - Inspect a cloned cluster through read-only drivers; cached plan hashes cannot detect managed remote drift.
 - Control readiness reports confirmed identity/artifact drift separately from unavailable SSH, socket-table, or panel evidence.
+- Approve and apply `review_hash`, never `plan.plan_hash`: a plan hash cannot see what the change removes; a missing shelf profile for a retiring server fails review.

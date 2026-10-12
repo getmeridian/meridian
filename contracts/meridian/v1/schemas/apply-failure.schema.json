@@ -84,6 +84,19 @@
           "minimum": 0,
           "title": "Resource Count",
           "type": "integer"
+        },
+        "retiring_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retiring Resources",
+          "type": "array"
+        },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
         }
       },
       "required": [
@@ -127,6 +140,20 @@
         "plan_hash": {
           "title": "Plan Hash",
           "type": "string"
+        },
+        "retired_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retired Resources",
+          "type": "array"
+        },
+        "retirement_errors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retirement Errors",
+          "type": "array"
         },
         "summary": {
           "title": "Summary",

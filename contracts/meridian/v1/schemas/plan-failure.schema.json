@@ -119,6 +119,12 @@
           "title": "Retiring Resources",
           "type": "array"
         },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
+        },
         "state_changes": {
           "items": {
             "type": "string"

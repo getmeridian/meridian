@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, cast
 from urllib.parse import urlparse
 
 from meridian import __version__
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler import (
     DeploymentContract,
     DeploymentTarget,
@@ -70,6 +70,7 @@ from meridian.reconciler.resources import (
     UnknownResourceOutcome,
     assert_complete_driver_registry,
 )
+from meridian.reconciler.retirement import retired_bindings, retirement_review_hash, retiring_server_refs
 from meridian.reconciler.runtime_drivers import (
     ControlPlaneDriverContext,
     ControlPlaneRuntimeDriver,
@@ -108,6 +109,13 @@ class SetupReview:
 
     intent: SetupIntent
     plan: ResourcePlan
+    retiring: tuple[ManagedResourceBinding, ...] = ()
+    retirement_targets: Mapping[str, DeploymentTarget] = field(default_factory=dict)
+
+    @property
+    def review_hash(self) -> str:
+        """The hash an operator approves: the plan plus exactly what it removes."""
+        return retirement_review_hash(self.plan.plan_hash, list(self.retiring), self.retirement_targets)
 
 
 @dataclass(frozen=True)
@@ -177,18 +185,12 @@ class SetupRuntime:
         self._cancellation = cancellation
         self._control_bootstrap = control_bootstrap or partial(_bootstrap_control_plane, cancellation=cancellation)
 
-    def review(self, draft: SetupDraft) -> SetupReview:
+    def review(self, draft: SetupDraft, *, cluster: ClusterConfig | None = None) -> SetupReview:
+        """Compile the draft and list the saved resources the new plan would remove."""
         intent = _draft_intent(draft)
         entries = self._entries(sorted(deployment_server_refs(intent)))
         contract = DeploymentContract(
-            server_targets={
-                server_ref: DeploymentTarget(
-                    host=entry.host,
-                    user=entry.user,
-                    port=entry.port,
-                )
-                for server_ref, entry in entries.items()
-            },
+            server_targets={server_ref: _deployment_target(entry) for server_ref, entry in entries.items()},
             runtime_pins={
                 "acme_server": ACME_SERVER,
                 "meridian_version": __version__,
@@ -206,10 +208,16 @@ class SetupRuntime:
             },
             renderer_contract=RENDERER_CONTRACT,
         )
-        return SetupReview(
-            intent=intent,
-            plan=compile_topology(intent, deployment_contract=contract),
-        )
+        plan = compile_topology(intent, deployment_contract=contract)
+        retiring = tuple(retired_bindings(plan, cluster if cluster is not None else self._cluster_loader()))
+        targets = {
+            server_ref: contract.server_targets[server_ref]
+            for server_ref in retiring_server_refs(retiring)
+            if server_ref in contract.server_targets
+        }
+        for server_ref, entry in self._retirement_entries(retiring, plan).items():
+            targets[server_ref] = _deployment_target(entry)
+        return SetupReview(intent=intent, plan=plan, retiring=retiring, retirement_targets=targets)
 
     def apply_intent(
         self,
@@ -218,13 +226,13 @@ class SetupRuntime:
         expected_plan_hash: str | None = None,
     ) -> ResourceExecutionResult:
         draft = SetupDraft.from_intent(intent)
-        plan_hash = self.review(draft).plan.plan_hash
-        if expected_plan_hash is not None and plan_hash != expected_plan_hash:
+        review_hash = self.review(draft).review_hash
+        if expected_plan_hash is not None and review_hash != expected_plan_hash:
             raise LocalStateError(
                 "The compiled topology changed after it was reviewed.",
                 hint="Review the current plan before applying it.",
             )
-        return self.apply(draft.model_copy(update={"review_hash": plan_hash}))
+        return self.apply(draft.model_copy(update={"review_hash": review_hash}))
 
     def inspect_intent(
         self,
@@ -232,8 +240,8 @@ class SetupRuntime:
     ) -> ResourceInspectionResult:
         """Observe a compiled topology without mutating remote or local state."""
         draft = SetupDraft.from_intent(intent)
-        review = self.review(draft)
         cluster = self._cluster_loader()
+        review = self.review(draft, cluster=cluster)
         if not cluster.panel.url or not cluster.panel.api_token:
             raise LocalStateError(
                 "Saved panel credentials are missing.",
@@ -270,27 +278,31 @@ class SetupRuntime:
                     bootstrap=lambda _action: _inspection_bootstrap_error(),
                 ),
             )
-            return inspect_resource_plan(
+            inspection = inspect_resource_plan(
                 review.plan,
                 shadow,
                 drivers,
             )
+            return inspection.model_copy(update={"review_hash": review.review_hash})
         finally:
             panel.close()
 
     def apply(self, draft: SetupDraft) -> ResourceExecutionResult:
-        review = self.review(draft)
-        if not draft.review_hash or draft.review_hash != review.plan.plan_hash:
+        cluster = self._cluster_loader()
+        review = self.review(draft, cluster=cluster)
+        if not draft.review_hash or draft.review_hash != review.review_hash:
             raise LocalStateError(
                 "The compiled topology no longer matches the reviewed plan.",
                 hint="Review the current plan before applying it.",
             )
 
-        cluster = self._cluster_loader()
         validate_resource_plan_transition(review.plan, cluster)
         cluster.topology_intent = review.intent
         self._persist(cluster)
-        entries = self._entries(sorted(review.plan.deployment_contract.server_targets))
+        entries = {
+            **self._retirement_entries(review.retiring, review.plan),
+            **self._entries(sorted(review.plan.deployment_contract.server_targets)),
+        }
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
 
@@ -339,7 +351,7 @@ class SetupRuntime:
             )
         finally:
             panel.close()
-        return result
+        return result.model_copy(update={"review_hash": review.review_hash})
 
     def _build_drivers(
         self,
@@ -460,6 +472,23 @@ class SetupRuntime:
     def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:
         """Publish connection pages for verified users and return their links."""
         return publish_connection_pages(self._cluster_loader(), usernames)
+
+    def _retirement_entries(
+        self,
+        retiring: Sequence[ManagedResourceBinding],
+        plan: ResourcePlan,
+    ) -> dict[str, ServerEntry]:
+        """Saved profiles for servers that only resources being removed still reference."""
+        entries: dict[str, ServerEntry] = {}
+        for server_ref in sorted(retiring_server_refs(retiring) - set(plan.deployment_contract.server_targets)):
+            entry = self._registry.find(server_ref)
+            if entry is None:
+                raise LocalStateError(
+                    f"Server {server_ref!r} still runs resources this change removes, but its saved profile is gone.",
+                    hint="Add the server back with its SSH details so Meridian can clean it up, then review again.",
+                )
+            entries[server_ref] = entry
+        return entries
 
     def _entries(
         self,
@@ -582,6 +611,10 @@ def _control_payload(
 
 def _access_users(plan: ResourcePlan) -> list[AccessUserPayload]:
     return [resource.payload for resource in plan.resources if isinstance(resource.payload, AccessUserPayload)]
+
+
+def _deployment_target(entry: ServerEntry) -> DeploymentTarget:
+    return DeploymentTarget(host=entry.host, user=entry.user, port=entry.port)
 
 
 def _connection_for_entry(entry: ServerEntry) -> ServerConnection:
