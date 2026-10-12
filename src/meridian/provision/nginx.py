@@ -10,6 +10,7 @@ import re
 import shlex
 
 from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
+from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.ensure import resolve_ctx
 from meridian.provision.nginx_render import (
     render_nginx_http_config,
@@ -117,6 +118,9 @@ class InstallNginx:
                     status="failed",
                     detail=f"Failed to add nginx signing key: {result.stderr.strip()[:200]}",
                 )
+            key_error = verify_apt_key(conn, "/etc/apt/keyrings/nginx.asc", "nginx")
+            if key_error:
+                return StepResult(name=self.name, status="failed", detail=key_error)
 
             # Add nginx.org stable repo
             repo_line = (

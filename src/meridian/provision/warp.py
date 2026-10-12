@@ -10,6 +10,7 @@ nginx, Xray inbound) are completely unaffected.
 
 from __future__ import annotations
 
+from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -35,9 +36,16 @@ class InstallWarp:
         installed = conn.run("command -v warp-cli 2>/dev/null", timeout=10)
         if installed.returncode != 0:
             # Add Cloudflare APT repository
+            key_download = "/tmp/meridian-cloudflare-warp.asc"
+            result = conn.run(f"curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg -o {key_download}", timeout=30)
+            if result.returncode != 0:
+                return StepResult(name=self.name, status="failed", detail="Failed to download the WARP signing key")
+            key_error = verify_apt_key(conn, key_download, "cloudflare-warp")
+            if key_error:
+                return StepResult(name=self.name, status="failed", detail=key_error)
             result = conn.run(
-                "curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg"
-                " | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg",
+                f"gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg {key_download}"
+                f" && rm -f {key_download}",
                 timeout=30,
             )
             if result.returncode != 0:

@@ -10,6 +10,7 @@ from __future__ import annotations
 import shlex
 
 from meridian.facts import ServerFacts
+from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.ensure import ensure_service_running
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
@@ -129,6 +130,9 @@ class InstallDocker:
                 status="failed",
                 detail=f"failed to add Docker GPG key: {result.stderr.strip()[:200]}",
             )
+        key_error = verify_apt_key(conn, "/etc/apt/keyrings/docker.asc", "docker")
+        if key_error:
+            return StepResult(name=self.name, status="failed", detail=key_error)
 
         # Add Docker apt repository
         repo_line = (

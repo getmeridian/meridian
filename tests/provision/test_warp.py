@@ -50,6 +50,10 @@ class TestInstallWarp:
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", rc=1)
         conn.when("curl -fsSL", stdout="")
+        conn.when(
+            "gpg --show-keys",
+            stdout="pub:-:255:22:6E2DD2174FA1C3BA:::::::\nfpr:::::::::C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA:\n",
+        )
         conn.when("tee", stdout="")
         conn.when("apt-get update", stdout="")
         conn.when("systemctl enable", stdout="")
@@ -85,7 +89,7 @@ class TestInstallWarp:
         ctx = ProvisionContext(ip="198.51.100.1", warp=True)
         result = InstallWarp().run(conn, ctx)
         assert result.status == "failed"
-        assert "GPG" in result.detail
+        assert "signing key" in result.detail
 
     def test_sets_proxy_mode(self):
         """Must use proxy mode (SOCKS5), not full tunnel (would break SSH)."""

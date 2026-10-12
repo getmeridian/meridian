@@ -59,6 +59,19 @@ GITHUB_REPO = "https://github.com/getmeridian/meridian"
 # Update throttle (seconds)
 UPDATE_CHECK_INTERVAL = 60
 
+# Primary-key fingerprints of third-party apt repositories Meridian adds
+APT_KEY_FINGERPRINTS: dict[str, frozenset[str]] = {
+    "docker": frozenset({"9DC858229FC7DD38854AE2D88D81803C0EBFCD88"}),
+    "nginx": frozenset(
+        {
+            "573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62",
+            "8540A6F18833A80E9C1653A42FD21310B49F6B46",
+            "9E9BE90EACBCDE69FE9B204CBCDCD8A38D88A2B3",
+        }
+    ),
+    "cloudflare-warp": frozenset({"C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA"}),
+}
+
 # acme.sh (TLS certificates) — the script is pinned and checksum-verified before it runs as root
 ACME_SH_VERSION = "3.1.6"
 ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8d7"
