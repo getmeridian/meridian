@@ -13,6 +13,12 @@ from meridian.health import tcp_connect
 from meridian.ssh import CommandResult, ServerConnection, SSHError, _verify_host_key
 
 
+@pytest.fixture(autouse=True)
+def _local_process_is_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local-mode tests describe a root process unless they say otherwise."""
+    monkeypatch.setattr("meridian.ssh.os.geteuid", lambda: 0, raising=False)
+
+
 class TestServerConnectionInit:
     def test_defaults(self) -> None:
         conn = ServerConnection(ip="198.51.100.10")
@@ -497,6 +503,22 @@ class TestDetectLocalMode:
         assert conn.detect_local_mode() is True
         assert conn.local_mode is True
         assert conn.needs_sudo is False
+
+    def test_readable_node_yml_does_not_make_a_non_root_user_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A sudo operator who can read node.yml still needs sudo for docker (#85)."""
+        state_dir = tmp_path / "meridian"
+        state_dir.mkdir()
+        node = state_dir / "node.yml"
+        node.write_text("node_uuid: test-node\n")
+
+        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
+        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", node)
+        monkeypatch.setattr("meridian.ssh.os.geteuid", lambda: 1000)
+        conn = ServerConnection(ip="198.51.100.1")  # resolved user defaults to root
+        assert conn.detect_local_mode() is True
+        assert conn.needs_sudo is True
 
     def test_returns_true_with_sudo_when_dir_exists_but_file_unreadable(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

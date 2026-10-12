@@ -136,6 +136,12 @@ SSH_MULTIPLEX_OPTS: list[str] = [
 ]
 
 
+def _running_unprivileged() -> bool:
+    """Local commands run as this process, whatever SSH user name was resolved."""
+    geteuid = getattr(os, "geteuid", None)
+    return geteuid is not None and geteuid() != 0
+
+
 class ServerConnection(_FileTransferMixin):
     """Manage SSH connections to a remote server.
 
@@ -161,7 +167,7 @@ class ServerConnection(_FileTransferMixin):
         self.local_mode = local_mode
         self.identity_file = identity_file
         self.password = password
-        self.needs_sudo = False  # on-server non-root — run commands via sudo
+        self.needs_sudo = local_mode and _running_unprivileged()  # on-server non-root — run commands via sudo
         self.multiplex = multiplex and not identity_file and not password
         if self.multiplex and not local_mode:
             ensure_multiplex_dir()
@@ -439,6 +445,8 @@ class ServerConnection(_FileTransferMixin):
         try:
             if SERVER_NODE_CONFIG.is_file() and SERVER_NODE_CONFIG.stat().st_size > 0:
                 self.local_mode = True
+                # A readable identity file does not make this process root (#85).
+                self.needs_sudo = _running_unprivileged()
                 return True
         except (PermissionError, OSError):
             file_check_failed = True
