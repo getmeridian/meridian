@@ -53,6 +53,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
   every container image is pinned to its tested multi-arch digest (amd64 and
   arm64), so a re-pushed tag cannot change what a fresh server runs.
+- `meridian update` stays on the current major version; `--major` moves to the
+  next one after you have read its release notes.
 
 ### Remnawave versions
 Fresh deploys install the versions below. Meridian requires at least backend
@@ -72,6 +74,7 @@ running version is newer than the tested one.
 
 ### Not yet available
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
+  A running deploy can be cancelled; it stops after its current step and resumes on the next run.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
