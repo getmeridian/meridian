@@ -36,11 +36,6 @@ class Resource(str, Enum):
     NGINX_CONFIGURED = "nginx_configured"
     TLS_CERTIFICATE = "tls_certificate"
     PWA_ASSETS = "pwa_assets"
-    RELAY_PACKAGES = "relay_packages"
-    RELAY_FIREWALL = "relay_firewall"
-    REALM_INSTALLED = "realm_installed"
-    REALM_CONFIGURED = "realm_configured"
-    RELAY_VERIFIED = "relay_verified"
 
     def __str__(self) -> str:
         return self.value

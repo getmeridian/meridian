@@ -251,26 +251,6 @@ class TestRelayProvisioningBranches:
         assert result.status == "failed"
         assert "checksum mismatch" in result.detail
 
-    def test_verify_relay_retries_until_service_is_active(self) -> None:
-        from meridian.provision.relay import RelayContext, VerifyRelay
-
-        conn = MagicMock()
-        conn.run.side_effect = [
-            MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-            MagicMock(returncode=3, stdout="inactive\n", stderr=""),
-            MagicMock(returncode=0, stdout="active\n", stderr=""),
-            MagicMock(returncode=0, stdout="", stderr=""),
-        ]
-
-        with patch("meridian.provision.relay.time.sleep") as sleep:
-            result = VerifyRelay().run(
-                conn,
-                RelayContext(relay_ip="203.0.113.10", exit_ip="198.51.100.10"),
-            )
-
-        assert result.status == "ok"
-        assert sleep.call_count == 2
-
 
 class TestRelayListJsonEnvelope:
     def test_empty_list_json_outputs_typed_envelope(

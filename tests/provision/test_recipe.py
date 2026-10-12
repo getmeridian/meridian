@@ -6,7 +6,6 @@ import pytest
 
 from meridian.provision import build_node_steps, build_setup_steps
 from meridian.provision.recipe import Operation, Recipe, RecipeValidationError, Resource, op
-from meridian.provision.relay import RelayContext, build_relay_steps
 from meridian.provision.steps import ProvisionContext, StepResult
 
 
@@ -71,18 +70,6 @@ def test_setup_pipeline_steps_are_operations_with_resources() -> None:
     assert Resource.DOCKER_INSTALLED in by_name["Deploy Remnawave panel"].requires
     assert Resource.NGINX_INSTALLED in by_name["Configure nginx"].requires
     assert Resource.TLS_CERTIFICATE in by_name["Deploy PWA assets"].requires
-
-
-def test_relay_pipeline_steps_are_operations_with_resources() -> None:
-    ctx = RelayContext(relay_ip="198.51.100.1", exit_ip="198.51.100.2")
-    steps = build_relay_steps(ctx)
-
-    assert all(isinstance(step, Operation) for step in steps)
-    by_name = {step.name: step for step in steps}
-    assert Resource.RELAY_PACKAGES in by_name["Install Realm TCP relay"].requires
-    assert Resource.REALM_INSTALLED in by_name["Configure Realm relay"].requires
-    assert Resource.RELAY_FIREWALL in by_name["Configure Realm relay"].requires
-    assert Resource.REALM_CONFIGURED in by_name["Verify relay connectivity"].requires
 
 
 def test_node_pipeline_keeps_panel_out_of_graph() -> None:

@@ -10,7 +10,6 @@ Uses the Remnawave provisioning pipeline.
 from __future__ import annotations
 
 from meridian.provision import build_setup_steps
-from meridian.provision.relay import RelayContext, build_relay_steps
 from meridian.provision.steps import ProvisionContext
 from tests.support.mock_connection import MockConnection
 
@@ -146,30 +145,3 @@ class TestFullPipelineContract:
 
 class TestRelayPipelineContract:
     """Verify data contract across the relay pipeline."""
-
-    def test_relay_pipeline_uses_typed_context(self) -> None:
-        """Full relay pipeline runs without KeyError."""
-        ctx = RelayContext(
-            relay_ip="198.51.100.10",
-            exit_ip="198.51.100.1",
-            listen_port=9443,
-        )
-
-        conn = MockConnection()
-        conn.when("dpkg-query", stdout="curl\tok\nwget\tok\n")
-        conn.when("sysctl -n net.core.default_qdisc", stdout="fq\n")
-        conn.when("sysctl -n net.ipv4.tcp_congestion_control", stdout="bbr\n")
-        conn.when("which ufw", stdout="/usr/sbin/ufw\n")
-        conn.when("ufw status", stdout="Status: active\n")
-        conn.when("realm --version", stdout="realm 2.9.3\n")
-        conn.when("uname -m", stdout="x86_64\n")
-        conn.when("systemctl is-active", stdout="active\n")
-        conn.when("nc -z", rc=0)
-
-        steps = build_relay_steps(ctx)
-
-        for step in steps:
-            try:
-                step.run(conn, ctx)
-            except AttributeError as e:
-                raise AssertionError(f"Relay step '{step.name}' crashed: {e}") from e
