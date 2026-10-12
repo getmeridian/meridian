@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 from uuid import uuid4
 
 from pydantic import ConfigDict, Field, model_validator
@@ -22,6 +22,8 @@ from meridian.core.workflow import InputField, InputSection, WorkflowPlan
 ServerAuthState = Literal["unknown", "validated", "key_ready", "failed"]
 ServerSource = Literal["manual", "engine"]
 ServerKeyPolicy = Literal["generate_meridian", "use_existing"]
+# systemd's /etc/machine-id: 32 lowercase hex digits, or empty when unknown.
+MachineIdValue = Annotated[str, Field(pattern=r"^([0-9a-f]{32})?$")]
 
 
 class ServerConnectionDraft(CoreModel):
@@ -46,6 +48,11 @@ class ServerProfile(CoreModel):
     last_error: str = ""
     key_path: str = ""
     source: ServerSource = "manual"
+    machine_id: MachineIdValue = Field(
+        default="",
+        description="The server's /etc/machine-id, recorded when Meridian ran on it. "
+        "On that machine Meridian runs commands locally instead of over SSH.",
+    )
 
 
 class ServerValidateRequest(CoreModel):

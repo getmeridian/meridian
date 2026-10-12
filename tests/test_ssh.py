@@ -546,94 +546,14 @@ class TestVerifyHostKey:
         assert not known_hosts.exists()
 
 
-class TestDetectLocalMode:
-    """Tests for detect_local_mode — file/directory-based server detection."""
-
-    def test_returns_true_when_node_yml_readable(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Root on deployed server: /etc/meridian/node.yml exists and is readable."""
-        state_dir = tmp_path / "meridian"
-        state_dir.mkdir()
-        node = state_dir / "node.yml"
-        node.write_text("node_uuid: test-node\n")
-
-        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
-        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", node)
-        conn = ServerConnection(ip="198.51.100.1")
-        assert conn.detect_local_mode() is True
-        assert conn.local_mode is True
-        assert conn.needs_sudo is False
-
-    def test_readable_node_yml_does_not_make_a_non_root_user_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+class TestLocalConnection:
+    @pytest.mark.parametrize(("euid", "needs_sudo"), [(0, False), (1000, True)])
+    def test_local_sudo_follows_the_process_uid_not_the_saved_user(
+        self, monkeypatch: pytest.MonkeyPatch, euid: int, needs_sudo: bool
     ) -> None:
-        """A sudo operator who can read node.yml still needs sudo for docker (#85)."""
-        state_dir = tmp_path / "meridian"
-        state_dir.mkdir()
-        node = state_dir / "node.yml"
-        node.write_text("node_uuid: test-node\n")
-
-        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
-        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", node)
-        monkeypatch.setattr("meridian.ssh.os.geteuid", lambda: 1000)
-        conn = ServerConnection(ip="198.51.100.1")  # resolved user defaults to root
-        assert conn.detect_local_mode() is True
-        assert conn.needs_sudo is True
-
-    def test_returns_true_with_sudo_when_dir_exists_but_file_unreadable(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Non-root on deployed server: directory exists but node.yml is unreadable."""
-        state_dir = tmp_path / "meridian"
-        state_dir.mkdir()
-        node = state_dir / "node.yml"
-        node.write_text("node_uuid: test-node\n")
-
-        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
-        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", node)
-
-        # Simulate PermissionError on is_file (non-root can't stat)
-        original_is_file = Path.is_file
-
-        def fake_is_file(self: Path) -> bool:
-            if self == node:
-                raise PermissionError("Permission denied")
-            return original_is_file(self)
-
-        monkeypatch.setattr(Path, "is_file", fake_is_file)
-
-        conn = ServerConnection(ip="198.51.100.1")
-        assert conn.detect_local_mode() is True
-        assert conn.local_mode is True
-        assert conn.needs_sudo is True
-
-    def test_returns_false_when_nothing_exists(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Not on server (e.g. laptop, even via TUN mode): no /etc/meridian/ at all."""
-        state_dir = tmp_path / "meridian"
-        # Don't create the directory — simulates a laptop
-        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
-        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", state_dir / "node.yml")
-
-        conn = ServerConnection(ip="198.51.100.1")
-        assert conn.detect_local_mode() is False
-        assert conn.local_mode is False
-        assert conn.needs_sudo is False
-
-    def test_returns_false_when_node_yml_empty(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Edge case: node.yml exists but is empty (incomplete deploy)."""
-        state_dir = tmp_path / "meridian"
-        state_dir.mkdir()
-        node = state_dir / "node.yml"
-        node.write_text("")
-
-        monkeypatch.setattr("meridian.config.SERVER_CREDS_DIR", state_dir)
-        monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", node)
-        conn = ServerConnection(ip="198.51.100.1")
-        assert conn.detect_local_mode() is False
-
-
-# ---------------------------------------------------------------------------
-# Secret redaction
-# ---------------------------------------------------------------------------
+        monkeypatch.setattr("meridian.ssh.os.geteuid", lambda: euid)
+        conn = ServerConnection(ip="198.51.100.1", user="root", local_mode=True)
+        assert conn.needs_sudo is needs_sudo
 
 
 class TestRedactCommand:

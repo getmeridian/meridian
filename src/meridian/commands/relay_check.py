@@ -17,6 +17,7 @@ from meridian.core.output import OperationContext, command_envelope
 from meridian.core.relay_check import RelayCheckResult, RelayHopTarget
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.core.verification import VerificationCheck, aggregate_verification
+from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection
 
@@ -146,12 +147,7 @@ def _entry(registry: ServerRegistry, server_ref: str) -> ServerEntry:
 
 def _connection_for(user_override: str) -> ConnectionFactory:
     def connect(entry: ServerEntry) -> ServerConnection:
-        return ServerConnection(
-            entry.host,
-            user_override or entry.user,
-            port=entry.port,
-            identity_file=entry.key_path,
-        )
+        return connection_for_entry(entry, user=user_override)
 
     return connect
 

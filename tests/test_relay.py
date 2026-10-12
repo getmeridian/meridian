@@ -89,7 +89,7 @@ class TestRelayCLI:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch(
                 "meridian.commands.resolve.resolve_server",
-                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, conn=MagicMock()),
+                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, machine_id="", conn=MagicMock()),
             ),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
@@ -120,7 +120,7 @@ class TestRelayCLI:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch(
                 "meridian.commands.resolve.resolve_server",
-                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, conn=MagicMock()),
+                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, machine_id="", conn=MagicMock()),
             ),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",

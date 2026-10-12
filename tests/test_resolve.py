@@ -184,7 +184,6 @@ class TestSingleServerAutoSelect:
     """Path 4: single registered server auto-selected."""
 
     def test_single_server_auto_select(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: ClusterConfig())
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "only-one"))
@@ -195,7 +194,6 @@ class TestSingleServerAutoSelect:
     def test_auto_select_ignores_cluster_relay_only_entries(
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "exit"))
         reg.add(ServerEntry("203.0.113.10", "root", "relay-a"))
@@ -210,7 +208,6 @@ class TestSingleServerAutoSelect:
     def test_dual_role_server_remains_auto_selectable(
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.9", "root", "main-exit"))
         reg.add(ServerEntry("198.51.100.10", "root", "exit-relay"))
@@ -228,7 +225,6 @@ class TestMultipleServers:
     """Path 5: multiple servers registered, no selection."""
 
     def test_multiple_servers_fail(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: ClusterConfig())
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "server1"))
@@ -240,7 +236,6 @@ class TestMultipleServers:
     def test_multiple_real_exits_do_not_auto_select_with_cluster_relay(
         self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "exit-a"))
         reg.add(ServerEntry("198.51.100.11", "root", "exit-b"))
@@ -257,7 +252,6 @@ class TestNoServers:
     """Path 6: empty registry, no explicit IP."""
 
     def test_no_servers_fail(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: None)
         monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: ClusterConfig())
         reg = ServerRegistry(servers_file)
         with pytest.raises(typer.Exit) as exc_info:
@@ -265,15 +259,82 @@ class TestNoServers:
         assert exc_info.value.exit_code != 0
 
 
-class TestLocalMode:
-    """Path 3: running on the server itself as root."""
+MACHINE_ID = "0123456789abcdef0123456789abcdef"
 
-    def test_local_mode_detection(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("meridian.resolve.detect_local_server_ip", lambda: "198.51.100.10")
+
+@pytest.fixture
+def this_machine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    machine_id_file = tmp_path / "machine-id"
+    machine_id_file.write_text(MACHINE_ID + "\n")
+    monkeypatch.setattr("meridian.servers.MACHINE_ID_FILE", machine_id_file)
+    return MACHINE_ID
+
+
+class TestLocalMode:
+    """Path 3: running on a saved server itself, matched by machine ID."""
+
+    def test_saved_server_with_this_machine_id_runs_locally(self, servers_file: Path, this_machine: str) -> None:
         reg = ServerRegistry(servers_file)
-        result = resolve_server(reg)
-        assert result.ip == "198.51.100.10"
-        assert result.local_mode is True
+        reg.add(ServerEntry(host="198.51.100.10", name="exit-a"))
+        reg.add(ServerEntry(host="198.51.100.11", name="home", user="ubuntu", machine_id=this_machine))
+
+        assert resolve_server(reg).ip == "198.51.100.11"
+        assert resolve_server(reg).local_mode is True
+        assert resolve_server(reg, explicit_ip="home").conn.local_mode is True
+        assert resolve_server(reg, explicit_ip="exit-a").local_mode is False
+
+    def test_copied_profiles_on_another_machine_keep_using_ssh(
+        self, servers_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        other = tmp_path / "other-machine-id"
+        other.write_text("f" * 32 + "\n")
+        monkeypatch.setattr("meridian.servers.MACHINE_ID_FILE", other)
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry(host="198.51.100.11", name="home", machine_id=MACHINE_ID))
+
+        result = resolve_server(reg, explicit_ip="home")
+
+        assert result.local_mode is False
+        assert result.machine_id == ""
+
+    def test_missing_machine_id_never_matches_an_empty_record(
+        self, servers_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("meridian.servers.MACHINE_ID_FILE", tmp_path / "absent")
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry(host="198.51.100.11", name="home"))
+
+        assert reg.find("home") is not None and reg.find("home").runs_here() is False
+
+    def test_an_address_assigned_to_this_machine_runs_locally_without_a_machine_id(
+        self, servers_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("meridian.servers.MACHINE_ID_FILE", tmp_path / "absent")
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry(host="127.0.0.1", name="loop"))
+
+        assert resolve_server(reg, explicit_ip="loop").local_mode is True
+        assert resolve_server(reg, explicit_ip="198.51.100.30").local_mode is False
+
+    def test_local_keyword_records_this_machine_for_later_commands(
+        self, servers_file: Path, this_machine: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("meridian.resolve.detect_public_ip", lambda: "198.51.100.12")
+        reg = ServerRegistry(servers_file)
+
+        result = resolve_server(reg, explicit_ip="local")
+
+        assert (result.ip, result.local_mode, result.machine_id) == ("198.51.100.12", True, this_machine)
+
+    def test_local_target_saves_the_account_running_meridian_not_root(
+        self, servers_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("meridian.resolve.detect_public_ip", lambda: "198.51.100.12")
+        monkeypatch.setattr("meridian.resolve.current_login", lambda: "ubuntu")
+        reg = ServerRegistry(servers_file)
+
+        assert resolve_server(reg, explicit_ip="local").user == "ubuntu"
+        assert resolve_server(reg, explicit_ip="local", user="admin").user == "admin"
 
 
 class TestLocalKeyword:
@@ -354,20 +415,3 @@ class TestResolvedServer:
         assert result.conn.ip == "198.51.100.10"
         assert result.conn.user == "ubuntu"
         assert result.conn.local_mode is False
-
-
-def test_local_server_ip_comes_from_the_saved_control_plane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from meridian.cluster import PanelConfig
-    from meridian.resolve import detect_local_server_ip
-
-    marker = tmp_path / "node.yml"
-    monkeypatch.setattr("meridian.config.SERVER_NODE_CONFIG", marker)
-    cluster = ClusterConfig(
-        panel=PanelConfig(server_ip="198.51.100.10"),
-        topology_intent=single_server_intent(None, server_ref="srv-0a1b2c3d4e5f"),
-    )
-    monkeypatch.setattr("meridian.cluster.ClusterConfig.load", lambda: cluster)
-
-    assert detect_local_server_ip() is None
-    marker.write_text("server: true\n")
-    assert detect_local_server_ip() == "198.51.100.10"

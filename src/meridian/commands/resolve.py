@@ -19,7 +19,7 @@ from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
 )
-from meridian.servers import ServerRegistry
+from meridian.servers import ServerRegistry, address_is_local
 from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
 
@@ -68,7 +68,8 @@ def _resolve_server(
 
     # 1. 'local' keyword: run on this machine without SSH
     if target.local:
-        detected_ip = _resolve_lib.detect_public_ip()
+        here = _resolve_lib.local_entry(registry)
+        detected_ip = here.host if here else _resolve_lib.detect_public_ip()
         if not detected_ip:
             fail(
                 "Could not detect this server's public IP",
@@ -87,8 +88,10 @@ def _resolve_server(
             registry_user = entry.user
             registry_port = entry.port
             registry_key_path = entry.key_path
+            local_mode = entry.runs_here()
         elif is_ip(target.host) or "." in target.host:
             ip = target.host
+            local_mode = address_is_local(ip)
         else:
             fail(
                 f"Server '{target.host}' not found",
@@ -96,12 +99,15 @@ def _resolve_server(
                 hint_type="user",
             )
 
-    # 3. Running on the server itself as root — /etc/meridian/ readable
+    # 3. Running on a saved server itself (its recorded machine ID matches)
     else:
-        local_ip = _resolve_lib.detect_local_server_ip()
-        if local_ip:
-            ip = local_ip
+        here = _resolve_lib.local_entry(registry)
+        if here:
+            ip = here.host
+            registry_user = here.user
+            registry_port = here.port
             local_mode = True
+            info(f"Using this server: {here.name or ip}")
 
         # 4. Single server auto-select
         else:
@@ -134,8 +140,9 @@ def _resolve_server(
                     fail_meridian_v3_state()
                 fail("No servers configured", hint="Deploy a server first: meridian deploy IP", hint_type="user")
 
-    # Resolve user: explicit flag > registry > default root
-    resolved_user = user or registry_user or "root"
+    # Resolve user: explicit flag > registry > this account when local (so the saved
+    # profile SSHes in as it from elsewhere) > default root
+    resolved_user = user or registry_user or (_resolve_lib.current_login() if local_mode else "") or "root"
 
     if not _resolve_lib.VALID_SSH_USER.match(resolved_user):
         fail(

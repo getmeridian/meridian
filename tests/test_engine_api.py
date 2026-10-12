@@ -74,6 +74,7 @@ def test_engine_exposes_contracts_workflows_and_saved_servers() -> None:
             "id": profile.id,
             "last_error": "",
             "last_validated_at": "",
+            "machine_id": "",
             "source": "manual",
             "ssh_port": 2222,
             "ssh_user": "ubuntu",

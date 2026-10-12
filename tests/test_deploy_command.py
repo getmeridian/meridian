@@ -45,7 +45,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
     conn = MagicMock(port=22)
-    resolved = SimpleNamespace(ip="198.51.100.10", user="root", conn=conn)
+    resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
     runtime.publish_handoff.return_value = [
@@ -99,7 +99,7 @@ def _fake_runtime() -> MagicMock:
 
 
 def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.google.com"), args=()):
-    resolved = SimpleNamespace(ip="198.51.100.10", user="root", conn=MagicMock(port=22))
+    resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22))
     with (
         patch("meridian.commands.deploy.resolve_server", return_value=resolved),
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),

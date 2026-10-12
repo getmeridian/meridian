@@ -96,6 +96,7 @@ def run_add(
                 name=request.name or resolved.ip,
                 port=request.ssh_port,
                 auth_state="validated",
+                machine_id=resolved.machine_id,
             )
         )
     except LocalStateError as exc:

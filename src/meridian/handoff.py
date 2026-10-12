@@ -117,6 +117,22 @@ def publish_connection_page(
     return HandoffLinks(user.username, subscription_url, page_url=target)
 
 
+def control_connection(cluster: ClusterConfig) -> ServerConnection:
+    """Open the control server through its saved profile (local when Meridian runs on it)."""
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.resolve import connection_for_entry
+    from meridian.servers import ServerRegistry
+
+    entry = ServerRegistry(SERVER_PROFILES_FILE).find(cluster.panel.server_ip)
+    if entry is not None:
+        return connection_for_entry(entry)
+    return ServerConnection(
+        cluster.panel.server_ip,
+        user=cluster.panel.ssh_user or "root",
+        port=cluster.panel.ssh_port or 22,
+    )
+
+
 def remove_connection_page(cluster: ClusterConfig, vless_uuid: str) -> str:
     """Delete a removed user's page from the control server; return an error or ''."""
     from uuid import UUID
@@ -127,11 +143,7 @@ def remove_connection_page(cluster: ClusterConfig, vless_uuid: str) -> str:
         canonical = str(UUID(vless_uuid))
     except ValueError:
         return f"unexpected page id {vless_uuid!r}"
-    with ServerConnection(
-        cluster.panel.server_ip,
-        user=cluster.panel.ssh_user or "root",
-        port=cluster.panel.ssh_port or 22,
-    ) as conn:
+    with control_connection(cluster) as conn:
         result = conn.run(f"rm -rf /var/www/private/{canonical}", timeout=30)
     if result.returncode != 0:
         return (result.stderr or result.stdout).strip()[:200] or "could not delete the page"
@@ -146,11 +158,7 @@ def publish_connection_pages(cluster: ClusterConfig, usernames: Iterable[str]) -
         return []
     with (
         MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel,
-        ServerConnection(
-            cluster.panel.server_ip,
-            user=cluster.panel.ssh_user or "root",
-            port=cluster.panel.ssh_port or 22,
-        ) as conn,
+        control_connection(cluster) as conn,
     ):
         results: list[HandoffLinks] = []
         for name in names:

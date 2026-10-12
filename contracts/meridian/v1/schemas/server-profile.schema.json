@@ -47,6 +47,13 @@
       "title": "Last Validated At",
       "type": "string"
     },
+    "machine_id": {
+      "default": "",
+      "description": "The server's /etc/machine-id, recorded when Meridian ran on it. On that machine Meridian runs commands locally instead of over SSH.",
+      "pattern": "^([0-9a-f]{32})?$",
+      "title": "Machine Id",
+      "type": "string"
+    },
     "source": {
       "default": "manual",
       "enum": [

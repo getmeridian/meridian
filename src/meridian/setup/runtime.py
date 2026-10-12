@@ -91,7 +91,7 @@ from meridian.reconciler.workloads import (
 )
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
 from meridian.remnawave.versions import check_panel_version
-from meridian.resolve import ResolvedServer
+from meridian.resolve import ResolvedServer, connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.ssh import ServerConnection
@@ -186,7 +186,7 @@ class SetupRuntime:
         self._cluster_loader = cluster_loader
         self._persist = persist or (lambda cluster: cluster.save())
         self._panel_factory = panel_factory
-        self._connection_builder = connection_builder or _connection_for_entry
+        self._connection_builder = connection_builder or connection_for_entry
         self._cancellation = cancellation
         self._reporter: Reporter = reporter or NoopReporter()
         self._operation = operation or OperationContext()
@@ -642,15 +642,6 @@ def _access_users(plan: ResourcePlan) -> list[AccessUserPayload]:
 
 def _deployment_target(entry: ServerEntry) -> DeploymentTarget:
     return DeploymentTarget(host=entry.host, user=entry.user, port=entry.port)
-
-
-def _connection_for_entry(entry: ServerEntry) -> ServerConnection:
-    return ServerConnection(
-        entry.host,
-        entry.user,
-        port=entry.port,
-        identity_file=entry.key_path,
-    )
 
 
 def _bootstrap_control_plane(

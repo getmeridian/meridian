@@ -174,7 +174,7 @@ class TestNodeAdd:
         cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
         registry = MagicMock()
         registry.find.return_value = SimpleNamespace(id="srv-new", host="198.51.100.5", name="new-exit")
-        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22)
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
 
         with (
             patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
@@ -197,7 +197,7 @@ class TestNodeAdd:
         pending = cluster.topology_intent.exits[0]
         registry = MagicMock()
         registry.find.return_value = SimpleNamespace(id=pending.server_ref, host="198.51.100.5", name="exit")
-        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22)
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
         applied = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
 
         with (
@@ -216,7 +216,7 @@ class TestNodeAdd:
         pending = cluster.topology_intent.exits[0]
         registry = MagicMock()
         registry.find.return_value = SimpleNamespace(id=pending.server_ref, host="198.51.100.5", name="exit")
-        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22)
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
 
         with (
             patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
@@ -238,7 +238,7 @@ class TestNodeAdd:
         cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
         registry = MagicMock()
         registry.find.return_value = SimpleNamespace(id="srv-new", host="198.51.100.5", name="new-exit")
-        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22)
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root", port=22, machine_id="")
 
         with (
             patch("meridian.commands.node.load_topology_cluster", return_value=cluster),

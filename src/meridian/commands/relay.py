@@ -109,6 +109,7 @@ def run_deploy(
                 name=request.relay_name or request.relay_ip,
                 port=request.ssh_port,
                 auth_state="validated",
+                machine_id=target.machine_id,
             )
         )
     except LocalStateError as exc:

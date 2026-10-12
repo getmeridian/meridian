@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import builtins
+import contextlib
+import ipaddress
 import json
 import os
+import re
+import socket
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -42,6 +46,18 @@ class ServerEntry:
     last_validated_at: str = ""
     last_error: str = ""
     source: ServerSource = "manual"
+    machine_id: str = ""
+
+    def runs_here(self) -> bool:
+        """Whether this is the machine Meridian is running on, so commands skip SSH.
+
+        Either the recorded machine ID matches (NAT clouds never put the public
+        IP on an interface) or the server's address is assigned locally. Neither
+        uses the outbound public IP, which a laptop on the server's own VPN shares.
+        """
+        if self.machine_id and self.machine_id == this_machine_id():
+            return True
+        return address_is_local(self.host)
 
     @property
     def ssh_user(self) -> str:
@@ -57,6 +73,30 @@ class ServerEntry:
     def title(self) -> str:
         """Alias for ``name`` — matches ``ServerProfile.title``."""
         return self.name
+
+
+MACHINE_ID_FILE = Path("/etc/machine-id")
+
+
+def this_machine_id() -> str:
+    """Return this machine's systemd machine ID, or '' where there is none (macOS, minimal containers)."""
+    try:
+        value = MACHINE_ID_FILE.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return value if re.fullmatch(r"[0-9a-f]{32}", value) else ""
+
+
+def address_is_local(host: str) -> bool:
+    """Whether ``host`` is an IP assigned to this machine; binding succeeds only for local addresses."""
+    try:
+        family = socket.AF_INET6 if ipaddress.ip_address(host).version == 6 else socket.AF_INET
+    except ValueError:
+        return False
+    with contextlib.suppress(OSError), socket.socket(family, socket.SOCK_DGRAM) as probe:
+        probe.bind((host, 0))
+        return True
+    return False
 
 
 class ServerRegistry:
@@ -77,20 +117,7 @@ class ServerRegistry:
         """Find a server by IP, name, or v2 profile ID (first match)."""
         needle = query.strip()
         profile = self._store.find(needle)
-        if profile:
-            return ServerEntry(
-                host=profile.host,
-                user=profile.ssh_user,
-                name=profile.title,
-                port=profile.ssh_port,
-                key_path=profile.key_path,
-                id=profile.id,
-                auth_state=profile.auth_state,
-                last_validated_at=profile.last_validated_at,
-                last_error=profile.last_error,
-                source=profile.source,
-            )
-        return None
+        return _profile_entries([profile])[0] if profile else None
 
     def add(self, entry: ServerEntry) -> None:
         """Add or update a server without merging distinct saved identities."""
@@ -119,6 +146,7 @@ class ServerRegistry:
                 "last_validated_at": entry.last_validated_at
                 or (existing_profile.last_validated_at if existing_profile else ""),
                 "source": existing_profile.source if existing_profile else entry.source,
+                "machine_id": entry.machine_id or (existing_profile.machine_id if existing_profile else ""),
             }
         )
         self._store.upsert(profile)
@@ -295,6 +323,7 @@ def _profile_entries(profiles: list[ServerProfile]) -> list[ServerEntry]:
             last_validated_at=profile.last_validated_at,
             last_error=profile.last_error,
             source=profile.source,
+            machine_id=profile.machine_id,
         )
         for profile in profiles
     ]

@@ -56,7 +56,7 @@ from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.renderers import emit_json
-from meridian.resolve import merge_target
+from meridian.resolve import connection_for_entry, merge_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
     DEFAULT_CLIENT,
@@ -199,7 +199,7 @@ def _execute(
     if first_deploy:
         check_ports(resolved.conn, resolved.ip, request.yes)
 
-    registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=getattr(resolved.conn, "port", 22)))
+    registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=resolved.port, machine_id=resolved.machine_id))
     entry = registry.find(resolved.ip)
     if entry is None or not entry.id:
         fail(
@@ -219,7 +219,7 @@ def _execute(
         # Reuse the verified (possibly local-mode) connection for the deploy target.
         if candidate.id == entry.id:
             return resolved.conn
-        return ServerConnection(candidate.host, candidate.user, port=candidate.port, identity_file=candidate.key_path)
+        return connection_for_entry(candidate)
 
     progress = ExitStack()
     runtime = SetupRuntime(

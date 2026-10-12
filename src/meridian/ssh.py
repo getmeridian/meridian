@@ -161,8 +161,7 @@ class ServerConnection(_FileTransferMixin):
     """Manage SSH connections to a remote server.
 
     Non-root remote users: commands are wrapped in sudo -n sh -c via SSH.
-    Non-root local users: detect_local_mode sets needs_sudo, commands run
-    via sudo -n bash -c for privilege escalation.
+    Non-root local users: commands run via sudo -n bash -c for privilege escalation.
     Passwordless sudo is required (standard on AWS/GCP/Azure/DO).
     """
 
@@ -470,39 +469,3 @@ class ServerConnection(_FileTransferMixin):
             ),
             category="user",
         )
-
-    def detect_local_mode(self) -> bool:
-        """Check if we're running on the target server itself.
-
-        Detection is file-based only: /etc/meridian/node.yml readable (root),
-        or /etc/meridian/ exists but the identity file is unreadable (non-root).
-
-        Does NOT use public IP matching — that produces false positives when
-        the user is connected to the server via TUN mode (VPN), since their
-        outbound IP matches the server IP.
-        """
-        from meridian.config import SERVER_CREDS_DIR, SERVER_NODE_CONFIG
-
-        file_check_failed = False
-
-        try:
-            if SERVER_NODE_CONFIG.is_file() and SERVER_NODE_CONFIG.stat().st_size > 0:
-                self.local_mode = True
-                # A readable identity file does not make this process root (#85).
-                self.needs_sudo = _running_unprivileged()
-                return True
-        except (PermissionError, OSError):
-            file_check_failed = True
-
-        # Dir exists but files not readable → non-root on deployed server
-        if file_check_failed:
-            try:
-                if SERVER_CREDS_DIR.is_dir():
-                    logger.warning("Running as non-root on the server. Using sudo for commands.")
-                    self.local_mode = True
-                    self.needs_sudo = True
-                    return True
-            except (PermissionError, OSError):
-                pass
-
-        return False

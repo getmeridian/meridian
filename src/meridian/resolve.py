@@ -7,12 +7,13 @@ pure helpers that library code may import without pulling in the CLI layer.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass
 
 from meridian.config import is_ip
-from meridian.servers import ServerEntry, ServerRegistry
+from meridian.servers import ServerEntry, ServerRegistry, this_machine_id
 from meridian.ssh import SSHUI, ServerConnection
 
 LOCAL_KEYWORDS = ("local", "locally")
@@ -128,23 +129,38 @@ class ResolvedServer:
     def port(self) -> int:
         return self.conn.port
 
+    @property
+    def machine_id(self) -> str:
+        """The ID to save with the profile, so later commands on this machine skip SSH too."""
+        return this_machine_id() if self.local_mode else ""
 
-def detect_local_server_ip() -> str | None:
-    """Check if we're running on a deployed server and extract its IP.
 
-    Requires the v4 server identity marker and a control-plane address in cluster.yml.
-    """
+def current_login() -> str:
+    """Name of the account running Meridian ('' where POSIX accounts do not exist)."""
     try:
-        from meridian.cluster import ClusterConfig
-        from meridian.config import SERVER_NODE_CONFIG
+        import pwd
 
-        if SERVER_NODE_CONFIG.is_file():
-            cluster = ClusterConfig.load()
-            if cluster.topology_intent is not None and cluster.panel.server_ip:
-                return cluster.panel.server_ip
-    except (PermissionError, OSError):
-        pass
-    return None
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except (ImportError, KeyError, AttributeError):
+        return ""
+
+
+def local_entry(registry: ServerRegistry) -> ServerEntry | None:
+    """Return the saved server Meridian is running on, if exactly one matches this machine."""
+    matches = [entry for entry in registry.list() if entry.runs_here()]
+    return matches[0] if len(matches) == 1 else None
+
+
+def connection_for_entry(entry: ServerEntry, *, user: str = "") -> ServerConnection:
+    """Open a saved server: locally when it is this machine, otherwise over SSH."""
+    if entry.runs_here():
+        return ServerConnection(entry.host, user or entry.user, local_mode=True, port=entry.port)
+    return ServerConnection(
+        entry.host,
+        user or entry.user,
+        port=entry.port,
+        identity_file=entry.key_path if not user or user == entry.user else "",
+    )
 
 
 def auto_selectable_entries(registry: ServerRegistry) -> list[ServerEntry]:
@@ -183,20 +199,6 @@ def ensure_server_connection(
     *,
     ui: SSHUI | None = None,
 ) -> ResolvedServer:
-    """Detect local mode if not already set, then verify SSH connectivity.
-
-    Local mode activates for root (who can read /etc/meridian/) and for
-    non-root users (who use sudo for commands).
-
-    Returns a new ResolvedServer with updated local_mode if changed.
-    """
-    if not resolved.local_mode:
-        if resolved.conn.detect_local_mode():
-            resolved = ResolvedServer(
-                ip=resolved.ip,
-                user=resolved.user,
-                local_mode=True,
-                conn=resolved.conn,
-            )
+    """Verify the resolved connection (SSH reachability, or passwordless sudo locally)."""
     resolved.conn.check_ssh(ui=ui)
     return resolved

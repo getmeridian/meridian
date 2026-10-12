@@ -28,7 +28,7 @@ from meridian.core.verification import (
     build_verification_check,
 )
 from meridian.diagnostics.network import resolve_hostname
-from meridian.resolve import detect_local_server_ip, detect_public_ip, is_local_keyword
+from meridian.resolve import detect_public_ip, is_local_keyword, local_entry
 from meridian.servers import ServerEntry, ServerRegistry
 
 
@@ -239,7 +239,7 @@ def resolve_verification_target(
 
     if value:
         if is_local_keyword(value):
-            return _local_target()
+            return _local_target(registry)
         if is_ip(value):
             normalized = str(ipaddress.ip_address(value))
             return ResolvedVerificationTarget(ip=normalized, label=normalized)
@@ -267,7 +267,7 @@ def resolve_verification_target(
 
     if requested_server:
         if is_local_keyword(requested_server):
-            return _local_target()
+            return _local_target(registry)
         entry = registry.find(requested_server)
         if entry is not None:
             return _entry_target(entry)
@@ -279,9 +279,9 @@ def resolve_verification_target(
             hint="Run `meridian server list` and choose an existing name.",
         )
 
-    local_ip = detect_local_server_ip()
-    if local_ip:
-        return ResolvedVerificationTarget(ip=local_ip, label=local_ip)
+    here = local_entry(registry)
+    if here is not None:
+        return _entry_target(here, local=True)
     entries = registry.list()
     if len(entries) == 1:
         return _entry_target(entries[0])
@@ -559,8 +559,11 @@ def _server_addresses(registry: ServerRegistry, server_refs: Iterable[str]) -> d
     return addresses
 
 
-def _local_target() -> ResolvedVerificationTarget:
-    ip = detect_local_server_ip() or detect_public_ip()
+def _local_target(registry: ServerRegistry) -> ResolvedVerificationTarget:
+    here = local_entry(registry)
+    if here is not None:
+        return _entry_target(here, local=True)
+    ip = detect_public_ip()
     if not ip:
         raise VerificationTargetError(
             "Could not determine this machine's public IP.",
@@ -570,7 +573,7 @@ def _local_target() -> ResolvedVerificationTarget:
     return ResolvedVerificationTarget(ip=normalized, label=normalized, local=True)
 
 
-def _entry_target(entry: ServerEntry) -> ResolvedVerificationTarget:
+def _entry_target(entry: ServerEntry, *, local: bool = False) -> ResolvedVerificationTarget:
     normalized = str(ipaddress.ip_address(entry.host))
     label = f"{entry.name} ({normalized})" if entry.name else normalized
-    return ResolvedVerificationTarget(ip=normalized, label=label)
+    return ResolvedVerificationTarget(ip=normalized, label=label, local=local)
