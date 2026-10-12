@@ -15,6 +15,7 @@ from meridian.compiler.models import (
     canonical_hash,
 )
 from meridian.reconciler.remnawave_drivers import RemnawaveDriverContext
+from meridian.reconciler.remnawave_retirement import ServiceUserRetirement
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -25,13 +26,14 @@ from meridian.reconciler.resources import (
 )
 from meridian.reconciler.routing_credentials import resolve_service_credentials
 from meridian.remnawave import RemnawaveNetworkError, User
+from meridian.remnawave.control_plane import SERVICE_USER_DESCRIPTION
 from meridian.remnawave.models import is_user_id
 from meridian.xray_workload import render_workload_config
 
 ValueT = TypeVar("ValueT")
 
 
-class ServiceUserDriver:
+class ServiceUserDriver(ServiceUserRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 
@@ -49,7 +51,7 @@ class ServiceUserDriver:
             user.username == payload.username
             and user.status == "ACTIVE"
             and sorted(user.active_internal_squad_uuids) == sorted(squad_uuids)
-            and user.description == "Managed by Meridian service routing"
+            and user.description == SERVICE_USER_DESCRIPTION
             and bool(user.vless_uuid)
         )
         return _observed(action, user.id, matches, _user_projection(user))
@@ -74,7 +76,7 @@ class ServiceUserDriver:
             owned = (
                 binding is not None
                 or self.context.was_managed(action.resource.logical_id, existing.id)
-                or existing.description == "Managed by Meridian service routing"
+                or existing.description == SERVICE_USER_DESCRIPTION
             )
             if not owned:
                 raise ResourceReconcileError(

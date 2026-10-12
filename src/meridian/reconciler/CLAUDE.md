@@ -13,7 +13,8 @@ Checkpointed reconciliation of compiled topology resources.
 ## What's done well
 
 - **Unknown outcomes are fail-closed** — a timed-out mutation remains `unknown` if observation fails; retries happen only after a successful non-converged observation using the same idempotency key.
-- **Retirement after convergence** — `retirement.py` deletes vanished bindings in `RETIREMENT_ORDER` only after the whole new plan succeeds; a failure leaves the generation uncommitted for retry. Kinds outside that order (exits, relays, gateways) are refused in `validate_resource_plan_transition` before any state is written.
+- **Retirement after convergence** — `retirement.py` removes vanished bindings in dependents-first `RETIREMENT_ORDER` only after the whole new plan succeeds; a failed rank stops later ranks and leaves the generation uncommitted for retry. Only teardown-owned kinds (control plane, subscription template/settings) are refused in `validate_resource_plan_transition`.
+- **Forget-only kinds are explicit** — `FORGET_ONLY` names kinds whose state lives in their Profile, is read-only, or must never be reverted (baseline packages/SSH/UFW); every other retirable kind needs a driver `retire()` or retirement fails closed.
 - **Reviewed render contract** — setup hashes resolved SSH targets, runtime pins, and `render_contract.py`; bump its manifest whenever deployed bytes or commands change.
 
 ## Pitfalls
@@ -27,3 +28,5 @@ Checkpointed reconciliation of compiled topology resources.
 - **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
 - **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
+- **Remnawave deletes Nodes asynchronously** — DELETE only queues the job; `NodeRetirement` polls until the Node is gone so its Profile is not deleted under it.
+- **Node runtime retirement shares a directory** — every exit uses `/opt/remnanode`; when the plan still runs a node on that server, only forget the old binding.

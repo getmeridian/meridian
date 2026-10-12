@@ -21,6 +21,7 @@ from meridian.compiler.models import (
     ServiceUserPayload,
     canonical_hash,
 )
+from meridian.reconciler import remnawave_retirement as retirement
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -40,7 +41,6 @@ from meridian.remnawave import (
     MeridianPanel,
     Node,
     RemnawaveNetworkError,
-    RemnawaveNotFoundError,
 )
 from meridian.xray_workload import render_workload_config
 
@@ -132,7 +132,7 @@ def build_remnawave_drivers(context: RemnawaveDriverContext) -> ResourceDrivers:
     return drivers
 
 
-class ConfigProfileDriver:
+class ConfigProfileDriver(retirement.ConfigProfileRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 
@@ -267,7 +267,7 @@ class InboundDriver:
         )
 
 
-class NodeBindingDriver:
+class NodeBindingDriver(retirement.NodeRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 
@@ -365,7 +365,7 @@ class NodeBindingDriver:
         return ResourceApplyReceipt(remote_id=existing.uuid)
 
 
-class HostDriver:
+class HostDriver(retirement.HostRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 
@@ -456,17 +456,8 @@ class HostDriver:
             )
         return ResourceApplyReceipt(remote_id=host.uuid)
 
-    def retire(self, binding: ManagedResourceBinding) -> None:
-        """Delete a Host whose path left the plan; already gone counts as done."""
-        if not binding.remote_id:
-            return
-        try:
-            _mutation(lambda: self.context.panel.delete_host(binding.remote_id), f"delete Host {binding.logical_id}")
-        except RemnawaveNotFoundError:
-            pass
 
-
-class InternalSquadDriver:
+class InternalSquadDriver(retirement.InternalSquadRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 

@@ -15,6 +15,7 @@ from meridian.compiler.models import (
     canonical_hash,
 )
 from meridian.reconciler.remnawave_drivers import RemnawaveDriverContext
+from meridian.reconciler.remnawave_retirement import ExternalSquadRetirement
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -180,7 +181,7 @@ class SubscriptionTemplateDriver:
         return ResourceApplyReceipt(remote_id=updated.uuid)
 
 
-class ExternalSquadDriver:
+class ExternalSquadDriver(ExternalSquadRetirement):
     def __init__(self, context: RemnawaveDriverContext) -> None:
         self.context = context
 

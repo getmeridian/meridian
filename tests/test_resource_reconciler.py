@@ -224,11 +224,11 @@ class TestResourceInspection:
 
 
 class TestCheckpointedExecution:
-    def test_rejects_intent_shrink_before_state_or_remote_mutation(self) -> None:
+    def test_rejects_removing_teardown_owned_resources_before_state_or_remote_mutation(self) -> None:
         plan = _plan()
         retired = ManagedResourceBinding(
-            logical_id="node:retired",
-            resource_kind="node_runtime",
+            logical_id="control:retired",
+            resource_kind="control_plane_runtime",
             generation=1,
             remote_id="host-1",
             desired_hash=_HASH_A,
@@ -236,7 +236,7 @@ class TestCheckpointedExecution:
             active=True,
         )
         cluster = ClusterConfig(
-            managed_bindings={"node:retired@1": retired},
+            managed_bindings={"control:retired@1": retired},
             active_generation=1,
             active_plan_hash=_HASH_B,
         )
@@ -245,7 +245,7 @@ class TestCheckpointedExecution:
 
         with pytest.raises(
             UnsupportedResourceRetirementError,
-            match="node:retired",
+            match="control:retired",
         ):
             execute_resource_plan(
                 plan,

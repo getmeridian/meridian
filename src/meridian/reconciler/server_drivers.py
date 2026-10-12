@@ -28,6 +28,7 @@ from meridian.provision.relay import InstallRealm, RelayContext, parse_realm_ver
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.provision.tls import IssueTLSCert
 from meridian.provision.warp import InstallWarp
+from meridian.reconciler import server_retirement as retirement
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -61,7 +62,6 @@ from meridian.reconciler.server_render import (
     render_realm_config,
     render_realm_unit,
 )
-from meridian.reconciler.server_retirement import FirewallRetirement, NginxArtifactRetirement
 from meridian.remnawave import MeridianPanel
 from meridian.remnawave.versions import effective_image
 from meridian.ssh import ServerConnection
@@ -205,7 +205,7 @@ class ServerBaselineDriver:
 NGINX_ENABLE_AND_RELOAD = "systemctl enable nginx >/dev/null 2>&1; systemctl reload-or-restart nginx"
 
 
-class FirewallRuleDriver(FirewallRetirement):
+class FirewallRuleDriver(retirement.FirewallRetirement):
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -357,7 +357,7 @@ class CertificateDriver:
         return ResourceApplyReceipt(remote_id=f"{cert_dir}/fullchain.pem")
 
 
-class NginxArtifactDriver(NginxArtifactRetirement):
+class NginxArtifactDriver(retirement.NginxArtifactRetirement):
     _LEGACY_STREAM_PATH = "/etc/nginx/stream.d/meridian.conf"
 
     def __init__(self, context: ServerDriverContext) -> None:
@@ -528,7 +528,7 @@ class NginxArtifactDriver(NginxArtifactRetirement):
             conn.run(f"rm -f {shlex.quote(enabled_path)}", timeout=15)
 
 
-class RealmHopDriver:
+class RealmHopDriver(retirement.RealmHopRetirement):
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -666,7 +666,7 @@ class RealmHopDriver:
         NginxArtifactDriver._restore_file(conn, unit_path, previous_unit)
 
 
-class NodeRuntimeDriver:
+class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 

@@ -30,17 +30,17 @@ class PendingPlanConflictError(ResourceReconcileError):
 
 
 class UnsupportedResourceRetirementError(ResourceReconcileError):
-    """A plan would orphan resources because retirement is not implemented."""
+    """A plan would remove resources that only teardown may remove."""
 
     def __init__(self, resource_ids: list[str]) -> None:
         preview = ", ".join(resource_ids[:5])
         if len(resource_ids) > 5:
             preview += f", and {len(resource_ids) - 5} more"
         super().__init__(
-            f"This change would remove resources Meridian cannot retire yet: {preview}.",
+            f"This change would remove resources Meridian only removes on teardown: {preview}.",
             hint=(
-                "Users and protocol paths can be removed; removing exits, relays, or routing "
-                "gateways from a running fleet is not supported yet. Restore them in the topology."
+                "The control plane and subscription delivery settings stay until `meridian teardown`. "
+                "Keep the control server and delivery formats in the topology."
             ),
             category="user",
         )
@@ -118,6 +118,7 @@ class ResourceExecutionResult(CoreModel):
     results: list[ResourceActionResult] = Field(default_factory=list)
     retired: list[str] = Field(default_factory=list)
     retirement_errors: list[str] = Field(default_factory=list)
+    review_hash: str = ""  # plan hash bound to the reviewed retirement set; set by the setup runtime
 
     @property
     def all_succeeded(self) -> bool:
@@ -161,6 +162,7 @@ class ResourceInspectionResult(CoreModel):
     generation: int
     inspections: list[ResourceInspection] = Field(default_factory=list)
     retiring: list[str] = Field(default_factory=list)
+    review_hash: str = ""  # plan hash bound to the retirement set; set by the setup runtime
 
     @property
     def converged(self) -> bool:

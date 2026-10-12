@@ -7,7 +7,10 @@ import shlex
 from typing import Any
 
 from meridian.cluster import ManagedResourceBinding
+from meridian.compiler.models import NodeRuntimePayload
+from meridian.config import REMNAWAVE_NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
+from meridian.reconciler.server_render import realm_config_path, realm_service_name
 from meridian.ssh import ServerConnection
 
 _FIREWALL_MARKER = re.compile(r"meridian-v4-[0-9a-f]{16}")
@@ -60,3 +63,57 @@ class NginxArtifactRetirement:
         )
         if result.returncode != 0:
             raise ResourceReconcileError(f"nginx did not reload after removing {path}: {result.stdout.strip()[:200]}")
+
+
+class RealmHopRetirement:
+    """Stop and delete one hop's Realm unit and config; the Realm binary stays for other hops."""
+
+    context: Any
+
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        service = realm_service_name(binding.logical_id)
+        if binding.remote_id != service:
+            raise ResourceReconcileError(f"Unexpected Realm service for {binding.logical_id}: {binding.remote_id!r}")
+        unit = f"/etc/systemd/system/{service}.service"
+        conn = _connection(self.context, binding)
+        result = conn.run(
+            f"systemctl disable --now {shlex.quote(service)} >/dev/null 2>&1;"
+            f" rm -f {shlex.quote(unit)} {shlex.quote(realm_config_path(binding.logical_id))}"
+            f" && systemctl daemon-reload && systemctl reset-failed {shlex.quote(service)} >/dev/null 2>&1;"
+            f" ! systemctl is-active --quiet {shlex.quote(service)}",
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise ResourceReconcileError(f"Realm service {service} is still running after removal.")
+
+
+class NodeRuntimeRetirement:
+    """Stop and delete the remnawave-node container and its Compose directory.
+
+    The control plane lives in a separate Compose project, so it keeps running.
+    When the reviewed plan still runs a node on the same server, the directory
+    already belongs to that replacement and only the binding is forgotten.
+    """
+
+    context: Any
+
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        if binding.remote_id != REMNAWAVE_NODE_DIR:
+            raise ResourceReconcileError(f"Unexpected node runtime for {binding.logical_id}: {binding.remote_id!r}")
+        conn = _connection(self.context, binding)
+        if any(
+            isinstance(resource.payload, NodeRuntimePayload) and resource.payload.server_ref == binding.server_ref
+            for resource in self.context.plan.resources
+        ):
+            return
+        compose = shlex.quote(f"{REMNAWAVE_NODE_DIR}/docker-compose.yml")
+        result = conn.run(
+            f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
+            " if docker inspect remnawave-node >/dev/null 2>&1;"
+            " then docker rm -f remnawave-node >/dev/null || exit 1; fi;"
+            f" rm -rf {shlex.quote(REMNAWAVE_NODE_DIR)}",
+            timeout=120,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:200]
+            raise ResourceReconcileError(f"Could not remove the Remnawave node runtime: {detail}")

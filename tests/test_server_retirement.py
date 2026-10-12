@@ -7,8 +7,16 @@ from types import SimpleNamespace
 import pytest
 
 from meridian.cluster import ManagedResourceBinding
+from meridian.compiler.models import NodeRuntimePayload
+from meridian.config import REMNAWAVE_NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
-from meridian.reconciler.server_retirement import FirewallRetirement, NginxArtifactRetirement
+from meridian.reconciler.server_render import realm_config_path, realm_service_name
+from meridian.reconciler.server_retirement import (
+    FirewallRetirement,
+    NginxArtifactRetirement,
+    NodeRuntimeRetirement,
+    RealmHopRetirement,
+)
 from tests.support.mock_connection import MockConnection
 
 _MARKER = "meridian-v4-0123456789abcdef"
@@ -68,3 +76,94 @@ def test_unexpected_ids_are_refused_without_touching_the_server(cls, remote_id: 
 def test_bindings_without_a_recorded_server_are_refused() -> None:
     with pytest.raises(ResourceReconcileError, match="before Meridian tracked its server"):
         _driver(FirewallRetirement, MockConnection()).retire(_binding(_MARKER, server_ref=""))
+
+
+def _plan_with_node(server_ref: str) -> SimpleNamespace:
+    payload = NodeRuntimePayload(workload_ref="exit-c", server_ref=server_ref, binding_ref="binding:exit-c")
+    return SimpleNamespace(resources=[SimpleNamespace(payload=payload)])
+
+
+def _runtime_driver(conn: MockConnection, *, plan: SimpleNamespace | None = None) -> NodeRuntimeRetirement:
+    driver = NodeRuntimeRetirement()
+    driver.context = SimpleNamespace(connection=lambda server_ref: conn, plan=plan or SimpleNamespace(resources=[]))
+    return driver
+
+
+def test_realm_hop_unit_and_config_are_removed_and_verified_stopped() -> None:
+    conn = MockConnection()
+    service = realm_service_name("realm:relay-chain:0")
+
+    _driver(RealmHopRetirement, conn).retire(
+        ManagedResourceBinding(logical_id="realm:relay-chain:0", remote_id=service, server_ref="srv-relay")
+    )
+
+    (command,) = conn.calls
+    assert command.index(f"systemctl disable --now {service}") < command.index("rm -f")
+    assert f"/etc/systemd/system/{service}.service" in command
+    assert realm_config_path("realm:relay-chain:0") in command
+    assert "daemon-reload" in command and command.endswith(f"! systemctl is-active --quiet {service}")
+
+
+def test_realm_hop_still_running_after_removal_is_a_failure() -> None:
+    conn = MockConnection()
+    conn.when("systemctl disable", rc=1)
+    service = realm_service_name("realm:relay-chain:1")
+
+    with pytest.raises(ResourceReconcileError, match="still running"):
+        _driver(RealmHopRetirement, conn).retire(
+            ManagedResourceBinding(logical_id="realm:relay-chain:1", remote_id=service, server_ref="srv-relay")
+        )
+
+
+def test_realm_hop_refuses_a_service_name_that_does_not_match_its_resource() -> None:
+    conn = MockConnection()
+
+    with pytest.raises(ResourceReconcileError, match="Unexpected Realm service"):
+        _driver(RealmHopRetirement, conn).retire(
+            ManagedResourceBinding(logical_id="realm:relay-chain:0", remote_id="sshd", server_ref="srv-relay")
+        )
+    assert conn.calls == []
+
+
+def test_node_runtime_container_and_compose_dir_are_removed() -> None:
+    conn = MockConnection()
+
+    _runtime_driver(conn).retire(
+        ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+    )
+
+    (command,) = conn.calls
+    assert f"docker compose -f {REMNAWAVE_NODE_DIR}/docker-compose.yml down" in command
+    assert "docker rm -f remnawave-node" in command
+    assert command.endswith(f"rm -rf {REMNAWAVE_NODE_DIR}")
+    assert "/opt/remnawave " not in command and not command.endswith("/opt/remnawave")
+
+
+def test_node_runtime_replaced_on_the_same_server_is_only_forgotten() -> None:
+    conn = MockConnection()
+
+    _runtime_driver(conn, plan=_plan_with_node("srv-exit-b")).retire(
+        ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+    )
+
+    assert conn.calls == []
+
+
+def test_node_runtime_removal_failure_is_reported() -> None:
+    conn = MockConnection()
+    conn.when("docker compose", rc=1, stderr="Cannot connect to the Docker daemon")
+
+    with pytest.raises(ResourceReconcileError, match="Cannot connect to the Docker daemon"):
+        _runtime_driver(conn).retire(
+            ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+        )
+
+
+def test_node_runtime_refuses_an_unexpected_directory() -> None:
+    conn = MockConnection()
+
+    with pytest.raises(ResourceReconcileError, match="Unexpected node runtime"):
+        _runtime_driver(conn).retire(
+            ManagedResourceBinding(logical_id="node:exit-b", remote_id="/", server_ref="srv-exit-b")
+        )
+    assert conn.calls == []
