@@ -516,7 +516,7 @@ class TestRelayCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["relay", "deploy", "--help"])
         assert result.exit_code == 0
-        assert "RELAY_IP" in result.output
+        assert "relay_ip" in result.output.lower()  # Typer >=0.27 renders {relay_ip}
         assert "Exit server" in result.output
 
 
