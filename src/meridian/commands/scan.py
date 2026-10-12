@@ -109,19 +109,19 @@ def scan_for_sni(conn: ServerConnection, ip: str, *, strict: bool = False) -> li
             strict=strict,
         )
     csv_output = scan_result.stdout.strip()
-
-    if not csv_output or csv_output == "IP,ORIGIN,CERT_DOMAIN,CERT_ISSUER,GEO_CODE":
+    if not csv_output:
         return []
 
-    # Parse CSV: extract cert_domain (column 3), skip header, deduplicate, filter bad targets
+    # The column set has changed between scanner releases (0.2.3 writes TLS,
+    # ALPN, curve and certificate details before CERT_DOMAIN). Read columns by
+    # name so a format change can never smuggle e.g. "TLS 1.3" into serverNames.
+    reader = csv.DictReader(io.StringIO(csv_output))
+    if not {"IP", "CERT_DOMAIN"} <= set(reader.fieldnames or ()):
+        return _unavailable("RealiTLScanner output has an unexpected format", strict=strict)
+
     domains: list[str] = []
-    for parts in csv.reader(io.StringIO(csv_output)):
-        if len(parts) < 3:
-            continue
-        csv_ip, _origin, cert_domain = parts[0], parts[1], parts[2]
-        if csv_ip == "IP":
-            continue  # header
-        cert_domain = cert_domain.strip()
+    for row in reader:
+        cert_domain = (row.get("CERT_DOMAIN") or "").strip()
         if not cert_domain or cert_domain.startswith("*"):
             continue  # wildcard certs
         try:

@@ -18,6 +18,14 @@ class FakeConnection:
         self.arch = arch
         self.scan_returncode = scan_returncode
         self.commands: list[str] = []
+        # RealiTLScanner 0.2.3 output: certificate details precede CERT_DOMAIN.
+        self.csv_output = (
+            "IP,ORIGIN,TLS,ALPN,CURVE,CERT_LENGTH,CERT_SIGNATURE,CERT_PUBLICKEY,CERT_DOMAIN,CERT_ISSUER,GEO_CODE\n"
+            '203.0.113.8,"Example, Inc",TLS 1.3,h2,X25519,2048,sig,rsa,cdn.test,issuer,GB\n'
+            "203.0.113.9,origin,TLS 1.3,h2,X25519,2048,sig,rsa,cdn.test,issuer,GB\n"
+            "203.0.113.10,origin,TLS 1.3,h2,X25519,2048,sig,rsa,*.wild.test,issuer,GB\n"
+            "203.0.113.11,origin,TLS 1.3,h2,X25519,2048,sig,rsa,bad host,issuer,GB\n"
+        )
 
     def run(self, command: str, **_kwargs: object) -> CommandResult:
         self.commands.append(command)
@@ -25,14 +33,7 @@ class FakeConnection:
             return CommandResult(args=command, returncode=0, stdout=f"{self.arch}\n")
         if command.startswith("ip addr show"):
             return CommandResult(args=command, returncode=0, stdout="198.51.100.8/24\n")
-        csv_output = (
-            "IP,ORIGIN,CERT_DOMAIN,CERT_ISSUER,GEO_CODE\n"
-            '203.0.113.8,"Example, Inc",cdn.test,issuer,GB\n'
-            "203.0.113.9,origin,cdn.test,issuer,GB\n"
-            "203.0.113.10,origin,*.wild.test,issuer,GB\n"
-            "203.0.113.11,origin,bad host,issuer,GB\n"
-        )
-        return CommandResult(args=command, returncode=self.scan_returncode, stdout=csv_output)
+        return CommandResult(args=command, returncode=self.scan_returncode, stdout=self.csv_output)
 
 
 def test_scanner_is_pinned_checksum_verified_and_isolated() -> None:
@@ -156,3 +157,18 @@ def test_standalone_scan_rejects_non_numeric_selection() -> None:
 
     assert exc_info.value.exit_code == 2
     load_cluster.assert_not_called()
+
+
+def test_scanner_reads_the_domain_column_by_name_in_any_release_format() -> None:
+    connection = FakeConnection()
+    connection.csv_output = "IP,ORIGIN,CERT_DOMAIN,CERT_ISSUER,GEO_CODE\n203.0.113.8,origin,cdn.test,issuer,GB\n"
+
+    assert scan_for_sni(connection, "198.51.100.8") == ["cdn.test"]
+
+
+def test_strict_scanner_reports_an_unknown_output_format_as_unavailable() -> None:
+    connection = FakeConnection()
+    connection.csv_output = "ADDR,NAME\n203.0.113.8,cdn.test\n"
+
+    with pytest.raises(ScanUnavailableError):
+        scan_for_sni(connection, "198.51.100.8", strict=True)
