@@ -63,6 +63,8 @@
             "command.started",
             "command.completed",
             "command.failed",
+            "command.cancel_requested",
+            "command.cancelled",
             "plan.computed",
             "plan.action.started",
             "plan.action.completed",
@@ -89,6 +91,44 @@
         "type"
       ],
       "title": "Event",
+      "type": "object"
+    },
+    "OperationCancellation": {
+      "additionalProperties": false,
+      "description": "Typed terminal record for an operation stopped at a safe point.",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "queued",
+            "preflight",
+            "provision",
+            "apply",
+            "verify",
+            "handoff"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "remote_changed": {
+          "default": false,
+          "title": "Remote Changed",
+          "type": "boolean"
+        },
+        "resume_hint": {
+          "default": "Run the same deploy again; finished steps are observed and skipped.",
+          "title": "Resume Hint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "message"
+      ],
+      "title": "OperationCancellation",
       "type": "object"
     },
     "OperationError": {
@@ -155,6 +195,17 @@
           "default": false,
           "title": "Cancelable",
           "type": "boolean"
+        },
+        "cancellation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationCancellation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "created_at": {
           "title": "Created At",

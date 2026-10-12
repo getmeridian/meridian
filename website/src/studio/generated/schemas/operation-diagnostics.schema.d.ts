@@ -26,6 +26,8 @@ export type Type =
   | "command.started"
   | "command.completed"
   | "command.failed"
+  | "command.cancel_requested"
+  | "command.cancelled"
   | "plan.computed"
   | "plan.action.started"
   | "plan.action.completed"
@@ -42,6 +44,10 @@ export type Type =
 export type Events = Event[];
 export type Markdown = string;
 export type Cancelable = boolean;
+export type Message2 = string;
+export type Phase1 = "queued" | "preflight" | "provision" | "apply" | "verify" | "handoff";
+export type RemoteChanged = boolean;
+export type ResumeHint = string;
 export type CreatedAt = string;
 export type CurrentPhase = string;
 export type ErrorCount = number;
@@ -126,6 +132,7 @@ export interface ResourceRef {
  */
 export interface OperationSnapshot {
   cancelable?: Cancelable;
+  cancellation?: OperationCancellation | null;
   created_at: CreatedAt;
   current_phase?: CurrentPhase;
   error_count?: ErrorCount;
@@ -140,6 +147,15 @@ export interface OperationSnapshot {
   state: State;
   updated_at: UpdatedAt;
   warning_count?: WarningCount;
+}
+/**
+ * Typed terminal record for an operation stopped at a safe point.
+ */
+export interface OperationCancellation {
+  message: Message2;
+  phase: Phase1;
+  remote_changed?: RemoteChanged;
+  resume_hint?: ResumeHint;
 }
 export interface Request {
   [k: string]: unknown;

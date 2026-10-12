@@ -646,6 +646,7 @@ export const commandCatalog = {
         "1": "unexpected Meridian bug",
         "2": "user/config error",
         "3": "system or infrastructure failure",
+        "5": "cancelled at a safe point; re-run the same deploy to resume",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -670,6 +671,12 @@ export const commandCatalog = {
           "status": "ok"
         },
         {
+          "category": "cancelled",
+          "exit_code": 5,
+          "meaning": "deploy stopped at a safe point after a cancel request; re-run resumes",
+          "status": "cancelled"
+        },
+        {
           "category": "user",
           "exit_code": 2,
           "meaning": "user or configuration error",
@@ -692,7 +699,8 @@ export const commandCatalog = {
       "statuses": [
         "changed",
         "ok",
-        "failed"
+        "failed",
+        "cancelled"
       ]
     },
     {

@@ -6,6 +6,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import Field
 
+from meridian.core.cancellation import OperationCancellation
 from meridian.core.deploy import DeployResult
 from meridian.core.models import CoreModel, Event
 
@@ -19,6 +20,7 @@ OperationState = Literal[
     "completed_after_cancel",
 ]
 OperationKind = Literal["deploy"]
+CancelOutcome = Literal["cancelled", "cancel_requested", "already_requested", "already_finished"]
 
 
 class DeployEventSink(Protocol):
@@ -50,6 +52,7 @@ class OperationSnapshot(CoreModel):
     cancelable: bool = False
     has_result: bool = False
     has_error: bool = False
+    cancellation: OperationCancellation | None = None
 
 
 class OperationError(CoreModel):
@@ -90,12 +93,17 @@ class OperationStart(CoreModel):
 
 
 class OperationCancel(CoreModel):
-    """Operation cancellation response."""
+    """Operation cancellation response.
+
+    ``cancel_requested`` means the worker stops at its next safe point;
+    ``already_finished`` is a no-op on a terminal operation.
+    """
 
     schema_version: Literal["meridian.operation-cancel/v1"] = Field(
         default="meridian.operation-cancel/v1",
         alias="schema",
     )
+    outcome: CancelOutcome
     operation: OperationSnapshot
 
 

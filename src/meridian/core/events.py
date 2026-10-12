@@ -8,6 +8,8 @@ CoreEventType = Literal[
     "command.started",
     "command.completed",
     "command.failed",
+    "command.cancel_requested",
+    "command.cancelled",
     "plan.computed",
     "plan.action.started",
     "plan.action.completed",
@@ -26,6 +28,8 @@ CoreEventType = Literal[
 COMMAND_STARTED: Final[CoreEventType] = "command.started"
 COMMAND_COMPLETED: Final[CoreEventType] = "command.completed"
 COMMAND_FAILED: Final[CoreEventType] = "command.failed"
+COMMAND_CANCEL_REQUESTED: Final[CoreEventType] = "command.cancel_requested"
+COMMAND_CANCELLED: Final[CoreEventType] = "command.cancelled"
 
 PLAN_COMPUTED: Final[CoreEventType] = "plan.computed"
 PLAN_ACTION_STARTED: Final[CoreEventType] = "plan.action.started"
@@ -47,6 +51,8 @@ EVENT_TYPES: Final[tuple[CoreEventType, ...]] = (
     COMMAND_STARTED,
     COMMAND_COMPLETED,
     COMMAND_FAILED,
+    COMMAND_CANCEL_REQUESTED,
+    COMMAND_CANCELLED,
     PLAN_COMPUTED,
     PLAN_ACTION_STARTED,
     PLAN_ACTION_COMPLETED,

@@ -105,7 +105,7 @@ def warn(msg: str) -> None:
         err_console.print(f"  [warn]![/warn] {escape(msg)}")
 
 
-_EXIT_CODES = {"user": 2, "system": 3, "bug": 1, "cancelled": 130}
+_EXIT_CODES = {"user": 2, "system": 3, "bug": 1, "cancelled": 5}
 
 
 def fail(

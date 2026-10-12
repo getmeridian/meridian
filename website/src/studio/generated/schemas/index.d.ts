@@ -63,6 +63,7 @@ export * as NodeListEnvelopeSchema from "./node-list-envelope.schema";
 export * as NodeListSchema from "./node-list.schema";
 export * as NodeTargetRequestSchema from "./node-target-request.schema";
 export * as OperationCancelSchema from "./operation-cancel.schema";
+export * as OperationCancellationSchema from "./operation-cancellation.schema";
 export * as OperationDiagnosticsSchema from "./operation-diagnostics.schema";
 export * as OperationErrorSchema from "./operation-error.schema";
 export * as OperationEventsSchema from "./operation-events.schema";

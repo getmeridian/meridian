@@ -28,10 +28,10 @@ class TestFail:
             fail("infra issue", hint_type="system")
         assert exc_info.value.exit_code == 3
 
-    def test_fail_cancelled_exit_code_130(self) -> None:
+    def test_fail_cancelled_exit_code_is_5_not_the_interrupt_code(self) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             fail("cancelled", hint_type="cancelled")
-        assert exc_info.value.exit_code == 130
+        assert exc_info.value.exit_code == 5
 
     def test_fail_explicit_exit_code_overrides(self) -> None:
         with pytest.raises(typer.Exit) as exc_info:
@@ -129,7 +129,7 @@ class TestFail:
             set_json_mode(False)
             set_quiet_mode(False)
 
-        assert exc_info.value.exit_code == 130
+        assert exc_info.value.exit_code == 5
         data = json.loads(capsys.readouterr().out)
         assert data["status"] == "cancelled"
         assert data["errors"][0]["category"] == "cancelled"

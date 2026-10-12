@@ -255,6 +255,44 @@
       "title": "MeridianError",
       "type": "object"
     },
+    "OperationCancellation": {
+      "additionalProperties": false,
+      "description": "Typed terminal record for an operation stopped at a safe point.",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "queued",
+            "preflight",
+            "provision",
+            "apply",
+            "verify",
+            "handoff"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "remote_changed": {
+          "default": false,
+          "title": "Remote Changed",
+          "type": "boolean"
+        },
+        "resume_hint": {
+          "default": "Run the same deploy again; finished steps are observed and skipped.",
+          "title": "Resume Hint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "message"
+      ],
+      "title": "OperationCancellation",
+      "type": "object"
+    },
     "Summary": {
       "additionalProperties": false,
       "description": "Structured summary shown in JSON envelopes and UI dashboards.",
@@ -280,6 +318,83 @@
         "text"
       ],
       "title": "Summary",
+      "type": "object"
+    },
+    "_DeployCancelledEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "deploy",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/OperationCancellation"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "cancelled",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/MeridianError"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_DeployCancelledEnvelope",
       "type": "object"
     },
     "_DeployChangedEnvelope": {
@@ -517,6 +632,7 @@
   "description": "Envelope schema for `meridian deploy --json`.",
   "discriminator": {
     "mapping": {
+      "cancelled": "#/$defs/_DeployCancelledEnvelope",
       "changed": "#/$defs/_DeployChangedEnvelope",
       "failed": "#/$defs/_DeployTerminalEnvelope",
       "ok": "#/$defs/_DeployPlanEnvelope"
@@ -532,6 +648,9 @@
     },
     {
       "$ref": "#/$defs/_DeployTerminalEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_DeployCancelledEnvelope"
     }
   ],
   "title": "DeployOutputEnvelope"

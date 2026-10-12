@@ -13,6 +13,7 @@ from meridian.core.apply import (
     CompiledApplyPreview,
     CompiledApplyResult,
 )
+from meridian.core.cancellation import OperationCancellation
 from meridian.core.clients import (
     ClientAddResult,
     ClientListResult,
@@ -281,7 +282,7 @@ class DeployCommandData(RootModel[DeployResult | DeployPlan]):
     """
 
 
-# --- Deploy (three-way discriminated union — kept manual) ---
+# --- Deploy (four-way discriminated union — kept manual) ---
 
 
 class _DeployChangedEnvelope(_ContractEnvelope):
@@ -305,9 +306,19 @@ class _DeployTerminalEnvelope(_ContractEnvelope):
     errors: list[MeridianError] = Field(min_length=1)
 
 
+class _DeployCancelledEnvelope(_ContractEnvelope):
+    command: Literal["deploy"]
+    status: Literal["cancelled"]
+    data: OperationCancellation
+    errors: list[MeridianError] = Field(min_length=1)
+
+
 class DeployOutputEnvelope(
     RootModel[
-        Annotated[_DeployChangedEnvelope | _DeployPlanEnvelope | _DeployTerminalEnvelope, Field(discriminator="status")]
+        Annotated[
+            _DeployChangedEnvelope | _DeployPlanEnvelope | _DeployTerminalEnvelope | _DeployCancelledEnvelope,
+            Field(discriminator="status"),
+        ]
     ]
 ):
     """Envelope schema for `meridian deploy --json`."""
@@ -460,6 +471,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "operation": OperationEnvelope,
     "deploy-operation-result": DeployOperationResult,
     "operation-cancel": OperationCancel,
+    "operation-cancellation": OperationCancellation,
     "operation-diagnostics": OperationDiagnostics,
     "operation-error": OperationError,
     "operation-events": OperationEvents,

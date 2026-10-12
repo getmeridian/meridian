@@ -644,7 +644,8 @@
         "1": "unexpected Meridian bug",
         "130": "process interrupted; no JSON envelope is emitted",
         "2": "user/config error",
-        "3": "system or infrastructure failure"
+        "3": "system or infrastructure failure",
+        "5": "cancelled at a safe point; re-run the same deploy to resume"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
@@ -666,6 +667,12 @@
           "exit_code": 0,
           "meaning": "deploy request was validated or planned",
           "status": "ok"
+        },
+        {
+          "category": "cancelled",
+          "exit_code": 5,
+          "meaning": "deploy stopped at a safe point after a cancel request; re-run resumes",
+          "status": "cancelled"
         },
         {
           "category": "user",
@@ -690,7 +697,8 @@
       "statuses": [
         "changed",
         "ok",
-        "failed"
+        "failed",
+        "cancelled"
       ]
     },
     {

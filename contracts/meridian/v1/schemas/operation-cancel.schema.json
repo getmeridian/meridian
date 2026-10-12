@@ -63,6 +63,8 @@
             "command.started",
             "command.completed",
             "command.failed",
+            "command.cancel_requested",
+            "command.cancelled",
             "plan.computed",
             "plan.action.started",
             "plan.action.completed",
@@ -91,6 +93,44 @@
       "title": "Event",
       "type": "object"
     },
+    "OperationCancellation": {
+      "additionalProperties": false,
+      "description": "Typed terminal record for an operation stopped at a safe point.",
+      "properties": {
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "phase": {
+          "enum": [
+            "queued",
+            "preflight",
+            "provision",
+            "apply",
+            "verify",
+            "handoff"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "remote_changed": {
+          "default": false,
+          "title": "Remote Changed",
+          "type": "boolean"
+        },
+        "resume_hint": {
+          "default": "Run the same deploy again; finished steps are observed and skipped.",
+          "title": "Resume Hint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "message"
+      ],
+      "title": "OperationCancellation",
+      "type": "object"
+    },
     "OperationSnapshot": {
       "additionalProperties": false,
       "description": "Public state summary for a long-running local Engine operation.",
@@ -99,6 +139,17 @@
           "default": false,
           "title": "Cancelable",
           "type": "boolean"
+        },
+        "cancellation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationCancellation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "created_at": {
           "title": "Created At",
@@ -219,10 +270,20 @@
     }
   },
   "additionalProperties": false,
-  "description": "Operation cancellation response.",
+  "description": "Operation cancellation response.\n\n``cancel_requested`` means the worker stops at its next safe point;\n``already_finished`` is a no-op on a terminal operation.",
   "properties": {
     "operation": {
       "$ref": "#/$defs/OperationSnapshot"
+    },
+    "outcome": {
+      "enum": [
+        "cancelled",
+        "cancel_requested",
+        "already_requested",
+        "already_finished"
+      ],
+      "title": "Outcome",
+      "type": "string"
     },
     "schema": {
       "const": "meridian.operation-cancel/v1",
@@ -232,6 +293,7 @@
     }
   },
   "required": [
+    "outcome",
     "operation"
   ],
   "title": "OperationCancel",

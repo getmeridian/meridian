@@ -14,7 +14,7 @@ from meridian.core.models import ErrorCategory
 if TYPE_CHECKING:
     from meridian.core.models import MeridianError as MeridianErrorModel
 
-_EXIT_CODES: dict[str, int] = {"user": 2, "system": 3, "bug": 1, "cancelled": 130}
+_EXIT_CODES: dict[str, int] = {"user": 2, "system": 3, "bug": 1, "cancelled": 5}
 
 
 class MeridianError(Exception):

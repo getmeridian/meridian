@@ -16,6 +16,7 @@
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
 - **Verification is four-state** - probe and test share typed passed, failed, warning, and skipped checks; skipped evidence is inconclusive, never a pass.
+- **Cancellation is cooperative** - `core/cancellation.py` owns the token protocol, the typed `OperationCancellation` record, and `OperationCancelledError`; workers poll only at safe points.
 - **Panel interfaces are narrow** — services depend on service-specific protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave implementation.
 
 ## What's done well
@@ -37,4 +38,4 @@
 - Do not put SSH passwords or private keys into public server contracts; Engine must handle them through short-lived secret channels.
 - Keep topology IDs lowercase and bounded, and validate access usernames against the pinned panel contract before compilation.
 - Plan/apply envelopes use distinct typed legacy and compiled results; preserve legacy schema names and add a separate command-data union.
-- Command catalogs list only completed JSON outcomes; process interruption exits 130 without promising a terminal envelope.
+- Command catalogs list only completed JSON outcomes; process interruption exits 130 without promising a terminal envelope, while a cooperative cancel is a completed `cancelled` outcome with exit 5.

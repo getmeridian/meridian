@@ -79,6 +79,12 @@ def _deploy_outcomes() -> list[CommandOutcome]:
     return [
         CommandOutcome(status="changed", exit_code=0, category="none", meaning="server was deployed"),
         CommandOutcome(status="ok", exit_code=0, category="none", meaning="deploy request was validated or planned"),
+        CommandOutcome(
+            status="cancelled",
+            exit_code=5,
+            category="cancelled",
+            meaning="deploy stopped at a safe point after a cancel request; re-run resumes",
+        ),
         CommandOutcome(status="failed", exit_code=2, category="user", meaning="user or configuration error"),
         CommandOutcome(status="failed", exit_code=3, category="system", meaning="system or infrastructure failure"),
         CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
@@ -234,13 +240,14 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         data_schema="deploy-command-data",
         failure_data_schema="empty-data",
         error_schema="error",
-        statuses=["changed", "ok", "failed"],
+        statuses=["changed", "ok", "failed", "cancelled"],
         outcomes=_deploy_outcomes(),
         exit_codes={
             "0": "server was deployed or deploy request was validated/planned",
             "1": "unexpected Meridian bug",
             "2": "user/config error",
             "3": "system or infrastructure failure",
+            "5": "cancelled at a safe point; re-run the same deploy to resume",
             "130": _INTERRUPT_EXIT_MEANING,
         },
         machine_flags=["--json", "--events=jsonl", "--request", "--dry-run"],

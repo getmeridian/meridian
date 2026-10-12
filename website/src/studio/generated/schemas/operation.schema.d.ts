@@ -6,6 +6,10 @@
  */
 
 export type Cancelable = boolean;
+export type Message = string;
+export type Phase = "queued" | "preflight" | "provision" | "apply" | "verify" | "handoff";
+export type RemoteChanged = boolean;
+export type ResumeHint = string;
 export type CreatedAt = string;
 export type CurrentPhase = string;
 export type ErrorCount = number;
@@ -16,9 +20,9 @@ export type Id = string;
 export type Kind = "deploy";
 export type LastSeq = number;
 export type Level = "debug" | "info" | "warning" | "error";
-export type Message = string;
+export type Message1 = string;
 export type OperationId = string;
-export type Phase = string;
+export type Phase1 = string;
 export type Id1 = string;
 export type Kind1 = string;
 export type Name = string;
@@ -29,6 +33,8 @@ export type Type =
   | "command.started"
   | "command.completed"
   | "command.failed"
+  | "command.cancel_requested"
+  | "command.cancelled"
   | "plan.computed"
   | "plan.action.started"
   | "plan.action.completed"
@@ -67,6 +73,7 @@ export interface OperationEnvelope {
  */
 export interface OperationSnapshot {
   cancelable?: Cancelable;
+  cancellation?: OperationCancellation | null;
   created_at: CreatedAt;
   current_phase?: CurrentPhase;
   error_count?: ErrorCount;
@@ -83,14 +90,23 @@ export interface OperationSnapshot {
   warning_count?: WarningCount;
 }
 /**
+ * Typed terminal record for an operation stopped at a safe point.
+ */
+export interface OperationCancellation {
+  message: Message;
+  phase: Phase;
+  remote_changed?: RemoteChanged;
+  resume_hint?: ResumeHint;
+}
+/**
  * JSONL event model for long-running operations.
  */
 export interface Event {
   data?: Data;
   level: Level;
-  message?: Message;
+  message?: Message1;
   operation_id: OperationId;
-  phase?: Phase;
+  phase?: Phase1;
   resource?: ResourceRef | null;
   schema?: Schema;
   seq: Seq;

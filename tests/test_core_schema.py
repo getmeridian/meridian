@@ -361,8 +361,11 @@ def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -
     for contract in command_catalog(include_schemas=True):
         assert contract["exit_codes"]["130"] == "process interrupted; no JSON envelope is emitted"
         assert contract["interrupt_behavior"] == "exit_130_without_envelope"
-        assert "cancelled" not in contract["statuses"]
         assert all(outcome["exit_code"] != 130 for outcome in contract["outcomes"])
+        # A cooperative cancel is a completed JSON outcome with its own exit code.
+        cancelled = [outcome for outcome in contract["outcomes"] if outcome["status"] == "cancelled"]
+        assert ("cancelled" in contract["statuses"]) == bool(cancelled), contract["command"]
+        assert all(outcome["exit_code"] == 5 and outcome["category"] == "cancelled" for outcome in cancelled)
         envelope = contract["envelope"]
         terminal_ref = next(option["$ref"] for option in envelope["oneOf"] if "TerminalEnvelope" in option["$ref"])
         terminal = envelope["$defs"][terminal_ref.rsplit("/", 1)[-1]]

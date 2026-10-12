@@ -19,6 +19,8 @@ export type Type =
   | "command.started"
   | "command.completed"
   | "command.failed"
+  | "command.cancel_requested"
+  | "command.cancelled"
   | "plan.computed"
   | "plan.action.started"
   | "plan.action.completed"

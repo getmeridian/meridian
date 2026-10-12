@@ -8,7 +8,11 @@
 /**
  * Envelope schema for `meridian deploy --json`.
  */
-export type DeployOutputEnvelope = _DeployChangedEnvelope | _DeployPlanEnvelope | _DeployTerminalEnvelope;
+export type DeployOutputEnvelope =
+  | _DeployChangedEnvelope
+  | _DeployPlanEnvelope
+  | _DeployTerminalEnvelope
+  | _DeployCancelledEnvelope;
 export type Command = "deploy";
 export type ClientName = string;
 export type ConnectionPagePath = string;
@@ -86,6 +90,23 @@ export type Schema2 = "meridian.output/v1";
 export type StartedAt2 = string;
 export type Status2 = "failed";
 export type Warnings2 = MeridianError[];
+export type Command3 = "deploy";
+export type Message1 = string;
+export type Phase = "queued" | "preflight" | "provision" | "apply" | "verify" | "handoff";
+export type RemoteChanged = boolean;
+export type ResumeHint = string;
+export type DurationMs3 = number;
+/**
+ * @minItems 1
+ */
+export type Errors3 = [MeridianError, ...MeridianError[]];
+export type ExitCode4 = number;
+export type MeridianVersion3 = string;
+export type OperationId3 = string;
+export type Schema3 = "meridian.output/v1";
+export type StartedAt3 = string;
+export type Status3 = "cancelled";
+export type Warnings3 = MeridianError[];
 
 export interface _DeployChangedEnvelope {
   command: Command;
@@ -209,3 +230,26 @@ export interface _DeployTerminalEnvelope {
  * Empty data object used by envelopes without command-specific failure data.
  */
 export interface EmptyData {}
+export interface _DeployCancelledEnvelope {
+  command: Command3;
+  data: OperationCancellation;
+  duration_ms: DurationMs3;
+  errors: Errors3;
+  exit_code: ExitCode4;
+  meridian_version: MeridianVersion3;
+  operation_id: OperationId3;
+  schema: Schema3;
+  started_at: StartedAt3;
+  status: Status3;
+  summary: Summary1;
+  warnings: Warnings3;
+}
+/**
+ * Typed terminal record for an operation stopped at a safe point.
+ */
+export interface OperationCancellation {
+  message: Message1;
+  phase: Phase;
+  remote_changed?: RemoteChanged;
+  resume_hint?: ResumeHint;
+}
