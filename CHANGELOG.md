@@ -71,11 +71,20 @@ running version is newer than the tested one.
 - `meridian fleet recover`, `apply --parallel`/`--prune-extras`, and the
   `desired_*` lists in `cluster.yml`.
 
-## [3.17.3] - 2026-10-11
+## [3.17.3] - 2026-10-12
 
 ### Changed
-- **`meridian update` stays on 3.x** — it installs the newest 3.x release and explains that Meridian 4 is not an in-place upgrade (new panel, new links for every user). Moving to 4 is explicit: `meridian update --major`. Your 3.x servers keep working either way
-- **Update notices no longer suggest redeploying after a major release**
+- **`meridian update` stays on 3.x** — it installs the newest 3.x release and explains that Meridian 4 is not an in-place upgrade (new panel, new links for every user). Moving to 4 is explicit: `meridian update --major`. Your 3.x servers keep working either way, but 3.x will eventually stop receiving updates
+- **Default camouflage target is `www.cloudflare.com`** — `www.microsoft.com` failed Reality handshakes in testing (#82). A redeploy keeps a server's existing target unless you pass `--sni`, so existing links keep working
+- **`meridian test` checks the exit IP over the server's address family** — IPv4 servers no longer fail the check when the observer answers over IPv6 (#82)
+
+### Fixed
+- **`meridian scan` works again** — RealiTLScanner renamed its release assets and changed its output format; scan now downloads the pinned 0.2.3 release, verifies its SHA-256, supports arm64 (#81), and reads results by column name (#78)
+- **Relay XHTTP links** use the exit's TLS name instead of the relay's Reality SNI (#78)
+
+### Added
+- **`--exit-user`** for relay commands when the exit uses a different SSH user (#78)
+- **`meridian preflight --ssh-port`** for servers on a non-standard SSH port (#84)
 
 ## [3.17.2] - 2026-04-20
 

@@ -140,7 +140,7 @@ code .
 برخی promptهای تعاملی ترمینال می‌توانند زیر WSL متفاوت رفتار کنند. اگر wizard مربوط به deploy ورودی را طبق انتظار قبول نمی‌کند، مقدارها را صریح بدهید:
 
 ```bash
-meridian deploy 198.51.100.10 --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
 همچنین می‌توانید اول preflight را اجرا کنید:
