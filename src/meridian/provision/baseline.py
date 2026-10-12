@@ -159,6 +159,8 @@ def build_server_baseline_checks(
         checks.append(
             BaselineCheck(
                 "docker",
+                # Absent Docker is drift to install (exit 1), not a missing inspection tool.
+                "command -v docker >/dev/null 2>&1 || exit 1; "
                 "docker info >/dev/null 2>&1 && docker compose version >/dev/null 2>&1",
             )
         )

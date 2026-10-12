@@ -100,3 +100,29 @@ def test_deploy_recipes_keep_baseline_as_their_prefix(
     steps = builder(ctx)
 
     assert [step.name for step in steps[: len(baseline)]] == [step.name for step in baseline]
+
+
+def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) -> None:
+    # A relay's baseline has no Docker; when the server gains an exit role the
+    # check must say "not installed" (exit 1), not "inspection tool missing" (127).
+    import subprocess
+
+    from meridian.reconciler.server_evidence import baseline_check_command
+
+    check = next(
+        check
+        for check in build_server_baseline_checks(
+            ProvisionContext(ip="198.51.100.1", harden=False), install_docker=True, manage_public_ports=False
+        )
+        if check.name == "docker"
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", baseline_check_command(check.name, check.command)],
+        env={"PATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "not found" not in result.stderr

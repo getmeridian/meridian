@@ -39,5 +39,6 @@
 - **Per-relay nginx files** — relay SNI routing uses per-file config, not monolithic rewrite.
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443; rewriting it duplicates the listener and fails `nginx -t` on every re-bootstrap.
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
+- **Baseline checks must exit 1 for absence** — a bare `docker …` exits 127 when Docker is missing, which observation treats as unavailable evidence and blocks a relay from ever becoming an exit.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
 - **WARP belongs in both recipes** — a WARP-enabled exit may be node-only, so `build_node_steps()` must install it after Docker just like first setup.
