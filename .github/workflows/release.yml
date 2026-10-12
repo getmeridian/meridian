@@ -113,11 +113,17 @@ jobs:
       - name: Check if tag already exists
         id: check_tag
         run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          # A pre-release VERSION on main is never published as the latest stable
+          # release; betas ship only through their own tag (see the prerelease job).
+          if echo "${{ steps.version.outputs.version }}" | grep -qE '(a|b|rc)[0-9]+$'; then
+            echo "VERSION is a pre-release; skipping the stable release"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Determine release type from semver
         id: semver

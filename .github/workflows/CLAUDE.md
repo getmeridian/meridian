@@ -27,5 +27,6 @@
 - **Release notes depend on CHANGELOG discipline** — if human forgets to update CHANGELOG before bumping VERSION, release notes fall back to git log (less useful).
 - **AI docs generated in 3 places** — CI website build, deploy-pages, publish-pypi all regenerate. Single source would reduce duplication.
 - **`workflow_run` uses main's copy of `release.yml`** — a branch whose packaging differs (e.g., a beta line) must release through its tag trigger, never by waiting for main's workflow.
+- **A pre-release VERSION never ships as stable** — the main release job skips `X.Y.ZbN`; only its tag publishes it.
 - **Stable release type ignores beta tags** — `git describe` excludes `a`/`b`/`rc` tags, or 4.0.0 after 4.0.0b2 would be titled a patch.
 - **System lab timeout 45min** — Remnawave image pulls inside nested Docker are slow. Timeout is generous to accommodate cold caches.

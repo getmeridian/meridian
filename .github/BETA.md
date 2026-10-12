@@ -19,6 +19,8 @@ meridian4 test 198.51.100.10          # does real traffic pass from here?
 meridian4 probe 198.51.100.10         # does the server look like a proxy from here?
 ```
 
+Known gaps: a server you remove must still be reachable, or the change cannot finish; removing a node leaves Docker installed on it.
+
 ### Tell us what you see
 
 Open a [Meridian 4 beta report](https://github.com/getmeridian/meridian/issues/new?template=v4_beta.yml). The most useful details: your country and network type (home ISP or mobile operator), whether your client app connects, and the output of `meridian4 test`. Outputs hide secrets, but replace IPs, domains, and links before posting.
@@ -45,6 +47,8 @@ meridian4 deploy 198.51.100.10        # IP вашего сервера
 meridian4 test 198.51.100.10          # проходит ли реальный трафик отсюда?
 meridian4 probe 198.51.100.10         # похож ли сервер на прокси, если смотреть отсюда?
 ```
+
+Известные ограничения: удаляемый сервер должен быть доступен, иначе изменение не завершится; после удаления узла на сервере остаётся Docker.
 
 ### Расскажите, что получилось
 
