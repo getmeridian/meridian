@@ -129,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 管理保存的 SSH 服务器（`~/.meridian/servers.json`）。
 
 ```
-meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```

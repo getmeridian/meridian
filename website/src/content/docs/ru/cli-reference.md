@@ -129,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 Управлять сохранёнными SSH серверами (`~/.meridian/servers.json`).
 
 ```
-meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```

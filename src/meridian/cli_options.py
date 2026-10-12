@@ -9,7 +9,9 @@ import typer
 TARGET_HELP = "Server: IP, saved name, user@host[:port], or 'local'"
 
 Target = Annotated[str, typer.Argument(metavar="SERVER", help=TARGET_HELP, show_default=False)]
-NewServer = Annotated[str, typer.Argument(metavar="SERVER", help="Server IP, or user@IP[:port]", show_default=False)]
+NewServer = Annotated[
+    str, typer.Argument(metavar="SERVER", help="Server IP, user@IP[:port], or local (this machine)", show_default=False)
+]
 User = Annotated[str, typer.Option("--user", "-u", help="SSH user (default: saved, else root)", show_default=False)]
 SshPort = Annotated[
     int,

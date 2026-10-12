@@ -129,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 Manage saved SSH servers (`~/.meridian/servers.json`).
 
 ```
-meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```
@@ -141,7 +141,7 @@ meridian server remove NAME_OR_IP [--yes]
 | `--ssh-port PORT` | 22 | SSH port |
 | `--yes`, `-y` | | Skip the removal confirmation (`server remove`) |
 
-Names and addresses must be unique; `server add` refuses collisions instead of retargeting an existing server. `server remove` deletes only the saved profile and refuses while the server still has a role in your topology.
+`server add local` saves the machine you are on; later commands run on it directly instead of over SSH. Names and addresses must be unique; `server add` refuses collisions instead of retargeting an existing server. `server remove` deletes only the saved profile and refuses while the server still has a role in your topology.
 
 ### meridian node
 

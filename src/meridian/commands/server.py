@@ -14,46 +14,39 @@ from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
-from meridian.resolve import merge_target
 from meridian.servers import ServerEntry, ServerRegistry
-from meridian.ssh import ServerConnection, SSHError
-from meridian.ssh_ui import RichSSHUI
 
 
 def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
-    """Register a server after verifying SSH access."""
-    try:
-        target = merge_target(ip, user=user, port=ssh_port)
-    except ValueError as exc:
-        fail(str(exc), hint="Use IP or user@IP[:port].", hint_type="user")
+    """Register a server after verifying access: over SSH, or locally for `local`/this machine."""
+    from meridian.commands.resolve import ensure_server_connection, resolve_server
+
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
     request = validate_command_input(
         ServerAddRequest,
         "Invalid server add request",
-        ip=target.host,
+        ip=resolved.ip,
         name=name,
-        user=target.user or "root",
-        ssh_port=target.port or 22,
+        user=resolved.user,
+        ssh_port=resolved.port,
     )
-
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
     pending_entry = ServerEntry(
         host=request.ip,
         user=request.user,
         name=request.name,
         port=request.ssh_port,
         auth_state="validated",
+        machine_id=resolved.machine_id,
     )
     try:
         registry.assert_can_add(pending_entry)
     except LocalStateError as exc:
         fail(exc)
-    conn = ServerConnection(ip=request.ip, user=request.user, local_mode=False, port=request.ssh_port)
 
-    info(f"Connecting to {request.ip}...")
-    try:
-        conn.check_ssh(ui=RichSSHUI())
-    except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+    if not resolved.local_mode:
+        info(f"Connecting to {request.ip}...")
+    ensure_server_connection(resolved)
 
     pending_entry.last_validated_at = datetime.now(UTC).isoformat()
     try:

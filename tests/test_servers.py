@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
@@ -265,23 +265,32 @@ class TestServerRegistry:
         assert reg.remove("nonexistent") is False
 
 
-def test_server_add_invalid_input_prints_readable_validation_error(capsys: pytest.CaptureFixture[str]) -> None:
+def _connection_factory() -> MagicMock:
+    """A ServerConnection stand-in whose instance reports the port it was built with."""
+    conn = MagicMock()
+
+    def build(**kwargs: object) -> MagicMock:
+        conn.port = kwargs["port"]
+        return conn
+
+    return MagicMock(side_effect=build, return_value=conn)
+
+
+def test_server_add_refuses_unknown_bare_word_before_connecting(capsys: pytest.CaptureFixture[str]) -> None:
     set_json_mode(False)
     set_quiet_mode(False)
 
     with (
-        patch("meridian.commands.server.ServerConnection") as mock_connection,
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as mock_connection,
         pytest.raises(typer.Exit) as exc_info,
     ):
         run_add("not-an-ip")
 
     captured = capsys.readouterr()
     assert exc_info.value.exit_code == 2
-    assert "Invalid server add request" in captured.err
-    assert "ip: Enter a valid IP address." in captured.err
-    assert "ValidationError" not in captured.err
+    assert "Server 'not-an-ip' not found" in captured.err
     assert "pydantic" not in captured.err.lower()
-    mock_connection.assert_not_called()
+    mock_connection.return_value.check_ssh.assert_not_called()
 
 
 def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest.CaptureFixture[str]) -> None:
@@ -289,7 +298,7 @@ def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest
     set_quiet_mode(False)
 
     with (
-        patch("meridian.commands.server.ServerConnection") as mock_connection,
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as mock_connection,
         pytest.raises(typer.Exit) as exc_info,
     ):
         run_add("198.51.100.10", ssh_port=70000)
@@ -299,17 +308,19 @@ def test_server_add_invalid_port_prints_readable_validation_error(capsys: pytest
     assert "Invalid server add request" in captured.err
     assert "ssh_port:" in captured.err
     assert "ValidationError" not in captured.err
-    mock_connection.assert_not_called()
+    mock_connection.return_value.check_ssh.assert_not_called()
 
 
 def test_server_add_persists_custom_port(servers_file: Path) -> None:
     with (
         patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
-        patch("meridian.commands.server.ServerConnection") as mock_connection,
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as mock_connection,
     ):
         run_add("198.51.100.10", name="edge-a", user="ubuntu", ssh_port=2222)
 
-    mock_connection.assert_called_once_with(ip="198.51.100.10", user="ubuntu", local_mode=False, port=2222)
+    kwargs = mock_connection.call_args.kwargs
+    assert (kwargs["ip"], kwargs["user"], kwargs["port"]) == ("198.51.100.10", "ubuntu", 2222)
+    assert kwargs["local_mode"] is False
     entry = ServerRegistry(servers_file).find("edge-a")
     assert entry is not None
     assert entry.port == 2222
@@ -323,20 +334,20 @@ def test_server_add_rejects_name_retarget_before_ssh(servers_file: Path) -> None
 
     with (
         patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
-        patch("meridian.commands.server.ServerConnection") as connection,
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as connection,
         pytest.raises(typer.Exit) as exc_info,
     ):
         run_add("198.51.100.20", name="edge")
 
     assert exc_info.value.exit_code == 2
-    connection.assert_not_called()
+    connection.return_value.check_ssh.assert_not_called()
     assert registry.find("edge").host == "198.51.100.10"
 
 
 def test_server_add_reports_registry_save_failure_after_ssh(servers_file: Path) -> None:
     with (
         patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
-        patch("meridian.commands.server.ServerConnection"),
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()),
         patch("meridian.commands.server.ServerRegistry.add", side_effect=OSError("disk full")),
         pytest.raises(typer.Exit) as exc_info,
     ):
@@ -455,3 +466,20 @@ class TestServerProfileStore:
 
         with pytest.raises(LocalStateCorruptedError, match="duplicate server id"):
             ServerProfileStore(path).list()
+
+
+def test_server_add_local_records_this_machine_without_ssh(servers_file: Path) -> None:
+    with (
+        patch("meridian.commands.server.SERVER_PROFILES_FILE", servers_file),
+        patch("meridian.commands.resolve._resolve_lib.detect_public_ip", return_value="198.51.100.30"),
+        patch("meridian.commands.resolve._resolve_lib.current_login", return_value="root"),
+        patch("meridian.commands.resolve.ServerConnection", new=_connection_factory()) as connection,
+        patch("meridian.resolve.this_machine_id", return_value="0123456789abcdef0123456789abcdef"),
+    ):
+        run_add("local", name="here")
+
+    assert connection.call_args.kwargs["local_mode"] is True
+    entry = ServerRegistry(servers_file).find("here")
+    assert entry is not None
+    assert entry.host == "198.51.100.30"
+    assert entry.machine_id == "0123456789abcdef0123456789abcdef"
