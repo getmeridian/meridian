@@ -11,7 +11,7 @@ section: guides
 
 شما نیاز دارید:
 - **VPS** درحال اجرای Debian یا Ubuntu که می‌توانید از طریق SSH با کلید، به‌عنوان root یا کاربر با sudo بدون گذرواژه دسترسی داشته باشید
-- **ترمینال** روی کامپیوتر خود (macOS، Linux یا WSL روی Windows)
+- **ترمینال** روی کامپیوتر خود (macOS، Linux یا [WSL روی Windows](/docs/fa/wsl/))
 
 ## نصب CLI
 

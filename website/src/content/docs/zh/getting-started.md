@@ -11,7 +11,7 @@ section: guides
 
 你需要：
 - 运行 Debian 或 Ubuntu 的 **VPS**，可通过 SSH 密钥以 root 或无密码 sudo 用户身份访问
-- 你自己机器上的**终端**（macOS、Linux 或 WSL）
+- 你自己机器上的**终端**（macOS、Linux 或 [Windows 上的 WSL](/docs/zh/wsl/)）
 
 ## 安装 CLI
 

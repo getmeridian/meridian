@@ -11,7 +11,7 @@ One command turns a fresh VPS into a hardened, undetectable proxy and gives you 
 
 You need:
 - A **VPS** running Debian or Ubuntu that you can reach over SSH with a key, as root or a user with passwordless sudo
-- A **terminal** on your own machine (macOS, Linux, or WSL on Windows)
+- A **terminal** on your own machine (macOS, Linux, or [WSL on Windows](/docs/en/wsl/))
 
 ## Install the CLI
 
