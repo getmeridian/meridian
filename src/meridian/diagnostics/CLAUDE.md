@@ -6,7 +6,7 @@
 
 **No CLI rendering** — checks return data; commands own Rich output. This keeps the module reusable from Engine, tests, and future Studio surfaces.
 
-**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O; `probe.py` selects checks from deployment facts.
+**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect → handshake → bytes until EOF or stall) every blocking/throughput check builds on; `probe.py` selects checks from deployment facts.
 
 ## What's done well
 
@@ -24,4 +24,5 @@
 - **Relay next-hop probes use bash `/dev/tcp` under `timeout`** — never `nc` (absent on minimal images); the probe echoes its own status so SSH or tool failures stay skipped.
 - **Running is not healthy** — a crash-looping container reports `Running` between restarts; read Docker's health status and treat `unhealthy` as a warning.
 - **Ownership markers must be ones v4 writes** — the port-443 owner is Meridian's only when a `meridian-v4-*` stream artifact exists; the 3.x `/etc/meridian/node.yml` is never written.
+- **A TLS alert is an answer, a timeout or reset is not** — classify flows by `TlsFlowResult.server_answered_tls`/`silenced`; macOS reports a pre-handshake reset as EINVAL from `getpeername()`.
 - **UFW port matching is line-based** — a rule for port 80 will not match port 8080 only if the line contains the exact port string; callers should be aware of broad ALLOW rules.

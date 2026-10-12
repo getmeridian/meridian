@@ -293,13 +293,21 @@ def _tls_probe(
         "alpn": alpn or [],
         "tls_version": tls_version,
     }
+    return run_json_helper(_TLS_HELPER, request, timeout=deadline)
+
+
+def run_json_helper(script: str, request: dict[str, object], *, timeout: float) -> dict[str, object] | None:
+    """Run a socket helper in a child interpreter so the wall-clock bound always holds.
+
+    Returns the helper's JSON object, or None when the helper could not run or answer.
+    """
     try:
         result = subprocess.run(
-            [sys.executable, "-c", _TLS_HELPER],
+            [sys.executable, "-c", script],
             input=json.dumps(request),
             capture_output=True,
             text=True,
-            timeout=deadline,
+            timeout=max(0.1, float(timeout)),
         )
         payload = json.loads(result.stdout)
     except (subprocess.TimeoutExpired, OSError, ValueError, TypeError, json.JSONDecodeError):
