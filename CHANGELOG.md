@@ -6,70 +6,86 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [4.0.0] - Unreleased
 
-### Remnawave compatibility matrix
-This release pins a single tested version tuple. Upgrading any one component
-without the rest is not supported — move the whole set together.
+Meridian 4 is a new foundation: the Remnawave panel replaces 3x-ui, and one
+reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 
-| Component | Pinned version |
+### Read first: this is not an in-place upgrade
+- Meridian 4 cannot manage servers deployed by 3.x, and existing client links
+  cannot carry over to Remnawave. Your 3.x servers keep working.
+- To keep managing them, stay on 3.x: `uv tool install 'meridian-vpn<4'`.
+- To move: deploy a fresh server with 4.0, give your users the new links, then
+  `meridian teardown` the old server (it also removes 3x-ui).
+- Requires Python 3.11+.
+
+### Deploy
+- **One command, verified end to end** — `meridian deploy IP` sets up the panel
+  and proxy, picks a camouflage target the server can actually use, pushes real
+  traffic through the delivered subscription, and only then prints "Done" with a
+  shareable connection page and QR code. Re-running it resumes or redeploys.
+- **Multi-server setups** — `meridian setup` is a guided, resumable wizard for
+  several exits, Realm relay chains, and routing gateways with failover.
+- **Review before change** — `meridian plan` shows what `meridian apply` would do
+  (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
+- **Optional paths** — `--domain` adds XHTTP and WSS (Cloudflare CDN fallback);
+  `--hysteria2` adds Hysteria2 on UDP/443. Blocking Russian destinations stays on
+  by default (`--no-geo-block` to turn it off).
+
+### Sharing
+- Connection pages are built from each user's real subscription, so relays and
+  every enabled protocol appear.
+- Subscription links live under the connection-page path and never reveal the
+  admin panel's address.
+- `meridian client add|show|list|enable|disable`. Permanent `client remove` is
+  not available yet; `client disable` revokes access immediately.
+
+### Security and correctness
+- No request logging on Meridian's web server; panel secrets are never rotated
+  on restart; the live SSH port is never firewalled; teardown removes everything
+  Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
+- `meridian test` and `meridian probe` are fail-closed: skipped evidence is never
+  reported as a pass.
+- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified.
+
+### Remnawave versions
+Fresh deploys install the versions below. Meridian requires at least backend
+3.4.0 and never downgrades a Remnawave you upgraded yourself; it warns when the
+running version is newer than the tested one.
+
+| Component | Version |
 |---|---|
-| `remnawave/backend` | `3.4.5` (supported floor `3.4.0`; newer operator-chosen tags are kept) |
+| `remnawave/backend` | `3.4.5` (minimum `3.4.0`) |
 | `remnawave/node` | `3.4.2` |
 | `remnawave/subscription-page` | `8.0.0` |
 | `postgres` (panel database) | `17-alpine` |
-| Xray-core client (test binary) | `26.7.28` |
-| RealiTLScanner (SNI discovery) | `0.2.3` |
+| Xray-core (test client) | `26.7.28` |
 | Realm (relay forwarder) | `2.9.3` |
-| Pebble (system-lab ACME CA) | `2.10.0` |
+| RealiTLScanner (`meridian scan`) | `0.2.3` |
 
-### Changed
-- **`meridian test` and `meridian probe` are fail-closed verification workflows** — both emit typed four-state JSON results, return exit 4 for completed findings and exit 3 for inconclusive evidence, understand persisted V4 topology, and never turn skipped network evidence green; full `test` executes the exact Remnawave Xray subscription for a deterministic managed client, rotates independent IP observers, and uses a direct control request to distinguish observer outages from broken proxy traffic
-- **Verification runtime hardening** — downloaded Xray archives now require a matching SHA2-256 sidecar, canonical local inbounds are restricted and rebound to loopback, TLS passes require valid trust/lifetime/hostname, and known direct exits must return the expected egress IP
-- **Fail-closed panel TLS** — provisioning now requires a trusted ACME certificate before sending administrator or API tokens; readiness, bootstrap auth, long-lived token creation, and later SDK calls all verify TLS
-- **SNI scanner hardening** — `scan` pins RealiTLScanner 0.2.3, verifies published per-architecture SHA-256 digests, supports arm64, validates scanner output, and removes its isolated remote workspace after every run
-- **V4 secondary command visibility** — node/relay lists and fleet status/inventory now project saved V4 exits and advertised relay endpoints, including explicit protocol metadata, while omitting roles the current public fleet contract cannot represent truthfully
-- **Secondary command state safety** — client output no longer renders saved panel administrator credentials, and destructive node/relay/teardown cleanup retains local topology until required remote cleanup succeeds
-- **Truthful relay subscriptions** — legacy Realm relays now advertise only the Reality transport their dedicated SNI route actually serves; stale XHTTP relay hosts remain visible to verification as findings until removed
-- **`meridian plan --json`** now emits the shared envelope shape with legacy actions or compiled V4 resource observations under `data`; exit `0` is converged, `2` means changes are pending, and unavailable observation evidence is a typed exit `3`
-- **Truthful interruption contracts** — `meridian api commands` distinguishes completed JSON outcomes from Ctrl-C/SIGINT, which exits `130` without promising an envelope on stdout
-- **`meridian fleet status --json`** and **`meridian fleet inventory --json`** now emit the shared envelope shape while preserving stable command fields under `data`
-- **Remnawave replaces 3x-ui** — modern panel with panel/node separation (NestJS + PostgreSQL + Valkey), proper REST API, built-in subscriptions, native multi-node support
-- **Single `cluster.yml` replaces per-server `proxy.yml`** — V4 `topology_intent` is the reviewed fleet authority; deployed metadata and optional legacy `desired_*` compatibility state live beside it. Client state remains in Remnawave's database, not locally
-- **Client creation follows topology ownership** — legacy `client add` is one panel API call instead of ~400 LOC of SSH-tunneled credential sync; V4 updates declared access intent and applies the compiled resource graph
-- **Relay = Remnawave Host entry** — enable/disable host toggles subscription inclusion automatically
-
-### Added
-- **meridian-core JSON contract foundation** — Pydantic-backed `meridian.output/v1` envelopes, structured summary/error/event models, JSONL event primitives, JSON Schema export, and centralized secret redaction for automation and future UI clients
-- **`meridian api schemas` / `meridian api schema NAME`** — discover and export JSON Schemas for the public meridian-core contracts used by CLI JSON output and future UI clients
-- **`meridian node add/list/remove/check`** — multi-node fleet management
-- **`meridian fleet status/recover`** — panel health, node connectivity, relay status, user count, and reconstruct-from-panel when local state is lost
-- **`MeridianPanel` REST client** — wraps the official `remnawave` Python SDK (v2.8.0) with retries, credential redaction, and thread-local event loops for parallel workers
-- **Config reliability** — corrupt YAML handling, version check, backup before mutations, disk-full error messages, external-edit guard (`cluster.save()` refuses to clobber if the file mtime advanced during a long-running apply), snapshot type validation
-- **Reality keys persisted** — public_key and short_id saved in cluster.yml for connection testing
-- **Declarative plan/apply workflow** — V4 compiles reviewed `topology_intent` into a finite resource graph for `plan` and `apply`. Legacy clusters retain optional `desired_nodes`, `desired_relays`, `desired_clients`, and `subscription_page` reconciliation, including hybrid imperative mirroring when those lists are managed
-- **Applied-state tracking** — every successful `apply` snapshots desired state into the typed `cluster.applied_state` model. The next plan distinguishes intentional removals (in applied → executes under `--yes`) from drift (not in applied → requires `--prune-extras=yes`). Closes the subtle bug where `--yes` silently skipped deliberate removals
-- **`meridian plan --json`** — structured output for CI consumption; exit 0 = converged, 2 = changes pending, and 3 = required observation unavailable. Legacy actions retain typed `actions[].kind`; V4 returns compiled resource observations and typed terminal errors
-- **`--prune-extras=ask|yes|no`** — explicit control over drift handling. Under `--yes`, `ask` downgrades to `no` (safety default); destructive actions still require one confirmation unless `--yes`
-- **Parallel legacy node provisioning** — `ThreadPoolExecutor` with `--parallel N` (range 1–32, default 4), per-worker `MeridianPanel` SDK instances, thread-local event loops, and serialized cluster saves. V4 applies its compiled graph and rejects non-default legacy parallel settings
-- **SSH multiplexing (`ControlMaster`)** — connection reuse across all SSH operations
-- **Warp tri-state** — `DesiredNode.warp: None | False | True` (keep-current / disable / enable) with correct YAML round-trip (explicit `null`, not dropped; loader defaults missing key to `None`)
-- **YAML null semantics** for `desired_*` and `subscription_page` — `null` means "unmanaged" (as documented); previously `desired_clients: null` collapsed to `[]` with `manage=True` and `subscription_page: null` loaded as `enabled=True`
-- **Duplicate node-name validator** — `compute_plan`'s name→IP map and `find_node()` disagreed on duplicates, which could misroute relay `exit_node` references. Caught at load time now
-- **Real-VM test harness** — optional `tests/realvm/` provisions real cloud VMs (Hetzner via `hcloud-python` SDK), runs full deploy + tier-α verification, tears down. Local-only (never in CI), opt-in via `make real-lab`. Foundation for a future `meridian deploy --create-vm <provider>` feature. Per-cloud `CloudProvider` abstract class under `src/meridian/infra/providers/`
-- **NET_ADMIN capability** on remnawave-node container — required by panel 2.6.2+ for Torrent Blocker, IP Control, and related plugins. Without it, those features silently no-op
-- **Subscription-page lifecycle via cluster.yml** — enable/disable the Remnawave subscription container declaratively; `docker compose up -d --no-recreate` on subpage-only apply to avoid incidental panel restart
-- **Hysteria2 UDP/443 fallback** — available after the TCP transports in subscription ordering, with matching host and firewall configuration
-- **`ConfigureFail2ban` + fail2ban package wired in both pipelines** — fail2ban is now actually installed and started on every hardened deploy. Previously `build_setup_steps` had an operator-precedence trap (`InstallPackages(REQUIRED_PACKAGES + ["fail2ban"] if harden else None)` parsed as `(REQUIRED + fail2ban) if harden else None`, skipping all packages on `--no-harden`) and `build_node_steps` (used for redeploy) lacked the step entirely
-- **Smart xray readiness polling** in system-lab — polls node API port 3010 + 5s grace for Reality inbound init, replacing a blind `sleep 30`
-
-### Fixed
-- **Safe fleet recovery** — recovered inbounds now use stable protocol keys and the current cluster schema; Reality public keys are derived from preserved private keys, and redeploy refuses incomplete key material instead of silently rotating credentials
+### Not yet available
+- Removing users, servers, relays, or protocol paths from a running fleet
+  (apply only adds; a redeploy must keep the same `--domain`).
+- `meridian studio` (local web UI) is experimental.
 
 ### Removed
-- **3x-ui panel** — PanelClient, ConfigurePanel, CreateInbound, all SSH-tunneled curl API calls
-- **All pre-v4 migration and compatibility paths** — v4 starts from typed `cluster.yml` and `servers.json` state; the old migrate command, installer/setup shims, per-server `proxy.yml` credentials, legacy registry import, and 3x-ui cleanup step are gone
-- **Legacy local connection-page renderer** — the server-hosted PWA is the only connection-page implementation
-- **Local client state** — no more UUID storage, credential sync, SCP rollback
-- **Legacy HAProxy + Caddy code paths** — replaced entirely by nginx (stream SNI routing + http TLS + reverse proxy)
+- 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
+- `meridian fleet recover`, `apply --parallel`/`--prune-extras`, and the
+  `desired_*` lists in `cluster.yml`.
+
+## [3.17.3] - 2026-10-11
+
+### Changed
+- **`meridian update` stays on 3.x** — it installs the newest 3.x release and explains that Meridian 4 is not an in-place upgrade (new panel, new links for every user). Moving to 4 is explicit: `meridian update --major`. Your 3.x servers keep working either way
+- **Update notices no longer suggest redeploying after a major release**
+
+## [3.17.2] - 2026-04-20
+
+### Fixed
+- **SSH hardening failure on cloud-init VPS** — deploy failed with `effective sshd setting mismatch: expected 'passwordauthentication no'` on Ubuntu instances with cloud-init. Root cause: sshd uses first-match-wins, and Meridian's `99-meridian.conf` loaded after cloud-init's `50-cloud-init.conf`. Now uses `00-meridian.conf` to load first, and neutralizes conflicting settings in other drop-ins (#31)
+
+## [3.17.1] - 2026-04-14
+
+### Fixed
+- **Credential sync and fetch for non-root deploy users** — deploying with `--user` (non-root) silently failed to sync `proxy.yml` to the server because SCP can't write to root-owned `/etc/meridian/`. This caused `relay deploy` and other commands that force-refresh credentials to fail. Now uses SSH + sudo for non-root users instead of SCP
 
 ## [3.17.0] - 2026-04-11
 
