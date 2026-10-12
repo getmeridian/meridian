@@ -42,6 +42,21 @@ pass "public subscription and connection page serve the deployed Reality link"
 meridian deploy "$EXIT_B_IP" --client-name solo --yes
 pass "redeploy with the same settings is idempotent"
 
+meridian client add bob
+meridian client remove bob --yes
+python3 <<'PYEOF'
+from meridian.cluster import ClusterConfig
+from meridian.remnawave import MeridianPanel
+
+cluster = ClusterConfig.load()
+assert cluster.topology_intent is not None
+assert cluster.topology_intent.access.users == ["solo"], cluster.topology_intent.access.users
+with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
+    assert panel.get_user("bob") is None, "removed client still exists in the panel"
+    assert panel.get_user("solo") is not None
+PYEOF
+pass "client remove retired the panel user and kept the others"
+
 meridian teardown "$EXIT_B_IP" --yes
 test ! -e "$MERIDIAN_HOME/cluster.yml"
 ssh root@"$EXIT_B_IP" 'test ! -e /opt/remnawave && test ! -e /etc/nginx/stream.d/meridian.conf'
