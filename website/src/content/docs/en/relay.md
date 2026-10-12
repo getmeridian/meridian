@@ -26,7 +26,7 @@ Relays carry **Reality** traffic. XHTTP, WSS, and Hysteria2 stay on the exit's o
 Deploy the exit first, then point a relay at it:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian adds the relay to your topology and applies it:
@@ -50,7 +50,7 @@ Meridian adds the relay to your topology and applies it:
 ### Example with all options
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
   --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
@@ -87,8 +87,8 @@ meridian relay remove 203.0.113.10
 Attach several relays to one exit, for example in different cities or networks:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
-meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 Clients receive every relay in their subscription. For relay chains with more than one hop, use `meridian setup`.

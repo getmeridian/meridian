@@ -56,6 +56,7 @@ from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.renderers import emit_json
+from meridian.resolve import merge_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
     DEFAULT_CLIENT,
@@ -71,7 +72,7 @@ def run(
     domain: str = "",
     sni: str = "",
     client_name: str = "",
-    user: str = "root",
+    user: str = "",
     yes: bool = False,
     harden: bool = True,
     requested_server: str = "",
@@ -82,7 +83,7 @@ def run(
     warp: bool = False,
     geo_block: bool = True,
     hysteria2: bool = False,
-    ssh_port: int = 22,
+    ssh_port: int = 0,
     fingerprint: str = "",
     request_path: str = "",
     json_output: bool = False,
@@ -102,6 +103,8 @@ def run(
     with error_context("deploy", timer=operation.timer), _quiet_machine_output(final_json):
         if events and events != "jsonl":
             fail(f"Unsupported --events value: {events}", hint="Use: --events=jsonl", hint_type="user")
+        if ip and not request_path:
+            ip, requested_server, user, ssh_port = _split_target(ip, requested_server, user, ssh_port)
         request = (
             _load_request(request_path)
             if request_path
@@ -494,9 +497,9 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
 
 def _redeploy_command(server_ip: str, request: DeployRequest) -> str:
     parts = ["meridian deploy", shlex.quote(server_ip)]
-    if request.user != "root":
+    if request.user and request.user != "root":
         parts.append(f"--user {shlex.quote(request.user)}")
-    if request.ssh_port != 22:
+    if request.ssh_port not in (0, 22):
         parts.append(f"--ssh-port {request.ssh_port}")
     if request.sni and request.sni != DEFAULT_SNI:
         parts.append(f"--sni {shlex.quote(request.sni)}")
@@ -548,6 +551,21 @@ def _load_request(source: str) -> DeployRequest:
     except ValidationError as exc:
         error = wrap_validation_error("Invalid deploy request JSON", exc)
         fail(str(error), hint=error.hint, hint_type="user")
+
+
+def _split_target(ip: str, requested_server: str, user: str, ssh_port: int) -> tuple[str, str, str, int]:
+    """Map the positional ``[user@]host[:port]`` / saved name / ``local`` onto request fields."""
+    try:
+        target = merge_target(ip, user=user, port=ssh_port)
+    except ValueError as exc:
+        fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
+    if target.local:
+        return ip, requested_server, target.user, target.port
+    if not is_ip(target.host) and ServerRegistry(SERVER_PROFILES_FILE).find(target.host) is not None:
+        if requested_server and requested_server != target.host:
+            fail(f"Two servers given: {target.host} and --server {requested_server}", hint_type="user")
+        return "", target.host, target.user, target.port
+    return target.host, requested_server, target.user, target.port
 
 
 def _build_request(**fields: Any) -> DeployRequest:

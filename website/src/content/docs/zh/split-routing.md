@@ -38,7 +38,7 @@ Meridian 在其 **Xray JSON** 和 **Mihomo** 订阅中提供分流，所以大�
 
 ### 为什么不在面板中编辑模板？
 
-Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板。它们承载你的出口和中继间的自动回退，以及上述路由。Meridian 在每次应用上恢复它们（包括重新部署和 `client add`、`node add`、`relay deploy`），所以在面板中添加的规则不会持续。
+Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板。它们承载你的出口和中继间的自动回退，以及上述路由。Meridian 在每次应用上恢复它们（包括重新部署和 `client add`、`node add`、`relay add`），所以在面板中添加的规则不会持续。
 
 ## 层如何配合工作
 

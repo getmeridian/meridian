@@ -94,6 +94,12 @@ running version is newer than the tested one.
 ## [3.17.3] - 2026-10-12
 
 ### Changed
+- **Name the server first, like ssh** — every server command takes one target:
+  an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
+  default to the saved values (else `root` and `22`) everywhere, including
+  `deploy`, `node add`, `relay add`, and `server add`. `--server NAME` still works.
+- **`relay deploy` is now `relay add`**, matching `node add`, `client add`, and
+  `server add`. The old name keeps working.
 - **`meridian update` stays on 3.x** — it installs the newest 3.x release and explains that Meridian 4 is not an in-place upgrade (new panel, new links for every user). Moving to 4 is explicit: `meridian update --major`. Your 3.x servers keep working either way, but 3.x will eventually stop receiving updates
 - **Default camouflage target is `www.cloudflare.com`** — `www.microsoft.com` failed Reality handshakes in testing (#82). A redeploy keeps a server's existing target unless you pass `--sni`, so existing links keep working
 - **`meridian test` checks the exit IP over the server's address family** — IPv4 servers no longer fail the check when the observer answers over IPv6 (#82)

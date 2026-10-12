@@ -20,6 +20,61 @@ LOCAL_KEYWORDS = ("local", "locally")
 VALID_SSH_USER = re.compile(r"^[a-zA-Z0-9._-]+$")
 
 
+@dataclass(frozen=True)
+class TargetSpec:
+    """A parsed ``[user@]host[:port]`` / saved-name / ``local`` command target.
+
+    ``host`` is still unresolved: it may be an IP, a hostname, or a saved
+    server name. Empty ``user`` and zero ``port`` mean "saved value, else default".
+    """
+
+    host: str = ""
+    user: str = ""
+    port: int = 0
+    local: bool = False
+
+
+_PORT_SUFFIX = re.compile(r"^(?P<host>[^:\[\]]+):(?P<port>\d+)$")
+_BRACKETED = re.compile(r"^\[(?P<host>[0-9A-Fa-f:.]+)\](?::(?P<port>\d+))?$")
+
+
+def parse_target(text: str) -> TargetSpec:
+    """Parse one positional target like ssh does: ``user@host:port``, ``[v6]:port``, a name, or ``local``.
+
+    Raises ``ValueError`` with an operator-facing message for malformed input.
+    """
+    value = text.strip()
+    if not value:
+        return TargetSpec()
+    if is_local_keyword(value):
+        return TargetSpec(local=True)
+    user = ""
+    if "@" in value:
+        user, _, value = value.rpartition("@")
+        if not VALID_SSH_USER.match(user):
+            raise ValueError(f"SSH user '{user}' is invalid; use letters, numbers, dots, hyphens, and underscores.")
+    port_text = ""
+    if bracketed := _BRACKETED.match(value):
+        value, port_text = bracketed["host"], bracketed["port"] or ""
+    elif suffixed := _PORT_SUFFIX.match(value):
+        value, port_text = suffixed["host"], suffixed["port"]
+    if not value:
+        raise ValueError(f"'{text}' has no host.")
+    port = int(port_text) if port_text else 0
+    if port_text and not 1 <= port <= 65535:
+        raise ValueError(f"SSH port {port_text} is out of range (1-65535).")
+    return TargetSpec(host=value, user=user, port=port)
+
+
+def merge_target(text: str, *, user: str = "", port: int = 0) -> TargetSpec:
+    """Parse *text* and fold in ``--user``/``--ssh-port`` flags, refusing contradictions."""
+    target = parse_target(text)
+    for label, flag, inline in (("SSH user", user, target.user), ("SSH port", port, target.port)):
+        if flag and inline and flag != inline:
+            raise ValueError(f"{label} given twice: {inline} in the target and {flag} as a flag.")
+    return TargetSpec(host=target.host, user=user or target.user, port=port or target.port, local=target.local)
+
+
 def is_local_keyword(value: str) -> bool:
     """Check if a value is the 'local' keyword for on-server deployment."""
     return value.lower() in LOCAL_KEYWORDS
@@ -68,6 +123,10 @@ class ResolvedServer:
     user: str
     local_mode: bool
     conn: ServerConnection
+
+    @property
+    def port(self) -> int:
+        return self.conn.port
 
 
 def detect_local_server_ip() -> str | None:

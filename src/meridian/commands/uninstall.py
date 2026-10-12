@@ -81,14 +81,16 @@ def _deregister_panel_node(cluster: ClusterConfig, server_ip: str) -> None:
 
 def run(
     ip: str = "",
-    user: str = "root",
+    user: str = "",
     yes: bool = False,
     requested_server: str = "",
+    *,
+    ssh_port: int = 0,
 ) -> None:
     """Uninstall Meridian from a server."""
     registry = ServerRegistry(SERVER_PROFILES_FILE)
 
-    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
+    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user, port=ssh_port)
 
     # Roles change only through the reviewed topology, so teardown refuses a
     # server that still carries one -- unless it is the whole fleet.

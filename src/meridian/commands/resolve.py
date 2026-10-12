@@ -39,71 +39,62 @@ def _resolve_server(
 ) -> ResolvedServer:
     """Resolve which server to target.
 
-    Priority: explicit IP / 'local' keyword > --server flag > local mode (root) > single registered > fail.
-
-    The 'local' keyword (or 'locally') triggers on-server deployment without SSH.
+    The target (positional, or the legacy ``--server``) is parsed like ssh:
+    ``[user@]host[:port]``, a saved name, or ``local``. Priority: that target >
+    local mode (root) > single registered > fail.
 
     If user is empty, it's auto-resolved from the server registry.
     If user is explicitly set, it overrides the registry value.
     If port is 0, it's auto-resolved from the server registry (default 22).
     If port is explicitly set (non-zero), it overrides the registry value.
     """
+    if explicit_ip and requested_server and explicit_ip != requested_server:
+        fail(
+            f"Two servers given: {explicit_ip} and --server {requested_server}",
+            hint="Name the server once, as the first argument.",
+            hint_type="user",
+        )
+    try:
+        target = _resolve_lib.merge_target(explicit_ip or requested_server, user=user, port=port)
+    except ValueError as exc:
+        fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
+    user, port = target.user, target.port
+
     ip = ""
     registry_user = ""
     registry_port = 22
     registry_key_path = ""
     local_mode = False
 
-    # 1. Explicit IP argument or 'local' keyword takes highest priority
-    if explicit_ip:
-        if _resolve_lib.is_local_keyword(explicit_ip):
-            detected_ip = _resolve_lib.detect_public_ip()
-            if not detected_ip:
-                fail(
-                    "Could not detect this server's public IP",
-                    hint="Provide the IP explicitly: meridian deploy 198.51.100.10",
-                    hint_type="system",
-                )
-            ip = detected_ip
-            local_mode = True
-            info(f"Local mode: deploying on this server ({ip})")
-        else:
-            ip = explicit_ip
-            # Check registry for saved user
-            entry = registry.find(explicit_ip)
-            if entry:
-                registry_user = entry.user
-                registry_port = entry.port
-                registry_key_path = entry.key_path
+    # 1. 'local' keyword: run on this machine without SSH
+    if target.local:
+        detected_ip = _resolve_lib.detect_public_ip()
+        if not detected_ip:
+            fail(
+                "Could not detect this server's public IP",
+                hint="Provide the IP explicitly: meridian <command> 198.51.100.10",
+                hint_type="system",
+            )
+        ip = detected_ip
+        local_mode = True
+        info(f"Local mode: using this server ({ip})")
 
-    # 2. --server flag (resolve via registry, or 'local' keyword)
-    elif requested_server:
-        if _resolve_lib.is_local_keyword(requested_server):
-            detected_ip = _resolve_lib.detect_public_ip()
-            if not detected_ip:
-                fail(
-                    "Could not detect this server's public IP",
-                    hint="Provide the IP explicitly: meridian <command> 198.51.100.10",
-                    hint_type="system",
-                )
-            ip = detected_ip
-            local_mode = True
-            info(f"Local mode: using this server ({ip})")
+    # 2. Named target: a saved server (by name, IP, or ID), else a literal address
+    elif target.host:
+        entry = registry.find(target.host)
+        if entry:
+            ip = entry.host
+            registry_user = entry.user
+            registry_port = entry.port
+            registry_key_path = entry.key_path
+        elif is_ip(target.host) or "." in target.host:
+            ip = target.host
         else:
-            entry = registry.find(requested_server)
-            if entry:
-                ip = entry.host
-                registry_user = entry.user
-                registry_port = entry.port
-                registry_key_path = entry.key_path
-            elif is_ip(requested_server):
-                ip = requested_server
-            else:
-                fail(
-                    f"Server '{requested_server}' not found",
-                    hint="See registered servers: meridian server list",
-                    hint_type="user",
-                )
+            fail(
+                f"Server '{target.host}' not found",
+                hint="See saved servers: meridian server list",
+                hint_type="user",
+            )
 
     # 3. Running on the server itself as root — /etc/meridian/ readable
     else:
@@ -125,7 +116,7 @@ def _resolve_server(
                 info(f"Using server: {label}")
 
             elif len(selectable_entries) > 1:
-                err_console.print("\n  Multiple servers. Use [bold]--server NAME[/bold]:\n")
+                err_console.print("\n  Several servers are saved. Name one:\n")
                 for entry in selectable_entries:
                     label = entry.name or entry.host
                     err_console.print(
@@ -133,8 +124,8 @@ def _resolve_server(
                     )
                 err_console.print()
                 fail(
-                    "Specify a server with --server",
-                    hint="Example: meridian <command> --server NAME",
+                    "Choose a server",
+                    hint="Example: meridian <command> NAME",
                     hint_type="user",
                 )
 

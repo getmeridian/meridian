@@ -7,6 +7,7 @@ import sys
 import typer
 
 from meridian import __version__
+from meridian.cli_options import NewServer, ServerAlias, SshPort, Target, Timeout, User, Yes
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner
 
@@ -314,7 +315,7 @@ def setup_cmd(
 
 @app.command("deploy")
 def deploy_cmd(
-    ip: str = typer.Argument("", help="Server IP address (or 'local' to deploy on this server)"),
+    ip: Target = "",
     domain: str = typer.Option(
         "",
         "--domain",
@@ -328,14 +329,14 @@ def deploy_cmd(
         help="TLS camouflage target (use 'meridian scan' to find best)",
     ),
     client_name: str = typer.Option("", "--client-name", help="Name for the first client"),
-    user: str = typer.Option("root", "--user", "-u", help="SSH user"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    user: User = "",
+    yes: Yes = False,
     harden: bool = typer.Option(
         True,
         "--harden/--no-harden",
         help="Harden SSH and firewall (disable if other services share the server)",
     ),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    server: ServerAlias = "",
     display_name: str = typer.Option(
         "",
         "--display-name",
@@ -361,7 +362,7 @@ def deploy_cmd(
         "--hysteria2",
         help="Also offer Hysteria2 over UDP/443 (needs --domain; QUIC is throttled in some regions)",
     ),
-    ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port if non-standard"),
+    ssh_port: SshPort = 0,
     fingerprint: str = typer.Option(
         "",
         "--fingerprint",
@@ -387,6 +388,8 @@ def deploy_cmd(
       [cyan]meridian deploy[/cyan]                          Ask for the server IP
       [cyan]meridian deploy 198.51.100.10[/cyan]            Deploy with defaults
       [cyan]meridian deploy 198.51.100.10 --domain vpn.example[/cyan]  CDN fallback via Cloudflare
+      [cyan]meridian deploy ubuntu@198.51.100.10:2222[/cyan]  Non-root user, custom SSH port
+      [cyan]meridian deploy local[/cyan]                    On this server, without SSH
       [cyan]meridian deploy 198.51.100.10 --no-harden[/cyan]  Skip SSH and firewall hardening
       [cyan]meridian deploy --request deploy.json --json --events=jsonl[/cyan]
     """
@@ -521,10 +524,10 @@ def client_disable_cmd(
 
 @server_app.command("add")
 def server_add_cmd(
-    ip: str = typer.Argument(..., help="Server IP address"),
+    ip: NewServer,
     name: str = typer.Option("", "--name", help="Display name"),
-    user: str = typer.Option("root", "--user", "-u", help="SSH user"),
-    ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port on the server"),
+    user: User = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Add a known server"""
     from meridian.commands.server import run_add
@@ -558,13 +561,13 @@ def server_remove_cmd(
 
 @app.command("preflight")
 def preflight_cmd(
-    ip: str = typer.Argument("", help="Server IP address or hostname"),
+    ip: Target = "",
     domain: str = typer.Option("", "--domain", "-d", help="Domain to check"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to verify"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: User = "",
     ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
-    ssh_port: int = typer.Option(0, "--ssh-port", min=0, max=65535, help="SSH port (default: saved or 22)"),
+    server: ServerAlias = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Validate server compatibility before deploying"""
     from meridian.commands.check import run
@@ -574,25 +577,26 @@ def preflight_cmd(
 
 @app.command("scan")
 def scan_cmd(
-    ip: str = typer.Argument("", help="Server IP address"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    ip: Target = "",
+    user: User = "",
+    server: ServerAlias = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Find optimal SNI targets on an IPv4 server via RealiTLScanner"""
     from meridian.commands.scan import run
 
-    run(ip, user, server)
+    run(ip, user, server, ssh_port=ssh_port)
 
 
 @app.command("test")
 def test_cmd(
-    ip: str = typer.Argument("", help="Server IP or domain to test"),
+    ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to test"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    server: ServerAlias = "",
     client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
     basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
-    timeout: str = typer.Option("5", "--timeout", help="Per-network-operation timeout in seconds (1-30)"),
+    timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
     """Test delivered proxy traffic from this device (no SSH required).
@@ -608,10 +612,10 @@ def test_cmd(
 
 @app.command("probe")
 def probe_cmd(
-    ip: str = typer.Argument("", help="Server IP or domain"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
+    server: ServerAlias = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI to use for generic probes"),
-    timeout: str = typer.Option("5", "--timeout", help="Per-network-operation timeout in seconds (1-30)"),
+    timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
     """Probe your server as a censor would"""
@@ -629,44 +633,47 @@ def probe_cmd(
 
 @app.command("doctor")
 def doctor_cmd(
-    ip: str = typer.Argument("", help="Server IP address"),
+    ip: Target = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: User = "",
     ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    server: ServerAlias = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Collect system info for bug reports"""
     from meridian.commands.diagnostics import run
 
-    run(ip, sni, user, ai, server)
+    run(ip, sni, user, ai, server, ssh_port=ssh_port)
 
 
 # Alias: rage → doctor
 @app.command("rage", hidden=True)
 def rage_cmd(
-    ip: str = typer.Argument("", help="Server IP address"),
+    ip: Target = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: User = "",
     ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    server: ServerAlias = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Alias for doctor"""
     from meridian.commands.diagnostics import run
 
-    run(ip, sni, user, ai, server)
+    run(ip, sni, user, ai, server, ssh_port=ssh_port)
 
 
 @app.command("teardown")
 def teardown_cmd(
-    ip: str = typer.Argument("", help="Server IP address"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    server: str = typer.Option("", "--server", help="Target server name or IP"),
+    ip: Target = "",
+    user: User = "",
+    yes: Yes = False,
+    server: ServerAlias = "",
+    ssh_port: SshPort = 0,
 ) -> None:
     """Remove an unreferenced proxy deployment from a server"""
     from meridian.commands.uninstall import run
 
-    run(ip, user, yes, server)
+    run(ip, user, yes, server, ssh_port=ssh_port)
 
 
 @app.command("update")
@@ -686,11 +693,11 @@ def update_cmd(
 # =============================================================================
 
 
-@relay_app.command("deploy")
-def relay_deploy_cmd(
-    relay_ip: str = typer.Argument(..., help="Relay server IP address"),
+@relay_app.command("add")
+def relay_add_cmd(
+    relay_ip: NewServer,
     exit: str = typer.Option(..., "--exit", "-e", help="Exit server IP or name"),
-    user: str = typer.Option("root", "--user", "-u", help="SSH user"),
+    user: User = "",
     name: str = typer.Option("", "--name", help="Friendly name for the relay (e.g. ru-moscow)"),
     port: int = typer.Option(443, "--port", "-p", help="Relay listen port"),
     sni: str = typer.Option(
@@ -698,19 +705,23 @@ def relay_deploy_cmd(
         "--sni",
         help="Reality SNI (inherits the exit path's when omitted)",
     ),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
-    ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port on the relay server"),
+    yes: Yes = False,
+    ssh_port: SshPort = 0,
 ) -> None:
-    """Deploy a TCP relay that forwards to an exit node.
+    """Add a TCP relay that forwards to an exit node.
 
     [dim]Examples:[/dim]
-      [cyan]meridian relay deploy 203.0.113.10 --exit 198.51.100.10[/cyan]
-      [cyan]meridian relay deploy 203.0.113.10 --exit myserver --name ru-moscow[/cyan]
-      [cyan]meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --sni yandex.ru[/cyan]
+      [cyan]meridian relay add 203.0.113.10 --exit 198.51.100.10[/cyan]
+      [cyan]meridian relay add 203.0.113.10 --exit myserver --name ru-moscow[/cyan]
+      [cyan]meridian relay add 203.0.113.10 --exit 198.51.100.10 --sni yandex.ru[/cyan]
     """
     from meridian.commands.relay import run_deploy
 
     run_deploy(relay_ip, exit, user, name, port, yes, sni=sni, ssh_port=ssh_port)
+
+
+# Earlier name for `relay add`; kept so existing scripts keep working.
+relay_app.command("deploy", hidden=True)(relay_add_cmd)
 
 
 @relay_app.command("list")
@@ -752,7 +763,7 @@ def relay_remove_cmd(
 def relay_check_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: User = "",
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
     """Check relay hops: Realm unit, next-hop TCP, and the public entry.
@@ -778,14 +789,14 @@ def relay_check_cmd(
 
 @node_app.command("add")
 def node_add_cmd(
-    ip: str = typer.Argument(..., help="Server IP address"),
+    ip: NewServer,
     name: str = typer.Option("", "--name", help="Friendly name for the node"),
-    user: str = typer.Option("root", "--user", "-u", help="SSH user"),
+    user: User = "",
     sni: str = typer.Option("", "--sni", help="Reality SNI target"),
     domain: str = typer.Option("", "--domain", help="Domain for WSS/XHTTP (Cloudflare CDN)"),
-    ssh_port: int = typer.Option(22, "--ssh-port", help="SSH port"),
+    ssh_port: SshPort = 0,
     harden: bool = typer.Option(True, help="Apply OS hardening (fleet servers require it)"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
 ) -> None:
     """Add an exit server to the fleet.
 
@@ -817,7 +828,7 @@ def node_list_cmd(
 @node_app.command("check")
 def node_check_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    user: User = "",
 ) -> None:
     """Run health checks on a node"""
     from meridian.commands.node import run_check

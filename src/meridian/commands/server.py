@@ -14,20 +14,25 @@ from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
+from meridian.resolve import merge_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection, SSHError
 from meridian.ssh_ui import RichSSHUI
 
 
-def run_add(ip: str, name: str = "", user: str = "root", ssh_port: int = 22) -> None:
+def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
     """Register a server after verifying SSH access."""
+    try:
+        target = merge_target(ip, user=user, port=ssh_port)
+    except ValueError as exc:
+        fail(str(exc), hint="Use IP or user@IP[:port].", hint_type="user")
     request = validate_command_input(
         ServerAddRequest,
         "Invalid server add request",
-        ip=ip,
+        ip=target.host,
         name=name,
-        user=user,
-        ssh_port=ssh_port,
+        user=target.user or "root",
+        ssh_port=target.port or 22,
     )
 
     registry = ServerRegistry(SERVER_PROFILES_FILE)

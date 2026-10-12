@@ -156,7 +156,7 @@ meridian deploy 198.51.100.10 --no-geo-block
 پس از اجرای exit، یک relay روی سرور داخلی اضافه کنید تا کاربران زمانی‌که IP خروج مسدود می‌شود راه ورودی داشته باشند. [راهنمای Relay](/docs/fa/relay/) را ببینید.
 
 ```
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 ## پنل مدیریت

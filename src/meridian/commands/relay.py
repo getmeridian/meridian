@@ -30,7 +30,7 @@ from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.remnawave import RemnawaveError
-from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh import SSHError
 from meridian.ssh_ui import RichSSHUI
 
 if TYPE_CHECKING:
@@ -40,31 +40,33 @@ if TYPE_CHECKING:
 def run_deploy(
     relay_ip: str,
     exit_arg: str,
-    user: str = "root",
+    user: str = "",
     relay_name: str = "",
     listen_port: int = 443,
     yes: bool = False,
     sni: str = "",
-    ssh_port: int = 22,
+    ssh_port: int = 0,
 ) -> None:
     """Deploy a relay node that forwards traffic to an exit server."""
-    request = validate_command_input(
-        RelayDeployRequest,
-        "Invalid relay deploy request",
-        relay_ip=relay_ip,
-        exit_arg=exit_arg,
-        user=user,
-        relay_name=relay_name,
-        listen_port=listen_port,
-        yes=yes,
-        sni=sni,
-        ssh_port=ssh_port,
-    )
-
+    from meridian.commands.resolve import resolve_server
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_relay_to_intent
     from meridian.setup.runtime import SetupRuntime
+
+    target = resolve_server(ServerRegistry(SERVER_PROFILES_FILE), explicit_ip=relay_ip, user=user, port=ssh_port)
+    request = validate_command_input(
+        RelayDeployRequest,
+        "Invalid relay add request",
+        relay_ip=target.ip,
+        exit_arg=exit_arg,
+        user=target.user,
+        relay_name=relay_name,
+        listen_port=listen_port,
+        yes=yes,
+        sni=sni,
+        ssh_port=target.port,
+    )
 
     cluster = load_topology_cluster()
     intent = cluster.topology_intent
@@ -94,11 +96,7 @@ def run_deploy(
     if not request.yes and not confirm(f"Add {request.relay_name or request.relay_ip} as a relay to {exit_ref}?"):
         raise typer.Exit(1)
 
-    connection = ServerConnection(
-        ip=request.relay_ip,
-        user=request.user,
-        port=request.ssh_port,
-    )
+    connection = target.conn
     try:
         connection.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
@@ -200,7 +198,7 @@ def _run_list(
 
     if not relays and not is_json_mode():
         info(f"No relays {'attached to exit ' + exit_arg if exit_arg else 'configured'}")
-        err_console.print("\n  [dim]Deploy one: meridian relay deploy RELAY_IP --exit EXIT_IP[/dim]\n")
+        err_console.print("\n  [dim]Deploy one: meridian relay add RELAY_IP --exit EXIT_IP[/dim]\n")
         return
 
     # Optionally check host status from panel

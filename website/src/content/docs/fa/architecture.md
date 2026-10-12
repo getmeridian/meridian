@@ -72,7 +72,7 @@ relay ترافیک TCP خام را از IP داخلی به listener Reality exit
 
 ## مدل State
 
-- **Topology** — `~/.meridian/cluster.yml` روی ماشین شما تدوین شده topology (control plane، exits، relays، gateways، مسیرهای پروتکل و لیست کاربران)، دسترسی پنل و کلیدهایی که Meridian تولید کرد را شامل می‌شود. `meridian setup`، `deploy`، `client add`، `node add` و `relay deploy` آن را تغییر می‌دهند؛ دستی ویرایش نکنید.
+- **Topology** — `~/.meridian/cluster.yml` روی ماشین شما تدوین شده topology (control plane، exits، relays، gateways، مسیرهای پروتکل و لیست کاربران)، دسترسی پنل و کلیدهایی که Meridian تولید کرد را شامل می‌شود. `meridian setup`، `deploy`، `client add`، `node add` و `relay add` آن را تغییر می‌دهند؛ دستی ویرایش نکنید.
 - **Clients** — حساب‌ها، کلیدها، وضعیت و ترافیق در دیتابیس Remnawave روی سرور control-plane زندگی می‌کنند.
 - **Saved servers** — `~/.meridian/servers.json` جزئیات اتصال SSH را شامل می‌شود.
 

@@ -50,18 +50,18 @@ meridian node add 198.51.100.20 --domain vpn.example.com
 relay روی سرور خانگی به کاربران یک نقطه ورود می‌دهد که زمانی که IP خارجی مسدود شوند قابل دسترس می‌ماند:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.20
+meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
 انتقال relay موجود به خروجی دیگر هنوز در دسترس نیست؛ به جای آن relay جدید را بر روی خروجی جدید deploy کنید.
 
 ### اگر سرور کنترل‌پلن از دست رفت
 
-`node add` و `relay deploy` به پنل نیاز دارند. اگر سرور که آن را میزبانی می‌کرد رفته و نمی‌تواند restore شود، هنوز migration خودکار نیست: `meridian deploy` با سرور جدید استقرار دهید، سپس هر کلاینت را با `meridian client add` بازسازی کنید. هر فرد لینک جدید می‌گیرد.
+`node add` و `relay add` به پنل نیاز دارند. اگر سرور که آن را میزبانی می‌کرد رفته و نمی‌تواند restore شود، هنوز migration خودکار نیست: `meridian deploy` با سرور جدید استقرار دهید، سپس هر کلاینت را با `meridian client add` بازسازی کنید. هر فرد لینک جدید می‌گیرد.
 
 ## آماده‌سازی قبل از مسدودسازی
 
-1. **relay اضافه کنید** روی سرور خانگی: `meridian relay deploy RELAY_IP --exit EXIT_IP`
+1. **relay اضافه کنید** روی سرور خانگی: `meridian relay add RELAY_IP --exit EXIT_IP`
 2. **دامنه استفاده کنید** برای fallback CDN: با `--domain vpn.example.com` deploy کنید
 3. **هر دو** — کلاینت‌ها سپس سه راه ورود دارند: relay (خانگی)، CDN (Cloudflare) و مستقیم
 4. **`~/.meridian/` backup کنید** — این است که شما را اجازه می‌دهد fleet را از ماشین دیگر مدیریت کنید

@@ -44,8 +44,7 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
     try:
         request = normalize_deploy_request(request)
         server_ip = request.ip
-        ssh_user = request.user
-        ssh_port = request.ssh_port
+        entry = None
         if request.requested_server:
             if is_local_deploy_target(request.requested_server):
                 server_ip = request.requested_server
@@ -61,16 +60,19 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
                         )
                 else:
                     server_ip = entry.host
-                    if request.user == "root" and entry.ssh_user:
-                        ssh_user = entry.ssh_user
-                    if request.ssh_port == 22:
-                        ssh_port = entry.ssh_port
+        elif server_ip and not is_local_deploy_target(server_ip):
+            entry = registry.find(server_ip)
 
         validate_deploy_target(server_ip)
     except DeployValidationError as exc:
         raise _user_error(exc) from exc
 
-    return ResolvedDeployTarget(server_ip=server_ip, ssh_user=ssh_user, ssh_port=ssh_port)
+    # An empty user or zero port means "the saved value, else the SSH default".
+    return ResolvedDeployTarget(
+        server_ip=server_ip,
+        ssh_user=request.user or (entry.ssh_user if entry else "") or "root",
+        ssh_port=request.ssh_port or (entry.ssh_port if entry else 0) or 22,
+    )
 
 
 def dry_run_deploy_request(

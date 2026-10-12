@@ -171,7 +171,8 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     assert deploy["client_name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
     assert deploy["requested_server"]["pattern"] == r"^$|^[^\r\n\t]+$"
     assert workflow_answers["ip"]["anyOf"] == deploy["ip"]["anyOf"]
-    assert workflow_answers["user"]["pattern"] == deploy["user"]["pattern"]
+    # Deploy requests leave the user empty to mean "saved, else root".
+    assert deploy["user"]["pattern"] == "^$|" + workflow_answers["user"]["pattern"]
 
 
 def test_topology_schemas_model_capabilities_and_country_routes() -> None:

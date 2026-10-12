@@ -72,7 +72,7 @@ flowchart LR
 
 ## 状态模型
 
-- **拓扑** — `~/.meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay deploy` 改变它；不要手工编辑它。
+- **拓扑** — `~/.meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
 - **客户端** — 账户、密钥、状态和流量位于控制平面服务器上的 Remnawave 数据库中。
 - **保存的服务器** — `~/.meridian/servers.json` 保存 SSH 连接详情。
 

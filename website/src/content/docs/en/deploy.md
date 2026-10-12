@@ -156,7 +156,7 @@ For a way to open Russian sites directly while keeping the block, see [Split rou
 After the exit is running, add a relay on a domestic server so users keep a way in if the exit IP gets blocked. See the [Relay guide](/docs/en/relay/).
 
 ```
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 ## Management panel

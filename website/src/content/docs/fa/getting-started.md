@@ -92,7 +92,7 @@ meridian client add alice
 meridian setup
 ```
 
-شما می‌توانید یک deployment را یک بار در یک بار با `meridian node add` و `meridian relay deploy` رشد کنید. هر تغییر از طریق topology بررسی‌شده یکسان می‌رود؛ `meridian plan` نشان می‌دهد چه تغییر می‌کند و `meridian apply` آن را اعمال می‌کند.
+شما می‌توانید یک deployment را یک بار در یک بار با `meridian node add` و `meridian relay add` رشد کنید. هر تغییر از طریق topology بررسی‌شده یکسان می‌رود؛ `meridian plan` نشان می‌دهد چه تغییر می‌کند و `meridian apply` آن را اعمال می‌کند.
 
 ## مراحل بعدی
 

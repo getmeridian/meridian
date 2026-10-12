@@ -42,26 +42,14 @@ if TYPE_CHECKING:
 def run_add(
     ip: str,
     name: str = "",
-    user: str = "root",
-    ssh_port: int = 22,
+    user: str = "",
+    ssh_port: int = 0,
     sni: str = "",
     domain: str = "",
     harden: bool = True,
     yes: bool = False,
 ) -> None:
     """Provision and add a new node to the fleet."""
-    request = validate_command_input(
-        NodeAddRequest,
-        "Invalid node add request",
-        ip=ip,
-        name=name,
-        user=user,
-        ssh_port=ssh_port,
-        sni=sni,
-        domain=domain,
-        harden=harden,
-        yes=yes,
-    )
     from meridian.commands.resolve import (
         ensure_server_connection,
         resolve_server,
@@ -70,6 +58,21 @@ def run_add(
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_exit_to_intent
     from meridian.setup.runtime import SetupRuntime
+
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    target = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
+    request = validate_command_input(
+        NodeAddRequest,
+        "Invalid node add request",
+        ip=target.ip,
+        name=name,
+        user=target.user,
+        ssh_port=target.port,
+        sni=sni,
+        domain=domain,
+        harden=harden,
+        yes=yes,
+    )
 
     cluster = load_topology_cluster()
     intent = cluster.topology_intent
@@ -84,15 +87,7 @@ def run_add(
     if not request.yes and not confirm(f"Add {request.name or request.ip} as a V4 exit?"):
         raise typer.Exit(1)
 
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
-    resolved = ensure_server_connection(
-        resolve_server(
-            registry,
-            explicit_ip=request.ip,
-            user=request.user,
-            port=request.ssh_port,
-        )
-    )
+    resolved = ensure_server_connection(target)
     try:
         registry.add(
             ServerEntry(

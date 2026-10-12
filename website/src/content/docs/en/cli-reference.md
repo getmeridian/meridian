@@ -12,7 +12,7 @@ section: reference
 Deploy one server and get a shareable connection link. The server becomes both the control plane (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
 
 ```
-meridian deploy [IP|local] [flags]
+meridian deploy [SERVER] [flags]
 ```
 
 | Flag | Default | Description |
@@ -25,9 +25,8 @@ meridian deploy [IP|local] [flags]
 | `--display-name NAME` | (none) | Label for connection pages |
 | `--icon EMOJI_OR_URL` | (none) | Page icon — emoji or image URL |
 | `--color PALETTE` | ocean | Page color theme (ocean/sunset/forest/lavender/rose/slate) |
-| `--user USER` | root | SSH user (non-root needs passwordless sudo) |
-| `--ssh-port PORT` | 22 | SSH port, if not 22 |
-| `--server NAME` | | Saved server to deploy to (name or IP) |
+| `--user USER` | saved, else root | SSH user (non-root needs passwordless sudo) |
+| `--ssh-port PORT` | saved, else 22 | SSH port |
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. `--no-harden` is for servers shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block` / `--no-geo-block` | on | Refuse Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) at the exit. Xray JSON and Mihomo subscriptions already send them directly from the device |
@@ -77,7 +76,7 @@ The output shows the plan hash, resource counts by kind, and any resources that 
 - `2` — changes pending (run `meridian apply`)
 - `3` — required evidence (panel, SSH, local state) was unavailable
 
-Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup`, `deploy`, `client add`, `node add`, or `relay deploy`.
+Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup`, `deploy`, `client add`, `node add`, or `relay add`.
 
 ### meridian apply
 
@@ -121,7 +120,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — lists clients with status, traffic, creation time, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
 
-**`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until the next apply (including redeploys and `client add`, `node add`, `relay deploy`), which turns every declared client back on.
+**`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until the next apply (including redeploys and `client add`, `node add`, `relay add`), which turns every declared client back on.
 
 **`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
 
@@ -130,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 Manage saved SSH servers (`~/.meridian/servers.json`).
 
 ```
-meridian server add IP [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```
@@ -149,7 +148,7 @@ Names and addresses must be unique; `server add` refuses collisions instead of r
 Manage exit servers. The first server is deployed with `meridian deploy` (or `meridian setup`); add more exits with `meridian node add`.
 
 ```
-meridian node add IP [flags]
+meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node check NAME_OR_IP [--user USER]
 meridian node remove NAME_OR_IP [--yes] [--force]
@@ -158,8 +157,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--name NAME` | (auto) | Friendly name for the node |
-| `--user USER` | root | SSH user on the node |
-| `--ssh-port PORT` | 22 | SSH port on the node |
+| `--user USER` | saved, else root | SSH user on the node |
+| `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`) |
 | `--sni HOST` | www.google.com | Reality camouflage target for this node |
 | `--domain DOMAIN` | (none) | Node domain; adds XHTTP, WSS, and Hysteria2 paths on it |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
@@ -180,7 +179,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 Manage relays — Realm TCP forwarders that give users a domestic entry point to an exit abroad. Relays carry Reality traffic.
 
 ```
-meridian relay deploy RELAY_IP --exit EXIT [flags]
+meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
@@ -188,16 +187,16 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--exit/-e EXIT` | (required for deploy) | Exit server IP or name |
+| `--exit/-e EXIT` | (required for add) | Exit server IP or name |
 | `--name NAME` | (auto) | Friendly name for the relay (e.g. "ru-moscow") |
 | `--port/-p PORT` | 443 | Listen port on the relay server |
 | `--sni HOST` | exit's target | Reality camouflage target for this relay; omit to use the exit's |
-| `--user/-u USER` | root | SSH user on the relay |
-| `--ssh-port PORT` | 22 | SSH port on the relay server |
+| `--user/-u USER` | saved, else root | SSH user on the relay |
+| `--ssh-port PORT` | saved, else 22 | SSH port on the relay server (`relay add`) |
 | `--yes/-y` | | Skip confirmation prompts |
 | `--json` | | Emit `relay list` (`data.relays[]`) or `relay check` as a `meridian.output/v1` envelope |
 
-**`relay deploy`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
+**`relay add`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
 **`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
 
@@ -225,8 +224,8 @@ meridian fleet inventory [--json]
 Check a server before deploying: camouflage target, port 443 availability and outside reachability, DNS, OS, disk, and clock. Nothing is installed. DNS uses the server's own resolver; the server address is not sent to a third-party service.
 
 ```
-meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai] [--server NAME]
+meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+                   [--ssh-port PORT] [--ai]
 ```
 
 `--domain` checks that the domain resolves to the server. `--sni` checks a specific camouflage target, `--user` and `--ssh-port` override the saved SSH user and port, and `--ai` copies an AI-ready diagnostic prompt to the clipboard.
@@ -238,7 +237,7 @@ Preflight accepts a public IP or hostname, opens a short-lived listener when por
 Find camouflage targets on the server's own network using a pinned RealiTLScanner release. Meridian verifies its SHA-256 checksum before running it and removes the remote workspace afterwards.
 
 ```
-meridian scan [IP] [--user USER] [--server NAME]
+meridian scan [SERVER] [--user USER] [--ssh-port PORT]
 ```
 
 RealiTLScanner scans IPv4 ranges; an IPv6-only server exits `3`. Picking a result prints the command to use it — it doesn't change a deployed topology. Skipping exits `0`, an invalid choice exits `2`, no suitable targets exits `4`, and scanner or download failures exit `3`.
@@ -252,7 +251,7 @@ A full test picks an active client, fetches the exact Xray JSON that Remnawave d
 A panel outage, HTTP `429`, or HTTP `5xx` makes the subscription unavailable, so the run exits `3`. Any other subscription rejection such as `400` or `422` is a completed failure and exits `4`.
 
 ```
-meridian test [IP|DOMAIN] [--server NAME] [--domain NAME] [--sni NAME]
+meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
               [--client NAME] [--basic] [--timeout SECONDS] [--json]
 ```
 
@@ -267,7 +266,7 @@ Probe a server as a censor would, to check whether the deployment gives itself a
 Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
 
 ```
-meridian probe [IP|DOMAIN] [--server NAME] [--sni NAME]
+meridian probe [SERVER|DOMAIN] [--sni NAME]
                [--timeout SECONDS] [--json]
 ```
 
@@ -278,10 +277,10 @@ Same exit codes as `test`: `0` passed, `4` found problems, `3` inconclusive. `--
 Collect system diagnostics for bug reports. Alias: `meridian rage`.
 
 ```
-meridian doctor [IP] [--sni HOST] [--user USER] [--ai] [--server NAME]
+meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 ```
 
-`--sni` picks the camouflage target to diagnose, `--user` overrides the saved SSH user, and `--ai` copies a redacted, AI-ready report to the clipboard instead of printing the issue template.
+`--sni` picks the camouflage target to diagnose, `--user` and `--ssh-port` override the saved SSH user and port, and `--ai` copies a redacted, AI-ready report to the clipboard instead of printing the issue template.
 
 Doctor follows the server's roles: a relay-only server isn't diagnosed as an exit, and routing gateways are labeled separately. Missing tools or a lost SSH connection make the report inconclusive (exit `3`); sections already collected are still shown.
 
@@ -290,12 +289,12 @@ Doctor follows the server's roles: a relay-only server isn't diagnosed as an exi
 Remove Meridian from a server.
 
 ```
-meridian teardown [IP] [--user USER] [--server NAME] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
 On a single-server deployment, teardown removes everything: the panel, node, nginx configuration, certificates, relays, and firewall rules on the server (Docker and system packages stay), then the local `cluster.yml` and saved server profile. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
 
-`--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown `--server`, or zero or several possible targets, exits `2` instead of prompting.
+`--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.
 
 ### meridian update
 
@@ -367,13 +366,14 @@ These recur across commands; each command accepts only the options listed in its
 
 | Flag | Used by |
 |------|---------|
-| `--server NAME` | deploy, preflight, scan, test, probe, doctor, teardown |
-| `--user`, `-u USER` | deploy, node add/check, relay commands, server add, preflight, scan, doctor, teardown |
-| `--sni HOST` | deploy, node add, relay deploy, preflight, test, probe, doctor |
+| `SERVER` argument | deploy, preflight, scan, test, probe, doctor, teardown, node add, relay add, server add |
+| `--user`, `-u USER` | deploy, node add/check, relay add/check, server add, preflight, scan, doctor, teardown |
+| `--ssh-port PORT` | deploy, node add, relay add, server add, preflight, scan, doctor, teardown |
+| `--sni HOST` | deploy, node add, relay add, preflight, test, probe, doctor |
 | `--domain DOMAIN` | deploy, node add, preflight, test |
 
-Client commands use the panel API directly and don't take `--server`. `test` and `probe` run from your device and don't use SSH.
+Client commands use the panel API directly and don't take a server. `test` and `probe` run from your device and don't use SSH.
 
 ## Server resolution
 
-For SSH commands, pass a target as an argument or with `--server NAME`; the argument wins where both are accepted. With neither, Meridian uses local mode (when running on a deployed server) or the only saved server. Zero or several candidates exit `2` rather than prompting. `test` and `probe` refuse an argument and `--server` together.
+Name the server first, the way `ssh` does: an IP, a saved name, `user@host:port`, or `local` to run on the current machine without SSH. `--user` and `--ssh-port` fill in what the target leaves out and must not contradict it. An empty user or port means the saved value, else `root` and `22`. With no server, Meridian uses local mode (when running on a deployed server) or the only saved server. Zero or several candidates exit `2` rather than prompting. The older `--server NAME` flag still works.

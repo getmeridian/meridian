@@ -50,18 +50,18 @@ See [Domain mode](/docs/en/domain-mode/) for the Cloudflare steps.
 A relay on a domestic server gives users an entry point that stays reachable when foreign IPs are blocked:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.20
+meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
 Moving an existing relay to a different exit isn't available yet; deploy a new relay against the new exit instead.
 
 ### If the control-plane server is lost
 
-`node add` and `relay deploy` need the panel. If the server that hosted it is gone and cannot be restored, there is no automatic migration yet: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
+`node add` and `relay add` need the panel. If the server that hosted it is gone and cannot be restored, there is no automatic migration yet: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
 
 ## Prepare before a block
 
-1. **Add a relay** on a domestic server: `meridian relay deploy RELAY_IP --exit EXIT_IP`
+1. **Add a relay** on a domestic server: `meridian relay add RELAY_IP --exit EXIT_IP`
 2. **Use a domain** for CDN fallback: deploy with `--domain vpn.example.com`
 3. **Both** — clients then have three ways in: relay (domestic), CDN (Cloudflare), and direct
 4. **Back up `~/.meridian/`** — it is what lets you manage the fleet from another machine

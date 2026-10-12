@@ -92,7 +92,7 @@ meridian client add alice
 meridian setup
 ```
 
-Вы также можете расти развёртывание одном шагом за раз с `meridian node add` и `meridian relay deploy`. Каждое изменение проходит через ту же рассмотренную топологию; `meridian plan` показывает, что будет изменено и `meridian apply` применяет это.
+Вы также можете расти развёртывание одном шагом за раз с `meridian node add` и `meridian relay add`. Каждое изменение проходит через ту же рассмотренную топологию; `meridian plan` показывает, что будет изменено и `meridian apply` применяет это.
 
 ## Следующие шаги
 

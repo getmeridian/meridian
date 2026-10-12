@@ -156,7 +156,7 @@ meridian deploy 198.51.100.10 --no-geo-block
 出口运行后，在国内服务器上添加中继，这样如果出口 IP 被阻止，用户保持有访问方式。详见[中继指南](/docs/zh/relay/)。
 
 ```
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 ## 管理面板

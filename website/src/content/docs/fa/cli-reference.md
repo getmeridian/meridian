@@ -12,7 +12,7 @@ section: reference
 یک سرور استقرار دهید و لینک اتصالی قابل اشتراک دریافت کنید. سرور هم control plane (پنل Remnawave) و هم exit می‌شود. Deploy توپولوژی بررسی‌شده‌ای مشابه `meridian setup` ایجاد می‌کند، آن را با checkpoints اعمال می‌کند، ترافیق واقعی را از طریق اشتراک تحویل‌داده‌شده تأیید می‌کند، و صفحه اتصال و URL اشتراک را چاپ می‌کند. دوباره اجرای دستور یکسان یک استقرار قطع‌شده را از سر می‌گیرد یا بازاستقرار می‌کند، مسیرها، کلیدها و کاربران را نگه می‌دارد.
 
 ```
-meridian deploy [IP|local] [flags]
+meridian deploy [SERVER] [flags]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -25,9 +25,8 @@ meridian deploy [IP|local] [flags]
 | `--display-name NAME` | (هیچ) | برچسب برای صفحات اتصال |
 | `--icon EMOJI_OR_URL` | (هیچ) | آیکون صفحه — emoji یا URL تصویر |
 | `--color PALETTE` | ocean | تم رنگ صفحه (ocean/sunset/forest/lavender/rose/slate) |
-| `--user USER` | root | کاربر SSH (non-root نیاز به sudo بدون رمز عبور دارد) |
-| `--ssh-port PORT` | 22 | پورت SSH، اگر 22 نیست |
-| `--server NAME` | | سرور ذخیره‌شده برای استقرار (نام یا IP) |
+| `--user USER` | ذخیره‌شده، وگرنه root | کاربر SSH (non-root نیاز به sudo بدون رمز عبور دارد) |
+| `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH |
 | `--harden / --no-harden` | فعال | ورود تنهای کلید SSH، fail2ban و firewall UFW. `--no-harden` برای سروری که سرویس‌های دیگری روی آن دارند است |
 | `--warp / --no-warp` | خاموش | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
 | `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را در exit block کنید (`geosite:category-ru` + `geoip:ru`). اشتراک‌های Xray JSON و Mihomo قبلاً آن‌ها را مستقیم از دستگاه ارسال می‌کنند |
@@ -77,7 +76,7 @@ meridian plan [--json]
 - `2` — تغییرات معلق (اجرا کنید `meridian apply`)
 - `3` — شواهد الزامی (panel، SSH، وضعیت محلی) دسترس نبود
 
-topology را در `cluster.yml` دستی ویرایش نکنید. آن را با `meridian setup`، `deploy`، `client add`، `node add` یا `relay deploy` تغییر دهید.
+topology را در `cluster.yml` دستی ویرایش نکنید. آن را با `meridian setup`، `deploy`، `client add`، `node add` یا `relay add` تغییر دهید.
 
 ### meridian apply
 
@@ -121,7 +120,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — کلاینت‌ها را با وضعیت، ترافیق، زمان ایجاد و آخری دیده‌شده فهرست می‌کند. با `--json`، `data.summary` counts و `data.clients[]` برمی‌گرداند.
 
-**`client enable` / `client disable`** — کلاینت را فوراً ازسرگیری یا تعلیق کنید. تعلیق تا بعدی اعمال دوام می‌آورد (شامل بازاستقرار و `client add`، `node add`، `relay deploy`)، که هر کلاینت اعلام‌شده را دوباره روشن می‌کند.
+**`client enable` / `client disable`** — کلاینت را فوراً ازسرگیری یا تعلیق کنید. تعلیق تا بعدی اعمال دوام می‌آورد (شامل بازاستقرار و `client add`، `node add`، `relay add`)، که هر کلاینت اعلام‌شده را دوباره روشن می‌کند.
 
 **`client remove`** — کلاینت را از topology حذف می‌کند، کاربر پنل و صفحه اتصال آن‌ها را حذف می‌کند. تأیید می‌خواهد مگر `--yes`. آخرین کلاینت نمی‌تواند حذف شود. کاربران را در پنل مستقیماً حذف نکنید؛ Meridian هر کلاینتی را که در topology باقی است در بعدی اعمال دوباره ایجاد می‌کند.
 
@@ -130,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 سروری SSH ذخیره‌شده مدیریت کنید (`~/.meridian/servers.json`).
 
 ```
-meridian server add IP [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```
@@ -149,7 +148,7 @@ meridian server remove NAME_OR_IP [--yes]
 سروری exit را مدیریت کنید. سرور اول با `meridian deploy` استقرار می‌یابد (یا `meridian setup`)؛ با `meridian node add` exit دیگر اضافه کنید.
 
 ```
-meridian node add IP [flags]
+meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node check NAME_OR_IP [--user USER]
 meridian node remove NAME_OR_IP [--yes] [--force]
@@ -158,8 +157,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--name NAME` | (خودکار) | نام دوستانه برای گره |
-| `--user USER` | root | کاربر SSH روی گره |
-| `--ssh-port PORT` | 22 | پورت SSH روی گره |
+| `--user USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی گره |
+| `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی گره (`node add`) |
 | `--sni HOST` | www.google.com | هدف camouflage Reality برای این گره |
 | `--domain DOMAIN` | (هیچ) | دامنه گره؛ XHTTP، WSS و مسیرهای Hysteria2 را روی آن اضافه می‌کند |
 | `--harden / --no-harden` | فعال | تقویت سیستم‌عامل، SSH و firewall. سروری فلیت همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
@@ -180,7 +179,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 relay را مدیریت کنید — Realm TCP forwarders که به کاربران نقطه ورود داخلی برای exit خارج دهند. Relay ترافیق Reality را حمل می‌کند.
 
 ```
-meridian relay deploy RELAY_IP --exit EXIT [flags]
+meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
@@ -188,16 +187,16 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--exit/-e EXIT` | (الزامی برای deploy) | IP یا نام سرور exit |
+| `--exit/-e EXIT` | (الزامی برای add) | IP یا نام سرور exit |
 | `--name NAME` | (خودکار) | نام دوستانه برای relay (مثل "ru-moscow") |
 | `--port/-p PORT` | 443 | پورت گوش دهی روی سرور relay |
 | `--sni HOST` | هدف exit | هدف camouflage Reality برای این relay؛ برای استفاده از exit حذف کنید |
-| `--user/-u USER` | root | کاربر SSH روی relay |
-| `--ssh-port PORT` | 22 | پورت SSH روی سرور relay |
+| `--user/-u USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی relay |
+| `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی سرور relay (`relay add`) |
 | `--yes/-y` | | پرسش تأیید را رد کنید |
 | `--json` | | `relay list` (`data.relays[]`) یا `relay check` را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
-**`relay deploy`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.
+**`relay add`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.
 
 **`relay remove`** — `RELAY` یک IP سرور relay یا نام ذخیره‌شده یا ID زنجیره relay است. هر زنجیره‌ای را از طریق آن سرور می‌اندازد (آن را با `--exit` محدود کنید)، فهرست می‌کند که چه چیزی حذف خواهد شد (واحدهای Realm، قوانین firewall، شنونده سمت exit، منتشر شده Hosts)، تأیید می‌کند و حذف بررسی‌شده را اعمال می‌کند. سرورها در سرورهای ذخیره‌شده باقی می‌مانند.
 
@@ -225,8 +224,8 @@ meridian fleet inventory [--json]
 قبل از استقرار یک سرور بررسی کنید: هدف camouflage، دسترسی و reachability خارجی پورت 443، DNS، سیستم‌عامل، دیسک و ساعت. هیچ چیزی نصب نمی‌شود. DNS از resolver خود سرور استفاده می‌کند؛ آدرس سرور به سرویس third-party ارسال نمی‌شود.
 
 ```
-meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai] [--server NAME]
+meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+                   [--ssh-port PORT] [--ai]
 ```
 
 `--domain` بررسی می‌کند که دامنه به سرور resolve شود. `--sni` هدف camouflage خاصی را بررسی می‌کند، `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند و `--ai` prompt تشخیصی آماده‌شده برای AI را به clipboard کپی می‌کند.
@@ -238,7 +237,7 @@ Preflight IP یا hostname عمومی را قبول می‌کند، listener ک�
 با استفاده از pinned RealiTLScanner release روی شبکه خود سرور هدف‌های camouflage پیدا کنید. Meridian قبل از اجرا SHA-256 checksum آن را تأیید می‌کند و workspace راه دور را بعد از آن حذف می‌کند.
 
 ```
-meridian scan [IP] [--user USER] [--server NAME]
+meridian scan [SERVER] [--user USER] [--ssh-port PORT]
 ```
 
 RealiTLScanner محدوده IPv4 را اسکن می‌کند؛ سرور IPv6-only exit `3` می‌شود. انتخاب نتیجه دستور را برای استفاده آن چاپ می‌کند — topology استقرار‌یافته را تغییر نمی‌دهد. رد کردن exit `0`، انتخاب نامعتبر exit `2`، بدون هدف مناسب exit `4` و scanner یا دانلود failures exit `3`.
@@ -252,7 +251,7 @@ RealiTLScanner محدوده IPv4 را اسکن می‌کند؛ سرور IPv6-onl
 outage panel، HTTP `429` یا HTTP `5xx` اشتراک را دسترس نمی‌کند، پس اجرا exit `3` می‌شود. هر انکار اشتراک دیگری مثل `400` یا `422` شکست تکمیل‌شده و exit `4` است.
 
 ```
-meridian test [IP|DOMAIN] [--server NAME] [--domain NAME] [--sni NAME]
+meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
               [--client NAME] [--basic] [--timeout SECONDS] [--json]
 ```
 
@@ -267,7 +266,7 @@ Exit `0` هر بررسی قبول شد، `4` تست مسائل پیدا کرد �
 بررسی‌ها از deployment واقعی پیروی می‌کنند: exposure پورت عمومی و داخلی، رفتار HTTP/TLS، سازگاری و camouflage SNI، مسیرهای proxy و panel معمول، WebSocket upgrades، reverse DNS، HTTP/2، نسخه‌های TLS legacy و دامنه‌های پیکربندی‌شده. `--sni` SNI را برای probes TLS عام جایگزین می‌کند. UDP-only listeners به عنوان نیاز `meridian test` کامل به جای حدس گزارش می‌شوند.
 
 ```
-meridian probe [IP|DOMAIN] [--server NAME] [--sni NAME]
+meridian probe [SERVER|DOMAIN] [--sni NAME]
                [--timeout SECONDS] [--json]
 ```
 
@@ -278,10 +277,10 @@ meridian probe [IP|DOMAIN] [--server NAME] [--sni NAME]
 جمع‌آوری تشخیص سیستم برای bug reports. نام مستعار: `meridian rage`.
 
 ```
-meridian doctor [IP] [--sni HOST] [--user USER] [--ai] [--server NAME]
+meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 ```
 
-`--sni` هدف camouflage را برای تشخیص انتخاب می‌کند، `--user` کاربر SSH ذخیره‌شده را جایگزین می‌کند و `--ai` گزارش redacted، آماده‌شده برای AI را به clipboard کپی می‌کند بجای چاپ issue template.
+`--sni` هدف camouflage را برای تشخیص انتخاب می‌کند، `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند و `--ai` گزارش redacted، آماده‌شده برای AI را به clipboard کپی می‌کند بجای چاپ issue template.
 
 Doctor از نقش‌های سرور پیروی می‌کند: سرور relay-only به عنوان exit تشخیص نمی‌شود، و routing gateways به طور جداگانه برچسب‌گذاری می‌شوند. ابزارهای missing یا اتصال SSH گم گزارش را inconclusive می‌کند (exit `3`)؛ بخش‌های قبلاً جمع‌آوری‌شده همچنان نشان داده می‌شوند.
 
@@ -290,12 +289,12 @@ Doctor از نقش‌های سرور پیروی می‌کند: سرور relay-on
 Meridian را از سرور حذف کنید.
 
 ```
-meridian teardown [IP] [--user USER] [--server NAME] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
 در یک deployment تنهای سرور، teardown همه چیز را حذف می‌کند: پنل، گره، پیکربندی nginx، گواهینامه‌ها، relay و قوانین firewall روی سرور (Docker و package‌های سیستم می‌مانند)، سپس `cluster.yml` محلی و پروفایل سرور ذخیره‌شده. همچنین 3x-ui را از Meridian 3.x حذف می‌کند. در فلیت چند‌سروری، teardown سروری را رد می‌کند که هنوز نقش در topology دارد.
 
-`--yes` تأیید را رد می‌کند؛ بررسی‌های نقش همچنان اول اجرا می‌شوند. رد کردن exit `1` می‌شود. `--server` نامعلوم، یا صفر یا چندین هدف ممکن، exit `2` بجای prompt.
+`--yes` تأیید را رد می‌کند؛ بررسی‌های نقش همچنان اول اجرا می‌شوند. رد کردن exit `1` می‌شود. نام سرور نامعلوم، یا صفر یا چندین هدف ممکن، exit `2` بجای prompt.
 
 ### meridian update
 
@@ -367,13 +366,14 @@ JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`sc
 
 | پرچم | استفاده‌شده توسط |
 |------|---------|
-| `--server NAME` | deploy، preflight، scan، test، probe، doctor، teardown |
-| `--user`, `-u USER` | deploy، node add/check، relay commands، server add، preflight، scan، doctor، teardown |
-| `--sni HOST` | deploy، node add، relay deploy، preflight، test، probe، doctor |
+| `SERVER` argument | deploy، preflight، scan، test، probe، doctor، teardown، node add، relay add، server add |
+| `--user`, `-u USER` | deploy، node add/check، relay add/check، server add، preflight، scan، doctor، teardown |
+| `--ssh-port PORT` | deploy، node add، relay add، server add، preflight، scan، doctor، teardown |
+| `--sni HOST` | deploy، node add، relay add، preflight، test، probe، doctor |
 | `--domain DOMAIN` | deploy، node add، preflight، test |
 
-دستورات client از API panel مستقیم استفاده می‌کنند و `--server` نمی‌گیرند. `test` و `probe` از دستگاه شما اجرا می‌شوند و SSH استفاده نمی‌کنند.
+دستورات client از API panel مستقیم استفاده می‌کنند و سرور نمی‌گیرند. `test` و `probe` از دستگاه شما اجرا می‌شوند و SSH استفاده نمی‌کنند.
 
 ## تفکیک سرور
 
-برای دستورات SSH، هدف را به عنوان argument یا با `--server NAME` پاس دهید؛ argument جایی‌که هر دو قبول می‌شوند برنده است. بدون هیچ یک، Meridian حالت محلی (زمانی‌که روی سرور استقرار‌یافته اجرا می‌شود) یا سرور تنهای ذخیره‌شده را استفاده می‌کند. صفر یا چندین نامزد exit `2` بجای prompt. `test` و `probe` argument و `--server` را مع رد می‌کنند.
+سرور را مانند `ssh` اول بنویسید: یک IP، یک نام ذخیره‌شده، `user@host:port` یا `local` برای اجرا روی همین ماشین بدون SSH. `--user` و `--ssh-port` بخش‌هایی را که در هدف نیامده کامل می‌کنند و نباید با آن تناقض داشته باشند. کاربر یا پورت خالی یعنی مقدار ذخیره‌شده، و اگر نباشد `root` و `22`. بدون سرور، Meridian از حالت محلی (هنگام اجرا روی سرور مستقرشده) یا تنها سرور ذخیره‌شده استفاده می‌کند. اگر هیچ نامزدی نباشد یا چند نامزد باشد، فرمان به‌جای پرسیدن با کد `2` خارج می‌شود. پرچم قدیمی `--server NAME` همچنان کار می‌کند.

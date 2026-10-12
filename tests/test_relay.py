@@ -87,7 +87,10 @@ class TestRelayCLI:
         with (
             patch("meridian.commands.relay.load_topology_cluster", return_value=cluster),
             patch("meridian.servers.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection"),
+            patch(
+                "meridian.commands.resolve.resolve_server",
+                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, conn=MagicMock()),
+            ),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
                 side_effect=LocalStateError("review state changed"),
@@ -115,7 +118,10 @@ class TestRelayCLI:
         with (
             patch("meridian.commands.relay.load_topology_cluster", return_value=cluster),
             patch("meridian.servers.ServerRegistry", return_value=registry),
-            patch("meridian.commands.relay.ServerConnection"),
+            patch(
+                "meridian.commands.resolve.resolve_server",
+                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, conn=MagicMock()),
+            ),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
                 side_effect=ReviewedApplyPersistenceError(
@@ -141,21 +147,22 @@ class TestRelayCLI:
         result = CliRunner().invoke(app, ["relay", "--help"])
 
         assert result.exit_code == 0
-        assert "deploy" in result.output
+        assert "add" in result.output
         assert "list" in result.output
         assert "remove" in result.output
         assert "check" in result.output
 
-    def test_relay_deploy_help(self) -> None:
+    def test_relay_add_help_and_hidden_deploy_alias(self) -> None:
         from typer.testing import CliRunner
 
         from meridian.cli import app
 
-        result = CliRunner().invoke(app, ["relay", "deploy", "--help"])
+        for command in ("add", "deploy"):
+            result = CliRunner().invoke(app, ["relay", command, "--help"])
 
-        assert result.exit_code == 0
-        assert "RELAY_IP" in result.output
-        assert "Exit server" in result.output
+            assert result.exit_code == 0
+            assert "SERVER" in result.output
+            assert "Exit server" in result.output
 
 
 class TestNginxStreamRelay:

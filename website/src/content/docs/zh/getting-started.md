@@ -92,7 +92,7 @@ meridian client add alice
 meridian setup
 ```
 
-也可以用 `meridian node add` 和 `meridian relay deploy` 逐步增长部署。每个变更都通过同样的已审核拓扑；`meridian plan` 显示会变更什么，`meridian apply` 应用它。
+也可以用 `meridian node add` 和 `meridian relay add` 逐步增长部署。每个变更都通过同样的已审核拓扑；`meridian plan` 显示会变更什么，`meridian apply` 应用它。
 
 ## 后续步骤
 

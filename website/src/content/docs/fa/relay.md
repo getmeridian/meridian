@@ -26,7 +26,7 @@ Relays ترافیک **Reality** را حمل می‌کند. XHTTP، WSS و Hyster
 اولین استقرار خروجی، سپس relay آن را به آن اشاره کنید:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian relay را به توپولوژی اضافه می‌کند و اعمال می‌کند:
@@ -50,7 +50,7 @@ Meridian relay را به توپولوژی اضافه می‌کند و اعمال
 ### مثال با تمام گزینه‌ها
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
   --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
@@ -87,8 +87,8 @@ meridian relay remove 203.0.113.10
 چند relay را به یک خروجی الحاق کنید، برای نمونه در شهرها یا شبکه‌های مختلف:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
-meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 کلاینت‌ها هر relay را در subscription خود دریافت می‌کنند. برای زنجیره‌های relay با بیش از یک hop، از `meridian setup` استفاده کنید.

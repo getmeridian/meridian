@@ -27,7 +27,7 @@ def test_teardown_bad_server_selector_fails_without_prompt_fallback() -> None:
         run(requested_server="typo", yes=True)
 
     assert exc_info.value.exit_code == 2
-    resolve.assert_called_once_with(registry, requested_server="typo", explicit_ip="", user="root")
+    resolve.assert_called_once_with(registry, requested_server="typo", explicit_ip="", user="", port=0)
 
 
 def test_teardown_declined_confirmation_exits_one() -> None:

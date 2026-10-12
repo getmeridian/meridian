@@ -26,7 +26,7 @@ Client → Relay (domestic IP) → Exit server (abroad) → Internet
 首先部署出口，然后指向它的中继：
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian 将中继添加到您的拓扑并应用它：
@@ -50,7 +50,7 @@ Meridian 将中继添加到您的拓扑并应用它：
 ### 包含所有选项的例子
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
   --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
@@ -87,8 +87,8 @@ meridian relay remove 203.0.113.10
 将多个中继连接到一个出口，例如在不同的城市或网络：
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
-meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 客户端在他们的订阅中收到每个中继。对于超过一个跳的中继链，使用 `meridian setup`。

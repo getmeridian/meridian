@@ -26,7 +26,7 @@ section: guides
 Разверните выход сначала, затем укажите ретранслятор на него:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
 Meridian добавляет ретранслятор в вашу топологию и применяет её:
@@ -50,7 +50,7 @@ Meridian добавляет ретранслятор в вашу тополог�
 ### Пример со всеми вариантами
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
   --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
@@ -87,8 +87,8 @@ meridian relay remove 203.0.113.10
 Присоедините несколько ретрансляторов к одному выходу, например в разных городах или сетях:
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
-meridian relay deploy 203.0.113.11 --exit 198.51.100.10 --name ru-spb
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
 Клиенты получают каждый ретранслятор в их подписке. Для цепей ретранслятора с более чем одним каналом используйте `meridian setup`.

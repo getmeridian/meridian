@@ -92,7 +92,7 @@ Client commands talk to the Remnawave panel API recorded in `cluster.yml`; they 
 meridian setup
 ```
 
-You can also grow a deployment one step at a time with `meridian node add` and `meridian relay deploy`. Every change goes through the same reviewed topology; `meridian plan` shows what would change and `meridian apply` applies it.
+You can also grow a deployment one step at a time with `meridian node add` and `meridian relay add`. Every change goes through the same reviewed topology; `meridian plan` shows what would change and `meridian apply` applies it.
 
 ## Next steps
 

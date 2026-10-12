@@ -3,24 +3,16 @@
 ## Design decisions
 
 **One file per command** — keeps concerns isolated. Each is a Typer sub-app registered in `cli.py`.
-
-**Topology-first pattern** — fleet commands load `cluster.yml` through `load_topology_cluster()`, which refuses pre-topology files with rebuild guidance. Mutations (`node add`, `relay deploy`, `client add`) edit `topology_intent` and run the reviewed `SetupRuntime` apply; reads use the panel API plus `adapters/cluster.py`.
-
-**Server resolution cascade** in `resolve.py` — adds CLI-specific Rich output around the shared helpers in `meridian.resolve`. Strict priority order for server-touching commands (deploy, node add):
-1. Explicit IP / `local` → 2. `--server` name → 3. Local-mode detection → 4. Single-server auto-select → 5. Fail with candidates and hint
-
+**Topology-first pattern** — fleet commands load `cluster.yml` through `load_topology_cluster()`, which refuses pre-topology files with rebuild guidance. Mutations (`node add`, `relay add`, `client add`) edit `topology_intent` and run the reviewed `SetupRuntime` apply; reads use the panel API plus `adapters/cluster.py`.
+**One target vocabulary** — `cli_options.py` owns the shared `SERVER` argument and `--user`/`--ssh-port`/`--timeout`/`--yes` types; `meridian.resolve.parse_target()`/`merge_target()` parse `[user@]host[:port]`, saved names, and `local` like ssh, refusing flag contradictions. Empty user / zero port mean "saved, else root/22". `--server` is a hidden alias.
+**Server resolution cascade** in `resolve.py` — adds CLI-specific Rich output around the shared helpers in `meridian.resolve`: 1. target (`local`, saved name/IP/ID, or literal address) → 2. local-mode detection → 3. single-server auto-select → 4. fail with candidates. Add commands (`node add`, `relay add`) resolve first, then validate their request with the resolved address, user, and port.
 **Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr. Hidden `--cancel-file PATH` makes deploy stop at its next safe point and emit a `cancelled` envelope (exit 5) once the file exists.
-
 **Health process API** — completed negative evidence exits 4, unavailable required evidence exits 3, and only fully passed checks exit 0; panel/system failures are inconclusive, while `--basic` never accepts or selects `--client`.
 **Canonical connection test** — full `test` fetches one deterministic active client's delivered Xray JSON and executes its fallback plus each target outbound without rebuilding credentials or transports locally.
-
 **Apply progress** — every command that runs `SetupRuntime` wraps it in `apply_progress()` (`apply_progress.py`): a spinner for the running action plus one line per change or failure, silent under `--json`/quiet; `deploy --events=jsonl` passes its JSONL reporter instead.
-
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
-
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
-
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay check` (`relay_check.py`) checks each compiled Realm hop over SSH plus the public entry locally, with the health exit codes.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (add/list/remove/check; `deploy` is a hidden alias), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay check` (`relay_check.py`) checks each compiled Realm hop over SSH plus the public entry locally, with the health exit codes.
 
 ## What's done well
 
@@ -38,6 +30,7 @@
 - V4 client reads and connectivity tests expose only users declared in `topology_intent.access.users`; never fall back to panel-wide service users.
 - Never render saved panel administrator credentials. Handoff links (`HANDOFF_LINK_KEYS`) appear verbatim only in the final output of the command that produced them (`emit_json(..., reveal=...)`); logs, events, and errors stay redacted.
 - Doctor reports pass every free-form line through `redact_string()` and render with Rich markup disabled before sharing.
+- A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
 - V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.

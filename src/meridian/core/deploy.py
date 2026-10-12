@@ -12,6 +12,7 @@ from meridian.core.inputs import (
     NameValue,
     OptionalHostnameValue,
     OptionalServerReferenceValue,
+    OptionalSshUserValue,
     SshUserValue,
 )
 from meridian.core.models import CoreModel
@@ -29,7 +30,7 @@ class DeployRequest(CoreModel):
     domain: OptionalHostnameValue = ""
     sni: OptionalHostnameValue = ""
     client_name: NameValue = ""
-    user: SshUserValue = "root"
+    user: OptionalSshUserValue = ""
     yes: bool = False
     harden: bool = True
     requested_server: OptionalServerReferenceValue = ""
@@ -39,7 +40,7 @@ class DeployRequest(CoreModel):
     warp: bool = False
     geo_block: bool = True
     hysteria2: bool = False
-    ssh_port: int = Field(default=22, ge=1, le=65535)
+    ssh_port: int = Field(default=0, ge=0, le=65535)
     fingerprint: TlsFingerprint | None = None
 
     @field_validator("fingerprint", mode="before")

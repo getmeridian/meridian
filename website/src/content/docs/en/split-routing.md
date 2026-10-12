@@ -38,7 +38,7 @@ Apps that import the plain link list (Base64) don't receive routing rules. In th
 
 ### Why not edit the template in the panel?
 
-Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave. They carry the automatic fallback between your exits and relays, and the routing above. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay deploy`), so rules added there in the panel won't last.
+Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave. They carry the automatic fallback between your exits and relays, and the routing above. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay add`), so rules added there in the panel won't last.
 
 ## How the layers work together
 

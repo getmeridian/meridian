@@ -12,7 +12,7 @@ section: reference
 部署一个服务器并获得可分享的连接链接。服务器既是控制平面（Remnawave 面板）又是出口。部署构建与 `meridian setup` 相同的已审核拓扑，用检查点应用它，验证通过交付的订阅的真实流量，并打印连接页面和订阅 URL。重新运行相同命令恢复中断的部署或重新部署，保持路径、密钥和用户。
 
 ```
-meridian deploy [IP|local] [flags]
+meridian deploy [SERVER] [flags]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -25,9 +25,8 @@ meridian deploy [IP|local] [flags]
 | `--display-name NAME` | (无) | 连接页面的标签 |
 | `--icon EMOJI_OR_URL` | (无) | 页面图标 — 表情符号或图片 URL |
 | `--color PALETTE` | ocean | 页面色彩主题 (ocean/sunset/forest/lavender/rose/slate) |
-| `--user USER` | root | SSH 用户（非 root 需无密码 sudo） |
-| `--ssh-port PORT` | 22 | SSH 端口（如果不是 22） |
-| `--server NAME` | | 保存的服务器来部署到（名称或 IP） |
+| `--user USER` | 已保存或 root | SSH 用户（非 root 需无密码 sudo） |
+| `--ssh-port PORT` | 已保存或 22 | SSH 端口 |
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
@@ -77,7 +76,7 @@ meridian plan [--json]
 - `2` — 变更待定（运行 `meridian apply`）
 - `3` — 需要的证据（面板、SSH、本地状态）不可用
 
-不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay deploy` 变更它。
+不要手工编辑 `cluster.yml` 中的拓扑。用 `meridian setup`、`deploy`、`client add`、`node add` 或 `relay add` 变更它。
 
 ### meridian apply
 
@@ -121,7 +120,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — 列出客户端带状态、流量、创建时间和最后看到。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
-**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到下次应用（包括重新部署和 `client add`、`node add`、`relay deploy`），它打开所有声明的客户端。
+**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到下次应用（包括重新部署和 `client add`、`node add`、`relay add`），它打开所有声明的客户端。
 
 **`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 
@@ -130,7 +129,7 @@ meridian client remove NAME [--yes] [--json]
 管理保存的 SSH 服务器（`~/.meridian/servers.json`）。
 
 ```
-meridian server add IP [--name NAME] [--user USER] [--ssh-port PORT]
+meridian server add [USER@]IP[:PORT] [--name NAME] [--user USER] [--ssh-port PORT]
 meridian server list
 meridian server remove NAME_OR_IP [--yes]
 ```
@@ -149,7 +148,7 @@ meridian server remove NAME_OR_IP [--yes]
 管理出口服务器。第一个服务器用 `meridian deploy`（或 `meridian setup`）部署；用 `meridian node add` 添加更多出口。
 
 ```
-meridian node add IP [flags]
+meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node check NAME_OR_IP [--user USER]
 meridian node remove NAME_OR_IP [--yes] [--force]
@@ -158,8 +157,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--name NAME` | (自动) | 节点的友好名称 |
-| `--user USER` | root | 节点上的 SSH 用户 |
-| `--ssh-port PORT` | 22 | 节点的 SSH 端口 |
+| `--user USER` | 已保存或 root | 节点上的 SSH 用户 |
+| `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`） |
 | `--sni HOST` | www.google.com | 此节点的 Reality 伪装目标 |
 | `--domain DOMAIN` | (无) | 节点域；在其上添加 XHTTP、WSS 和 Hysteria2 路径 |
 | `--harden / --no-harden` | 启 | OS、SSH 和防火墙加固。舰队服务器总是保持它；`--no-harden` 被拒绝 |
@@ -180,7 +179,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 管理中继 — Realm TCP 转发器，给用户一个到国外出口的国内入口点。中继承载 Reality 流量。
 
 ```
-meridian relay deploy RELAY_IP --exit EXIT [flags]
+meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
@@ -188,16 +187,16 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--exit/-e EXIT` | (部署需要) | 出口服务器 IP 或名称 |
+| `--exit/-e EXIT` | (add 需要) | 出口服务器 IP 或名称 |
 | `--name NAME` | (自动) | 中继的友好名称（如 "ru-moscow"） |
 | `--port/-p PORT` | 443 | 中继服务器上的监听端口 |
 | `--sni HOST` | 出口的目标 | 此中继的 Reality 伪装目标；省略以使用出口的 |
-| `--user/-u USER` | root | 中继服务器上的 SSH 用户 |
-| `--ssh-port PORT` | 22 | 中继服务器的 SSH 端口 |
+| `--user/-u USER` | 已保存或 root | 中继服务器上的 SSH 用户 |
+| `--ssh-port PORT` | 已保存或 22 | 中继服务器的 SSH 端口（`relay add`） |
 | `--yes/-y` | | 跳过确认提示 |
 | `--json` | | 将 `relay list`（`data.relays[]`）或 `relay check` 作为 `meridian.output/v1` 信封发出 |
 
-**`relay deploy`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
+**`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
 **`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
 
@@ -225,8 +224,8 @@ meridian fleet inventory [--json]
 在部署前检查服务器：伪装目标、端口 443 可用性和外部可达性、DNS、OS、磁盘和时钟。没有安装任何东西。DNS 使用服务器自己的解析器；服务器地址不发送给第三方服务。
 
 ```
-meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai] [--server NAME]
+meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+                   [--ssh-port PORT] [--ai]
 ```
 
 `--domain` 检查域名解析到服务器。`--sni` 检查特定伪装目标，`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口，`--ai` 复制 AI 就绪诊断提示到剪贴板。
@@ -238,7 +237,7 @@ meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
 使用固定 RealiTLScanner 版本在服务器自己的网络上找伪装目标。Meridian 在运行之前验证其 SHA-256 校验和并之后删除远程工作空间。
 
 ```
-meridian scan [IP] [--user USER] [--server NAME]
+meridian scan [SERVER] [--user USER] [--ssh-port PORT]
 ```
 
 RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结果打印使用它的命令 — 它不改变已部署的拓扑。跳过退出 `0`，无效选择退出 `2`，无合适目标退出 `4`，扫描器或下载失败退出 `3`。
@@ -252,7 +251,7 @@ RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结�
 面板停机、HTTP `429` 或 HTTP `5xx` 使订阅不可用，所以运行退出 `3`。任何其他订阅拒绝如 `400` 或 `422` 是完成的失败并退出 `4`。
 
 ```
-meridian test [IP|DOMAIN] [--server NAME] [--domain NAME] [--sni NAME]
+meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
               [--client NAME] [--basic] [--timeout SECONDS] [--json]
 ```
 
@@ -267,7 +266,7 @@ meridian test [IP|DOMAIN] [--server NAME] [--domain NAME] [--sni NAME]
 检查遵循真实部署：公共和内部端口暴露、HTTP/TLS 行为、SNI 一致性和伪装、常见代理和面板路径、WebSocket 升级、反向 DNS、HTTP/2、遗留 TLS 版本和已配置域名。`--sni` 覆盖通用 TLS 探测的 SNI。纯 UDP 监听器报告为需要完整 `meridian test` 而不是被猜测。
 
 ```
-meridian probe [IP|DOMAIN] [--server NAME] [--sni NAME]
+meridian probe [SERVER|DOMAIN] [--sni NAME]
                [--timeout SECONDS] [--json]
 ```
 
@@ -278,10 +277,10 @@ meridian probe [IP|DOMAIN] [--server NAME] [--sni NAME]
 为错误报告收集系统诊断。别名：`meridian rage`。
 
 ```
-meridian doctor [IP] [--sni HOST] [--user USER] [--ai] [--server NAME]
+meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 ```
 
-`--sni` 选择诊断的伪装目标，`--user` 覆盖保存的 SSH 用户，`--ai` 复制重新编辑、AI 就绪报告到剪贴板而不是打印问题模板。
+`--sni` 选择诊断的伪装目标，`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口，`--ai` 复制重新编辑、AI 就绪报告到剪贴板而不是打印问题模板。
 
 医生遵循服务器的角色：纯中继服务器不诊断为出口，路由网关单独标记。缺失工具或失去 SSH 连接使报告不确定（退出 `3`）；已收集的部分仍显示。
 
@@ -290,12 +289,12 @@ meridian doctor [IP] [--sni HOST] [--user USER] [--ai] [--server NAME]
 从服务器删除 Meridian。
 
 ```
-meridian teardown [IP] [--user USER] [--server NAME] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
 在单服务器部署上，拆除删除所有东西：面板、节点、nginx 配置、证书、中继和服务器上的防火墙规则（Docker 和系统包保留），然后是本地 `cluster.yml` 和保存的服务器配置。它也删除 Meridian 3.x 的 3x-ui。在多服务器舰队中，拆除拒绝仍在拓扑中有角色的服务器。
 
-`--yes` 跳过确认；角色检查仍先运行。拒绝退出 `1`。未知 `--server` 或零个或多个可能目标退出 `2` 而不是提示。
+`--yes` 跳过确认；角色检查仍先运行。拒绝退出 `1`。未知的服务器名称或零个或多个可能目标退出 `2` 而不是提示。
 
 ### meridian update
 
@@ -367,13 +366,14 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 
 | 标志 | 被使用 |
 |------|---------|
-| `--server NAME` | deploy、preflight、scan、test、probe、doctor、teardown |
-| `--user`, `-u USER` | deploy、node add/check、relay commands、server add、preflight、scan、doctor、teardown |
-| `--sni HOST` | deploy、node add、relay deploy、preflight、test、probe、doctor |
+| `SERVER` 参数 | deploy、preflight、scan、test、probe、doctor、teardown、node add、relay add、server add |
+| `--user`, `-u USER` | deploy、node add/check、relay add/check、server add、preflight、scan、doctor、teardown |
+| `--ssh-port PORT` | deploy、node add、relay add、server add、preflight、scan、doctor、teardown |
+| `--sni HOST` | deploy、node add、relay add、preflight、test、probe、doctor |
 | `--domain DOMAIN` | deploy、node add、preflight、test |
 
-客户端命令直接使用面板 API 并不取 `--server`。`test` 和 `probe` 从你的设备运行并不使用 SSH。
+客户端命令直接使用面板 API 并不取服务器。`test` 和 `probe` 从你的设备运行并不使用 SSH。
 
 ## 服务器解析
 
-对于 SSH 命令，作为参数或用 `--server NAME` 传递目标；参数在两者都接受处获胜。都不给，Meridian 使用本地模式（在已部署服务器上运行时）或唯一保存的服务器。零个或多个候选退出 `2` 而不是提示。`test` 和 `probe` 拒绝参数和 `--server` 在一起。
+与 `ssh` 一样，先写服务器：IP、已保存的名称、`user@host:port`，或 `local`（在当前机器上运行，不经 SSH）。`--user` 和 `--ssh-port` 补充目标中未写明的部分，且不能与之冲突。用户或端口留空表示使用已保存的值，没有则为 `root` 和 `22`。未指定服务器时，Meridian 使用本地模式（在已部署的服务器上运行时）或唯一已保存的服务器。没有候选或有多个候选时以退出码 `2` 结束，而不会提示选择。旧的 `--server NAME` 参数仍然可用。

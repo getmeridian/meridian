@@ -72,7 +72,7 @@ A relay forwards raw TCP from a domestic IP to the exit's Reality listener. Encr
 
 ## State model
 
-- **Topology** — `~/.meridian/cluster.yml` on your machine holds the reviewed topology (control plane, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay deploy` change it; don't edit it by hand.
+- **Topology** — `~/.meridian/cluster.yml` on your machine holds the reviewed topology (control plane, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay add` change it; don't edit it by hand.
 - **Clients** — accounts, keys, status, and traffic live in the Remnawave database on the control-plane server.
 - **Saved servers** — `~/.meridian/servers.json` holds SSH connection details.
 

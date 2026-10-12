@@ -93,7 +93,7 @@ To redeploy, run the same command again — paths, keys, and users are kept.
 ```bash
 meridian setup                                          # guided wizard: exits, relays, routing, users
 meridian node add 198.51.100.11 --name germany          # another exit
-meridian relay deploy 203.0.113.10 --exit 198.51.100.10 # domestic entry point
+meridian relay add 203.0.113.10 --exit 198.51.100.10 # domestic entry point
 ```
 
 Every change goes through one reviewed topology stored in `~/.meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies it with checkpoints, so an interrupted run resumes where it stopped.
@@ -131,7 +131,7 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 | `meridian plan` / `meridian apply` | Review and apply the topology in `cluster.yml` |
 | `meridian client add\|show\|list\|enable\|disable` | Manage the people who connect |
 | `meridian node add\|list\|check` | Manage exit servers |
-| `meridian relay deploy\|list` | Manage relays |
+| `meridian relay add\|list` | Manage relays |
 | `meridian fleet status\|inventory` | Fleet health and inventory |
 | `meridian test [IP]` | Push real traffic through the delivered subscription (no SSH) |
 | `meridian probe [IP]` | Probe your server as a censor would |

@@ -50,18 +50,18 @@ meridian node add 198.51.100.20 --domain vpn.example.com
 中继在国内服务器上为用户提供一个入口点，在外国 IP 被阻止时保持可到达：
 
 ```bash
-meridian relay deploy 203.0.113.10 --exit 198.51.100.20
+meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
 将现有中继移到不同出口尚不可用；改为针对新出口部署一个新中继。
 
 ### 如果控制平面服务器丢失
 
-`node add` 和 `relay deploy` 需要面板。如果托管它的服务器消失且无法恢复，目前没有自动迁移：用 `meridian deploy` 部署新服务器，然后用 `meridian client add` 重新创建每个客户端。每个人获得新链接。
+`node add` 和 `relay add` 需要面板。如果托管它的服务器消失且无法恢复，目前没有自动迁移：用 `meridian deploy` 部署新服务器，然后用 `meridian client add` 重新创建每个客户端。每个人获得新链接。
 
 ## 块前准备
 
-1. **添加中继**在国内服务器上：`meridian relay deploy RELAY_IP --exit EXIT_IP`
+1. **添加中继**在国内服务器上：`meridian relay add RELAY_IP --exit EXIT_IP`
 2. **使用域名** CDN 回退：用 `--domain vpn.example.com` 部署
 3. **两者** — 客户端然后有三个进入方式：中继（国内）、CDN（Cloudflare）和直接
 4. **备份 `~/.meridian/`** — 它是让您从另一台机器管理集群的方式

@@ -10,7 +10,7 @@ import typer
 from meridian.cluster import ClusterConfig
 from meridian.commands.resolve import resolve_server, try_resolve_server
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
-from meridian.resolve import is_local_keyword
+from meridian.resolve import TargetSpec, is_local_keyword, merge_target, parse_target
 from meridian.servers import ServerEntry, ServerProfileStore, ServerRegistry
 from meridian.setup.editor import add_exit_to_intent, add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
@@ -64,6 +64,57 @@ class TestExplicitIP:
         reg.add(ServerEntry("198.51.100.10", "ubuntu", "mybox"))
         result = resolve_server(reg, explicit_ip="198.51.100.10", user="admin")
         assert result.user == "admin"  # explicit overrides
+
+
+class TestTargetSyntax:
+    """One positional target parsed like ssh, merged with flags and saved profiles."""
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("198.51.100.10", TargetSpec(host="198.51.100.10")),
+            ("ubuntu@198.51.100.10:2222", TargetSpec(host="198.51.100.10", user="ubuntu", port=2222)),
+            ("[2001:db8::1]:2200", TargetSpec(host="2001:db8::1", port=2200)),
+            ("2001:db8::1", TargetSpec(host="2001:db8::1")),
+            ("admin@[2001:db8::1]", TargetSpec(host="2001:db8::1", user="admin")),
+            ("mybox", TargetSpec(host="mybox")),
+            ("local", TargetSpec(local=True)),
+        ],
+    )
+    def test_parses_ssh_style_targets(self, text: str, expected: TargetSpec) -> None:
+        assert parse_target(text) == expected
+
+    @pytest.mark.parametrize("text", ["bad user@198.51.100.10", "198.51.100.10:70000", "@198.51.100.10"])
+    def test_rejects_malformed_targets(self, text: str) -> None:
+        with pytest.raises(ValueError):
+            parse_target(text)
+
+    def test_flags_fill_gaps_but_cannot_contradict_the_target(self) -> None:
+        assert merge_target("198.51.100.10", user="ubuntu", port=2222) == TargetSpec(
+            host="198.51.100.10", user="ubuntu", port=2222
+        )
+        with pytest.raises(ValueError, match="given twice"):
+            merge_target("ubuntu@198.51.100.10", user="admin")
+
+    def test_positional_saved_name_resolves_to_its_host_not_the_name(self, servers_file: Path) -> None:
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry("198.51.100.10", "ubuntu", "mybox", port=2222))
+
+        result = resolve_server(reg, explicit_ip="mybox")
+
+        assert (result.ip, result.user, result.port) == ("198.51.100.10", "ubuntu", 2222)
+
+    def test_inline_user_and_port_override_the_saved_profile(self, servers_file: Path) -> None:
+        reg = ServerRegistry(servers_file)
+        reg.add(ServerEntry("198.51.100.10", "ubuntu", "mybox"))
+
+        result = resolve_server(reg, explicit_ip="admin@198.51.100.10:2200")
+
+        assert (result.user, result.port) == ("admin", 2200)
+
+    def test_unknown_bare_name_fails_instead_of_dialing_it(self, servers_file: Path) -> None:
+        with pytest.raises(typer.Exit):
+            resolve_server(ServerRegistry(servers_file), explicit_ip="mybox")
 
 
 class TestServerFlag:

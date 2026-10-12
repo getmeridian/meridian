@@ -33,7 +33,7 @@ def render_nginx_stream_config(
     # Build SNI → backend map entries
     map_entries = [
         # Per-relay SNI entries are included from individual files.
-        # Each relay gets its own map file created during relay deploy.
+        # Each relay gets its own map file created during relay add.
         "    include /etc/nginx/stream.d/relay-maps/*.conf;",
         f"    {reality_sni}  xray_reality;",
     ]

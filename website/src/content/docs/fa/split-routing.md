@@ -38,7 +38,7 @@ Meridian split routing را در subscriptions **Xray JSON** و **Mihomo** خو�
 
 ### چرا template را در پنل ویرایش نکنید؟
 
-Meridian template JSON Xray و subscription Mihomo خود را در Remnawave مدیریت می‌کند. آن‌ها fallback خودکار بین exits و relays شما را حمل می‌کند، و مسیریابی بالا را دارند. Meridian آن‌ها را در هر apply (شامل redeploys و `client add`، `node add`، `relay deploy`) restore می‌کند، بنابراین قوانین اضافه‌شده در پنل آنجا دوام نخواهند داشت.
+Meridian template JSON Xray و subscription Mihomo خود را در Remnawave مدیریت می‌کند. آن‌ها fallback خودکار بین exits و relays شما را حمل می‌کند، و مسیریابی بالا را دارند. Meridian آن‌ها را در هر apply (شامل redeploys و `client add`، `node add`، `relay add`) restore می‌کند، بنابراین قوانین اضافه‌شده در پنل آنجا دوام نخواهند داشت.
 
 ## چگونه لایه‌ها با هم کار می‌کنند
 
