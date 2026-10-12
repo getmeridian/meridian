@@ -23,6 +23,7 @@ uv run pytest tests/systemlab/ -q
 - Removal runs `relay check`, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent on its server or in the panel.
 
 ## Pitfalls
+- `scripts/panel-ui-check.py` is the only browser-level proof that the panel UI works behind the secret path; run it locally after every backend bump (never in CI). Remnawave's UI itself fetches `ungh.cc` star counts — not a Meridian leak.
 
 - A running node API precedes panel `is_connected`; preserve the stage grace period and runtime polling through the asynchronous handshake.
 - Keep the external connectivity probe explicitly routed to the pool; a fixed exit route makes failover assertions meaningless, while private bridge targets are blocked.
