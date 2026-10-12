@@ -112,9 +112,10 @@ def run(
     )
     sni_check = sni_result.stdout.strip()
     if not sni_check:
-        # Fallback: TCP connect
+        # Fallback: plain TCP connect through bash, which minimal images keep (nc is often absent)
+        q_tcp_probe = shlex.quote(f"exec 3<>/dev/tcp/{sni_host}/443")
         sni_result2 = resolved.conn.run(
-            f"command -v nc >/dev/null 2>&1 || exit 127; nc -z -w 3 {q_sni} 443 2>&1 && echo OK",
+            f"timeout 3 bash -c {q_tcp_probe} 2>/dev/null && echo OK",
             timeout=8,
         )
         sni_check = sni_result2.stdout.strip()
@@ -128,7 +129,7 @@ def run(
     elif any(result.returncode in {124, 255} for result in (sni_result, sni_result2) if result is not None) or (
         sni_result.returncode == 127 and (sni_result2 is None or sni_result2.returncode == 127)
     ):
-        warn("Could not test camouflage target reachability (openssl and nc are unavailable)")
+        warn("Could not test camouflage target reachability (openssl and bash TCP probes are unavailable)")
         results["sni"] = "evidence unavailable"
         unavailable += 1
     else:

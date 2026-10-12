@@ -53,7 +53,7 @@ class FakeConnection:
             stdout = f"{int(time.time())}\n"
         if command.startswith("ss -H -tlnp"):
             returncode = self.ss_returncode
-        elif "openssl s_client" in command or "nc -z" in command:
+        elif "openssl s_client" in command or "/dev/tcp/" in command:
             returncode = self.sni_returncode
         elif command.startswith("test -f /etc/meridian/node.yml"):
             returncode = self.ownership_returncode
