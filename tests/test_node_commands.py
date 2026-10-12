@@ -192,6 +192,45 @@ class TestNodeAdd:
         assert exc_info.value.exit_code == 2
         registry.add.assert_called_once()
 
+    def test_rerunning_add_for_a_pending_exit_resumes_instead_of_adding_a_second_exit(self) -> None:
+        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
+        pending = cluster.topology_intent.exits[0]
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(id=pending.server_ref, host="198.51.100.5", name="exit")
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root")
+        applied = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
+
+        with (
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
+            patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent", applied),
+        ):
+            run_add(ip="198.51.100.5", name="exit", yes=True)
+
+        assert applied.call_args.args[0] == cluster.topology_intent
+
+    def test_rerunning_add_with_a_different_sni_refuses_instead_of_ignoring_it(self) -> None:
+        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
+        pending = cluster.topology_intent.exits[0]
+        registry = MagicMock()
+        registry.find.return_value = SimpleNamespace(id=pending.server_ref, host="198.51.100.5", name="exit")
+        resolved = SimpleNamespace(ip="198.51.100.5", user="root")
+
+        with (
+            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch("meridian.commands.resolve.resolve_server", return_value=resolved),
+            patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent") as applied,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_add(ip="198.51.100.5", sni="www.example.net", yes=True)
+
+        assert exc_info.value.exit_code == 2
+        applied.assert_not_called()
+
     def test_v4_apply_persistence_error_warns_remote_state_may_have_changed(
         self,
         capsys: pytest.CaptureFixture[str],

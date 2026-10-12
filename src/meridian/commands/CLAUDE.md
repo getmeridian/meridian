@@ -38,3 +38,4 @@
 - Doctor reports pass every free-form line through `redact_string()` and render with Rich markup disabled before sharing.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
 - V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.
+- A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.

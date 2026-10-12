@@ -116,13 +116,26 @@ def run_add(
         fail(exc)
     if entry is None:
         raise RuntimeError("Validated server was not saved")
-    updated = add_exit_to_intent(
-        intent,
-        server_ref=entry.id,
-        title=request.name or f"exit-{len(intent.exits) + 1}",
-        reality_sni=request.sni or DEFAULT_SNI,
-        tls_hostname=request.domain,
-    )
+    existing = next((exit_ for exit_ in intent.exits if exit_.server_ref == entry.id), None)
+    if existing is None:
+        updated = add_exit_to_intent(
+            intent,
+            server_ref=entry.id,
+            title=request.name or f"exit-{len(intent.exits) + 1}",
+            reality_sni=request.sni or DEFAULT_SNI,
+            tls_hostname=request.domain,
+        )
+    else:
+        # A failed or interrupted add leaves its exit in the intent; re-running resumes it.
+        saved_snis = {path.reality_sni for path in existing.paths if path.reality_sni}
+        saved_domains = {path.tls_sni for path in existing.paths if path.tls_sni}
+        if (request.sni and request.sni not in saved_snis) or (request.domain and request.domain not in saved_domains):
+            fail(
+                f"{resolved.ip} is already exit {existing.id} with different settings",
+                hint="Change an existing exit's SNI or domain with `meridian setup`.",
+                hint_type="user",
+            )
+        updated = intent
     try:
         with reviewed_apply_persistence("V4 exit apply"):
             result = SetupRuntime(
