@@ -30,5 +30,6 @@ Checkpointed reconciliation of compiled topology resources.
 - **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
 - **Attest server artifacts against their own inputs** — hashing the whole deployment contract makes every fleet edit re-run work on every server; include only the server's own target plus pins and renderer contract.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
+- **Bindings are per generation** — a new generation finds resources by name; when a list endpoint omits content (Templates), GET the record by UUID before comparing or every intent edit rewrites it.
 - **Remnawave deletes Nodes asynchronously** — DELETE only queues the job; `NodeRetirement` polls until the Node is gone so its Profile is not deleted under it.
 - **Node runtime retirement shares a directory** — every exit uses `/opt/remnanode`; when the plan still runs a node on that server, only forget the old binding.

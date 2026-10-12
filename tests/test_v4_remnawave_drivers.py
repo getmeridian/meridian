@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from dataclasses import replace
 from typing import cast
 from uuid import UUID
 
@@ -309,7 +310,8 @@ class StatefulPanel:
         return self.templates.get(uuid)
 
     def list_subscription_templates(self) -> list[SubscriptionTemplate]:
-        return list(self.templates.values())
+        # Remnawave 3.4 lists templates without their content; only GET by UUID returns it.
+        return [replace(template, template_json=None, encoded_template_yaml="") for template in self.templates.values()]
 
     def create_external_squad(self, name: str) -> ExternalSquad:
         _assert_short_display_name(name)
@@ -939,6 +941,11 @@ def test_intent_change_after_first_apply_converges_with_the_same_keys() -> None:
     assert result.all_succeeded, [item.error for item in result.results if item.error]
     assert cluster.active_generation == 2
     assert sorted(key_calls) == ["srv-exit-a", "srv-exit-b"]
+    # A new generation finds unchanged Templates by name and must not rewrite them.
+    template_statuses = {
+        item.status for item in result.results if item.action.resource.payload.kind == "subscription_template"
+    }
+    assert template_statuses == {"converged"}
     second_gen = {item.id: item for item in cluster.workloads if item.generation == 2}
     assert second_gen["exit-a"].reality_keys["srv-exit-a"].private_key == "private-exit-a"
     assert second_gen["exit-b"].reality_keys["srv-exit-b"].private_key == "private-exit-b"

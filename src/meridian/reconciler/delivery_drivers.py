@@ -366,7 +366,9 @@ def _bound_or_named_template(
     if binding is not None and binding.remote_id:
         return context.panel.get_subscription_template(binding.remote_id)
     matches = [template for template in context.panel.list_subscription_templates() if template.name == payload.name]
-    return _one_or_none(matches, f"Templates named {payload.name!r}")
+    listed = _one_or_none(matches, f"Templates named {payload.name!r}")
+    # The list omits template content, so compare against the full record.
+    return context.panel.get_subscription_template(listed.uuid) if listed is not None else None
 
 
 def _bound_or_named_external_squad(
