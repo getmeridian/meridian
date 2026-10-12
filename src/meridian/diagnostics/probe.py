@@ -9,6 +9,7 @@ from threading import Event, Thread
 from typing import cast
 
 from meridian.core.verification import VerificationCheck
+from meridian.diagnostics.blocking import blocking_jobs
 from meridian.diagnostics.external import (
     check_domain_root,
     check_http2_support,
@@ -168,6 +169,7 @@ def run_probe_checks(
                 partial(check_sni_camouflage, ip, route.tls_sni, port=route.port, timeout=timeout),
             )
 
+    jobs.extend(blocking_jobs(ip, context, requested_sni=requested_sni, timeout=timeout))
     if context.public_udp_ports:
         jobs.append(lambda: check_udp_surface(context.public_udp_ports))
     if not context.public_tcp_ports and not context.public_udp_ports:

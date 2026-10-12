@@ -28,6 +28,7 @@ from meridian.core.output import OperationContext
 from meridian.core.topology import SetupIntent
 from meridian.core.verification import VerificationCheck, VerificationCounts, VerificationVerdict
 from meridian.diagnostics import check_container_running, check_disk_space, check_port_listening, check_tls_certificate
+from meridian.diagnostics.blocking import blocking_jobs
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
 from meridian.diagnostics.network import resolve_hostname
 from meridian.diagnostics.preflight import collect_preflight
@@ -299,6 +300,9 @@ def _server_report(
             host = (route.tls_sni or route.host_header) if route is not None else default_host
             result = check_tls_certificate(conn, host or entry.host, port=port_number)
             checks.append(check_from_result(f"tls:{port_number}", f"TLS certificate on {port_number}", result))
+        if not conn.local_mode:
+            # Deployer-vantage throughput: only meaningful (and only run) from another machine.
+            checks.extend(job() for job in blocking_jobs(entry.host, deployment, differential=False))
 
     checks.append(check_from_result("disk", "Disk", check_disk_space(conn, min_free_mb=1024)))
     return health_report(label, "server", checks, server_ref=entry.id, roles=roles)

@@ -65,6 +65,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         containers=MagicMock(return_value=PASSED),
         ports=MagicMock(return_value=PASSED),
         tls=MagicMock(return_value=PASSED),
+        blocking=MagicMock(return_value=[]),
     )
     with (
         patch.object(health, "topology_from_local_cluster", return_value=SimpleNamespace(nodes=[fleet.node])),
@@ -75,6 +76,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         patch.object(health, "check_tls_certificate", mocks.tls),
         patch.object(health, "check_disk_space", return_value=PASSED),
         patch.object(health, "deployment_verification_context", return_value=fleet.deployment),
+        patch.object(health, "blocking_jobs", mocks.blocking),
         patch("meridian.commands.relay_check.collect_relay_check", return_value=SimpleNamespace(checks=[])) as relay,
     ):
         mocks.relay_check = relay
@@ -173,6 +175,19 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         call(fleet.conn, 39001, transport="any"),
     ]
     mocks.tls.assert_called_once_with(fleet.conn, "edge.example.com", port=7443)
+
+
+def test_remote_check_measures_data_flow_from_the_deployer_without_the_differential(fleet: SimpleNamespace) -> None:
+    mocks = _run(fleet, "exit-a", scope="server")
+
+    mocks.blocking.assert_called_once_with("198.51.100.10", fleet.deployment, differential=False)
+
+
+def test_on_server_check_skips_deployer_vantage_data_flow(fleet: SimpleNamespace) -> None:
+    fleet.conn.local_mode = True
+    mocks = _run(fleet, "exit-a", scope="server")
+
+    mocks.blocking.assert_not_called()
 
 
 def test_findings_print_their_fix(capsys: pytest.CaptureFixture[str]) -> None:

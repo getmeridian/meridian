@@ -52,6 +52,13 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   `--json` returns one typed report. `meridian test --probe` replaces `meridian
   probe`. `preflight`, `node check`, `relay check`, and `probe` still work for
   one release.
+- **"What is blocked?"** — `meridian test --probe` now tells a blocked server
+  IP from a blocked camouflage SNI by comparing the server with and without the
+  SNI against the real camouflage site, and inconclusive stays inconclusive.
+  It also catches throttling: a ~50 KB download from the control server (and
+  through the CDN when WSS uses one) that freezes after about 16–24 KB is
+  flagged with a suggestion to change the IP. `meridian check` runs the
+  download check too when it's run from another machine.
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including

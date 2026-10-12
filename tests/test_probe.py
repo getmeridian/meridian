@@ -438,6 +438,7 @@ def test_reality_camouflage_uses_custom_port_without_managed_web_policy() -> Non
         patch("meridian.diagnostics.probe.check_http2_support", return_value=passed),
         patch("meridian.diagnostics.probe.check_legacy_tls", return_value=passed),
         patch("meridian.diagnostics.probe.check_sni_camouflage", return_value=passed),
+        patch("meridian.diagnostics.probe.blocking_jobs", return_value=[]),
         patch("meridian.diagnostics.probe.check_proxy_paths") as proxy_paths,
         patch("meridian.diagnostics.probe.check_websocket_upgrade") as websocket,
     ):

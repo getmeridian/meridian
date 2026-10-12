@@ -220,7 +220,7 @@ meridian fleet inventory [--json]
 Check a server's health, or whether a new server can run Meridian. What runs depends on the server's role in your fleet:
 
 - **Not in the fleet yet** — pre-flight checks: camouflage target reachability and DNS, port 443 availability and outside reachability, domain DNS, OS, disk, and clock. Nothing is installed; a short-lived listener tests the firewall when port 443 is free. DNS uses the server's own resolver.
-- **Control, exit, or routing gateway** — panel connection, SSH (or local access), containers (including the subscription page's health), every compiled public and internal port, TLS certificates, and disk space.
+- **Control, exit, or routing gateway** — panel connection, SSH (or local access), containers (including the subscription page's health), every compiled public and internal port, TLS certificates, and disk space. Run from another machine, the control server also gets a data-flow check: a ~50 KB download that warns when it freezes after about 16–24 KB (throttling, measured from where you are).
 - **Relay** — every Realm hop on the server: the service is active and can reach its next hop, and the chain's public entry accepts TCP from your machine.
 
 With no server, every server in the fleet is checked.
@@ -267,7 +267,9 @@ Exit `0` means every check passed, `4` means the test found problems, and `3` me
 
 `--probe` looks at a server the way an active prober would, to check whether the deployment gives itself away, instead of sending traffic. It works on any IP or domain and applies stricter checks when the target belongs to your saved topology.
 
-Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes. The older `meridian probe` command still works for one release.
+Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
+
+`--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes. The older `meridian probe` command still works for one release.
 
 ### meridian doctor
 

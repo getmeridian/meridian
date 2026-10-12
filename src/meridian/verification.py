@@ -91,6 +91,7 @@ class DeploymentVerificationContext:
     https_routes: tuple[VerificationHttpsRoute, ...] = ()
     endpoint_addresses: tuple[str, ...] = ()
     panel_secret_path: str = ""
+    connection_page_path: str = ""
     expected_egress_ip: str = ""
 
     def __post_init__(self) -> None:
@@ -506,6 +507,7 @@ def _v4_context(
         https_routes=tuple(https_routes),
         endpoint_addresses=tuple(sorted(endpoint_addresses)),
         panel_secret_path=cluster.panel.secret_path if intent.control.server_ref in matching_refs else "",
+        connection_page_path=cluster.panel.sub_path if intent.control.server_ref in matching_refs else "",
         expected_egress_ip=expected_egress_ip,
     )
 
