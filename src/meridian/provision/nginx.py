@@ -31,6 +31,20 @@ V4_STREAM_ARTIFACT_GLOB = "/etc/nginx/stream.d/meridian-v4-*.conf"
 # Older Meridian releases fronted 443 with HAProxy (+ Caddy). Only retire them
 # when Meridian's own markers are present: an operator's unrelated HAProxy or
 # Caddy must never be stopped or have its config and certificates deleted.
+# `http2 on;` arrived in nginx 1.25.1; Ubuntu 24.04 still ships 1.24, so older
+# distro builds are replaced from the nginx.org repository.
+NGINX_MIN_VERSION = (1, 25)
+# Without a terminal, dpkg stops at conffile prompts (e.g. mime.types when
+# nginx.org replaces the distro package); keep the existing files instead.
+_APT_KEEP_CONFIG = "-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+# nginx.org's nginx.conf only includes conf.d; V4 HTTP artifacts live in sites-enabled.
+_ENSURE_SITES_INCLUDE = (
+    "mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled && "
+    "{ grep -q 'sites-enabled' /etc/nginx/nginx.conf || "
+    r"sed -i 's|^\(\s*\)include /etc/nginx/conf.d/\*.conf;|&\n\1include /etc/nginx/sites-enabled/*;|' "
+    "/etc/nginx/nginx.conf; }"
+)
+
 LEGACY_PROXY_CLEANUP = (
     # Remove the old watchdog first so cron cannot restart haproxy/caddy mid-deploy.
     "rm -f /etc/meridian/health-check.sh; "
@@ -48,7 +62,7 @@ class InstallNginx:
     """Install nginx, stream module, and acme.sh.
 
     Handles upgrade path from old HAProxy+Caddy stack, version
-    requirements (>=1.16), and the nginx.org official repo fallback.
+    requirements (>= NGINX_MIN_VERSION for `http2 on;`), and the nginx.org official repo fallback.
     """
 
     name = "Install nginx"
@@ -71,12 +85,12 @@ class InstallNginx:
             ver_check = conn.run("nginx -v 2>&1", timeout=15)
             ver_output = ver_check.stdout + ver_check.stderr
             m = re.search(r"nginx/(\d+)\.(\d+)", ver_output)
-            if m and (int(m.group(1)), int(m.group(2))) < (1, 16):
+            if m and (int(m.group(1)), int(m.group(2))) < NGINX_MIN_VERSION:
                 needs_official_repo = True
         else:
             # Not installed — try distro repo first, upgrade if too old
             result = conn.run(
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y nginx",
+                f"DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
                 timeout=180,
             )
             if result.returncode != 0:
@@ -87,7 +101,7 @@ class InstallNginx:
                 ver_check = conn.run("nginx -v 2>&1", timeout=15)
                 ver_output = ver_check.stdout + ver_check.stderr
                 m = re.search(r"nginx/(\d+)\.(\d+)", ver_output)
-                if m and (int(m.group(1)), int(m.group(2))) < (1, 16):
+                if m and (int(m.group(1)), int(m.group(2))) < NGINX_MIN_VERSION:
                     needs_official_repo = True
 
         if needs_official_repo:
@@ -148,7 +162,7 @@ class InstallNginx:
 
             result = conn.run(
                 "DEBIAN_FRONTEND=noninteractive apt-get update -qq"
-                " && DEBIAN_FRONTEND=noninteractive apt-get install -y nginx",
+                f" && DEBIAN_FRONTEND=noninteractive apt-get install -y {_APT_KEEP_CONFIG} nginx",
                 timeout=180,
             )
             if result.returncode != 0:
@@ -167,6 +181,7 @@ class InstallNginx:
                 "sed -i '/load_module.*ngx_stream_module/d' /etc/nginx/nginx.conf 2>/dev/null; true",
                 timeout=15,
             )
+            conn.run(_ENSURE_SITES_INCLUDE, timeout=15)
 
         # -- Ensure stream module is available --
         conn.run(

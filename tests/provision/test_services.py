@@ -792,6 +792,21 @@ class TestInstallNginx:
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
 
+    def test_distro_nginx_older_than_1_25_is_replaced_from_nginx_org(self):
+        # Ubuntu 24.04 ships nginx 1.24, which rejects the rendered `http2 on;`.
+        conn = MockConnection()
+        conn.when("dpkg -l nginx", stdout="ii  nginx")
+        conn.when("nginx -v", stdout="nginx version: nginx/1.24.0 (Ubuntu)")
+        conn.when("nginx -V", stdout="--with-stream_ssl_preread_module")
+        conn.when("ID", stdout="ubuntu")
+        conn.when("VERSION_CODENAME", stdout="noble")
+        conn.when("test -f /root/.acme.sh/acme.sh", stdout="", rc=0)
+        conn.when("crontab -l", stdout="acme.sh --cron", rc=0)
+
+        InstallNginx().run(conn, ProvisionContext(ip="198.51.100.1"))
+
+        conn.assert_called_with_pattern("nginx.org/keys/nginx_signing.key")
+
     def test_acme_sh_is_pinned_and_verified_before_it_runs(self):
         from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION
 
