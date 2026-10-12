@@ -33,7 +33,7 @@
 - **PQ encryption removed in v4** — Xray VLESS PQ requires per-user encryption fields on inbound clients plus Remnawave API support. Do not re-add the flag without both.
 - **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients.
 - **Hysteria2 naming boundary** — external keys and URLs use `hysteria2`; Remnawave profiles require protocol/network `hysteria` plus version `2`.
-- **Unknown panel admin is a user error** — register is refused once any admin exists; with no saved credentials and both register and login refused, stop with restore-or-`meridian uninstall` guidance instead of retrying.
+- **Unknown panel admin is a user error** — register is refused once any admin exists; with no saved credentials and both register and login refused, stop with restore-or-`meridian teardown` guidance instead of retrying.
 - **Remnawave 3.4 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token. Tokens are signed with `APP_SECRET` (2.x `JWT_AUTH_SECRET`, carried over on upgrade).
 - **Xray runtime and config failures differ** — keep the executable/assets atomic and validate canonical configs with `run -test`; malformed delivery fails, while local runtime absence is inconclusive.
 - **Exit-IP observers are single-stack** — pick IPv4-only or IPv6-only observers by the server's address; a dual-stack observer lets a dual-stack exit answer over the other family and fail the egress match.

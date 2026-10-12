@@ -33,4 +33,4 @@ def test_panel_with_an_unknown_admin_fails_once_with_recovery_guidance() -> None
 
     assert "administrator Meridian doesn't know" in str(exc_info.value)
     assert exc_info.value.category == "user"
-    assert "meridian uninstall 198.51.100.10" in exc_info.value.hint
+    assert "meridian teardown 198.51.100.10" in exc_info.value.hint

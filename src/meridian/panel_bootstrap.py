@@ -239,7 +239,7 @@ def ensure_control_plane_access(
                     hint=(
                         "It is probably left from an earlier deploy whose ~/.meridian was lost or moved. "
                         "To keep its users, restore that ~/.meridian/cluster.yml and run the command again. "
-                        f"To start over, wipe it with `meridian uninstall {resolved.ip}` "
+                        f"To start over, wipe it with `meridian teardown {resolved.ip}` "
                         "(this deletes the panel and every user on it), then deploy again."
                     ),
                     category="user",
