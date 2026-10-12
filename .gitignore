@@ -46,3 +46,6 @@ tests/realvm/.local/
 # Remnawave reference repos (cloned for deep referencing)
 .remnawave-ref/
 references/
+
+# pnpm content store (created when pnpm cannot use its global store)
+.pnpm-store/
