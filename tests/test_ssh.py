@@ -78,6 +78,27 @@ class TestServerConnectionRun:
             assert "ConnectTimeout=10" in cmd
             assert "StrictHostKeyChecking=yes" in cmd
 
+    def test_control_socket_path_fits_macos_limit_for_ipv6_targets(self, monkeypatch) -> None:
+        from pathlib import Path
+
+        from meridian import ssh
+
+        monkeypatch.setattr(ssh, "MERIDIAN_HOME", Path("/Users/someone/.meridian-v4"))
+        opts = ssh.multiplex_opts("a-long-deploy-user", "2001:db8:1234:5678:9abc:def0:1234:5678", 2222)
+
+        path = next(opt.split("=", 1)[1] for opt in opts if opt.startswith("ControlPath="))
+        assert len(path) + len(".tECSFEUKn4XON7D8") <= 103
+        assert ":" not in Path(path).name
+
+    def test_too_deep_home_disables_multiplexing_instead_of_breaking_ssh(self, monkeypatch) -> None:
+        from pathlib import Path
+
+        from meridian import ssh
+
+        monkeypatch.setattr(ssh, "MERIDIAN_HOME", Path("/Users/someone/" + "nested/" * 12 + ".meridian"))
+
+        assert ssh.multiplex_opts("root", "198.51.100.10", 22) == []
+
     def test_remote_can_pin_identity_file(self) -> None:
         conn = ServerConnection(ip="198.51.100.10", user="deploy", identity_file="/tmp/meridian_ed25519")
         with patch("meridian.ssh.subprocess.run") as mock_run:

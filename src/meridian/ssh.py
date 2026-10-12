@@ -8,6 +8,7 @@ callers stay dependency-free.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -126,14 +127,22 @@ def _stringify_output(value: str | bytes | None) -> str:
 # to the same host. ControlPersist=300 keeps the master alive for 5min
 # after the last command, so sequential provisioner steps don't pay
 # the TCP+auth handshake each time.
-SSH_MULTIPLEX_OPTS: list[str] = [
-    "-o",
-    "ControlMaster=auto",
-    "-o",
-    f"ControlPath={MERIDIAN_HOME / 'ssh'}/%r@%h:%p",
-    "-o",
-    "ControlPersist=300",
-]
+#
+# A Unix socket path holds at most 103 bytes on macOS, and ssh binds the master
+# at the ControlPath plus a 17-character temporary suffix. Hashing the target
+# keeps IPv6 addresses and long user names out of the path; a home directory
+# that is still too deep turns multiplexing off instead of breaking SSH.
+_MAX_CONTROL_PATH = 103 - 17
+
+
+def multiplex_opts(user: str, host: str, port: int) -> list[str]:
+    """Return ControlMaster options for one target, or none if the socket path cannot fit."""
+    digest = hashlib.sha256(f"{user}@{host}:{port}".encode()).hexdigest()[:12]
+    path = MERIDIAN_HOME / "ssh" / digest
+    if len(os.fsencode(path)) > _MAX_CONTROL_PATH:
+        return []
+    control_path = str(path).replace("%", "%%")
+    return ["-o", "ControlMaster=auto", "-o", f"ControlPath={control_path}", "-o", "ControlPersist=300"]
 
 
 def _running_unprivileged() -> bool:
@@ -181,7 +190,7 @@ class ServerConnection(_FileTransferMixin):
         return self
 
     def __exit__(self, *_exc_info: object) -> None:
-        # Multiplexed connections persist for SSH_MULTIPLEX_OPTS' lifetime;
+        # Multiplexed connections persist for ControlPersist's lifetime;
         # nothing to release here.
         return None
 
@@ -196,7 +205,7 @@ class ServerConnection(_FileTransferMixin):
             "StrictHostKeyChecking=yes",
         ]
         if self.multiplex and not self.local_mode:
-            opts.extend(SSH_MULTIPLEX_OPTS)
+            opts.extend(multiplex_opts(self.user, self.ip, self.port))
         if self.identity_file:
             opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
         if self.port != 22:
