@@ -8,16 +8,20 @@ section: guides
 ## Which tool to use
 
 ```
-BEFORE INSTALL           → meridian preflight IP
+BEFORE INSTALL           → meridian check IP
   "Will this server work for Meridian?"
   Tests: SNI reachability, port 443, DNS, OS, disk space.
+
+AFTER INSTALL, IS IT HEALTHY? → meridian check
+  "Are the panel, nodes, relays, ports, and certificates OK?"
+  Tests every server in the fleet by role, over SSH.
 
 AFTER INSTALL, CAN'T CONNECT → meridian test IP
   "Is the proxy reachable from where I am right now?"
   Tests: configured listeners, TLS/SNI, the delivered subscription, and real proxy traffic.
   No SSH needed — runs from the client device.
 
-AFTER INSTALL, CHECK EXPOSURE → meridian probe IP
+AFTER INSTALL, CHECK EXPOSURE → meridian test IP --probe
   "Does this deployment reveal a proxy or management surface?"
   Tests: public ports, TLS/HTTP behavior, paths, SNI, DNS and topology policy.
   No SSH needed — runs from the client device.
@@ -27,7 +31,7 @@ AFTER INSTALL, SOMETHING BROKE → meridian doctor IP
   Collects: server OS, Docker, Remnawave node and nginx logs, ports, firewall, SNI, DNS.
 ```
 
-Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
+Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 
 ## Can't connect at all
 
@@ -55,7 +59,7 @@ Add `--ai` to preflight or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Check Xray: `docker logs remnawave-node --tail 20`
 2. Check port: `ss -tlnp sport = :443` — should be nginx
-3. Test SNI: `meridian preflight IP`
+3. Test SNI: `meridian check IP --sni HOST`
 
 ### Domain not reachable
 
@@ -97,7 +101,7 @@ Deploys and applies are checkpointed. Fix the reported cause and run the same co
 
 ### Port 443 conflict
 
-Another service (Apache, Nginx) is using port 443. Stop it or use a clean server. `meridian preflight` will tell you what's using the port.
+Another service (Apache, Nginx) is using port 443. Stop it or use a clean server. `meridian check IP` tells you what's using the port.
 
 ### Docker installation fails
 
@@ -111,7 +115,7 @@ Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `
 
 Check the container: `docker logs remnawave-node --tail 50`. Common causes are a port collision on the host (node runs in `network_mode: host`, so ports from `cluster.yml` must be free), an unreachable panel (node registration needs the panel's `node_secret_key` at boot), or a missing `NET_ADMIN` capability.
 
-**Fix:** run `meridian node check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
+**Fix:** run `meridian check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
 
 ### Disk space insufficient
 
@@ -119,7 +123,7 @@ Less than 2GB free. Free up space: `docker system prune -af`, `journalctl --vacu
 
 ### DNS resolution fails (domain mode)
 
-The certificate for your domain can only be issued once the domain's A record points at the server (grey cloud while deploying). Update the record, wait for it to propagate (usually 5–15 minutes), then run the same deploy command again. `meridian preflight IP --domain DOMAIN` checks this before you deploy.
+The certificate for your domain can only be issued once the domain's A record points at the server (grey cloud while deploying). Update the record, wait for it to propagate (usually 5–15 minutes), then run the same deploy command again. `meridian check IP --domain DOMAIN` checks this before you deploy.
 
 ## Was working, now stopped
 
@@ -158,7 +162,7 @@ meridian doctor
 
 See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) section for relay-specific issues (port conflict, firewall, exit unreachable, service not started).
 
-## Interpreting preflight output
+## Interpreting pre-flight checks
 
 | Check | What It Tests | If It Fails |
 |-------|--------------|-------------|

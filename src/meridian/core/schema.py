@@ -43,6 +43,7 @@ from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployR
 from meridian.core.events import EVENT_TYPES
 from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, RemoteCommandResult, RemoteTarget
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
+from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
     CoreModel,
     Event,
@@ -268,6 +269,19 @@ _, _, TestOutputEnvelope = _make_command_envelope(
 )
 
 
+_, _, CheckOutputEnvelope = _make_command_envelope(
+    "Check",
+    "check",
+    HealthCheckResult,
+    failure_data_type=HealthCheckResult | EmptyData,
+    doc="Envelope schema for `meridian check --json`.",
+)
+
+
+class CheckFailureData(RootModel[HealthCheckResult | EmptyData]):
+    """Failure data schema for `meridian check --json`."""
+
+
 _, _, RelayCheckOutputEnvelope = _make_command_envelope(
     "RelayCheck",
     "relay.check",
@@ -463,6 +477,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-disable-envelope": ClientDisableOutputEnvelope,
     "node-list-envelope": NodeListOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
+    "check": HealthCheckResult,
+    "check-envelope": CheckOutputEnvelope,
+    "check-failure": CheckFailureData,
     "relay-check": RelayCheckResult,
     "relay-check-envelope": RelayCheckOutputEnvelope,
     "relay-check-failure": RelayCheckFailureData,

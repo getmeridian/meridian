@@ -8,7 +8,7 @@ section: reference
 ## 报告问题
 
 - **有 Bug？** 使用 [Bug 报告模板](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
-- **连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian preflight`
+- **连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian check`
 - **有功能想法？** 使用 [功能请求模板](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
 - **安全漏洞？** 见 [安全](/docs/zh/security/)——不要开放公开问题
 

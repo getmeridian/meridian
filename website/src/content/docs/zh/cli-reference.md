@@ -150,7 +150,7 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node check NAME_OR_IP [--user USER]
+
 meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 
@@ -170,8 +170,6 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node list`** — 列出节点带实时面板状态、Xray 版本和流量。如果面板状态不可用，已配置的节点显示为 `unknown`，命令退出 `3`。
 
-**`node check`** — 检查面板连接、SSH、容器、节点的已配置公共端口、TLS 证书和磁盘空间，并为每个失败打印修复。退出 `0` 是健康，`4` 意味着发现问题，`3` 意味着需要的证据不可用。
-
 **`node remove`** — 从拓扑中删除出口或路由网关。它列出将被删除的每个资源（面板节点和配置文件、节点容器、防火墙规则、已发布的主机），请求确认，并准确应用该审查；服务器留在保存的服务器中。对于控制服务器拒绝（使用 `meridian teardown`），而中继仍路由到出口（先删除它们或传递 `--force`），而路由网关通过它进入舰队，以及当结果会破坏拓扑时（例如空出口池或默认出口）。范围限定为已删除网关的路由规则与其一起删除。
 
 ### meridian relay
@@ -181,7 +179,7 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
+
 meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
@@ -194,13 +192,13 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 | `--user/-u USER` | 已保存或 root | 中继服务器上的 SSH 用户 |
 | `--ssh-port PORT` | 已保存或 22 | 中继服务器的 SSH 端口（`relay add`） |
 | `--yes/-y` | | 跳过确认提示 |
-| `--json` | | 将 `relay list`（`data.relays[]`）或 `relay check` 作为 `meridian.output/v1` 信封发出 |
+| `--json` | | 将 `relay list`（`data.relays[]`）作为 `meridian.output/v1` 信封发出 |
 
 **`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
 **`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
 
-**`relay check`** — 检查中继服务器运行的每个 Realm 跳跃（或一条链的每个跳跃）：通过 SSH，跳跃的服务是否活跃以及它是否可以打开 TCP 到下一个跳跃；从您的机器，链的公共入口是否接受 TCP。退出 `0` 表示每个检查都通过，`4` 表示发现问题，`3` 表示无法检查跳跃。使用 `meridian test` 通过整条路由推动真实流量。
+要检查中继的跳跃，运行 `meridian check RELAY`。
 
 ### meridian fleet
 
@@ -219,18 +217,26 @@ meridian fleet inventory [--json]
 
 **`fleet inventory`** — 你的已配置服务器、角色、节点和中继，可达时带实时面板状态。它永不打印面板 API 令牌或秘密路径。如果实时状态不可用，已配置库存仍显示，带警告，命令退出 `3`。使用 `plan --json` 决定应用是否有工作要做。
 
-### meridian preflight
+### meridian check
 
-在部署前检查服务器：伪装目标、端口 443 可用性和外部可达性、DNS、OS、磁盘和时钟。没有安装任何东西。DNS 使用服务器自己的解析器；服务器地址不发送给第三方服务。
+检查服务器的健康，或新服务器是否能运行 Meridian。运行的内容取决于服务器在舰队中的角色：
+
+- **还未在舰队中** — 部署前检查：伪装目标可达性和 DNS、端口 443 可用性和外部可达性、域名 DNS、OS、磁盘和时钟。没有安装任何东西；当端口 443 空闲时打开短暂监听器来测试防火墙。DNS 使用服务器自己的解析器。
+- **控制、出口或路由网关** — 面板连接、SSH（或本地访问）、容器（包括订阅页面的健康）、每个已编译的公共和内部端口、TLS 证书和磁盘空间。
+- **中继** — 服务器运行的每个 Realm 跳跃：服务活跃并可到达下一跳，链的公共入口从你的机器接受 TCP。
+
+不指定服务器时，舰队中的每个服务器都被检查。
 
 ```
-meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai]
+meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+               [--ssh-port PORT] [--ai] [--json]
 ```
 
-`--domain` 检查域名解析到服务器。`--sni` 检查特定伪装目标，`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口，`--ai` 复制 AI 就绪诊断提示到剪贴板。
+`--domain` 和 `--sni` 适用于尚未部署的服务器：检查域名解析到服务器以及特定伪装目标可达。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。`--ai` 复制 AI 就绪诊断提示到剪贴板。`--json` 发出单个 `meridian.output/v1` 信封，每个服务器和范围都有一份报告。
 
-前检查接受公共 IP 或主机名，端口 443 空闲时打开短暂监听器，永不把缺失证据当作成功对待。退出 `0` 意味着兼容，`4` 意味着发现问题，`3` 意味着需要的证据不可用，`2` 意味着无效输入。
+缺失证据永不视为成功。退出 `0` 表示每个检查都通过，`4` 表示发现问题，`3` 表示需要的证据不可用，`2` 表示无效输入。每个失败都打印其修复。使用 `meridian test` 通过整条路由推动真实流量。
+
+较旧的 `preflight`、`node check` 和 `relay check` 命令仍在本版本工作一个发布周期。
 
 ### meridian scan
 
@@ -252,25 +258,18 @@ RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结�
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
-              [--client NAME] [--basic] [--timeout SECONDS] [--json]
+              [--client NAME] [--basic] [--probe] [--timeout SECONDS] [--json]
 ```
 
 `--client` 测试特定活跃客户端。`--basic` 仅运行网络和 TLS 检查，无下载 Xray，无法验证纯 UDP 路径；不能与 `--client` 组合（退出 `2`）。`--timeout`（默认 `5`，范围 `1`–`30`）限制每个网络操作，与第一运行 Xray 下载分开。
 
 退出 `0` 意味着每个检查通过，`4` 意味着测试发现问题，`3` 意味着需要的证据不可用。`--json` 发出 `meridian.output/v1` 信封与每个检查和发现。
 
-### meridian probe
+#### 审查者的视角：`meridian test --probe`
 
-探测服务器就像审查者一样，检查部署是否泄露自己。不需要 SSH。在任何 IP 或域工作，当目标属于保存拓扑时应用更严格的检查。
+`--probe` 像活跃探测者一样查看服务器，检查部署是否泄露自己，而不是发送流量。在任何 IP 或域工作，当目标属于保存拓扑时应用更严格的检查。
 
-检查遵循真实部署：公共和内部端口暴露、HTTP/TLS 行为、SNI 一致性和伪装、常见代理和面板路径、WebSocket 升级、反向 DNS、HTTP/2、遗留 TLS 版本和已配置域名。`--sni` 覆盖通用 TLS 探测的 SNI。纯 UDP 监听器报告为需要完整 `meridian test` 而不是被猜测。
-
-```
-meridian probe [SERVER|DOMAIN] [--sni NAME]
-               [--timeout SECONDS] [--json]
-```
-
-与 `test` 相同退出码：`0` 通过，`4` 发现问题，`3` 不确定。`--timeout` 默认 `5` 秒（范围 `1`–`30`）。跳过的检查永不报告为通过。
+检查遵循真实部署：公共和内部端口暴露、HTTP/TLS 行为、SNI 一致性和伪装、常见代理和面板路径、WebSocket 升级、反向 DNS、HTTP/2、遗留 TLS 版本和已配置域名。`--sni` 覆盖通用 TLS 探测的 SNI。纯 UDP 监听器报告为需要完整 `meridian test` 而不是被猜测。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 组合。退出码与 `test` 相同；跳过的检查永不报告为通过。较旧的 `meridian probe` 命令仍在本版本工作一个发布周期。
 
 ### meridian doctor
 
@@ -366,13 +365,13 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 
 | 标志 | 被使用 |
 |------|---------|
-| `SERVER` 参数 | deploy、preflight、scan、test、probe、doctor、teardown、node add、relay add、server add |
-| `--user`, `-u USER` | deploy、node add/check、relay add/check、server add、preflight、scan、doctor、teardown |
-| `--ssh-port PORT` | deploy、node add、relay add、server add、preflight、scan、doctor、teardown |
-| `--sni HOST` | deploy、node add、relay add、preflight、test、probe、doctor |
-| `--domain DOMAIN` | deploy、node add、preflight、test |
+| `SERVER` 参数 | deploy、check、scan、test、doctor、teardown、node add、relay add、server add |
+| `--user`, `-u USER` | deploy、check、node add、relay add、server add、scan、doctor、teardown |
+| `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、teardown |
+| `--sni HOST` | deploy、check、node add、relay add、test、doctor |
+| `--domain DOMAIN` | deploy、check、node add、test |
 
-客户端命令直接使用面板 API 并不取服务器。`test` 和 `probe` 从你的设备运行并不使用 SSH。
+客户端命令直接使用面板 API 并不取服务器。`test` 从你的设备运行并不使用 SSH。
 
 ## 服务器解析
 

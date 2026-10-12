@@ -283,6 +283,71 @@
     },
     {
       "argv": [
+        "check",
+        "SERVER"
+      ],
+      "command": "check",
+      "data_schema": "check",
+      "description": "Check fleet servers by role (or a new server's readiness) and return one typed report per scope.",
+      "envelope_schema": "check-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "every checked server passed",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "user/config error",
+        "3": "system failure, or SSH/panel evidence was unavailable",
+        "4": "check completed with negative findings"
+      },
+      "failure_data_schema": "check-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--user",
+        "--ssh-port",
+        "--sni",
+        "--domain"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "check completed and passed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "check completed with negative findings",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "check failed or was inconclusive",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
         "client",
         "add",
         "NAME..."
@@ -951,8 +1016,9 @@
     },
     {
       "argv": [
-        "probe",
-        "TARGET"
+        "test",
+        "TARGET",
+        "--probe"
       ],
       "command": "probe",
       "data_schema": "probe-result",

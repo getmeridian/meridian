@@ -143,10 +143,10 @@ Some interactive terminal prompts can behave differently under WSL. If the deplo
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-You can also run a preflight check first:
+You can also check the server first:
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### Permission denied over SSH

@@ -72,7 +72,7 @@ meridian relay list --exit 198.51.100.10  # relays for one exit
 Check a relay's hops — each Realm service is running, each hop reaches the next, and the public entry accepts connections — then test real traffic through the whole route:
 
 ```bash
-meridian relay check 203.0.113.10
+meridian check 203.0.113.10
 meridian test
 ```
 
@@ -105,7 +105,7 @@ Make sure the relay port is open in your cloud provider's firewall or security g
 
 ### Exit unreachable
 
-The relay must reach the exit's Reality port. Run `meridian test` to check the route end to end, and `meridian node check EXIT` to check the exit itself.
+The relay must reach the exit's Reality port. Run `meridian test` to check the route end to end, and `meridian check EXIT` to check the exit itself.
 
 ### Relay service not running
 

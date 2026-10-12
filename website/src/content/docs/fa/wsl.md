@@ -143,10 +143,10 @@ code .
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-همچنین می‌توانید اول preflight را اجرا کنید:
+همچنین می‌توانید اول سرور را بررسی کنید:
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### خطای Permission denied در SSH

@@ -72,7 +72,7 @@ meridian relay list --exit 198.51.100.10  # relays برای یک خروجی
 hopهای relay را بررسی کنید — هر سرویس Realm در حال اجرا است، هر hop را به حالت بعدی می‌رساند و ورود عمومی اتصالات را می‌پذیرد — سپس ترافیک واقعی را از طریق کل مسیر آزمایش کنید:
 
 ```bash
-meridian relay check 203.0.113.10
+meridian check 203.0.113.10
 meridian test
 ```
 
@@ -105,7 +105,7 @@ meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 
 ### خروجی دسترس‌پذیر نیست
 
-relay باید به درگاه Reality خروجی برسد. `meridian test` را برای بررسی مسیر انتهایی اجرا کنید و `meridian node check EXIT` را برای بررسی خروجی خود اجرا کنید.
+relay باید به درگاه Reality خروجی برسد. `meridian test` را برای بررسی مسیر انتهایی اجرا کنید و `meridian check EXIT` را برای بررسی خروجی خود اجرا کنید.
 
 ### سرویس relay اجرا نمی‌شود
 

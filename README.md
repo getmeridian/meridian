@@ -130,12 +130,13 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 | `meridian setup` | Guided, resumable wizard for several servers |
 | `meridian plan` / `meridian apply` | Review and apply the topology in `cluster.yml` |
 | `meridian client add\|show\|list\|enable\|disable` | Manage the people who connect |
-| `meridian node add\|list\|check` | Manage exit servers |
-| `meridian relay add\|list` | Manage relays |
+| `meridian node add\|list\|remove` | Manage exit servers |
+| `meridian relay add\|list\|remove` | Manage relays |
 | `meridian fleet status\|inventory` | Fleet health and inventory |
 | `meridian test [IP]` | Push real traffic through the delivered subscription (no SSH) |
-| `meridian probe [IP]` | Probe your server as a censor would |
-| `meridian preflight [IP]` / `meridian scan [IP]` | Check a server / find camouflage targets near it |
+| `meridian check [IP]` | Check fleet health, or whether a new server can run Meridian |
+| `meridian test [IP] --probe` | Look at your server the way a censor would |
+| `meridian scan [IP]` | Find camouflage targets near a server |
 | `meridian doctor [IP]` | Collect diagnostics for bug reports |
 | `meridian teardown [IP]` | Remove Meridian from a server |
 | `meridian update` | Update the CLI |

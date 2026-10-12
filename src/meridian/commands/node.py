@@ -22,7 +22,7 @@ from meridian.commands._helpers import (
 )
 from meridian.commands._validation import validate_command_input
 from meridian.commands.apply_progress import apply_progress
-from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.errors import MeridianError as MeridianException
@@ -34,7 +34,7 @@ from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
 if TYPE_CHECKING:
-    from meridian.diagnostics import CheckResult
+    pass
 
 # -- Node Add --
 
@@ -154,145 +154,6 @@ def run_add(
 
 
 # -- Node Check --
-
-
-def run_check(ip_or_name: str, user: str = "") -> None:
-    """Check health of a node: panel status, SSH, containers, ports, TLS."""
-    from meridian.config import SERVER_PROFILES_FILE
-    from meridian.diagnostics import (
-        check_container_running,
-        check_disk_space,
-        check_port_listening,
-        check_tls_certificate,
-    )
-    from meridian.servers import ServerRegistry
-    from meridian.ssh import ServerConnection, SSHError
-    from meridian.ssh_ui import RichSSHUI
-    from meridian.verification import deployment_verification_context
-
-    request = validate_command_input(NodeTargetRequest, "Invalid node check request", ip_or_name=ip_or_name, user=user)
-    cluster = load_topology_cluster()
-    try:
-        topology = topology_from_local_cluster(cluster)
-    except LocalStateError as exc:
-        fail(exc)
-    node = next(
-        (item for item in topology.nodes if request.ip_or_name in {item.ip, item.name}),
-        None,
-    )
-    if node is None:
-        fail(f"Node '{request.ip_or_name}' not found", hint="Check: meridian node list", hint_type="user")
-
-    err_console.print()
-    info(f"Checking node {node.ip} ({node.name or 'unnamed'})...")
-    err_console.print()
-
-    exit_code = 0
-    deployment = None
-    try:
-        deployment = deployment_verification_context(
-            cluster,
-            ServerRegistry(SERVER_PROFILES_FILE),
-            node.ip,
-        )
-    except LocalStateError as exc:
-        warn(f"V4 listener evidence is unavailable: {exc}")
-        exit_code = 3
-
-    # 1. Panel heartbeat (command-specific — requires panel client)
-    try:
-        panel = make_panel(cluster)
-        with panel:
-            api_node = panel.get_node(node.uuid) if node.uuid else None
-            if api_node and api_node.is_disabled:
-                err_console.print("  [yellow]![/yellow] Panel: node disabled")
-                exit_code = 4
-            elif api_node and api_node.is_connected:
-                ok("Panel: node connected")
-            elif api_node:
-                err_console.print("  [red]✗[/red] Panel: node disconnected")
-                exit_code = 4
-            else:
-                err_console.print("  [red]✗[/red] Panel: node not registered")
-                exit_code = 4
-    except RemnawaveError:
-        err_console.print("  [yellow]![/yellow] Panel: unreachable")
-        exit_code = max(exit_code, 3)
-
-    # 2. SSH connectivity (command-specific — requires SSH auth)
-    ssh_user = request.user or node.ssh_user or "root"
-    try:
-        conn = ServerConnection(ip=node.ip, user=ssh_user, port=node.ssh_port)
-        conn.check_ssh(ui=RichSSHUI())
-        ok("SSH: connected")
-    except (OSError, SSHError):
-        err_console.print("  [yellow]![/yellow] SSH: cannot connect")
-        warn("Cannot proceed with server-side checks")
-        err_console.print()
-        raise typer.Exit(max(exit_code, 3))
-
-    # 3. Docker containers — via diagnostics
-    container_names = ["remnawave-node"]
-    if node.is_panel_host:
-        container_names.extend(("remnawave", "remnawave-db", "remnawave-redis"))
-    for name in container_names:
-        exit_code = max(exit_code, _render_check(check_container_running(conn, name), f"Container: {name}"))
-
-    # 4. Listener and TLS evidence apply to both exits and routing gateways.
-    if deployment is not None and deployment.kind == "v4":
-        for port in deployment.public_tcp_ports:
-            result = check_port_listening(conn, port, transport="tcp")
-            exit_code = max(exit_code, _render_check(result, f"Public TCP port {port}"))
-        for port in deployment.public_udp_ports:
-            result = check_port_listening(conn, port, transport="udp")
-            exit_code = max(exit_code, _render_check(result, f"Public UDP port {port}"))
-        for label, port in deployment.internal_ports.items():
-            result = check_port_listening(conn, port, transport="any")
-            exit_code = max(exit_code, _render_check(result, f"Internal port {port} ({label})"))
-
-        default_host = node.domain or node.sni or node.ip
-        for port in deployment.public_tls_ports:
-            route = next((candidate for candidate in deployment.https_routes if candidate.port == port), None)
-            host = (route.tls_sni or route.host_header) if route is not None else default_host
-            result = check_tls_certificate(conn, host or default_host, port=port)
-            exit_code = max(exit_code, _render_check(result, f"TLS cert on port {port}"))
-    else:
-        warn("V4 listener evidence is unavailable for this saved server")
-        exit_code = max(exit_code, 3)
-
-    # 6. Disk space — via diagnostics
-    exit_code = max(exit_code, _render_check(check_disk_space(conn, min_free_mb=1024), "Disk"))
-
-    err_console.print()
-    if exit_code == 0:
-        ok("All checks passed")
-    elif exit_code == 3:
-        warn("Checks were inconclusive — required evidence was unavailable")
-    else:
-        warn("Some checks failed — review above")
-    err_console.print()
-    if exit_code:
-        raise typer.Exit(exit_code)
-
-
-def _render_check(result: CheckResult, label: str) -> int:
-    """Render one diagnostic and return its verification-style exit code."""
-    if result.status == "passed":
-        ok(f"{label}: {result.detail}")
-        return 0
-    if result.status == "skipped":
-        warn(f"{label}: {result.detail}")
-        return 3
-    if result.status == "warning":
-        warn(f"{label}: {result.detail}")
-        if result.remediation:
-            err_console.print(f"    [dim]Run: {escape(result.remediation)}[/dim]")
-        return 4
-    # failed
-    err_console.print(f"  [red]✗[/red] {escape(label)}: {escape(result.detail)}")
-    if result.remediation:
-        err_console.print(f"    [dim]Run: {escape(result.remediation)}[/dim]")
-    return 4
 
 
 # -- Node List --

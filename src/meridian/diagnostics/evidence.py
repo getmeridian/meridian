@@ -10,6 +10,7 @@ from meridian.core.verification import (
     VerificationStatus,
     build_verification_check,
 )
+from meridian.diagnostics.checks import CheckResult
 
 
 def finding(
@@ -37,4 +38,11 @@ def finish_check(
         name,
         findings,
         duration_ms=max(0, int((time.monotonic() - started) * 1000)),
+    )
+
+
+def check_from_result(check_id: str, name: str, result: CheckResult) -> VerificationCheck:
+    """Lift one SSH health primitive onto the shared verification contract."""
+    return build_verification_check(
+        check_id, name, [finding(check_id, result.status, result.detail, result.remediation)]
     )

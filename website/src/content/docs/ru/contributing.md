@@ -8,7 +8,7 @@ section: reference
 ## Сообщение о проблемах
 
 - **Ошибка?** Используйте [шаблон отчёта об ошибке](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — сначала запустите `meridian doctor`
-- **Проблема подключения?** Используйте [шаблон проблемы подключения](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian preflight`
+- **Проблема подключения?** Используйте [шаблон проблемы подключения](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian check`
 - **Идея функции?** Используйте [шаблон запроса функции](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
 - **Уязвимость безопасности?** См. [Безопасность](/docs/ru/security/) — НЕ открывайте публичную проблему
 

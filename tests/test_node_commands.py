@@ -10,19 +10,18 @@ import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
-from meridian.commands.node import _render_check, run_add, run_check, run_list
+from meridian.commands.node import run_add, run_list
 from meridian.console import set_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel
 from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
-from meridian.diagnostics import CheckResult
 from meridian.remnawave import Node, RemnawaveError
 
 # ---------------------------------------------------------------------------
@@ -268,197 +267,6 @@ class TestNodeAdd:
 # ---------------------------------------------------------------------------
 
 
-class TestNodeCheck:
-    def test_check_v4_routing_gateway_uses_node_runtime_checks(self) -> None:
-        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
-        topology = _projected_topology(
-            TopologyNode(
-                ip="198.51.100.30",
-                name="gateway-a",
-                uuid="gateway-a",
-                is_panel_host=False,
-                ssh_user="root",
-                ssh_port=22,
-                domain="",
-                sni="www.example.com",
-                xhttp_path="",
-                ws_path="",
-                role="routing_gateway",
-            )
-        )
-        panel = _make_panel_mock()
-        panel.get_node.return_value = _make_api_node(connected=True)
-        connection = MagicMock()
-        passed = CheckResult(name="check", status="passed", detail="healthy")
-        deployment = SimpleNamespace(
-            kind="v4",
-            public_tcp_ports=(443,),
-            public_udp_ports=(),
-            internal_ports={},
-            public_tls_ports=(443,),
-            https_routes=(SimpleNamespace(port=443, tls_sni="www.example.com", host_header=""),),
-        )
-
-        with (
-            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
-            patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
-            patch("meridian.commands.node.make_panel", return_value=panel),
-            patch("meridian.ssh.ServerConnection", return_value=connection),
-            patch("meridian.diagnostics.check_container_running", return_value=passed) as container_check,
-            patch("meridian.diagnostics.check_port_listening", return_value=passed) as port_check,
-            patch("meridian.diagnostics.check_tls_certificate", return_value=passed) as tls_check,
-            patch("meridian.diagnostics.check_disk_space", return_value=passed),
-            patch("meridian.verification.deployment_verification_context", return_value=deployment),
-        ):
-            run_check(ip_or_name="gateway-a")
-
-        container_check.assert_called_once_with(connection, "remnawave-node")
-        port_check.assert_called_once_with(connection, 443, transport="tcp")
-        tls_check.assert_called_once_with(connection, "www.example.com", port=443)
-
-    def test_check_v4_uses_compiled_public_and_allocated_internal_ports(self) -> None:
-        cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
-        topology = _projected_topology(
-            TopologyNode(
-                ip="198.51.100.30",
-                name="gateway-a",
-                uuid="gateway-a",
-                is_panel_host=False,
-                ssh_user="root",
-                ssh_port=22,
-                domain="edge.example.com",
-                sni="www.example.com",
-                xhttp_path="",
-                ws_path="",
-                role="routing_gateway",
-            )
-        )
-        panel = _make_panel_mock()
-        panel.get_node.return_value = _make_api_node(connected=True)
-        connection = MagicMock()
-        passed = CheckResult(name="check", status="passed", detail="healthy")
-        deployment = SimpleNamespace(
-            kind="v4",
-            public_tcp_ports=(7443,),
-            public_udp_ports=(9443,),
-            internal_ports={"gateway-a/reality": 39001},
-            public_tls_ports=(7443,),
-            https_routes=(SimpleNamespace(port=7443, tls_sni="edge.example.com", host_header=""),),
-        )
-
-        with (
-            patch("meridian.commands.node.load_topology_cluster", return_value=cluster),
-            patch("meridian.commands.node.topology_from_local_cluster", return_value=topology),
-            patch("meridian.commands.node.make_panel", return_value=panel),
-            patch("meridian.ssh.ServerConnection", return_value=connection),
-            patch("meridian.diagnostics.check_container_running", return_value=passed),
-            patch("meridian.diagnostics.check_port_listening", return_value=passed) as port_check,
-            patch("meridian.diagnostics.check_tls_certificate", return_value=passed) as tls_check,
-            patch("meridian.diagnostics.check_disk_space", return_value=passed),
-            patch("meridian.verification.deployment_verification_context", return_value=deployment),
-        ):
-            run_check(ip_or_name="gateway-a")
-
-        assert port_check.call_args_list == [
-            call(connection, 7443, transport="tcp"),
-            call(connection, 9443, transport="udp"),
-            call(connection, 39001, transport="any"),
-        ]
-        tls_check.assert_called_once_with(connection, "edge.example.com", port=7443)
-
-    def test_check_connected_node(self, tmp_home: Path) -> None:
-        """Checking a connected node should report panel connected status."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-        panel.get_node.return_value = _make_api_node(connected=True)
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.return_value = None
-        mock_conn.run.side_effect = [
-            _ssh_result("true\n"),  # container running
-            _ssh_result("1\n"),  # port 443
-            _ssh_result("notAfter=Dec 31 23:59:59 2026 GMT\n"),  # TLS
-            _ssh_result("2048M\n"),  # disk
-        ]
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
-        ):
-            mock_load.return_value = cluster
-            run_check(ip_or_name="198.51.100.2")
-
-        panel.get_node.assert_called_once_with("550e8400-e29b-41d4-a716-446655440002")
-
-    def test_check_disconnected_node(self, tmp_home: Path) -> None:
-        """Checking a disconnected node should report disconnected status."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-        panel.get_node.return_value = _make_api_node(connected=False)
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.return_value = None
-        mock_conn.run.side_effect = [
-            _ssh_result("true\n"),  # container running
-            _ssh_result("1\n"),  # port 443
-            _ssh_result("notAfter=Dec 31 23:59:59 2026 GMT\n"),  # TLS
-            _ssh_result("2048M\n"),  # disk
-        ]
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            mock_load.return_value = cluster
-            run_check(ip_or_name="exit-node")
-
-        assert exc_info.value.exit_code == 4
-
-    def test_check_node_not_found_fails(self, tmp_home: Path) -> None:
-        """Checking a node that doesn't exist should fail."""
-        cluster = _configured_cluster()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = cluster
-            run_check(ip_or_name="198.51.100.99")
-
-    def test_check_panel_unreachable(self, tmp_home: Path) -> None:
-        """If the panel API is unreachable, check should report it and continue SSH checks."""
-        cluster = _configured_cluster()
-        panel = _make_panel_mock()
-        panel.__enter__ = MagicMock(return_value=panel)
-        panel.__exit__ = MagicMock(return_value=False)
-        panel.get_node.side_effect = RemnawaveError("Connection refused")
-
-        mock_conn = MagicMock()
-        mock_conn.check_ssh.return_value = None
-        mock_conn.run.side_effect = [
-            _ssh_result("true\n"),
-            _ssh_result("1\n"),
-            _ssh_result("notAfter=Dec 31 23:59:59 2026 GMT\n"),
-            _ssh_result("2048M\n"),
-        ]
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.ssh.ServerConnection", return_value=mock_conn),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            mock_load.return_value = cluster
-            run_check(ip_or_name="198.51.100.2")
-
-        assert exc_info.value.exit_code == 3
-        # SSH checks still ran
-        mock_conn.check_ssh.assert_called_once()
-
-
 # ---------------------------------------------------------------------------
 # TestNodeRemove
 # ---------------------------------------------------------------------------
@@ -635,68 +443,6 @@ class TestNodeList:
 # ---------------------------------------------------------------------------
 # TestRenderCheck (remediation display)
 # ---------------------------------------------------------------------------
-
-
-class TestRenderCheck:
-    def test_render_check_failed_with_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Failed checks with remediation should print the hint below the result."""
-        result = CheckResult(
-            name="container:remnawave-node",
-            status="failed",
-            detail="remnawave-node exists but is not running",
-            remediation="docker start remnawave-node",
-        )
-        exit_code = _render_check(result, "Container: remnawave-node")
-
-        assert exit_code == 4
-        captured = capsys.readouterr().err
-        assert "remnawave-node exists but is not running" in captured
-        assert "Run: docker start remnawave-node" in captured
-
-    def test_render_check_failed_without_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Failed checks without remediation should not print a hint line."""
-        result = CheckResult(
-            name="custom",
-            status="failed",
-            detail="something broke",
-            remediation="",
-        )
-        exit_code = _render_check(result, "Custom")
-
-        assert exit_code == 4
-        captured = capsys.readouterr().err
-        assert "something broke" in captured
-        assert "Run:" not in captured
-
-    def test_render_check_warning_with_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Warning checks with remediation should print the hint below."""
-        result = CheckResult(
-            name="tls_certificate",
-            status="warning",
-            detail="Could not verify TLS certificate",
-            remediation="Check that nginx is running and serving TLS on port 443",
-        )
-        exit_code = _render_check(result, "TLS cert")
-
-        assert exit_code == 4
-        captured = capsys.readouterr().err
-        assert "Could not verify TLS certificate" in captured
-        assert "Run: Check that nginx is running" in captured
-
-    def test_render_check_passed_ignores_remediation(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Passed checks should not print remediation even if set."""
-        result = CheckResult(
-            name="disk_space",
-            status="passed",
-            detail="42000 MB free",
-            remediation="should not appear",
-        )
-        exit_code = _render_check(result, "Disk")
-
-        assert exit_code == 0
-        captured = capsys.readouterr().err
-        assert "42000 MB free" in captured
-        assert "should not appear" not in captured
 
 
 # ---------------------------------------------------------------------------

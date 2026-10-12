@@ -60,7 +60,7 @@ meridian scan 198.51.100.10
 meridian deploy 198.51.100.10 --sni dl.google.com
 ```
 
-برای بررسی دستی یک هدف، `meridian preflight 198.51.100.10 --sni HOST` را اجرا کنید. `apple.com` و `icloud.com` را از دست بدهید — شبکه‌های آن‌ها با VPS providers مطابقت ندارند.
+برای بررسی دستی یک هدف، `meridian check 198.51.100.10 --sni HOST` را اجرا کنید. `apple.com` و `icloud.com` را از دست بدهید — شبکه‌های آن‌ها با VPS providers مطابقت ندارند.
 
 ### هدف camouflage در مقابل دامنه
 
@@ -102,7 +102,7 @@ meridian deploy 198.51.100.10 --display-name "VPN علی" --icon 🚀 --color su
 مطمئن نیستید که یک سرور مناسب است؟
 
 ```
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 هدف camouflage را بررسی می‌کند، آیا پورت 443 آزاد است و از بیرون قابل دسترس است، DNS دامنه اختیاری، سیستم‌عامل، فضای دیسک و اختلاف ساعت، بدون نصب چیزی.
@@ -123,7 +123,7 @@ meridian deploy 198.51.100.10 --user ubuntu
 meridian deploy local
 ```
 
-این SSH را رد می‌کند. `preflight local`، `scan local` و `doctor local` به همین شکل کار می‌کنند. اجرای Meridian از ماشین خود همچنان توصیه می‌شود، زیرا `meridian test` نیاز به نقطه نظر بیرونی است.
+این SSH را رد می‌کند. `check local`، `scan local` و `doctor local` به همین شکل کار می‌کنند و بعد از استقرار، دستورات بعدی روی سرور نیز به صورت محلی اجرا می‌شود. اجرای Meridian از ماشین خود همچنان توصیه می‌شود، زیرا `meridian test` نیاز به نقطه نظر بیرونی است.
 
 ## Cloudflare WARP
 

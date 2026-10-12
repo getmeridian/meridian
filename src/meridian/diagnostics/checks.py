@@ -73,7 +73,8 @@ def check_container_running(conn: ServerConnection, container_name: str) -> Chec
     q_name = shlex.quote(container_name)
     result = conn.run(
         "command -v docker >/dev/null 2>&1 || exit 127; "
-        f"docker inspect -f '{{{{.State.Running}}}}' {q_name} 2>/dev/null",
+        f"docker inspect -f '{{{{.State.Running}}}} {{{{if .State.Health}}}}{{{{.State.Health.Status}}}}{{{{end}}}}' "
+        f"{q_name} 2>/dev/null",
         timeout=15,
     )
 
@@ -92,8 +93,16 @@ def check_container_running(conn: ServerConnection, container_name: str) -> Chec
             remediation=f"Deploy or restart the {container_name} container",
         )
 
-    running = result.stdout.strip() == "true"
-    if running:
+    running, _, health = result.stdout.strip().partition(" ")
+    if running == "true" and health == "unhealthy":
+        # A crash-looping service often still reports Running between restarts.
+        return CheckResult(
+            name=f"container:{container_name}",
+            status="warning",
+            detail=f"{container_name} is running but its health check fails",
+            remediation=f"docker logs --tail 50 {container_name}",
+        )
+    if running == "true":
         return CheckResult(
             name=f"container:{container_name}",
             status="passed",

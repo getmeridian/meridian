@@ -9,8 +9,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.commands.check import run
+from meridian.commands.health import run as run_check
 from meridian.ssh import CommandResult
+
+pytestmark = pytest.mark.usefixtures("tmp_home")
 
 
 class FakeConnection:
@@ -45,7 +47,7 @@ class FakeConnection:
             stdout = "203.0.113.20\n"
         elif command.startswith("ss -H -tlnp"):
             stdout = self.ss_stdout
-        elif command.startswith("test -f /etc/meridian/node.yml") and self.meridian_managed:
+        elif "meridian-v4-*.conf" in command and self.meridian_managed:
             stdout = "managed\n"
         elif "nohup python3 -c" in command:
             stdout = "4242\n"
@@ -55,7 +57,7 @@ class FakeConnection:
             returncode = self.ss_returncode
         elif "openssl s_client" in command or "/dev/tcp/" in command:
             returncode = self.sni_returncode
-        elif command.startswith("test -f /etc/meridian/node.yml"):
+        elif "meridian-v4-*.conf" in command:
             returncode = self.ownership_returncode
         elif "getent " in command:
             returncode = self.dns_returncode
@@ -78,17 +80,17 @@ def _run_preflight(
     facts.os_release.return_value = SimpleNamespace(pretty_name=os_info, id="ubuntu" if os_info else "")
     facts.free_disk_mb.return_value = disk_mb
     with (
-        patch("meridian.commands.check.resolve_server", return_value=resolved),
-        patch("meridian.commands.check.ensure_server_connection", return_value=resolved),
-        patch("meridian.commands.check.ServerFacts", return_value=facts),
-        patch("meridian.commands.check.tcp_connect", return_value=external_reachable),
+        patch("meridian.commands.health.resolve_server", return_value=resolved),
+        patch("meridian.commands.health.ensure_server_connection", return_value=resolved),
+        patch("meridian.diagnostics.preflight.ServerFacts", return_value=facts),
+        patch("meridian.diagnostics.preflight.tcp_connect", return_value=external_reachable),
     ):
-        run(ip=resolved.ip, sni="cdn.test")
+        run_check(resolved.ip, sni="cdn.test", scope="preflight")
 
 
 def test_preflight_resolves_registered_hostname_for_external_probe() -> None:
     connection = FakeConnection(sni_reachable=True)
-    with patch("meridian.commands.check.resolve_hostname", return_value="198.51.100.20") as resolve:
+    with patch("meridian.commands.health.resolve_hostname", return_value="198.51.100.20") as resolve:
         _run_preflight(connection, address="exit.example.test")
 
     resolve.assert_called_once_with("exit.example.test", timeout=5)
@@ -98,10 +100,10 @@ def test_preflight_connects_on_the_requested_ssh_port() -> None:
     connection = FakeConnection(sni_reachable=True)
     resolved = SimpleNamespace(ip="198.51.100.20", user="root", conn=connection, local_mode=False)
     with (
-        patch("meridian.commands.check.resolve_server", side_effect=SystemExit) as resolve,
+        patch("meridian.commands.health.resolve_server", side_effect=SystemExit) as resolve,
         pytest.raises(SystemExit),
     ):
-        run(ip=resolved.ip, ssh_port=2222)
+        run_check(resolved.ip, ssh_port=2222, scope="preflight")
 
     assert resolve.call_args.kwargs["port"] == 2222
 

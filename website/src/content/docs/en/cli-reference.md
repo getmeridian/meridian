@@ -150,7 +150,6 @@ Manage exit servers. The first server is deployed with `meridian deploy` (or `me
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node check NAME_OR_IP [--user USER]
 meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 
@@ -170,8 +169,6 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node list`** — lists nodes with live panel status, Xray version, and traffic. If panel status is unavailable, configured nodes are shown as `unknown` and the command exits `3`.
 
-**`node check`** — checks panel connection, SSH, containers, the node's configured public ports, TLS certificates, and disk space, and prints a fix for each failure. Exit `0` is healthy, `4` means problems were found, and `3` means required evidence was unavailable.
-
 **`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (panel node and profile, node container, firewall rules, published Hosts), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
 
 ### meridian relay
@@ -181,7 +178,6 @@ Manage relays — Realm TCP forwarders that give users a domestic entry point to
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
@@ -194,13 +190,13 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 | `--user/-u USER` | saved, else root | SSH user on the relay |
 | `--ssh-port PORT` | saved, else 22 | SSH port on the relay server (`relay add`) |
 | `--yes/-y` | | Skip confirmation prompts |
-| `--json` | | Emit `relay list` (`data.relays[]`) or `relay check` as a `meridian.output/v1` envelope |
+| `--json` | | Emit `relay list` (`data.relays[]`) as a `meridian.output/v1` envelope |
 
 **`relay add`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
 **`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
 
-**`relay check`** — checks every Realm hop the relay server runs (or every hop of one chain): over SSH, that the hop's service is active and that it can open TCP to its next hop; from your machine, that the chain's public entry accepts TCP. Exit `0` means every check passed, `4` means problems were found, and `3` means a hop could not be inspected. Use `meridian test` to push real traffic through the whole route.
+To check a relay's hops, run `meridian check RELAY`.
 
 ### meridian fleet
 
@@ -219,18 +215,26 @@ meridian fleet inventory [--json]
 
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live panel status when reachable. It never prints the panel API token or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
-### meridian preflight
+### meridian check
 
-Check a server before deploying: camouflage target, port 443 availability and outside reachability, DNS, OS, disk, and clock. Nothing is installed. DNS uses the server's own resolver; the server address is not sent to a third-party service.
+Check a server's health, or whether a new server can run Meridian. What runs depends on the server's role in your fleet:
+
+- **Not in the fleet yet** — pre-flight checks: camouflage target reachability and DNS, port 443 availability and outside reachability, domain DNS, OS, disk, and clock. Nothing is installed; a short-lived listener tests the firewall when port 443 is free. DNS uses the server's own resolver.
+- **Control, exit, or routing gateway** — panel connection, SSH (or local access), containers (including the subscription page's health), every compiled public and internal port, TLS certificates, and disk space.
+- **Relay** — every Realm hop on the server: the service is active and can reach its next hop, and the chain's public entry accepts TCP from your machine.
+
+With no server, every server in the fleet is checked.
 
 ```
-meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai]
+meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+               [--ssh-port PORT] [--ai] [--json]
 ```
 
-`--domain` checks that the domain resolves to the server. `--sni` checks a specific camouflage target, `--user` and `--ssh-port` override the saved SSH user and port, and `--ai` copies an AI-ready diagnostic prompt to the clipboard.
+`--domain` and `--sni` apply to servers not deployed yet: they check that the domain resolves to the server and that a specific camouflage target is reachable. `--user` and `--ssh-port` override the saved SSH user and port. `--ai` copies an AI-ready diagnostic prompt to the clipboard. `--json` emits one `meridian.output/v1` envelope with a report per server and scope.
 
-Preflight accepts a public IP or hostname, opens a short-lived listener when port 443 is free, and never treats missing evidence as success. Exit `0` means compatible, `4` means problems were found, `3` means required evidence was unavailable, and `2` means invalid input.
+Missing evidence is never treated as success. Exit `0` means every check passed, `4` means problems were found, `3` means required evidence was unavailable, and `2` means invalid input. Each failure prints its fix. Use `meridian test` to push real traffic through the whole route.
+
+The older `preflight`, `node check`, and `relay check` commands still work for one release.
 
 ### meridian scan
 
@@ -252,25 +256,18 @@ A panel outage, HTTP `429`, or HTTP `5xx` makes the subscription unavailable, so
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
-              [--client NAME] [--basic] [--timeout SECONDS] [--json]
+              [--client NAME] [--basic] [--probe] [--timeout SECONDS] [--json]
 ```
 
 `--client` tests a specific active client. `--basic` runs only network and TLS checks, without downloading Xray, and cannot verify UDP-only paths; it cannot be combined with `--client` (exit `2`). `--timeout` (default `5`, range `1`–`30`) limits each network operation, separate from the first-run Xray download.
 
 Exit `0` means every check passed, `4` means the test found problems, and `3` means required evidence was unavailable. `--json` emits a `meridian.output/v1` envelope with every check and finding.
 
-### meridian probe
+#### Censor's view: `meridian test --probe`
 
-Probe a server as a censor would, to check whether the deployment gives itself away. No SSH is needed. Works on any IP or domain, and applies stricter checks when the target belongs to your saved topology.
+`--probe` looks at a server the way an active prober would, to check whether the deployment gives itself away, instead of sending traffic. It works on any IP or domain and applies stricter checks when the target belongs to your saved topology.
 
-Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
-
-```
-meridian probe [SERVER|DOMAIN] [--sni NAME]
-               [--timeout SECONDS] [--json]
-```
-
-Same exit codes as `test`: `0` passed, `4` found problems, `3` inconclusive. `--timeout` defaults to `5` seconds (range `1`–`30`). Skipped checks are never reported as passes.
+Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes. The older `meridian probe` command still works for one release.
 
 ### meridian doctor
 
@@ -366,13 +363,13 @@ These recur across commands; each command accepts only the options listed in its
 
 | Flag | Used by |
 |------|---------|
-| `SERVER` argument | deploy, preflight, scan, test, probe, doctor, teardown, node add, relay add, server add |
-| `--user`, `-u USER` | deploy, node add/check, relay add/check, server add, preflight, scan, doctor, teardown |
-| `--ssh-port PORT` | deploy, node add, relay add, server add, preflight, scan, doctor, teardown |
-| `--sni HOST` | deploy, node add, relay add, preflight, test, probe, doctor |
-| `--domain DOMAIN` | deploy, node add, preflight, test |
+| `SERVER` argument | deploy, check, scan, test, doctor, teardown, node add, relay add, server add |
+| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
+| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
+| `--sni HOST` | deploy, check, node add, relay add, test, doctor |
+| `--domain DOMAIN` | deploy, check, node add, test |
 
-Client commands use the panel API directly and don't take a server. `test` and `probe` run from your device and don't use SSH.
+Client commands use the panel API directly and don't take a server. `test` runs from your device and doesn't use SSH.
 
 ## Server resolution
 

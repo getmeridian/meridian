@@ -2,7 +2,7 @@
 
 ## Design decisions
 
-**Four-state results** — SSH health checks use frozen `CheckResult`; client-side verification uses core `VerificationCheck`. Both model passed/failed/warning/skipped and carry remediation without CLI rendering.
+**One result contract** — every reported check is a core `VerificationCheck`; SSH primitives still return frozen `CheckResult` and are lifted with `evidence.check_from_result()`. `preflight.py` collects pre-deploy checks with an optional progress callback.
 
 **No CLI rendering** — checks return data; commands own Rich output. This keeps the module reusable from Engine, tests, and future Studio surfaces.
 
@@ -11,7 +11,7 @@
 ## What's done well
 
 - **shlex.quote on all interpolated values** in conn.run() calls.
-- **Extracted from commands/node.py run_check** — disk, container, port, TLS, firewall checks are now testable without CLI scaffolding.
+- **Shared by every check scope** — disk, container, port, TLS, and firewall primitives are testable without CLI scaffolding.
 
 ## Pitfalls
 
@@ -22,4 +22,6 @@
 - **Inspection is not validation** — unverified TLS may collect a certificate, but pass status requires separate trust, lifetime, and hostname validation.
 - **Probe cancellation is prompt** — daemon workers stop accepting jobs on SIGINT so socket timeouts cannot delay process exit 130.
 - **Relay next-hop probes use bash `/dev/tcp` under `timeout`** — never `nc` (absent on minimal images); the probe echoes its own status so SSH or tool failures stay skipped.
+- **Running is not healthy** — a crash-looping container reports `Running` between restarts; read Docker's health status and treat `unhealthy` as a warning.
+- **Ownership markers must be ones v4 writes** — the port-443 owner is Meridian's only when a `meridian-v4-*` stream artifact exists; the 3.x `/etc/meridian/node.yml` is never written.
 - **UFW port matching is line-based** — a rule for port 80 will not match port 8080 only if the line contains the exact port string; callers should be aware of broad ALLOW rules.

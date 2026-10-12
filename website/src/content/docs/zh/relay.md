@@ -72,7 +72,7 @@ meridian relay list --exit 198.51.100.10  # 一个出口的中继
 检查中继的跳跃 — 每个 Realm 服务正在运行，每个跳跃到达下一个，公共入口接受连接 — 然后通过整条路由测试真实流量：
 
 ```bash
-meridian relay check 203.0.113.10
+meridian check 203.0.113.10
 meridian test
 ```
 
@@ -105,7 +105,7 @@ meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 
 ### 出口无法到达
 
-中继必须到达出口的 Reality 端口。运行 `meridian test` 以检查端到端的路由，并运行 `meridian node check EXIT` 以检查出口本身。
+中继必须到达出口的 Reality 端口。运行 `meridian test` 以检查端到端的路由，并运行 `meridian check EXIT` 以检查出口本身。
 
 ### 中继服务不运行
 

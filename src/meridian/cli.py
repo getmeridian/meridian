@@ -557,11 +557,42 @@ def server_remove_cmd(
 
 
 # =============================================================================
-# Preflight / Scan / Test
+# Check / Scan / Test
 # =============================================================================
 
 
-@app.command("preflight")
+@app.command("check")
+def check_cmd(
+    target: Target = "",
+    domain: str = typer.Option("", "--domain", "-d", help="Domain to check on a server not deployed yet"),
+    sni: str = typer.Option("", "--sni", "-s", help="Camouflage target to check on a server not deployed yet"),
+    user: User = "",
+    ssh_port: SshPort = 0,
+    ai: bool = typer.Option(False, "--ai", help="Copy an AI-ready diagnostic prompt to the clipboard"),
+    server: ServerAlias = "",
+    json_output: bool = typer.Option(False, "--json", help="Output a typed check result as JSON"),
+) -> None:
+    """Check server health, or whether a new server can run Meridian.
+
+    A server outside the fleet gets pre-flight checks. Control, exit, and
+    gateway servers get panel, container, listener, TLS, and disk checks;
+    relays get their hops checked. With no server, the whole fleet is checked.
+    Exits 0 when every check passes, 4 on findings, 3 when evidence was unavailable.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian check[/cyan]
+      [cyan]meridian check 198.51.100.10[/cyan]
+      [cyan]meridian check ubuntu@198.51.100.20:2222 --sni www.example.com[/cyan]
+    """
+    from meridian.commands.health import run
+
+    if json_output:
+        _enable_json_output()
+    run(target or server, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai)
+
+
+# Kept for one release: `check` runs these checks on servers outside the fleet.
+@app.command("preflight", hidden=True)
 def preflight_cmd(
     ip: Target = "",
     domain: str = typer.Option("", "--domain", "-d", help="Domain to check"),
@@ -571,10 +602,10 @@ def preflight_cmd(
     server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
-    """Validate server compatibility before deploying"""
-    from meridian.commands.check import run
+    """Validate server compatibility before deploying (use: meridian check)"""
+    from meridian.commands.health import run
 
-    run(ip, domain, sni, user, ai, server, ssh_port=ssh_port)
+    run(ip or server, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai, scope="preflight")
 
 
 @app.command("scan")
@@ -598,21 +629,32 @@ def test_cmd(
     server: ServerAlias = "",
     client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
     basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
+    probe: bool = typer.Option(False, "--probe", help="Look at the server the way a censor's scanner would"),
     timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
     """Test delivered proxy traffic from this device (no SSH required).
 
     `--basic` skips client traffic and cannot be combined with `--client`.
+    `--probe` checks what an active prober sees instead of sending traffic.
     """
-    from meridian.commands.test import run
-
     if json_output:
         _enable_json_output()
+    if probe:
+        from meridian.commands.probe import run as run_probe
+        from meridian.console import fail
+
+        if basic or client or domain:
+            fail("--probe cannot be combined with --basic, --client, or --domain", hint_type="user")
+        run_probe(ip, server, sni, timeout)
+        return
+    from meridian.commands.test import run
+
     run(ip, domain, sni, server, client, basic, timeout)
 
 
-@app.command("probe")
+# Kept for one release: now `meridian test --probe`.
+@app.command("probe", hidden=True)
 def probe_cmd(
     ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
     server: ServerAlias = "",
@@ -620,7 +662,7 @@ def probe_cmd(
     timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
-    """Probe your server as a censor would"""
+    """Probe your server as a censor would (use: meridian test --probe)"""
     from meridian.commands.probe import run
 
     if json_output:
@@ -761,7 +803,8 @@ def relay_remove_cmd(
     run_remove(relay_ip, exit, yes)
 
 
-@relay_app.command("check")
+# Kept for one release: `meridian check RELAY` checks the same hops.
+@relay_app.command("check", hidden=True)
 def relay_check_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
@@ -827,15 +870,16 @@ def node_list_cmd(
     run_list()
 
 
-@node_app.command("check")
+# Kept for one release: now `meridian check NODE`.
+@node_app.command("check", hidden=True)
 def node_check_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
     user: User = "",
 ) -> None:
-    """Run health checks on a node"""
-    from meridian.commands.node import run_check
+    """Run health checks on a node (use: meridian check NODE)"""
+    from meridian.commands.health import run
 
-    run_check(node, user=user)
+    run(node, user=user, scope="server")
 
 
 @node_app.command("remove")

@@ -39,8 +39,14 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   edit the topology, show every resource they will delete, and clean up the
   panel node, node container, Realm units, firewall rules, and published Hosts.
   `meridian plan` lists removals too, and the review covers them.
-- **Per-hop relay checks** — `meridian relay check` confirms each Realm hop is
-  running and reaches the next one, and that the public entry accepts connections.
+- **One health command: `meridian check`** — checks whatever the server is in
+  your fleet: pre-flight readiness for a new server; panel connection,
+  containers (including Docker health, so a crash-looping service is flagged),
+  every compiled port, TLS, and disk for control, exit, and gateway servers;
+  and each Realm hop for relays. With no server it checks the whole fleet, and
+  `--json` returns one typed report. `meridian test --probe` replaces `meridian
+  probe`. `preflight`, `node check`, `relay check`, and `probe` still work for
+  one release.
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including
@@ -69,7 +75,7 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
-- `meridian test` and `meridian probe` are fail-closed: skipped evidence is never
+- `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
   every container image is pinned to its tested multi-arch digest (amd64 and

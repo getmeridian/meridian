@@ -5,15 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import typer
-from rich.markup import escape
 
 from meridian.commands._helpers import load_topology_cluster
 from meridian.commands._validation import validate_command_input
-from meridian.console import err_console, error_context, fail, is_json_mode
+from meridian.commands.check_render import emit_verification_json, render_verification
+from meridian.console import error_context, fail, is_json_mode
 from meridian.core.command_inputs import RelayTargetRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.models import MeridianError, OutputStatus, Summary
-from meridian.core.output import OperationContext, command_envelope
+from meridian.core.output import OperationContext
 from meridian.core.relay_check import RelayCheckResult, RelayHopTarget
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.core.verification import VerificationCheck, aggregate_verification
@@ -34,7 +33,7 @@ def run_check(
     """Check every Realm hop a relay server runs (or every hop of one chain)."""
     operation = OperationContext()
     with error_context("relay.check", timer=operation.timer):
-        result = _collect(relay_ip, exit_arg, user, connection_factory=connection_factory)
+        result = collect_relay_check(relay_ip, exit_arg, user, connection_factory=connection_factory)
     if is_json_mode():
         _emit_json(result, operation)
     else:
@@ -43,7 +42,7 @@ def run_check(
         raise typer.Exit(result.exit_code)
 
 
-def _collect(
+def collect_relay_check(
     relay_ip: str,
     exit_arg: str,
     user: str,
@@ -162,56 +161,20 @@ def _summary(result: RelayCheckResult) -> str:
 
 
 def _emit_json(result: RelayCheckResult, operation: OperationContext) -> None:
-    from meridian.renderers import emit_json
-
-    summary = _summary(result)
-    status: OutputStatus = "ok"
-    errors = None
-    if result.verdict == "inconclusive":
-        status = "failed"
-        errors = [
-            MeridianError(
-                code="MERIDIAN_RELAY_CHECK_INCONCLUSIVE",
-                category="system",
-                message=summary,
-                hint="Restore SSH access to every relay hop, then rerun the check.",
-                retryable=True,
-                exit_code=3,
-            )
-        ]
-    emit_json(
-        command_envelope(
-            command="relay.check",
-            data=result.to_data(),
-            summary=Summary(text=summary, changed=False, counts=result.counts.model_dump()),
-            status=status,
-            exit_code=result.exit_code,
-            errors=errors,
-            timer=operation.timer,
-        )
+    emit_verification_json(
+        command="relay.check",
+        data=result.to_data(),
+        verdict=result.verdict,
+        counts=result.counts,
+        exit_code=result.exit_code,
+        summary=_summary(result),
+        timer=operation.timer,
+        inconclusive_code="MERIDIAN_RELAY_CHECK_INCONCLUSIVE",
+        inconclusive_hint="Restore SSH access to every relay hop, then rerun the check.",
     )
 
 
 def _render(result: RelayCheckResult) -> None:
-    err_console.print()
-    err_console.print(
-        f"  [bold]Relay check[/bold] [dim]{escape(result.relay)} - {escape(', '.join(result.chains))}[/dim]"
+    render_verification(
+        "Relay check", f"{result.relay} - {', '.join(result.chains)}", result.checks, result.verdict, _summary(result)
     )
-    err_console.print()
-    for check in result.checks:
-        marker, style = {
-            "passed": ("+", "green"),
-            "failed": ("x", "red"),
-            "warning": ("!", "yellow"),
-            "skipped": ("-", "dim"),
-        }[check.status]
-        err_console.print(f"  [{style}]{marker}[/{style}] [bold]{escape(check.name)}[/bold]")
-        for finding in check.findings:
-            tone = "dim" if finding.status in {"passed", "skipped"} else "red"
-            err_console.print(f"      [{tone}]{escape(finding.message)}[/{tone}]")
-            if finding.remediation and finding.status != "passed":
-                err_console.print(f"      [dim]Fix: {escape(finding.remediation)}[/dim]")
-    err_console.print()
-    style = {"passed": "green", "findings": "red", "inconclusive": "yellow"}[result.verdict]
-    err_console.print(f"  [{style}][bold]{escape(_summary(result))}[/bold][/{style}]")
-    err_console.print()

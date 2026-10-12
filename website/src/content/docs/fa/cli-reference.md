@@ -150,7 +150,6 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node check NAME_OR_IP [--user USER]
 meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 
@@ -170,8 +169,6 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node list`** — گره‌ها را با وضعیت panel زندگی، نسخه Xray و ترافیق فهرست می‌کند. اگر وضعیت panel دسترس نباشد، گره‌های پیکربندی‌شده به عنوان `unknown` نشان داده می‌شوند و دستور exit `3` می‌شود.
 
-**`node check`** — اتصال panel، SSH، containers، پورت‌های عمومی پیکربندی‌شده گره، گواهینامه‌های TLS و فضای دیسک را بررسی کرده و برای هر شکست راه‌حل چاپ می‌کند. Exit `0` سالم است، `4` مسائل پیدا شده و `3` شواهد الزامی دسترس نبود.
-
 **`node remove`** — یک exit یا دروازه مسیریابی را از topology شما حذف می‌کند. هر منابعی را که حذف خواهد شد فهرست می‌کند (پنل node و profile، container node، قوانین firewall، منتشر شده Hosts)، تأیید می‌خواهد، و دقیقاً آن بررسی را اعمال می‌کند؛ سرور در سرورهای ذخیره‌شده باقی می‌ماند. برای سرور کنترل (از `meridian teardown` استفاده کنید) رد می‌شود، درحالی که relays هنوز به exit مسیریابی می‌کنند (ابتدا آنها را بردارید یا `--force` را منتقل کنید)، درحالی که یک دروازه مسیریابی از طریق آن وارد فلیت می‌شود، و وقتی نتیجه topology را می‌شکند (برای مثال یک حوزه egress خالی یا egress پیش‌فرض). قوانین مسیریابی محدود به یک دروازه حذف‌شده با آن حذف می‌شوند.
 
 ### meridian relay
@@ -181,7 +178,6 @@ relay را مدیریت کنید — Realm TCP forwarders که به کاربرا
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
@@ -194,13 +190,13 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 | `--user/-u USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی relay |
 | `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی سرور relay (`relay add`) |
 | `--yes/-y` | | پرسش تأیید را رد کنید |
-| `--json` | | `relay list` (`data.relays[]`) یا `relay check` را به عنوان پاکت `meridian.output/v1` ارسال کنید |
+| `--json` | | `relay list` (`data.relays[]`) را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
 **`relay add`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.
 
 **`relay remove`** — `RELAY` یک IP سرور relay یا نام ذخیره‌شده یا ID زنجیره relay است. هر زنجیره‌ای را از طریق آن سرور می‌اندازد (آن را با `--exit` محدود کنید)، فهرست می‌کند که چه چیزی حذف خواهد شد (واحدهای Realm، قوانین firewall، شنونده سمت exit، منتشر شده Hosts)، تأیید می‌کند و حذف بررسی‌شده را اعمال می‌کند. سرورها در سرورهای ذخیره‌شده باقی می‌مانند.
 
-**`relay check`** — هر hop Realm را که سرور relay اجرا می‌کند بررسی می‌کند (یا هر hop یک زنجیره): از طریق SSH، که سرویس hop فعال است و می‌تواند TCP را به hop بعدی باز کند؛ از دستگاه شما، که ورود عمومی زنجیره TCP را می‌پذیرد. Exit `0` به معنی هر بررسی پاس شده، `4` به معنی مسائل پیدا شده و `3` به معنی یک hop را نمی‌توان بررسی کرد. از `meridian test` برای فشار ترافیک واقعی از طریق کل مسیر استفاده کنید.
+برای بررسی hopهای relay، از `meridian check RELAY` استفاده کنید.
 
 ### meridian fleet
 
@@ -219,18 +215,26 @@ meridian fleet inventory [--json]
 
 **`fleet inventory`** — سروری، نقش، گره و relay پیکربندی‌شده شما، با وضعیت panel زندگی زمانی‌که قابل دسترس باشد. هرگز API token یا مسیرهای مخفی panel را چاپ نمی‌کند. اگر وضعیت زندگی دسترس نباشد، موجودی پیکربندی‌شده هنوز نشان داده می‌شود، با هشدار، و دستور exit `3` می‌شود. `plan --json` را برای تصمیم‌گیری‌اینکه آیا اعمال کار دارد استفاده کنید.
 
-### meridian preflight
+### meridian check
 
-قبل از استقرار یک سرور بررسی کنید: هدف camouflage، دسترسی و reachability خارجی پورت 443، DNS، سیستم‌عامل، دیسک و ساعت. هیچ چیزی نصب نمی‌شود. DNS از resolver خود سرور استفاده می‌کند؛ آدرس سرور به سرویس third-party ارسال نمی‌شود.
+سلامتی سرور را بررسی کنید، یا آیا یک سرور جدید می‌تواند Meridian را اجرا کند. آنچه اجرا می‌شود به نقش سرور در فلیت شما بستگی دارد:
+
+- **هنوز در فلیت نیست** — بررسی‌های پیش‌استقرار: reachability هدف camouflage و DNS، دسترسی و reachability خارجی پورت 443، DNS دامنه، سیستم‌عامل، دیسک و ساعت. هیچ چیزی نصب نمی‌شود؛ listener کوتاه‌مدت زمانی‌که پورت 443 آزاد است firewall را تست می‌کند. DNS از resolver خود سرور استفاده می‌کند.
+- **کنترل، exit یا routing gateway** — اتصال panel، SSH (یا دسترسی محلی)، containers (شامل سلامتی صفحه اشتراک)، هر پورت عمومی و داخلی compiled، گواهینامه‌های TLS و فضای دیسک.
+- **Relay** — هر hop Realm روی سرور: سرویس فعال است و می‌تواند hop بعدی را reach کند، و ورود عمومی زنجیره TCP را می‌پذیرد از دستگاه شما.
+
+بدون سرور، هر سرور در فلیت بررسی می‌شود.
 
 ```
-meridian preflight [SERVER] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ssh-port PORT] [--ai]
+meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
+               [--ssh-port PORT] [--ai] [--json]
 ```
 
-`--domain` بررسی می‌کند که دامنه به سرور resolve شود. `--sni` هدف camouflage خاصی را بررسی می‌کند، `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند و `--ai` prompt تشخیصی آماده‌شده برای AI را به clipboard کپی می‌کند.
+`--domain` و `--sni` برای سروری که هنوز deploy نشده‌اند اعمال می‌شود: بررسی می‌کنند که دامنه به سرور resolve شود و هدف camouflage خاص قابل‌دسترس است. `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند. `--ai` prompt تشخیصی آماده‌شده برای AI را به clipboard کپی می‌کند. `--json` یک پاکت `meridian.output/v1` با گزارش در هر سرور و scope ارسال می‌کند.
 
-Preflight IP یا hostname عمومی را قبول می‌کند، listener کوتاه‌مدت باز می‌کند زمانی‌که پورت 443 آزاد است، و هرگز شواهد missing را موفقیت نمی‌دانند. Exit `0` compatible، `4` مسائل پیدا شده، `3` شواهد الزامی دسترس نبود و `2` input نامعتبر است.
+شواهد missing هرگز به عنوان موفقیت تلقی نمی‌شود. Exit `0` هر بررسی پاس شده، `4` مسائل پیدا شده، `3` شواهد الزامی دسترس نبود و `2` input نامعتبر است. هر شکست fix خود را چاپ می‌کند. از `meridian test` برای فشار ترافیق واقعی از طریق کل مسیر استفاده کنید.
+
+دستورات قدیمی‌تر `preflight`، `node check` و `relay check` برای یک release دیگر کار می‌کنند.
 
 ### meridian scan
 
@@ -252,25 +256,18 @@ outage panel، HTTP `429` یا HTTP `5xx` اشتراک را دسترس نمی‌
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
-              [--client NAME] [--basic] [--timeout SECONDS] [--json]
+              [--client NAME] [--basic] [--probe] [--timeout SECONDS] [--json]
 ```
 
 `--client` کلاینت فعال خاصی را تست می‌کند. `--basic` فقط بررسی شبکه و TLS را بدون دانلود Xray اجرا می‌کند، و نتوانست UDP-only paths را تأیید کند؛ نتوانست با `--client` ترکیب شود (exit `2`). `--timeout` (پیش‌فرض `5`، محدوده `1`–`30`) هر عملیات شبکه را محدود می‌کند، جدا از اول‌ین Xray download.
 
 Exit `0` هر بررسی قبول شد، `4` تست مسائل پیدا کرد و `3` شواهد الزامی دسترس نبود. `--json` پاکت `meridian.output/v1` با هر بررسی و finding ارسال می‌کند.
 
-### meridian probe
+#### نقطه نظر سانسورکننده: `meridian test --probe`
 
-سرور را مثل سانسورکننده probe کنید، برای بررسی‌اینکه آیا deployment خود را فاش می‌کند. SSH نیاز نیست. روی هر IP یا دامنه کار می‌کند، و بررسی‌های سخت‌گیرانه‌تر اعمال می‌کند زمانی‌که هدف به topology ذخیره‌شده شما تعلق دارد.
+`--probe` سرور را مثل سانسورکننده فعال probe می‌کند، برای بررسی‌اینکه آیا deployment خود را فاش می‌کند، بجای ارسال ترافیق. روی هر IP یا دامنه کار می‌کند، و بررسی‌های سخت‌گیرانه‌تر اعمال می‌کند زمانی‌که هدف به topology ذخیره‌شده شما تعلق دارد.
 
-بررسی‌ها از deployment واقعی پیروی می‌کنند: exposure پورت عمومی و داخلی، رفتار HTTP/TLS، سازگاری و camouflage SNI، مسیرهای proxy و panel معمول، WebSocket upgrades، reverse DNS، HTTP/2، نسخه‌های TLS legacy و دامنه‌های پیکربندی‌شده. `--sni` SNI را برای probes TLS عام جایگزین می‌کند. UDP-only listeners به عنوان نیاز `meridian test` کامل به جای حدس گزارش می‌شوند.
-
-```
-meridian probe [SERVER|DOMAIN] [--sni NAME]
-               [--timeout SECONDS] [--json]
-```
-
-کدهای خروج test یکسان: `0` قبول شد، `4` مسائل پیدا کرد، `3` inconclusive. `--timeout` پیش‌فرض `5` ثانیه (محدوده `1`–`30`). بررسی‌های حذف‌شده هرگز به عنوان passes گزارش نمی‌شوند.
+بررسی‌ها از deployment واقعی پیروی می‌کنند: exposure پورت عمومی و داخلی، رفتار HTTP/TLS، سازگاری و camouflage SNI، مسیرهای proxy و panel معمول، WebSocket upgrades، reverse DNS، HTTP/2، نسخه‌های TLS legacy و دامنه‌های پیکربندی‌شده. `--sni` SNI را برای probes TLS عام جایگزین می‌کند. UDP-only listeners به عنوان نیاز `meridian test` کامل به جای حدس گزارش می‌شوند. `--probe` نمی‌تواند با `--basic`، `--client` یا `--domain` ترکیب شود. کدهای خروج test یکسان هستند؛ بررسی‌های حذف‌شده هرگز به عنوان passes گزارش نمی‌شوند. دستور قدیمی‌تر `meridian probe` برای یک release دیگر کار می‌کند.
 
 ### meridian doctor
 
@@ -366,13 +363,13 @@ JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`sc
 
 | پرچم | استفاده‌شده توسط |
 |------|---------|
-| `SERVER` argument | deploy، preflight، scan، test، probe، doctor، teardown، node add، relay add، server add |
-| `--user`, `-u USER` | deploy، node add/check، relay add/check، server add، preflight، scan، doctor، teardown |
-| `--ssh-port PORT` | deploy، node add، relay add، server add، preflight، scan، doctor، teardown |
-| `--sni HOST` | deploy، node add، relay add، preflight، test، probe، doctor |
-| `--domain DOMAIN` | deploy، node add، preflight، test |
+| `SERVER` argument | deploy، check، scan، test، doctor، teardown، node add، relay add، server add |
+| `--user`, `-u USER` | deploy، check، node add، relay add، server add، scan، doctor، teardown |
+| `--ssh-port PORT` | deploy، check، node add، relay add، server add، scan، doctor، teardown |
+| `--sni HOST` | deploy، check، node add، relay add، test، doctor |
+| `--domain DOMAIN` | deploy، check، node add، test |
 
-دستورات client از API panel مستقیم استفاده می‌کنند و سرور نمی‌گیرند. `test` و `probe` از دستگاه شما اجرا می‌شوند و SSH استفاده نمی‌کنند.
+دستورات client از API panel مستقیم استفاده می‌کنند و سرور نمی‌گیرند. `test` از دستگاه شما اجرا می‌شود و SSH استفاده نمی‌کند.
 
 ## تفکیک سرور
 

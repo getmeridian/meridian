@@ -151,14 +151,14 @@ def local_entry(registry: ServerRegistry) -> ServerEntry | None:
     return matches[0] if len(matches) == 1 else None
 
 
-def connection_for_entry(entry: ServerEntry, *, user: str = "") -> ServerConnection:
+def connection_for_entry(entry: ServerEntry, *, user: str = "", port: int = 0) -> ServerConnection:
     """Open a saved server: locally when it is this machine, otherwise over SSH."""
     if entry.runs_here():
-        return ServerConnection(entry.host, user or entry.user, local_mode=True, port=entry.port)
+        return ServerConnection(entry.host, user or entry.user, local_mode=True, port=port or entry.port)
     return ServerConnection(
         entry.host,
         user or entry.user,
-        port=entry.port,
+        port=port or entry.port,
         identity_file=entry.key_path if not user or user == entry.user else "",
     )
 

@@ -8,16 +8,20 @@ section: guides
 ## 使用哪种工具
 
 ```
-安装前           → meridian preflight IP
+安装前           → meridian check IP
   "这个服务器是否适合 Meridian？"
   测试：SNI 可达性、端口 443、DNS、操作系统、磁盘空间。
+
+安装后，是否健康？ → meridian check
+  "面板、节点、中继、端口和证书都好吗？"
+  按角色测试舰队中的每个服务器，通过 SSH。
 
 安装后，无法连接 → meridian test IP
   "代理从我现在的地方是否可达？"
   测试：已配置的监听器、TLS/SNI、交付的订阅和真实代理流量。
   无需 SSH — 从客户端设备运行。
 
-安装后，检查暴露 → meridian probe IP
+安装后，检查暴露 → meridian test IP --probe
   "此部署是否暴露代理或管理表面？"
   测试：公开端口、TLS/HTTP 行为、路径、SNI、DNS 和拓扑策略。
   无需 SSH — 从客户端设备运行。
@@ -27,7 +31,7 @@ section: guides
   收集：服务器 OS、Docker、Remnawave 节点和 nginx 日志、端口、防火墙、SNI、DNS。
 ```
 
-添加 `--ai` 到 preflight 或 doctor 以获得 AI 就绪的诊断提示。
+添加 `--ai` 到 check 或 doctor 以获得 AI 就绪的诊断提示。
 
 ## 完全无法连接
 
@@ -55,7 +59,7 @@ section: guides
 **修复：**
 1. 检查 Xray：`docker logs remnawave-node --tail 20`
 2. 检查端口：`ss -tlnp sport = :443` — 应该是 nginx
-3. 测试 SNI：`meridian preflight IP`
+3. 测试 SNI：`meridian check IP --sni HOST`
 
 ### 域名无法到达
 
@@ -97,7 +101,7 @@ section: guides
 
 ### 端口 443 冲突
 
-另一服务（Apache、Nginx）正在使用端口 443。停止它或使用干净的服务器。`meridian preflight` 会告诉您什么在使用该端口。
+另一服务（Apache、Nginx）正在使用端口 443。停止它或使用干净的服务器。`meridian check IP` 会告诉您什么在使用该端口。
 
 ### Docker 安装失败
 
@@ -111,7 +115,7 @@ section: guides
 
 检查容器：`docker logs remnawave-node --tail 50`。常见原因是主机上的端口冲突（节点运行在 `network_mode: host`，所以来自 `cluster.yml` 的端口必须空闲）、无法到达的面板（节点启动需要面板的 `node_secret_key`）或缺失 `NET_ADMIN` 能力。
 
-**修复：** 运行 `meridian node check IP` 并在重新部署前遵循其补救。要验证 Remnawave 面板状态，登录管理 UI 在 `https://<IP>/<secret_path>/` 并检查 **Nodes** — 节点应该是 `connected`；`meridian fleet status` 从 CLI 表面相同信息。
+**修复：** 运行 `meridian check IP` 并在重新部署前遵循其补救。要验证 Remnawave 面板状态，登录管理 UI 在 `https://<IP>/<secret_path>/` 并检查 **Nodes** — 节点应该是 `connected`；`meridian fleet status` 从 CLI 表面相同信息。
 
 ### 磁盘空间不足
 
@@ -119,7 +123,7 @@ section: guides
 
 ### DNS 解析失败（域名模式）
 
-您的域名的证书只能在域名的 A 记录指向服务器后发行（部署时灰色云）。更新记录，等待它传播（通常 5-15 分钟），然后再次运行相同的部署命令。`meridian preflight IP --domain DOMAIN` 在您部署前检查这个。
+您的域名的证书只能在域名的 A 记录指向服务器后发行（部署时灰色云）。更新记录，等待它传播（通常 5-15 分钟），然后再次运行相同的部署命令。`meridian check IP --domain DOMAIN` 在您部署前检查这个。
 
 ## 曾经工作，现在停止了
 

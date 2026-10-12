@@ -60,7 +60,7 @@ The scan runs a pinned, checksum-verified build of RealiTLScanner on the server 
 meridian deploy 198.51.100.10 --sni dl.google.com
 ```
 
-To check one target by hand, run `meridian preflight 198.51.100.10 --sni HOST`. Avoid `apple.com` and `icloud.com` — their networks don't match VPS providers.
+To check one target by hand, run `meridian check 198.51.100.10 --sni HOST`. Avoid `apple.com` and `icloud.com` — their networks don't match VPS providers.
 
 ### Camouflage target vs. domain
 
@@ -102,7 +102,7 @@ At the end of every deploy, Meridian prints the exact redeploy command with your
 Not sure a server is suitable?
 
 ```
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 Checks the camouflage target, whether port 443 is free and reachable from outside, optional domain DNS, OS, disk space, and clock skew, without installing anything.
@@ -123,7 +123,7 @@ If you are logged into the server as root:
 meridian deploy local
 ```
 
-This skips SSH. `preflight local`, `scan local`, and `doctor local` work the same way. Running Meridian from your own machine is still recommended, because `meridian test` needs an outside vantage point.
+This skips SSH. `check local`, `scan local`, and `doctor local` work the same way, and once deployed, later commands on the server run locally too. Running Meridian from your own machine is still recommended, because `meridian test` needs an outside vantage point.
 
 ## Cloudflare WARP
 

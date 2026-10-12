@@ -5,22 +5,19 @@ from __future__ import annotations
 from dataclasses import replace
 
 import typer
-from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
+from meridian.commands.check_render import emit_verification_json, render_verification
 from meridian.config import SERVER_PROFILES_FILE
-from meridian.console import err_console, error_context, fail, is_json_mode
+from meridian.console import error_context, fail, is_json_mode
 from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.inputs import validate_hostname_value
-from meridian.core.models import MeridianError, OutputStatus, Summary
-from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import redact_string
+from meridian.core.output import OperationContext
 from meridian.core.verification import (
     ProbeResult,
     VerificationTarget,
 )
 from meridian.diagnostics.probe import run_probe_checks
-from meridian.renderers import emit_json
 from meridian.servers import ServerRegistry
 from meridian.verification import (
     VerificationHttpsRoute,
@@ -142,35 +139,16 @@ def _summary_text(result: ProbeResult) -> str:
 
 
 def _emit_json_result(result: ProbeResult, *, operation: OperationContext) -> None:
-    summary = _summary_text(result)
-    errors = None
-    status: OutputStatus = "ok"
-    if result.verdict == "inconclusive":
-        status = "failed"
-        errors = [
-            MeridianError(
-                code="MERIDIAN_PROBE_INCONCLUSIVE",
-                category="system",
-                message=summary,
-                hint="Retry from a network that can reach every required target.",
-                retryable=True,
-                exit_code=3,
-            )
-        ]
-    emit_json(
-        command_envelope(
-            command="probe",
-            data=result.to_data(),
-            summary=Summary(
-                text=summary,
-                changed=False,
-                counts=result.counts.model_dump(),
-            ),
-            status=status,
-            exit_code=result.exit_code,
-            errors=errors,
-            timer=operation.timer,
-        )
+    emit_verification_json(
+        command="probe",
+        data=result.to_data(),
+        verdict=result.verdict,
+        counts=result.counts,
+        exit_code=result.exit_code,
+        summary=_summary_text(result),
+        timer=operation.timer,
+        inconclusive_code="MERIDIAN_PROBE_INCONCLUSIVE",
+        inconclusive_hint="Retry from a network that can reach every required target.",
     )
 
 
@@ -178,33 +156,7 @@ def _render_result(result: ProbeResult) -> None:
     target = result.target.requested
     if result.target.resolved_ip and result.target.resolved_ip not in target:
         target = f"{target} ({result.target.resolved_ip})"
-    err_console.print()
-    err_console.print("  [bold]Censor probe[/bold]")
     mode = "Meridian deployment policy" if result.context.mode == "meridian" else "generic observations"
-    err_console.print(f"  [dim]{escape(redact_string(target))} - {mode}[/dim]")
-    err_console.print()
-    for check in result.checks:
-        marker, style = {
-            "passed": ("+", "green"),
-            "failed": ("x", "red"),
-            "warning": ("!", "yellow"),
-            "skipped": ("-", "dim"),
-        }[check.status]
-        err_console.print(f"  [{style}]{marker}[/{style}] [bold]{escape(check.name)}[/bold]")
-        for finding in check.findings:
-            finding_style = {
-                "passed": "dim",
-                "failed": "red",
-                "warning": "yellow",
-                "skipped": "dim",
-            }[finding.status]
-            message = escape(redact_string(finding.message))
-            err_console.print(f"      [{finding_style}]{message}[/{finding_style}]")
-            if finding.remediation and finding.status in {"failed", "warning", "skipped"}:
-                remediation = escape(redact_string(finding.remediation))
-                err_console.print(f"      [dim]Fix: {remediation}[/dim]")
-    err_console.print()
-    summary = _summary_text(result)
-    style = "green" if result.verdict == "passed" else "red" if result.verdict == "findings" else "yellow"
-    err_console.print(f"  [{style}][bold]{summary}[/bold][/{style}]")
-    err_console.print()
+    render_verification(
+        "Censor probe", f"{target} - {mode}", result.checks, result.verdict, _summary_text(result), redact=True
+    )

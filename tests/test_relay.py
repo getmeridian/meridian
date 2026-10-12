@@ -150,7 +150,8 @@ class TestRelayCLI:
         assert "add" in result.output
         assert "list" in result.output
         assert "remove" in result.output
-        assert "check" in result.output
+        # `relay check` is a hidden alias of `meridian check RELAY` for one release.
+        assert CliRunner().invoke(app, ["relay", "check", "--help"]).exit_code == 0
 
     def test_relay_add_help_and_hidden_deploy_alias(self) -> None:
         from typer.testing import CliRunner

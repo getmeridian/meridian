@@ -286,3 +286,15 @@ class TestCheckResultContract:
         for status in ("passed", "failed", "warning", "skipped"):
             r = CheckResult(name="x", status=status)
             assert r.status == status
+
+
+def test_running_but_unhealthy_container_is_a_warning_not_a_pass() -> None:
+    from tests.support.mock_connection import MockConnection
+
+    conn = MockConnection()
+    conn.when("docker inspect", stdout="true unhealthy\n")
+
+    result = check_container_running(conn, "remnawave-subscription-page")
+
+    assert result.status == "warning"
+    assert "docker logs" in result.remediation

@@ -8,16 +8,16 @@ section: guides
 ## کدام ابزار را استفاده کنید
 
 ```
-قبل از نصب           → meridian preflight IP
+قبل از نصب           → meridian check IP
   "آیا این سرور برای Meridian کار می‌کند؟"
   آزمایش‌ها: قابلیت رسیدن SNI، درگاه 443، DNS، OS، فضای دیسک.
 
-بعد از نصب، نمی‌تواند اتصال برقرار کند → meridian test IP
+بعد از نصب، سالم است؟ → meridian check
   "آیا proxy از جایی که من هستم قابل رسیدن است؟"
   آزمایش‌ها: listeners پیکربندی‌شده، TLS/SNI، subscription تحویل‌شده و ترافیک proxy واقعی.
   SSH نیاز نیست — از دستگاه کلاینت اجرا می‌شود.
 
-بعد از نصب، nodesرسی‌های دسترسی → meridian probe IP
+بعد از نصب، دسترسی را بررسی کنید → meridian test IP --probe
   "آیا این استقرار proxy یا سطح مدیریت را فاش می‌کند؟"
   آزمایش‌ها: درگاه‌های عمومی، رفتار TLS/HTTP، مسیرها، SNI، DNS و سیاست توپولوژی.
   SSH نیاز نیست — از دستگاه کلاینت اجرا می‌شود.
@@ -27,7 +27,7 @@ section: guides
   جمع‌آوری: OS سرور، Docker، لاگ‌های گره Remnawave و nginx، درگاه‌ها، firewall، SNI، DNS.
 ```
 
-`--ai` را به preflight یا doctor برای یک prompt تشخیصی آماده AI اضافه کنید.
+`--ai` را به check یا doctor برای یک prompt تشخیصی آماده AI اضافه کنید.
 
 ## نمی‌تواند اصلاً اتصال برقرار کند
 
@@ -55,7 +55,7 @@ section: guides
 **راه‌حل‌ها:**
 1. Xray را بررسی کنید: `docker logs remnawave-node --tail 20`
 2. درگاه را بررسی کنید: `ss -tlnp sport = :443` — باید nginx باشد
-3. SNI را آزمایش کنید: `meridian preflight IP`
+3. SNI را آزمایش کنید: `meridian check IP --sni HOST`
 
 ### دامنه قابل رسیدن نیست
 
@@ -97,7 +97,7 @@ Deploys و applies checkpoint شده‌اند. علت گزارش‌شده را �
 
 ### تضاد درگاه 443
 
-سرویس دیگر (Apache، Nginx) درگاه 443 را استفاده می‌کند. آن را متوقف کنید یا سرور تمیز استفاده کنید. `meridian preflight` به شما می‌گوید درگاه را کیست.
+سرویس دیگر (Apache، Nginx) درگاه 443 را استفاده می‌کند. آن را متوقف کنید یا سرور تمیز استفاده کنید. `meridian check IP` به شما می‌گوید درگاه را کیست.
 
 ### نصب Docker ناموفق
 
@@ -111,7 +111,7 @@ SSH دستی را امتحان کنید: `ssh root@SERVER_IP`. مطمئن شوی
 
 Container را بررسی کنید: `docker logs remnawave-node --tail 50`. علت‌های معمول تصادم درگاه روی host (node در `network_mode: host` اجرا می‌شود، بنابراین درگاه‌های `cluster.yml` باید آزاد باشند)، panel غیرقابل دسترس (ثبت گره نیاز به `node_secret_key` پنل در boot دارد) یا `NET_ADMIN` capability گمشده.
 
-**راه‌حل:** `meridian node check IP` را اجرا کنید و remediation آن را قبل از redeploy دنبال کنید. برای تأیید وضعیت پنل Remnawave، وارد UI مدیریت در `https://<IP>/<secret_path>/` شوید و **Nodes** را بررسی کنید — گره باید `connected` باشد؛ `meridian fleet status` همان اطلاعات را از CLI نشان می‌دهد.
+**راه‌حل:** `meridian check IP` را اجرا کنید و remediation آن را قبل از redeploy دنبال کنید. برای تأیید وضعیت پنل Remnawave، وارد UI مدیریت در `https://<IP>/<secret_path>/` شوید و **Nodes** را بررسی کنید — گره باید `connected` باشد؛ `meridian fleet status` همان اطلاعات را از CLI نشان می‌دهد.
 
 ### فضای دیسک ناکافی
 
@@ -119,7 +119,7 @@ Container را بررسی کنید: `docker logs remnawave-node --tail 50`. عل
 
 ### DNS resolution ناموفق (حالت domain)
 
-certificate برای دامنه شما تنها زمانی می‌تواند صادر شود که رکورد A دامنه به سرور اشاره کند (ابر خاکستری در حین deploy). رکورد را به‌روز کنید، برای تکثیر انتظار دهید (معمولاً 5–15 دقیقه)، سپس دستور deploy یکسان را دوباره اجرا کنید. `meridian preflight IP --domain DOMAIN` این را قبل از deploy بررسی می‌کند.
+certificate برای دامنه شما تنها زمانی می‌تواند صادر شود که رکورد A دامنه به سرور اشاره کند (ابر خاکستری در حین deploy). رکورد را به‌روز کنید، برای تکثیر انتظار دهید (معمولاً 5–15 دقیقه)، سپس دستور deploy یکسان را دوباره اجرا کنید. `meridian check IP --domain DOMAIN` این را قبل از deploy بررسی می‌کند.
 
 ## کار می‌کرد، اکنون متوقف شد
 

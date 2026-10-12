@@ -60,7 +60,7 @@ meridian scan 198.51.100.10
 meridian deploy 198.51.100.10 --sni dl.google.com
 ```
 
-要手动检查一个目标，运行 `meridian preflight 198.51.100.10 --sni HOST`。避免 `apple.com` 和 `icloud.com` — 它们的网络与 VPS 提供商不匹配。
+要手动检查一个目标，运行 `meridian check 198.51.100.10 --sni HOST`。避免 `apple.com` 和 `icloud.com` — 它们的网络与 VPS 提供商不匹配。
 
 ### 伪装目标 vs 域名
 
@@ -102,7 +102,7 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 不确定服务器是否合适？
 
 ```
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 检查伪装目标、端口 443 是否空闲且可从外部访问、可选的域名 DNS、OS、磁盘空间和时钟偏差，无需安装任何东西。
@@ -123,7 +123,7 @@ meridian deploy 198.51.100.10 --user ubuntu
 meridian deploy local
 ```
 
-这跳过 SSH。`preflight local`、`scan local` 和 `doctor local` 工作方式相同。仍然建议从你自己的机器运行 Meridian，因为 `meridian test` 需要外部角度。
+这跳过 SSH。`check local`、`scan local` 和 `doctor local` 工作方式相同，部署后，服务器上的后续命令也可本地运行。仍然建议从你自己的机器运行 Meridian，因为 `meridian test` 需要外部角度。
 
 ## Cloudflare WARP
 

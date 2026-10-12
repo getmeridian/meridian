@@ -143,10 +143,10 @@ code .
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-Также можно сначала запустить предварительную проверку:
+Также можно сначала проверить сервер:
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### Permission denied по SSH

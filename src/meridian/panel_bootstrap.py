@@ -160,7 +160,7 @@ def run_provisioner(
     if failed:
         raise ProvisioningError(
             "Setup failed",
-            hint=f"Step '{failed[0].name}' failed: {failed[0].detail}\nRun: meridian preflight {ctx.ip}",
+            hint=f"Step '{failed[0].name}' failed: {failed[0].detail}\nRun: meridian check {ctx.ip}",
         )
 
     logger.info("All provisioning steps completed")

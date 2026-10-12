@@ -7,7 +7,7 @@
 const tabs = [
   { key: 'install', label: 'Deploy', i18n: 'builder.tab.deploy' },
   { key: 'relay', label: 'Relay', i18n: 'builder.tab.relay' },
-  { key: 'check', label: 'Preflight', i18n: 'builder.tab.preflight' },
+  { key: 'check', label: 'Check', i18n: 'builder.tab.preflight' },
   { key: 'scan', label: 'SNI Scan', i18n: 'builder.tab.scan' },
   { key: 'diag', label: 'Doctor', i18n: 'builder.tab.doctor' },
   { key: 'uninstall', label: 'Teardown', i18n: 'builder.tab.teardown' },
@@ -167,9 +167,9 @@ const tabs = [
       descKey: 'builder.desc.relay',
     },
     check: {
-      desc: 'Test if your server is compatible — checks SNI, ports, DNS, OS, disk, ASN match.',
+      desc: 'Check a new server is compatible (SNI, ports, DNS, OS, disk), or a deployed one is healthy.',
       show: ['ip', 'user', 'domain', 'sni', 'ai'],
-      cmd: 'preflight',
+      cmd: 'check',
       descKey: 'builder.desc.preflight',
     },
     scan: {
@@ -314,7 +314,7 @@ const tabs = [
           status.className = 'builder__status builder__status--ok';
         }
       } else if (curTab === 'check') {
-        status.textContent = ip ? 'Runs preflight checks without installing anything.' : 'Enter your server IP to run the preflight.';
+        status.textContent = ip ? 'Runs checks without installing anything.' : 'Enter your server IP to check it.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       } else if (curTab === 'scan') {
         status.textContent = ip ? "Scans server's /24 subnet for same-network TLS targets." : 'Enter your server IP to find optimal SNI targets.';

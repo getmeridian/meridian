@@ -143,10 +143,10 @@ code .
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-也可以先运行 preflight 检查：
+也可以先检查服务器：
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### SSH 提示 Permission denied
