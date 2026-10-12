@@ -915,6 +915,27 @@ class TestConfigureNginx:
         assert bootstrap_calls
         assert "subjectAltName=DNS:example.com" in bootstrap_calls[0]
 
+    @staticmethod
+    def _rerun(*, v4_owns_443: bool) -> MockConnection:
+        conn = MockConnection()
+        conn.when("meridian-v4-*.conf", rc=0 if v4_owns_443 else 2)
+        conn.when("test -f /etc/ssl/meridian/fullchain.pem", stdout="", rc=0)
+        conn.when("grep", stdout="stream {", rc=0)
+        conn.when("nginx -t", stdout="syntax is ok")
+        ctx = ProvisionContext(ip="198.51.100.1")
+        result = ConfigureNginx(domain="", ip_mode=True, server_ip="198.51.100.1").run(conn, ctx)
+        assert result.status == "changed"
+        return conn
+
+    def test_writes_legacy_stream_config_on_a_fresh_server(self):
+        assert "/etc/nginx/stream.d/meridian.conf" in self._rerun(v4_owns_443=False).write_map
+
+    def test_rerun_never_duplicates_a_v4_owned_443_listener(self):
+        conn = self._rerun(v4_owns_443=True)
+
+        assert "/etc/nginx/stream.d/meridian.conf" not in conn.write_map
+        assert "/etc/nginx/conf.d/meridian-http.conf" in conn.write_map
+
 
 # ---------------------------------------------------------------------------
 # IssueTLSCert step

@@ -20,6 +20,9 @@ from meridian.provision.nginx_render import (
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
+# Stream files the V4 reconciler owns (reconciler/server_render.py names them).
+V4_STREAM_ARTIFACT_GLOB = "/etc/nginx/stream.d/meridian-v4-*.conf"
+
 # ---------------------------------------------------------------------------
 # InstallNginx — install nginx binary, stream module, and acme.sh
 # ---------------------------------------------------------------------------
@@ -329,6 +332,12 @@ class ConfigureNginx:
                 )
 
         # -- Deploy nginx stream config --
+        # A V4 stream artifact that already owns :443 retired this legacy file;
+        # writing it again would duplicate the listener and fail `nginx -t`.
+        v4_owns_443 = conn.run(
+            f"grep -qsE '^ *listen 443;' {V4_STREAM_ARTIFACT_GLOB}",
+            timeout=15,
+        )
         stream_config = render_nginx_stream_config(
             reality_sni=reality_sni,
             reality_backend_port=reality_backend_port,
@@ -336,19 +345,20 @@ class ConfigureNginx:
             server_ip=server_ip,
             domain=self.domain,
         )
-        result = conn.put_text(
-            "/etc/nginx/stream.d/meridian.conf",
-            stream_config,
-            mode="644",
-            timeout=15,
-            operation_name="write nginx stream config",
-        )
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"Failed to write stream config: {result.stderr.strip()}",
+        if v4_owns_443.returncode != 0:
+            result = conn.put_text(
+                "/etc/nginx/stream.d/meridian.conf",
+                stream_config,
+                mode="644",
+                timeout=15,
+                operation_name="write nginx stream config",
             )
+            if result.returncode != 0:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"Failed to write stream config: {result.stderr.strip()}",
+                )
 
         # -- Deploy nginx http config --
         if self.ip_mode:
