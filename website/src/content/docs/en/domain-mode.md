@@ -43,13 +43,13 @@ Each client's subscription and connection page list every path:
 | Reality | Direct to the server IP | Primary — fastest |
 | XHTTP | Your domain (through Cloudflare when proxied) | Reality is blocked or throttled |
 | WSS | Your domain (through Cloudflare when proxied) | Server IP is blocked |
-| Hysteria2 (opt-in) | Your domain over UDP/443 | Lossy or high-latency networks |
+| Hysteria2 (opt-in) | Your server's IP over UDP/443, with the domain's certificate | Lossy or high-latency networks |
 
 Apps that import the Xray JSON or Mihomo subscription switch between paths automatically when one stops working. Other apps show each path as a separate entry.
 
 ## Hysteria2 and Cloudflare
 
-Hysteria2 uses QUIC over UDP, which Cloudflare's proxy does not carry. With an orange-cloud record, Hysteria2 clients reach Cloudflare instead of your server and won't connect; the TCP paths are unaffected. QUIC is also throttled in some regions. Only enable `--hysteria2` if your users need it and can reach the server over UDP.
+Hysteria2 dials your server's IP over UDP and uses the domain only for its TLS certificate, so it keeps working when the record is proxied through Cloudflare (which can't carry it). QUIC is throttled in some regions; enable `--hysteria2` only if your users need it.
 
 ## Adding a domain later
 

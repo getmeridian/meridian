@@ -43,13 +43,13 @@ meridian deploy 198.51.100.10 --domain vpn.example.com
 | Reality | 直接到服务器 IP | 主要 — 最快 |
 | XHTTP | 您的域名（代理时通过 Cloudflare） | Reality 被阻止或节流 |
 | WSS | 您的域名（代理时通过 Cloudflare） | 服务器 IP 被阻止 |
-| Hysteria2（可选） | 您的域名 UDP/443 上 | 丢包或高延迟网络 |
+| Hysteria2（可选） | 通过 UDP/443 连接服务器 IP，使用域名证书 | 丢包或高延迟网络 |
 
 导入 Xray JSON 或 Mihomo 订阅的应用在一条路径停止工作时自动在路径间切换。其他应用将每条路径显示为单独条目。
 
 ## Hysteria2 和 Cloudflare
 
-Hysteria2 在 UDP 上使用 QUIC，Cloudflare 的代理不承载。使用橙色云记录，Hysteria2 客户端到达 Cloudflare 而不是您的服务器且不会连接；TCP 路径不受影响。QUIC 在某些地区也被节流。仅在您的用户需要它并可以通过 UDP 到达服务器时启用 `--hysteria2`。
+Hysteria2 通过 UDP 直接连接服务器 IP，域名仅用于其 TLS 证书，因此即使记录经由 Cloudflare 代理（Cloudflare 无法承载这类流量）也能正常工作。部分地区会限速 QUIC；仅在用户确实需要时启用 `--hysteria2`。
 
 ## 稍后添加域名
 
