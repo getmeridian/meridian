@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test Reality connections (direct + via relay) through the deployed exit node.
 
-Uses the default CONNECT_TEST_URL (ifconfig.me) since xray blocks private IPs
+Uses the default address-family-specific CONNECT_TEST_URL since xray blocks private IPs
 (geoip:private routing rule — x-ui regenerates this from its DB, can't patch).
 IP match is disabled because the Docker bridge IP won't match the public egress IP.
 

@@ -11,11 +11,13 @@ CACHE_DIR = MERIDIAN_HOME / "cache"
 SERVERS_FILE = MERIDIAN_HOME / "servers"
 SERVER_CREDS_DIR = Path("/etc/meridian")
 
-DEFAULT_SNI = "www.microsoft.com"
+DEFAULT_SNI = "www.cloudflare.com"
 DEFAULT_FINGERPRINT = "chrome"
 DEFAULT_PANEL_PORT = 2053
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"
-CONNECT_TEST_URL = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "https://ifconfig.me").strip() or "https://ifconfig.me"
+CONNECT_TEST_URL = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "").strip()
+CONNECT_TEST_URL_IPV4 = "https://api.ipify.org"
+CONNECT_TEST_URL_IPV6 = "https://api6.ipify.org"
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
     "true",

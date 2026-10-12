@@ -20,7 +20,7 @@ from meridian.urls import generate_qr_base64
 # Demo data using RFC 5737 IPs (safe for public display)
 DEMO_IP = "198.51.100.1"
 DEMO_UUID = "550e8400-e29b-41d4-a716-446655440000"
-DEMO_SNI = "www.microsoft.com"
+DEMO_SNI = "www.cloudflare.com"
 DEMO_XHTTP_PATH = "xhttp-demo-path"
 
 # Source directories to watch for changes

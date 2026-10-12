@@ -70,8 +70,8 @@ const tabs = [
           <input id="f-sni-on" type="checkbox" class="builder__checkbox" />
           <span data-t="builder.field.sni">Custom SNI</span>
         </label>
-        <input id="f-sni" type="text" placeholder="www.microsoft.com" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.sni.hint">Site that Reality impersonates. Default: www.microsoft.com. Use <code>meridian scan</code> for optimal targets.</span>
+        <input id="f-sni" type="text" placeholder="www.cloudflare.com" class="builder__input builder__input--toggle" />
+        <span class="builder__hint" data-t="builder.field.sni.hint">Site that Reality impersonates. Default: www.cloudflare.com. Use <code>meridian scan</code> for optimal targets.</span>
       </div>
 
       <div class="builder__field" id="row-name">
@@ -269,7 +269,7 @@ const tabs = [
     if (user && user !== 'root') args.push('--user ' + user);
     if (cfg.show.includes('exit') && exitServer) args.push('--exit ' + exitServer);
     if (cfg.show.includes('domain') && domOn && dom) args.push('--domain ' + dom);
-    if (cfg.show.includes('sni') && sniOn && sni && sni !== 'www.microsoft.com') args.push('--sni ' + sni);
+    if (cfg.show.includes('sni') && sniOn && sni && sni !== 'www.cloudflare.com') args.push('--sni ' + sni);
     if (cfg.show.includes('name') && clientName && clientName !== 'default') args.push('--client-name ' + clientName);
     if (cfg.show.includes('display-name') && displayNameVal) args.push('--display-name "' + displayNameVal + '"');
     if (cfg.show.includes('icon') && iconVal) args.push('--icon "' + iconVal + '"');

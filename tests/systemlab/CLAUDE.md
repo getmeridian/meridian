@@ -52,7 +52,7 @@ The system lab deploys Meridian across two separate containers via SSH — exact
 
 ## Pitfalls
 
-- **xray `geoip:private` blocks lab IPs** — can't use internal echo service; x-ui regenerates config on restart. Test uses ifconfig.me (external, flaky).
+- **xray `geoip:private` blocks lab IPs** — can't use internal echo service; x-ui regenerates config on restart. Test uses an external exit-IP endpoint.
 - **Pebble can't issue IP certs** — ACME protocol limitation. Infrastructure is ready; needs domain mode (phase 2).
 - **Relay remove fails** — credential sync bug: `_refresh_exit_credentials_or_fail` overwrites local relay data. Product bug, not test bug.
 - **systemd reports `degraded`** — some kernel features missing in containers. Accepted.

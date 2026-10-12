@@ -18,6 +18,8 @@ from pathlib import Path
 
 from meridian.config import (
     CONNECT_TEST_URL,
+    CONNECT_TEST_URL_IPV4,
+    CONNECT_TEST_URL_IPV6,
     DEFAULT_FINGERPRINT,
     DEFAULT_SNI,
     MERIDIAN_HOME,
@@ -26,6 +28,15 @@ from meridian.config import (
     XRAY_VERSION,
 )
 from meridian.credentials import ServerCredentials
+
+
+def _connect_test_url(server_ip: str) -> str:
+    """Return the exit-IP endpoint matching the expected server address family."""
+    if CONNECT_TEST_URL:
+        return CONNECT_TEST_URL
+    if ":" in server_ip:
+        return CONNECT_TEST_URL_IPV6
+    return CONNECT_TEST_URL_IPV4
 
 
 def _xray_bin_path() -> Path:
@@ -321,7 +332,7 @@ def test_connection(
                 "10",
                 "--max-time",
                 "15",
-                CONNECT_TEST_URL,
+                _connect_test_url(server_ip),
             ],
             capture_output=True,
             text=True,

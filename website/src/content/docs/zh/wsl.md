@@ -140,7 +140,7 @@ code .
 某些交互式终端提示在 WSL 下可能表现不同。如果 deploy 向导没有按预期接受输入，请显式提供值：
 
 ```bash
-meridian deploy 198.51.100.10 --sni www.microsoft.com
+meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
 也可以先运行 preflight 检查：

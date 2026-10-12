@@ -66,7 +66,7 @@ A relay node is a lightweight TCP forwarder running [Realm](https://github.com/z
 ## How Reality protocol works
 
 1. Server generates an **x25519 keypair**. Public key is shared with clients, private key stays on server.
-2. Client connects on port 443 with a TLS Client Hello containing the camouflage domain (e.g., `www.microsoft.com`) as SNI.
+2. Client connects on port 443 with a TLS Client Hello containing the camouflage domain (e.g., `www.cloudflare.com`) as SNI.
 3. To any observer, this looks like a normal HTTPS connection to microsoft.com.
 4. If a **prober** sends their own Client Hello, the server proxies the connection to the real microsoft.com — the prober sees a valid certificate.
 5. If the client includes valid authentication (derived from the x25519 key), the server establishes the VLESS tunnel.

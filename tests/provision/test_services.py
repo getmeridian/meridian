@@ -27,28 +27,28 @@ from tests.provision.conftest import MockConnection, make_credentials
 class TestRenderNginxStreamConfig:
     def test_contains_sni_routing(self):
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
-        assert "www.microsoft.com" in cfg
+        assert "www.cloudflare.com" in cfg
         assert "ssl_preread on" in cfg
         assert "proxy_pass $meridian_backend" in cfg
 
     def test_reality_sni_routes_to_xray(self):
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
-        assert "www.microsoft.com  xray_reality" in cfg
+        assert "www.cloudflare.com  xray_reality" in cfg
         assert "127.0.0.1:10443" in cfg
 
     def test_server_ip_routes_to_nginx(self):
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -57,7 +57,7 @@ class TestRenderNginxStreamConfig:
 
     def test_domain_routes_to_nginx(self):
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -69,7 +69,7 @@ class TestRenderNginxStreamConfig:
     def test_no_sni_routes_to_nginx(self):
         """Browsers connecting to bare IP send no SNI (RFC 6066)."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -79,19 +79,19 @@ class TestRenderNginxStreamConfig:
     def test_unknown_sni_routes_to_reality_dest(self):
         """Unknown SNI routes to reality dest — eliminates SNI differential."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
         )
         assert "default  reality_dest" in cfg
         assert "upstream reality_dest" in cfg
-        assert "www.microsoft.com:443" in cfg
+        assert "www.cloudflare.com:443" in cfg
 
     def test_no_domain_no_domain_rule(self):
         """Without domain, only server IP + no-SNI route to nginx. Default → reality_dest."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -589,7 +589,7 @@ class TestNginxFingerprinting:
     def test_stream_ipv4_listening(self):
         """Stream server listens on IPv4 (IPv6 omitted for host compatibility)."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -600,7 +600,7 @@ class TestNginxFingerprinting:
     def test_stream_proxy_connect_timeout(self):
         """Stream proxy should have a short connect timeout (good practice)."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -610,7 +610,7 @@ class TestNginxFingerprinting:
     def test_stream_proxy_timeout(self):
         """Stream proxy needs a long idle timeout for VPN sessions."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -620,7 +620,7 @@ class TestNginxFingerprinting:
     def test_stream_socket_keepalive(self):
         """TCP keepalives keep relay→exit connections alive through NATs."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",
@@ -722,7 +722,7 @@ class TestNginxFingerprinting:
     def test_unknown_sni_proxied_to_dest(self):
         """Unknown SNIs must be TCP-proxied to Reality dest, not served by nginx."""
         cfg = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="198.51.100.1",

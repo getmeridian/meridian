@@ -62,7 +62,7 @@ class TestRealityConfig:
             socks_port=10808,
             server_ip="198.51.100.1",
             uuid="test-uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="testpbk",
             short_id="abcd1234",
         )
@@ -85,14 +85,14 @@ class TestRealityConfig:
         assert stream["security"] == "reality"
         assert stream["realitySettings"]["publicKey"] == "testpbk"
         assert stream["realitySettings"]["shortId"] == "abcd1234"
-        assert stream["realitySettings"]["serverName"] == "www.microsoft.com"
+        assert stream["realitySettings"]["serverName"] == "www.cloudflare.com"
 
     def test_pq_encryption(self) -> None:
         config = build_reality_config(
             socks_port=10808,
             server_ip="198.51.100.1",
             uuid="test-uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="testpbk",
             short_id="abcd1234",
             encryption="mlkem768x25519plus.native.0rtt.testkey",
@@ -149,7 +149,7 @@ class TestBuildTestConfigs:
 
         creds = ServerCredentials(
             panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com"),
+            server=ServerConfig(ip="198.51.100.1", sni="www.cloudflare.com"),
             protocols={
                 "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
             },
@@ -171,7 +171,7 @@ class TestBuildTestConfigs:
 
         creds = ServerCredentials(
             panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com", domain="example.com"),
+            server=ServerConfig(ip="198.51.100.1", sni="www.cloudflare.com", domain="example.com"),
             protocols={
                 "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
                 "xhttp": XHTTPConfig(xhttp_path="xp"),
@@ -201,7 +201,7 @@ class TestBuildTestConfigs:
 
         creds = ServerCredentials(
             panel=PanelConfig(username="admin", password="pass", port=2053),
-            server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com", warp=True),
+            server=ServerConfig(ip="198.51.100.1", sni="www.cloudflare.com", warp=True),
             protocols={
                 "reality": RealityConfig(uuid="uuid-1", public_key="pbk", short_id="sid", private_key="priv"),
                 "xhttp": XHTTPConfig(xhttp_path="xp"),
