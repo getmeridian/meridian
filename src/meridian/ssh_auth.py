@@ -191,9 +191,18 @@ def _verify_host_key(ip: str, port: int = 22, *, ui: SSHUI | None = None) -> boo
 
     # Add only the verified key to known_hosts (user only saw this fingerprint)
     known_hosts = Path.home() / ".ssh" / "known_hosts"
-    known_hosts.parent.mkdir(mode=0o700, exist_ok=True)
-    with open(known_hosts, "a") as f:
-        f.write(preferred + "\n")
+    try:
+        known_hosts.parent.mkdir(mode=0o700, exist_ok=True)
+        with open(known_hosts, "a") as f:
+            f.write(preferred + "\n")
+    except OSError as exc:
+        from meridian.ssh import SSHError
+
+        raise SSHError(
+            f"Cannot save the host key for {ip} to {known_hosts}: {exc.strerror or exc}",
+            hint=f"Fix the file's permissions, or add the key yourself: ssh-keyscan {ip} >> ~/.ssh/known_hosts",
+            category="user",
+        ) from exc
 
     ui.ok("Host key saved")
     return True

@@ -280,6 +280,29 @@ class TestCheckSSH:
         # Should return without doing anything
         conn.check_ssh()  # no exception
 
+    def test_local_non_root_without_passwordless_sudo_fails_with_a_working_command(self) -> None:
+        conn = ServerConnection(ip="198.51.100.10", local_mode=True)
+        conn.needs_sudo = True
+        denied = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="sudo: a password is required")
+        with patch("meridian.ssh.subprocess.run", return_value=denied), pytest.raises(SSHError) as exc_info:
+            conn.check_ssh()
+
+        assert exc_info.value.category == "user"
+        assert 'sudo "$(command -v meridian)"' in exc_info.value.hint
+        assert "NOPASSWD" in exc_info.value.hint
+
+    @patch("meridian.ssh._host_key_known", return_value=True)
+    def test_remote_password_sudo_is_not_reported_as_an_ssh_key_problem(self, _mock_hk: Any) -> None:
+        conn = ServerConnection(ip="198.51.100.10", user="alice")
+        with patch.object(conn, "run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="sudo: a password is required"
+            )
+            with pytest.raises(SSHError, match="sudo asks for a password") as exc_info:
+                conn.check_ssh()
+
+        assert "alice ALL=(ALL) NOPASSWD:ALL" in exc_info.value.hint
+
     @patch("meridian.ssh._host_key_known", return_value=True)
     def test_ssh_success(self, _mock_hk: Any) -> None:
         conn = ServerConnection(ip="198.51.100.10")
@@ -394,6 +417,21 @@ class TestVerifyHostKey:
         # Only 1 key written (the preferred ed25519), not all 3
         assert len(lines) == 1
         assert "ssh-ed25519" in lines[0]
+
+    def test_unwritable_known_hosts_is_a_user_error_not_a_traceback(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / ".ssh" / "known_hosts").mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        scan = subprocess.CompletedProcess(args=[], returncode=0, stdout=self.SCAN_OUTPUT, stderr="")
+        ui = MagicMock()
+        ui.host_key_prompt.return_value = True
+
+        with patch("meridian.ssh.subprocess.run", return_value=scan), pytest.raises(SSHError) as excinfo:
+            _verify_host_key("198.51.100.10", ui=ui)
+
+        assert excinfo.value.category == "user"
+        assert "ssh-keyscan 198.51.100.10" in (excinfo.value.hint or "")
 
     def test_prefers_ed25519_over_rsa(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """ed25519 should be preferred over ecdsa and rsa."""

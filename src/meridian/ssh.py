@@ -145,6 +145,12 @@ def multiplex_opts(user: str, host: str, port: int) -> list[str]:
     return ["-o", "ControlMaster=auto", "-o", f"ControlPath={control_path}", "-o", "ControlPersist=300"]
 
 
+def _sudo_needs_password(stderr: str) -> bool:
+    """sudo -n reports both missing rights and password-only rights this way."""
+    lowered = stderr.casefold()
+    return "a password is required" in lowered or "a terminal is required" in lowered
+
+
 def _running_unprivileged() -> bool:
     """Local commands run as this process, whatever SSH user name was resolved."""
     geteuid = getattr(os, "geteuid", None)
@@ -397,6 +403,8 @@ class ServerConnection(_FileTransferMixin):
                 Defaults to logger-based output.
         """
         if self.local_mode:
+            if self.needs_sudo:
+                self._require_local_sudo()
             return
         if ui is None:
             ui = _DEFAULT_UI
@@ -433,9 +441,35 @@ class ServerConnection(_FileTransferMixin):
                     hint=f"Install it as root: ssh root@{self.ip} 'apt-get install -y sudo'",
                     category="system",
                 )
+            if self.user != "root" and _sudo_needs_password(stderr):
+                raise SSHError(
+                    f"{self.user} can log in to {self.ip}, but sudo asks for a password",
+                    hint=(
+                        "Meridian needs root or passwordless sudo. Use --user root, or allow it on the server: "
+                        f"echo '{self.user} ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/meridian"
+                    ),
+                    category="user",
+                )
             ui.ssh_failed(self.ip, self.user, stderr)
             raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", category="system")
         ui.ok("SSH connection successful")
+
+    def _require_local_sudo(self) -> None:
+        """Fail early, with a working command, when this non-root process cannot use sudo."""
+        result = subprocess.run(["sudo", "-n", "true"], capture_output=True, text=True, timeout=10, check=False)
+        if result.returncode == 0:
+            return
+        import getpass
+
+        user = getpass.getuser()
+        raise SSHError(
+            f"{user} cannot run commands as root without a password",
+            hint=(
+                'Run Meridian as root with your installed copy: sudo "$(command -v meridian)" <command>. '
+                f"Or allow passwordless sudo: echo '{user} ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/meridian"
+            ),
+            category="user",
+        )
 
     def detect_local_mode(self) -> bool:
         """Check if we're running on the target server itself.

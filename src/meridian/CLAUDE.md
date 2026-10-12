@@ -28,6 +28,7 @@
 - **Panel accessible via HTTPS** — Remnawave backend is reverse-proxied by nginx at a secret path on public 443; all REST goes from the deployer's machine directly, no SSH tunnel.
 - **Shared links never use the panel path** — build subscription URLs with `PanelConfig.subscription_url()` (connection-page path + `/sub/`); `SUB_PUBLIC_DOMAIN` matches it.
 - **Local mode**: detection is file-based only — `/etc/meridian/node.yml` or dir existence; sudo follows the process UID, never the resolved user name.
+- **Sudo must be passwordless and checked up front** — `sudo -n true` fails with "a password is required" both locally and remotely; report it as a user error with a working `sudo "$(command -v meridian)"` or NOPASSWD hint, never as an SSH key problem. An unwritable `known_hosts` is also a user error.
 - **SSH ControlPath must fit a Unix socket** — macOS allows 103 bytes and ssh adds a 17-character suffix; hash the target into the path and drop multiplexing when `MERIDIAN_HOME` is still too deep.
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
 - **Do not call `console.fail()` from library modules** (resolve, panel_bootstrap, node_deploy, reality_keys, provision/). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.
