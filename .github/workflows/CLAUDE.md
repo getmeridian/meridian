@@ -10,6 +10,8 @@
 
 **VERSION-driven releases** — read VERSION file, check if git tag exists. If missing: detect semver change, extract CHANGELOG section, push tag, create Release. Idempotent — safe to re-run.
 
+**Pre-releases from tags** — pushing `vX.Y.ZbN` (or `aN`/`rcN`) runs `release.yml` from the tagged commit: unit tests, a GitHub pre-release with `.github/BETA.md` plus the upcoming `X.Y.Z` CHANGELOG section, then the same PyPI gate. Stable releases still come only from main. Installers and `meridian update` on stable builds never pick a pre-release.
+
 **OIDC publishing** — Pages deploy uses trusted publisher (no token). PyPI requires `environment: pypi` approval gate + OIDC. No long-lived secrets.
 
 ## What's done well
@@ -24,4 +26,6 @@
 
 - **Release notes depend on CHANGELOG discipline** — if human forgets to update CHANGELOG before bumping VERSION, release notes fall back to git log (less useful).
 - **AI docs generated in 3 places** — CI website build, deploy-pages, publish-pypi all regenerate. Single source would reduce duplication.
+- **`workflow_run` uses main's copy of `release.yml`** — a branch whose packaging differs (e.g., a beta line) must release through its tag trigger, never by waiting for main's workflow.
+- **Stable release type ignores beta tags** — `git describe` excludes `a`/`b`/`rc` tags, or 4.0.0 after 4.0.0b2 would be titled a patch.
 - **System lab timeout 45min** — Remnawave image pulls inside nested Docker are slow. Timeout is generous to accommodate cold caches.

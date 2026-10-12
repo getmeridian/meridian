@@ -89,15 +89,16 @@ jobs:
       - name: Verify VERSION file format
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "VERSION file must be semver (X.Y.Z), got: $VERSION"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'; then
+            echo "VERSION file must be X.Y.Z or a pre-release like X.Y.ZbN, got: $VERSION"
             exit 1
           fi
           echo "OK: VERSION=$VERSION"
 
       - name: Verify CHANGELOG has current version
         run: |
-          VERSION=$(cat VERSION | tr -d '[:space:]')
+          # A pre-release (X.Y.ZbN) is described by its upcoming X.Y.Z section.
+          VERSION=$(cat VERSION | tr -d '[:space:]' | sed -E 's/(a|b|rc)[0-9]+$//')
           if ! grep -q "## \[$VERSION\]" CHANGELOG.md; then
             echo "CHANGELOG.md missing entry for version $VERSION"
             echo "Add a '## [$VERSION]' section to CHANGELOG.md before releasing"

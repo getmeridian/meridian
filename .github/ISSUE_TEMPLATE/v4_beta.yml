@@ -1,0 +1,82 @@
+name: Meridian 4 beta report / Отчёт о бете Meridian 4
+description: What worked and what didn't with a Meridian 4 beta / Что сработало и что нет в бете Meridian 4
+labels: ["v4-beta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing! English or Russian are both fine.
+        Спасибо за тестирование! Можно писать по-русски.
+
+        **Replace IPs, domains, and links before posting.** / **Замените IP-адреса, домены и ссылки перед публикацией.**
+
+  - type: input
+    id: version
+    attributes:
+      label: Meridian version / Версия Meridian
+      description: "`meridian4 --version`"
+      placeholder: "4.0.0b1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Result / Результат
+      options:
+        - Deploy failed / Развёртывание не удалось
+        - Deployed, clients can't connect / Развёрнуто, клиенты не подключаются
+        - Connects, but drops or is slow / Подключается, но обрывается или медленно
+        - Connects and works / Подключается и работает
+        - Something else / Другое
+    validations:
+      required: true
+
+  - type: input
+    id: network
+    attributes:
+      label: Where you tested from / Откуда тестировали
+      description: Country and network type, no precise location / Страна и тип сети, без точного местоположения
+      placeholder: "Russia, mobile (MTS) / Россия, мобильный (МТС)"
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: Client app and device / Приложение и устройство
+      placeholder: "Hiddify 2.5 on Android 15"
+
+  - type: input
+    id: server
+    attributes:
+      label: Server provider and country / Хостинг и страна сервера
+      placeholder: "Hetzner, Finland"
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you did and what happened / Что вы сделали и что произошло
+      description: Commands you ran, what you expected, what you saw / Какие команды запускали, чего ожидали, что увидели
+    validations:
+      required: true
+
+  - type: textarea
+    id: test
+    attributes:
+      label: Output of `meridian4 test IP` from inside the censored network / Вывод `meridian4 test IP` изнутри сети с блокировками
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Other output (`meridian4 probe`, `meridian4 doctor`, deploy errors) / Другой вывод
+      render: shell
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy / Приватность
+      options:
+        - label: I replaced IPs, domains, and links in everything above / Я заменил(а) IP-адреса, домены и ссылки выше
+          required: true
