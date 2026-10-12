@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Literal, Protocol, cast
 
+import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
@@ -210,7 +211,7 @@ class SetupWizard:
             host = self._ask("Server IP address", stage="servers")
             title = self._ask(
                 "Server name",
-                default=host,
+                default=f"server-{len(items) + 1}",
                 stage="servers",
             )
             user = self._ask(
@@ -218,14 +219,18 @@ class SetupWizard:
                 default="root",
                 stage="servers",
             )
-            port = int(
-                self._ask(
-                    "SSH port",
-                    default="22",
-                    stage="servers",
-                )
+            port_text = self._ask(
+                "SSH port",
+                default="22",
+                stage="servers",
             )
-            self.register_server(host, title, user, port)
+            if not port_text.isdigit():
+                raise ValueError("Enter the SSH port as a number, for example 22.")
+            try:
+                self.register_server(host, title, user, int(port_text))
+            except typer.Exit:
+                # The registration already explained the problem; let the user correct it.
+                self.io.write("[dim]Try again, or type quit.[/dim]")
 
     def _roles(self, draft: SetupDraft) -> None:
         items = [item for item in self.shelf.items(draft.roles) if item.server_ref in draft.server_refs]
