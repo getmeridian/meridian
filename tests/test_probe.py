@@ -287,7 +287,7 @@ def test_camouflage_origin_uses_bounded_resolution_before_tls() -> None:
     assert certificate.call_args_list[1].args == ("203.0.113.20", "www.example.com")
 
 
-def test_camouflage_certificate_variation_is_inconclusive_across_valid_edges() -> None:
+def test_camouflage_certificate_variation_across_valid_edges_still_passes() -> None:
     with (
         patch("meridian.diagnostics.external.resolve_hostname", return_value="203.0.113.20"),
         patch("meridian.diagnostics.external.get_certificate_der", side_effect=[b"server", b"origin"]),
@@ -296,7 +296,7 @@ def test_camouflage_certificate_variation_is_inconclusive_across_valid_edges() -
     ):
         result = check_sni_camouflage(_IP, "www.example.com", timeout=2)
 
-    assert result.status == "skipped"
+    assert result.status == "passed"
     assert result.findings[0].code == "CAMOUFLAGE_EDGE_VARIATION"
 
 

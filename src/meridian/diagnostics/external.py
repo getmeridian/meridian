@@ -764,13 +764,16 @@ def check_sni_camouflage(
             )
         ]
     else:
+        # Large origins (Google, CDNs) serve different certificates per edge; a
+        # trusted, hostname-valid certificate from the server is what an observer
+        # can check, so the difference alone is not evidence against camouflage.
         findings = [
             finding(
                 "CAMOUFLAGE_EDGE_VARIATION",
-                "skipped",
+                "passed",
                 (
-                    f"Both endpoints returned trusted certificates for {expected_sni}, "
-                    "but independently resolved edges used different certificate identities"
+                    f"The server returned a trusted certificate for {expected_sni}; "
+                    "it differs from the one this device sees directly, as is normal for multi-edge sites"
                 ),
             )
         ]
