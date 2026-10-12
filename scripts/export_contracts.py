@@ -9,7 +9,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from meridian import __version__
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import Event, MeridianError, OutputEnvelope, OutputStatus, Summary
 from meridian.core.output import EVENT_SCHEMA, OUTPUT_SCHEMA, json_dumps, jsonl_dumps
@@ -26,6 +25,8 @@ from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_serv
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "contracts" / "meridian" / "v1"
 FIXED_TIME = "2026-05-04T21:00:00Z"
+# Fixtures are examples: a fixed version keeps release bumps from rewriting them.
+FIXTURE_VERSION = "4.0.0"
 
 
 def _plain_json(value: Any) -> str:
@@ -48,7 +49,7 @@ def _envelope(
 ) -> OutputEnvelope:
     payload = OutputEnvelope(
         schema=OUTPUT_SCHEMA,
-        meridian_version=__version__,
+        meridian_version=FIXTURE_VERSION,
         command=command,
         operation_id=operation_id,
         started_at=FIXED_TIME,
