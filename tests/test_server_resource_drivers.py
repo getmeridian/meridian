@@ -11,6 +11,8 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
     COMPILER_VERSION,
     CertificatePayload,
+    DeploymentContract,
+    DeploymentTarget,
     FirewallRulePayload,
     NginxArtifactPayload,
     NginxRouteSpec,
@@ -18,7 +20,6 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
-    canonical_hash,
     compute_plan_hash,
     make_resource,
 )
@@ -38,6 +39,7 @@ from meridian.reconciler.server_drivers import (
     ServerBaselineDriver,
     ServerDriverContext,
 )
+from meridian.reconciler.server_evidence import baseline_attestation
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
 
@@ -83,12 +85,24 @@ def _single_action(logical_id: str, payload):
 
 
 def _baseline_attestation(plan: ResourcePlan, action) -> str:
-    return canonical_hash(
-        {
-            "resource": action.expected_hash,
-            "deployment_contract": plan.deployment_contract.model_dump(mode="json"),
-        }
-    )
+    return baseline_attestation(action, plan, "srv-exit")
+
+
+def test_baseline_attestation_ignores_other_servers_joining_or_leaving() -> None:
+    plan, action = _action()
+    own = DeploymentTarget(host="198.51.100.10", user="root", port=22)
+
+    def attest(**targets: DeploymentTarget) -> str:
+        contract = DeploymentContract(
+            server_targets=targets,
+            runtime_pins={"remnawave_node_image": "remnawave/node:3.4.2"},
+            renderer_contract="test-v1",
+        )
+        return baseline_attestation(action, plan.model_copy(update={"deployment_contract": contract}), "srv-exit")
+
+    relay = DeploymentTarget(host="198.51.100.20", user="root", port=22)
+    assert attest(**{"srv-exit": own}) == attest(**{"srv-exit": own, "srv-relay": relay})
+    assert attest(**{"srv-exit": own}) != attest(**{"srv-exit": own.model_copy(update={"port": 2222})})
 
 
 def test_server_baseline_observes_every_durable_check_and_attestation() -> None:

@@ -16,7 +16,6 @@ from meridian.compiler.models import (
     RealmHopPayload,
     ResourcePlan,
     ServerBaselinePayload,
-    canonical_hash,
 )
 from meridian.config import REALM_VERSION, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
@@ -39,6 +38,7 @@ from meridian.reconciler.resources import (
 )
 from meridian.reconciler.server_evidence import (
     assertion_matches,
+    baseline_attestation,
     baseline_check_command,
     build_observation,
     docker_container_running,
@@ -148,7 +148,7 @@ class ServerBaselineDriver:
         }
         marker = conn.get_text(baseline_marker_path(action.resource.logical_id), timeout=15)
         marker_content = file_content_or_absent(action.resource.logical_id, marker, "baseline attestation")
-        attestation = _resource_contract_attestation(action, self.context.plan)
+        attestation = baseline_attestation(action, self.context.plan, payload.server_ref)
         marker_ok = marker_content == f"{attestation}\n"
         matches = marker_ok and all(outcomes.values())
         return build_observation(
@@ -190,7 +190,7 @@ class ServerBaselineDriver:
         attestation = ensure_file_content(
             conn,
             baseline_marker_path(action.resource.logical_id),
-            f"{_resource_contract_attestation(action, self.context.plan)}\n",
+            f"{baseline_attestation(action, self.context.plan, payload.server_ref)}\n",
             mode="600",
             create_parent=True,
         )
@@ -770,15 +770,6 @@ def _baseline_context(
         user=conn.user,
         harden=payload.harden,
         is_panel_host=False,
-    )
-
-
-def _resource_contract_attestation(action: ResourceAction, plan: ResourcePlan) -> str:
-    return canonical_hash(
-        {
-            "resource": action.expected_hash,
-            "deployment_contract": plan.deployment_contract.model_dump(mode="json"),
-        }
     )
 
 

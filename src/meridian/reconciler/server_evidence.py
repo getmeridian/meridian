@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import NoReturn, Protocol
 
-from meridian.compiler.models import canonical_hash
+from meridian.compiler.models import ResourcePlan, canonical_hash
 from meridian.diagnostics import command_evidence_unavailable
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -250,4 +250,18 @@ def _raise_unavailable(logical_id: str, description: str, reason: str) -> NoRetu
         f"Could not observe {logical_id}: {description} evidence is unavailable ({reason}).",
         hint="Restore SSH access and the required server inspection tools, then retry.",
         retryable=True,
+    )
+
+
+def baseline_attestation(action: ResourceAction, plan: ResourcePlan, server_ref: str) -> str:
+    """Hash only what the baseline consumes, so other servers joining or leaving never re-run it."""
+    contract = plan.deployment_contract
+    target = contract.server_targets.get(server_ref)
+    return canonical_hash(
+        {
+            "resource": action.expected_hash,
+            "server_target": target.model_dump(mode="json") if target is not None else None,
+            "runtime_pins": contract.runtime_pins,
+            "renderer_contract": contract.renderer_contract,
+        }
     )

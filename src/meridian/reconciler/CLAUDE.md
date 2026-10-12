@@ -27,6 +27,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
 - **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
 - **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
+- **Attest server artifacts against their own inputs** — hashing the whole deployment contract makes every fleet edit re-run work on every server; include only the server's own target plus pins and renderer contract.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
 - **Remnawave deletes Nodes asynchronously** — DELETE only queues the job; `NodeRetirement` polls until the Node is gone so its Profile is not deleted under it.
 - **Node runtime retirement shares a directory** — every exit uses `/opt/remnanode`; when the plan still runs a node on that server, only forget the old binding.
