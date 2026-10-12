@@ -10,6 +10,11 @@ from pathlib import Path
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
+from meridian.core.cancellation import (
+    CancellationToken,
+    OperationCancellation,
+    OperationCancelledError,
+)
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -58,8 +63,15 @@ def execute_resource_plan(
     clock: Clock | None = None,
     max_unknown_attempts: int = 2,
     after_apply: AfterApply | None = None,
+    cancellation: CancellationToken | None = None,
 ) -> ResourceExecutionResult:
-    """Apply a reviewed plan with durable checkpoints and mandatory observation."""
+    """Apply a reviewed plan with durable checkpoints and mandatory observation.
+
+    *cancellation* is honored only between actions (and between provisioning
+    steps inside an action). A started mutation always records its outcome
+    first, so a cancelled apply leaves the generation pending with no
+    ``running`` checkpoint, and re-running the same plan resumes it.
+    """
     if max_unknown_attempts < 1:
         raise ValueError("max_unknown_attempts must be at least 1")
     validate_resource_plan_transition(plan, cluster)
@@ -71,6 +83,8 @@ def execute_resource_plan(
     succeeded: set[str] = set()
 
     for action in actions:
+        if cancellation is not None and cancellation.is_cancelled():
+            raise _apply_cancelled(results, len(actions), f"Stopped before {action.resource.logical_id}.")
         blocked = [dependency for dependency in action.resource.dependencies if dependency not in succeeded]
         if blocked:
             result = _record_blocked(action, blocked, cluster, save, now)
@@ -85,15 +99,24 @@ def execute_resource_plan(
                     f"no resource driver registered for {action.resource.payload.kind}",
                 )
             else:
-                result = _execute_action(
-                    action,
-                    driver,
-                    cluster,
-                    save,
-                    now,
-                    max_unknown_attempts=max_unknown_attempts,
-                    after_apply=after_apply,
-                )
+                try:
+                    result = _execute_action(
+                        action,
+                        driver,
+                        cluster,
+                        save,
+                        now,
+                        max_unknown_attempts=max_unknown_attempts,
+                        after_apply=after_apply,
+                        cancellation=cancellation,
+                    )
+                except OperationCancelledError as exc:
+                    raise _apply_cancelled(
+                        results,
+                        len(actions),
+                        f"Stopped inside {action.resource.logical_id}: {exc}",
+                        interrupted=True,
+                    ) from exc
         results.append(result)
         if result.succeeded:
             succeeded.add(action.resource.logical_id)
@@ -103,6 +126,8 @@ def execute_resource_plan(
         generation=generation,
         results=results,
     )
+    if execution.all_succeeded and cancellation is not None and cancellation.is_cancelled():
+        raise _apply_cancelled(results, len(actions), "Stopped before retiring removed resources.")
     if execution.all_succeeded:
         # Retire only after everything still desired has converged, so a
         # removal never strands traffic that the new plan has not yet carried.
@@ -224,6 +249,7 @@ def _execute_action(
     *,
     max_unknown_attempts: int,
     after_apply: AfterApply | None,
+    cancellation: CancellationToken | None = None,
 ) -> ResourceActionResult:
     checkpoint = _checkpoint(action, cluster)
     binding = _binding(action, cluster)
@@ -250,6 +276,11 @@ def _execute_action(
         receipt = ResourceApplyReceipt()
         try:
             receipt = driver.apply(action, binding)
+        except OperationCancelledError as exc:
+            # Raised only at a provisioning step boundary: completed steps are
+            # idempotent and the next run observes before re-applying.
+            _record_cancelled(action, cluster, persist, clock, str(exc))
+            raise
         except UnknownResourceOutcome as exc:
             checkpoint.status = "unknown"
             checkpoint.last_error = str(exc)
@@ -261,6 +292,12 @@ def _execute_action(
             if observation_converges(action, observed):
                 _record_success(action, observed, binding, cluster, persist, clock, receipt=receipt)
                 return ResourceActionResult(action=action, status="applied", changed=True)
+            if run_attempts < max_unknown_attempts and cancellation is not None and cancellation.is_cancelled():
+                message = "unknown mutation was observed as not converged; cancelled before retrying"
+                _record_cancelled(action, cluster, persist, clock, message)
+                raise OperationCancelledError(
+                    OperationCancellation(phase="apply", message=message, remote_changed=True)
+                )
             if run_attempts < max_unknown_attempts:
                 continue
             return _record_failure(
@@ -414,6 +451,37 @@ def _record_failure(
     checkpoint.updated_at = _timestamp(clock)
     persist(cluster)
     return ResourceActionResult(action=action, status="failed", error=error)
+
+
+def _record_cancelled(
+    action: ResourceAction,
+    cluster: ClusterConfig,
+    persist: PersistCluster,
+    clock: Clock,
+    error: str,
+) -> None:
+    checkpoint = _checkpoint(action, cluster)
+    checkpoint.status = "cancelled"
+    checkpoint.last_error = error
+    checkpoint.updated_at = _timestamp(clock)
+    persist(cluster)
+
+
+def _apply_cancelled(
+    results: list[ResourceActionResult],
+    total: int,
+    detail: str,
+    *,
+    interrupted: bool = False,
+) -> OperationCancelledError:
+    """Describe where apply stopped; every checkpoint is already persisted."""
+    return OperationCancelledError(
+        OperationCancellation(
+            phase="apply",
+            message=f"Apply stopped after {len(results)} of {total} resource actions. {detail}",
+            remote_changed=interrupted or any(result.changed for result in results),
+        )
+    )
 
 
 def _record_blocked(

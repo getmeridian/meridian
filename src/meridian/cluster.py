@@ -179,7 +179,7 @@ class ResourceAllocation:
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
-ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped"]
+ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped", "cancelled"]
 
 
 @dataclass

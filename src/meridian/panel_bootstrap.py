@@ -19,6 +19,7 @@ from meridian.cluster import (
 from meridian.config import (
     DEFAULT_SNI,
 )
+from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import PanelSetupError, ProvisioningError
 from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
@@ -75,6 +76,7 @@ def run_provisioner(
     operation: OperationContext | None = None,
     remote_executor: RemoteExecutor | None = None,
     renderer: StepRenderer | None = None,
+    cancellation: CancellationToken | None = None,
 ) -> None:
     """Run the SSH-based provisioner pipeline (OS, Docker, containers)."""
     from meridian.provision import ProvisionContext, Provisioner, build_node_steps, build_setup_steps
@@ -144,7 +146,14 @@ def run_provisioner(
     remote_executor = remote_executor or SSHRemoteExecutor(resolved.conn)
     conn = RemoteExecutorConnection(remote_executor)
 
-    results = provisioner.run(conn, ctx, reporter=reporter, operation=operation, renderer=renderer)
+    results = provisioner.run(
+        conn,
+        ctx,
+        reporter=reporter,
+        operation=operation,
+        renderer=renderer,
+        cancellation=cancellation,
+    )
 
     # Check for failures
     failed = [r for r in results if r.status == "failed"]

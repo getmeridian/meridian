@@ -5,6 +5,7 @@ from __future__ import annotations
 import secrets
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -38,6 +39,7 @@ from meridian.config import (
     REMNAWAVE_VALKEY_IMAGE,
     XRAY_VERSION,
 )
+from meridian.core.cancellation import CancellationToken
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
@@ -165,13 +167,15 @@ class SetupRuntime:
         panel_factory: PanelFactory = MeridianPanel,
         connection_builder: ConnectionBuilder | None = None,
         control_bootstrap: ControlBootstrap | None = None,
+        cancellation: CancellationToken | None = None,
     ) -> None:
         self._registry = registry
         self._cluster_loader = cluster_loader
         self._persist = persist or (lambda cluster: cluster.save())
         self._panel_factory = panel_factory
         self._connection_builder = connection_builder or _connection_for_entry
-        self._control_bootstrap = control_bootstrap or _bootstrap_control_plane
+        self._cancellation = cancellation
+        self._control_bootstrap = control_bootstrap or partial(_bootstrap_control_plane, cancellation=cancellation)
 
     def review(self, draft: SetupDraft) -> SetupReview:
         intent = _draft_intent(draft)
@@ -331,6 +335,7 @@ class SetupRuntime:
                 drivers,
                 persist=self._persist,
                 after_apply=environment_after_apply_barrier,
+                cancellation=self._cancellation,
             )
         finally:
             panel.close()
@@ -368,6 +373,7 @@ class SetupRuntime:
             connection_for=connections.__getitem__,
             server_addresses=addresses,
             node_secrets=shared_node_secrets,
+            cancellation=self._cancellation,
         )
         drivers: ResourceDrivers = {}
         drivers.update(build_remnawave_drivers(remnawave))
@@ -593,6 +599,8 @@ def _bootstrap_control_plane(
     cluster: ClusterConfig,
     entry: ServerEntry,
     connection: ServerConnection,
+    *,
+    cancellation: CancellationToken | None = None,
 ) -> None:
     if cluster.panel.server_ip and cluster.panel.server_ip != entry.host and cluster.panel.api_token:
         raise LocalStateError(
@@ -628,6 +636,7 @@ def _bootstrap_control_plane(
         reality_port=ports["reality"],
         wss_port=ports["wss"],
         info_page_path=info_page_path,
+        cancellation=cancellation,
     )
     ensure_control_plane_access(
         resolved=resolved,

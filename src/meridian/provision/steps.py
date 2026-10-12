@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing import Protocol as TypingProtocol
 
 from meridian.config import DEFAULT_SNI
+from meridian.core.cancellation import CancellationToken, raise_if_cancelled
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.provision.progress import NoopStepRenderer, StepRenderer
 
@@ -113,11 +114,16 @@ class Provisioner:
         reporter: Reporter = NoopReporter(),
         operation: OperationContext | None = None,
         renderer: StepRenderer | None = None,
+        cancellation: CancellationToken | None = None,
     ) -> list[StepResult]:
         """Execute all steps, collecting results.
 
         Rendering is delegated to *renderer*. Pass ``RichStepRenderer()``
         for interactive CLI output or omit for silent headless execution.
+
+        *cancellation* is polled only between steps, so a running step (and
+        its SSH commands) always finishes; a requested cancel then raises
+        ``OperationCancelledError`` before the next step starts.
 
         Accepts any context type (ProvisionContext, RelayContext, etc.)
         as long as steps can consume it.  If ``ctx`` has a ``results``
@@ -128,6 +134,12 @@ class Provisioner:
 
         total = len(self.steps)
         for i, step in enumerate(self.steps):
+            raise_if_cancelled(
+                cancellation,
+                phase="provision",
+                message=f"Stopped before provisioning step {step.name!r} ({i + 1} of {total}).",
+                remote_changed=i > 0,
+            )
             start = time.monotonic()
             _report_step_event(
                 reporter,

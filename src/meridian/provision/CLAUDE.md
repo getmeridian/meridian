@@ -20,6 +20,8 @@
 
 **Renderer abstraction** — `StepRenderer.step_starting()` returns `AbstractContextManager[None]`. Rich stays in `progress.py`; `steps.py` has zero Rich imports. CLI passes `RichStepRenderer`; Engine/tests use `NoopStepRenderer`.
 
+**Cooperative cancellation** — `Provisioner.run(cancellation=...)` polls the token only before each step; a running step and its SSH commands always finish, so a cancel looks exactly like a pipeline that stopped after its last completed step.
+
 **Executor bridge** — deploy provisioning enters through `RemoteExecutorConnection`; steps can keep `conn.run()` while transports move behind core executor contracts.
 
 **Relay steps are separate** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver, which owns config, firewall, and service state. Panel-agnostic.

@@ -11,6 +11,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
+from meridian.core.cancellation import CancellationFlag, OperationCancelledError
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
@@ -415,3 +416,43 @@ def test_apply_intent_rejects_a_plan_changed_after_review(tmp_path) -> None:
 
     with pytest.raises(LocalStateError, match="changed after it was reviewed"):
         runtime.apply_intent(intent, expected_plan_hash=reviewed_hash)
+
+
+def test_cancelled_apply_stops_before_remote_work_and_threads_the_token(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    cluster = ClusterConfig()
+    flag = CancellationFlag()
+    flag.cancel()
+    bootstrap = MagicMock()
+    server_contexts: list[object] = []
+    runtime = SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+        persist=lambda _state: None,
+        connection_builder=lambda _entry: MagicMock(spec=ServerConnection),
+        control_bootstrap=bootstrap,
+        cancellation=flag,
+    )
+    monkeypatch.setattr("meridian.setup.runtime.build_remnawave_drivers", lambda context: _drivers(context.plan))
+
+    def server_drivers(context) -> ResourceDrivers:
+        server_contexts.append(context.cancellation)
+        return _drivers(context.plan)
+
+    monkeypatch.setattr("meridian.setup.runtime.build_server_drivers", server_drivers)
+    draft = SetupDraft.from_intent(_intent())
+    draft = draft.model_copy(update={"review_hash": runtime.review(draft).plan.plan_hash})
+
+    with pytest.raises(OperationCancelledError) as exc_info:
+        runtime.apply(draft)
+
+    assert exc_info.value.cancellation.remote_changed is False
+    assert server_contexts == [flag]
+    bootstrap.assert_not_called()
+    assert cluster.topology_intent == _intent()
+    assert cluster.pending_plan_hash == draft.review_hash
+    assert cluster.active_plan_hash == ""

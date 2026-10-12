@@ -7,6 +7,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Compiled-resource apply is checkpointed** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
 - **Remnawave drivers are ownership-safe** — UUID bindings win; deterministic wire-safe names recover unknown creates, mismatched collisions fail, and global settings updates preserve unmanaged Response Rules.
 - **Server artifacts are per-resource and rollback-safe** — Realm services and nginx files use hashed logical IDs; failed reloads restore previous files before the action fails.
+- **Cancellation is cooperative** — the executor polls its token only between actions, before an unknown-outcome retry, and before retirement; the generation stays pending so re-running the same plan resumes from checkpoints.
 - **Server preparation is graph-owned** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; compiled rules alone open public ports.
 
 ## What's done well
@@ -24,4 +25,5 @@ Checkpointed reconciliation of compiled topology resources.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
 - **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
+- **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
