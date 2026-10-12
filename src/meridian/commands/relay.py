@@ -330,7 +330,6 @@ def select_relay_chains(
 def run_remove(
     relay_ip: str,
     exit_arg: str = "",
-    user: str = "",
     yes: bool = False,
 ) -> None:
     """Drop every relay chain through a relay server (or one chain by ID), then apply the reviewed removal."""
@@ -339,7 +338,6 @@ def run_remove(
         "Invalid relay remove request",
         relay_ip=relay_ip,
         exit_arg=exit_arg,
-        user=user,
         yes=yes,
     )
     from meridian.commands.topology_removal import apply_topology_removal

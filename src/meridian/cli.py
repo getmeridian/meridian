@@ -724,7 +724,6 @@ def relay_list_cmd(
 def relay_remove_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
-    user: str = typer.Option("", "--user", "-u", help="SSH user"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
     """Remove relay chains through a relay server.
@@ -740,7 +739,7 @@ def relay_remove_cmd(
     """
     from meridian.commands.relay import run_remove
 
-    run_remove(relay_ip, exit, user, yes)
+    run_remove(relay_ip, exit, yes)
 
 
 @relay_app.command("check")
