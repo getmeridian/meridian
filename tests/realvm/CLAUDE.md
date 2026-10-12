@@ -27,6 +27,9 @@ Costs real money (~€0.01 per full single-topology run).
 - **JSON command output is enveloped** — read command fields below `data`; there are no legacy top-level payloads in v4.
 - **Never return success for an unsupported topology** — add its verifier and manifest contract before allowing provisioning.
 - **Let's Encrypt IP-cert rate limit** — repeated bare-IP runs can trigger self-signed fallback and fail the issuer assertion; recreate the VM for a fresh IP.
+- **Never use www.microsoft.com as a Reality target** — its certificate record exceeds REALITY's 8192-byte limit (XTLS/Xray-core#6356), so deploy converges but no traffic passes; keep the default SNI.
+- **Check the managed certificate without SNI** — `openssl -servername <IP>` routes to the camouflage fallback; use `-noservername`.
+- **One Hetzner project rejects a duplicate SSH public key** — concurrent runs need distinct keys; set `REALVM_KNOWN_HOSTS` to keep throwaway host keys out of `~/.ssh/known_hosts`.
 
 ## Links
 

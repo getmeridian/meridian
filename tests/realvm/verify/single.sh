@@ -18,7 +18,8 @@ echo "════════════════════════�
 
 # ── 1. SSH reachability + host key scan ─────────────────
 echo ">>> SSH reachability + host key scan..."
-if ssh-keyscan -T 15 "$TARGET_IP" >> ~/.ssh/known_hosts 2>/dev/null; then
+# REALVM_KNOWN_HOSTS keeps throwaway VM host keys out of your own known_hosts.
+if ssh-keyscan -T 15 "$TARGET_IP" >> "${REALVM_KNOWN_HOSTS:-$HOME/.ssh/known_hosts}" 2>/dev/null; then
   pass "SSH reachable, host key captured"
 else
   fail_test "Cannot reach SSH on $TARGET_IP"
@@ -29,7 +30,7 @@ fi
 echo ">>> Running: meridian deploy $TARGET_IP --user root --yes --no-harden ..."
 # --no-harden keeps deploy time under ~3 min on real VM for fast iteration.
 # Subsequent `meridian deploy --yes` redeploy WILL harden (tested below).
-if uv run meridian deploy "$TARGET_IP" --user root --yes --no-harden --sni www.microsoft.com; then
+if uv run meridian deploy "$TARGET_IP" --user root --yes --no-harden; then
   pass "initial deploy succeeded"
 else
   fail_test "meridian deploy failed — check output above"
@@ -40,7 +41,7 @@ fi
 # ── 3. Let's Encrypt certificate issuer (real, not Pebble) ─────────────────
 echo ">>> Checking Let's Encrypt certificate issuer..."
 CERT_INFO=$(ssh -o StrictHostKeyChecking=no root@"$TARGET_IP" \
-  "openssl s_client -connect 127.0.0.1:443 -servername $TARGET_IP </dev/null 2>/dev/null | openssl x509 -noout -issuer -dates" 2>/dev/null || true)
+  "openssl s_client -connect 127.0.0.1:443 -noservername </dev/null 2>/dev/null | openssl x509 -noout -issuer -dates" 2>/dev/null || true)
 if echo "$CERT_INFO" | grep -qiE "Let's Encrypt|R10|R11|ISRG Root"; then
   pass "certificate issuer is Let's Encrypt"
 elif echo "$CERT_INFO" | grep -qiE "self.?signed|localhost|CN ?= ?$TARGET_IP"; then
@@ -68,7 +69,7 @@ fi
 
 # ── 5. SSH hardening check ─────────────────
 echo ">>> Redeploying WITH hardening to trigger SSH pubkey-only ..."
-if uv run meridian deploy "$TARGET_IP" --user root --yes --sni www.microsoft.com; then
+if uv run meridian deploy "$TARGET_IP" --user root --yes; then
   pass "hardened redeploy succeeded"
 else
   fail_test "hardened redeploy failed"
@@ -181,7 +182,7 @@ SUB_URL=$(echo "$SHOW_JSON" | python3 -c "
 import sys, json
 payload = json.loads(sys.stdin.read() or '{}')
 data = payload.get('data', {}) if isinstance(payload, dict) else {}
-url = data.get('subscription_url') or data.get('sub_url') or ''
+url = (data.get('handoff') or {}).get('subscription_url', '')
 print(url)
 " 2>/dev/null || true)
 # Fallback: grep the text output with charset that includes URL-safe punctuation.
