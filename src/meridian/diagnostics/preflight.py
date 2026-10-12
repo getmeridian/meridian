@@ -8,6 +8,7 @@ import shlex
 import time
 from collections.abc import Callable
 
+from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.errors import MeridianError
 from meridian.core.execution import ServerConnection
 from meridian.core.verification import VerificationCheck, VerificationFinding
@@ -22,6 +23,22 @@ _FIREWALL_HINT = "Allow inbound TCP 443 in your cloud provider's firewall / secu
 # Listeners Meridian itself runs on 443; a v4 stream artifact proves the server is ours.
 _MERIDIAN_LISTENERS = frozenset({"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"})
 _V4_STREAM_MARKER = 'test -n "$(ls /etc/nginx/stream.d/meridian-v4-*.conf 2>/dev/null)" && echo managed'
+
+
+def reachable_reality_targets(
+    conn: ServerConnection, candidates: tuple[str, ...] = REALITY_SNI_CANDIDATES
+) -> list[str]:
+    """Camouflage targets the server itself reaches over TLS 1.3 + HTTP/2, which Reality requires."""
+    reachable = []
+    for candidate in candidates:
+        probe = conn.run(
+            f"curl -s -o /dev/null --max-time 8 --tlsv1.3 --http2 -w '%{{http_version}}' "
+            f"https://{shlex.quote(candidate)}/",
+            timeout=15,
+        )
+        if probe.returncode == 0 and probe.stdout.strip() == "2":
+            reachable.append(candidate)
+    return reachable
 
 
 def collect_preflight(

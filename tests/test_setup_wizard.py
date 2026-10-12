@@ -448,3 +448,27 @@ def test_setup_without_a_terminal_refuses_instead_of_taking_defaults(tmp_home, m
     with pytest.raises(typer.Exit) as exc_info:
         setup_v4.run()
     assert exc_info.value.exit_code == 2
+
+
+def test_camouflage_default_is_what_the_exit_can_reach_and_warns_when_nothing_is(tmp_path) -> None:
+    for suggestion, expected in (("dl.google.com", "dl.google.com"), ("", "www.google.com")):
+        store, shelf, service = _services(tmp_path / (suggestion or "none"))
+        probed: list[str] = []
+        io = _ScriptedIO([*_TWO_SERVER_JOURNEY[:11], ("Names of the people", "save")])
+        wizard = SetupWizard(
+            service=service,
+            shelf=shelf,
+            runtime=cast(SetupRuntime, _Runtime()),
+            register_server=lambda *_args: None,
+            io=io,
+            suggest_sni=lambda ref, value=suggestion: (probed.append(ref), value)[1],
+        )
+
+        assert wizard.run() == "saved"
+
+        draft = store.load()
+        assert draft is not None and draft.paths is not None
+        assert draft.paths.exits[0].paths[0].reality_sni == expected
+        assert probed == ["srv-exit"]
+        warned = any("could not reach the usual camouflage sites" in line for line in io.output)
+        assert warned is (not suggestion)

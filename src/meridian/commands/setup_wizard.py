@@ -50,6 +50,8 @@ from .wizard_prompts import Choice, Navigation, Prompter, RichWizardIO, WizardIO
 
 WizardOutcome = Literal["completed", "saved"]
 RegisterServer = Callable[[str, str, str, int], None]
+# Returns the camouflage target a saved server can actually use, or "" when unknown.
+SuggestSni = Callable[[str], str]
 Role = Literal["exit", "relay", "gateway", "control"]
 
 _EXTRA_PATHS = ("xhttp", "wss", "hysteria2")
@@ -70,6 +72,7 @@ class SetupWizard:
         auto_approve: bool = False,
         ask_language: bool = False,
         on_language: Callable[[str], None] | None = None,
+        suggest_sni: SuggestSni | None = None,
     ) -> None:
         self.service = service
         self.shelf = shelf
@@ -80,6 +83,7 @@ class SetupWizard:
         self.auto_approve = auto_approve
         self.ask_language = ask_language
         self.on_language = on_language
+        self.suggest_sni = suggest_sni
         self._verification: SetupVerification | None = None
         self._reviewed_now = False
 
@@ -267,7 +271,13 @@ class SetupWizard:
         for exit_ in draft.roles.exits:
             title, host = hosts.get(exit_.server_ref, (exit_.id, ""))
             self.prompt.say(t("paths.exit_header", server=title, address=host), style="bold")
-            reality_sni = self.prompt.ask(t("paths.sni"), default=DEFAULT_SNI)
+            suggested = ""
+            if self.suggest_sni is not None:
+                self.prompt.say(t("paths.sni_probe", server=title), style="dim")
+                suggested = self.suggest_sni(exit_.server_ref)
+                if not suggested:
+                    self.prompt.say(t("paths.sni_unreachable", server=title), style="warn")
+            reality_sni = self.prompt.ask(t("paths.sni"), default=suggested or DEFAULT_SNI)
             paths = [ProtocolPathIntent(id=f"{exit_.id}-reality", protocol="reality", reality_sni=reality_sni)]
             extras = _extra_paths(self.prompt.ask(t("paths.extras"), default=primary_word("word.none")))
             domain = self.prompt.ask(t("paths.domain", address=host)) if extras else ""

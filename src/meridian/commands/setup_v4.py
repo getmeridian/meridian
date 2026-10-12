@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from functools import partial
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -15,7 +16,7 @@ from meridian.config import (
     SETUP_DRAFT_FILE,
 )
 from meridian.console import error_context, fail, has_tty
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.servers import ServerRegistry
@@ -71,6 +72,7 @@ def run(
                 auto_approve=yes,
                 ask_language=language is None and not yes and (draft is None or not draft.completed_stages),
                 on_language=_remember_language,
+                suggest_sni=partial(_suggest_sni, registry),
             )
             wizard.run()
 
@@ -92,6 +94,21 @@ def _load_intent(source: str) -> SetupIntent:
             f"Invalid setup intent at {location or 'document'}: {first['msg']}",
             hint_type="user",
         )
+
+
+def _suggest_sni(registry: ServerRegistry, server_ref: str) -> str:
+    """First camouflage candidate the exit server reaches over TLS 1.3 + HTTP/2 ('' if none or unknown)."""
+    from meridian.diagnostics.preflight import reachable_reality_targets
+    from meridian.resolve import connection_for_entry
+
+    entry = registry.find(server_ref)
+    if entry is None:
+        return ""
+    try:
+        targets = reachable_reality_targets(connection_for_entry(entry))
+    except (MeridianError, OSError):
+        return ""
+    return targets[0] if targets else ""
 
 
 def _remember_language(code: str) -> None:

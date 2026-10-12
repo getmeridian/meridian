@@ -57,6 +57,8 @@
   "paths.extras_explain": "Reality 始终启用。你可以添加备用方法；如果 Reality 被阻止，应用会切换到这些：\n  xhttp — 看起来像你域名上的普通 HTTPS\n  wss — 通过 Cloudflare CDN 的 WebSocket，隐藏服务器地址\n  hysteria2 — 在差网络上很快，但使用 UDP，移动网络经常阻止\n所有三种都需要指向出口的域名。",
   "paths.exit_header": "{server} ({address})",
   "paths.sni": "伪装网站 (SNI)",
+  "paths.sni_probe": "正在检查 {server} 能访问哪些伪装网站...",
+  "paths.sni_unreachable": "{server} 无法通过 TLS 1.3 访问常用的伪装网站。请检查服务器的出站 HTTPS，或输入一个确定可用的网站。",
   "paths.extras": "备用方法 (xhttp、wss、hysteria2，用逗号分隔)，或无",
   "paths.domain": "DNS 指向 {address} 的域名",
   "paths.wss_warning": "注意：从俄罗斯出发，经过 Cloudflare 的连接常在约 20 KB 后卡住。请把 WSS 当作最后的备选，而不是主要方式。",

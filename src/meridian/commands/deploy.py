@@ -335,15 +335,9 @@ TrafficOutcome = Literal["ok", "egress_mismatch", "failed", "inconclusive"]
 
 def _reachable_reality_targets(conn: ServerConnection) -> list[str]:
     """Candidate camouflage targets the server itself can reach over TLS 1.3 + HTTP/2."""
-    reachable = []
-    for candidate in REALITY_SNI_CANDIDATES:
-        probe = conn.run(
-            f"curl -s -o /dev/null --max-time 8 --tlsv1.3 --http2 -w '%{{http_version}}' "
-            f"https://{shlex.quote(candidate)}/",
-            timeout=15,
-        )
-        if probe.returncode == 0 and probe.stdout.strip() == "2":
-            reachable.append(candidate)
+    from meridian.diagnostics.preflight import reachable_reality_targets
+
+    reachable = reachable_reality_targets(conn)
     if not reachable:
         fail(
             "The server cannot reach any Reality camouflage target over TLS 1.3",
