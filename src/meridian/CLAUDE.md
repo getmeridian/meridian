@@ -8,7 +8,7 @@
 **Server facts** — `facts.py` is the typed cache for OS, Docker, UFW, containers, sshd ports, disk, and sysctl data. Use it before adding one-off probe parsing in provisioners or diagnostics.
 **Console output** — `fail()` with `hint_type` (user/system/bug) controls the footer. Every error must be actionable. `ConsoleState` class wraps globals; module-level functions delegate to singleton instance.
 **Engine boundary** — `meridian.engine` owns command-free runtime use cases only when a local executable surface needs them. Static Studio does not need Engine; executable Studio will need it for SSH, files, secrets, events, and cancellation.
-**Pinned version tuple** — `config.py` pins Remnawave images/SDK plus external binaries. Move the tuple together and update the CHANGELOG compatibility matrix; mismatched Remnawave backend/node/SDK versions silently lose data.
+**Remnawave version policy** — `config.py` pins the tested backend/node/subscription-page tags (move them together, update the CHANGELOG matrix) plus a `REMNAWAVE_MIN_VERSION` floor. Pins install on fresh servers and replace older tags; newer or floating operator tags are kept (`remnawave/versions.py`). Verification refuses panels below the floor and warns on an untested newer major.
 **Resumable setup** — `core/setup.py` owns secret-free contracts; `setup/` owns atomic draft persistence, stage invalidation, and immutable server-shelf selection.
 **Finite compiler** — `compiler/` purely transforms complete setup intent into typed, dependency-ordered, hash-reviewed V4 resources. It never performs I/O or generates secrets.
 **Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only the reviewed protocols and egress policy.
@@ -33,7 +33,7 @@
 - **PQ encryption removed in v4** — Xray VLESS PQ requires per-user encryption fields on inbound clients plus Remnawave API support. Do not re-add the flag without both.
 - **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients.
 - **Hysteria2 naming boundary** — external keys and URLs use `hysteria2`; Remnawave profiles require protocol/network `hysteria` plus version `2`.
-- **Remnawave 2.8 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token.
+- **Remnawave 3.4 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token. Tokens are signed with `APP_SECRET` (2.x `JWT_AUTH_SECRET`, carried over on upgrade).
 - **Xray runtime and config failures differ** — keep the executable/assets atomic and validate canonical configs with `run -test`; malformed delivery fails, while local runtime absence is inconclusive.
 - **Xray downloads are checksum-verified** — a missing, malformed, or mismatched release SHA2-256 sidecar makes connection verification inconclusive; never execute that archive.
 - **Fleet role contracts are finite** — do not project routing gateways as exits or source-restricted internal relay hops as public endpoints.

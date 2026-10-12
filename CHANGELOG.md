@@ -12,11 +12,11 @@ without the rest is not supported — move the whole set together.
 
 | Component | Pinned version |
 |---|---|
-| `remnawave/backend` | `2.8.0` |
-| `remnawave/node` | `2.8.0` |
-| `remnawave/subscription-page` | `7.2.6` |
-| `remnawave` Python SDK | `2.8.0` |
-| Xray-core client (test binary) | `26.6.27` |
+| `remnawave/backend` | `3.4.5` (supported floor `3.4.0`; newer operator-chosen tags are kept) |
+| `remnawave/node` | `3.4.2` |
+| `remnawave/subscription-page` | `8.0.0` |
+| `postgres` (panel database) | `17-alpine` |
+| Xray-core client (test binary) | `26.7.28` |
 | RealiTLScanner (SNI discovery) | `0.2.3` |
 | Realm (relay forwarder) | `2.9.3` |
 | Pebble (system-lab ACME CA) | `2.10.0` |

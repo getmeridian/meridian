@@ -123,6 +123,23 @@ class TestRenderNginxIpConfig:
         assert "ssl_certificate" in cfg
         assert "/etc/ssl/meridian/fullchain.pem" in cfg
 
+    def test_panel_subpath_rewrites_match_the_3_4_frontend_bundle(self):
+        cfg = render_nginx_ip_config(
+            server_ip="198.51.100.1",
+            nginx_internal_port=8443,
+            panel_web_base_path="secretpanel",
+            panel_internal_port=2053,
+            info_page_path="connect",
+        )
+        # The 3.4 bundle emits route/asset literals in backticks; quoted forms never match.
+        for literal in ("dashboard", "auth", "oauth2/", "locales/", "lotties/", "favicons/", "assets/"):
+            assert f"sub_filter '`/{literal}' '`/secretpanel/{literal}';" in cfg
+        assert "sub_filter '\"/" not in cfg
+        # /api calls ride the rewritten axios baseURL; rewriting them would double the prefix.
+        assert "'`/api" not in cfg
+        assert "proxy_redirect /api/ /secretpanel/api/;" in cfg
+        assert "proxy_cookie_path /api/ /secretpanel/api/;" in cfg
+
     def test_has_server_tokens_off(self):
         cfg = render_nginx_ip_config(
             server_ip="198.51.100.1",

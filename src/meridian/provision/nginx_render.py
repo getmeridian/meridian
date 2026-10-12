@@ -386,11 +386,21 @@ def render_nginx_server_block(
                 #
                 # HTML: href/src for assets, favicons, splash_screens
                 #       CSS url() for fonts
-                # JS:   axios baseURL, i18next loadPath, React Router
-                #       routes (/dashboard, /auth, /oauth2), Lottie srcs
+                # JS:   axios baseURL (every /api call, the backend-tools
+                #       queue link, and the node SSH websocket derive from
+                #       it), plus backtick literals the 3.4 bundle uses for
+                #       React Router routes, i18next loadPath, Lottie,
+                #       favicon fallback, workers, wasm, and editor schemas.
+                #       Never rewrite `/api: it is joined onto the
+                #       rewritten baseURL and would double the prefix.
+                # Backend-tools auth redirects and cookie paths are root-
+                # absolute, so Location and Set-Cookie are mapped too.
                 #
                 # This eliminates all root-level paths — every probe
                 # returns stock nginx 403/404.
+                proxy_redirect default;
+                proxy_redirect /api/ /{panel_web_base_path}/api/;
+                proxy_cookie_path /api/ /{panel_web_base_path}/api/;
                 proxy_set_header Accept-Encoding "";
                 sub_filter_once off;
                 sub_filter_types application/javascript text/javascript;
@@ -400,12 +410,13 @@ def render_nginx_server_block(
                 sub_filter 'src="/a' 'src="/{panel_web_base_path}/a';
                 sub_filter 'url(/a' 'url(/{panel_web_base_path}/a';
                 sub_filter '=window.location.origin;' '=window.location.origin+"/{panel_web_base_path}";';
-                sub_filter '"/locales/' '"/{panel_web_base_path}/locales/';
-                sub_filter '"/api/queues' '"/{panel_web_base_path}/api/queues';
-                sub_filter '"/dashboard' '"/{panel_web_base_path}/dashboard';
-                sub_filter '"/auth' '"/{panel_web_base_path}/auth';
-                sub_filter '"/oauth2/' '"/{panel_web_base_path}/oauth2/';
-                sub_filter '"/lotties/' '"/{panel_web_base_path}/lotties/';
+                sub_filter '`/dashboard' '`/{panel_web_base_path}/dashboard';
+                sub_filter '`/auth' '`/{panel_web_base_path}/auth';
+                sub_filter '`/oauth2/' '`/{panel_web_base_path}/oauth2/';
+                sub_filter '`/locales/' '`/{panel_web_base_path}/locales/';
+                sub_filter '`/lotties/' '`/{panel_web_base_path}/lotties/';
+                sub_filter '`/favicons/' '`/{panel_web_base_path}/favicons/';
+                sub_filter '`/assets/' '`/{panel_web_base_path}/assets/';
             }}
 
     {subscription_block}

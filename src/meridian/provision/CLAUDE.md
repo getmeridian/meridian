@@ -26,9 +26,9 @@
 ## What's done well
 - **Idempotent containers** — panel/node steps check `docker inspect` before deploying.
 - **Health polling** — panel step waits for `/api/health`, node step waits for port binding.
-- **Secrets generated once** — PostgreSQL password and JWT secrets come from `secrets.token_hex` on first install only; restarts reuse `.env` (Postgres keeps its init password, API tokens depend on the JWT secrets).
-
+- **Secrets generated once** — PostgreSQL password and `APP_SECRET` come from `secrets.token_hex` on first install only; restarts reuse `.env` (Postgres keeps its init password, API tokens depend on `APP_SECRET`; a 2.x `JWT_AUTH_SECRET` is adopted as it).
 ## Pitfalls
+- **Panel sub-path rewrites follow the bundle** — Remnawave has no base-path support; `sub_filter` must match the shipped frontend's literal forms (3.4 uses backticks). Re-grep the bundle on every backend bump and never rewrite `` `/api `` (it rides the rewritten axios baseURL).
 
 - **nginx `add_header` inheritance** — child `location` blocks with `add_header` suppress parent headers. Use `map` directives.
 - **acme.sh shortlived IP certs** — 6-day certs need `--days 5` and explicit renew window.
