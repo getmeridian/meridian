@@ -367,34 +367,3 @@ def run_remove(
     hop_counts = [len(relay.hop_server_refs) for relay in chains]
     extra = (f"Every hop of the chain stops forwarding ({sum(hop_counts)} hops in total).",)
     apply_topology_removal(cluster, updated, subject=subject, yes=request.yes, extra_lines=extra)
-
-
-def run_check(
-    relay_ip: str,
-    exit_arg: str = "",
-    user: str = "",
-) -> None:
-    """Check health of a relay node."""
-    request = validate_command_input(
-        RelayTargetRequest,
-        "Invalid relay check request",
-        relay_ip=relay_ip,
-        exit_arg=exit_arg,
-        user=user,
-    )
-
-    cluster = load_topology_cluster()
-    try:
-        topology = topology_from_local_cluster(cluster)
-    except LocalStateError as exc:
-        fail(exc)
-    if not any(relay.ip == request.relay_ip for relay in topology.relays):
-        fail(f"Relay {request.relay_ip} not found in cluster", hint="Check: meridian relay list", hint_type="user")
-    fail(
-        f"Relay {request.relay_ip} is part of a relay chain",
-        hint=(
-            "Per-hop relay checking isn't available yet. Use `meridian test` for end-to-end route health "
-            "and `meridian setup` to review the chain."
-        ),
-        hint_type="user",
-    )

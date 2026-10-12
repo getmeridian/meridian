@@ -181,7 +181,7 @@ Manage relays — Realm TCP forwarders that give users a domestic entry point to
 ```
 meridian relay deploy RELAY_IP --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay check RELAY_IP [--exit EXIT] [--user USER]
+meridian relay check RELAY [--exit EXIT] [--user USER] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
@@ -194,13 +194,13 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 | `--user/-u USER` | root | SSH user on the relay |
 | `--ssh-port PORT` | 22 | SSH port on the relay server |
 | `--yes/-y` | | Skip confirmation prompts |
-| `--json` | | Emit `relay list` as a `meridian.output/v1` envelope with `data.relays[]` |
+| `--json` | | Emit `relay list` (`data.relays[]`) or `relay check` as a `meridian.output/v1` envelope |
 
 **`relay deploy`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
 **`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
 
-**`relay check`** — not available yet. It refuses; use `meridian test` to check a relay route end to end.
+**`relay check`** — checks every Realm hop the relay server runs (or every hop of one chain): over SSH, that the hop's service is active and that it can open TCP to its next hop; from your machine, that the chain's public entry accepts TCP. Exit `0` means every check passed, `4` means problems were found, and `3` means a hop could not be inspected. Use `meridian test` to push real traffic through the whole route.
 
 ### meridian fleet
 

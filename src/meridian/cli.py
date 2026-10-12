@@ -192,6 +192,7 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
         ["fleet", "inventory"],
         ["node", "list"],
         ["relay", "list"],
+        ["relay", "check"],
     ):
         return True
     return positionals[0] == "api"
@@ -744,13 +745,24 @@ def relay_remove_cmd(
 
 @relay_app.command("check")
 def relay_check_cmd(
-    relay_ip: str = typer.Argument(..., help="Relay IP to check"),
-    exit: str = typer.Option("", "--exit", "-e", help="Exit server IP or name"),
+    relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
+    exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Check a relay (not available yet; use test for relay chains)"""
-    from meridian.commands.relay import run_check
+    """Check relay hops: Realm unit, next-hop TCP, and the public entry.
 
+    Exits 0 when every check passes, 4 on negative findings, and 3 when
+    a hop could not be inspected.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian relay check 198.51.100.20[/cyan]
+      [cyan]meridian relay check relay-chain --json[/cyan]
+    """
+    from meridian.commands.relay_check import run_check
+
+    if json_mode:
+        _enable_json_output()
     run_check(relay_ip, exit, user)
 
 

@@ -21,4 +21,5 @@
 - **Protocol shape controls checks** — do not require TCP/443 or HTTPS from a UDP-only Hysteria endpoint; full canonical traffic is the UDP authority.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but pass status requires separate trust, lifetime, and hostname validation.
 - **Probe cancellation is prompt** — daemon workers stop accepting jobs on SIGINT so socket timeouts cannot delay process exit 130.
+- **Relay next-hop probes use bash `/dev/tcp` under `timeout`** — never `nc` (absent on minimal images); the probe echoes its own status so SSH or tool failures stay skipped.
 - **UFW port matching is line-based** — a rule for port 80 will not match port 8080 only if the line contains the exact port string; callers should be aware of broad ALLOW rules.

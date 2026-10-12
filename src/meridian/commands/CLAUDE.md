@@ -18,7 +18,7 @@
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay check` refuses until per-hop checks exist.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay check` (`relay_check.py`) checks each compiled Realm hop over SSH plus the public entry locally, with the health exit codes.
 
 ## What's done well
 

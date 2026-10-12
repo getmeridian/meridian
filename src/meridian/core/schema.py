@@ -70,6 +70,7 @@ from meridian.core.plan import (
     CompiledPlanResult,
     PlanCommandData,
 )
+from meridian.core.relay_check import RelayCheckResult
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -267,6 +268,19 @@ _, _, TestOutputEnvelope = _make_command_envelope(
 )
 
 
+_, _, RelayCheckOutputEnvelope = _make_command_envelope(
+    "RelayCheck",
+    "relay.check",
+    RelayCheckResult,
+    failure_data_type=RelayCheckResult | EmptyData,
+    doc="Envelope schema for `meridian relay check --json`.",
+)
+
+
+class RelayCheckFailureData(RootModel[RelayCheckResult | EmptyData]):
+    """Failure data schema for `meridian relay check --json`."""
+
+
 class ProbeFailureData(RootModel[ProbeResult | EmptyData]):
     """Failure data schema for probe JSON output."""
 
@@ -449,6 +463,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-disable-envelope": ClientDisableOutputEnvelope,
     "node-list-envelope": NodeListOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
+    "relay-check": RelayCheckResult,
+    "relay-check-envelope": RelayCheckOutputEnvelope,
+    "relay-check-failure": RelayCheckFailureData,
     "plan-envelope": PlanOutputEnvelope,
     "plan-failure": PlanFailureData,
     "probe-envelope": ProbeOutputEnvelope,

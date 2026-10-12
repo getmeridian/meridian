@@ -1,0 +1,266 @@
+{
+  "$defs": {
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "RelayCheckResult": {
+      "additionalProperties": false,
+      "description": "Health of every checked hop: unit state, next-hop TCP, and public listener.",
+      "properties": {
+        "chains": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Chains",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/VerificationCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "counts": {
+          "$ref": "#/$defs/VerificationCounts"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            3,
+            4
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hops": {
+          "items": {
+            "$ref": "#/$defs/RelayHopTarget"
+          },
+          "title": "Hops",
+          "type": "array"
+        },
+        "relay": {
+          "title": "Relay",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "findings",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relay",
+        "verdict",
+        "exit_code",
+        "counts"
+      ],
+      "title": "RelayCheckResult",
+      "type": "object"
+    },
+    "RelayHopTarget": {
+      "additionalProperties": false,
+      "description": "One Realm hop of a relay chain, resolved from the compiled topology.",
+      "properties": {
+        "chain_ref": {
+          "title": "Chain Ref",
+          "type": "string"
+        },
+        "hop_index": {
+          "minimum": 0,
+          "title": "Hop Index",
+          "type": "integer"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "listen_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        },
+        "next_host": {
+          "title": "Next Host",
+          "type": "string"
+        },
+        "next_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Next Port",
+          "type": "integer"
+        },
+        "public": {
+          "title": "Public",
+          "type": "boolean"
+        },
+        "server_ref": {
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "service": {
+          "title": "Service",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id",
+        "chain_ref",
+        "hop_index",
+        "server_ref",
+        "host",
+        "service",
+        "listen_port",
+        "public",
+        "next_host",
+        "next_port"
+      ],
+      "title": "RelayHopTarget",
+      "type": "object"
+    },
+    "VerificationCheck": {
+      "additionalProperties": false,
+      "description": "One independently reportable verification check.",
+      "properties": {
+        "duration_ms": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/VerificationFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status"
+      ],
+      "title": "VerificationCheck",
+      "type": "object"
+    },
+    "VerificationCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate check counts by terminal status.",
+      "properties": {
+        "checks": {
+          "minimum": 0,
+          "title": "Checks",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "skipped": {
+          "minimum": 0,
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "warnings": {
+          "minimum": 0,
+          "title": "Warnings",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checks",
+        "passed",
+        "failed",
+        "warnings",
+        "skipped"
+      ],
+      "title": "VerificationCounts",
+      "type": "object"
+    },
+    "VerificationFinding": {
+      "additionalProperties": false,
+      "description": "One structured observation produced by a verification check.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "remediation": {
+          "default": "",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "status",
+        "message"
+      ],
+      "title": "VerificationFinding",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/RelayCheckResult"
+    },
+    {
+      "$ref": "#/$defs/EmptyData"
+    }
+  ],
+  "description": "Failure data schema for `meridian relay check --json`.",
+  "title": "RelayCheckFailureData"
+}

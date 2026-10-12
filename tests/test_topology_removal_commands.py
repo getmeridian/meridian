@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,8 @@ import typer
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands.node import run_remove as node_remove
 from meridian.commands.relay import run_remove as relay_remove
+from meridian.commands.relay_check import run_check
+from meridian.console import set_json_mode
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -25,6 +28,7 @@ from meridian.core.topology import (
 )
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
+from tests.support.mock_connection import MockConnection
 
 SERVERS = {
     "srv-control": ("198.51.100.10", "control"),
@@ -187,6 +191,82 @@ class TestRelayRemove:
         with pytest.raises(typer.Exit) as exc_info:
             _remove_relay("198.51.100.99")
         assert exc_info.value.exit_code == 2
+
+
+class TestRelayCheck:
+    @staticmethod
+    def _check(
+        query: str,
+        connections: dict[str, MockConnection],
+        *,
+        listener_open: bool = True,
+    ) -> int:
+        cluster = ClusterConfig(topology_intent=_intent())
+        with (
+            patch("meridian.commands.relay_check.load_topology_cluster", return_value=cluster),
+            patch("meridian.diagnostics.relay.tcp_connect", return_value=listener_open),
+        ):
+            try:
+                run_check(query, connection_factory=lambda entry: connections[entry.host])
+            except typer.Exit as exc:
+                return int(exc.exit_code)
+        return 0
+
+    @staticmethod
+    def _hop(probe_status: int = 0) -> MockConnection:
+        conn = MockConnection().when("systemctl is-active", stdout="active\n")
+        return conn.when("/dev/tcp", stdout=f"probe-status={probe_status}\n")
+
+    @classmethod
+    def _healthy(cls) -> MockConnection:
+        return cls._hop()
+
+    def test_every_hop_passing_exits_zero(self, registry: ServerRegistry) -> None:
+        edge, core = self._healthy(), self._healthy()
+
+        assert self._check("relay-a", {"198.51.100.13": edge, "198.51.100.14": core}) == 0
+        assert any("/dev/tcp/198.51.100.14/" in command for command in edge._calls)
+        assert any("/dev/tcp/198.51.100.12/" in command for command in core._calls)
+        assert not any(" nc " in command for command in edge._calls + core._calls)
+
+    def test_server_query_checks_only_its_hops(self, registry: ServerRegistry) -> None:
+        core = self._healthy()
+
+        assert self._check("198.51.100.14", {"198.51.100.14": core}) == 0
+        assert len(core._calls) == 2
+
+    def test_closed_next_hop_is_negative_evidence(self, registry: ServerRegistry) -> None:
+        core = self._hop(probe_status=1)
+
+        assert self._check("relay-a", {"198.51.100.13": self._healthy(), "198.51.100.14": core}) == 4
+
+    def test_closed_public_listener_is_negative_evidence(self, registry: ServerRegistry) -> None:
+        connections = {"198.51.100.13": self._healthy(), "198.51.100.14": self._healthy()}
+
+        assert self._check("relay-a", connections, listener_open=False) == 4
+
+    def test_ssh_failure_is_inconclusive_json(
+        self,
+        registry: ServerRegistry,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        unreachable = MockConnection().when("", rc=255)
+        set_json_mode(True)
+        try:
+            code = self._check("relay-a", {"198.51.100.13": self._healthy(), "198.51.100.14": unreachable})
+        finally:
+            set_json_mode(False)
+
+        assert code == 3
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["command"] == "relay.check"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["code"] == "MERIDIAN_RELAY_CHECK_INCONCLUSIVE"
+        assert payload["data"]["verdict"] == "inconclusive"
+        assert [hop["hop_index"] for hop in payload["data"]["hops"]] == [0, 1]
+
+    def test_unknown_relay_fails_before_ssh(self, registry: ServerRegistry) -> None:
+        assert self._check("198.51.100.99", {}) == 2
 
 
 class _FakeRuntime:

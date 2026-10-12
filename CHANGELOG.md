@@ -33,6 +33,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   edit the topology, show every resource they will delete, and clean up the
   panel node, node container, Realm units, firewall rules, and published Hosts.
   `meridian plan` lists removals too, and the review covers them.
+- **Per-hop relay checks** — `meridian relay check` confirms each Realm hop is
+  running and reaches the next one, and that the public entry accepts connections.
 
 ### Sharing
 - Connection pages are built from each user's real subscription, so relays and
