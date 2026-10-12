@@ -94,6 +94,18 @@ def test_preflight_resolves_registered_hostname_for_external_probe() -> None:
     resolve.assert_called_once_with("exit.example.test", timeout=5)
 
 
+def test_preflight_connects_on_the_requested_ssh_port() -> None:
+    connection = FakeConnection(sni_reachable=True)
+    resolved = SimpleNamespace(ip="198.51.100.20", user="root", conn=connection, local_mode=False)
+    with (
+        patch("meridian.commands.check.resolve_server", side_effect=SystemExit) as resolve,
+        pytest.raises(SystemExit),
+    ):
+        run(ip=resolved.ip, ssh_port=2222)
+
+    assert resolve.call_args.kwargs["port"] == 2222
+
+
 def test_preflight_returns_findings_exit_when_required_sni_is_unreachable() -> None:
     connection = FakeConnection(sni_reachable=False)
 

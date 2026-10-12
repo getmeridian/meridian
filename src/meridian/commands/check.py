@@ -64,6 +64,7 @@ def run(
     user: str = "root",
     ai: bool = False,
     requested_server: str = "",
+    ssh_port: int = 0,
 ) -> None:
     """Run pre-flight checks on a server."""
     try:
@@ -72,7 +73,9 @@ def run(
     except ValueError as exc:
         fail(str(exc), hint_type="user")
     registry = ServerRegistry(SERVER_PROFILES_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
+    resolved = resolve_server(
+        registry, requested_server=requested_server, explicit_ip=ip, user=user, port=ssh_port
+    )
 
     try:
         probe_ip = str(ipaddress.ip_address(resolved.ip))

@@ -549,11 +549,12 @@ def preflight_cmd(
     user: str = typer.Option("", "--user", "-u", help="SSH user"),
     ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
     server: str = typer.Option("", "--server", help="Target server name or IP"),
+    ssh_port: int = typer.Option(0, "--ssh-port", min=0, max=65535, help="SSH port (default: saved or 22)"),
 ) -> None:
     """Validate server compatibility before deploying"""
     from meridian.commands.check import run
 
-    run(ip, domain, sni, user, ai, server)
+    run(ip, domain, sni, user, ai, server, ssh_port=ssh_port)
 
 
 @app.command("scan")

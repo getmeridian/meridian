@@ -223,10 +223,10 @@ Check a server before deploying: camouflage target, port 443 availability and ou
 
 ```
 meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ai] [--server NAME]
+                   [--ssh-port PORT] [--ai] [--server NAME]
 ```
 
-`--domain` checks that the domain resolves to the server. `--sni` checks a specific camouflage target, `--user` overrides the saved SSH user, and `--ai` copies an AI-ready diagnostic prompt to the clipboard.
+`--domain` checks that the domain resolves to the server. `--sni` checks a specific camouflage target, `--user` and `--ssh-port` override the saved SSH user and port, and `--ai` copies an AI-ready diagnostic prompt to the clipboard.
 
 Preflight accepts a public IP or hostname, opens a short-lived listener when port 443 is free, and never treats missing evidence as success. Exit `0` means compatible, `4` means problems were found, `3` means required evidence was unavailable, and `2` means invalid input.
 
