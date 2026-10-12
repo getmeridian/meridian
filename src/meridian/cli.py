@@ -433,6 +433,8 @@ def deploy_cmd(
 def client_add(
     names: list[str] = typer.Argument(..., help="Client name(s) to add"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    # Adding never asks; accepted so scripts can pass --yes to every mutating command.
+    _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
 ) -> None:
     """Add one or more clients through the active topology model.
 

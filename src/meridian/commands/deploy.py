@@ -17,6 +17,7 @@ from typing import Any, Literal, NoReturn
 
 import typer
 from pydantic import ValidationError
+from rich.markup import escape
 
 from meridian.adapters import JsonlReporter
 from meridian.adapters.cancellation import FileCancellationToken
@@ -45,7 +46,6 @@ from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import EngineError, MeridianError
 from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
-from meridian.core.inputs import is_local_deploy_target
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS
@@ -56,7 +56,7 @@ from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
 from meridian.renderers import emit_json
-from meridian.resolve import connection_for_entry, merge_target
+from meridian.resolve import connection_for_entry, merge_target, parse_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
     DEFAULT_CLIENT,
@@ -135,7 +135,18 @@ def run(
                     hint="Pass a server IP, or call `meridian api workflow deploy --json` and use --request FILE.",
                     hint_type="user",
                 )
-            request = _build_request(**{**request.model_dump(), "ip": _prompt_server_ip()})
+            ip, requested_server, user, ssh_port = _split_target(
+                _prompt_server_target(), request.requested_server, request.user, request.ssh_port
+            )
+            request = _build_request(
+                **{
+                    **request.model_dump(),
+                    "ip": ip,
+                    "requested_server": requested_server,
+                    "user": user,
+                    "ssh_port": ssh_port,
+                }
+            )
         try:
             request = normalize_deploy_request(request)
         except DeployValidationError as exc:
@@ -455,15 +466,21 @@ def _save_branding(request: DeployRequest) -> None:
     persist_reviewed_apply(cluster)
 
 
-def _prompt_server_ip() -> str:
+def _prompt_server_target() -> str:
     err_console.print("\n  [bold]Deploy Meridian[/bold]")
     err_console.print("  [dim]You need a fresh VPS (Ubuntu/Debian) you can SSH into as root or a sudo user.[/dim]")
     err_console.print("  [dim]For multiple servers, relays, or routing, use: meridian setup[/dim]\n")
     for _attempt in range(3):
-        value = prompt("Server IP address").strip()
-        if is_ip(value) or is_local_deploy_target(value):
+        value = prompt("Server IP (or user@IP:port)").strip()
+        try:
+            target = parse_target(value)
+        except ValueError:
+            target = None
+        if target is not None and (target.local or is_ip(target.host)):
             return value
-        err_console.print("  [warn]Enter an IPv4/IPv6 address, or 'local' to deploy on this machine.[/warn]")
+        err_console.print(
+            "  [warn]Enter an IPv4/IPv6 address, user@IP[:port], or 'local' to deploy on this machine.[/warn]"
+        )
     fail("No server IP given", hint="Run: meridian deploy SERVER_IP", hint_type="user")
 
 
@@ -477,9 +494,15 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
         print_handoff_links(links.subscription_url, page_url=links.page_url)
     err_console.print()
     err_console.print("  [bold]Next[/bold]")
-    err_console.print(f"    [info]meridian test {server_ip}[/info]        verify it from your machine")
-    err_console.print("    [info]meridian client add alice[/info]   give someone else their own link")
-    err_console.print("    [info]meridian setup[/info]              add relays or more servers")
+    another = "bob" if request.client_name == "alice" else "alice"
+    steps = [
+        (f"meridian test {server_ip}", "verify it from your machine"),
+        (f"meridian client add {another}", "give someone else their own link"),
+        ("meridian setup", "add relays or more servers"),
+    ]
+    width = max(len(command) for command, _ in steps) + 3
+    for command, purpose in steps:
+        err_console.print(f"    [info]{escape(command)}[/info]{' ' * (width - len(command))}{purpose}")
     if request.domain:
         err_console.print()
         err_console.print("  [bold]Cloudflare[/bold]")

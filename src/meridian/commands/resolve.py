@@ -118,7 +118,7 @@ def _resolve_server(
                 registry_user = entry.user
                 registry_port = entry.port
                 registry_key_path = entry.key_path
-                label = f"{entry.name} ({ip})" if entry.name else ip
+                label = f"{entry.name} ({ip})" if entry.name and entry.name != ip else ip
                 info(f"Using server: {label}")
 
             elif len(selectable_entries) > 1:

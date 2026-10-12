@@ -209,3 +209,15 @@ def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Pat
     runtime.verify.assert_not_called()
     runtime.publish_handoff.assert_not_called()
     assert runtime.constructed_with["cancellation"].path == tmp_home / "cancel"
+
+
+def test_interactive_prompt_takes_the_same_target_syntax_as_the_argument(monkeypatch) -> None:
+    from meridian.commands import deploy
+
+    answers = iter(["myvps", "ubuntu@198.51.100.10:2222"])
+    monkeypatch.setattr(deploy, "prompt", lambda _label: next(answers))
+
+    value = deploy._prompt_server_target()
+
+    assert value == "ubuntu@198.51.100.10:2222"
+    assert deploy._split_target(value, "", "", 0) == ("198.51.100.10", "", "ubuntu", 2222)
