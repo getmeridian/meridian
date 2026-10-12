@@ -1,14 +1,15 @@
 """Remnawave version policy: supported floor, tested major, never-downgrade images.
 
 Operators may upgrade Remnawave themselves. Meridian installs its tested
-image tags on fresh servers, upgrades tags it knows are older, and otherwise
-keeps whatever newer or unmanaged tag (``3``, ``latest``, a digest) the
-operator chose.
+``tag@sha256:digest`` pins on fresh servers, upgrades tags it knows are older,
+and otherwise keeps whatever newer or unmanaged tag (``3``, ``latest``, a bare
+digest) the operator chose.
 """
 
 from __future__ import annotations
 
 import re
+from typing import NamedTuple
 
 from meridian.config import REMNAWAVE_MIN_VERSION, REMNAWAVE_TESTED_MAJOR
 
@@ -18,7 +19,7 @@ Version = tuple[int, int, int]
 
 _VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]*)?$")
 _IMAGE_LINE_RE = re.compile(r"""^\s*image:\s*["']?([^\s"'#]+)""", re.MULTILINE)
-_DEFAULT_REGISTRY_PREFIXES = ("docker.io/library/", "docker.io/", "index.docker.io/")
+_DEFAULT_REGISTRY_PREFIXES = ("docker.io/", "index.docker.io/", "registry-1.docker.io/")
 
 
 def parse_version(value: str) -> Version | None:
@@ -29,21 +30,32 @@ def parse_version(value: str) -> Version | None:
     return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
 
-def split_image(image: str) -> tuple[str, str]:
-    """Split an image reference into a normalized repository and its tag or digest."""
+class ImageRef(NamedTuple):
+    """A normalized image reference: repository, tag, and content digest."""
+
+    repository: str
+    tag: str
+    digest: str  # ``sha256:<hex>`` or empty
+
+    def same_content(self, other: ImageRef) -> bool:
+        """Whether both references pin the same repository and content digest."""
+        return bool(self.digest) and self.repository == other.repository and self.digest == other.digest
+
+
+def parse_image(image: str) -> ImageRef:
+    """Split ``[registry/]repo[:tag][@digest]`` with Docker Hub prefixes normalized away."""
     reference = image.strip()
     for prefix in _DEFAULT_REGISTRY_PREFIXES:
         if reference.startswith(prefix):
             reference = reference[len(prefix) :]
             break
-    if "@" in reference:
-        repo, _, digest = reference.partition("@")
-        return repo, "@" + digest
+    reference = reference.removeprefix("library/")
+    reference, _, digest = reference.partition("@")
     last_slash = reference.rfind("/")
     colon = reference.rfind(":")
     if colon > last_slash:
-        return reference[:colon], reference[colon + 1 :]
-    return reference, ""
+        return ImageRef(reference[:colon], reference[colon + 1 :], digest)
+    return ImageRef(reference, "", digest)
 
 
 def find_image(compose: str | None, repository: str) -> str | None:
@@ -51,7 +63,7 @@ def find_image(compose: str | None, repository: str) -> str | None:
     if not compose:
         return None
     for match in _IMAGE_LINE_RE.finditer(compose):
-        if split_image(match.group(1))[0] == repository:
+        if parse_image(match.group(1)).repository == repository:
             return match.group(1)
     return None
 
@@ -59,35 +71,40 @@ def find_image(compose: str | None, repository: str) -> str | None:
 def resolve_image(pinned: str, existing: str | None) -> str:
     """Choose the image to run without ever downgrading the operator's choice.
 
-    The pinned tag wins only on fresh servers, for a different repository, or
-    when the existing tag is a version older than the pin. Newer versions and
-    non-version tags are user-managed and kept verbatim.
+    Versions are compared by tag; digests only identify content. The existing
+    reference is kept verbatim when it already names the pinned content (any
+    spelling), carries a newer version, or uses a non-version tag (``3``,
+    ``latest``, a bare digest). The pin wins on fresh servers, for a different
+    repository, for an older version, and for the same version so the tested
+    digest replaces a tag-only or differently-digested reference.
     """
     if not existing:
         return pinned
-    repo, tag = split_image(existing)
-    pinned_repo, pinned_tag = split_image(pinned)
-    if repo != pinned_repo:
+    current = parse_image(existing)
+    pin = parse_image(pinned)
+    if current.repository != pin.repository:
         return pinned
-    existing_version = parse_version(tag)
+    if current.same_content(pin):
+        return existing
+    existing_version = parse_version(current.tag)
     if existing_version is None:
         return existing
-    pinned_version = parse_version(pinned_tag)
-    if pinned_version is None or existing_version >= pinned_version:
+    pinned_version = parse_version(pin.tag)
+    if pinned_version is None or existing_version > pinned_version:
         return existing
     return pinned
 
 
 def effective_image(pinned: str, compose: str | None) -> str:
     """Resolve the image for ``pinned``'s repository against an existing compose file."""
-    return resolve_image(pinned, find_image(compose, split_image(pinned)[0]))
+    return resolve_image(pinned, find_image(compose, parse_image(pinned).repository))
 
 
 def image_below_floor(image: str | None) -> bool:
     """Return whether ``image`` carries a version tag older than the supported floor."""
     if not image:
         return False
-    version = parse_version(split_image(image)[1])
+    version = parse_version(parse_image(image).tag)
     floor = parse_version(REMNAWAVE_MIN_VERSION)
     return version is not None and floor is not None and version < floor
 

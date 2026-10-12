@@ -23,3 +23,4 @@
 - The public Xray JSON selector is `json` and returns an array of generated configs; `xray-json` is a template name and returns 403 as an unknown client type.
 - Reality Hosts use `securityLayer=DEFAULT`; `REALITY` is an Inbound transport security value, not a Host enum.
 - Keep certificate verification enabled for credential-bearing requests; explicit overrides are for caller-supplied trust contexts and isolated tests.
+- Image references may be `repo:tag@sha256:...`: compare versions by tag via `parse_image()` and treat an equal digest as the same image in any spelling; never string-compare or `rfind(':')` a reference.

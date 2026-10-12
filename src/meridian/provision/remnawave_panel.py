@@ -26,7 +26,7 @@ from meridian.config import (
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
 )
 from meridian.provision.steps import ProvisionContext, StepResult
-from meridian.remnawave.versions import effective_image, find_image, image_below_floor, split_image
+from meridian.remnawave.versions import effective_image, find_image, image_below_floor, parse_image
 from meridian.ssh import ServerConnection
 
 if TYPE_CHECKING:
@@ -364,7 +364,7 @@ class DeployRemnawavePanel:
         compose_text = current_compose.stdout if current_compose.returncode == 0 else None
         image = effective_image(REMNAWAVE_BACKEND_IMAGE, compose_text)
         sub_page_image = effective_image(REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE, compose_text)
-        below_floor = image_below_floor(find_image(compose_text, split_image(REMNAWAVE_BACKEND_IMAGE)[0]))
+        below_floor = image_below_floor(find_image(compose_text, parse_image(REMNAWAVE_BACKEND_IMAGE).repository))
 
         front_end_domain = self.front_end_domain or ctx.domain or ctx.ip
         host = ctx.domain or ctx.ip
