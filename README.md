@@ -140,7 +140,7 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 | `meridian teardown [IP]` | Remove Meridian from a server |
 | `meridian update` | Update the CLI |
 
-Removing a client, node, or relay isn't available yet; `client disable` revokes access immediately. Most commands support `--json` for scripting. See the [CLI reference](https://getmeridian.org/docs/en/cli-reference/) for every command and flag.
+`client remove` revokes a client permanently; removing a node or relay isn't available yet. Most commands support `--json` for scripting. See the [CLI reference](https://getmeridian.org/docs/en/cli-reference/) for every command and flag.
 
 ## Client apps
 

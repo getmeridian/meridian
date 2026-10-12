@@ -53,4 +53,4 @@ Hysteria2 dials your server's IP over UDP and uses the domain only for its TLS c
 
 ## Adding a domain later
 
-Run your deploy command again with `--domain` added. Existing Reality links keep working. Once a domain is deployed, keep passing the same `--domain` on later redeploys — removing paths from a running server isn't supported yet.
+Run your deploy command again with `--domain` added. Existing Reality links keep working. To drop the domain later, redeploy without `--domain`: the XHTTP and WSS paths are removed and subscriptions update.

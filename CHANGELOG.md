@@ -35,8 +35,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the
   admin panel's address.
-- `meridian client add|show|list|enable|disable`. Permanent `client remove` is
-  not available yet; `client disable` revokes access immediately.
+- `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
+  the user and their page; links stop working immediately.
 
 ### Security and correctness
 - No request logging on Meridian's web server; panel secrets are never rotated
@@ -62,8 +62,8 @@ running version is newer than the tested one.
 | RealiTLScanner (`meridian scan`) | `0.2.3` |
 
 ### Not yet available
-- Removing users, servers, relays, or protocol paths from a running fleet
-  (apply only adds; a redeploy must keep the same `--domain`).
+- Removing servers, relays, or routing gateways from a running fleet (users and
+  protocol paths can be removed).
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
 
 ### Removed

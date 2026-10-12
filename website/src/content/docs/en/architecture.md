@@ -80,7 +80,7 @@ A relay forwards raw TCP from a domestic IP to the exit's Reality listener. Encr
 
 Meridian turns the topology into a list of resources: firewall rules, nginx routes, containers, Remnawave profiles, hosts, users, and templates. `meridian plan` observes each one on the live servers and panel and reports what needs repair. `meridian apply` applies the exact plan it showed, checkpointing every step so an interrupted apply resumes safely. Resources whose outcome is uncertain are re-observed before any retry.
 
-Changes are additive for now: adding servers, relays, users, or domain paths works; removing them from a running fleet is refused until safe retirement exists.
+Users and protocol paths can be added and removed; after the new plan converges, apply deletes what left it (panel users and hosts, nginx files, firewall rules). Removing an exit, relay, or routing gateway from a running fleet is refused for now.
 
 Panel edits to resources Meridian owns show up in `meridian plan` and are restored by the next apply. Remnawave settings Meridian doesn't manage are left alone.
 

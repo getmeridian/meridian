@@ -45,6 +45,12 @@ def mark_connection_page_deployed(cluster: ClusterConfig, user_uuid: str) -> Non
     cluster.connection_page_markers = sorted({*cluster.connection_page_markers, _page_marker(user_uuid)})
 
 
+def forget_connection_page(cluster: ClusterConfig, user_uuid: str) -> None:
+    """Drop page deployment evidence after the page was removed."""
+    marker = _page_marker(user_uuid)
+    cluster.connection_page_markers = [item for item in cluster.connection_page_markers if item != marker]
+
+
 def generate_client_files(
     protocol_urls: list[ProtocolURL],
     server_ip: str,

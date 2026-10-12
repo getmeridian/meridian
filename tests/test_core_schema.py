@@ -307,7 +307,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
         "status": "ok",
         "exit_code": 3,
         "category": "none",
-        "meaning": "client was removed but local state or legacy page cleanup is incomplete",
+        "meaning": "client was removed but their connection page could not be deleted",
     } in by_command["client.remove"]["outcomes"]
     assert by_command["client.enable"]["data_schema"] == "client-status"
     assert by_command["client.disable"]["data_schema"] == "client-status"

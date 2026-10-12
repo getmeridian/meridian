@@ -465,7 +465,7 @@ def client_remove(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Remove a client (not available yet; use client disable)"""
+    """Remove a client permanently; their links stop working"""
     from meridian.commands.client import run_remove
 
     if json_mode:

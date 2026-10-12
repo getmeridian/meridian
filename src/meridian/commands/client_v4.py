@@ -13,7 +13,7 @@ from meridian.commands._helpers import ReviewedApplyPersistenceError, make_panel
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
-from meridian.core.clients import build_client_add_result
+from meridian.core.clients import build_client_add_result, build_client_remove_result
 from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -179,3 +179,62 @@ def _report_v4_state_failure(
         hint="Repair cluster.yml persistence, inspect current panel state, then run `meridian plan` before retrying.",
         hint_type="system",
     )
+
+
+def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool) -> None:
+    """Remove an access user through the reviewed topology, then delete their page."""
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.console import confirm
+    from meridian.handoff import remove_connection_page
+    from meridian.servers import ServerRegistry
+    from meridian.setup.editor import remove_access_user_from_intent
+    from meridian.setup.runtime import SetupRuntime
+
+    intent = cluster.topology_intent
+    if intent is None:
+        raise RuntimeError("Topology intent is missing")
+    try:
+        updated = remove_access_user_from_intent(intent, name)
+    except ValueError as exc:
+        fail(str(exc), hint="Check client names with: meridian client list", hint_type="user")
+    if not yes and not confirm(f"Remove client '{name}'? Their links stop working immediately."):
+        raise typer.Exit(1)
+
+    with make_panel(cluster) as panel:
+        user = get_user_or_fail(panel, name, action="load")
+    try:
+        result = SetupRuntime(
+            ServerRegistry(SERVER_PROFILES_FILE),
+            cluster_loader=lambda: cluster,
+            persist=persist_reviewed_apply,
+        ).apply_intent(updated)
+    except MeridianError as exc:
+        fail(exc)
+    except ReviewedApplyPersistenceError as exc:
+        fail(f"Client '{name}' may have been removed, but local state was not saved", hint=str(exc), hint_type="system")
+    if not result.all_succeeded:
+        fail(
+            f"Client '{name}' was not fully removed",
+            hint=f"{result.failure_summary}. The client is out of the topology; rerun `meridian apply` to finish.",
+            hint_type="system",
+        )
+
+    page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
+    if page_error:
+        warn(f"Client '{name}' was removed, but their connection page could not be deleted: {page_error}")
+    else:
+        persist_reviewed_apply(cluster)
+    if is_json_mode():
+        emit_json(
+            command_envelope(
+                command="client.remove",
+                data=build_client_remove_result(name).to_data(),
+                summary=Summary(text=f"Removed client {name}", changed=True, counts={"removed": 1}),
+                exit_code=3 if page_error else 0,
+                timer=operation.timer,
+            )
+        )
+    else:
+        ok(f"Removed client '{name}'. Their links no longer work.")
+    if page_error:
+        raise typer.Exit(3)

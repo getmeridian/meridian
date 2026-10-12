@@ -516,14 +516,14 @@ export const commandCatalog = {
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Permanent client removal is not available yet; use client disable to revoke access.",
+      "description": "Remove one client from the topology and delete their connection page.",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client was removed",
         "1": "unexpected Meridian bug",
         "2": "client not found or input/config error",
-        "3": "client removed with incomplete local/page cleanup, or system/panel failure",
+        "3": "client removed but page cleanup failed, or system/panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -542,7 +542,7 @@ export const commandCatalog = {
         {
           "category": "none",
           "exit_code": 3,
-          "meaning": "client was removed but local state or legacy page cleanup is incomplete",
+          "meaning": "client was removed but their connection page could not be deleted",
           "status": "ok"
         },
         {

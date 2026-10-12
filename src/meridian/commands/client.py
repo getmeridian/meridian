@@ -33,6 +33,7 @@ from meridian.commands.client_state import (
     require_access_user as _require_access_user,
 )
 from meridian.commands.client_v4 import run_add_v4 as _run_add_v4
+from meridian.commands.client_v4 import run_remove_v4 as _run_remove_v4
 from meridian.console import err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.core.clients import (
     PanelUserLike,
@@ -309,12 +310,7 @@ def _run_remove(
             hint="Pass --yes to confirm the mutation.",
             hint_type="user",
         )
-    load_topology_cluster()
-    fail(
-        f"Permanent removal of client '{name}' isn't available yet",
-        hint="Use `meridian client disable` to revoke access now; do not delete the panel user directly.",
-        hint_type="user",
-    )
+    _run_remove_v4(name, load_topology_cluster(), operation, yes=yes)
 
 
 # -- Client Enable --

@@ -93,7 +93,7 @@ Branding is saved in `cluster.yml` and applies to every client's connection page
 
 To redeploy, run the same command again. Meridian keeps the saved paths, keys, and users, so existing links keep working. A redeploy without `--sni` keeps the saved camouflage target.
 
-At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Keep it: changes are additive for now. You can add a domain, Hysteria2, or users, but removing something that is already deployed (for example, dropping `--domain`) is refused.
+At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Running it again with different flags changes the server to match: adding or dropping `--domain` or `--hysteria2` adds or removes those paths.
 
 `meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
 

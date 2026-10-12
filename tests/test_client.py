@@ -496,7 +496,7 @@ class TestRunList:
 
 
 class TestRunRemove:
-    def test_v4_remove_refuses_direct_panel_delete(self, tmp_home: Path) -> None:
+    def test_last_client_cannot_be_removed(self, tmp_home: Path) -> None:
         cluster = _make_v4_cluster(tmp_home, users=["alice"])
         with (
             patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
@@ -507,6 +507,42 @@ class TestRunRemove:
 
         assert exc_info.value.exit_code == 2
         panel.assert_not_called()
+
+    def test_remove_retires_the_user_through_the_topology_and_deletes_the_page(self, tmp_home: Path) -> None:
+        cluster = _make_v4_cluster(tmp_home, users=["alice", "bob"])
+        panel = _make_panel_mock()
+        panel.get_user.return_value = _make_user("bob")
+        runtime = MagicMock()
+        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
+
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            patch("meridian.handoff.remove_connection_page", return_value="") as remove_page,
+        ):
+            run_remove(name="bob", yes=True)
+
+        assert runtime.apply_intent.call_args.args[0].access.users == ["alice"]
+        remove_page.assert_called_once_with(cluster, _make_user("bob").vless_uuid)
+        panel.delete_user.assert_not_called()  # retirement owns the delete
+
+    def test_unfinished_retirement_is_a_system_error(self, tmp_home: Path) -> None:
+        cluster = _make_v4_cluster(tmp_home, users=["alice", "bob"])
+        runtime = MagicMock()
+        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=False, failure_summary="retire x: down")
+
+        with (
+            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
+            patch("meridian.commands._helpers.MeridianPanel", return_value=_make_panel_mock()),
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_remove(name="bob", yes=True)
+
+        assert exc_info.value.exit_code == 3
 
 
 class TestPanelAPIErrors:
@@ -667,7 +703,7 @@ class TestRunDisable:
 
 class TestRunRemoveJson:
     def test_remove_json_refusal_emits_error_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client remove --json emits an error envelope for the unavailable removal."""
+        """client remove --json emits an error envelope when the client is unknown."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 

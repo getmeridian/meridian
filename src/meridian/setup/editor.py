@@ -29,6 +29,18 @@ def add_access_users_to_intent(intent: SetupIntent, usernames: list[str]) -> Set
     return SetupIntent.model_validate(payload)
 
 
+def remove_access_user_from_intent(intent: SetupIntent, username: str) -> SetupIntent:
+    """Return validated intent without one access user; at least one user must remain."""
+    if username not in intent.access.users:
+        raise ValueError(f"Client '{username}' is not in the topology")
+    remaining = [user for user in intent.access.users if user != username]
+    if not remaining:
+        raise ValueError("A fleet needs at least one client; add another before removing the last one")
+    payload = intent.model_dump(mode="json")
+    payload["access"] = AccessIntent(squad_name=intent.access.squad_name, users=remaining).model_dump(mode="json")
+    return SetupIntent.model_validate(payload)
+
+
 def add_exit_to_intent(
     intent: SetupIntent,
     *,

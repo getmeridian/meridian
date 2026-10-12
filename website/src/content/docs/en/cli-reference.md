@@ -93,7 +93,7 @@ meridian apply [--yes] [--json]
 
 JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.meridian` permissions, then run `plan` and `apply` again.
 
-Apply is additive for now: a topology change that would remove an exit, relay, or user is refused.
+Removing users or protocol paths is applied: the removed resources are deleted after everything still in the plan has converged, and `plan` lists them first. Removing an exit, relay, or routing gateway is refused for now.
 
 ### meridian client
 
@@ -122,7 +122,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until the next apply (including redeploys and `client add`, `node add`, `relay deploy`), which turns every declared client back on.
 
-**`client remove`** — permanent removal isn't available yet. The command refuses and points to `client disable`. Don't delete users in the panel; Meridian recreates them on the next apply.
+**`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
 
 ### meridian server
 

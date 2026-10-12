@@ -69,7 +69,7 @@ A disable is temporary: the next apply turns every declared client back on. Appl
 
 ## Removing a client
 
-Permanent removal isn't available yet — `meridian client remove` refuses and explains this. Use `meridian client disable` to revoke access now. Don't delete the user in the Remnawave panel: Meridian would recreate it on the next apply.
+`meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client. Don't delete users in the Remnawave panel directly — Meridian recreates any client still in the topology on the next apply.
 
 ## Subscription links
 
