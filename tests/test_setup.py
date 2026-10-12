@@ -128,6 +128,32 @@ class TestRunWithExplicitIP:
 
         mock_fetch.assert_called_once_with(resolved, force=True)
 
+    def test_redeploy_keeps_the_saved_camouflage_target(self, tmp_home: Path, monkeypatch) -> None:
+        """Changing DEFAULT_SNI must not silently move existing servers (their links would break)."""
+        import meridian.commands.setup as setup_mod
+
+        monkeypatch.setattr(setup_mod, "creds_dir_for", lambda ip, local_mode: tmp_home / "credentials" / ip)
+        resolved = SimpleNamespace(
+            ip="1.2.3.4", user="root", conn=Mock(), creds_dir=tmp_home / "credentials" / "1.2.3.4"
+        )
+        resolved.creds_dir.mkdir(parents=True)
+        creds = ServerCredentials()
+        creds.server.sni = "www.microsoft.com"
+        creds.save(resolved.creds_dir / "proxy.yml")
+
+        with (
+            patch("meridian.commands.setup.resolve_server", return_value=resolved),
+            patch("meridian.commands.setup.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.setup._check_ports"),
+            patch("meridian.commands.setup.fetch_credentials", return_value=True),
+            patch("meridian.commands.setup._run_provisioner") as mock_provision,
+            patch("meridian.commands.setup._print_success"),
+            patch("meridian.commands.setup._offer_relay"),
+        ):
+            run(ip="1.2.3.4", yes=True)
+
+        assert mock_provision.call_args.args[2] == "www.microsoft.com"
+
     def test_deploy_proceeds_when_refresh_fails_with_cache_but_no_remote_state(self, tmp_home: Path) -> None:
         """Redeploy should proceed with local cache when server has no credentials (pre-sync deploy)."""
         resolved = SimpleNamespace(

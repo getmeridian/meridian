@@ -211,12 +211,16 @@ def run(
         if creds.has_credentials:
             creds.save(proxy_file)  # Re-save as v2 if loaded from v1
 
-    # Suggest scanned SNI if available and no --sni was given
+    # Without --sni, a redeploy keeps the server's camouflage target (changing it
+    # breaks every client link issued with the old SNI); otherwise suggest a scan result.
     if not sni:
         proxy_file = resolved.creds_dir / "proxy.yml"
         if proxy_file.exists():
             creds = ServerCredentials.load(proxy_file)
-            if creds.server.scanned_sni:
+            if creds.server.sni:
+                info(f"Keeping the current camouflage target: {creds.server.sni} (pass --sni to change it)")
+                sni = creds.server.sni
+            elif creds.server.scanned_sni:
                 info(f"Detected optimal SNI from scan: {creds.server.scanned_sni}")
                 if yes:
                     sni = creds.server.scanned_sni
@@ -385,14 +389,21 @@ def _interactive_wizard(
         err_console.print("  [dim]the same network, which are hardest to distinguish.[/dim]")
         err_console.print()
 
-        # Check for previously scanned SNI
+        # Check for the server's current and previously scanned SNI
+        saved_sni = ""
         saved_scanned_sni = ""
         creds_dir = creds_dir_for(server_ip, local_mode=is_local)
         if (creds_dir / "proxy.yml").exists():
             saved_creds = ServerCredentials.load(creds_dir / "proxy.yml")
+            saved_sni = saved_creds.server.sni or ""
             saved_scanned_sni = saved_creds.server.scanned_sni or ""
 
-        if saved_scanned_sni:
+        # A redeploy keeps the server's camouflage target: changing it breaks every
+        # client link issued with the old SNI. Pass --sni to change it on purpose.
+        if saved_sni:
+            info(f"Keeping the current camouflage target: {saved_sni} (pass --sni to change it)")
+            sni = saved_sni
+        elif saved_scanned_sni:
             info(f"Previous scan found: {saved_scanned_sni}")
             if not yes:
                 choice = choose(
