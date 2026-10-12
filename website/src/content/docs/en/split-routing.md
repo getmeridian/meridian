@@ -24,23 +24,21 @@ You get both:
 - **VPS protection** — the server-side block stays on as a safety net
 - **Working Russian sites** — the device sends them directly, never through the proxy
 
-## How to set it up
+## How it works in Meridian
 
-Split routing is configured in the client app. Meridian does not yet ship split routing in its subscriptions.
+Meridian ships split routing in its **Xray JSON** and **Mihomo** subscriptions, so most apps need no setup. Every subscription sends these destinations directly:
 
-- **Hiddify** — in settings, set the region to **Russia**. Hiddify then sends Russian sites directly.
-- **v2rayNG, v2RayTun, v2rayN, and other Xray apps** — open the app's routing settings and add **direct** rules for `geosite:category-ru` and `geoip:ru`.
-- **Mihomo / Clash Meta apps** — subscription refreshes replace the config, so add these rules through the app's override or merge feature, above the final `MATCH` rule:
-  ```yaml
-  - GEOSITE,category-ru,DIRECT
-  - GEOIP,RU,DIRECT
-  ```
+- local network addresses (`geosite:private`, `geoip:private`)
+- `.ru`, `.su`, and `.рф` domains, plus `geosite:category-ru`
+- Russian IP ranges (`geoip:ru`)
 
-Menu names differ between apps and versions; look for "Routing", "Region", or "Bypass".
+It also refuses QUIC (UDP 443) to everything else, so apps fall back to TCP, where the proxy routes them by name.
+
+Apps that import the plain link list (Base64) don't receive routing rules. In those apps, add **direct** rules for `geosite:category-ru` and `geoip:ru` in the routing settings, or switch to an app that imports Xray JSON or Mihomo subscriptions. Hiddify users can instead set the region to **Russia**.
 
 ### Why not edit the template in the panel?
 
-Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave — they carry the automatic fallback between your exits and relays. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay deploy`), so rules added there in the panel won't last. Replacing their routing sections can also break the automatic fallback.
+Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave. They carry the automatic fallback between your exits and relays, and the routing above. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay deploy`), so rules added there in the panel won't last.
 
 ## How the layers work together
 
@@ -49,10 +47,10 @@ Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawav
 | **Server-side geo-block** | Drops Russia-bound traffic at the exit | VPS IP showing up in Russian service logs |
 | **Split routing on the device** | Sends Russian traffic directly | Broken Russian sites, needless proxy load |
 
-With split routing on, Russian traffic never reaches the server. If a device doesn't have the rules (an older app, a new phone), the server still blocks Russian destinations, so the VPS IP stays protected.
+Russian traffic never reaches the server. If a device doesn't have the rules (a Base64 import, an older app), the server still blocks Russian destinations, so the VPS IP stays protected.
 
 If your users need Russian sites through the VPN instead, deploy with `--no-geo-block`.
 
 ## DNS considerations
 
-With split routing, Russian domains should resolve through local DNS, and everything else through the proxy, to avoid leaks. Apps with a region or bypass preset usually handle this. If your app has a separate DNS setting, enable its DNS leak protection for proxied traffic.
+In Xray JSON subscriptions, names that match no rule are resolved through the proxy, so foreign lookups don't leak to the local ISP. Mihomo subscriptions match Russian IP ranges only for connections made by IP and never resolve other names locally. If your app has a separate DNS setting, enable its DNS leak protection for proxied traffic.

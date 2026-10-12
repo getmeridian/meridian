@@ -404,6 +404,32 @@ class TestPureCompiler:
             "www.microsoft.com" in route.server_names and route.backend_port != 8443 for route in streams[0].routes
         )
 
+    def test_delivered_clients_keep_russian_and_local_traffic_off_the_tunnel(self) -> None:
+        import yaml
+
+        plan = compile_topology(_intent())
+        templates = {
+            resource.payload.template_type: resource.payload
+            for resource in plan.resources
+            if isinstance(resource.payload, SubscriptionTemplatePayload)
+        }
+        xray = templates["XRAY_JSON"].template_json
+        assert xray is not None
+        rules = xray["routing"]["rules"]
+        direct = [rule for rule in rules if rule.get("outboundTag") == "DIRECT"]
+        assert ["geoip:private"] in [rule.get("ip") for rule in direct]
+        assert ["geoip:ru"] in [rule.get("ip") for rule in direct]
+        assert any("geosite:category-ru" in rule.get("domain", []) for rule in direct)
+        assert {"type": "field", "network": "udp", "port": "443", "outboundTag": "BLOCK"} in rules
+        assert rules[-1]["balancerTag"] == "MERIDIAN_AUTO"
+        assert all(inbound["sniffing"]["routeOnly"] for inbound in xray["inbounds"])
+
+        mihomo = yaml.safe_load(templates["MIHOMO"].template_yaml.replace("# LEAVE THIS LINE!", ""))
+        assert mihomo["rules"][-1] == "MATCH,MERIDIAN AUTO"
+        assert "GEOIP,RU,DIRECT,no-resolve" in mihomo["rules"]
+        assert "GEOSITE,category-ru,DIRECT" in mihomo["rules"]
+        assert "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT" in mihomo["rules"]
+
     def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
         plan = compile_topology(_intent())
         templates = [

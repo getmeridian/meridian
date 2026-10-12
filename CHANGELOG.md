@@ -45,6 +45,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   admin panel's address.
 - `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
   the user and their page; links stop working immediately.
+- **Russian sites work with the VPN on** — Xray JSON and Mihomo subscriptions
+  send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
+  traffic directly and refuse foreign QUIC, while the exit's block stays as a
+  safety net. Plain Base64 imports still need the app's own routing settings.
 
 ### Security and correctness
 - No request logging on Meridian's web server; panel secrets are never rotated

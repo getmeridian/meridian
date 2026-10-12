@@ -24,23 +24,21 @@ Meridian 默认启用**服务器端地理封锁**：出口丢弃发往俄罗斯�
 - **VPS 保护** — 服务器端阻止保持作为安全网
 - **工作的俄罗斯网站** — 设备直接发送它们，从不通过代理
 
-## 如何设置
+## Meridian 中如何工作
 
-分流在客户端应用中配置。Meridian 还未在其订阅中提供分流。
+Meridian 在其 **Xray JSON** 和 **Mihomo** 订阅中提供分流，所以大多数应用无需设置。每个订阅直接发送这些目标：
 
-- **Hiddify** — 在设置中，将地区设置为**俄罗斯**。Hiddify 随后直接发送俄罗斯网站。
-- **v2rayNG、v2RayTun、v2rayN 和其他 Xray 应用** — 打开应用的路由设置并为 `geosite:category-ru` 和 `geoip:ru` 添加**直接**规则。
-- **Mihomo / Clash Meta 应用** — 订阅刷新替换配置，所以通过应用的覆盖或合并功能在最终 `MATCH` 规则上方添加这些规则：
-  ```yaml
-  - GEOSITE,category-ru,DIRECT
-  - GEOIP,RU,DIRECT
-  ```
+- 本地网络地址（`geosite:private`、`geoip:private`）
+- `.ru`、`.su` 和 `.рф` 域名，加上 `geosite:category-ru`
+- 俄罗斯 IP 范围（`geoip:ru`）
 
-菜单名称在应用和版本间不同；寻找"路由"、"地区"或"旁路"。
+它也拒绝 QUIC（UDP 443）到其他所有，所以应用回退到 TCP，代理通过名称路由它们。
+
+导入纯链接列表（Base64）的应用不接收路由规则。在这些应用中，在路由设置中为 `geosite:category-ru` 和 `geoip:ru` 添加**直接**规则，或切换到导入 Xray JSON 或 Mihomo 订阅的应用。Hiddify 用户可改为将地区设置为**俄罗斯**。
 
 ### 为什么不在面板中编辑模板？
 
-Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板 — 它们承载出口和中继间的自动回退。Meridian 在每次应用上恢复它们（包括重新部署和 `client add`、`node add`、`relay deploy`），所以在面板中添加的规则不会持续。替换它们的路由部分也可能破坏自动回退。
+Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板。它们承载你的出口和中继间的自动回退，以及上述路由。Meridian 在每次应用上恢复它们（包括重新部署和 `client add`、`node add`、`relay deploy`），所以在面板中添加的规则不会持续。
 
 ## 层如何配合工作
 
@@ -49,10 +47,10 @@ Meridian 在 Remnawave 中管理自己的 Xray JSON 和 Mihomo 订阅模板 — 
 | **服务器端地理封锁** | 在出口丢弃俄罗斯目标流量 | VPS IP 出现在俄罗斯服务日志中 |
 | **设备上的分流路由** | 直接发送俄罗斯流量 | 破损的俄罗斯网站、不必要的代理负载 |
 
-启用分流时，俄罗斯流量永不到达服务器。如果设备没有规则（旧应用、新手机），服务器仍阻止俄罗斯目标，所以 VPS IP 保持受保护。
+俄罗斯流量永不到达服务器。如果设备没有规则（Base64 导入、旧应用），服务器仍阻止俄罗斯目标，所以 VPS IP 保持受保护。
 
 如果你的用户需要通过 VPN 的俄罗斯网站，用 `--no-geo-block` 部署。
 
 ## DNS 考虑
 
-通过分流，俄罗斯域名应通过本地 DNS 解析，其他所有通过代理，以避免泄露。具有地区或旁路预设的应用通常处理这个。如果你的应用有单独的 DNS 设置，为代理流量启用其 DNS 泄露保护。
+在 Xray JSON 订阅中，不匹配任何规则的名称通过代理解析，所以外域查询不泄露到本地 ISP。Mihomo 订阅仅匹配俄罗斯 IP 范围以获得由 IP 进行的连接，永不本地解析其他名称。如果你的应用有单独的 DNS 设置，为代理流量启用其 DNS 泄露保护。

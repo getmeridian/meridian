@@ -271,7 +271,7 @@ class SetupWizard:
                 stage="roles",
             )
             geo_block = self._yes_no(
-                f"Block Russian sites and IPs on {exit_id}?",
+                f"Refuse Russian sites at {exit_id}? (apps open them directly; keeps the server out of their logs)",
                 default=True,
                 stage="roles",
             )

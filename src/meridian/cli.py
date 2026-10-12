@@ -354,7 +354,7 @@ def deploy_cmd(
     geo_block: bool = typer.Option(
         True,
         "--geo-block/--no-geo-block",
-        help="Block Russian domains and IPs (geosite:category-ru + geoip:ru)",
+        help="Refuse Russian domains and IPs at the exit; subscriptions already send them directly",
     ),
     hysteria2: bool = typer.Option(
         False,

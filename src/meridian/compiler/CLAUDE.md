@@ -8,6 +8,8 @@
 
 **Workload profiles are aggregate** — each exit Profile owns its complete typed Inbound set; derived Inbound resources expose the profile-scoped identities needed by bindings, Hosts, and squads.
 
+**Client routing is one typed list** — `delivery.py::DEFAULT_CLIENT_ROUTES` (private + Russian destinations direct, foreign QUIC blocked) renders into both Xray JSON rules and Mihomo rule lines; add a rule there, never in one template.
+
 **Fallback is capability-specific** — Xray JSON and Mihomo receive managed health-checked templates; Base64 receives ordered alternatives without an automatic-failover claim.
 
 ## What's done well
@@ -29,4 +31,6 @@
 - A Host is published only after its listener and node runtime dependencies.
 - Certificate resources depend on their reviewed TCP/80 ACME firewall rule.
 - One exit workload per server: a Remnawave node runtime can activate only one Profile.
+- Client geodata must exist in stock dat files (v2fly `geosite`/`geoip`, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole delivered config.
+- Mihomo IP rules keep `no-resolve`: resolving names locally leaks them and spoofed domestic answers would match `geoip:ru`.
 - Xray server pools use observatory-backed `leastPing`; do not claim unsupported strict-priority failover.
