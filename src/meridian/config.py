@@ -59,6 +59,10 @@ GITHUB_REPO = "https://github.com/getmeridian/meridian"
 # Update throttle (seconds)
 UPDATE_CHECK_INTERVAL = 60
 
+# acme.sh (TLS certificates) — the script is pinned and checksum-verified before it runs as root
+ACME_SH_VERSION = "3.1.6"
+ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8d7"
+
 # Relay (Realm TCP relay)
 REALM_VERSION = "2.9.3"
 REALM_GITHUB_URL = "https://github.com/zhboner/realm/releases/download"

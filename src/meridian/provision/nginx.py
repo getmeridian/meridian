@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import shlex
 
-from meridian.config import REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
+from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION, REMNAWAVE_PANEL_PORT, REMNAWAVE_SUBSCRIPTION_PAGE_PORT
 from meridian.provision.ensure import resolve_ctx
 from meridian.provision.nginx_render import (
     render_nginx_http_config,
@@ -196,10 +196,14 @@ class InstallNginx:
         # -- Install acme.sh (if not already installed) --
         check = conn.run("test -f /root/.acme.sh/acme.sh", timeout=15)
         if check.returncode != 0:
-            # email='' breaks acme.sh installer (shift error), omit when empty
-            email_flag = f"email={shlex.quote(self.email)}" if self.email else ""
+            # Pinned script, verified before it runs as root (never `curl | sh`).
+            url = f"https://raw.githubusercontent.com/acmesh-official/acme.sh/{ACME_SH_VERSION}/acme.sh"
+            email_flag = f" --accountemail {shlex.quote(self.email)}" if self.email else ""
             result = conn.run(
-                f"curl -fsSL https://get.acme.sh | sh -s -- {email_flag}",
+                'set -e; work=$(mktemp -d); trap \'rm -rf "$work"\' EXIT; cd "$work"; '
+                f"curl -fsSL --retry 3 -o acme.sh {shlex.quote(url)}; "
+                f"echo {shlex.quote(ACME_SH_SHA256 + '  acme.sh')} | sha256sum -c -; "
+                f"sh ./acme.sh --install --home /root/.acme.sh{email_flag}",
                 timeout=120,
             )
             if result.returncode != 0:

@@ -792,6 +792,24 @@ class TestInstallNginx:
         assert result.status == "ok"
         conn.assert_called_with_pattern("acme.sh --install-cronjob")
 
+    def test_acme_sh_is_pinned_and_verified_before_it_runs(self):
+        from meridian.config import ACME_SH_SHA256, ACME_SH_VERSION
+
+        conn = MockConnection()
+        conn.when("dpkg -l nginx", stdout="ii  nginx")
+        conn.when("nginx -V", stdout="--with-stream_ssl_preread_module")
+        conn.when("test -f /root/.acme.sh/acme.sh", rc=1)
+        conn.when("systemctl", stdout="")
+
+        InstallNginx(email="ops@example.com").run(conn, ProvisionContext(ip="198.51.100.1"))
+
+        install = next(call for call in conn.calls if "acme.sh --install --home" in call)
+        assert f"acmesh-official/acme.sh/{ACME_SH_VERSION}/acme.sh" in install
+        assert ACME_SH_SHA256 in install and "sha256sum -c" in install
+        assert install.index("sha256sum -c") < install.index("sh ./acme.sh --install")
+        assert "| sh -" not in install and "| sh\n" not in install and "get.acme.sh" not in install
+        assert "--accountemail ops@example.com" in install
+
     def test_missing_acme_cron_returns_changed(self):
         conn = MockConnection()
         conn.when("dpkg -l nginx", stdout="ii  nginx")
