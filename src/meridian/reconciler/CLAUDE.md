@@ -12,7 +12,7 @@ Checkpointed reconciliation of compiled topology resources.
 ## What's done well
 
 - **Unknown outcomes are fail-closed** — a timed-out mutation remains `unknown` if observation fails; retries happen only after a successful non-converged observation using the same idempotency key.
-- **Intent shrink is fail-closed** — compiled apply rejects removal of any active binding until reverse-dependency, ownership-checked retirement is implemented.
+- **Retirement after convergence** — `retirement.py` deletes vanished bindings in `RETIREMENT_ORDER` only after the whole new plan succeeds; a failure leaves the generation uncommitted for retry. Kinds outside that order (exits, relays, gateways) are refused in `validate_resource_plan_transition` before any state is written.
 - **Reviewed render contract** — setup hashes resolved SSH targets, runtime pins, and `render_contract.py`; bump its manifest whenever deployed bytes or commands change.
 
 ## Pitfalls
@@ -24,4 +24,4 @@ Checkpointed reconciliation of compiled topology resources.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
 - **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
-- **Do not mark old bindings inactive as a substitute for deletion** — retirement must remove owned remote resources in reverse dependency order.
+- **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.

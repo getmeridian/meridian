@@ -18,7 +18,7 @@
 
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove`, `node remove`, `relay remove`, and `relay check` refuse until intent shrink and per-hop checks exist.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/check/remove), `relay` (deploy/list/remove/check), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `test`, `probe`, `doctor`, `teardown`. `client remove` edits the intent and lets retirement delete the user; `node remove`, `relay remove`, and `relay check` refuse until server retirement and per-hop checks exist.
 
 ## What's done well
 
