@@ -23,10 +23,18 @@ def run(
     user: str = "root",
     ai: bool = False,
     requested_server: str = "",
+    *,
+    ssh_port: int = 0,
 ) -> None:
     """Run pre-flight checks on a server."""
     registry = ServerRegistry(SERVERS_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
+    resolved = resolve_server(
+        registry,
+        requested_server=requested_server,
+        explicit_ip=ip,
+        user=user,
+        port=ssh_port,
+    )
 
     resolved = ensure_server_connection(resolved)
     fetch_credentials(resolved)
