@@ -60,3 +60,13 @@ def test_legacy_proxy_cleanup_only_touches_meridian_owned_configs(tmp_path) -> N
     assert "systemctl stop haproxy" in haproxy
     assert caddy.startswith("[ -e /etc/caddy/conf.d/meridian.caddy ]")
     assert "systemctl stop caddy" in caddy
+
+
+def test_teardown_leaves_the_operators_meridian_cli_in_place(mock_conn) -> None:
+    """Run on the server, teardown must not delete the command its own output says to run next."""
+    from meridian.provision.steps import ProvisionContext
+    from meridian.provision.uninstall import Uninstall
+
+    Uninstall().run(mock_conn, ProvisionContext(ip="198.51.100.1"))
+
+    mock_conn.assert_not_called_with_pattern("bin/meridian")

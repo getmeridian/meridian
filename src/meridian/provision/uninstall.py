@@ -72,8 +72,6 @@ class Uninstall:
             ),
             # Server credentials, scripts, and V4 baseline attestations
             "rm -rf /etc/meridian /root/meridian /var/lib/meridian",
-            # CLI symlink
-            "rm -f /usr/local/bin/meridian",
             # Systemd daemon-reload after removing units and overrides
             "systemctl daemon-reload 2>/dev/null; true",
             # UFW rules
