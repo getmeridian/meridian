@@ -27,6 +27,7 @@ from meridian.reconciler.resources import (
     build_resource_actions,
     observation_converges,
 )
+from meridian.reconciler.retirement import retire, retired_bindings, unretirable
 
 PersistCluster = Callable[[ClusterConfig], None]
 Clock = Callable[[], datetime]
@@ -103,6 +104,11 @@ def execute_resource_plan(
         results=results,
     )
     if execution.all_succeeded:
+        # Retire only after everything still desired has converged, so a
+        # removal never strands traffic that the new plan has not yet carried.
+        retired, errors = retire(retired_bindings(plan, cluster), drivers, cluster, save)
+        execution = execution.model_copy(update={"retired": retired, "retirement_errors": errors})
+    if execution.all_succeeded:
         _commit_generation(plan, generation, cluster, save)
     return execution
 
@@ -129,16 +135,9 @@ def validate_resource_plan_transition(
                 f"remote outcome is unresolved for: {resources}."
             )
 
-    desired_ids = {resource.logical_id for resource in plan.resources}
-    retired_ids = sorted(
-        {
-            binding.logical_id
-            for binding in cluster.managed_bindings.values()
-            if binding.active and binding.logical_id not in desired_ids
-        }
-    )
-    if retired_ids:
-        raise UnsupportedResourceRetirementError(retired_ids)
+    blocked = unretirable(retired_bindings(plan, cluster))
+    if blocked:
+        raise UnsupportedResourceRetirementError(blocked)
 
 
 def inspect_resource_plan(
@@ -182,6 +181,7 @@ def inspect_resource_plan(
         plan_hash=plan.plan_hash,
         generation=generation,
         inspections=inspections,
+        retiring=[binding.logical_id for binding in retired_bindings(plan, cluster)],
     )
 
 
@@ -390,6 +390,7 @@ def _record_success(
         observed_hash=observation.observed_hash,
         active=binding.active if binding is not None else False,
         adopted=binding.adopted if binding is not None else False,
+        server_ref=str(getattr(action.resource.payload, "server_ref", "") or ""),
     )
     checkpoint = _checkpoint(action, cluster)
     checkpoint.status = "succeeded"

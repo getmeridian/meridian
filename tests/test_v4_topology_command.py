@@ -87,6 +87,8 @@ def _execution(*results: SimpleNamespace) -> SimpleNamespace:
         all_succeeded=all(item.succeeded for item in items),
         changed=any(item.changed for item in items),
         failed=[item for item in items if not item.succeeded],
+        retired=[],
+        retirement_errors=[],
     )
 
 
@@ -226,6 +228,7 @@ def test_v4_plan_json_uses_typed_compiled_result() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        retiring=[],
         converged=True,
         drifted=[],
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
@@ -263,6 +266,7 @@ def test_v4_plan_reports_generation_activation_when_resources_match() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        retiring=[],
         converged=True,
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
     )
@@ -291,6 +295,7 @@ def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
+        retiring=[],
         converged=False,
         inspections=[
             SimpleNamespace(

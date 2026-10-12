@@ -37,11 +37,10 @@ class UnsupportedResourceRetirementError(ResourceReconcileError):
         if len(resource_ids) > 5:
             preview += f", and {len(resource_ids) - 5} more"
         super().__init__(
-            f"This topology change would retire managed resources: {preview}.",
+            f"This change would remove resources Meridian cannot retire yet: {preview}.",
             hint=(
-                "Restore the previous topology. Meridian V4 currently permits additive and "
-                "in-place changes only; ownership-safe resource retirement must land before "
-                "intent can shrink."
+                "Users and protocol paths can be removed; removing exits, relays, or routing "
+                "gateways from a running fleet is not supported yet. Restore them in the topology."
             ),
             category="user",
         )
@@ -117,18 +116,30 @@ class ResourceExecutionResult(CoreModel):
     plan_hash: str
     generation: int
     results: list[ResourceActionResult] = Field(default_factory=list)
+    retired: list[str] = Field(default_factory=list)
+    retirement_errors: list[str] = Field(default_factory=list)
 
     @property
     def all_succeeded(self) -> bool:
-        return all(result.succeeded for result in self.results)
+        return all(result.succeeded for result in self.results) and not self.retirement_errors
 
     @property
     def changed(self) -> bool:
-        return any(result.changed for result in self.results)
+        return bool(self.retired) or any(result.changed for result in self.results)
 
     @property
     def failed(self) -> list[ResourceActionResult]:
         return [result for result in self.results if not result.succeeded]
+
+    @property
+    def failure_summary(self) -> str:
+        """One line naming every failed resource and failed retirement."""
+        return "; ".join(
+            [
+                *(f"{item.action.resource.logical_id}: {item.error}" for item in self.failed),
+                *self.retirement_errors,
+            ]
+        )
 
 
 class ResourceInspection(CoreModel):
@@ -149,10 +160,11 @@ class ResourceInspectionResult(CoreModel):
     plan_hash: str
     generation: int
     inspections: list[ResourceInspection] = Field(default_factory=list)
+    retiring: list[str] = Field(default_factory=list)
 
     @property
     def converged(self) -> bool:
-        return all(inspection.converged for inspection in self.inspections)
+        return not self.retiring and all(inspection.converged for inspection in self.inspections)
 
     @property
     def drifted(self) -> list[ResourceInspection]:

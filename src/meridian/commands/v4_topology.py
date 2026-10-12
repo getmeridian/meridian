@@ -126,11 +126,15 @@ def run_v4_apply(
     if not result.all_succeeded:
         for item in result.failed:
             warn(f"Failed: {item.action.resource.logical_id} — {item.error}")
+        for retirement_error in result.retirement_errors:
+            warn(f"Failed: {retirement_error}")
         fail(
             "V4 topology apply failed.",
             hint="Fix the failed resource and rerun `meridian apply`.",
             hint_type="system",
         )
+    for logical_id in result.retired:
+        ok(f"Removed {logical_id}")
     if result.changed:
         ok("V4 topology applied.")
     else:
@@ -188,6 +192,8 @@ def run_v4_plan(
             )
         elif drifted:
             summary_text = f"{len(drifted)} of {len(resources)} V4 resources require repair."
+        elif inspection.retiring:
+            summary_text = f"{len(inspection.retiring)} resources will be removed."
         else:
             summary_text = "V4 resources match; saved generation state requires activation."
         result_data = CompiledPlanResult(
@@ -210,6 +216,7 @@ def run_v4_plan(
                 )
                 for item in drifted
             ],
+            retiring_resources=inspection.retiring,
             resources=[
                 CompiledPlanResourceResult(
                     logical_id=resource.logical_id,
@@ -259,6 +266,8 @@ def run_v4_plan(
             err_console.print(
                 f"  [yellow]unavailable[/yellow] {escape(item.action.resource.logical_id)} — {escape(item.error)}"
             )
+        for logical_id in inspection.retiring:
+            err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:
             err_console.print(f"  [yellow]state[/yellow] {escape(change)}")
         err_console.print()

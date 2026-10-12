@@ -121,6 +121,11 @@ class AccessUserDriver:
             )
         return ResourceApplyReceipt(remote_id=user.id)
 
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        """Delete a user removed from the access list; already gone counts as done."""
+        if binding.remote_id:
+            _mutation(lambda: self.context.panel.delete_user(binding.remote_id), f"delete User {binding.logical_id}")
+
 
 class SubscriptionTemplateDriver:
     def __init__(self, context: RemnawaveDriverContext) -> None:

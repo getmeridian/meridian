@@ -36,6 +36,7 @@ class CompiledPlanResult(CoreModel):
     state_changes: list[str] = Field(default_factory=list)
     observation_errors: list[CompiledPlanDriftResult] = Field(default_factory=list)
     drifted_resources: list[CompiledPlanDriftResult] = Field(default_factory=list)
+    retiring_resources: list[str] = Field(default_factory=list)
     resources: list[CompiledPlanResourceResult] = Field(default_factory=list)
 
     def to_data(self) -> dict[str, Any]:

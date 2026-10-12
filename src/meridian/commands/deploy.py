@@ -205,7 +205,7 @@ def _execute(request: DeployRequest) -> DeployResult:
             )
             applied = runtime.apply_intent(intent)
             if not applied.all_succeeded:
-                failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in applied.failed)
+                failures = applied.failure_summary
                 fail(
                     "Deploy did not converge",
                     hint=f"{failures}. Fix the cause and run the same command again; finished steps are skipped.",

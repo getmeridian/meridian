@@ -38,6 +38,7 @@ export type Kind =
   | "probe";
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
+export type RetiringResources = string[];
 export type StateChanges = string[];
 export type Summary = string;
 
@@ -51,6 +52,7 @@ export interface CompiledPlanResult {
   observation_errors?: ObservationErrors;
   plan_hash: PlanHash;
   resources?: Resources;
+  retiring_resources?: RetiringResources;
   state_changes?: StateChanges;
   summary: Summary;
 }

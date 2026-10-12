@@ -112,6 +112,13 @@
       "title": "Resources",
       "type": "array"
     },
+    "retiring_resources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Retiring Resources",
+      "type": "array"
+    },
     "state_changes": {
       "items": {
         "type": "string"

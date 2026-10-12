@@ -69,7 +69,7 @@ def run_add_v4(
     except ReviewedApplyPersistenceError as exc:
         _report_v4_state_failure(names, cluster, operation, exc)
     if not result.all_succeeded:
-        failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
+        failures = result.failure_summary
         fail(
             "V4 client access did not converge",
             hint=failures + ". The updated intent was saved; retry `meridian apply` after fixing the failure.",

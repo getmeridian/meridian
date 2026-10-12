@@ -581,7 +581,7 @@ class SetupWizard:
             raise _Navigation("save")
         result = self.runtime.apply(draft)
         if not result.all_succeeded:
-            failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
+            failures = result.failure_summary
             raise LocalStateError(
                 "Setup apply did not converge.",
                 hint=failures or "Fix the failed resource and resume setup.",

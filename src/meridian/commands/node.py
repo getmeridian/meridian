@@ -132,7 +132,7 @@ def run_add(
     except MeridianException as exc:
         fail(exc)
     if not result.all_succeeded:
-        failures = "; ".join(f"{item.action.resource.logical_id}: {item.error}" for item in result.failed)
+        failures = result.failure_summary
         fail(
             "V4 exit did not converge.",
             hint=failures,

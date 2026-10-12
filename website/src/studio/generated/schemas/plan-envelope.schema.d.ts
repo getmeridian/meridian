@@ -43,6 +43,7 @@ export type Kind =
   | "probe";
 export type LogicalId1 = string;
 export type Resources = CompiledPlanResourceResult[];
+export type RetiringResources = string[];
 export type StateChanges = string[];
 export type Summary = string;
 export type DurationMs = number;
@@ -73,6 +74,7 @@ export type ExitCode3 = number;
 export type ObservationErrors1 = CompiledPlanDriftResult[];
 export type PlanHash1 = string;
 export type Resources1 = CompiledPlanResourceResult[];
+export type RetiringResources1 = string[];
 export type StateChanges1 = string[];
 export type Summary2 = string;
 export type DurationMs1 = number;
@@ -112,6 +114,7 @@ export interface PlanCommandData {
   observation_errors?: ObservationErrors;
   plan_hash: PlanHash;
   resources?: Resources;
+  retiring_resources?: RetiringResources;
   state_changes?: StateChanges;
   summary: Summary;
 }
@@ -185,6 +188,7 @@ export interface CompiledPlanResult {
   observation_errors?: ObservationErrors1;
   plan_hash: PlanHash1;
   resources?: Resources1;
+  retiring_resources?: RetiringResources1;
   state_changes?: StateChanges1;
   summary: Summary2;
 }

@@ -162,6 +162,7 @@ class ManagedResourceBinding:
     observed_hash: str = ""
     active: bool = False
     adopted: bool = False
+    server_ref: str = ""  # host owning server-side artifacts, needed to retire them
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 

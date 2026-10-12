@@ -40,6 +40,7 @@ from meridian.remnawave import (
     MeridianPanel,
     Node,
     RemnawaveNetworkError,
+    RemnawaveNotFoundError,
 )
 from meridian.xray_workload import render_workload_config
 
@@ -454,6 +455,15 @@ class HostDriver:
                 f"update Host {payload.remark}",
             )
         return ResourceApplyReceipt(remote_id=host.uuid)
+
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        """Delete a Host whose path left the plan; already gone counts as done."""
+        if not binding.remote_id:
+            return
+        try:
+            _mutation(lambda: self.context.panel.delete_host(binding.remote_id), f"delete Host {binding.logical_id}")
+        except RemnawaveNotFoundError:
+            pass
 
 
 class InternalSquadDriver:

@@ -60,6 +60,7 @@ from meridian.reconciler.server_render import (
     render_realm_config,
     render_realm_unit,
 )
+from meridian.reconciler.server_retirement import FirewallRetirement, NginxArtifactRetirement
 from meridian.remnawave import MeridianPanel
 from meridian.remnawave.versions import effective_image
 from meridian.ssh import ServerConnection
@@ -206,7 +207,7 @@ class ServerBaselineDriver:
 NGINX_ENABLE_AND_RELOAD = "systemctl enable nginx >/dev/null 2>&1; systemctl reload-or-restart nginx"
 
 
-class FirewallRuleDriver:
+class FirewallRuleDriver(FirewallRetirement):
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -358,7 +359,7 @@ class CertificateDriver:
         return ResourceApplyReceipt(remote_id=f"{cert_dir}/fullchain.pem")
 
 
-class NginxArtifactDriver:
+class NginxArtifactDriver(NginxArtifactRetirement):
     _LEGACY_STREAM_PATH = "/etc/nginx/stream.d/meridian.conf"
 
     def __init__(self, context: ServerDriverContext) -> None:

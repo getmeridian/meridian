@@ -227,8 +227,8 @@ class TestCheckpointedExecution:
     def test_rejects_intent_shrink_before_state_or_remote_mutation(self) -> None:
         plan = _plan()
         retired = ManagedResourceBinding(
-            logical_id="host:retired",
-            resource_kind="host",
+            logical_id="node:retired",
+            resource_kind="node_runtime",
             generation=1,
             remote_id="host-1",
             desired_hash=_HASH_A,
@@ -236,7 +236,7 @@ class TestCheckpointedExecution:
             active=True,
         )
         cluster = ClusterConfig(
-            managed_bindings={"host:retired@1": retired},
+            managed_bindings={"node:retired@1": retired},
             active_generation=1,
             active_plan_hash=_HASH_B,
         )
@@ -245,7 +245,7 @@ class TestCheckpointedExecution:
 
         with pytest.raises(
             UnsupportedResourceRetirementError,
-            match="host:retired",
+            match="node:retired",
         ):
             execute_resource_plan(
                 plan,
@@ -259,6 +259,73 @@ class TestCheckpointedExecution:
         assert driver.apply_calls == []
         assert saves == []
         assert cluster.pending_plan_hash == ""
+
+    def test_vanished_host_and_user_are_retired_after_convergence(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=2)[0]
+        events: list[str] = []
+
+        class Retiring(ScriptedDriver):
+            def retire(self, binding: ManagedResourceBinding) -> None:
+                events.append(f"retire:{binding.logical_id}:{binding.remote_id}")
+
+        bindings = {
+            f"{kind}:gone@1": ManagedResourceBinding(
+                logical_id=f"{kind}:gone",
+                resource_kind=kind,
+                generation=1,
+                remote_id=f"{kind}-remote",
+                active=True,
+            )
+            for kind in ("host", "access_user")
+        }
+        cluster = ClusterConfig(managed_bindings=bindings, active_generation=1, active_plan_hash=_HASH_B)
+        firewall = Retiring([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")], events=events)
+        retiring = Retiring([], events=events)
+
+        result = execute_resource_plan(
+            plan,
+            cluster,
+            {"firewall_rule": firewall, "host": retiring, "access_user": retiring},
+            persist=lambda _state: None,
+            clock=_clock,
+        )
+
+        assert result.all_succeeded
+        assert result.retired == ["access_user:gone", "host:gone"]
+        assert events.index("apply:firewall:srv-exit:tcp:443") < events.index(
+            "retire:access_user:gone:access_user-remote"
+        )
+        assert not any(binding.active for key, binding in cluster.managed_bindings.items() if key.endswith(":gone@1"))
+        assert cluster.active_generation == 2
+
+    def test_failed_retirement_keeps_the_generation_uncommitted(self) -> None:
+        plan = _plan()
+        action = build_resource_actions(plan, generation=2)[0]
+
+        class Broken(ScriptedDriver):
+            def retire(self, binding: ManagedResourceBinding) -> None:
+                raise OSError("panel unavailable")
+
+        cluster = ClusterConfig(
+            managed_bindings={
+                "host:gone@1": ManagedResourceBinding(
+                    logical_id="host:gone", resource_kind="host", generation=1, remote_id="h", active=True
+                )
+            },
+            active_generation=1,
+            active_plan_hash=_HASH_B,
+        )
+        firewall = ScriptedDriver([_missing(), _converged(action)], [ResourceApplyReceipt(remote_id="fw")])
+
+        result = execute_resource_plan(
+            plan, cluster, {"firewall_rule": firewall, "host": Broken([])}, persist=lambda _state: None, clock=_clock
+        )
+
+        assert not result.all_succeeded
+        assert "retire host:gone: panel unavailable" in result.failure_summary
+        assert cluster.active_generation == 1
+        assert cluster.managed_bindings["host:gone@1"].active
 
     def test_applies_in_dependency_order_and_commits_generation(self) -> None:
         plan = _plan(with_probe=True)
