@@ -7,13 +7,14 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from meridian import i18n
 from meridian.commands.apply_progress import apply_progress
 from meridian.commands.setup_wizard import SetupWizard
 from meridian.config import (
     SERVER_PROFILES_FILE,
     SETUP_DRAFT_FILE,
 )
-from meridian.console import error_context, fail
+from meridian.console import error_context, fail, has_tty
 from meridian.core.errors import LocalStateError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
@@ -50,6 +51,17 @@ def run(
                 )
             store.save(SetupDraft.from_intent(_load_intent(intent_path)))
 
+        draft = store.load()
+        if not yes and not has_tty():
+            fail(
+                "`meridian setup` asks questions and needs a terminal.",
+                hint="Run it in an interactive terminal, or pass --intent FILE --yes.",
+                hint_type="user",
+            )
+        language = i18n.explicit_locale()
+        if language is not None:
+            i18n.set_locale(language)
+
         with apply_progress(registry=registry) as reporter:
             wizard = SetupWizard(
                 service=service,
@@ -57,6 +69,8 @@ def run(
                 runtime=SetupRuntime(registry, reporter=reporter),
                 register_server=_register_server,
                 auto_approve=yes,
+                ask_language=language is None and not yes and (draft is None or not draft.completed_stages),
+                on_language=_remember_language,
             )
             wizard.run()
 
@@ -78,6 +92,12 @@ def _load_intent(source: str) -> SetupIntent:
             f"Invalid setup intent at {location or 'document'}: {first['msg']}",
             hint_type="user",
         )
+
+
+def _remember_language(code: str) -> None:
+    locale = i18n.normalize_locale(code) or i18n.DEFAULT_LOCALE
+    i18n.set_locale(locale)
+    i18n.save_locale(locale)
 
 
 def _register_server(

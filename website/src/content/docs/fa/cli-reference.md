@@ -42,7 +42,7 @@ meridian deploy [SERVER] [flags]
 
 ### meridian setup
 
-چندین سرور را با wizard راهنمایی resumable پیکربندی کنید: exits، transparent Realm relay chains، routing gateways با failover pools و access users.
+یک wizard راهنمایی resumable برای یک یا بسیاری سرور: exits، Realm relays، routing gateways با failover pools و users. این برای افرادی نوشته شده است که هرگز VPN را تنظیم نکرده‌اند: هر سؤال از اصطلاح واقعی (exit، relay، SNI) استفاده می‌کند و آن را در یک جملهٔ ساده با پیش‌فرض ایمن توضیح می‌دهد که می‌توانید با فشار دادن Enter بپذیرید.
 
 ```
 meridian setup [--intent FILE|-] [--restart] [--yes]
@@ -54,7 +54,7 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | پیشرفت setup ذخیره‌شده را قبل از شروع دور کنید |
 | `--yes`, `-y` | | بررسی و اعمال را بدون پرسش تأیید کنید |
 
-wizard از طریق سروری، نقش، مسیرهای پروتکل، مسیریابی، دسترسی، بررسی و اعمال راه‌اندازی می‌شود. در هر prompt می‌توانید `back`، `details`، `save` یا `quit` تایپ کنید. پیشرفت بعد از هر مرحله در `~/.meridian/setup.json` ذخیره می‌شود، بنابراین `meridian setup` دوباره اجرا resume می‌شود؛ رمزهای عبور و کلیدهای خصوصی هرگز در آنجا ذخیره نمی‌شوند. `--intent` draft موجود را جایگزین نمی‌کند مگر `--restart` همچنین داده شود. هنگامی‌که اعمال موفق باشد، setup هر گره و اشتراک را تأیید کرده و صفحه اتصال هر کاربر را چاپ می‌کند.
+اولین سؤال زبان است (English, Русский, فارسی, 中文)، از ترمینال شما پیش‌انتخاب‌شده و در `~/.meridian/preferences.json` به‌خاطر سپرده می‌شود؛ `--lang` یا `MERIDIAN_LANG` آن را رد می‌کنند. سپس wizard از طریق سروری (یک IP، `user@IP:port` یا `local` برای این ماشین)، آنچه که هر سرور انجام می‌دهد، روش‌های اتصال، مسیریابی (تنها زمانی پرسیده می‌شود که routing gateway داشته باشید)، users، خلاصهٔ ساده‌زبان و اعمال راه‌اندازی می‌شود. در هر prompt می‌توانید `back`، `details`، `save` یا `quit` تایپ کنید (یا همان کلمات به زبان شما). اجرای `meridian` بدون فرمان در یک ترمینال، قبل از آن‌که VPN موجود باشد، برای شروع wizard پیشنهاد می‌دهد. پیشرفت بعد از هر مرحله در `~/.meridian/setup.json` ذخیره می‌شود، بنابراین `meridian setup` دوباره اجرا resume می‌شود؛ رمزهای عبور و کلیدهای خصوصی هرگز در آنجا ذخیره نمی‌شوند. `--intent` draft موجود را جایگزین نمی‌کند مگر `--restart` همچنین داده شود. هنگامی‌که اعمال موفق باشد، setup هر گره و اشتراک را تأیید کرده و صفحه اتصال هر کاربر را چاپ می‌کند.
 
 ### meridian plan
 
@@ -351,6 +351,7 @@ meridian api workflow NAME [--json]
 | `--version`, `-v` | نسخه CLI را نشان داده و خروج کنید |
 | `--verbose` | فعال کردن debug logging |
 | `--quiet`, `-q` | output پیشرفت را suppress کنید |
+| `--lang CODE` | زبان برای wizard setup: `en`, `ru`, `fa` یا `zh` (پیش‌فرض: انتخاب ذخیره‌شده، وگرنه پرسیده می‌شود) |
 | `--json` | درخواست JSON envelope از دستور که آن را پشتیبانی می‌کند؛ دستورات دیگر صریح ناموفق می‌شوند |
 | `--install-completion` | shell completion برای shell فعلی نصب کنید |
 | `--show-completion` | completion script برای shell فعلی چاپ کنید |

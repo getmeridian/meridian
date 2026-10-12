@@ -24,8 +24,13 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   and proxy, picks a camouflage target the server can actually use, pushes real
   traffic through the delivered subscription, and only then prints "Done" with a
   shareable connection page and QR code. Re-running it resumes or redeploys.
-- **Multi-server setups** — `meridian setup` is a guided, resumable wizard for
-  several exits, Realm relay chains, and routing gateways with failover.
+- **A setup wizard anyone can follow** — `meridian setup` is a guided,
+  resumable wizard for one server or many (exits, Realm relays, routing
+  gateways with failover). It speaks English, Russian, Persian, and Chinese
+  (asked first, remembered, or `--lang`), explains each term in one plain
+  sentence, accepts `local` for the machine you are on, skips routing questions
+  unless you have a gateway, and ends with a plain summary before anything
+  changes. Running `meridian` alone in a terminal offers to start it.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
 - **Optional paths** — `--domain` adds XHTTP and WSS (Cloudflare CDN fallback);

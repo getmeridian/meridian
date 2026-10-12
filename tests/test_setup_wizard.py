@@ -23,20 +23,42 @@ from meridian.setup.shelf import ServerShelf
 
 
 class _ScriptedIO:
-    def __init__(self, answers: Sequence[str]) -> None:
+    """Answers prompts in order; each answer names a fragment its prompt must contain."""
+
+    def __init__(self, answers: Sequence[tuple[str, str]]) -> None:
         self.answers = list(answers)
         self.output: list[str] = []
+        self.labels: list[str] = []
 
     def write(self, message: str = "") -> None:
         self.output.append(message)
 
     def ask(self, label: str, *, default: str = "") -> str:
         assert self.answers, f"Unexpected prompt: {label}"
-        answer = self.answers.pop(0)
+        fragment, answer = self.answers.pop(0)
+        assert fragment in label, f"Expected a prompt containing {fragment!r}, got {label!r}"
+        self.labels.append(label)
         return answer or default
 
     def approve(self, label: str) -> bool:
         raise AssertionError(f"Unexpected direct approval prompt: {label}")
+
+
+# control server runs only the panel; the second server is the exit.
+_TWO_SERVER_JOURNEY: list[tuple[str, str]] = [
+    ("Which servers should this VPN run on", "all"),
+    ("control panel", "1"),
+    ("Job for control", "control"),
+    ("Job for exit", ""),
+    ("Country code", ""),
+    ("WARP", ""),
+    ("Refuse Russian sites", ""),
+    ("Domain for the control panel", ""),
+    ("Name of this VPN", ""),
+    ("Camouflage site", ""),
+    ("Backup methods", ""),
+    ("Names of the people", ""),
+]
 
 
 class _Runtime:
@@ -106,29 +128,7 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
     tmp_path,
 ) -> None:
     store, shelf, service = _services(tmp_path)
-    io = _ScriptedIO(
-        [
-            "all",
-            "1",
-            "2",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "yes",
-            "yes",
-        ]
-    )
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "yes")])
     wizard = SetupWizard(
         service=service,
         shelf=shelf,
@@ -145,6 +145,8 @@ def test_guided_journey_persists_every_stage_and_hands_off_subscription(
     assert draft is not None
     assert draft.current_stage == "handoff"
     assert draft.roles is not None and all(exit_.geo_block for exit_ in draft.roles.exits)
+    assert draft.roles.control.server_ref == "srv-control"
+    assert [exit_.server_ref for exit_ in draft.roles.exits] == ["srv-exit"]
     assert draft.completed_stages == list(
         (
             "servers",
@@ -175,7 +177,7 @@ def test_review_lists_removals_and_approves_the_retirement_bound_hash(tmp_path) 
             server_ref="srv-old-relay",
         ),
     )
-    io = _ScriptedIO(["all", "1", "2", *[""] * 15, "yes", "yes"])
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "")])
     wizard = SetupWizard(
         service=service,
         shelf=shelf,
@@ -190,7 +192,7 @@ def test_review_lists_removals_and_approves_the_retirement_bound_hash(tmp_path) 
     assert draft is not None
     assert draft.review_hash != draft.applied_plan_hash
     assert draft.applied_plan_hash == compile_topology(draft.to_intent()).plan_hash
-    assert any("Removes 1 resources" in line for line in io.output)
+    assert any("removes 1 resources" in line for line in io.output)
     assert any("realm:old-relay:0" in line for line in io.output)
 
 
@@ -198,7 +200,7 @@ def test_details_repeats_prompt_and_quit_keeps_progress_file_untouched(
     tmp_path,
 ) -> None:
     store, shelf, service = _services(tmp_path)
-    io = _ScriptedIO(["details", "quit"])
+    io = _ScriptedIO([("Which servers should this VPN run on", "details"), ("Which servers", "quit")])
     wizard = SetupWizard(
         service=service,
         shelf=shelf,
@@ -209,35 +211,14 @@ def test_details_repeats_prompt_and_quit_keeps_progress_file_untouched(
 
     assert wizard.run() == "saved"
     assert store.load() is None
-    assert any("stable IDs" in line for line in io.output)
+    assert any("never stores passwords" in line for line in io.output)
 
 
 def test_back_from_review_invalidates_access_and_review_hash(
     tmp_path,
 ) -> None:
     store, shelf, service = _services(tmp_path)
-    seed_io = _ScriptedIO(
-        [
-            "all",
-            "1",
-            "2",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "save",
-        ]
-    )
+    seed_io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "save")])
     seed = SetupWizard(
         service=service,
         shelf=shelf,
@@ -249,7 +230,7 @@ def test_back_from_review_invalidates_access_and_review_hash(
     draft = store.load()
     assert draft is not None and draft.current_stage == "review"
 
-    io = _ScriptedIO(["back", "save"])
+    io = _ScriptedIO([("Set this up now?", "back"), ("Names of the people", "save")])
     wizard = SetupWizard(
         service=service,
         shelf=shelf,
@@ -264,3 +245,206 @@ def test_back_from_review_invalidates_access_and_review_hash(
     assert rewound.current_stage == "access"
     assert rewound.access is None
     assert rewound.review_hash == ""
+
+
+def _wizard(service, shelf, io, register_server=lambda *_args: None) -> SetupWizard:
+    return SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime()),
+        register_server=register_server,
+        io=io,
+    )
+
+
+def test_first_server_added_as_local_is_selected_and_becomes_control_and_exit(tmp_path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    store = SetupDraftStore(tmp_path / "setup.json")
+    shelf = ServerShelf(registry)
+    service = SetupDraftService(store, shelf)
+    registered: list[tuple[str, str, str, int]] = []
+
+    def register(address: str, name: str, user: str, port: int) -> None:
+        registered.append((address, name, user, port))
+        registry.add(ServerEntry(host="198.51.100.30", name=name, id="srv-here", auth_state="validated"))
+
+    io = _ScriptedIO(
+        [
+            ("Server address", "local"),
+            ("Short name", ""),
+            ("Add another server?", ""),
+            ("Country code", "de"),
+            ("WARP", ""),
+            ("Refuse Russian sites", "no"),
+            ("Domain for the control panel", ""),
+            ("Name of this VPN", ""),
+            ("Camouflage site", ""),
+            ("Backup methods", ""),
+            ("Names of the people", "alice, laptop"),
+            ("Set this up now?", ""),
+        ]
+    )
+
+    assert _wizard(service, shelf, io, register).run() == "completed"
+
+    assert registered == [("local", "this-server", "", 0)]
+    draft = store.load()
+    assert draft is not None and draft.roles is not None and draft.access is not None
+    assert draft.roles.control.server_ref == "srv-here"
+    assert [(exit_.server_ref, exit_.region, exit_.geo_block) for exit_ in draft.roles.exits] == [
+        ("srv-here", "DE", False)
+    ]
+    assert draft.access.access.users == ["alice", "laptop"]
+    assert any("this-server will run the control panel" in line for line in io.output)
+
+
+def test_relay_forwards_to_the_only_exit_without_asking(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [
+            ("Which servers should this VPN run on", "all"),
+            ("control panel", "2"),
+            ("Job for control", "relay"),
+            ("Job for exit", "exit"),
+            ("Country code", ""),
+            ("WARP", ""),
+            ("Refuse Russian sites", ""),
+            ("Domain for the control panel", ""),
+            ("Name of this VPN", ""),
+            ("Camouflage site", ""),
+            ("Backup methods", ""),
+            ("Names of the people", ""),
+            ("Set this up now?", "save"),
+        ]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+
+    draft = store.load()
+    assert draft is not None and draft.roles is not None
+    (relay,) = draft.roles.transparent_relays
+    assert relay.hop_server_refs == ["srv-control"]
+    assert relay.exit_ref == "exit"
+    assert any("Relay" in line and "control (198.51.100.10)" in line for line in io.output)
+
+
+def test_routing_is_skipped_without_a_gateway_and_asked_with_one(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [
+            ("Which servers should this VPN run on", "all"),
+            ("control panel", "1"),
+            ("Job for control", "gateway"),
+            ("Job for exit", ""),
+            ("Country code", ""),
+            ("WARP", ""),
+            ("Refuse Russian sites", ""),
+            ("Domain for the control panel", ""),
+            ("Name of this VPN", ""),
+            ("Camouflage site", ""),
+            ("Backup methods", ""),
+            ("Where should traffic go by default?", ""),
+            ("Add a rule", "yes"),
+            ("Match traffic by", "domain"),
+            ("Values", "example.org"),
+            ("Block this traffic", "yes"),
+            ("Add a rule", ""),
+            ("Names of the people", "save"),
+        ]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+
+    draft = store.load()
+    assert draft is not None and draft.routing is not None
+    assert draft.routing.default_egress_ref == "exit"
+    (route,) = draft.routing.routes
+    assert (route.match, route.match_values, route.action) == ("domain", ["example.org"], "block")
+
+
+def test_typing_exit_picks_the_role_instead_of_quitting(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [
+            ("Which servers should this VPN run on", "all"),
+            ("control panel", "1"),
+            ("Job for control", "exit"),
+            ("Job for exit", "exit"),
+            ("Country code", "quit"),
+        ]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+    assert io.answers == []
+
+
+def test_backup_methods_get_random_paths_and_wss_warns_about_cdn_stalls(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [
+            *_TWO_SERVER_JOURNEY[:10],
+            ("Backup methods", "wss, xhttp"),
+            ("Domain whose DNS points at 198.51.100.20", "vpn.example.org"),
+            ("Names of the people", "save"),
+        ]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+
+    draft = store.load()
+    assert draft is not None and draft.paths is not None
+    paths = {path.protocol: path for path in draft.paths.exits[0].paths}
+    assert list(paths) == ["reality", "xhttp", "wss"]
+    assert paths["xhttp"].path != paths["wss"].path
+    assert all(len(paths[name].path) == 16 and "exit" not in paths[name].path for name in ("xhttp", "wss"))
+    assert any("stall after about 20 KB" in line for line in io.output)
+
+
+def test_backup_methods_without_a_domain_repeat_the_stage(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [
+            *_TWO_SERVER_JOURNEY[:10],
+            ("Backup methods", "hysteria2"),
+            ("Domain whose DNS points", ""),
+            ("Camouflage site", "quit"),
+        ]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+    assert any("need a domain" in line for line in io.output)
+
+
+def test_language_step_comes_first_and_switches_the_following_prompts(tmp_path) -> None:
+    from meridian import i18n
+
+    store, shelf, service = _services(tmp_path)
+    chosen: list[str] = []
+    io = _ScriptedIO([("Language / Язык", "2"), ("", "quit")])
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime()),
+        register_server=lambda *_args: None,
+        io=io,
+        ask_language=True,
+        on_language=lambda code: (chosen.append(code), i18n.set_locale(i18n.normalize_locale(code) or "en")),
+    )
+    try:
+        assert wizard.run() == "saved"
+        assert chosen == ["ru"]
+        assert io.labels[1] == i18n.catalog("ru")["servers.pick"]
+    finally:
+        i18n.set_locale("en")
+
+
+def test_setup_without_a_terminal_refuses_instead_of_taking_defaults(tmp_home, monkeypatch) -> None:
+    import pytest
+    import typer
+
+    from meridian.commands import setup_v4
+
+    monkeypatch.setattr(setup_v4, "has_tty", lambda: False)
+    with pytest.raises(typer.Exit) as exc_info:
+        setup_v4.run()
+    assert exc_info.value.exit_code == 2

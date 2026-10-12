@@ -31,6 +31,7 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(cfg, "CACHE_DIR", home / "cache")
     monkeypatch.setattr(cfg, "SERVER_PROFILES_FILE", home / "servers.json")
     monkeypatch.setattr(cfg, "SETUP_DRAFT_FILE", home / "setup.json")
+    monkeypatch.setattr(cfg, "PREFERENCES_FILE", home / "preferences.json")
     monkeypatch.setattr(cfg, "MERIDIAN_SSH_KEY_FILE", home / "ssh" / "meridian_ed25519")
 
     return home

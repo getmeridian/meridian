@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+import typer
 from typer.testing import CliRunner
 
 import meridian.cli as cli
@@ -48,7 +49,26 @@ class TestCLIBasics:
     def test_no_args_shows_help(self) -> None:
         result = runner.invoke(app)
         output = _strip_ansi(result.output)
-        assert "deploy" in output or "Usage" in output
+        assert result.exit_code == 0
+        assert "Usage" in output and "deploy" in output
+
+    def test_bare_meridian_in_a_terminal_without_a_fleet_offers_the_wizard(self, monkeypatch, tmp_home) -> None:
+        started: list[bool] = []
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stderr.isatty", lambda: True)
+        monkeypatch.setattr("meridian.commands.wizard_prompts.prompt", lambda label, default="": default)
+        monkeypatch.setattr("meridian.commands.setup_v4.run", lambda **_kwargs: started.append(True))
+        ctx = typer.Context(typer.main.get_command(app))
+
+        cli._offer_setup_or_help(ctx, interactive=True)
+
+        assert started == [True]
+
+    def test_unsupported_lang_is_a_user_error(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        result = runner.invoke(app, ["--lang", "de", "server", "list"])
+        assert result.exit_code == 2
+        assert "Unsupported language: de" in _strip_ansi(result.output)
 
 
 class TestSubcommandHelp:

@@ -55,6 +55,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── setup/CLAUDE.md                     — resumable setup draft + server shelf
 ├── compiler/CLAUDE.md                  — pure finite topology compiler
 ├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
+├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 │   └── routes.py                       — FastAPI route handlers
 ├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple

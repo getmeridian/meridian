@@ -196,6 +196,15 @@ def banner(version: str) -> None:
     err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
 
 
+def has_tty() -> bool:
+    """Whether prompts can reach a terminal (they read /dev/tty, so piped stdin is fine)."""
+    try:
+        with open("/dev/tty"):
+            return True
+    except OSError:
+        return False
+
+
 def prompt(message: str, default: str = "") -> str:
     """Interactive prompt that reads from /dev/tty for pipe safety."""
     suffix = f" [{default}]" if default else ""

@@ -42,7 +42,7 @@ meridian deploy [SERVER] [flags]
 
 ### meridian setup
 
-用可恢复的引导向导配置多个服务器：出口、透明 Realm 中继链、带故障转移池的路由网关和访问用户。
+用可恢复的引导向导为一个或多个服务器配置：出口、Realm 中继、带故障转移池的路由网关和用户。它是为从未设置过 VPN 的人编写的：每个问题都使用真实术语（出口、中继、SNI）并用一个简单句子解释它，并附带一个可以通过按 Enter 接受的安全默认值。
 
 ```
 meridian setup [--intent FILE|-] [--restart] [--yes]
@@ -54,7 +54,7 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | 启动前放弃保存的设置进度 |
 | `--yes`, `-y` | | 批准审核并应用无需询问 |
 
-向导走过服务器、角色、协议路径、路由、访问、审核和应用。在任何提示处你可以输入 `back`、`details`、`save` 或 `quit`。进度在每个阶段后保存在 `~/.meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
+第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问）、用户、平实语言摘要和应用。在任何提示处你可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
 
 ### meridian plan
 
@@ -353,6 +353,7 @@ meridian api workflow NAME [--json]
 | `--version`, `-v` | 显示 CLI 版本并退出 |
 | `--verbose` | 启用调试日志 |
 | `--quiet`, `-q` | 压制进度输出 |
+| `--lang CODE` | 设置向导的语言：`en`、`ru`、`fa` 或 `zh`（默认：已保存的选择，否则询问） |
 | `--json` | 从支持它的命令请求 JSON 信封；其他命令明确失败 |
 | `--install-completion` | 为当前 shell 安装补全 |
 | `--show-completion` | 为当前 shell 打印补全脚本 |

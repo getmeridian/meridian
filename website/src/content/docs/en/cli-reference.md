@@ -42,7 +42,7 @@ Without an IP, deploy asks for one. `local` deploys on the machine you are runni
 
 ### meridian setup
 
-Configure several servers with a resumable guided wizard: exits, transparent Realm relay chains, routing gateways with failover pools, and access users.
+A resumable guided wizard for one server or many: exits, Realm relays, routing gateways with failover pools, and users. It is written for people who have never set up a VPN: every question uses the real term (exit, relay, SNI) and explains it in one plain sentence, with a safe default you can accept by pressing Enter.
 
 ```
 meridian setup [--intent FILE|-] [--restart] [--yes]
@@ -54,7 +54,7 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | Discard saved setup progress before starting |
 | `--yes`, `-y` | | Approve the review and apply without asking |
 
-The wizard walks through servers, roles, protocol paths, routing, access, review, and apply. At any prompt you can type `back`, `details`, `save`, or `quit`. Progress is saved in `~/.meridian/setup.json` after each stage, so running `meridian setup` again resumes; passwords and private keys are never stored there. `--intent` does not replace an existing draft unless `--restart` is also given. When apply succeeds, setup verifies every node and subscription and prints each user's connection page.
+The first question is the language (English, Русский, فارسی, 中文), preselected from your terminal and remembered in `~/.meridian/preferences.json`; `--lang` or `MERIDIAN_LANG` skips it. Then the wizard walks through servers (an IP, `user@IP:port`, or `local` for this machine), what each server does, connection methods, routing (only asked when you have a routing gateway), users, a plain-language summary, and apply. At any prompt you can type `back`, `details`, `save`, or `quit` (or the same words in your language). Running `meridian` with no command in a terminal, before any VPN exists, offers to start the wizard. Progress is saved in `~/.meridian/setup.json` after each stage, so running `meridian setup` again resumes; passwords and private keys are never stored there. `--intent` does not replace an existing draft unless `--restart` is also given. When apply succeeds, setup verifies every node and subscription and prints each user's connection page.
 
 ### meridian plan
 
@@ -351,6 +351,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--version`, `-v` | Show the CLI version and exit |
 | `--verbose` | Enable debug logging |
 | `--quiet`, `-q` | Suppress progress output |
+| `--lang CODE` | Language for the setup wizard: `en`, `ru`, `fa`, or `zh` (default: saved choice, else asked) |
 | `--json` | Request a JSON envelope from a command that supports it; other commands fail explicitly |
 | `--install-completion` | Install shell completion for the current shell |
 | `--show-completion` | Print the completion script for the current shell |

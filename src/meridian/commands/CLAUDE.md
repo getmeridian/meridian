@@ -11,6 +11,7 @@
 **Canonical connection test** — full `test` fetches one deterministic active client's delivered Xray JSON and executes its fallback plus each target outbound without rebuilding credentials or transports locally.
 **Apply progress** — every command that runs `SetupRuntime` wraps it in `apply_progress()` (`apply_progress.py`): a spinner for the running action plus one line per change or failure, silent under `--json`/quiet; `deploy --events=jsonl` passes its JSONL reporter instead.
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
+**One wizard for everyone** — real terms plus one plain sentence each, all text from `meridian.i18n`; `wizard_prompts.py` owns navigation words, yes/no, numbered choices, and the language step. Smart defaults replace questions (exit IDs from server names, random transport paths, routing only with a gateway, delivery formats).
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
 **Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (add/list/remove), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
 
@@ -33,4 +34,5 @@
 - A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.
 - V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.
+- The wizard needs a terminal: `prompt()` returns the default when `/dev/tty` is missing, so a headless run would loop on required answers; `setup` refuses without one unless `--yes`.
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.

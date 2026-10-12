@@ -16,7 +16,6 @@ app = typer.Typer(
     help="Censorship-resistant proxy server management",
     epilog="[dim]Docs: https://getmeridian.org/docs[/dim]",
     add_completion=True,
-    no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
@@ -44,10 +43,21 @@ def main_callback(
     verbose: bool = typer.Option(False, "--verbose", help="Enable debug logging"),
     json_mode: bool = typer.Option(False, "--json", help="JSON output to stdout (for scripting)"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
+    lang: str = typer.Option("", "--lang", help="Language for the setup wizard: en, ru, fa, zh", show_default=False),
 ) -> None:
     """Meridian — Censorship-resistant proxy server management."""
     if ctx.resilient_parsing:
         return
+
+    if lang:
+        from meridian import i18n
+
+        locale = i18n.normalize_locale(lang)
+        if locale is None:
+            from meridian.console import fail
+
+            fail(f"Unsupported language: {lang}", hint="Use one of: en, ru, fa, zh.", hint_type="user")
+        i18n.request_locale(locale)
 
     if verbose:
         import logging
@@ -95,6 +105,7 @@ def main_callback(
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:
+        _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))
         raise typer.Exit()
 
     # Show banner before subcommands (but not for --help)
@@ -114,6 +125,27 @@ def _enable_json_output() -> None:
 
     set_json_mode(True)
     set_quiet_mode(True)
+
+
+def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
+    """Bare `meridian`: in a terminal with no fleet yet, offer the setup wizard; otherwise show help."""
+    from meridian.config import CLUSTER_CONFIG
+
+    if interactive and sys.stdin.isatty() and sys.stderr.isatty() and not CLUSTER_CONFIG.exists():
+        from meridian import i18n
+        from meridian.commands.wizard_prompts import Navigation, Prompter, RichWizardIO
+
+        i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
+        try:
+            start = Prompter(RichWizardIO()).yes_no(i18n.t("cli.offer_setup"), default=True)
+        except (Navigation, ValueError):
+            start = False
+        if start:
+            from meridian.commands import setup_v4
+
+            setup_v4.run()
+            return
+    typer.echo(ctx.get_help())
 
 
 def _argv_requests_machine_output(args: list[str] | None = None) -> bool:

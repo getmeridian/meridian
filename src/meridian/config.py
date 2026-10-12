@@ -11,6 +11,7 @@ CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
 CACHE_DIR = MERIDIAN_HOME / "cache"
 SERVER_PROFILES_FILE = MERIDIAN_HOME / "servers.json"
 SETUP_DRAFT_FILE = MERIDIAN_HOME / "setup.json"
+PREFERENCES_FILE = MERIDIAN_HOME / "preferences.json"
 MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
 
 DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
