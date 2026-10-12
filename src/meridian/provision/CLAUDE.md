@@ -39,6 +39,7 @@
 - **`return 444` is banned from HTTPS blocks** — use 403/404 instead (less fingerprintable).
 - **Per-relay nginx files** — relay SNI routing uses per-file config, not monolithic rewrite.
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443; rewriting it duplicates the listener and fails `nginx -t` on every re-bootstrap.
+- **`docker compose restart` keeps the old environment** — after changing an `env_file` (subscription page API token) recreate the service with `up -d --no-deps --force-recreate`.
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
 - **Baseline checks must exit 1 for absence** — a bare `docker …` exits 127 when Docker is missing, which observation treats as unavailable evidence and blocks a relay from ever becoming an exit.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.

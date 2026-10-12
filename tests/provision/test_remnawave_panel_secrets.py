@@ -204,3 +204,15 @@ def test_panel_compose_replaces_floating_database_and_cache_tags_with_pins() -> 
     assert f"image: {REMNAWAVE_VALKEY_IMAGE}" in compose
     assert "postgres:17-alpine\n" not in compose
     assert f"image: {REMNAWAVE_BACKEND_IMAGE}" in compose
+
+
+def test_subscription_page_token_is_applied_by_recreating_not_restarting() -> None:
+    """`docker compose restart` keeps the empty token the container was created with."""
+    from meridian.provision.remnawave_panel import configure_subscription_page
+
+    conn = MockConnection()
+
+    assert configure_subscription_page(conn, "token-value") is True
+    assert any(b"REMNAWAVE_API_TOKEN=token-value" in text for _path, text, _kw in conn.writes)
+    conn.assert_called_with_pattern("up -d --no-deps --force-recreate remnawave-subscription-page")
+    conn.assert_not_called_with_pattern("compose restart")

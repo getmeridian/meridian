@@ -311,9 +311,9 @@ def configure_subscription_page(
 ) -> bool:
     """Write the subscription page .env with a real API token and restart the container.
 
-    Called from setup.py after the API token is created. The subscription page
-    container starts with an empty token (from initial compose up) and gets
-    restarted here with the valid token.
+    Called after the API token is created. The subscription page container
+    starts with an empty token (from the initial compose up) and is recreated
+    here with the valid token.
 
     Returns True on success, False on failure (non-fatal — logged as warning).
     """
@@ -335,13 +335,15 @@ def configure_subscription_page(
         logger.warning("Failed to write subscription page .env: %s", result.stderr.strip()[:200])
         return False
 
+    # `restart` keeps the environment the container was created with; only a
+    # recreate reads the new token from env_file.
     result = conn.run(
-        f"docker compose restart {_SUBSCRIPTION_PAGE_CONTAINER}",
+        f"docker compose up -d --no-deps --force-recreate {_SUBSCRIPTION_PAGE_CONTAINER}",
         cwd=panel_dir,
         timeout=60,
     )
     if result.returncode != 0:
-        logger.warning("Failed to restart subscription page: %s", result.stderr.strip()[:200])
+        logger.warning("Failed to recreate subscription page: %s", result.stderr.strip()[:200])
         return False
     return True
 
