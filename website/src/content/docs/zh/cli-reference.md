@@ -225,10 +225,10 @@ meridian fleet inventory [--json]
 
 ```
 meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ai] [--server NAME]
+                   [--ssh-port PORT] [--ai] [--server NAME]
 ```
 
-`--domain` 检查域名解析到服务器。`--sni` 检查特定伪装目标，`--user` 覆盖保存的 SSH 用户，`--ai` 复制 AI 就绪诊断提示到剪贴板。
+`--domain` 检查域名解析到服务器。`--sni` 检查特定伪装目标，`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口，`--ai` 复制 AI 就绪诊断提示到剪贴板。
 
 前检查接受公共 IP 或主机名，端口 443 空闲时打开短暂监听器，永不把缺失证据当作成功对待。退出 `0` 意味着兼容，`4` 意味着发现问题，`3` 意味着需要的证据不可用，`2` 意味着无效输入。
 
@@ -298,10 +298,10 @@ meridian teardown [IP] [--user USER] [--server NAME] [--yes]
 
 ### meridian update
 
-更新 CLI 到 PyPI 上的最新版本。Meridian 尝试 uv、pipx 和 pip，仅在活跃 `meridian` 命令显示新版本时报告成功。退出 `0` 意味着已是最新或已更新；`3` 意味着更新或其验证失败。更新 CLI 不改变你的服务器。
+更新 CLI 到 PyPI 上其主要版本的最新版本。较新的主要版本仅被宣布；`--major` 在你阅读发行说明后移至该版本。测试版遵循其主要版本的较新测试版，然后是稳定版本。Meridian 尝试 uv、pipx 和 pip，仅在活跃 `meridian` 命令显示新版本时报告成功。退出 `0` 意味着已是最新或已更新；`3` 意味着更新或其验证失败。更新 CLI 不改变你的服务器。
 
 ```
-meridian update
+meridian update [--major]
 ```
 
 ### meridian studio

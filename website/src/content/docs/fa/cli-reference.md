@@ -225,10 +225,10 @@ meridian fleet inventory [--json]
 
 ```
 meridian preflight [IP] [--domain NAME] [--sni HOST] [--user USER]
-                   [--ai] [--server NAME]
+                   [--ssh-port PORT] [--ai] [--server NAME]
 ```
 
-`--domain` بررسی می‌کند که دامنه به سرور resolve شود. `--sni` هدف camouflage خاصی را بررسی می‌کند، `--user` کاربر SSH ذخیره‌شده را جایگزین می‌کند و `--ai` prompt تشخیصی آماده‌شده برای AI را به clipboard کپی می‌کند.
+`--domain` بررسی می‌کند که دامنه به سرور resolve شود. `--sni` هدف camouflage خاصی را بررسی می‌کند، `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند و `--ai` prompt تشخیصی آماده‌شده برای AI را به clipboard کپی می‌کند.
 
 Preflight IP یا hostname عمومی را قبول می‌کند، listener کوتاه‌مدت باز می‌کند زمانی‌که پورت 443 آزاد است، و هرگز شواهد missing را موفقیت نمی‌دانند. Exit `0` compatible، `4` مسائل پیدا شده، `3` شواهد الزامی دسترس نبود و `2` input نامعتبر است.
 
@@ -298,10 +298,10 @@ meridian teardown [IP] [--user USER] [--server NAME] [--yes]
 
 ### meridian update
 
-CLI را به آخرین release روی PyPI به‌روزرسانی کنید. Meridian uv، pipx و pip را امتحان می‌کند، و فقط موفقیت را گزارش می‌کند زمانی‌که دستور `meridian` فعال نسخه جدید را نشان می‌دهد. Exit `0` قبلاً جاری یا به‌روزرسانی‌شده؛ `3` به‌روزرسانی یا تأیید آن ناموفق بود. به‌روزرسانی CLI سروری شما را تغییر نمی‌دهد.
+CLI را به آخرین release نسخه اصلی خود روی PyPI به‌روزرسانی کنید. نسخه اصلی جدید فقط اعلام می‌شود؛ `--major` بعد از خواندن یادداشت‌های release برای آن جابه‌جا می‌شود. نسخه beta نسخه‌های beta جدیدتر نسخه اصلی خود را دنبال می‌کند و سپس release پایدار. Meridian uv، pipx و pip را امتحان می‌کند، و فقط موفقیت را گزارش می‌کند زمانی‌که دستور `meridian` فعال نسخه جدید را نشان می‌دهد. Exit `0` قبلاً جاری یا به‌روزرسانی‌شده؛ `3` به‌روزرسانی یا تأیید آن ناموفق بود. به‌روزرسانی CLI سروری شما را تغییر نمی‌دهد.
 
 ```
-meridian update
+meridian update [--major]
 ```
 
 ### meridian studio
