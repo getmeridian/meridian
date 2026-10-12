@@ -12,7 +12,7 @@ uv run pytest tests/systemlab/ -q
 
 **Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
 
-**Small fail-fast stages** — the controller runs bootstrap, deploy, canonical-subscription, and resilience scripts; Make always tears Compose down. Pure contract tests run in normal pytest.
+**Small fail-fast stages** — the controller runs bootstrap, deploy, canonical-subscription, resilience, and removal scripts; Make always tears Compose down. Pure contract tests run in normal pytest.
 
 ## What's done well
 
@@ -20,6 +20,7 @@ uv run pytest tests/systemlab/ -q
 - Remnawave's single delivered Xray config is executed directly; Base64 and Mihomo documents are parsed and endpoint-checked instead of treated as opaque strings.
 - The `ifconfig.me` probe explicitly targets the `leastPing` pool; resilience proves both one-exit-down directions and fail-closed all-down behavior.
 - Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real managed Host mutation but before observation.
+- Removal runs `relay check`, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent on its server or in the panel.
 
 ## Pitfalls
 
@@ -37,4 +38,5 @@ uv run pytest tests/systemlab/ -q
 - Keep interruption markers bounded and tied to an exact logical resource; never simulate recovery by editing `cluster.yml` checkpoints.
 - Fast reruns must remove nested containers, volumes, and networks before and after validation while retaining pulled images.
 - Client startup failures must never satisfy negative proxy tests; keep Xray runtime assets versioned with its binary.
+- Lab exits egress through Docker NAT, so `meridian test` may report an exit-IP mismatch; count it only as traffic evidence, never as a passed egress check.
 - Raw TLS reachability does not qualify a Reality target; use only targets proven by authenticated Xray traffic.

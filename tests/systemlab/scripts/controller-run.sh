@@ -36,7 +36,8 @@ for stage in \
   05-single-deploy.sh \
   10-deploy.sh \
   20-subscriptions.sh \
-  30-resilience.sh
+  30-resilience.sh \
+  40-removal.sh
 do
   run_stage "$stage"
 done

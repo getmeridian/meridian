@@ -14,6 +14,7 @@ _STAGES = (
     "10-deploy.sh",
     "20-subscriptions.sh",
     "30-resilience.sh",
+    "40-removal.sh",
 )
 
 
