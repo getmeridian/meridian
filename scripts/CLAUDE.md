@@ -10,9 +10,11 @@
 
 ## What's done well
 
+- `pin_image_digests.py` resolves every `*_IMAGE` constant in `meridian.config` to its multi-arch index digest, refuses indexes without linux/amd64 and linux/arm64, and prints paste-ready lines (network, never CI).
 - `export_contracts.py` keeps schemas, command catalog, workflow manifests, event types, and fixtures generated from one core source.
 
 ## Pitfalls
 
 - Do not hide CLI prompts or process exits inside scripts that generate API contracts.
+- Pin the index (manifest-list) digest, never a per-platform manifest digest: arm64 servers would fail to pull an amd64-only pin.
 - Keep generated fixture clocks, operation IDs, and durations stable.
