@@ -521,3 +521,15 @@ class TestCommandLocalJsonQuieting:
         _reset_output_modes()
         assert result.exit_code == 0
         assert _assert_machine_json_without_banner(result.output) == {"ok": True}
+
+
+def test_beta_banner_points_testers_at_the_report_form(capsys) -> None:
+    from meridian.console import banner
+
+    banner("4.0.0b1")
+    beta = capsys.readouterr().err
+    banner("4.0.0")
+    stable = capsys.readouterr().err
+
+    assert "beta" in beta and "template=v4_beta.yml" in beta
+    assert "beta" not in stable

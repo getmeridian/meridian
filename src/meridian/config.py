@@ -66,6 +66,7 @@ DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip
 PYPI_PACKAGE = "meridian-vpn"
 PYPI_JSON_URL = f"https://pypi.org/pypi/{PYPI_PACKAGE}/json"
 GITHUB_REPO = "https://github.com/getmeridian/meridian"
+BETA_REPORT_URL = f"{GITHUB_REPO}/issues/new?template=v4_beta.yml"
 
 # Update throttle (seconds)
 UPDATE_CHECK_INTERVAL = 60

@@ -40,7 +40,8 @@ def fail_meridian_v3_state() -> NoReturn:
             "Your 3.x servers keep working. To keep managing them, reinstall 3.x: "
             "uv tool install 'meridian-vpn<4' (or pipx install 'meridian-vpn<4'). "
             "Moving to 4.0 needs a fresh deploy, and every client gets a new link: "
-            "https://github.com/getmeridian/meridian/releases"
+            "https://github.com/getmeridian/meridian/releases. "
+            "To try Meridian 4 next to 3.x, give it its own home: MERIDIAN_HOME=~/.meridian-v4 meridian ..."
         ),
         hint_type="user",
     )

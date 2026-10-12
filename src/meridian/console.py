@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -184,8 +185,15 @@ def line() -> None:
 
 
 def banner(version: str) -> None:
-    if not _state.quiet_mode:
-        err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
+    if _state.quiet_mode:
+        return
+    if re.search(r"\d(a|b|rc)\d+$", version):
+        from meridian.config import BETA_REPORT_URL
+
+        err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim] [warn]beta[/warn]")
+        err_console.print(f"  [dim]Report what works and what doesn't: {BETA_REPORT_URL}[/dim]\n")
+        return
+    err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
 
 
 def prompt(message: str, default: str = "") -> str:
