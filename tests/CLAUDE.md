@@ -37,4 +37,5 @@ Top-level `conftest.py` provides:
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes.
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
 - **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
+- **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with the label-matched scripted IO, and the real terminal path with `pexpect` (`test_setup_wizard_tty.py`, skipped where pexpect is absent).
 - **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.
