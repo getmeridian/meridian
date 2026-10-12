@@ -11,7 +11,7 @@ _RENDERER_MANIFEST = {
     "nginx": "per-resource-v3",
     "node-compose": "remnawave-node-v1",
     "realm": "hashed-systemd-v1",
-    "xray-workload": "routing-vision-v2",
+    "xray-workload": "routing-vision-v3",
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)

@@ -102,7 +102,9 @@ def render_workload_config(
             for balancer in profile.egress_balancers
         ]
     config: dict[str, Any] = {
-        "log": {"loglevel": "warning"},
+        # No access log: it would record every user's destinations on the server.
+        # Remnawave reads only startup errors from the log; IP stats use the API.
+        "log": {"loglevel": "warning", "access": "none"},
         "dns": {
             "servers": [
                 {

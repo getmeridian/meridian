@@ -126,6 +126,12 @@ def test_geo_block_refuses_russian_destinations_only_when_reviewed() -> None:
     assert all(rule in blocked["routing"]["rules"] for rule in geo_rules)
 
 
+def test_access_logging_is_disabled() -> None:
+    config = render_workload_config(_profile(), reality_keys=_keys())
+
+    assert config["log"] == {"loglevel": "warning", "access": "none"}
+
+
 def test_warp_is_preferred_without_removing_direct_or_block() -> None:
     config = render_workload_config(_profile(warp=True), reality_keys=_keys())
     assert [outbound["tag"] for outbound in config["outbounds"]] == [
