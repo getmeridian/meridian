@@ -91,6 +91,7 @@ from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
 from meridian.remnawave.versions import check_panel_version
 from meridian.resolve import ResolvedServer
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.ssh import ServerConnection
 
 PersistCluster = Callable[[ClusterConfig], None]
@@ -297,14 +298,16 @@ class SetupRuntime:
             )
 
         validate_resource_plan_transition(review.plan, cluster)
-        cluster.topology_intent = review.intent
-        self._persist(cluster)
+        targets = sorted(review.plan.deployment_contract.server_targets)
         entries = {
             **self._retirement_entries(review.retiring, review.plan),
-            **self._entries(sorted(review.plan.deployment_contract.server_targets)),
+            **self._entries(targets),
         }
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
+        refuse_legacy_deployments({ref: connections[ref] for ref in targets}, addresses)
+        cluster.topology_intent = review.intent
+        self._persist(cluster)
 
         control = _control_payload(review.plan)
         control_entry = entries[control.server_ref]

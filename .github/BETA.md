@@ -1,15 +1,15 @@
 > [!WARNING]
-> **This is a beta of Meridian 4.** Nobody gets it automatically: `pip`, `uv`, the install script, and `meridian update` on 3.x all skip it. Meridian 3.x keeps working.
+> **This is a beta of Meridian 4.** Nobody gets it automatically: `pip`, `uv`, the install script, and `meridian update` on 3.x all skip it. Your 3.x servers keep working.
 
-**Use a fresh server you can wipe.** Meridian 4 cannot manage servers deployed by 3.x, and every user of a moved server needs a new link.
+**Use a separate, fresh server you can wipe.** Meridian 3.x and 4 cannot share a server: both need port 443. Meridian 4 refuses to deploy onto a server that still runs 3.x; replacing a 3.x server means tearing it down first, and every one of its users needs a new link.
 
 ### Try it next to 3.x
 
-You need [uv](https://docs.astral.sh/uv/getting-started/installation/). Your 3.x command and `~/.meridian` stay untouched:
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/). On your computer the beta keeps its own state, so your 3.x command and `~/.meridian` stay untouched:
 
 ```bash
 alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --from meridian-vpn@latest meridian'
-meridian4 deploy 198.51.100.10        # your server's IP
+meridian4 deploy 198.51.100.10        # IP of the separate server
 ```
 
 The alias always runs the newest beta. Then, **from a device inside the censored network**, run:
@@ -28,17 +28,17 @@ Open a [Meridian 4 beta report](https://github.com/getmeridian/meridian/issues/n
 ---
 
 > [!WARNING]
-> **Это бета-версия Meridian 4.** Она не устанавливается сама: `pip`, `uv`, установочный скрипт и `meridian update` в 3.x её пропускают. Meridian 3.x продолжает работать.
+> **Это бета-версия Meridian 4.** Она не устанавливается сама: `pip`, `uv`, установочный скрипт и `meridian update` в 3.x её пропускают. Ваши серверы на 3.x продолжают работать.
 
-**Используйте новый сервер, который не жалко переустановить.** Meridian 4 не управляет серверами, развёрнутыми через 3.x, а после переезда сервера всем его пользователям нужна новая ссылка.
+**Используйте отдельный новый сервер, который не жалко переустановить.** Meridian 3.x и 4 не могут работать на одном сервере: обоим нужен порт 443. Meridian 4 откажется разворачиваться на сервере, где ещё работает 3.x; чтобы заменить такой сервер, его сначала нужно очистить, и всем его пользователям понадобится новая ссылка.
 
 ### Как попробовать рядом с 3.x
 
-Нужен [uv](https://docs.astral.sh/uv/getting-started/installation/). Команда 3.x и папка `~/.meridian` останутся как есть:
+Нужен [uv](https://docs.astral.sh/uv/getting-started/installation/). На вашем компьютере бета хранит своё состояние отдельно, поэтому команда 3.x и папка `~/.meridian` останутся как есть:
 
 ```bash
 alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --from meridian-vpn@latest meridian'
-meridian4 deploy 198.51.100.10        # IP вашего сервера
+meridian4 deploy 198.51.100.10        # IP отдельного сервера
 ```
 
 Алиас всегда запускает самую свежую бету. Затем **с устройства внутри сети с блокировками** выполните:

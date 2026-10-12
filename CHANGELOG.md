@@ -15,6 +15,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - To keep managing them, stay on 3.x: `uv tool install 'meridian-vpn<4'`.
 - To move: deploy a fresh server with 4.0, give your users the new links, then
   `meridian teardown` the old server (it also removes 3x-ui).
+- 3.x and 4.0 cannot share a server, since both need port 443. 4.0 refuses to
+  deploy onto a server that still runs 3.x (or 2.x) instead of taking it over.
 - Requires Python 3.11+.
 
 ### Deploy

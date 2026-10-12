@@ -12,7 +12,7 @@ import pytest
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
 from meridian.core.cancellation import CancellationFlag, OperationCancelledError
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, ProvisioningError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
     AccessIntent,
@@ -26,8 +26,14 @@ from meridian.reconciler.contract_drivers import ContractResourceDriver
 from meridian.reconciler.resources import ResourceDrivers
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
+from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.setup.runtime import SetupRuntime
 from meridian.ssh import ServerConnection
+
+
+@pytest.fixture(autouse=True)
+def _no_legacy_deployments(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("meridian.setup.runtime.refuse_legacy_deployments", lambda _connections, _addresses: None)
 
 
 class _Panel:
@@ -370,6 +376,33 @@ def test_apply_rejects_unreviewed_hash_before_remote_work(
 
     with pytest.raises(LocalStateError, match="no longer matches"):
         runtime.apply(draft)
+
+
+def test_apply_refuses_a_server_running_meridian_3_before_persisting_intent(tmp_path, monkeypatch) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry)
+    cluster = ClusterConfig()
+    persists: list[object] = []
+    connection = MagicMock(spec=ServerConnection)
+    connection.run.return_value = SimpleNamespace(returncode=0, stdout="3x-ui\nmeridian-legacy-check-done\n", stderr="")
+    monkeypatch.setattr("meridian.setup.runtime.refuse_legacy_deployments", refuse_legacy_deployments)
+    runtime = SetupRuntime(
+        registry,
+        cluster_loader=lambda: cluster,
+        persist=persists.append,
+        connection_builder=lambda _entry: connection,
+        control_bootstrap=MagicMock(side_effect=AssertionError("must not bootstrap")),
+    )
+    draft = SetupDraft.from_intent(_intent())
+    draft = draft.model_copy(update={"review_hash": runtime.review(draft).review_hash})
+
+    with pytest.raises(ProvisioningError, match="Meridian 3.x") as exc_info:
+        runtime.apply(draft)
+
+    assert exc_info.value.category == "user"
+    assert "meridian teardown" in exc_info.value.hint
+    assert persists == []
+    assert cluster.topology_intent is None
 
 
 def test_review_hash_changes_when_a_saved_server_target_changes(tmp_path) -> None:

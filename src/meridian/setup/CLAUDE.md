@@ -27,3 +27,4 @@
 - Control readiness reports confirmed identity/artifact drift separately from unavailable SSH, socket-table, or panel evidence.
 - Approve and apply `review_hash`, never `plan.plan_hash`: a plan hash cannot see what the change removes; a missing shelf profile for a retiring server fails review.
 - Never attest the control bootstrap against the whole deployment contract: adding or removing any other server would re-run the full panel provisioner on the live control server.
+- Apply checks every target server for Meridian 3.x/2.x artifacts (`legacy_guard.py`) before persisting intent; V4 takes over 443 and stops old proxies, so a live old deployment must be torn down explicitly, never replaced silently.
