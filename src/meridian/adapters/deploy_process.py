@@ -11,17 +11,28 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
+from meridian.adapters.cancellation import FileCancellationToken
+from meridian.core.cancellation import OperationCancellation, OperationCancelledError
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.errors import EngineError
 from meridian.core.models import ErrorCategory
-from meridian.core.operations import DeployEventSink
+from meridian.core.operations import DeployOperationHandle
+
+INTERRUPTED_EXIT_CODE = 130
 
 
-def run_deploy_process(request: DeployRequest, operation: DeployEventSink) -> dict[str, Any]:
-    """Run the stable CLI process API and stream JSONL events into Engine state."""
+def run_deploy_process(request: DeployRequest, operation: DeployOperationHandle) -> dict[str, Any]:
+    """Run the stable CLI process API and stream JSONL events into Engine state.
+
+    Cancellation never signals the child: the Engine creates a marker file the
+    child polls at safe points, so an in-flight SSH command always finishes and
+    records its outcome before the deploy reports ``cancelled``.
+    """
     with tempfile.TemporaryDirectory(prefix="meridian-engine-") as tmp:
         request_path = Path(tmp) / "deploy.json"
         request_path.write_text(request.model_dump_json(by_alias=True), encoding="utf-8")
+        cancel_token = FileCancellationToken(Path(tmp) / "cancel")
+        operation.on_cancel(cancel_token.request)
         process = subprocess.Popen(
             [
                 sys.executable,
@@ -32,6 +43,8 @@ def run_deploy_process(request: DeployRequest, operation: DeployEventSink) -> di
                 str(request_path),
                 "--json",
                 "--events=jsonl",
+                "--cancel-file",
+                str(cancel_token.path),
             ],
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -49,6 +62,17 @@ def run_deploy_process(request: DeployRequest, operation: DeployEventSink) -> di
         return_code = process.wait()
 
     envelope = _parse_envelope(stdout)
+    if envelope.get("status") == "cancelled":
+        raise _cancelled_from_envelope(envelope)
+    if return_code == INTERRUPTED_EXIT_CODE and not envelope:
+        raise EngineError(
+            "Deploy process was interrupted before it reported a result.",
+            hint=(
+                "A step may have been cut off mid-change. Run deploy again; "
+                "Meridian observes every resource before changing it."
+            ),
+            category="system",
+        )
     if return_code != 0 or envelope.get("status") == "failed":
         raise _engine_error_from_envelope(envelope, stderr_tail)
 
@@ -68,7 +92,18 @@ def run_deploy_process(request: DeployRequest, operation: DeployEventSink) -> di
     }
 
 
-def _capture_event(text: str, operation: DeployEventSink, stderr_tail: list[str]) -> None:
+def _cancelled_from_envelope(envelope: dict[str, Any]) -> OperationCancelledError:
+    try:
+        return OperationCancelledError(OperationCancellation.model_validate(envelope.get("data") or {}))
+    except ValidationError as exc:
+        raise EngineError(
+            "Deploy reported cancellation without a readable cancellation record.",
+            hint=str(exc),
+            category="bug",
+        ) from exc
+
+
+def _capture_event(text: str, operation: DeployOperationHandle, stderr_tail: list[str]) -> None:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:

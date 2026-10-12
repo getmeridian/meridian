@@ -655,7 +655,8 @@ export const commandCatalog = {
         "--json",
         "--events=jsonl",
         "--request",
-        "--dry-run"
+        "--dry-run",
+        "--cancel-file"
       ],
       "outcomes": [
         {

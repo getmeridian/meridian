@@ -144,6 +144,7 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
         "--assets-dir",
         "--parallel",
         "--request",
+        "--cancel-file",
         "--events",
         "--timeout",
         "--client",
@@ -364,6 +365,12 @@ def deploy_cmd(
     events: str = typer.Option("", "--events", help="Stream progress events as JSONL (use: jsonl)"),
     request_path: str = typer.Option("", "--request", help="Deploy-request JSON file or '-' for stdin"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate and plan without SSH changes"),
+    cancel_file: str = typer.Option(
+        "",
+        "--cancel-file",
+        hidden=True,
+        help="Stop at the next safe point once this file exists (used by Studio)",
+    ),
 ) -> None:
     """Deploy one server and get a shareable connection link
 
@@ -403,6 +410,7 @@ def deploy_cmd(
         json_output=json_enabled,
         events=events,
         dry_run=dry_run,
+        cancel_file=cancel_file,
     )
 
 

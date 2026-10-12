@@ -106,9 +106,11 @@ def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.goo
         patch("meridian.commands.deploy.check_ports"),
         patch("meridian.commands.deploy._reachable_reality_targets", return_value=list(targets)),
         patch("meridian.commands.deploy._verify_traffic", side_effect=traffic),
-        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime) as runtime_cls,
     ):
-        return _invoke(["deploy", "198.51.100.10", "--yes", *args])
+        result = _invoke(["deploy", "198.51.100.10", "--yes", *args])
+    runtime.constructed_with = runtime_cls.call_args.kwargs if runtime_cls.call_args else {}
+    return result
 
 
 def test_dead_camouflage_target_falls_back_to_the_next_candidate(tmp_home: Path, monkeypatch) -> None:
@@ -165,3 +167,45 @@ def test_traffic_check_waits_for_node_warm_up_before_declaring_failure(monkeypat
     monkeypatch.setattr(deploy.time, "sleep", lambda _seconds: None)
 
     assert deploy._verify_traffic("198.51.100.10", "default") == ("ok", "exit IP 198.51.100.10")
+
+
+def test_cancel_file_present_before_start_reports_cancelled_without_ssh(tmp_home: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
+    cancel_file = tmp_home / "cancel"
+    cancel_file.touch()
+
+    with patch("meridian.commands.deploy.resolve_server") as resolve_server:
+        result = _invoke(["deploy", "198.51.100.10", "--yes", "--json", "--cancel-file", str(cancel_file)])
+
+    assert result.exit_code == 5, result.output
+    envelope = json.loads(result.stdout)
+    assert envelope["status"] == "cancelled"
+    assert envelope["data"]["phase"] == "preflight"
+    assert envelope["data"]["remote_changed"] is False
+    assert envelope["errors"][0]["category"] == "cancelled"
+    resolve_server.assert_not_called()
+
+
+def test_cancel_during_apply_stops_before_verification_and_handoff(tmp_home: Path, monkeypatch) -> None:
+    from meridian.core.cancellation import OperationCancellation, OperationCancelledError
+
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
+    runtime = _fake_runtime()
+    runtime.apply_intent.side_effect = OperationCancelledError(
+        OperationCancellation(
+            phase="apply", message="Apply stopped after 4 of 12 resource actions.", remote_changed=True
+        )
+    )
+
+    result = _deploy_with(runtime, [("ok", "unused")], args=("--json", "--cancel-file", str(tmp_home / "cancel")))
+
+    assert result.exit_code == 5, result.output
+    envelope = json.loads(result.stdout)
+    assert envelope["status"] == "cancelled"
+    assert envelope["summary"]["changed"] is True
+    assert envelope["data"]["message"] == "Apply stopped after 4 of 12 resource actions."
+    runtime.verify.assert_not_called()
+    runtime.publish_handoff.assert_not_called()
+    assert runtime.constructed_with["cancellation"].path == tmp_home / "cancel"

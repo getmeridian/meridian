@@ -9,7 +9,7 @@
 **Server resolution cascade** in `resolve.py` — adds CLI-specific Rich output around the shared helpers in `meridian.resolve`. Strict priority order for server-touching commands (deploy, node add):
 1. Explicit IP / `local` → 2. `--server` name → 3. Local-mode detection → 4. Single-server auto-select → 5. Fail with candidates and hint
 
-**Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr.
+**Machine deploy mode** — `deploy --json`, `deploy --events=jsonl`, `deploy --request FILE`, and `deploy --dry-run` are process API surfaces for UI clients. Keep prompts and Rich output out; stdout is the final `meridian.output/v1` envelope and JSONL progress goes to stderr. Hidden `--cancel-file PATH` makes deploy stop at its next safe point and emit a `cancelled` envelope (exit 5) once the file exists.
 
 **Health process API** — completed negative evidence exits 4, unavailable required evidence exits 3, and only fully passed checks exit 0; panel/system failures are inconclusive, while `--basic` never accepts or selects `--client`.
 **Canonical connection test** — full `test` fetches one deterministic active client's delivered Xray JSON and executes its fallback plus each target outbound without rebuilding credentials or transports locally.

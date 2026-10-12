@@ -13,11 +13,13 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
+import typer
 from pydantic import ValidationError
 
 from meridian.adapters import JsonlReporter
+from meridian.adapters.cancellation import FileCancellationToken
 from meridian.cluster import BrandingConfig, ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.client_handoff import print_handoff_links
@@ -36,11 +38,12 @@ from meridian.console import (
     set_quiet_mode,
     warn,
 )
+from meridian.core.cancellation import CancellationToken, OperationCancelledError, raise_if_cancelled
 from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import EngineError, MeridianError
-from meridian.core.events import COMMAND_COMPLETED, COMMAND_STARTED
+from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
 from meridian.core.inputs import is_local_deploy_target
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -83,8 +86,13 @@ def run(
     json_output: bool = False,
     events: str = "",
     dry_run: bool = False,
+    cancel_file: str = "",
 ) -> None:
-    """Deploy (or redeploy) one server and hand off its first client."""
+    """Deploy (or redeploy) one server and hand off its first client.
+
+    With *cancel_file*, the deploy stops at its next safe point once that file
+    exists and reports a typed ``cancelled`` result (exit 5).
+    """
     operation = OperationContext()
     final_json = json_output or events == "jsonl"
     reporter: Reporter = JsonlReporter() if events == "jsonl" else NoopReporter()
@@ -150,13 +158,18 @@ def run(
                 hint="Set `yes: true` after the UI user confirms the deployment.",
                 hint_type="user",
             )
-        result = _execute(request)
+        cancellation = FileCancellationToken(Path(cancel_file)) if cancel_file else None
+        try:
+            result = _execute(request, cancellation)
+        except OperationCancelledError as exc:
+            _finish_cancelled(exc, reporter, operation, final_json=final_json)
         _emit_completed(reporter, operation, mode=result.mode, server_ip=result.server_ip, dry_run=False)
         if final_json:
             _emit_json(result, operation=operation, status="changed")
 
 
-def _execute(request: DeployRequest) -> DeployResult:
+def _execute(request: DeployRequest, cancellation: CancellationToken | None = None) -> DeployResult:
+    raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before connecting to the server.")
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     try:
         target = resolve_deploy_target(request, registry)
@@ -184,6 +197,7 @@ def _execute(request: DeployRequest) -> DeployResult:
         sni_candidates = [request.sni]
     else:
         sni_candidates = _reachable_reality_targets(resolved.conn)
+    raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before changing the server.")
 
     from meridian.setup.runtime import SetupRuntime
 
@@ -193,12 +207,24 @@ def _execute(request: DeployRequest) -> DeployResult:
             return resolved.conn
         return ServerConnection(candidate.host, candidate.user, port=candidate.port, identity_file=candidate.key_path)
 
-    runtime = SetupRuntime(registry, persist=persist_reviewed_apply, connection_builder=connect)
+    runtime = SetupRuntime(
+        registry,
+        persist=persist_reviewed_apply,
+        connection_builder=connect,
+        cancellation=cancellation,
+    )
     info("First deployment: installing the control plane and proxy" if first_deploy else "Redeploying")
     info("Applying the reviewed topology; this takes a few minutes on a fresh server...")
     client = request.client_name or DEFAULT_CLIENT
     try:
         for attempt, sni in enumerate(sni_candidates):
+            if attempt:
+                raise_if_cancelled(
+                    cancellation,
+                    phase="apply",
+                    message=f"Deploy was cancelled before retrying with camouflage target {sni}.",
+                    remote_changed=True,
+                )
             intent = _intent_or_fail(
                 cluster.topology_intent if attempt == 0 else ClusterConfig.load().topology_intent,
                 entry.id,
@@ -213,6 +239,12 @@ def _execute(request: DeployRequest) -> DeployResult:
                     hint_type="system",
                 )
             ok("Server converged")
+            raise_if_cancelled(
+                cancellation,
+                phase="verify",
+                message="Deploy was cancelled after the server converged, before verification.",
+                remote_changed=True,
+            )
             draft = SetupDraft.from_intent(intent).model_copy(
                 update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
             )
@@ -220,16 +252,24 @@ def _execute(request: DeployRequest) -> DeployResult:
             for message in verification.warnings:
                 warn(message)
             ok("Verified the control plane, node, and subscription")
-            traffic, detail = _verify_traffic(resolved.ip, client)
+            traffic, detail = _verify_traffic(resolved.ip, client, cancellation=cancellation)
             if traffic == "failed" and attempt + 1 < len(sni_candidates):
                 warn(f"No traffic through camouflage target {sni or DEFAULT_SNI}; trying {sni_candidates[attempt + 1]}")
                 continue
             _report_traffic(traffic, detail, resolved.ip)
             break
+        raise_if_cancelled(
+            cancellation,
+            phase="handoff",
+            message="Deploy was cancelled after verification, before publishing connection pages.",
+            remote_changed=True,
+        )
         _save_branding(request)
         (links,) = runtime.publish_handoff([client])
     except ReviewedApplyPersistenceError as exc:
         fail("Deploy changed the server, but local state could not be saved", hint=str(exc), hint_type="system")
+    except OperationCancelledError:
+        raise
     except MeridianError as exc:
         fail(exc)
 
@@ -292,6 +332,7 @@ def _verify_traffic(
     *,
     attempts: int = 4,
     delay: float = 10,
+    cancellation: CancellationToken | None = None,
 ) -> tuple[TrafficOutcome, str]:
     """Push real traffic through the delivered subscription, allowing node warm-up.
 
@@ -303,6 +344,12 @@ def _verify_traffic(
         if outcome != "failed" or attempt + 1 == attempts:
             return outcome, detail
         time.sleep(delay)
+        raise_if_cancelled(
+            cancellation,
+            phase="verify",
+            message="Deploy was cancelled while waiting for traffic verification.",
+            remote_changed=True,
+        )
     return "inconclusive", "no traffic check ran"
 
 
@@ -521,6 +568,40 @@ def _emit_json(result: DeployResult | DeployPlan, *, operation: OperationContext
         ),
         reveal=HANDOFF_LINK_KEYS,
     )
+
+
+def _finish_cancelled(
+    exc: OperationCancelledError,
+    reporter: Reporter,
+    operation: OperationContext,
+    *,
+    final_json: bool,
+) -> NoReturn:
+    """Report a cooperative cancel as a typed terminal result, not a failure."""
+    cancellation = exc.cancellation.model_dump(mode="json")
+    emit_event(
+        reporter,
+        operation,
+        COMMAND_CANCELLED,
+        level="warning",
+        phase="deploy",
+        message=str(exc),
+        data={"command": "deploy", **cancellation},
+    )
+    if not final_json:
+        fail(exc)
+    emit_json(
+        command_envelope(
+            command="deploy",
+            data=cancellation,
+            summary=Summary(text=str(exc), changed=exc.cancellation.remote_changed),
+            status="cancelled",
+            exit_code=exc.exit_code,
+            errors=[exc.to_error_model()],
+            timer=operation.timer,
+        )
+    )
+    raise typer.Exit(code=exc.exit_code)
 
 
 def _emit_completed(

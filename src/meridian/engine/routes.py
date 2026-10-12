@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import EngineError
 from meridian.core.inputs import ServerReferenceValue
+from meridian.core.operations import OperationCancel
 from meridian.core.redaction import redact
 from meridian.core.schema import schema_catalog
 from meridian.core.servers import (
@@ -326,13 +327,14 @@ def deploy_start(body: DeployRequest, request: Request, x_meridian_csrf: str = H
 
 @router.post("/operations/{operation_id}/cancel")
 def operation_cancel(operation_id: str, request: Request, x_meridian_csrf: str = Header(default="")) -> dict[str, Any]:
+    """Request cooperative cancellation; finished operations answer ``already_finished``."""
     _require_csrf(x_meridian_csrf, request)
     manager = _manager(request)
-    state = manager.cancel(operation_id)
-    if state is None:
+    outcome = manager.cancel(operation_id)
+    if outcome is None:
         raise HTTPException(status_code=404, detail="Operation not found.")
     operation = _get_operation(manager, operation_id)
-    return {"schema": "meridian.operation-cancel/v1", "operation": operation.snapshot()}
+    return OperationCancel(outcome=outcome, operation=operation.snapshot()).model_dump(mode="json", by_alias=True)
 
 
 # ---------------------------------------------------------------------------

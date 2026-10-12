@@ -250,7 +250,7 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
             "5": "cancelled at a safe point; re-run the same deploy to resume",
             "130": _INTERRUPT_EXIT_MEANING,
         },
-        machine_flags=["--json", "--events=jsonl", "--request", "--dry-run"],
+        machine_flags=["--json", "--events=jsonl", "--request", "--dry-run", "--cancel-file"],
         stability="preview",
         description="Deploy or validate a Meridian server from a typed deploy request.",
     ),

@@ -320,7 +320,13 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["apply"]["stability"] == "preview"
     assert by_command["deploy"]["envelope_schema"] == "deploy-envelope"
     assert by_command["deploy"]["data_schema"] == "deploy-command-data"
-    assert by_command["deploy"]["machine_flags"] == ["--json", "--events=jsonl", "--request", "--dry-run"]
+    assert by_command["deploy"]["machine_flags"] == [
+        "--json",
+        "--events=jsonl",
+        "--request",
+        "--dry-run",
+        "--cancel-file",
+    ]
     assert by_command["api.commands"]["data_schema"] == "api-commands"
     assert by_command["api.workflow"]["data_schema"] == "api-workflow"
     assert by_command["api.workflow"]["machine_flags"] == ["--json"]

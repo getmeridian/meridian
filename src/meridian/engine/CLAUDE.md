@@ -7,6 +7,7 @@
 - **Adapters stay explicit** - Filesystem state, server registries, SSH, panel clients, and future HTTP handlers are passed in or isolated behind small runtime helpers.
 - **Only for execution** - Static Studio can use generated contracts without Engine. Engine is for local executable UI mode: SSH, files, secrets, operation state, events, and cancellation.
 - **Localhost API first** - `meridian studio` serves a FastAPI app on `127.0.0.1` with contract/workflow discovery, server onboarding actions, deploy dry-run, and process-local deploy operations.
+- **Cancellation is a request, not a kill** - `POST /operations/{id}/cancel` returns a typed `outcome`; a running deploy gets a marker file via `adapters/cancellation.py` and its child stops at the next safe point. A running SSH command always finishes; nothing signals or kills the child.
 - **Routes are module-level** - `routes.py` has standalone handler functions on an APIRouter; `api.py` wires app.state and includes the router. No closures capture injected services.
 
 ## Pitfalls
@@ -18,3 +19,4 @@
 - Keep password bootstrap one-time only: no generated contracts, logs, events, browser storage, or profile persistence.
 - `EngineBootstrapKeyRequest` lives in `routes.py`, not `api.py` -- it is only used by route handlers.
 - Deploy dry-run compiles through `setup/single_server.py::preview_single_server_deploy()`, the same preview `deploy --dry-run` uses; never reintroduce a parallel deploy planner.
+- Only a `cancelled` deploy envelope (exit 5) means a clean stop; exit 130 without an envelope is an interruption with possibly unknown outcomes and must surface as a failure.

@@ -10,14 +10,23 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from meridian.core.cancellation import OperationCancellation, OperationCancelledError
 from meridian.core.deploy import DeployRequest
 from meridian.core.errors import EngineError
+from meridian.core.events import COMMAND_CANCEL_REQUESTED, COMMAND_CANCELLED, CoreEventType
 from meridian.core.models import Event, EventLevel
-from meridian.core.operations import DeployOperationResult, OperationKind, OperationSnapshot, OperationState
+from meridian.core.operations import (
+    CancelOutcome,
+    DeployOperationResult,
+    OperationKind,
+    OperationSnapshot,
+    OperationState,
+)
 from meridian.core.output import now_iso
 from meridian.core.redaction import HANDOFF_LINK_KEYS, redact
 
 OperationRunner = Callable[[DeployRequest, "EngineOperation"], dict[str, Any]]
+TERMINAL_STATES: frozenset[OperationState] = frozenset({"succeeded", "failed", "cancelled", "completed_after_cancel"})
 
 
 class ActiveDeployOperationError(EngineError):
@@ -53,6 +62,8 @@ class EngineOperation:
         self.events: list[dict[str, Any]] = []
         self.result: dict[str, Any] | None = None
         self.error: dict[str, Any] | None = None
+        self.cancellation: OperationCancellation | None = None
+        self._cancel_callbacks: list[Callable[[], None]] = []
         self._lock = threading.Lock()
 
     def snapshot(self) -> OperationSnapshot:
@@ -76,6 +87,7 @@ class EngineOperation:
                 cancelable=self.state in {"queued", "running"},
                 has_result=self.result is not None,
                 has_error=self.error is not None,
+                cancellation=self.cancellation,
             )
 
     def event_payloads(self, *, after_seq: int = 0) -> list[dict[str, Any]]:
@@ -112,7 +124,7 @@ class EngineOperation:
         level: EventLevel = "info",
         message: str,
         phase: str = "deploy",
-        event_type: str | None = None,
+        event_type: CoreEventType | None = None,
     ) -> None:
         status_type = event_type or (
             "error" if level == "error" else "warning" if level == "warning" else "command.started"
@@ -156,14 +168,42 @@ class EngineOperation:
             self.state = "failed"
             self.updated_at = now_iso()
 
-    def cancel(self) -> OperationState:
+    def mark_cancelled(self, cancellation: OperationCancellation) -> None:
         with self._lock:
+            self.cancellation = cancellation
+            self.state = "cancelled"
+            self.updated_at = now_iso()
+
+    def on_cancel(self, callback: Callable[[], None]) -> None:
+        """Run *callback* when cancellation is requested, or now if it already was."""
+        with self._lock:
+            if self.state != "cancel_requested":
+                self._cancel_callbacks.append(callback)
+                return
+        callback()
+
+    def cancel(self) -> CancelOutcome:
+        """Request cooperative cancellation; terminal operations are left untouched."""
+        callbacks: list[Callable[[], None]] = []
+        with self._lock:
+            if self.state in TERMINAL_STATES:
+                return "already_finished"
+            if self.state == "cancel_requested":
+                return "already_requested"
+            self.updated_at = now_iso()
             if self.state == "queued":
                 self.state = "cancelled"
-            elif self.state == "running":
-                self.state = "cancel_requested"
-            self.updated_at = now_iso()
-            return self.state
+                self.cancellation = OperationCancellation(
+                    phase="queued",
+                    message="Deploy was cancelled before it started.",
+                    resume_hint="Nothing changed. Start the deploy again when you are ready.",
+                )
+                return "cancelled"
+            self.state = "cancel_requested"
+            callbacks, self._cancel_callbacks = self._cancel_callbacks, []
+        for callback in callbacks:
+            callback()
+        return "cancel_requested"
 
     def cancel_requested(self) -> bool:
         with self._lock:
@@ -219,22 +259,24 @@ class OperationManager:
         with self._lock:
             return self._active_deploy_for_target_locked(request_target)
 
-    def cancel(self, operation_id: str) -> OperationState | None:
+    def cancel(self, operation_id: str) -> CancelOutcome | None:
         operation = self.get(operation_id)
         if operation is None:
             return None
-        state = operation.cancel()
-        if state not in ("cancelled", "cancel_requested"):
-            return state
-        operation.emit_status(
-            level="warning",
-            message=(
-                "Operation was cancelled before it started."
-                if state == "cancelled"
-                else "Cancellation requested. SSH work may finish the current step first."
-            ),
-        )
-        return state
+        outcome = operation.cancel()
+        if outcome == "cancelled":
+            operation.emit_status(
+                level="warning",
+                event_type=COMMAND_CANCELLED,
+                message="Deploy was cancelled before it started. Nothing changed.",
+            )
+        elif outcome == "cancel_requested":
+            operation.emit_status(
+                level="warning",
+                event_type=COMMAND_CANCEL_REQUESTED,
+                message="Cancellation requested. Deploy stops at the next safe point; a running step finishes first.",
+            )
+        return outcome
 
     def _run_deploy(self, operation: EngineOperation, runner: OperationRunner) -> None:
         if not operation.mark_running():
@@ -244,6 +286,10 @@ class OperationManager:
             result = runner(operation.request, operation)
             if result.get("schema") == "meridian.deploy-operation-result/v1":
                 result = DeployOperationResult.model_validate(result).model_dump(mode="json", by_alias=True)
+        except OperationCancelledError as exc:
+            operation.emit_status(level="warning", event_type=COMMAND_CANCELLED, message=str(exc))
+            operation.mark_cancelled(exc.cancellation)
+            return
         except EngineError as exc:
             operation.emit_status(level="error", message=str(exc))
             operation.mark_failed(
@@ -283,11 +329,7 @@ class OperationManager:
         if len(self._operations) < self._max_operations:
             return
         removable = sorted(
-            (
-                operation
-                for operation in self._operations.values()
-                if operation.state in {"succeeded", "failed", "cancelled", "completed_after_cancel"}
-            ),
+            (operation for operation in self._operations.values() if operation.state in TERMINAL_STATES),
             key=lambda operation: operation.updated_at,
         )
         for operation in removable[: max(1, len(self._operations) - self._max_operations + 1)]:

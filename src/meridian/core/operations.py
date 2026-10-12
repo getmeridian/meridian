@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Literal, Protocol
 
 from pydantic import Field
@@ -23,15 +24,18 @@ OperationKind = Literal["deploy"]
 CancelOutcome = Literal["cancelled", "cancel_requested", "already_requested", "already_finished"]
 
 
-class DeployEventSink(Protocol):
-    """Narrow event-sink protocol for deploy process adapters.
+class DeployOperationHandle(Protocol):
+    """Narrow operation handle for deploy process adapters.
 
-    Adapters push JSONL events into the running operation without
-    depending on the full ``EngineOperation`` class.
+    Adapters push JSONL events into the running operation and learn about
+    cancellation requests without depending on the full ``EngineOperation``.
     """
 
     def add_event(self, event: dict[str, Any]) -> None:
         """Record a typed deploy event."""
+
+    def on_cancel(self, callback: Callable[[], None]) -> None:
+        """Run *callback* once cancellation is requested (immediately if it already was)."""
 
 
 class OperationSnapshot(CoreModel):
