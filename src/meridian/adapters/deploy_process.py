@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any, cast
 
@@ -50,7 +51,18 @@ def run_deploy_process(request: DeployRequest, operation: DeployOperationHandle)
             stdout=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             text=True,
+            # Its own session: Ctrl-C in the Studio terminal must not interrupt a
+            # step mid-change. Studio shutdown cancels cooperatively instead.
+            start_new_session=True,
         )
+        # Drain stdout concurrently so a large final envelope cannot block the
+        # child while stderr events are still being read.
+        stdout_chunks: list[str] = []
+        stdout_reader = threading.Thread(
+            target=lambda: stdout_chunks.append(process.stdout.read() if process.stdout is not None else ""),
+            daemon=True,
+        )
+        stdout_reader.start()
         stderr_tail: list[str] = []
         if process.stderr is not None:
             for line in process.stderr:
@@ -58,8 +70,9 @@ def run_deploy_process(request: DeployRequest, operation: DeployOperationHandle)
                 if not text:
                     continue
                 _capture_event(text, operation, stderr_tail)
-        stdout = process.stdout.read() if process.stdout is not None else ""
         return_code = process.wait()
+        stdout_reader.join()
+        stdout = "".join(stdout_chunks)
 
     envelope = _parse_envelope(stdout)
     if envelope.get("status") == "cancelled":

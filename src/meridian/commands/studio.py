@@ -38,7 +38,7 @@ def run(port: int = 0, *, assets_dir: str = "", no_open: bool = False) -> None:
 
     info(f"Serving Studio assets from {assets}")
     ok(f"Meridian Studio running at {url}")
-    info("Press Ctrl+C to stop")
+    info("Press Ctrl+C to stop; a running deploy finishes its current step first")
 
     if not no_open:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()

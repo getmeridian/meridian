@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from meridian.adapters.deploy_process import run_deploy_process
 from meridian.adapters.server_engine import default_server_connection_factory
@@ -112,12 +114,20 @@ def create_engine_app(
     token = csrf_token or secrets.token_urlsafe(32)
     allowed_hosts = _allowed_hosts(host, port)
     allowed_origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    manager = operation_manager or OperationManager()
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        yield
+        # Stopping Studio stops deploys at a safe point instead of orphaning them.
+        await run_in_threadpool(manager.shutdown)
+
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
     # Store all injectable services on app.state for route handlers
     app.state.csrf_token = token
     app.state.assets_dir = str(assets_dir) if assets_dir else ""
-    app.state.operation_manager = operation_manager or OperationManager()
+    app.state.operation_manager = manager
     app.state.cluster_loader = cluster_loader
     app.state.server_connection_factory = server_connection_factory
     app.state.server_key_provider = server_key_provider

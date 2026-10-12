@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import io
 import json
+import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -41,19 +41,28 @@ class _FakeChild:
         self.forced_exit = exit_code
         self.signalled = False
         self.returncode = 0
-        self.stdout = io.StringIO()
+        self.envelope = ""
+        self.exited = threading.Event()
+        self.stdout = self  # like a pipe: read() returns once the child has exited
         self.stderr = self._stderr()
 
+    def read(self) -> str:
+        assert self.exited.wait(5), "child never exited"
+        return self.envelope
+
     def _stderr(self) -> Iterator[str]:
-        yield json.dumps(_event("provision.step.completed", "packages")) + "\n"
-        self.handle.request_cancel()  # the Engine cancel arrives while a step is running
-        if self.forced_exit is not None:
-            self.returncode = self.forced_exit
-            return
-        if self.cancel_file.exists():
-            self.returncode = 5
-            self.stdout = io.StringIO(json.dumps(_cancelled_envelope()))
-            yield json.dumps(_event("command.cancelled", "Apply stopped after 1 of 9 resource actions.")) + "\n"
+        try:
+            yield json.dumps(_event("provision.step.completed", "packages")) + "\n"
+            self.handle.request_cancel()  # the Engine cancel arrives while a step is running
+            if self.forced_exit is not None:
+                self.returncode = self.forced_exit
+                return
+            if self.cancel_file.exists():
+                self.returncode = 5
+                self.envelope = json.dumps(_cancelled_envelope())
+                yield json.dumps(_event("command.cancelled", "Apply stopped after 1 of 9 resource actions.")) + "\n"
+        finally:
+            self.exited.set()
 
     def wait(self) -> int:
         return self.returncode

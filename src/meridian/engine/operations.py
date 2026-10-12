@@ -278,6 +278,20 @@ class OperationManager:
             )
         return outcome
 
+    def shutdown(self) -> int:
+        """Ask every active operation to stop at its next safe point, then wait for them.
+
+        Returns how many operations were still active. A deploy never gets cut
+        off mid-command: it finishes the running step and records its outcome.
+        """
+        active = [
+            operation for operation in self.list() if operation.state in {"queued", "running", "cancel_requested"}
+        ]
+        for operation in active:
+            self.cancel(operation.id)
+        self._executor.shutdown(wait=True)
+        return len(active)
+
     def _run_deploy(self, operation: EngineOperation, runner: OperationRunner) -> None:
         if not operation.mark_running():
             return

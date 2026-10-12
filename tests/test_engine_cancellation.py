@@ -196,3 +196,34 @@ def test_cancel_request_fires_registered_callbacks_once() -> None:
     operation.cancel()
 
     assert fired == ["early"]
+
+
+def test_engine_shutdown_cancels_running_deploys_and_waits_for_a_safe_point() -> None:
+    started = Event()
+    saw_cancel = Event()
+
+    def runner(request: DeployRequest, operation: Any) -> dict[str, Any]:
+        operation.on_cancel(saw_cancel.set)
+        started.set()
+        assert saw_cancel.wait(5), "shutdown never requested cancellation"
+        raise OperationCancelledError(
+            OperationCancellation(phase="apply", message="Stopped because Studio is shutting down.")
+        )
+
+    manager = OperationManager()
+    with TestClient(
+        create_engine_app(
+            assets_dir=None,
+            host="127.0.0.1",
+            port=8765,
+            csrf_token="test-csrf",
+            operation_manager=manager,
+            deploy_runner=runner,
+        ),
+        base_url="http://127.0.0.1:8765",
+    ) as client:
+        operation_id = _start(client)
+        assert started.wait(5)
+
+    # Leaving the client runs the app's shutdown: the deploy was cancelled and finished.
+    assert manager.get(operation_id).state == "cancelled"

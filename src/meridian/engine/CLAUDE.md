@@ -11,6 +11,7 @@
 - **Routes are module-level** - `routes.py` has standalone handler functions on an APIRouter; `api.py` wires app.state and includes the router. No closures capture injected services.
 
 ## Pitfalls
+- The deploy child runs in its own session and Engine shutdown cancels it cooperatively; never let terminal SIGINT or a closed pipe cut a step off mid-change.
 
 - Do not import `commands.resolve`; it creates CLI output, process exits, and SSH connections at import/use time.
 - Do not expose raw shell, arbitrary file access, or unredacted secrets from Engine APIs.
