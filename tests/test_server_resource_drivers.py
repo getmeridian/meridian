@@ -748,3 +748,26 @@ def test_node_runtime_upgrades_image_older_than_the_pin() -> None:
         driver.apply(action, None)
 
     assert deploy.call_args.kwargs["image"] == REMNAWAVE_NODE_IMAGE
+
+
+def test_node_runtime_adopts_the_pinned_digest_for_a_tag_only_compose_once() -> None:
+    from meridian.config import REMNAWAVE_NODE_IMAGE
+    from meridian.remnawave.versions import parse_image
+
+    tag_only = f"remnawave/node:{parse_image(REMNAWAVE_NODE_IMAGE).tag}"
+    driver, action, _panel = _node_runtime_with_compose(tag_only)
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+    pinned_driver, pinned_action, _panel = _node_runtime_with_compose(REMNAWAVE_NODE_IMAGE)
+    assert observation_converges(pinned_action, pinned_driver.observe(pinned_action, None))
+
+
+def test_node_runtime_accepts_another_spelling_of_the_pinned_digest() -> None:
+    from meridian.config import REMNAWAVE_NODE_IMAGE
+    from meridian.remnawave.versions import parse_image
+
+    pin = parse_image(REMNAWAVE_NODE_IMAGE)
+    driver, action, _panel = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
+
+    assert observation_converges(action, driver.observe(action, None))

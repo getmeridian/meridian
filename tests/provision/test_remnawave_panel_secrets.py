@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from meridian.config import REMNAWAVE_BACKEND_IMAGE, REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
+from meridian.config import (
+    REMNAWAVE_BACKEND_IMAGE,
+    REMNAWAVE_POSTGRES_IMAGE,
+    REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+    REMNAWAVE_VALKEY_IMAGE,
+)
 from meridian.provision.containers import ComposeDeployResult
 from meridian.provision.remnawave_panel import DeployRemnawavePanel
 from meridian.provision.steps import ProvisionContext
@@ -188,3 +193,14 @@ def test_running_panel_at_or_above_floor_is_left_alone() -> None:
 
     assert result.status == "skipped"
     assert env == {}
+
+
+def test_panel_compose_replaces_floating_database_and_cache_tags_with_pins() -> None:
+    # PostgreSQL and Valkey are Meridian-owned: a floating tag from an older
+    # compose is rewritten to the digest pin, unlike operator Remnawave tags.
+    compose = _restart_with_compose(_compose("remnawave/backend:3.4.5", "remnawave/subscription-page:8.0.0"))
+
+    assert f"image: {REMNAWAVE_POSTGRES_IMAGE}" in compose
+    assert f"image: {REMNAWAVE_VALKEY_IMAGE}" in compose
+    assert "postgres:17-alpine\n" not in compose
+    assert f"image: {REMNAWAVE_BACKEND_IMAGE}" in compose

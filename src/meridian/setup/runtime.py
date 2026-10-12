@@ -32,8 +32,10 @@ from meridian.config import (
     REMNAWAVE_NODE_API_PORT,
     REMNAWAVE_NODE_IMAGE,
     REMNAWAVE_PANEL_PORT,
+    REMNAWAVE_POSTGRES_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
+    REMNAWAVE_VALKEY_IMAGE,
     XRAY_VERSION,
 )
 from meridian.core.defaults import DEFAULT_SNI
@@ -192,8 +194,10 @@ class SetupRuntime:
                 "remnawave_node_image": REMNAWAVE_NODE_IMAGE,
                 "remnawave_node_api_port": str(REMNAWAVE_NODE_API_PORT),
                 "remnawave_panel_port": str(REMNAWAVE_PANEL_PORT),
+                "remnawave_postgres_image": REMNAWAVE_POSTGRES_IMAGE,
                 "remnawave_subscription_page_image": REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
                 "remnawave_subscription_page_port": str(REMNAWAVE_SUBSCRIPTION_PAGE_PORT),
+                "remnawave_valkey_image": REMNAWAVE_VALKEY_IMAGE,
                 "xray_version": XRAY_VERSION,
             },
             renderer_contract=RENDERER_CONTRACT,

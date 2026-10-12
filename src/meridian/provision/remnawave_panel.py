@@ -22,8 +22,10 @@ from meridian.config import (
     REMNAWAVE_BACKEND_IMAGE,
     REMNAWAVE_PANEL_DIR,
     REMNAWAVE_PANEL_PORT,
+    REMNAWAVE_POSTGRES_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
+    REMNAWAVE_VALKEY_IMAGE,
 )
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.remnawave.versions import effective_image, find_image, image_below_floor, parse_image
@@ -92,7 +94,7 @@ services:
         max-file: "5"
 
   remnawave-db:
-    image: postgres:17-alpine
+    image: {REMNAWAVE_POSTGRES_IMAGE}
     container_name: {_DB_CONTAINER}
     restart: always
     networks:
@@ -119,7 +121,7 @@ services:
         max-file: "5"
 
   remnawave-redis:
-    image: valkey/valkey:9-alpine
+    image: {REMNAWAVE_VALKEY_IMAGE}
     container_name: {_REDIS_CONTAINER}
     restart: always
     networks:

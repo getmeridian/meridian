@@ -9,7 +9,8 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "firewall": "ufw-comment-v1",
     "nginx": "per-resource-v3",
-    "node-compose": "remnawave-node-v1",
+    "node-compose": "remnawave-node-v2",
+    "panel-compose": "remnawave-panel-v2",
     "realm": "hashed-systemd-v1",
     "xray-workload": "routing-vision-v3",
 }

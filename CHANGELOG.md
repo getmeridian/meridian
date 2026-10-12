@@ -44,7 +44,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
 - `meridian test` and `meridian probe` are fail-closed: skipped evidence is never
   reported as a pass.
-- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified.
+- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
+  every container image is pinned to its tested multi-arch digest (amd64 and
+  arm64), so a re-pushed tag cannot change what a fresh server runs.
 
 ### Remnawave versions
 Fresh deploys install the versions below. Meridian requires at least backend
@@ -56,7 +58,8 @@ running version is newer than the tested one.
 | `remnawave/backend` | `3.4.5` (minimum `3.4.0`) |
 | `remnawave/node` | `3.4.2` |
 | `remnawave/subscription-page` | `8.0.0` |
-| `postgres` (panel database) | `17-alpine` |
+| `postgres` (panel database) | `17.11-alpine` |
+| `valkey/valkey` (panel cache) | `9.1.2-alpine` |
 | Xray-core (test client) | `26.7.28` |
 | Realm (relay forwarder) | `2.9.3` |
 | RealiTLScanner (`meridian scan`) | `0.2.3` |
