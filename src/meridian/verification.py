@@ -29,7 +29,7 @@ from meridian.core.verification import (
 )
 from meridian.diagnostics.network import resolve_hostname
 from meridian.resolve import detect_public_ip, is_local_keyword, local_entry
-from meridian.servers import ServerEntry, ServerRegistry
+from meridian.servers import ServerEntry, ServerRegistry, address_is_local
 
 
 class VerificationTargetError(MeridianError):
@@ -243,7 +243,7 @@ def resolve_verification_target(
             return _local_target(registry)
         if is_ip(value):
             normalized = str(ipaddress.ip_address(value))
-            return ResolvedVerificationTarget(ip=normalized, label=normalized)
+            return ResolvedVerificationTarget(ip=normalized, label=normalized, local=address_is_local(normalized))
         if not allow_domain:
             raise VerificationTargetError(
                 f"Target {value!r} is not an IP address.",
@@ -274,7 +274,7 @@ def resolve_verification_target(
             return _entry_target(entry)
         if is_ip(requested_server):
             normalized = str(ipaddress.ip_address(requested_server))
-            return ResolvedVerificationTarget(ip=normalized, label=normalized)
+            return ResolvedVerificationTarget(ip=normalized, label=normalized, local=address_is_local(normalized))
         raise VerificationTargetError(
             f"Saved server {requested_server!r} was not found.",
             hint="Run `meridian server list` and choose an existing name.",
@@ -578,4 +578,4 @@ def _local_target(registry: ServerRegistry) -> ResolvedVerificationTarget:
 def _entry_target(entry: ServerEntry, *, local: bool = False) -> ResolvedVerificationTarget:
     normalized = str(ipaddress.ip_address(entry.host))
     label = f"{entry.name} ({normalized})" if entry.name else normalized
-    return ResolvedVerificationTarget(ip=normalized, label=label, local=local)
+    return ResolvedVerificationTarget(ip=normalized, label=label, local=local or entry.runs_here())

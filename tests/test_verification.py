@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from subprocess import TimeoutExpired
+from unittest.mock import patch
 
 import pytest
 
@@ -387,3 +388,21 @@ def test_target_outside_the_topology_is_checked_as_external(tmp_path: Path) -> N
 
         assert context.kind == "external"
         assert context.endpoint_addresses == ("198.51.100.99",)
+
+
+def test_saved_server_that_runs_here_resolves_as_local_vantage(tmp_path: Path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    registry.add(ServerEntry(host="198.51.100.20", name="exit", machine_id="0123456789abcdef0123456789abcdef"))
+
+    with patch("meridian.servers.this_machine_id", return_value="0123456789abcdef0123456789abcdef"):
+        target = resolve_verification_target("", "exit", registry, allow_domain=True)
+
+    assert target.local is True
+
+
+def test_literal_ip_bound_on_this_machine_resolves_as_local_vantage(tmp_path: Path) -> None:
+    registry = ServerRegistry(tmp_path / "servers.json")
+    with patch("meridian.verification.address_is_local", return_value=True):
+        target = resolve_verification_target("198.51.100.20", "", registry, allow_domain=True)
+
+    assert target.local is True

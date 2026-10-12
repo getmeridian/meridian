@@ -36,12 +36,15 @@ def run_probe_checks(
     *,
     requested_sni: str = "",
     timeout: float = 5,
+    local_vantage: bool = False,
 ) -> list[VerificationCheck]:
     """Run independent public checks concurrently and return stable ordering."""
     routes = _effective_routes(context, requested_sni=requested_sni)
     qualify_ids = len(routes) > 1
     jobs: list[Callable[[], VerificationCheck]] = [
-        lambda: check_port_surface(ip, expected_tcp_ports=context.public_tcp_ports, timeout=min(timeout, 3)),
+        lambda: check_port_surface(
+            ip, expected_tcp_ports=context.public_tcp_ports, timeout=min(timeout, 3), local_vantage=local_vantage
+        ),
         lambda: check_reverse_dns(ip, timeout=min(timeout, 3)),
     ]
 

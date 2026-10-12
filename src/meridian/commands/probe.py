@@ -116,6 +116,7 @@ def collect_probe_result(
         deployment,
         requested_sni=sni,
         timeout=timeout,
+        local_vantage=target.local,
     )
     if context_check is not None:
         checks.insert(0, context_check)

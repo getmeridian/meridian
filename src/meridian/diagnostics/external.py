@@ -47,8 +47,18 @@ def check_port_surface(
     *,
     expected_tcp_ports: tuple[int, ...] = (443,),
     timeout: float = 3,
+    local_vantage: bool = False,
 ) -> VerificationCheck:
     started = time.monotonic()
+    if local_vantage:
+        # A connection to the server's own address arrives over loopback, past the firewall.
+        skipped = finding(
+            "PORT_SURFACE_LOCAL_VANTAGE",
+            "skipped",
+            "On the server itself every listening port looks reachable, so the public port surface cannot be judged",
+            "Run `meridian test --probe` from another machine.",
+        )
+        return finish_check("port_surface", "Port surface", [skipped], started)
     findings: list[VerificationFinding] = []
     expected = tuple(sorted(set(expected_tcp_ports)))
     with ThreadPoolExecutor(max_workers=min(12, len(expected) + len(_SUSPICIOUS_PORTS) + 1)) as executor:

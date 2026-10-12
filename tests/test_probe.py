@@ -161,6 +161,16 @@ def test_open_plaintext_management_port_is_a_failure() -> None:
     assert not any(finding.code == "NO_UNEXPECTED_PORTS" for finding in result.findings)
 
 
+def test_port_surface_from_the_server_itself_is_skipped_not_judged() -> None:
+    # Own-address connections arrive over loopback, past UFW, so firewalled ports look public.
+    with patch("meridian.diagnostics.external.tcp_connect", return_value=True) as connect:
+        result = check_port_surface(_IP, local_vantage=True)
+
+    connect.assert_not_called()
+    assert result.status == "skipped"
+    assert result.findings[0].code == "PORT_SURFACE_LOCAL_VANTAGE"
+
+
 def test_closed_required_port_is_a_failure() -> None:
     with patch("meridian.diagnostics.external.tcp_connect", return_value=False):
         result = check_port_surface(_IP, expected_tcp_ports=(443, 8443))

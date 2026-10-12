@@ -27,3 +27,4 @@
 - **A TLS alert is an answer, a timeout or reset is not** — classify flows by `TlsFlowResult.server_answered_tls`/`silenced`; macOS reports a pre-handshake reset as EINVAL from `getpeername()`.
 - **Blocking verdicts need a control** — an unreachable real camouflage site makes the differential inconclusive, never "IP blocked"; only Meridian's own ~50 KB `pwa/app.js` on the control server is a size-known stall target, so exit-only servers get no data-flow check.
 - **UFW port matching is line-based** — a rule for port 80 will not match port 8080 only if the line contains the exact port string; callers should be aware of broad ALLOW rules.
+- **External checks need an outside vantage** — from the server itself, own-address connections arrive over loopback past UFW; `check_port_surface(local_vantage=True)` skips instead of reporting firewalled ports as public.
