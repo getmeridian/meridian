@@ -93,7 +93,7 @@ meridian apply [--yes] [--json]
 
 JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.meridian` 权限，然后再次运行 `plan` 和 `apply`。
 
-应用目前是增量的：会删除出口、中继或用户的拓扑变更被拒绝。
+删除用户或协议路径被应用：删除的资源在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。删除出口、中继或路由网关目前被拒绝。
 
 ### meridian client
 
@@ -122,7 +122,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到下次应用（包括重新部署和 `client add`、`node add`、`relay deploy`），它打开所有声明的客户端。
 
-**`client remove`** — 永久删除还不可用。命令拒绝并指向 `client disable`。不要在面板中删除用户；Meridian 在下次应用时重新创建它们。
+**`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 
 ### meridian server
 

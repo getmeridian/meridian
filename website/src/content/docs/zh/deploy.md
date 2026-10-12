@@ -93,7 +93,7 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 
 要重新部署，运行相同的命令。Meridian 保持保存的路径、密钥和用户，所以现有链接继续工作。不指定 `--sni` 的重新部署保持保存的伪装目标。
 
-在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。保存它：目前变更是增量的。你可以添加域名、Hysteria2 或用户，但删除已部署的东西（例如，去掉 `--domain`）被拒绝。
+在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。用不同标志再次运行它改变服务器以匹配：添加或删除 `--domain` 或 `--hysteria2` 添加或删除这些路径。
 
 `meridian deploy` 仅重新部署已经是你舰队中出口的服务器。要添加另一个服务器，使用 `meridian node add NEW_IP`。
 

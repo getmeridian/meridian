@@ -69,7 +69,7 @@ meridian client enable alice
 
 ## 删除客户端
 
-永久删除尚不可用 — `meridian client remove` 拒绝并解释原因。使用 `meridian client disable` 现在撤销访问。不要在 Remnawave 面板中删除用户：Meridian 会在下次应用时重新创建它。
+`meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面被删除。集群至少保持一个客户端。不要直接在 Remnawave 面板中删除用户 — Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 
 ## 订阅链接
 
