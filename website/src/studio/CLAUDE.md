@@ -17,6 +17,7 @@
 - Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
 - Static adapter logic is pure browser-safe JavaScript with Node tests; it may persist non-secret wizard progress in versioned localStorage.
 - LocalEngine adapter detects `meridian studio` and uses CSRF-protected typed endpoints without breaking static hosting.
+- Operation state copy and the Cancel control's visibility live in pure `operationState.js`; the page only renders what it returns.
 - Help copy and journey structure live in `helpCatalog.js`; reusable Studio UI fragments live under `components/`.
 
 ## Pitfalls
@@ -26,3 +27,4 @@
 - Keep Engine assumptions behind adapters; static Studio still uses generated fixtures, exported requests, copied CLI, or pasted output.
 - Persist only non-secret Studio draft progress in browser storage. Never persist pasted machine output by default.
 - Never include SSH passwords in draft JSON, copied commands, generated contracts, storage, or URLs.
+- Cancel means "stop at the next safe point": keep the control disabled (not hidden) while `cancel_requested`, and render `cancelled` from `snapshot.cancellation`, including whether the server changed.

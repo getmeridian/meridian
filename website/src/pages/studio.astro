@@ -449,7 +449,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
           <ol class="studio__timeline" id="studio-timeline"></ol>
           <div class="studio__actionbar">
             <button class="studio__ghost" type="button" data-prev-step="review">Back</button>
-            <button class="studio__secondary" type="button" id="cancel-operation">Stop after current step</button>
+            <button class="studio__secondary" type="button" id="cancel-operation" hidden>Cancel deploy</button>
           </div>
         </article>
       </section>
@@ -510,7 +510,13 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
 <script>
   // @ts-nocheck
   import { studioJourneySteps } from '../studio/helpCatalog.js';
-  import { connectLocalEngine, engineGet, enginePost } from '../studio/localEngineAdapter.js';
+  import { cancelOperation, connectLocalEngine, engineGet, enginePost } from '../studio/localEngineAdapter.js';
+  import {
+    cancelControl,
+    describeCancellation,
+    describeCancelOutcome,
+    operationStateLabel,
+  } from '../studio/operationState.js';
   import {
     buildCliCommands,
     buildCommandPack,
@@ -625,6 +631,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
   let savedServers = [];
   let savedServersLoaded = false;
   let currentOperationId = journey.activeOperationId || '';
+  let currentOperationSnapshot = null;
   let lastEventSeq = 0;
   let operationEvents = [];
   let pollTimer = 0;
@@ -812,7 +819,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
       !journey.confirmDeploy ||
       !journey.readiness.dryRunComplete ||
       journey.lastDryRunSignature !== signature;
-    els.cancelOperation.disabled = !currentOperationId || !engine;
+    applyCancelControl();
     document.querySelectorAll('[data-local-action]').forEach((element) => {
       element.hidden = !engine;
     });
@@ -1266,6 +1273,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     };
     els.recoveryTitle.textContent = headline;
     els.recoveryCopy.textContent = hint || recoveryMessageFor(headline, retryable);
+    els.retryDeploy.textContent = 'Try deploy again';
     els.retryDeploy.hidden = !retryable;
     els.copyDiagnostics.hidden = !operationId || !engine;
     els.recoveryCard.hidden = false;
@@ -1378,7 +1386,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     const title = document.createElement('strong');
     const body = document.createElement('span');
     const meta = document.createElement('small');
-    title.textContent = friendlyOperationState(state);
+    title.textContent = operationStateLabel(state);
     body.textContent = index > 0 && total > 0 ? `${step}, step ${index} of ${total}` : String(step);
     meta.textContent =
       state === 'running' || state === 'queued'
@@ -1389,15 +1397,50 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     els.progressCard.hidden = false;
   }
 
-  function friendlyOperationState(state) {
-    if (state === 'queued') return 'Waiting to start';
-    if (state === 'running') return 'Deploy in progress';
-    if (state === 'cancel_requested') return 'Stopping after current step';
-    if (state === 'completed_after_cancel') return 'Completed after stop request';
-    if (state === 'cancelled') return 'Stopped before deploy';
-    if (state === 'failed') return 'Needs recovery';
-    if (state === 'succeeded') return 'Deploy complete';
-    return state;
+  function applyCancelControl() {
+    const control = cancelControl(currentOperationSnapshot, Boolean(currentOperationId));
+    els.cancelOperation.hidden = !engine || !currentOperationId || control.hidden;
+    els.cancelOperation.disabled = control.disabled;
+    els.cancelOperation.textContent = control.label;
+  }
+
+  async function cancelDeploy() {
+    if (!engine || !currentOperationId) return;
+    els.cancelOperation.disabled = true;
+    try {
+      const payload = await cancelOperation(engine, currentOperationId);
+      const outcome = describeCancelOutcome(payload.outcome);
+      currentOperationSnapshot = payload.operation || currentOperationSnapshot;
+      setStatus(outcome.title, outcome.detail, outcome.tone);
+      showStatus(els.deployPreviewStatus, outcome.title, outcome.detail, outcome.tone);
+      applyCancelControl();
+      pollOperation();
+    } catch (error) {
+      applyCancelControl();
+      renderEngineError(error, { operationId: currentOperationId });
+    }
+  }
+
+  function renderCancelled(cancellation, operationId) {
+    const view = describeCancellation(cancellation);
+    els.result.dataset.status = 'warning';
+    const title = document.createElement('strong');
+    const text = document.createElement('span');
+    const details = document.createElement('small');
+    title.textContent = 'stopped';
+    text.textContent = view.detail;
+    details.textContent = view.serverNote;
+    els.result.replaceChildren(title, text, details);
+    lastFailure = { message: view.title, hint: view.hint, retryable: true, operationId };
+    els.recoveryTitle.textContent = view.title;
+    els.recoveryCopy.textContent = `${view.serverNote} ${view.hint}`;
+    els.retryDeploy.textContent = cancellation?.phase === 'queued' ? 'Start deploy' : 'Resume deploy';
+    els.retryDeploy.hidden = false;
+    els.copyDiagnostics.hidden = !operationId || !engine;
+    els.recoveryCard.hidden = false;
+    els.actionCenter.hidden = true;
+    setStatus(view.title, view.serverNote, 'warning');
+    showStatus(els.deployPreviewStatus, view.title, view.serverNote, 'warning');
   }
 
   async function startDeploy() {
@@ -1410,6 +1453,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     try {
       const payload = await enginePost(engine, '/api/v1/deploy/start', request);
       currentOperationId = payload.operation?.id || '';
+      currentOperationSnapshot = payload.operation || null;
       journey.activeOperationId = currentOperationId;
       lastEventSeq = 0;
       operationEvents = [];
@@ -1420,6 +1464,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     } catch (error) {
       if (error?.operation?.id) {
         currentOperationId = error.operation.id;
+        currentOperationSnapshot = error.operation;
         journey.activeOperationId = currentOperationId;
         lastEventSeq = 0;
         operationEvents = [];
@@ -1443,6 +1488,8 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
         engineGet(`/api/v1/operations/${currentOperationId}/result`),
       ]);
       const state = statusPayload.operation?.state || 'running';
+      currentOperationSnapshot = statusPayload.operation || currentOperationSnapshot;
+      applyCancelControl();
       operationEvents = [...operationEvents, ...(eventsPayload.events || [])];
       lastEventSeq = eventsPayload.latest_seq || statusPayload.operation?.last_seq || lastEventSeq;
       renderTimeline(operationEvents);
@@ -1480,11 +1527,11 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
         return;
       }
       if (state === 'cancel_requested') {
-        setStatus('Cancel requested', 'Studio is waiting for the current Engine step to stop safely.', 'warning');
+        const stopping = describeCancelOutcome('cancel_requested');
+        setStatus(stopping.title, stopping.detail, 'warning');
       }
       if (state === 'cancelled') {
-        showStatus(els.deployPreviewStatus, 'Operation stopped', 'Deploy did not start, or stopped before a terminal result was available.', 'warning');
-        setStatus('Operation stopped', 'Deploy did not start, or stopped before a terminal result was available.', 'warning');
+        renderCancelled(statusPayload.operation?.cancellation, currentOperationId);
         lastTerminalOperationId = currentOperationId;
         journey.activeOperationId = '';
         currentOperationId = '';
@@ -1779,13 +1826,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     }
   });
   els.startDeploy.addEventListener('click', startDeploy);
-  els.cancelOperation.addEventListener('click', () => {
-    if (engine && currentOperationId) {
-      runAction('Stop after current step', () => enginePost(engine, `/api/v1/operations/${currentOperationId}/cancel`, {}), {
-        nextStep: 'complete',
-      });
-    }
-  });
+  els.cancelOperation.addEventListener('click', cancelDeploy);
   $('copy-ssh-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).connect, 'SSH command'));
   $('copy-key-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).copyKey, 'Key command'));
   $('copy-save-command').addEventListener('click', () => copy(buildServerCliCommands(serverDraft()).save, 'Save command'));

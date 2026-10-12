@@ -53,6 +53,12 @@ export async function enginePost(engine, path, body, fetchImpl = globalThis.fetc
   return payload;
 }
 
+// Ask the local Engine to stop an operation at its next safe point.
+// Resolves to the typed meridian.operation-cancel/v1 payload ({ outcome, operation }).
+export async function cancelOperation(engine, operationId, fetchImpl = globalThis.fetch) {
+  return enginePost(engine, `/api/v1/operations/${encodeURIComponent(operationId)}/cancel`, {}, fetchImpl);
+}
+
 export async function engineGet(path, fetchImpl = globalThis.fetch) {
   const response = await fetchImpl(path, {
     cache: "no-store",

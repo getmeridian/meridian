@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { connectLocalEngine, enginePost, EngineRequestError } from "./localEngineAdapter.js";
+import { cancelOperation, connectLocalEngine, enginePost, EngineRequestError } from "./localEngineAdapter.js";
 
 function jsonResponse(payload, ok = true) {
   return {
@@ -81,5 +81,25 @@ test("enginePost preserves active operation details from Engine errors", async (
       error instanceof EngineRequestError &&
       error.operation?.id === "op-active" &&
       error.retryable === true,
+  );
+});
+
+test("cancelOperation posts to the CSRF-protected cancel route", async () => {
+  const calls = [];
+  const payload = await cancelOperation({ csrfToken: "csrf" }, "op-1", async (path, init) => {
+    calls.push([path, init]);
+    return jsonResponse({ schema: "meridian.operation-cancel/v1", outcome: "cancel_requested" });
+  });
+
+  assert.equal(payload.outcome, "cancel_requested");
+  assert.equal(calls[0][0], "/api/v1/operations/op-1/cancel");
+  assert.equal(calls[0][1].method, "POST");
+  assert.equal(calls[0][1].headers["x-meridian-csrf"], "csrf");
+});
+
+test("cancelOperation surfaces an unknown operation as a typed error", async () => {
+  await assert.rejects(
+    cancelOperation({ csrfToken: "csrf" }, "op-gone", async () => jsonResponse({ detail: "Operation not found." }, false)),
+    (error) => error instanceof EngineRequestError && error.message === "Operation not found.",
   );
 });
