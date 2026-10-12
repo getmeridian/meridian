@@ -26,6 +26,7 @@ from meridian.config import (
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
 )
 from meridian.provision.steps import ProvisionContext, StepResult
+from meridian.remnawave.versions import effective_image, find_image, image_below_floor, split_image
 from meridian.ssh import ServerConnection
 
 if TYPE_CHECKING:
@@ -357,9 +358,13 @@ class DeployRemnawavePanel:
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         panel_dir = REMNAWAVE_PANEL_DIR
         panel_port = REMNAWAVE_PANEL_PORT
-        image = REMNAWAVE_BACKEND_IMAGE
-        sub_page_image = REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
         sub_page_host_port = REMNAWAVE_SUBSCRIPTION_PAGE_PORT
+        # Keep operator-upgraded images; pinned tags only replace older ones.
+        current_compose = conn.get_text(f"{panel_dir}/docker-compose.yml", timeout=15)
+        compose_text = current_compose.stdout if current_compose.returncode == 0 else None
+        image = effective_image(REMNAWAVE_BACKEND_IMAGE, compose_text)
+        sub_page_image = effective_image(REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE, compose_text)
+        below_floor = image_below_floor(find_image(compose_text, split_image(REMNAWAVE_BACKEND_IMAGE)[0]))
 
         front_end_domain = self.front_end_domain or ctx.domain or ctx.ip
         host = ctx.domain or ctx.ip
@@ -384,7 +389,9 @@ class DeployRemnawavePanel:
                 core_running = False
                 break
 
-        if core_running:
+        # A running panel older than the supported floor is upgraded in place
+        # (Prisma migrates the database on start) instead of being skipped.
+        if core_running and not below_floor:
             # Check if subscription page also running (upgrade from pre-subscription deploys)
             sub_check = conn.run(
                 f"docker inspect -f '{{{{.State.Running}}}}' {_SUBSCRIPTION_PAGE_CONTAINER} 2>/dev/null",

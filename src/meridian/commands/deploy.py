@@ -215,7 +215,9 @@ def _execute(request: DeployRequest) -> DeployResult:
             draft = SetupDraft.from_intent(intent).model_copy(
                 update={"review_hash": applied.plan_hash, "applied_plan_hash": applied.plan_hash}
             )
-            runtime.verify(draft)
+            verification = runtime.verify(draft)
+            for message in verification.warnings:
+                warn(message)
             ok("Verified the control plane, node, and subscription")
             traffic, detail = _verify_traffic(resolved.ip, client)
             if traffic == "failed" and attempt + 1 < len(sni_candidates):

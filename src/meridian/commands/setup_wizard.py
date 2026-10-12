@@ -593,6 +593,8 @@ class SetupWizard:
 
     def _verify(self, draft: SetupDraft) -> None:
         self._verification = self.runtime.verify(draft)
+        for message in self._verification.warnings:
+            self.io.write(f"[warn]{message}[/warn]")
         self.io.write(f"[ok]Verified {self._verification.node_count} managed node(s) and canonical subscriptions.[/ok]")
         self.service.mark_verified(datetime.now(UTC).isoformat().replace("+00:00", "Z"))
 

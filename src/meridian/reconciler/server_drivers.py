@@ -61,6 +61,7 @@ from meridian.reconciler.server_render import (
     render_realm_unit,
 )
 from meridian.remnawave import MeridianPanel
+from meridian.remnawave.versions import effective_image
 from meridian.ssh import ServerConnection
 
 ConnectionFactory = Callable[[str], ServerConnection]
@@ -670,6 +671,10 @@ class NodeRuntimeDriver:
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
+    def _image(self, compose: str | None) -> str:
+        """Accept an operator-upgraded node image; never treat it as drift to downgrade."""
+        return effective_image(_runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE), compose)
+
     def observe(
         self,
         action: ResourceAction,
@@ -678,10 +683,9 @@ class NodeRuntimeDriver:
         payload = _payload(action, NodeRuntimePayload)
         conn = self.context.connection(payload.server_ref)
         compose_path = f"{REMNAWAVE_NODE_DIR}/docker-compose.yml"
-        node_image = _runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE)
-        expected_compose = render_node_compose(node_image, payload.api_port)
         compose = conn.get_text(compose_path, timeout=15)
         compose_content = file_content_or_absent(action.resource.logical_id, compose, "node compose file")
+        expected_compose = render_node_compose(self._image(compose_content), payload.api_port)
         running = conn.run(
             "docker inspect remnawave-node --format '{{.State.Running}}' 2>&1",
             timeout=15,
@@ -739,12 +743,9 @@ class NodeRuntimeDriver:
             secret = self.context.panel.get_node_secret_key()
         if not secret:
             raise ResourceReconcileError(f"Remnawave returned no node secret for workload {payload.workload_ref!r}.")
-        deployed = deploy_node_container(
-            conn,
-            secret,
-            node_api_port=payload.api_port,
-            image=_runtime_pin(self.context.plan, "remnawave_node_image", REMNAWAVE_NODE_IMAGE),
-        )
+        current = conn.get_text(f"{REMNAWAVE_NODE_DIR}/docker-compose.yml", timeout=15)
+        image = self._image(current.stdout if current.returncode == 0 else None)
+        deployed = deploy_node_container(conn, secret, node_api_port=payload.api_port, image=image)
         if not deployed:
             raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
         node_uuid = self.context.remote_id(payload.binding_ref, action.generation)

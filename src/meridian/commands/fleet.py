@@ -14,6 +14,7 @@ import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
+from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
 from meridian.core.errors import LocalStateError
@@ -22,6 +23,7 @@ from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.fleet import collect_fleet_inventory, collect_fleet_status
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
+from meridian.remnawave.versions import check_panel_version
 from meridian.renderers import emit_json
 
 
@@ -66,6 +68,24 @@ def _render_warnings(warnings: list[MeridianError]) -> None:
         return
     for warning in warnings:
         warn(warning.message)
+
+
+def _panel_version_warnings(cluster: ClusterConfig) -> list[MeridianError]:
+    """Flag a live panel outside Meridian's supported Remnawave range."""
+    try:
+        with make_panel(cluster) as panel:
+            version = panel.get_version()
+    except RemnawaveError:
+        return []  # reachability is already reported by the status collector
+    try:
+        message = check_panel_version(version)
+    except RemnawaveError as exc:
+        return [_version_warning(str(exc), exc.hint)]
+    return [_version_warning(message, "")] if message else []
+
+
+def _version_warning(message: str, hint: str) -> MeridianError:
+    return MeridianError(code="MERIDIAN_PANEL_VERSION", category="user", message=message, hint=hint, exit_code=0)
 
 
 # -- Fleet Inventory --
@@ -291,6 +311,8 @@ def _run_status(*, operation: OperationContext) -> int:
 
     status = result.status
     warnings = result.warnings
+    if status.panel.healthy:
+        warnings = [*warnings, *_panel_version_warnings(cluster)]
     _render_warnings(warnings)
     exit_code = {"healthy": 0, "degraded": 4, "unknown": 3}[status.summary.health]
 

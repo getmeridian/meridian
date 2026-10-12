@@ -23,7 +23,7 @@ from meridian.core.topology import (
 )
 from meridian.reconciler.contract_drivers import ContractResourceDriver
 from meridian.reconciler.resources import ResourceDrivers
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.runtime import SetupRuntime
 from meridian.ssh import ServerConnection
@@ -32,9 +32,13 @@ from meridian.ssh import ServerConnection
 class _Panel:
     def __init__(self) -> None:
         self.closed = 0
+        self.version = "3.4.5"
 
     def ping(self) -> bool:
         return True
+
+    def get_version(self) -> str:
+        return self.version
 
     def close(self) -> None:
         self.closed += 1
@@ -337,6 +341,15 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     verification = runtime.verify(applied)
     assert verification.node_count == 1
     assert verification.subscription_urls == {"default": "https://panel.example/pages/sub/short-default"}
+    assert verification.panel_version == "3.4.5"
+    assert verification.warnings == ()
+    panel.version = "4.1.0"
+    newer = runtime.verify(applied)
+    assert len(newer.warnings) == 1 and "newer than the tested 3.x" in newer.warnings[0]
+    panel.version = "3.3.9"
+    with pytest.raises(RemnawaveError, match="older than the minimum supported 3.4.0"):
+        runtime.verify(applied)
+    panel.version = "3.4.5"
     assert persists
 
     cluster.panel.server_ip = "198.51.100.99"

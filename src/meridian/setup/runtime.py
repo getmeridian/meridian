@@ -83,6 +83,7 @@ from meridian.reconciler.workloads import (
     WorkloadStateManager,
 )
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
+from meridian.remnawave.versions import check_panel_version
 from meridian.resolve import ResolvedServer
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection
@@ -112,6 +113,8 @@ class SetupVerification:
     plan_hash: str
     node_count: int
     subscription_urls: Mapping[str, str]
+    panel_version: str = ""
+    warnings: tuple[str, ...] = ()
 
 
 class LazyPanel:
@@ -403,6 +406,8 @@ class SetupRuntime:
         try:
             if not panel.ping():
                 raise ResourceReconcileError("The Remnawave control plane did not answer verification.")
+            panel_version = panel.get_version()
+            version_warning = check_panel_version(panel_version)
             nodes = panel.list_nodes()
             expected_nodes = {
                 payload.name
@@ -438,6 +443,8 @@ class SetupRuntime:
             plan_hash=review.plan.plan_hash,
             node_count=len(observed_nodes),
             subscription_urls=subscription_urls,
+            panel_version=panel_version,
+            warnings=(version_warning,) if version_warning else (),
         )
 
     def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:

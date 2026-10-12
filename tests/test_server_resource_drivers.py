@@ -705,3 +705,46 @@ def test_port_443_stream_apply_retires_the_legacy_artifact(
     driver.apply(action, None)
 
     assert any(call.args[0] == "rm -f /etc/nginx/stream.d/meridian.conf" for call in connection.run.call_args_list)
+
+
+def _node_runtime_with_compose(image: str) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
+    from meridian.node_deploy import render_node_compose
+
+    driver, action, panel = _node_runtime_case()
+    connection = MagicMock(spec=ServerConnection)
+    connection.get_text.return_value = _result(stdout=render_node_compose(image, action.resource.payload.api_port))
+    connection.run.return_value = _result(stdout="true\n")
+    driver.context.connection_for = lambda _ref: connection
+    panel.get_node.return_value = SimpleNamespace(is_connected=True)
+    return driver, action, panel
+
+
+@pytest.mark.parametrize("image", ["remnawave/node:3.9.1", "remnawave/node:4.0.0", "remnawave/node:latest"])
+def test_node_runtime_accepts_operator_upgraded_image(image: str) -> None:
+    driver, action, _panel = _node_runtime_with_compose(image)
+
+    assert observation_converges(action, driver.observe(action, None))
+
+    with (
+        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True) as deploy,
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True),
+    ):
+        driver.apply(action, None)
+
+    assert deploy.call_args.kwargs["image"] == image
+
+
+def test_node_runtime_upgrades_image_older_than_the_pin() -> None:
+    from meridian.config import REMNAWAVE_NODE_IMAGE
+
+    driver, action, _panel = _node_runtime_with_compose("remnawave/node:2.8.0")
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+    with (
+        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True) as deploy,
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True),
+    ):
+        driver.apply(action, None)
+
+    assert deploy.call_args.kwargs["image"] == REMNAWAVE_NODE_IMAGE
