@@ -122,7 +122,7 @@ def main() -> int:
             label += " with bogus credentials"
         runnable, socks_port = use_free_local_ports(selected)
         try:
-            connected, detail = test_connection(
+            attempt = test_connection(
                 xray_bin,
                 runnable,
                 "",
@@ -130,6 +130,7 @@ def main() -> int:
                 label,
                 expect_ip_match=False,
             )
+            connected, detail = attempt.success, attempt.detail
         except XrayStartupError as exc:
             print(f"    FAIL {label}: {exc}")
             failures += 1

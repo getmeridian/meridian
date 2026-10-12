@@ -59,6 +59,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   through the CDN when WSS uses one) that freezes after about 16–24 KB is
   flagged with a suggestion to change the IP. `meridian check` runs the
   download check too when it's run from another machine.
+- **`meridian test` says how each path fails** — every delivered path reports
+  its time to first byte, and a failed one is reported as "connects, but no
+  traffic passes" or "unreachable". `--json` adds `data.transports`.
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including

@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import time
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ _CONNECTION_RETRY_DELAY = 1.0
 _PROXY_TAG_PREFIX = "MERIDIAN_PROXY"
 _SAFE_LOCAL_INBOUND_PROTOCOLS = {"http", "socks"}
 XRAY_BOOTSTRAP_TIMEOUT = 120.0
+_TIMING_MARKER = "\n@@meridian-ttfb@@"
 
 
 class XrayStartupError(MeridianError):
@@ -52,6 +54,19 @@ class XrayConfigError(ValueError):
 
 # Traffic flowed, but left through an unexpected IP (NAT, multi-IP hosts, misrouting).
 EGRESS_MISMATCH_PREFIX = "exit IP"
+
+
+@dataclass(frozen=True)
+class ConnectionAttempt:
+    """Outcome of pushing traffic through one local Xray client.
+
+    ``success`` is None when the external IP observers, not the proxy, failed.
+    ``first_byte_ms`` is the observer response's time to first byte through the proxy.
+    """
+
+    success: bool | None
+    detail: str
+    first_byte_ms: int | None = None
 
 
 def _xray_bin_path() -> Path:
@@ -274,6 +289,18 @@ def outbound_address(outbound: dict[str, Any]) -> str:
     return address.strip() if isinstance(address, str) else ""
 
 
+def outbound_tcp_endpoint(outbound: dict[str, Any]) -> tuple[str, int] | None:
+    """Return a VLESS outbound's TCP address and port; None for UDP or malformed shapes."""
+    if outbound.get("protocol") != "vless":
+        return None
+    address = outbound_address(outbound)
+    destinations = outbound.get("settings", {}).get("vnext")
+    port = destinations[0].get("port") if isinstance(destinations, list) and destinations else None
+    if not address or not isinstance(port, int) or not 1 <= port <= 65535:
+        return None
+    return address, port
+
+
 def outbound_label(outbound: dict[str, Any]) -> str:
     """Derive a credential-free display label for a canonical outbound."""
     settings = outbound.get("settings")
@@ -432,7 +459,7 @@ def test_connection(
     expect_ip_match: bool = True,
     *,
     timeout: float = 15,
-) -> tuple[bool | None, str]:
+) -> ConnectionAttempt:
     """Start xray client, curl through SOCKS5, verify connectivity.
 
     Args:
@@ -444,7 +471,7 @@ def test_connection(
         expect_ip_match: If True, verify exit IP matches server_ip.
 
     Returns:
-        (success, detail_message) tuple.
+        The attempt's success, detail message, and time to first byte.
 
     Raises:
         XrayConfigError: If Xray rejects the delivered canonical config.
@@ -498,7 +525,7 @@ def test_connection(
             observer_url = observers[(attempt - 1) % len(observers)]
             attempted_urls.append(observer_url)
             try:
-                observed_ip, last_detail = _query_ip_observer(
+                observed_ip, last_detail, first_byte_ms = _query_ip_observer(
                     observer_url,
                     socks_port=socks_port,
                     timeout=operation_timeout,
@@ -508,11 +535,20 @@ def test_connection(
                         try:
                             expected_ip = ipaddress.ip_address(server_ip)
                         except ValueError:
-                            return False, f"expected server IP {server_ip!r} is invalid"
+                            return ConnectionAttempt(False, f"expected server IP {server_ip!r} is invalid")
                         if observed_ip != expected_ip:
-                            return False, f"{EGRESS_MISMATCH_PREFIX} {observed_ip} does not match server {expected_ip}"
+                            return ConnectionAttempt(
+                                False,
+                                f"{EGRESS_MISMATCH_PREFIX} {observed_ip} does not match server {expected_ip}",
+                                first_byte_ms,
+                            )
                     elapsed = time.monotonic() - start
-                    return True, f"exit IP {observed_ip} ({elapsed:.1f}s, attempt {attempt})"
+                    first_byte = f"first byte {first_byte_ms} ms, " if first_byte_ms is not None else ""
+                    return ConnectionAttempt(
+                        True,
+                        f"exit IP {observed_ip} ({first_byte}{elapsed:.1f}s, attempt {attempt})",
+                        first_byte_ms,
+                    )
             except subprocess.TimeoutExpired:
                 last_detail = "timeout"
 
@@ -528,12 +564,14 @@ def test_connection(
         # and the caller must report an inconclusive test rather than a defect.
         for observer_url in dict.fromkeys(attempted_urls):
             try:
-                control_ip, _ = _query_ip_observer(observer_url, socks_port=None, timeout=operation_timeout)
+                control_ip, _, _ = _query_ip_observer(observer_url, socks_port=None, timeout=operation_timeout)
             except subprocess.TimeoutExpired:
                 continue
             if control_ip is not None:
-                return False, f"{last_detail} after {_CONNECTION_ATTEMPTS} attempts; observer works directly"
-        return None, f"{last_detail} after {_CONNECTION_ATTEMPTS} attempts; IP observers unavailable"
+                return ConnectionAttempt(
+                    False, f"{last_detail} after {_CONNECTION_ATTEMPTS} attempts; observer works directly"
+                )
+        return ConnectionAttempt(None, f"{last_detail} after {_CONNECTION_ATTEMPTS} attempts; IP observers unavailable")
 
     except ReadinessTimeout as exc:
         returncode = proc.poll() if proc is not None else None
@@ -560,11 +598,14 @@ def _query_ip_observer(
     *,
     socks_port: int | None,
     timeout: float,
-) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address | None, str]:
+) -> tuple[ipaddress.IPv4Address | ipaddress.IPv6Address | None, str, int | None]:
+    """Return the observed IP (or None with a reason) and the time to first byte in ms."""
     args = [
         "curl",
         "-sS",
         "--fail",
+        "--write-out",
+        _TIMING_MARKER + "%{time_starttransfer}",
         "--connect-timeout",
         f"{min(10.0, timeout):g}",
         "--max-time",
@@ -580,10 +621,17 @@ def _query_ip_observer(
         timeout=timeout + 5,
         stdin=subprocess.DEVNULL,
     )
+    body, marker, timing = result.stdout.rpartition(_TIMING_MARKER)
+    if not marker:
+        body, timing = result.stdout, ""
+    try:
+        first_byte_ms: int | None = round(float(timing) * 1000)
+    except ValueError:
+        first_byte_ms = None
     if result.returncode != 0:
         stderr_hint = result.stderr.strip()[:100] if result.stderr else ""
-        return None, f"curl failed{f' ({stderr_hint})' if stderr_hint else ''}"
+        return None, f"curl failed{f' ({stderr_hint})' if stderr_hint else ''}", None
     try:
-        return ipaddress.ip_address(result.stdout.strip()), ""
+        return ipaddress.ip_address(body.strip()), "", first_byte_ms
     except ValueError:
-        return None, "invalid IP response"
+        return None, "invalid IP response", None

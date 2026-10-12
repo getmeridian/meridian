@@ -7,12 +7,14 @@ import math
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
 from meridian.cluster import ClusterConfig
 from meridian.core.verification import (
+    TransportOutcome,
+    TransportResult,
     VerificationCheck,
     VerificationFinding,
     build_verification_check,
@@ -39,11 +41,13 @@ from meridian.verification import (
 )
 from meridian.xray_client import (
     EGRESS_MISMATCH_PREFIX,
+    ConnectionAttempt,
     XrayStartupError,
     ensure_xray_binary,
     is_supported_proxy_outbound,
     outbound_address,
     outbound_label,
+    outbound_tcp_endpoint,
     parse_xray_subscription,
     proxy_outbounds,
     route_only,
@@ -52,6 +56,7 @@ from meridian.xray_client import (
 )
 
 PanelFactory = Callable[[str, str, float], MeridianPanel]
+EndpointProbe = Callable[[str, int, float], bool]
 
 
 class XrayProvider(Protocol):
@@ -69,7 +74,7 @@ class ConnectionTester(Protocol):
         expect_ip_match: bool,
         *,
         timeout: float,
-    ) -> tuple[bool | None, str]: ...
+    ) -> ConnectionAttempt: ...
 
 
 def create_verification_panel(url: str, token: str, timeout: float) -> MeridianPanel:
@@ -83,6 +88,15 @@ class ConnectivityChecks:
 
     checks: list[VerificationCheck]
     client: str = ""
+    transports: list[TransportResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ProtocolRun:
+    """One executed canonical route: its reportable check and its transport outcome."""
+
+    check: VerificationCheck
+    transport: TransportResult
 
 
 def _connectivity_routes(
@@ -200,7 +214,7 @@ def collect_connectivity_checks(
             checks.append(check_udp_requires_full_test(deployment.public_udp_ports))
         return ConnectivityChecks(checks=checks)
 
-    protocol_checks, selected_client = check_canonical_subscription(
+    canonical = check_canonical_subscription(
         cluster,
         deployment,
         target_ip,
@@ -210,8 +224,9 @@ def collect_connectivity_checks(
         xray_provider=xray_provider,
         connection_tester=connection_tester,
     )
-    checks.extend(protocol_checks)
-    return ConnectivityChecks(checks=checks, client=selected_client)
+    return ConnectivityChecks(
+        checks=[*checks, *canonical.checks], client=canonical.client, transports=canonical.transports
+    )
 
 
 def check_device_clock(
@@ -344,8 +359,38 @@ def check_canonical_subscription(
     panel_factory: PanelFactory,
     xray_provider: XrayProvider,
     connection_tester: ConnectionTester,
-) -> tuple[list[VerificationCheck], str]:
+    endpoint_probe: EndpointProbe = tcp_connect,
+) -> ConnectivityChecks:
     """Fetch and execute the exact Xray document delivered to one active user."""
+    transports: list[TransportResult] = []
+    checks, client = _run_canonical_subscription(
+        cluster,
+        deployment,
+        target_ip,
+        requested_client=requested_client,
+        timeout=timeout,
+        panel_factory=panel_factory,
+        xray_provider=xray_provider,
+        connection_tester=connection_tester,
+        endpoint_probe=endpoint_probe,
+        transports=transports,
+    )
+    return ConnectivityChecks(checks=checks, client=client, transports=transports)
+
+
+def _run_canonical_subscription(
+    cluster: ClusterConfig,
+    deployment: DeploymentVerificationContext,
+    target_ip: str,
+    *,
+    requested_client: str,
+    timeout: float,
+    panel_factory: PanelFactory,
+    xray_provider: XrayProvider,
+    connection_tester: ConnectionTester,
+    endpoint_probe: EndpointProbe,
+    transports: list[TransportResult],
+) -> tuple[list[VerificationCheck], str]:
     if not cluster.panel.url or not cluster.panel.api_token:
         return [
             build_verification_check(
@@ -514,24 +559,24 @@ def check_canonical_subscription(
             connection_tester,
             expected_egress_ip="",
             timeout=timeout,
-        )
+        ).check
     )
     for index, outbound in enumerate(selected_outbounds, start=1):
-        tag = str(outbound["tag"])
-        label = outbound_label(outbound)
-        checks.append(
-            execute_xray_config(
-                f"protocol_{index}",
-                label,
-                config,
-                xray_binary,
-                target_ip,
-                connection_tester,
-                expected_egress_ip=deployment.expected_egress_ip,
-                timeout=timeout,
-                outbound_tag=tag,
-            )
+        run = execute_xray_config(
+            f"protocol_{index}",
+            outbound_label(outbound),
+            config,
+            xray_binary,
+            target_ip,
+            connection_tester,
+            expected_egress_ip=deployment.expected_egress_ip,
+            timeout=timeout,
+            outbound_tag=str(outbound["tag"]),
+            endpoint=outbound_tcp_endpoint(outbound),
+            endpoint_probe=endpoint_probe,
         )
+        checks.append(run.check)
+        transports.append(run.transport)
     return checks, selected.username
 
 
@@ -546,13 +591,21 @@ def execute_xray_config(
     expected_egress_ip: str,
     timeout: float,
     outbound_tag: str = "",
-) -> VerificationCheck:
-    """Run one canonical route through a collision-free local SOCKS listener."""
+    endpoint: tuple[str, int] | None = None,
+    endpoint_probe: EndpointProbe = tcp_connect,
+) -> ProtocolRun:
+    """Run one canonical route through a collision-free local SOCKS listener.
+
+    When traffic fails and the route's TCP ``endpoint`` is known, a direct connect
+    separates "connects, no traffic" from "unreachable".
+    """
     started = time.monotonic()
+    first_byte_ms: int | None = None
+    outcome: TransportOutcome
     try:
         selected = route_only(config, outbound_tag) if outbound_tag else config
         runnable, socks_port = use_free_local_ports(selected)
-        success, detail = connection_tester(
+        attempt = connection_tester(
             xray_binary,
             runnable,
             expected_egress_ip or target_ip,
@@ -562,60 +615,88 @@ def execute_xray_config(
             timeout=timeout,
         )
     except ValueError as exc:
-        findings = [
-            VerificationFinding(
-                code="PROTOCOL_CONFIG_INVALID",
-                status="failed",
-                message=f"{label} canonical config is invalid: {exc}",
-                remediation="Repair the delivered subscription before retrying.",
-            )
-        ]
+        outcome = "invalid"
+        finding = VerificationFinding(
+            code="PROTOCOL_CONFIG_INVALID",
+            status="failed",
+            message=f"{label} canonical config is invalid: {exc}",
+            remediation="Repair the delivered subscription before retrying.",
+        )
     except XrayStartupError as exc:
-        findings = [
-            VerificationFinding(
-                code="PROTOCOL_TEST_UNAVAILABLE",
-                status="skipped",
-                message=f"{label} could not be executed: {exc}",
-                remediation="Inspect the local Xray diagnostics and canonical subscription.",
-            )
-        ]
+        outcome = "inconclusive"
+        finding = VerificationFinding(
+            code="PROTOCOL_TEST_UNAVAILABLE",
+            status="skipped",
+            message=f"{label} could not be executed: {exc}",
+            remediation="Inspect the local Xray diagnostics and canonical subscription.",
+        )
     else:
-        if success is None:
-            findings = [
-                VerificationFinding(
-                    code="PROTOCOL_TRAFFIC_INCONCLUSIVE",
-                    status="skipped",
-                    message=f"{label}: {detail}",
-                    remediation="Retry when an external IP observer is reachable.",
-                )
-            ]
-            return build_verification_check(
-                check_id,
-                label,
-                findings,
-                duration_ms=max(0, int((time.monotonic() - started) * 1000)),
-            )
-        if success:
-            code = "PROTOCOL_TRAFFIC_OK"
-        elif detail.startswith(EGRESS_MISMATCH_PREFIX):
-            code = "PROTOCOL_EGRESS_MISMATCH"
-        else:
-            code = "PROTOCOL_TRAFFIC_FAILED"
-        findings = [
-            VerificationFinding(
-                code=code,
-                status="passed" if success else "failed",
-                message=f"{label}: {detail}",
-                remediation=(
-                    "Inspect the delivered endpoint, credentials, firewall, and Xray logs." if not success else ""
-                ),
-            )
-        ]
-    return build_verification_check(
+        first_byte_ms = attempt.first_byte_ms
+        outcome, finding = _classify_attempt(label, attempt, endpoint, endpoint_probe, timeout=timeout)
+    check = build_verification_check(
         check_id,
         label,
-        findings,
+        [finding],
         duration_ms=max(0, int((time.monotonic() - started) * 1000)),
+    )
+    return ProtocolRun(
+        check=check,
+        transport=TransportResult(check_id=check_id, label=label, outcome=outcome, first_byte_ms=first_byte_ms),
+    )
+
+
+def _classify_attempt(
+    label: str,
+    attempt: ConnectionAttempt,
+    endpoint: tuple[str, int] | None,
+    endpoint_probe: EndpointProbe,
+    *,
+    timeout: float,
+) -> tuple[TransportOutcome, VerificationFinding]:
+    if attempt.success is None:
+        return "inconclusive", VerificationFinding(
+            code="PROTOCOL_TRAFFIC_INCONCLUSIVE",
+            status="skipped",
+            message=f"{label}: {attempt.detail}",
+            remediation="Retry when an external IP observer is reachable.",
+        )
+    if attempt.success:
+        return "ok", VerificationFinding(
+            code="PROTOCOL_TRAFFIC_OK", status="passed", message=f"{label}: {attempt.detail}"
+        )
+    if attempt.detail.startswith(EGRESS_MISMATCH_PREFIX):
+        return "egress_mismatch", VerificationFinding(
+            code="PROTOCOL_EGRESS_MISMATCH",
+            status="failed",
+            message=f"{label}: {attempt.detail}",
+            remediation="Inspect the delivered endpoint, credentials, firewall, and Xray logs.",
+        )
+    if endpoint is None:
+        return "failed", VerificationFinding(
+            code="PROTOCOL_TRAFFIC_FAILED",
+            status="failed",
+            message=f"{label}: {attempt.detail}",
+            remediation="Inspect the delivered endpoint, credentials, firewall, and Xray logs.",
+        )
+    host, port = endpoint
+    if endpoint_probe(host, port, min(timeout, 5.0)):
+        return "no_traffic", VerificationFinding(
+            code="PROTOCOL_NO_TRAFFIC",
+            status="failed",
+            message=f"{label}: connects to port {port}, but no traffic passes ({attempt.detail})",
+            remediation=(
+                "The server accepts the connection but the proxy session carries nothing: check the node's "
+                "Xray logs and credentials, or run `meridian test --probe` to see whether the session is cut."
+            ),
+        )
+    return "unreachable", VerificationFinding(
+        code="PROTOCOL_UNREACHABLE",
+        status="failed",
+        message=f"{label}: port {port} is unreachable from here ({attempt.detail})",
+        remediation=(
+            "Nothing answers on that port: check the server with `meridian check`; if it is up, the address "
+            "may be blocked from this network (`meridian test --probe`)."
+        ),
     )
 
 

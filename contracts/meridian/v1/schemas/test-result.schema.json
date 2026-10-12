@@ -1,5 +1,52 @@
 {
   "$defs": {
+    "TransportResult": {
+      "additionalProperties": false,
+      "description": "One delivered transport's traffic outcome, linked to its check by ID.\n\n``no_traffic`` means the endpoint accepts TCP but the proxy session carries\nnothing; ``unreachable`` means the endpoint does not accept TCP at all.",
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "first_byte_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Byte Ms"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "ok",
+            "no_traffic",
+            "unreachable",
+            "failed",
+            "egress_mismatch",
+            "inconclusive",
+            "invalid"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "label",
+        "outcome"
+      ],
+      "title": "TransportResult",
+      "type": "object"
+    },
     "VerificationCheck": {
       "additionalProperties": false,
       "description": "One independently reportable verification check.",
@@ -240,6 +287,13 @@
     },
     "target": {
       "$ref": "#/$defs/VerificationTarget"
+    },
+    "transports": {
+      "items": {
+        "$ref": "#/$defs/TransportResult"
+      },
+      "title": "Transports",
+      "type": "array"
     },
     "verdict": {
       "enum": [

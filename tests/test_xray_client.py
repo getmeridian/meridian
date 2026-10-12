@@ -350,6 +350,33 @@ def test_rejects_canonical_config_with_non_object_routing() -> None:
         parse_xray_subscription(json.dumps(canonical))
 
 
+def _attempt_pair(*args, **kwargs):
+    attempt = run_connection_test(*args, **kwargs)
+    return attempt.success, attempt.detail
+
+
+def test_connection_reports_time_to_first_byte_through_the_proxy(tmp_path: Path) -> None:
+    proc = MagicMock()
+    proc.poll.return_value = None
+    proc.stdout = io.StringIO()
+    response = SimpleNamespace(returncode=0, stdout="203.0.113.10\n\n@@meridian-ttfb@@0.412", stderr="")
+
+    with (
+        patch("meridian.xray_client._validate_xray_config"),
+        patch("meridian.xray_client.subprocess.Popen", return_value=proc),
+        patch("meridian.xray_client.poll_until_ready"),
+        patch("meridian.xray_client.subprocess.run", return_value=response) as curl,
+    ):
+        attempt = run_connection_test(
+            tmp_path / "xray", {"inbounds": []}, "", 10808, "canonical endpoint", expect_ip_match=False
+        )
+
+    assert attempt.success is True
+    assert attempt.first_byte_ms == 412
+    assert "first byte 412 ms" in attempt.detail
+    assert "--write-out" in curl.call_args.args[0]
+
+
 def test_connection_retries_a_transient_proxy_reset(tmp_path: Path) -> None:
     proc = MagicMock()
     proc.poll.return_value = None
@@ -366,7 +393,7 @@ def test_connection_retries_a_transient_proxy_reset(tmp_path: Path) -> None:
         patch("meridian.xray_client.subprocess.run", side_effect=responses) as curl,
         patch("meridian.xray_client.time.sleep"),
     ):
-        connected, detail = run_connection_test(
+        connected, detail = _attempt_pair(
             tmp_path / "xray",
             {"inbounds": []},
             "",
@@ -396,7 +423,7 @@ def test_connection_rejects_a_non_ip_oracle_response(tmp_path: Path) -> None:
         patch("meridian.xray_client.subprocess.run", return_value=response) as curl,
         patch("meridian.xray_client.time.sleep"),
     ):
-        connected, detail = run_connection_test(
+        connected, detail = _attempt_pair(
             tmp_path / "xray",
             {"inbounds": []},
             "",
@@ -423,7 +450,7 @@ def test_connection_rejects_curl_failure_even_with_an_ip_body(tmp_path: Path) ->
         patch("meridian.xray_client.subprocess.run", return_value=response) as curl,
         patch("meridian.xray_client.time.sleep"),
     ):
-        connected, detail = run_connection_test(
+        connected, detail = _attempt_pair(
             tmp_path / "xray",
             {"inbounds": []},
             "",
@@ -459,7 +486,7 @@ def test_connection_asks_observers_that_answer_only_over_the_server_family(
         patch("meridian.xray_client.subprocess.run", side_effect=[failure, exit_ip]) as curl,
         patch("meridian.xray_client.time.sleep"),
     ):
-        connected, _ = run_connection_test(tmp_path / "xray", {"inbounds": []}, server_ip, 10808, "reality")
+        connected, _ = _attempt_pair(tmp_path / "xray", {"inbounds": []}, server_ip, 10808, "reality")
 
     assert connected is True
     assert [call.args[0][-1] for call in curl.call_args_list] == list(observers[:2])
@@ -479,7 +506,7 @@ def test_connection_requires_sustained_failure(tmp_path: Path) -> None:
         patch("meridian.xray_client.subprocess.run", side_effect=[failure, failure, failure, control]) as curl,
         patch("meridian.xray_client.time.sleep") as sleep,
     ):
-        connected, detail = run_connection_test(
+        connected, detail = _attempt_pair(
             tmp_path / "xray",
             {"inbounds": []},
             "",

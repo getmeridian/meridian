@@ -252,6 +252,8 @@ Test delivered proxy traffic from your device. No SSH is needed.
 
 A full test picks an active client, fetches the exact Xray JSON that Remnawave delivers to them, and pushes real traffic through the automatic fallback and through every path of the target server. The first run may spend up to 120 seconds downloading and verifying the pinned Xray runtime. Traffic checks rotate independent IP observers and compare them with a direct request, so an observer outage is inconclusive rather than a false failure. `MERIDIAN_CONNECT_TEST_URL` overrides the observer for controlled environments.
 
+Each path reports its time to first byte. When a path fails, Meridian opens a plain TCP connection to its endpoint to say whether it **connects, but no traffic passes** (the server answers but the proxy session carries nothing: wrong credentials or a session being cut) or is **unreachable** (nothing answers on that port). With `--json`, `data.transports` lists every path's outcome (`ok`, `no_traffic`, `unreachable`, `failed`, `egress_mismatch`, `inconclusive`, `invalid`) and `first_byte_ms`.
+
 A panel outage, HTTP `429`, or HTTP `5xx` makes the subscription unavailable, so the run exits `3`. Any other subscription rejection such as `400` or `422` is a completed failure and exits `4`.
 
 ```

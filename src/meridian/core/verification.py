@@ -189,6 +189,30 @@ class VerificationResult(CoreModel):
         return to_plain(self)
 
 
+TransportOutcome = Literal[
+    "ok",
+    "no_traffic",
+    "unreachable",
+    "failed",
+    "egress_mismatch",
+    "inconclusive",
+    "invalid",
+]
+
+
+class TransportResult(CoreModel):
+    """One delivered transport's traffic outcome, linked to its check by ID.
+
+    ``no_traffic`` means the endpoint accepts TCP but the proxy session carries
+    nothing; ``unreachable`` means the endpoint does not accept TCP at all.
+    """
+
+    check_id: str
+    label: str
+    outcome: TransportOutcome
+    first_byte_ms: int | None = Field(default=None, ge=0)
+
+
 class ProbeResult(VerificationResult):
     """External fingerprint and exposure verification result."""
 
@@ -198,3 +222,4 @@ class TestResult(VerificationResult):
 
     scope: Literal["basic", "full"] = "full"
     client: str = ""
+    transports: list[TransportResult] = Field(default_factory=list)

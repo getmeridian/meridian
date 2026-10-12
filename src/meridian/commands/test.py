@@ -164,6 +164,7 @@ def collect_test_result(
         checks=checks,
         scope="basic" if basic else "full",
         client=run_result.client,
+        transports=run_result.transports,
     )
 
 
