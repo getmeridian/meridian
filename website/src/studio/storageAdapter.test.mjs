@@ -76,7 +76,7 @@ test("sanitizeJourneyDraft restores missing defaults", () => {
   assert.equal(draft.server.host, "198.51.100.10");
   assert.equal(draft.server.ssh_user, "root");
   assert.equal(draft.deploy.warp, true);
-  assert.equal(draft.deploy.sni, "www.microsoft.com");
+  assert.equal(draft.deploy.sni, "www.google.com");
   assert.equal(draft.readiness.dryRunComplete, false);
 });
 

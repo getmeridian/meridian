@@ -51,7 +51,7 @@ export function buildDeployRequestFromJourney(journey) {
     icon: String(journey.deploy?.icon ?? "").trim(),
     pq: Boolean(journey.deploy?.pq ?? false),
     server_name: String(journey.deploy?.server_name ?? "My VPN").trim() || "My VPN",
-    sni: String(journey.deploy?.sni ?? "www.microsoft.com").trim() || "www.microsoft.com",
+    sni: String(journey.deploy?.sni ?? "www.google.com").trim() || "www.google.com",
     warp: Boolean(journey.deploy?.warp ?? false),
     yes: Boolean(journey.confirmDeploy),
   };
