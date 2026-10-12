@@ -16,11 +16,13 @@ from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
+    DEFAULT_TLS_FINGERPRINT,
     AccessIntent,
     ControlPlaneIntent,
     ExitIntent,
     ProtocolPathIntent,
     SetupIntent,
+    TlsFingerprint,
 )
 
 DEFAULT_EXIT_ID = "main"
@@ -39,6 +41,7 @@ def single_server_intent(
     warp: bool = False,
     geo_block: bool = True,
     hysteria2: bool = False,
+    fingerprint: TlsFingerprint | None = None,
 ) -> SetupIntent:
     """Return the intent for deploying (or redeploying) one server.
 
@@ -56,7 +59,7 @@ def single_server_intent(
         exit_ = ExitIntent(
             id=DEFAULT_EXIT_ID,
             server_ref=server_ref,
-            paths=_paths(DEFAULT_EXIT_ID, None, sni=sni, domain=domain, hysteria2=hysteria2),
+            paths=_paths(DEFAULT_EXIT_ID, None, sni=sni, domain=domain, hysteria2=hysteria2, fingerprint=fingerprint),
             warp=warp,
             geo_block=geo_block,
         )
@@ -76,7 +79,7 @@ def single_server_intent(
         )
     updated = current.model_copy(
         update={
-            "paths": _paths(current.id, current, sni=sni, domain=domain, hysteria2=hysteria2),
+            "paths": _paths(current.id, current, sni=sni, domain=domain, hysteria2=hysteria2, fingerprint=fingerprint),
             "warp": warp,
             "geo_block": geo_block,
         }
@@ -92,6 +95,21 @@ def single_server_intent(
     )
 
 
+def request_intent(existing: SetupIntent | None, request: DeployRequest, *, server_ref: str) -> SetupIntent:
+    """Return the reviewed intent one deploy request describes."""
+    return single_server_intent(
+        existing,
+        server_ref=server_ref,
+        sni=request.sni,
+        domain=request.domain,
+        client_name=request.client_name,
+        warp=request.warp,
+        geo_block=request.geo_block,
+        hysteria2=request.hysteria2,
+        fingerprint=request.fingerprint,
+    ).model_copy(update={"harden": request.harden})
+
+
 def preview_single_server_deploy(
     existing: SetupIntent | None,
     request: DeployRequest,
@@ -105,16 +123,7 @@ def preview_single_server_deploy(
 
     Raises :class:`LocalStateError` when the request cannot target this fleet.
     """
-    intent = single_server_intent(
-        existing,
-        server_ref=server_ref,
-        sni=request.sni,
-        domain=request.domain,
-        client_name=request.client_name,
-        warp=request.warp,
-        geo_block=request.geo_block,
-        hysteria2=request.hysteria2,
-    ).model_copy(update={"harden": request.harden})
+    intent = request_intent(existing, request, server_ref=server_ref)
     plan = compile_topology(intent)
     ports = {
         inbound.protocol: inbound.listen_port
@@ -147,10 +156,19 @@ def _paths(
     sni: str,
     domain: str,
     hysteria2: bool,
+    fingerprint: TlsFingerprint | None,
 ) -> list[ProtocolPathIntent]:
     previous: dict[str, ProtocolPathIntent] = {path.protocol: path for path in current.paths} if current else {}
     reality_sni = sni or (previous["reality"].reality_sni if "reality" in previous else DEFAULT_SNI)
-    paths = [ProtocolPathIntent(id=f"{exit_id}-reality", protocol="reality", reality_sni=reality_sni)]
+    # Like the SNI, a redeploy keeps the saved fingerprint unless one is passed.
+    tls_fingerprint = fingerprint or (
+        previous["reality"].fingerprint if "reality" in previous else DEFAULT_TLS_FINGERPRINT
+    )
+    paths = [
+        ProtocolPathIntent(
+            id=f"{exit_id}-reality", protocol="reality", reality_sni=reality_sni, fingerprint=tls_fingerprint
+        )
+    ]
     if not domain:
         return paths
     tls_protocols: tuple[Literal["xhttp"], Literal["wss"]] = ("xhttp", "wss")
@@ -165,6 +183,7 @@ def _paths(
                 tls_sni=domain,
                 host=domain,
                 path=path,
+                fingerprint=tls_fingerprint,
             )
         )
     if hysteria2:

@@ -19,7 +19,14 @@ from meridian.compiler.names import (
 from meridian.core.inputs import IPAddressValue, PortValue, ServerReferenceValue, SshUserValue
 from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind as ResourceKind
-from meridian.core.topology import EgressStrategy, ProtocolKind, RouteMatchKind, TrafficRouteAction
+from meridian.core.topology import (
+    DEFAULT_TLS_FINGERPRINT,
+    EgressStrategy,
+    ProtocolKind,
+    RouteMatchKind,
+    TlsFingerprint,
+    TrafficRouteAction,
+)
 
 COMPILER_VERSION: Literal["v4.1"] = "v4.1"
 OwnershipMarker = Literal["meridian/v4"]
@@ -143,6 +150,7 @@ class ServiceOutboundSpec(CoreModel):
     target_inbound_ref: str
     target_port: int
     target_sni: str
+    target_fingerprint: TlsFingerprint = DEFAULT_TLS_FINGERPRINT
 
 
 class EgressBalancerSpec(CoreModel):

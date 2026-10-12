@@ -700,7 +700,7 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     assert any(host.path == "/xhttp-a" for host in direct_hosts)
     assert any(host.path == "/ws-b" for host in direct_hosts)
     assert any(host.alpn == "h3" for host in direct_hosts)
-    assert sum(host.fingerprint == "chrome" for host in direct_hosts) == 2
+    assert all(host.fingerprint == ("" if host.alpn == "h3" else "chrome") for host in direct_hosts)
     assert all(host.tags == ["MERIDIAN_V4_VISIBLE"] for host in direct_hosts)
     assert all(host.tags == ["MERIDIAN_V4_XRAY_EDGE"] for host in hidden_edges)
     assert all(host.exclude_from_subscription_types == ["MIHOMO", "XRAY_BASE64"] for host in hidden_edges)

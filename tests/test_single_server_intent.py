@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from meridian.compiler import compile_topology
+from meridian.compiler.models import HostPayload
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import AccessIntent, ExitIntent, ProtocolPathIntent
 from meridian.setup.single_server import single_server_intent
@@ -54,6 +55,33 @@ def test_redeploy_keeps_transport_paths_users_and_other_exits() -> None:
     assert again.exits[0].warp is True
     assert again.exits[1] == other
     assert again.access.users == ["alice", "bob", "carol"]
+
+
+def test_fingerprint_reaches_every_tcp_path_and_survives_a_plain_redeploy() -> None:
+    first = single_server_intent(
+        None, server_ref="srv-a", domain="vpn.example.com", hysteria2=True, fingerprint="firefox"
+    )
+    again = single_server_intent(first, server_ref="srv-a", domain="vpn.example.com", hysteria2=True)
+
+    for intent in (first, again):
+        paths = {path.protocol: path.fingerprint for path in intent.exits[0].paths}
+        assert paths == {"reality": "firefox", "xhttp": "firefox", "wss": "firefox", "hysteria2": "chrome"}
+    hosts = [
+        resource.payload
+        for resource in compile_topology(again).resources
+        if isinstance(resource.payload, HostPayload) and not resource.payload.is_hidden
+    ]
+    assert {host.protocol: host.fingerprint for host in hosts if not host.xray_json_template_ref} == {
+        "reality": "firefox",
+        "xhttp": "firefox",
+        "wss": "firefox",
+        "hysteria2": "",
+    }
+
+
+def test_hysteria2_path_refuses_a_tls_fingerprint() -> None:
+    with pytest.raises(ValueError, match="QUIC"):
+        ProtocolPathIntent(id="h", protocol="hysteria2", tls_sni="vpn.example.com", fingerprint="firefox")
 
 
 def test_unknown_server_in_an_existing_fleet_is_refused() -> None:

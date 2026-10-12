@@ -20,6 +20,7 @@ meridian deploy [IP|local] [flags]
 | `--sni HOST` | (auto) | Camouflage target. Without it, the server tries `www.google.com`, `dl.google.com`, `www.cloudflare.com` and uses the first that carries traffic; a redeploy keeps the saved target. An explicit `--sni` is never swapped |
 | `--domain DOMAIN` | (none) | Your domain for XHTTP and WSS (Cloudflare CDN fallback). The panel and connection pages stay on the IP certificate |
 | `--hysteria2` | off | Also offer Hysteria2 on UDP/443. Needs `--domain`; QUIC is throttled in some regions |
+| `--fingerprint NAME` | chrome | TLS fingerprint clients present on Reality, XHTTP, and WSS (`chrome`, `firefox`, `safari`, `ios`, `android`, `edge`, `random`, `randomized`). Change it if your region starts flagging the current one; a redeploy keeps the saved value |
 | `--client-name NAME` | default | Name of the first client |
 | `--display-name NAME` | (none) | Label for connection pages |
 | `--icon EMOJI_OR_URL` | (none) | Page icon — emoji or image URL |
@@ -29,7 +30,7 @@ meridian deploy [IP|local] [flags]
 | `--server NAME` | | Saved server to deploy to (name or IP) |
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. `--no-harden` is for servers shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
-| `--geo-block` / `--no-geo-block` | on | Block Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) |
+| `--geo-block` / `--no-geo-block` | on | Refuse Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) at the exit. Xray JSON and Mihomo subscriptions already send them directly from the device |
 | `--yes` | | Skip confirmation prompts |
 | `--json` | | Emit the final deploy result as a `meridian.output/v1` envelope |
 | `--events=jsonl` | | Stream typed progress events as JSONL on stderr |

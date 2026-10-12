@@ -20,6 +20,7 @@ meridian deploy [IP|local] [flags]
 | `--sni HOST` | (自动) | 伪装目标。不指定时，服务器尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
 | `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名（Cloudflare CDN 回退）。面板和连接页面保持在 IP 证书上 |
 | `--hysteria2` | 关 | 在 UDP/443 上也提供 Hysteria2。需要 `--domain`；QUIC 在某些地区被限制 |
+| `--fingerprint NAME` | chrome | 客户端在 Reality、XHTTP 和 WSS 上呈现的 TLS 指纹（`chrome`、`firefox`、`safari`、`ios`、`android`、`edge`、`random`、`randomized`）。如果你的地区开始标记当前指纹，请更改它；重新部署保留已保存的值 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
 | `--display-name NAME` | (无) | 连接页面的标签 |
 | `--icon EMOJI_OR_URL` | (无) | 页面图标 — 表情符号或图片 URL |
@@ -29,7 +30,7 @@ meridian deploy [IP|local] [flags]
 | `--server NAME` | | 保存的服务器来部署到（名称或 IP） |
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
-| `--geo-block` / `--no-geo-block` | 启 | 阻止俄罗斯域名和 IP (`geosite:category-ru` + `geoip:ru`) |
+| `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |

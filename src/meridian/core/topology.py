@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import Literal, Self
+from typing import Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
@@ -29,6 +29,9 @@ TrafficScope = Literal["default", "country"]
 TrafficRouteAction = Literal["route", "block"]
 RegionalTrafficMode = Literal["block", "regional_exit", "default_exit"]
 ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
+TlsFingerprint = Literal["chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized"]
+# uTLS ClientHello presented on every TCP path unless the operator picks another.
+DEFAULT_TLS_FINGERPRINT: Final[TlsFingerprint] = "chrome"
 RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
 EgressStrategy = Literal["least_ping"]
 DeliveryFormat = Literal["base64", "xray_json", "mihomo"]
@@ -57,9 +60,12 @@ class ProtocolPathIntent(CoreModel):
     tls_sni: OptionalHostnameValue = ""
     host: OptionalHostnameValue = ""
     path: OptionalTransportPathValue = ""
+    fingerprint: TlsFingerprint = DEFAULT_TLS_FINGERPRINT
 
     @model_validator(mode="after")
     def validate_protocol_fields(self) -> Self:
+        if self.protocol == "hysteria2" and self.fingerprint != DEFAULT_TLS_FINGERPRINT:
+            raise ValueError("Hysteria2 runs over QUIC; a TLS fingerprint does not apply.")
         if self.protocol == "reality":
             if not self.reality_sni:
                 raise ValueError("Reality paths require a camouflage SNI.")

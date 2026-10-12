@@ -54,6 +54,7 @@ def compile_gateway_routing(intent: SetupIntent, gateway: RoutingGatewayIntent) 
             target_inbound_ref=bridge_inbound_id(gateway.id, exit_ref),
             target_port=0,
             target_sni=_exit_reality_path(intent, exit_ref).reality_sni,
+            target_fingerprint=_exit_reality_path(intent, exit_ref).fingerprint,
         )
         for exit_ref in target_exits
     )

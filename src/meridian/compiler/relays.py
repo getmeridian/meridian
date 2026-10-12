@@ -137,7 +137,7 @@ def compile_relays(
                     sni=relay.reality_sni or path.reality_sni or path.tls_sni,
                     host=path.host,
                     path=f"/{path.path}" if path.path else "",
-                    fingerprint="chrome" if path.protocol == "reality" else "",
+                    fingerprint="" if path.protocol == "hysteria2" else path.fingerprint,
                     security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
                 ),
                 dependencies=[first_hop_id, inbound_id],

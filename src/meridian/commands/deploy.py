@@ -61,7 +61,7 @@ from meridian.setup.single_server import (
     DEFAULT_CLIENT,
     PENDING_SERVER_REF,
     preview_single_server_deploy,
-    single_server_intent,
+    request_intent,
 )
 from meridian.ssh import ServerConnection
 
@@ -83,6 +83,7 @@ def run(
     geo_block: bool = True,
     hysteria2: bool = False,
     ssh_port: int = 22,
+    fingerprint: str = "",
     request_path: str = "",
     json_output: bool = False,
     events: str = "",
@@ -120,6 +121,7 @@ def run(
                 geo_block=geo_block,
                 hysteria2=hysteria2,
                 ssh_port=ssh_port,
+                fingerprint=fingerprint,
             )
         )
         machine_mode = final_json or bool(request_path) or dry_run
@@ -428,16 +430,7 @@ def _dry_run(request: DeployRequest) -> DeployPlan:
 
 def _intent_or_fail(existing: SetupIntent | None, server_ref: str, request: DeployRequest) -> SetupIntent:
     try:
-        return single_server_intent(
-            existing,
-            server_ref=server_ref,
-            sni=request.sni,
-            domain=request.domain,
-            client_name=request.client_name,
-            warp=request.warp,
-            geo_block=request.geo_block,
-            hysteria2=request.hysteria2,
-        ).model_copy(update={"harden": request.harden})
+        return request_intent(existing, request, server_ref=server_ref)
     except MeridianError as exc:
         fail(exc)
 
@@ -519,6 +512,8 @@ def _redeploy_command(server_ip: str, request: DeployRequest) -> str:
         parts.append("--warp")
     if not request.geo_block:
         parts.append("--no-geo-block")
+    if request.fingerprint:
+        parts.append(f"--fingerprint {shlex.quote(request.fingerprint)}")
     if request.server_name:
         parts.append(f"--display-name {shlex.quote(request.server_name)}")
     if request.icon:

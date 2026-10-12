@@ -558,7 +558,7 @@ def _compile_exit_endpoints(
                     host=path.host,
                     path=f"/{path.path}" if path.path else "",
                     alpn="h3" if path.protocol == "hysteria2" else "",
-                    fingerprint="chrome" if path.protocol == "reality" else "",
+                    fingerprint="" if path.protocol == "hysteria2" else path.fingerprint,
                     security_layer="TLS" if is_tls else "DEFAULT",
                 ),
                 dependencies=dependencies,

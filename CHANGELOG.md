@@ -31,6 +31,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Optional paths** — `--domain` adds XHTTP and WSS (Cloudflare CDN fallback);
   `--hysteria2` adds Hysteria2 on UDP/443. Blocking Russian destinations stays on
   by default (`--no-geo-block` to turn it off).
+- **TLS fingerprint is a setting** — every Reality, XHTTP, and WSS link presents
+  the `chrome` fingerprint by default (XHTTP and WSS used to send none, which
+  exposed the client library); `--fingerprint` or the topology's path
+  `fingerprint` switches it when a region starts flagging one.
 - **Shrink a running fleet** — `meridian node remove` and `meridian relay remove`
   edit the topology, show every resource they will delete, and clean up the
   panel node, node container, Realm units, firewall rules, and published Hosts.

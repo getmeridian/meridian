@@ -29,6 +29,28 @@
       "default": "",
       "title": "Domain"
     },
+    "fingerprint": {
+      "anyOf": [
+        {
+          "enum": [
+            "chrome",
+            "firefox",
+            "safari",
+            "ios",
+            "android",
+            "edge",
+            "random",
+            "randomized"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fingerprint"
+    },
     "geo_block": {
       "default": true,
       "title": "Geo Block",

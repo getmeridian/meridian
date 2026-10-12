@@ -20,6 +20,7 @@ meridian deploy [IP|local] [flags]
 | `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، سرور `www.google.com`، `dl.google.com`، `www.cloudflare.com` را امتحان می‌کند و از اول‌ی آن‌های که ترافیق حمل می‌کنند استفاده می‌کند؛ بازاستقرار هدف ذخیره‌شده را نگه می‌دارد. `--sni` صریح هرگز جابه‌جا نمی‌شود |
 | `--domain DOMAIN` | (هیچ) | دامنه شما برای XHTTP و WSS (CDN Cloudflare fallback). پنل و صفحات اتصال روی گواهینامه IP می‌مانند |
 | `--hysteria2` | خاموش | همچنین Hysteria2 را روی UDP/443 ارائه دهید. `--domain` نیاز دارد؛ QUIC در برخی از مناطق throttled است |
+| `--fingerprint NAME` | chrome | اثر انگشت TLS که کلاینت‌ها در Reality، XHTTP و WSS نشان می‌دهند (`chrome`، `firefox`، `safari`، `ios`، `android`، `edge`، `random`، `randomized`). اگر منطقه شما شروع به پرچم‌گذاری کردن آن کند تغییر دهید؛ بازاستقرار مقدار ذخیره‌شده را نگه می‌دارد |
 | `--client-name NAME` | default | نام کلاینت اول |
 | `--display-name NAME` | (هیچ) | برچسب برای صفحات اتصال |
 | `--icon EMOJI_OR_URL` | (هیچ) | آیکون صفحه — emoji یا URL تصویر |
@@ -29,7 +30,7 @@ meridian deploy [IP|local] [flags]
 | `--server NAME` | | سرور ذخیره‌شده برای استقرار (نام یا IP) |
 | `--harden / --no-harden` | فعال | ورود تنهای کلید SSH، fail2ban و firewall UFW. `--no-harden` برای سروری که سرویس‌های دیگری روی آن دارند است |
 | `--warp / --no-warp` | خاموش | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
-| `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را block کنید (`geosite:category-ru` + `geoip:ru`) |
+| `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را در exit block کنید (`geosite:category-ru` + `geoip:ru`). اشتراک‌های Xray JSON و Mihomo قبلاً آن‌ها را مستقیم از دستگاه ارسال می‌کنند |
 | `--yes` | | پرسش تأیید را رد کنید |
 | `--json` | | نتیجه deploy نهایی را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 | `--events=jsonl` | | رویدادهای تعریف‌شده پیشرفت را به عنوان JSONL روی stderr جریان دهید |

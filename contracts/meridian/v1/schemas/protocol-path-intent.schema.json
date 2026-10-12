@@ -2,6 +2,21 @@
   "additionalProperties": false,
   "description": "One protocol-specific public path backed by an exit workload.",
   "properties": {
+    "fingerprint": {
+      "default": "chrome",
+      "enum": [
+        "chrome",
+        "firefox",
+        "safari",
+        "ios",
+        "android",
+        "edge",
+        "random",
+        "randomized"
+      ],
+      "title": "Fingerprint",
+      "type": "string"
+    },
     "host": {
       "anyOf": [
         {

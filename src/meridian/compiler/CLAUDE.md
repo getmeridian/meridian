@@ -32,5 +32,6 @@
 - Certificate resources depend on their reviewed TCP/80 ACME firewall rule.
 - One exit workload per server: a Remnawave node runtime can activate only one Profile.
 - Client geodata must exist in stock dat files (v2fly `geosite`/`geoip`, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole delivered config.
+- Every TCP Host (Reality, XHTTP, WSS) and gateway edge carries its path's `fingerprint`; an empty one makes clients send the Go TLS ClientHello, a known DPI signature. Hysteria2 (QUIC) carries none.
 - Mihomo IP rules keep `no-resolve`: resolving names locally leaks them and spoofed domestic answers would match `geoip:ru`.
 - Xray server pools use observatory-backed `leastPing`; do not claim unsupported strict-priority failover.

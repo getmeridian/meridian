@@ -248,7 +248,7 @@ def _render_service_outbound(
             "network": "tcp",
             "security": "reality",
             "realitySettings": {
-                "fingerprint": "chrome",
+                "fingerprint": edge.target_fingerprint,
                 "serverName": edge.target_sni,
                 "publicKey": credential.public_key,
                 "shortId": credential.short_id,

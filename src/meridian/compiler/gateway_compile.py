@@ -28,7 +28,7 @@ from meridian.compiler.routing import (
     edge_id,
     service_user_id,
 )
-from meridian.core.topology import SetupIntent
+from meridian.core.topology import DEFAULT_TLS_FINGERPRINT, SetupIntent
 
 
 def compile_routing_gateways(
@@ -288,7 +288,7 @@ def _compile_reality_endpoint(
                 public_port=public_port,
                 protocol="reality",
                 sni=reality_sni,
-                fingerprint="chrome",
+                fingerprint=DEFAULT_TLS_FINGERPRINT,
             ),
             dependencies=[runtime_id, inbound_id],
         )

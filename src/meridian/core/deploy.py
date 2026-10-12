@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.inputs import (
@@ -16,6 +16,7 @@ from meridian.core.inputs import (
 )
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
+from meridian.core.topology import TlsFingerprint
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
 
 DeployMode = Literal["first_deploy", "redeploy"]
@@ -39,6 +40,12 @@ class DeployRequest(CoreModel):
     geo_block: bool = True
     hysteria2: bool = False
     ssh_port: int = Field(default=22, ge=1, le=65535)
+    fingerprint: TlsFingerprint | None = None
+
+    @field_validator("fingerprint", mode="before")
+    @classmethod
+    def blank_fingerprint_keeps_saved(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 class DeployWorkflowAnswers(CoreModel):

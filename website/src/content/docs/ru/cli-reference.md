@@ -20,6 +20,7 @@ meridian deploy [IP|local] [flags]
 | `--sni HOST` | (авто) | Цель маскировки. Без него сервер пытается `www.google.com`, `dl.google.com`, `www.cloudflare.com` и использует первый, который несёт трафик; переразворачивание сохраняет сохранённую цель. Явный `--sni` никогда не меняется |
 | `--domain DOMAIN` | (нет) | Ваш домен для XHTTP и WSS (возврат CDN Cloudflare). Панель и страницы подключения остаются на IP-сертификате |
 | `--hysteria2` | отключен | Также предлагать Hysteria2 на UDP/443. Требует `--domain`; QUIC дросселируется в некоторых регионах |
+| `--fingerprint NAME` | chrome | Отпечаток TLS, который клиенты показывают на Reality, XHTTP и WSS (`chrome`, `firefox`, `safari`, `ios`, `android`, `edge`, `random`, `randomized`). Измените его, если ваш регион начнёт флагировать текущий; переразворачивание сохраняет сохранённое значение |
 | `--client-name NAME` | default | Имя первого клиента |
 | `--display-name NAME` | (нет) | Ярлык для страниц подключения |
 | `--icon EMOJI_OR_URL` | (нет) | Значок страницы — эмодзи или URL изображения |
@@ -29,7 +30,7 @@ meridian deploy [IP|local] [flags]
 | `--server NAME` | | Сохранённый сервер для развёртывания (имя или IP) |
 | `--harden / --no-harden` | вкл | SSH только по ключу, fail2ban и брандмауэр UFW. `--no-harden` для серверов, общих с другими сервисами |
 | `--warp / --no-warp` | выкл | Отправлять исходящий трафик через Cloudflare WARP |
-| `--geo-block` / `--no-geo-block` | вкл | Блокировать российские домены и IP (`geosite:category-ru` + `geoip:ru`) |
+| `--geo-block` / `--no-geo-block` | вкл | Блокировать российские домены и IP (`geosite:category-ru` + `geoip:ru`) на выходе. Xray JSON и Mihomo подписки уже отправляют их напрямую с устройства |
 | `--yes` | | Пропустить диалоги подтверждения |
 | `--json` | | Выдать окончательный результат развёртывания как конверт `meridian.output/v1` |
 | `--events=jsonl` | | Потоком передавать типизированные события прогресса как JSONL на stderr |
