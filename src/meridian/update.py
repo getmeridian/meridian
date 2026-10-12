@@ -127,7 +127,9 @@ def do_upgrade(expected_version: str = "") -> bool:
     spec = f"{PYPI_PACKAGE}=={expected_version}" if expected_version else PYPI_PACKAGE
     commands: list[list[str]] = []
     if shutil.which("uv"):
-        commands.append(["uv", "tool", "install", "--force", spec] if expected_version else ["uv", "tool", "upgrade", spec])
+        commands.append(
+            ["uv", "tool", "install", "--force", spec] if expected_version else ["uv", "tool", "upgrade", spec]
+        )
     if shutil.which("pipx"):
         commands.append(["pipx", "install", "--force", spec] if expected_version else ["pipx", "upgrade", spec])
     if shutil.which("pip3"):
