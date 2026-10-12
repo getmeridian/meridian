@@ -436,7 +436,6 @@ wheels = [
 name = "meridian-vpn"
 source = { editable = "." }
 dependencies = [
-    { name = "fastapi" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "packaging" },
@@ -445,24 +444,30 @@ dependencies = [
     { name = "rich" },
     { name = "segno" },
     { name = "typer" },
-    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "fastapi" },
     { name = "hatchling" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-pyyaml" },
+    { name = "uvicorn" },
 ]
 hetzner = [
     { name = "hcloud" },
 ]
+studio = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.128" },
+    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.128" },
+    { name = "fastapi", marker = "extra == 'studio'", specifier = ">=0.128" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.31.0" },
     { name = "hcloud", marker = "extra == 'hetzner'", specifier = ">=2.0" },
     { name = "httpx", specifier = ">=0.27" },
@@ -477,9 +482,10 @@ requires-dist = [
     { name = "segno", specifier = ">=1.5" },
     { name = "typer", specifier = ">=0.12" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
-    { name = "uvicorn", specifier = ">=0.30" },
+    { name = "uvicorn", marker = "extra == 'dev'", specifier = ">=0.30" },
+    { name = "uvicorn", marker = "extra == 'studio'", specifier = ">=0.30" },
 ]
-provides-extras = ["dev", "hetzner"]
+provides-extras = ["dev", "hetzner", "studio"]
 
 [[package]]
 name = "mypy"

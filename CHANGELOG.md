@@ -64,7 +64,7 @@ running version is newer than the tested one.
 ### Not yet available
 - Removing users, servers, relays, or protocol paths from a running fleet
   (apply only adds; a redeploy must keep the same `--domain`).
-- `meridian studio` (local web UI) is experimental.
+- `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.

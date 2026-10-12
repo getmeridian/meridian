@@ -38,3 +38,21 @@ def test_requested_port_must_be_available() -> None:
             _choose_port("127.0.0.1", port)
 
     assert exc_info.value.exit_code == 2
+
+
+def test_missing_studio_extra_explains_how_to_install(monkeypatch) -> None:
+    import sys
+
+    from typer.testing import CliRunner
+
+    import meridian.cli as cli
+    from meridian.cli import app
+
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.delitem(sys.modules, "meridian.commands.studio", raising=False)
+    monkeypatch.setitem(sys.modules, "uvicorn", None)
+
+    result = CliRunner().invoke(app, ["studio", "--no-open"])
+
+    assert result.exit_code == 2
+    assert "meridian-vpn[studio]" in result.output

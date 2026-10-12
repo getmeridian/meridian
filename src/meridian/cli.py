@@ -213,8 +213,17 @@ def studio_cmd(
     assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
     no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),
 ) -> None:
-    """Open Meridian Studio with the localhost Engine API"""
-    from meridian.commands.studio import run
+    """Open Meridian Studio, the local web UI (experimental)"""
+    try:
+        from meridian.commands.studio import run
+    except ModuleNotFoundError as exc:
+        from meridian.console import fail
+
+        fail(
+            f"Meridian Studio needs extra packages ({exc.name})",
+            hint="Install them with: uv tool install 'meridian-vpn[studio]'  (or pip install 'meridian-vpn[studio]')",
+            hint_type="user",
+        )
 
     run(port=port, assets_dir=assets_dir, no_open=no_open)
 
