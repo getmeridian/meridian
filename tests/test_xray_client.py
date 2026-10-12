@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from meridian.credentials import ServerCredentials
 from meridian.xray_client import (
+    _connect_test_url,
     _find_free_port,
     _parse_dgst,
     build_reality_config,
@@ -40,6 +41,26 @@ class TestParseDgst:
 
 
 # ---------------------------------------------------------------------------
+# _connect_test_url
+# ---------------------------------------------------------------------------
+
+
+class TestConnectTestUrl:
+    def test_ipv4_uses_ipv4_endpoint_by_default(self, monkeypatch) -> None:
+        monkeypatch.setattr("meridian.xray_client.CONNECT_TEST_URL", "")
+        assert _connect_test_url("198.51.100.1") == "https://api.ipify.org"
+
+    def test_ipv6_uses_ipv6_endpoint_by_default(self, monkeypatch) -> None:
+        monkeypatch.setattr("meridian.xray_client.CONNECT_TEST_URL", "")
+        assert _connect_test_url("2001:db8::1") == "https://api6.ipify.org"
+
+    def test_env_override_wins_for_ipv4_and_ipv6(self, monkeypatch) -> None:
+        monkeypatch.setattr("meridian.xray_client.CONNECT_TEST_URL", "https://echo.test/ip")
+        assert _connect_test_url("198.51.100.1") == "https://echo.test/ip"
+        assert _connect_test_url("2001:db8::1") == "https://echo.test/ip"
+
+
+# ---------------------------------------------------------------------------
 # build_reality_config
 # ---------------------------------------------------------------------------
 
@@ -50,7 +71,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="550e8400-e29b-41d4-a716-446655440000",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="testpubkey123",
             short_id="abcd1234",
         )
@@ -65,7 +86,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="test-uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
         )
@@ -79,7 +100,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="my-test-uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
         )
@@ -91,7 +112,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.42",
             uuid="uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
         )
@@ -118,7 +139,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
         )
@@ -130,7 +151,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
             fingerprint="firefox",
@@ -143,7 +164,7 @@ class TestBuildRealityConfig:
             socks_port=10800,
             server_ip="198.51.100.1",
             uuid="uuid",
-            sni="www.microsoft.com",
+            sni="www.cloudflare.com",
             public_key="pk",
             short_id="sid",
         )
@@ -281,7 +302,7 @@ class TestBuildTestConfigs:
         self,
         *,
         ip: str = "198.51.100.1",
-        sni: str = "www.microsoft.com",
+        sni: str = "www.cloudflare.com",
         domain: str = "",
         warp: bool = False,
         reality_uuid: str = "",

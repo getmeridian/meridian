@@ -16,14 +16,14 @@ meridian deploy 1.2.3.4
 The wizard guides you through configuration. Or specify everything upfront:
 
 ```
-meridian deploy 1.2.3.4 --sni www.microsoft.com --client-name alice --yes
+meridian deploy 1.2.3.4 --sni www.cloudflare.com --client-name alice --yes
 ```
 
 ## All flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | TLS camouflage target |
+| `--sni HOST` | www.cloudflare.com | TLS camouflage target |
 | `--domain DOMAIN` | (none) | Cloudflare CDN fallback domain |
 | `--client-name NAME` | default | Name for the first client |
 | `--display-name NAME` | (none) | Label for connection pages (e.g. "Alice's VPN") |
@@ -55,14 +55,14 @@ These settings are stored in server credentials and apply to all client connecti
 
 The SNI (Server Name Indication) target is the domain your server impersonates. This is **not** a domain you own — it's any popular website with TLS. When a censor probes your server, they see that real site's certificate, making your server indistinguishable from normal traffic.
 
-The default (`www.microsoft.com`) works well for most cases. For optimal stealth, scan your server's network for same-ASN targets — these are harder to detect because the IP range matches:
+The default (`www.cloudflare.com`) works well for most cases. For optimal stealth, scan your server's network for same-ASN targets — these are harder to detect because the IP range matches:
 
 ```
 meridian scan 1.2.3.4
 ```
 
 **Good targets** (global CDN):
-- `www.microsoft.com` — Azure CDN, global
+- `www.cloudflare.com` — Cloudflare CDN, global
 - `www.twitch.tv` — Fastly CDN, global
 - `dl.google.com` — Google CDN, global
 - `github.com` — Fastly CDN, global

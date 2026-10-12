@@ -17,7 +17,7 @@ meridian deploy [IP] [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sni HOST` | www.microsoft.com | TLS camouflage target |
+| `--sni HOST` | www.cloudflare.com | TLS camouflage target |
 | `--domain DOMAIN` | (none) | Cloudflare CDN fallback domain |
 | `--client-name NAME` | default | Name for the first client |
 | `--display-name NAME` | (none) | Label for connection pages |
@@ -27,6 +27,8 @@ meridian deploy [IP] [flags]
 | `--harden / --no-harden` | enabled | Harden SSH + firewall |
 | `--pq / --no-pq` | disabled | Post-quantum encryption — ML-KEM-768 hybrid (experimental) |
 | `--warp / --no-warp` | disabled | Route outgoing traffic through Cloudflare WARP |
+| `--geo-block / --no-geo-block` | enabled | Block Russian domains and IPs (geosite:category-ru + geoip:ru) |
+| `--ssh-port PORT` | 22 | SSH port if non-standard |
 | `--server NAME` | | Target server (name or IP) |
 | `--decoy MODE` | none | Decoy response for unknown paths (`none` / `403`) |
 | `--yes` | | Skip confirmation prompts |
@@ -73,6 +75,8 @@ meridian relay check RELAY_IP [--exit EXIT]
 | `--name NAME` | (auto) | Friendly name for the relay (e.g., "ru-moscow") |
 | `--port/-p PORT` | 443 | Listen port on relay server |
 | `--user/-u USER` | root | SSH user on relay |
+| `--exit-user USER` | registry or root | SSH user on the exit, when it differs from the relay's |
+| `--ssh-port PORT` | 22 | SSH port on relay if non-standard |
 | `--yes/-y` | | Skip confirmation prompts |
 
 **How relays work**: Client connects to the relay's domestic IP. Relay forwards raw TCP to the exit server abroad. All encryption is end-to-end between client and exit — the relay never sees plaintext. All protocols (Reality, XHTTP, WSS) work through the relay.
@@ -82,7 +86,7 @@ meridian relay check RELAY_IP [--exit EXIT]
 Pre-flight server validation. Tests SNI, ports, DNS, OS, disk, ASN without installing anything.
 
 ```
-meridian preflight [IP] [--ai] [--server NAME]
+meridian preflight [IP] [--ai] [--server NAME] [--ssh-port PORT]
 ```
 
 ### meridian scan
@@ -131,11 +135,16 @@ meridian teardown [IP] [--server NAME] [--yes]
 
 ### meridian update
 
-Update CLI to latest version.
+Update the CLI to the latest release of your current major version.
 
 ```
 meridian update
+meridian update --major
 ```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--major` | | Also move to a new major version. Meridian 4 is not an in-place upgrade: it cannot manage servers deployed by 3.x, so moving means a fresh deploy and new links for every user |
 
 ### meridian --version
 
@@ -154,6 +163,7 @@ These flags are available on most commands that interact with a server:
 |------|-------------|
 | `--server NAME` | Target a specific named server |
 | `--user/-u USER` | SSH user (default: root, non-root gets sudo automatically) |
+| `--ssh-port PORT` | SSH port (if non-standard). 0 = use port from server registry, or 22 if not registered |
 | `--sni HOST` | TLS camouflage target (used by deploy, preflight, test, doctor) |
 | `--domain DOMAIN` | Cloudflare CDN fallback domain (used by deploy, preflight, test) |
 

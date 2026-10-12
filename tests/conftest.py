@@ -53,7 +53,7 @@ panel:
   port: 2053
 server:
   ip: 1.2.3.4
-  sni: www.microsoft.com
+  sni: www.cloudflare.com
   scanned_sni: dl.google.com
 protocols:
   reality:
@@ -89,7 +89,7 @@ reality_uuid: 550e8400-e29b-41d4-a716-446655440000
 reality_private_key: WBNp7SHzGMaqp6ohXMfJHUyBMWHoeHMflVPaaxdtRHo
 reality_public_key: K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy
 reality_short_id: abcd1234
-reality_sni: www.microsoft.com
+reality_sni: www.cloudflare.com
 wss_uuid: 660e8400-e29b-41d4-a716-446655440001
 xhttp_uuid: ""
 xhttp_enabled: false

@@ -20,7 +20,7 @@ from meridian.urls import build_protocol_urls, generate_qr_base64, generate_qr_t
 
 def _make_creds(
     ip: str = "1.2.3.4",
-    sni: str = "www.microsoft.com",
+    sni: str = "www.cloudflare.com",
     public_key: str = "K6JYbz4MflVPaaxdtRHo",
     short_id: str = "abcd1234",
     domain: str = "",
@@ -61,7 +61,7 @@ class TestBuildProtocolURLs:
         assert reality.startswith("vless://uuid-1@1.2.3.4:443")
         assert "flow=xtls-rprx-vision" in reality
         assert "security=reality" in reality
-        assert "sni=www.microsoft.com" in reality
+        assert "sni=www.cloudflare.com" in reality
         assert "fp=chrome" in reality
         assert "pbk=K6JYbz4MflVPaaxdtRHo" in reality
         assert "sid=abcd1234" in reality
@@ -207,7 +207,7 @@ class TestBuildProtocolURLsEdgeCases:
         assert "#alice-WSS" in wss
 
     def test_empty_sni_defaults(self) -> None:
-        """When SNI is None, should default to www.microsoft.com."""
+        """When SNI is None, should default to www.cloudflare.com."""
         creds = ServerCredentials(
             panel=PanelConfig(username="admin", password="pass", port=2053),
             server=ServerConfig(ip="1.2.3.4", sni=None),
@@ -222,7 +222,7 @@ class TestBuildProtocolURLsEdgeCases:
         )
         urls = build_protocol_urls("test", "uuid-1", "", creds)
         reality = _find_url(urls, "reality")
-        assert "sni=www.microsoft.com" in reality
+        assert "sni=www.cloudflare.com" in reality
 
     def test_url_contains_encryption_none(self) -> None:
         creds = _make_creds()

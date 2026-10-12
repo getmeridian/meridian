@@ -120,7 +120,7 @@ def make_credentials(**overrides: object) -> ServerCredentials:
             info_page_path="infopath",
             port=2053,
         ),
-        server=ServerConfig(ip="198.51.100.1", sni="www.microsoft.com"),
+        server=ServerConfig(ip="198.51.100.1", sni="www.cloudflare.com"),
         protocols={
             "reality": RealityConfig(
                 uuid="550e8400-e29b-41d4-a716-446655440000",

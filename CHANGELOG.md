@@ -4,6 +4,12 @@ All notable changes to Meridian are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- **Default Reality SNI target** — changed from `www.microsoft.com` to `www.cloudflare.com`
+- **Connectivity test endpoints** — `meridian test` now defaults to address-family-specific exit-IP endpoints: IPv4 uses `api.ipify.org`, IPv6 uses `api6.ipify.org`; `MERIDIAN_CONNECT_TEST_URL` still overrides both
+
 ## [3.17.2] - 2026-04-20
 
 ### Fixed

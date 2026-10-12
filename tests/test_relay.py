@@ -30,7 +30,7 @@ panel:
   port: 2053
 server:
   ip: 5.6.7.8
-  sni: www.microsoft.com
+  sni: www.cloudflare.com
   hosted_page: true
 protocols:
   reality:
@@ -166,7 +166,7 @@ class TestBuildRelayUrls:
         assert "K6JYbz4MflVPaaxdtRHoWBNp7SHzGMaqp6ohXMfJHUy" in reality_url.url  # public key
         assert "abcd1234" in reality_url.url  # short ID
         # Without relay_sni, Reality SNI defaults to exit's SNI
-        assert "www.microsoft.com" in reality_url.url
+        assert "www.cloudflare.com" in reality_url.url
         assert uuid in reality_url.url
 
         # Fragment should include relay identifier
@@ -202,12 +202,15 @@ class TestBuildRelayUrls:
 
         # Reality SNI should be relay-specific
         assert "sni=yandex.ru" in reality_url.url
-        assert "sni=www.microsoft.com" not in reality_url.url
+        assert "sni=www.cloudflare.com" not in reality_url.url
 
-        # XHTTP should also use relay SNI
+        # XHTTP must NOT use relay's Reality SNI — that SNI routes to a
+        # Reality-only Xray inbound on the exit. XHTTP terminates at nginx
+        # via the exit's server_name (domain or exit IP).
         xhttp_urls = [u for u in result.urls if u.key == "xhttp"]
         if xhttp_urls:
-            assert "sni=yandex.ru" in xhttp_urls[0].url
+            assert "sni=5.6.7.8" in xhttp_urls[0].url  # exit IP
+            assert "sni=yandex.ru" not in xhttp_urls[0].url
 
     def test_build_all_relay_urls_uses_relay_sni(self, sample_proxy_with_relays: Path) -> None:
         """build_all_relay_urls passes relay.sni from each RelayEntry."""
@@ -226,7 +229,7 @@ class TestBuildRelayUrls:
 
         # Second relay has no sni → Reality URL uses exit's default
         r1_reality = next(u for u in results[1].urls if u.key == "reality")
-        assert "sni=www.microsoft.com" in r1_reality.url
+        assert "sni=www.cloudflare.com" in r1_reality.url
 
     def test_build_relay_urls_no_name(self, sample_proxy_with_relays: Path) -> None:
         from meridian.urls import build_relay_urls
@@ -513,7 +516,7 @@ class TestRelayCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["relay", "deploy", "--help"])
         assert result.exit_code == 0
-        assert "RELAY_IP" in result.output
+        assert "relay_ip" in result.output.lower()  # Typer >=0.27 renders {relay_ip}
         assert "Exit server" in result.output
 
 
@@ -660,6 +663,121 @@ class TestRelayStoredUser:
         relay_conn.check_ssh.assert_called_once()
         mock_conn_cls.assert_called_once_with(ip="1.2.3.4", user="ubuntu")
 
+    def test_deploy_uses_registry_user_by_default(self, sample_proxy_with_relays: Path) -> None:
+        from meridian.commands.relay import run_deploy
+
+        creds_dir = sample_proxy_with_relays.parent
+        resolved_exit = MagicMock()
+        resolved_exit.ip = "5.6.7.8"
+        resolved_exit.user = "root"
+        resolved_exit.local_mode = False
+        resolved_exit.creds_dir = creds_dir
+        resolved_exit.conn = MagicMock()
+
+        registry = MagicMock()
+        registry.find.return_value = MagicMock(user="ubuntu")
+        relay_conn = MagicMock()
+        # ss port check returns nothing in use, nc connectivity test succeeds
+        relay_conn.run.side_effect = [
+            MagicMock(returncode=1, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]
+        provisioner = MagicMock()
+        provisioner.run.return_value = []
+
+        with (
+            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
+            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
+            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn) as mock_conn_cls,
+            patch("meridian.commands.relay._create_relay_inbound", return_value=True),
+            patch("meridian.commands.relay._deploy_relay_nginx", return_value=True),
+            patch("meridian.commands.relay._save_exit_credentials_with_sync"),
+            patch("meridian.commands.relay._save_relay_local"),
+            patch("meridian.commands.relay._regenerate_client_pages"),
+            patch("meridian.provision.steps.Provisioner", return_value=provisioner),
+        ):
+            run_deploy("2.3.4.5", "5.6.7.8", yes=True, sni="yandex.ru")
+
+        mock_conn_cls.assert_called_once_with(ip="2.3.4.5", user="ubuntu", port=22)
+        added_entry = registry.add.call_args[0][0]
+        assert added_entry.host == "2.3.4.5"
+
+    def test_deploy_separate_relay_and_exit_users(self, sample_proxy_with_relays: Path) -> None:
+        """--user and --exit-user must be passed independently to the right server."""
+        from meridian.commands.relay import run_deploy
+
+        creds_dir = sample_proxy_with_relays.parent
+        resolved_exit = MagicMock()
+        resolved_exit.ip = "5.6.7.8"
+        resolved_exit.user = "bob"
+        resolved_exit.local_mode = False
+        resolved_exit.creds_dir = creds_dir
+        resolved_exit.conn = MagicMock()
+
+        registry = MagicMock()
+        relay_conn = MagicMock()
+        relay_conn.run.side_effect = [
+            MagicMock(returncode=1, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]
+        provisioner = MagicMock()
+        provisioner.run.return_value = []
+
+        with (
+            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit) as mock_resolve,
+            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
+            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn) as mock_conn_cls,
+            patch("meridian.commands.relay._create_relay_inbound", return_value=True),
+            patch("meridian.commands.relay._deploy_relay_nginx", return_value=True),
+            patch("meridian.commands.relay._save_exit_credentials_with_sync"),
+            patch("meridian.commands.relay._save_relay_local"),
+            patch("meridian.commands.relay._regenerate_client_pages"),
+            patch("meridian.provision.steps.Provisioner", return_value=provisioner),
+        ):
+            run_deploy("2.3.4.5", "5.6.7.8", user="alice", exit_user="bob", yes=True, sni="yandex.ru")
+
+        # Exit resolver received the exit user, NOT the relay user
+        mock_resolve.assert_called_once()
+        assert mock_resolve.call_args.args[2] == "bob"
+        # Relay SSH connection used the relay user
+        mock_conn_cls.assert_called_once_with(ip="2.3.4.5", user="alice", port=22)
+
+    def test_deploy_explicit_user_overrides_registry(self, sample_proxy_with_relays: Path) -> None:
+        from meridian.commands.relay import run_deploy
+
+        creds_dir = sample_proxy_with_relays.parent
+        resolved_exit = MagicMock()
+        resolved_exit.ip = "5.6.7.8"
+        resolved_exit.user = "root"
+        resolved_exit.local_mode = False
+        resolved_exit.creds_dir = creds_dir
+        resolved_exit.conn = MagicMock()
+
+        registry = MagicMock()
+        registry.find.return_value = MagicMock(user="ubuntu")
+        relay_conn = MagicMock()
+        relay_conn.run.side_effect = [
+            MagicMock(returncode=1, stdout="", stderr=""),
+            MagicMock(returncode=0, stdout="", stderr=""),
+        ]
+        provisioner = MagicMock()
+        provisioner.run.return_value = []
+
+        with (
+            patch("meridian.commands.relay._resolve_exit", return_value=resolved_exit),
+            patch("meridian.commands.relay.ServerRegistry", return_value=registry),
+            patch("meridian.commands.relay.ServerConnection", return_value=relay_conn) as mock_conn_cls,
+            patch("meridian.commands.relay._create_relay_inbound", return_value=True),
+            patch("meridian.commands.relay._deploy_relay_nginx", return_value=True),
+            patch("meridian.commands.relay._save_exit_credentials_with_sync"),
+            patch("meridian.commands.relay._save_relay_local"),
+            patch("meridian.commands.relay._regenerate_client_pages"),
+            patch("meridian.provision.steps.Provisioner", return_value=provisioner),
+        ):
+            run_deploy("2.3.4.5", "5.6.7.8", user="root", yes=True, sni="yandex.ru")
+
+        mock_conn_cls.assert_called_once_with(ip="2.3.4.5", user="root", port=22)
+
     def test_check_uses_registry_user_by_default(self, sample_proxy_with_relays: Path) -> None:
         from meridian.commands.relay import run_check
 
@@ -755,7 +873,7 @@ class TestNginxStreamRelay:
         from meridian.provision.services import _render_nginx_stream_config
 
         config = _render_nginx_stream_config(
-            reality_sni="www.microsoft.com",
+            reality_sni="www.cloudflare.com",
             reality_backend_port=10443,
             nginx_internal_port=8443,
             server_ip="5.6.7.8",

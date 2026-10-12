@@ -15,6 +15,39 @@ from meridian.credentials import ServerCredentials
 from meridian.servers import ServerRegistry
 from meridian.ssh import ServerConnection
 
+_SCANNER_VERSION = "0.2.3"
+_SCANNER_ASSETS: dict[str, tuple[str, str]] = {
+    "x86_64": ("RealiTLScanner-linux-amd64", "a55595446de9f1c2e6c5c3cd766a7320a11115947df48f101749bb62c8055592"),
+    "aarch64": ("RealiTLScanner-linux-arm64", "27bdd3e53d4391c66c8df3391d3c3fb5eb2dc356125f2fb33ac58fcaaf8f88b3"),
+}
+
+
+def _is_valid_hostname(value: str) -> bool:
+    """Return True if value is a plausible DNS hostname.
+
+    Rejects anything with whitespace or characters outside the RFC 1123 label
+    alphabet, and labels that don't start/end with an alphanumeric. Stricter
+    than necessary by design — the cost of letting garbage through is a broken
+    Reality inbound on a live server.
+    """
+    if not value or len(value) > 253:
+        return False
+    labels = value.split(".")
+    if len(labels) < 2:
+        return False
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if not (label[0].isalnum() and label[-1].isalnum()):
+            return False
+        if any(not (ch.isalnum() or ch == "-") for ch in label):
+            return False
+    # Reject IPv4 literals — Reality serverNames must be DNS hostnames.
+    # An all-numeric TLD is the cheap discriminator.
+    if labels[-1].isdigit():
+        return False
+    return True
+
 
 def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     """Run RealiTLScanner on the server and return list of discovered SNI targets.
@@ -28,18 +61,14 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
     except Exception:
         return []
     raw_arch = arch_result.stdout.strip()
-    match raw_arch:
-        case "x86_64":
-            arch = "64"
-        case "aarch64":
-            warn("RealiTLScanner has no arm64 build.")
-            return []
-        case _:
-            warn(f"Unsupported architecture for scanner: {raw_arch}")
-            return []
+    asset = _SCANNER_ASSETS.get(raw_arch)
+    if asset is None:
+        warn(f"Unsupported architecture for scanner: {raw_arch}")
+        return []
+    asset_name, expected_sha256 = asset
 
-    # Download RealiTLScanner to server
-    scanner_url = f"https://github.com/XTLS/RealiTLScanner/releases/latest/download/RealiTLScanner-linux-{arch}"
+    # Download a pinned RealiTLScanner release; "latest" broke when upstream renamed assets
+    scanner_url = f"https://github.com/XTLS/RealiTLScanner/releases/download/v{_SCANNER_VERSION}/{asset_name}"
     q_url = shlex.quote(scanner_url)
     from rich.status import Status
 
@@ -56,19 +85,15 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
         warn("Failed to download RealiTLScanner")
         return []
 
-    # Verify downloaded binary integrity (ELF header + minimum size)
-    try:
-        verify_result = conn.run(
-            "file /tmp/realitlscanner | grep -q 'ELF.*executable' && "
-            "test $(stat -c%s /tmp/realitlscanner 2>/dev/null || stat -f%z /tmp/realitlscanner) -gt 100000",
-            timeout=10,
-        )
-        if verify_result.returncode != 0:
-            warn("Downloaded scanner binary failed integrity check")
-            conn.run("rm -f /tmp/realitlscanner", timeout=5)
-            return []
-    except Exception:
-        pass  # verification is best-effort
+    # Verify the published SHA-256 before running anything
+    verify_result = conn.run(
+        f"printf '%s  %s\\n' {shlex.quote(expected_sha256)} /tmp/realitlscanner | sha256sum -c - >/dev/null",
+        timeout=10,
+    )
+    if verify_result.returncode != 0:
+        warn("Downloaded scanner binary failed checksum verification")
+        conn.run("rm -f /tmp/realitlscanner", timeout=5)
+        return []
 
     # Get server's subnet CIDR for scanning
     try:
@@ -108,22 +133,37 @@ def scan_for_sni(conn: ServerConnection, ip: str) -> list[str]:
         return []
     csv_output = csv_result.stdout.strip()
 
-    if not csv_output or csv_output == "IP,ORIGIN,CERT_DOMAIN,CERT_ISSUER,GEO_CODE":
+    lines = csv_output.splitlines()
+    if not lines:
         return []
 
-    # Parse CSV: extract cert_domain (column 3), skip header, deduplicate, filter bad targets
+    # RealiTLScanner CSV header has shifted over time (5 columns → 11 columns
+    # with TLS/ALPN/CURVE/CERT_* details). Resolve CERT_DOMAIN by header name
+    # instead of a fixed index, so a future format change doesn't silently
+    # smuggle e.g. "TLS 1.3" into Xray's Reality serverNames.
+    header = [h.strip() for h in lines[0].split(",")]
+    try:
+        domain_idx = header.index("CERT_DOMAIN")
+        ip_idx = header.index("IP")
+    except ValueError:
+        return []
+
     domains: list[str] = []
-    for csv_line in csv_output.splitlines():
+    for csv_line in lines[1:]:
         parts = csv_line.split(",")
-        if len(parts) < 3:
+        if len(parts) <= max(domain_idx, ip_idx):
             continue
-        csv_ip, _origin, cert_domain = parts[0], parts[1], parts[2]
-        if csv_ip == "IP":
-            continue  # header
-        if not cert_domain:
+        csv_ip = parts[ip_idx].strip()
+        cert_domain = parts[domain_idx].strip()
+        if csv_ip == "IP" or not cert_domain:
             continue
         if cert_domain.startswith("*"):
             continue  # wildcard certs
+        # Defensive hostname validation — RFC 1123 letters/digits/hyphens/dots
+        # only. Rejects pre-parsed garbage like "TLS 1.3" before it can land
+        # in Reality settings.
+        if not _is_valid_hostname(cert_domain):
+            continue
         # Filter known-bad targets
         if any(
             bad in cert_domain.lower()
@@ -203,5 +243,5 @@ def run(
             err_console.print("  [dim]Tip: with --domain, your own domain works as SNI too (self-steal).[/dim]\n")
             return
 
-    info("No target selected. The default (www.microsoft.com) works well for most servers.")
+    info("No target selected. The default (www.cloudflare.com) works well for most servers.")
     err_console.print()
