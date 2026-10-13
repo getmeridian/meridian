@@ -80,6 +80,18 @@ class TestCheckForUpdate:
         rendered = " ".join(str(call.args[0]) for call in mock_print.call_args_list if call.args)
         assert "meridian update" in rendered
 
+    def test_beta_update_is_named_a_beta_and_points_at_apply(self) -> None:
+        with (
+            patch("meridian.update._should_check", return_value=True),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.0b1", "4.0.0b2")),
+            patch("meridian.update.err_console.print") as mock_print,
+        ):
+            check_for_update("4.0.0b1")
+
+        rendered = " ".join(str(call.args[0]) for call in mock_print.call_args_list if call.args)
+        assert "Beta:" in rendered and "Patch release" not in rendered
+        assert "meridian apply" in rendered and "meridian deploy" not in rendered
+
     def test_same_version_no_output(self) -> None:
         with (
             patch("meridian.update._should_check", return_value=True),

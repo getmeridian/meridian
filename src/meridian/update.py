@@ -105,12 +105,15 @@ def check_for_update(current_version: str) -> None:
 
     target = update_target(current, releases)
     if target is not None:
-        kind = "Patch release" if target.release[:2] == current.release[:2] else "See what's new"
+        if target.is_prerelease:
+            kind = "Beta"
+        else:
+            kind = "Patch release" if target.release[:2] == current.release[:2] else "See what's new"
         err_console.print(f"\n  [warn]v{target} available[/warn]")
         err_console.print(f"  [dim]{kind}: {_RELEASES_URL}[/dim]")
         err_console.print(
             "  [dim]Run[/dim] [bold]meridian update[/bold] [dim]when ready, then[/dim] "
-            "[bold]meridian deploy[/bold] [dim]to apply[/dim]\n"
+            "[bold]meridian apply[/bold] [dim]to bring your servers up to date[/dim]\n"
         )
         return
 
