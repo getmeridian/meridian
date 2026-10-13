@@ -10,6 +10,8 @@
 
 **Client routing is one typed list** — `delivery.py::DEFAULT_CLIENT_ROUTES` (private + Russian destinations direct, foreign QUIC blocked) renders into both Xray JSON rules and Mihomo rule lines; add a rule there, never in one template.
 
+**Exit egress overrides are server-side** — `ExitIntent.egress_overrides` compile into the exit Profile's `routing_rules` (in operator order, ahead of the default egress and geo block) via `routing.exit_override_routes`; an override-only `warp` adds WARP after `direct` (`exit_outbound_tags`) and sets `NodeRuntimePayload.warp`. Client routes stay in `delivery.py`.
+
 **Fallback is capability-specific** — Xray JSON and Mihomo receive managed health-checked templates; Base64 receives ordered alternatives without an automatic-failover claim.
 
 ## What's done well

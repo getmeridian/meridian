@@ -11,6 +11,9 @@ from pydantic import ValidationError
 from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
 from meridian.core.topology import (
     AccessIntent,
+    EgressOverrideAction,
+    EgressOverrideIntent,
+    EgressOverrideMatch,
     ExitIntent,
     ProtocolPathIntent,
     SetupIntent,
@@ -192,6 +195,74 @@ def remove_relays_from_intent(intent: SetupIntent, relay_ids: set[str]) -> Setup
     payload = intent.model_dump(mode="json")
     payload["transparent_relays"] = [relay for relay in payload["transparent_relays"] if relay["id"] not in relay_ids]
     return _validated(payload)
+
+
+def add_egress_override_to_intent(
+    intent: SetupIntent,
+    exit_id: str,
+    *,
+    action: EgressOverrideAction,
+    values: list[str],
+    override_id: str = "",
+) -> tuple[SetupIntent, EgressOverrideIntent]:
+    """Return validated intent with one more egress override on an exit, and that override.
+
+    Values are bare domains, ``geosite:NAME``, or ``geoip:NAME``; one override holds one kind.
+    """
+    exit_ = _exit(intent, exit_id)
+    kinds = {_override_kind(value) for value in values}
+    if len(kinds) != 1:
+        raise ValueError("Mix of domains, geosite:, and geoip: values; add each kind with its own command.")
+    existing = {override.id for override in exit_.egress_overrides}
+    if override_id in existing:
+        raise ValueError(f"Exit {exit_id} already has an override named {override_id!r}.")
+    try:
+        override = EgressOverrideIntent(
+            id=override_id or unique_resource_id(action, "", existing),
+            match=kinds.pop(),
+            values=values,
+            action=action,
+        )
+    except ValidationError as exc:
+        raise ValueError(str(exc.errors()[0].get("msg", exc)).removeprefix("Value error, ")) from exc
+    payload = intent.model_dump(mode="json")
+    for item in payload["exits"]:
+        if item["id"] == exit_id:
+            item["egress_overrides"].append(override.model_dump(mode="json"))
+    return _validated(payload), override
+
+
+def remove_egress_override_from_intent(
+    intent: SetupIntent,
+    exit_id: str,
+    override_id: str,
+) -> tuple[SetupIntent, EgressOverrideIntent]:
+    """Return validated intent without one of an exit's egress overrides, and the removed override."""
+    exit_ = _exit(intent, exit_id)
+    removed = next((override for override in exit_.egress_overrides if override.id == override_id), None)
+    if removed is None:
+        raise ValueError(f"Exit {exit_id} has no override named {override_id!r}.")
+    payload = intent.model_dump(mode="json")
+    for item in payload["exits"]:
+        if item["id"] == exit_id:
+            item["egress_overrides"] = [entry for entry in item["egress_overrides"] if entry["id"] != override_id]
+    return _validated(payload), removed
+
+
+def _exit(intent: SetupIntent, exit_id: str) -> ExitIntent:
+    exit_ = next((item for item in intent.exits if item.id == exit_id), None)
+    if exit_ is None:
+        raise ValueError(f"Exit {exit_id!r} is not in the topology.")
+    return exit_
+
+
+def _override_kind(value: str) -> EgressOverrideMatch:
+    lowered = value.strip().lower()
+    if lowered.startswith("geosite:"):
+        return "geosite"
+    if lowered.startswith("geoip:"):
+        return "geoip"
+    return "domain"
 
 
 def _validated(payload: dict[str, Any]) -> SetupIntent:

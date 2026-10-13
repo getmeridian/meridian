@@ -198,6 +198,23 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 برای بررسی hopهای relay، از `meridian check RELAY` استفاده کنید.
 
+### meridian route
+
+Send chosen destinations from an exit through Cloudflare WARP, directly, or nowhere, ahead of the exit's default egress. (Translation pending; see the English reference.)
+
+```
+meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route list [EXIT] [--json]
+meridian route remove EXIT ROUTE [--yes] [--json]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--via ACTION` | `warp`, `direct`, or `block` |
+| `--name ID` | Route ID |
+| `--yes/-y` | Skip the removal confirmation |
+| `--json` | Emit a `meridian.output/v1` envelope |
+
 ### meridian fleet
 
 سلامتی و موجودی fleet از panel زندگی.

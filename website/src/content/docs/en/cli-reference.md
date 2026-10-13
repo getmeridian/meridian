@@ -201,6 +201,31 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 To check a relay's hops, run `meridian check RELAY`.
 
+### meridian route
+
+Send chosen destinations from an exit through Cloudflare WARP, directly, or nowhere, ahead of the exit's default egress.
+
+```
+meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route list [EXIT] [--json]
+meridian route remove EXIT ROUTE [--yes] [--json]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--via ACTION` | (required for add) | `warp`, `direct`, or `block` |
+| `--name ID` | the action, numbered | Route ID shown by `route list` and used by `route remove` |
+| `--yes/-y` | | Skip the removal confirmation (required with `--json`) |
+| `--json` | | Emit a `meridian.output/v1` envelope (`data.override` for add/remove, `data.exits[]` for list) |
+
+`EXIT` is an exit ID, saved server name, or IP. Each `VALUE` is a domain (subdomains included), `geosite:NAME`, or `geoip:NAME`; one route holds one kind.
+
+**`route add`** — adds the route to the exit in your topology and applies it. Routes match in the order they were added. A `warp` route on an exit without WARP sets WARP up for that route only; other traffic stays direct.
+
+**`route list`** — shows each exit's default egress and its routes in match order.
+
+**`route remove`** — removes one route and applies the change; its destinations follow the exit's default egress again. WARP stays installed on the server but carries nothing until a route or `--warp` uses it again.
+
 ### meridian fleet
 
 Fleet-wide health and inventory from the live panel, and image upgrades after `meridian update`.

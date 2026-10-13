@@ -51,7 +51,12 @@ from meridian.compiler.names import (
     subscription_template_name,
 )
 from meridian.compiler.relays import compile_relays, register_relay_ingress
-from meridian.compiler.routing import bridge_inbound_id, compile_gateway_routing
+from meridian.compiler.routing import (
+    bridge_inbound_id,
+    compile_gateway_routing,
+    exit_outbound_tags,
+    exit_override_routes,
+)
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
 
 
@@ -197,8 +202,9 @@ def compile_topology(
                 name=profile_name(exit_.id),
                 inbound_refs=path_refs,
                 inbounds=inbound_specs,
-                outbound_tags=["warp"] if exit_.warp else ["direct"],
+                outbound_tags=exit_outbound_tags(exit_),
                 geo_block=exit_.geo_block,
+                routing_rules=exit_override_routes(exit_),
             ),
             dependencies=[control_id, *(item[2] for item in bridge_specs)],
         )
@@ -237,7 +243,7 @@ def compile_topology(
                 workload_ref=exit_.id,
                 server_ref=exit_.server_ref,
                 binding_ref=binding_id,
-                warp=exit_.warp,
+                warp=exit_.needs_warp,
             ),
             dependencies=[binding_id],
             postconditions=[
@@ -250,7 +256,7 @@ def compile_topology(
             workload_ref=exit_.id,
             server_ref=exit_.server_ref,
             binding_ref=binding_id,
-            warp=exit_.warp,
+            warp=exit_.needs_warp,
         ).api_port
         add_firewall(
             builder,

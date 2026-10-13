@@ -20,7 +20,7 @@
 
 ## Pitfalls
 - Never add credential-shaped fields to `SetupDraft`.
-- Preserve relay `listen_port` in both `SetupDraft.from_intent()` and `to_intent()`; otherwise review silently returns to 443.
+- Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.
 - Keep remote action checkpoints in typed cluster state, not `setup.json`.
 - Inspect a cloned cluster through read-only drivers; cached plan hashes cannot detect managed remote drift.

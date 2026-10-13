@@ -72,6 +72,7 @@ from meridian.core.plan import (
     PlanCommandData,
 )
 from meridian.core.relay_check import RelayCheckResult
+from meridian.core.routes import RouteListResult, RouteMutationResult
 from meridian.core.schema_topology import TOPOLOGY_SCHEMAS
 from meridian.core.servers import (
     ServerBootstrapKeyRequest,
@@ -423,6 +424,27 @@ _, _, RelayListOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian --json relay list`.",
 )
 
+_, _, RouteAddOutputEnvelope = _make_command_envelope(
+    "RouteAdd",
+    "route.add",
+    RouteMutationResult,
+    doc="Envelope schema for `meridian route add --json`.",
+)
+
+_, _, RouteListOutputEnvelope = _make_command_envelope(
+    "RouteList",
+    "route.list",
+    RouteListResult,
+    doc="Envelope schema for `meridian route list --json`.",
+)
+
+_, _, RouteRemoveOutputEnvelope = _make_command_envelope(
+    "RouteRemove",
+    "route.remove",
+    RouteMutationResult,
+    doc="Envelope schema for `meridian route remove --json`.",
+)
+
 _, _, ApiSchemasOutputEnvelope = _make_command_envelope(
     "ApiSchemas",
     "api.schemas",
@@ -477,6 +499,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-disable-envelope": ClientDisableOutputEnvelope,
     "node-list-envelope": NodeListOutputEnvelope,
     "relay-list-envelope": RelayListOutputEnvelope,
+    "route-add-envelope": RouteAddOutputEnvelope,
+    "route-list-envelope": RouteListOutputEnvelope,
+    "route-remove-envelope": RouteRemoveOutputEnvelope,
     "check": HealthCheckResult,
     "check-envelope": CheckOutputEnvelope,
     "check-failure": CheckFailureData,
@@ -561,6 +586,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-inventory": FleetInventory,
     "node-list": NodeListResult,
     "relay-list": RelayListResult,
+    "route-list": RouteListResult,
+    "route-mutation": RouteMutationResult,
     "command-contract": CommandContract,
     "command-catalog-entry": CommandCatalogEntry,
     "command-outcome": CommandOutcome,

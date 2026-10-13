@@ -22,7 +22,7 @@ Checkpointed reconciliation of compiled topology resources.
 
 ## Pitfalls
 
-- **Imperative commands are intent edits** — `client add|remove`, `node add|remove`, and `relay add|remove` change `topology_intent` and apply it (removals through reviewed retirement); never mutate panel or server state beside the compiled plan.
+- **Imperative commands are intent edits** — `client add|remove`, `node add|remove`, `relay add|remove`, and `route add|remove` change `topology_intent` and apply it (removals through reviewed retirement); never mutate panel or server state beside the compiled plan.
 - **Never catch an uncertain driver mutation as an ordinary failure** — raise `UnknownResourceOutcome` so the executor observes before any retry.
 - **Unavailable observation evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Access users are partly operator-owned** — observe/apply only username and squads; status (client disable, panel limits/expiry), description, and quotas belong to the operator, so never re-enable or rewrite them (doing so undid `client disable` and failed every apply after a description edit).

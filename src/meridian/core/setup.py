@@ -18,6 +18,7 @@ from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
     DeliveryIntent,
+    EgressOverrideIntent,
     EgressPoolIntent,
     ExitIntent,
     OrderedRouteIntent,
@@ -50,6 +51,7 @@ class SetupExitRole(CoreModel):
     region: OptionalCountryCodeValue = ""
     warp: bool = False
     geo_block: bool = False
+    egress_overrides: list[EgressOverrideIntent] = Field(default_factory=list)
 
 
 class SetupRelayRole(CoreModel):
@@ -178,6 +180,7 @@ class SetupDraft(CoreModel):
                     region=exit_.region,
                     warp=exit_.warp,
                     geo_block=exit_.geo_block,
+                    egress_overrides=exit_.egress_overrides,
                 )
                 for exit_ in intent.exits
             ],
@@ -310,6 +313,7 @@ class SetupDraft(CoreModel):
                 paths=paths_by_exit[exit_.id],
                 warp=exit_.warp,
                 geo_block=exit_.geo_block,
+                egress_overrides=exit_.egress_overrides,
             )
             for exit_ in self.roles.exits
         ]

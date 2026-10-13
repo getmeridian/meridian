@@ -206,6 +206,8 @@ class SetupWizard:
 
         used: set[str] = set()
         exits: list[SetupExitRole] = []
+        # Per-destination overrides are edited with `meridian route`; keep them when an exit is re-asked.
+        overrides = {exit_.server_ref: exit_.egress_overrides for exit_ in (draft.roles.exits if draft.roles else [])}
         for ref, role in assignments.items():
             if role != "exit":
                 continue
@@ -214,7 +216,16 @@ class SetupWizard:
             region = self.prompt.ask(t("roles.region"))
             warp = self.prompt.yes_no(t("roles.warp"), default=False, hint=t("roles.warp_hint"))
             geo_block = self.prompt.yes_no(t("roles.geo_block"), default=True, hint=t("roles.geo_block_hint"))
-            exits.append(SetupExitRole(id=exit_id, server_ref=ref, region=region, warp=warp, geo_block=geo_block))
+            exits.append(
+                SetupExitRole(
+                    id=exit_id,
+                    server_ref=ref,
+                    region=region,
+                    warp=warp,
+                    geo_block=geo_block,
+                    egress_overrides=overrides.get(ref, []),
+                )
+            )
         if not exits:
             raise ValueError(t("error.need_exit"))
         exit_choices = [Choice(exit_.id, titles[exit_.server_ref]) for exit_ in exits]

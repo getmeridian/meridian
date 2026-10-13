@@ -53,27 +53,25 @@ def render_workload_config(
     outbounds: list[dict[str, Any]] = [
         _render_service_outbound(edge, credentials[edge.edge_id]) for edge in profile.service_outbounds
     ]
-    if "warp" in profile.outbound_tags:
-        outbounds.append(
-            {
-                "tag": "warp",
-                "protocol": "socks",
-                "settings": {
-                    "servers": [
-                        {
-                            "address": "127.0.0.1",
-                            "port": WARP_PROXY_PORT,
-                        }
-                    ]
-                },
-            }
-        )
+    # Unmatched traffic leaves through the first outbound, so WARP leads only when it is the
+    # default egress; an override-only WARP outbound goes after direct and block.
+    warp_outbound = {
+        "tag": "warp",
+        "protocol": "socks",
+        "settings": {"servers": [{"address": "127.0.0.1", "port": WARP_PROXY_PORT}]},
+    }
+    warp_default = profile.outbound_tags[:1] == ["warp"]
+    if warp_default:
+        outbounds.append(warp_outbound)
     outbounds.extend(
         [
             {"tag": "direct", "protocol": "freedom"},
             {"tag": "block", "protocol": "blackhole"},
         ]
     )
+    if not warp_default and "warp" in profile.outbound_tags:
+        outbounds.append(warp_outbound)
+    _validate_route_targets(profile, {outbound["tag"] for outbound in outbounds})
     routing: dict[str, Any] = {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
@@ -84,6 +82,10 @@ def render_workload_config(
             }
         ],
     }
+    # Reviewed routes (gateway rules, exit egress overrides) are explicit operator choices, so
+    # they win over the blanket geo block; the private-range block above always comes first.
+    for rule in profile.routing_rules:
+        routing["rules"].extend(_render_route(rule))
     if profile.geo_block:
         routing["rules"].extend(
             [
@@ -91,8 +93,6 @@ def render_workload_config(
                 {"type": "field", "ip": ["geoip:ru"], "outboundTag": "block"},
             ]
         )
-    for rule in profile.routing_rules:
-        routing["rules"].extend(_render_route(rule))
     if profile.egress_balancers:
         routing["balancers"] = [
             {
@@ -273,9 +273,21 @@ def _render_route(rule: WorkloadRouteSpec) -> list[dict[str, Any]]:
         return [{**base, "ip": [f"geoip:{country}" for country in country_codes]}]
     if rule.match == "domain":
         return [{**base, "domain": [f"domain:{value}" for value in rule.match_values]}]
+    if rule.match == "geosite":
+        return [{**base, "domain": [f"geosite:{value}" for value in rule.match_values]}]
+    if rule.match == "geoip":
+        return [{**base, "ip": [f"geoip:{value}" for value in rule.match_values]}]
     if rule.match == "ip":
         return [{**base, "ip": rule.match_values}]
     return [{**base, "network": ",".join(rule.match_values)}]
+
+
+def _validate_route_targets(profile: ConfigProfilePayload, outbound_tags: set[str]) -> None:
+    for rule in profile.routing_rules:
+        if rule.target_type == "outbound" and rule.target_tag not in outbound_tags:
+            raise WorkloadConfigError(
+                f"Route {rule.route_id} on {profile.workload_id} targets missing Outbound {rule.target_tag!r}."
+            )
 
 
 def _validate_service_outbound_selectors(profile: ConfigProfilePayload) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from typing import Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
@@ -34,6 +35,10 @@ TlsFingerprint = Literal["chrome", "firefox", "safari", "ios", "android", "edge"
 DEFAULT_TLS_FINGERPRINT: Final[TlsFingerprint] = "chrome"
 RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
 EgressStrategy = Literal["least_ping"]
+EgressOverrideMatch = Literal["domain", "geosite", "geoip"]
+EgressOverrideAction = Literal["warp", "direct", "block"]
+# v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
+_GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo"]
 
 
@@ -85,6 +90,32 @@ class ProtocolPathIntent(CoreModel):
         return self
 
 
+class EgressOverrideIntent(CoreModel):
+    """Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress."""
+
+    id: TopologyIdValue
+    match: EgressOverrideMatch
+    values: list[str] = Field(min_length=1)
+    action: EgressOverrideAction
+
+    @field_validator("values")
+    @classmethod
+    def validate_values(cls, values: list[str], info: ValidationInfo) -> list[str]:
+        kind = info.data.get("match", "domain")
+        normalized: list[str] = []
+        for value in values:
+            if kind == "domain":
+                normalized.append(validate_hostname_value(value))
+                continue
+            name = value.strip().lower().removeprefix(f"{kind}:")
+            if _GEO_LIST_NAME.fullmatch(name) is None:
+                raise ValueError(f"Enter a {kind} list name such as {'netflix' if kind == 'geosite' else 'ir'}.")
+            normalized.append(name)
+        if len(normalized) != len(set(normalized)):
+            raise ValueError(f"{kind} override values must be unique.")
+        return normalized
+
+
 class ExitIntent(CoreModel):
     """One independent Xray exit workload and its public protocol paths."""
 
@@ -94,9 +125,18 @@ class ExitIntent(CoreModel):
     paths: list[ProtocolPathIntent] = Field(min_length=1)
     warp: bool = False
     geo_block: bool = False  # refuse Russian destinations (geosite:category-ru, geoip:ru)
+    egress_overrides: list[EgressOverrideIntent] = Field(default_factory=list)
+
+    @property
+    def needs_warp(self) -> bool:
+        """WARP runs on this exit when it is the default egress or any override uses it."""
+        return self.warp or any(override.action == "warp" for override in self.egress_overrides)
 
     @model_validator(mode="after")
     def validate_paths(self) -> Self:
+        override_ids = [override.id for override in self.egress_overrides]
+        if len(override_ids) != len(set(override_ids)):
+            raise ValueError(f"Exit {self.id} lists an egress override ID more than once.")
         path_ids = [path.id for path in self.paths]
         if len(path_ids) != len(set(path_ids)):
             raise ValueError(f"Exit {self.id} lists a protocol path ID more than once.")

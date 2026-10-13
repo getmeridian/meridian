@@ -21,6 +21,7 @@ from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind as ResourceKind
 from meridian.core.topology import (
     DEFAULT_TLS_FINGERPRINT,
+    EgressOverrideMatch,
     EgressStrategy,
     ProtocolKind,
     RouteMatchKind,
@@ -165,11 +166,11 @@ class EgressBalancerSpec(CoreModel):
 
 
 class WorkloadRouteSpec(CoreModel):
-    """One first-match route embedded in a gateway Profile."""
+    """One first-match route embedded in a gateway Profile, or an exit's egress override."""
 
     route_id: str
     priority: int
-    match: RouteMatchKind
+    match: RouteMatchKind | EgressOverrideMatch
     match_values: list[str]
     target_type: Literal["outbound", "balancer"]
     target_tag: str
@@ -370,7 +371,7 @@ class RouteRulePayload(CoreModel):
     gateway_ref: str
     profile_ref: str
     priority: int
-    match: RouteMatchKind
+    match: RouteMatchKind | EgressOverrideMatch
     match_values: list[str]
     action: TrafficRouteAction
     target_ref: str = ""

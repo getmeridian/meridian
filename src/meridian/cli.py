@@ -25,6 +25,7 @@ client_app = typer.Typer(help="Manage proxy clients (add, remove, enable, disabl
 server_app = typer.Typer(help="Manage known servers", no_args_is_help=True)
 node_app = typer.Typer(help="Manage proxy nodes in the fleet", no_args_is_help=True)
 relay_app = typer.Typer(help="Manage relay nodes", no_args_is_help=True)
+route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
 fleet_app = typer.Typer(help="Fleet-wide health, inventory, and recovery", no_args_is_help=True)
 api_app = typer.Typer(help="Machine-readable Meridian API contracts", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
@@ -32,6 +33,7 @@ app.add_typer(client_app, name="client")
 app.add_typer(server_app, name="server")
 app.add_typer(node_app, name="node")
 app.add_typer(relay_app, name="relay")
+app.add_typer(route_app, name="route")
 app.add_typer(fleet_app, name="fleet")
 app.add_typer(api_app, name="api")
 app.add_typer(dev_app, name="dev", hidden=True)
@@ -868,6 +870,63 @@ def relay_check_cmd(
     if json_mode:
         _enable_json_output()
     run_check(relay_ip, exit, user)
+
+
+# =============================================================================
+# Route (per-destination egress overrides on exits)
+# =============================================================================
+
+
+@route_app.command("add")
+def route_add_cmd(
+    exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
+    values: list[str] = typer.Argument(..., help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"),
+    via: str = typer.Option(..., "--via", help="warp, direct, or block"),
+    name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+) -> None:
+    """Send matching destinations through WARP, directly, or nowhere.
+
+    Overrides apply on the exit, ahead of its default egress, in the order
+    they were added. Using --via warp sets up WARP on the exit if needed.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian route add exit-1 --via warp netflix.com chatgpt.com[/cyan]
+      [cyan]meridian route add exit-1 --via block geosite:category-ads-all[/cyan]
+    """
+    from meridian.commands.route import run_add
+
+    if json_mode:
+        _enable_json_output()
+    run_add(exit, values, via, name)
+
+
+@route_app.command("list")
+def route_list_cmd(
+    exit: str = typer.Argument("", help="Only this exit (ID, saved name, or IP)"),
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+) -> None:
+    """List every exit's egress overrides in first-match order"""
+    from meridian.commands.route import run_list
+
+    if json_mode:
+        _enable_json_output()
+    run_list(exit)
+
+
+@route_app.command("remove")
+def route_remove_cmd(
+    exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
+    route_id: str = typer.Argument(..., help="Route ID from `meridian route list`"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+) -> None:
+    """Remove one egress override; its destinations follow the exit's default again"""
+    from meridian.commands.route import run_remove
+
+    if json_mode:
+        _enable_json_output()
+    run_remove(exit, route_id, yes=yes)
 
 
 # =============================================================================

@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "panel-compose": "remnawave-panel-v2",
     "realm": "neutral-systemd-v2",
     "server-baseline": "neutral-paths-v2",
-    "xray-workload": "reality-min-client-v4",
+    "xray-workload": "egress-overrides-v5",
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)

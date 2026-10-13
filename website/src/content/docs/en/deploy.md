@@ -139,6 +139,19 @@ meridian deploy 198.51.100.10 --warp
 
 Meridian installs the `cloudflare-warp` client in proxy mode (SOCKS5 on `127.0.0.1:40000`) and makes it Xray's outbound. Incoming connections are not affected. WARP is free and needs no Cloudflare account.
 
+### WARP for some sites only
+
+To send only chosen sites through WARP and keep everything else direct, add a route on the exit instead of turning WARP on for all traffic. Meridian sets up WARP on the exit the first time a route needs it:
+
+```
+meridian route add exit-1 --via warp chatgpt.com netflix.com
+meridian route add exit-1 --via block geosite:category-ads-all
+meridian route list
+meridian route remove exit-1 warp
+```
+
+Values are domains (subdomains included), `geosite:NAME` lists, or `geoip:NAME` lists from the stock v2fly data files; one route holds one kind. `--via direct` does the opposite on a WARP exit: those destinations skip WARP. Routes apply in the order you added them, before the exit's default egress and before geo-blocking. These routes live on the server; they are separate from the client-side rules that send Russian sites direct on the user's device.
+
 ## Geo-blocking
 
 By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the proxy. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.

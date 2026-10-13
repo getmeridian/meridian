@@ -198,6 +198,23 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 Для проверки хопов ретранслятора запустите `meridian check RELAY`.
 
+### meridian route
+
+Send chosen destinations from an exit through Cloudflare WARP, directly, or nowhere, ahead of the exit's default egress. (Translation pending; see the English reference.)
+
+```
+meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route list [EXIT] [--json]
+meridian route remove EXIT ROUTE [--yes] [--json]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--via ACTION` | `warp`, `direct`, or `block` |
+| `--name ID` | Route ID |
+| `--yes/-y` | Skip the removal confirmation |
+| `--json` | Emit a `meridian.output/v1` envelope |
+
 ### meridian fleet
 
 Здоровье флота и инвентарь с живой панели.

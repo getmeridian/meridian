@@ -13,6 +13,7 @@ from meridian.compiler.models import (
 )
 from meridian.core.topology import (
     EgressPoolIntent,
+    ExitIntent,
     ProtocolPathIntent,
     RouteMatchKind,
     RoutingGatewayIntent,
@@ -202,3 +203,25 @@ def _route_spec(
         target_type="outbound",
         target_tag=edge_outbound_tag(gateway_ref, target_ref),
     )
+
+
+def exit_override_routes(exit_: ExitIntent) -> list[WorkloadRouteSpec]:
+    """Render an exit's egress overrides as first-match Profile rules, in the operator's order."""
+    return [
+        WorkloadRouteSpec(
+            route_id=f"override-{override.id}",
+            priority=index,
+            match=override.match,
+            match_values=override.values,
+            target_type="outbound",
+            target_tag=override.action,
+        )
+        for index, override in enumerate(exit_.egress_overrides)
+    ]
+
+
+def exit_outbound_tags(exit_: ExitIntent) -> list[str]:
+    """The exit's default egress first, then WARP when only overrides use it."""
+    if exit_.warp:
+        return ["warp"]
+    return ["direct", "warp"] if exit_.needs_warp else ["direct"]

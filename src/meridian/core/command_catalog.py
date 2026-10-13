@@ -167,6 +167,27 @@ def _client_remove_outcomes() -> list[CommandOutcome]:
     ]
 
 
+def _route_mutation_outcomes(success: str) -> list[CommandOutcome]:
+    return [
+        CommandOutcome(status="ok", exit_code=0, category="none", meaning=success),
+        CommandOutcome(
+            status="failed", exit_code=2, category="user", meaning="unknown exit or route, or invalid values"
+        ),
+        CommandOutcome(status="failed", exit_code=3, category="system", meaning="apply or local-state failure"),
+        CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
+    ]
+
+
+def _route_mutation_exit_codes(success: str) -> dict[str, str]:
+    return {
+        "0": success,
+        "1": "unexpected Meridian bug",
+        "2": "unknown exit or route, or invalid values",
+        "3": "apply or local-state failure",
+        "130": _INTERRUPT_EXIT_MEANING,
+    }
+
+
 def _relay_list_outcomes() -> list[CommandOutcome]:
     return [
         CommandOutcome(status="ok", exit_code=0, category="none", meaning="relay list and host status were collected"),
@@ -538,6 +559,59 @@ _COMMAND_CONTRACTS: dict[str, CommandContract] = {
         machine_flags=["--json", "--exit"],
         stability="stable",
         description="List configured relays with live panel host status when available.",
+    ),
+    "route.add": CommandContract(
+        command="route.add",
+        argv=["route", "add", "EXIT", "VALUE..."],
+        envelope_schema="route-add-envelope",
+        data_schema="route-mutation",
+        failure_data_schema="empty-data",
+        error_schema="error",
+        statuses=["ok", "failed"],
+        outcomes=_route_mutation_outcomes("the override was added and applied"),
+        exit_codes=_route_mutation_exit_codes("the override was added and applied"),
+        machine_flags=["--json", "--via", "--name"],
+        stability="preview",
+        description="Add a per-destination egress override (WARP, direct, block) to an exit and apply it.",
+    ),
+    "route.list": CommandContract(
+        command="route.list",
+        argv=["route", "list"],
+        envelope_schema="route-list-envelope",
+        data_schema="route-list",
+        failure_data_schema="empty-data",
+        error_schema="error",
+        statuses=["ok", "failed"],
+        outcomes=[
+            CommandOutcome(status="ok", exit_code=0, category="none", meaning="overrides were listed"),
+            CommandOutcome(
+                status="failed", exit_code=2, category="user", meaning="unknown exit or configuration error"
+            ),
+            CommandOutcome(status="failed", exit_code=1, category="bug", meaning="unexpected Meridian bug"),
+        ],
+        exit_codes={
+            "0": "overrides were listed",
+            "1": "unexpected Meridian bug",
+            "2": "unknown exit or configuration error",
+            "130": _INTERRUPT_EXIT_MEANING,
+        },
+        machine_flags=["--json"],
+        stability="preview",
+        description="List every exit's default egress and its overrides in first-match order.",
+    ),
+    "route.remove": CommandContract(
+        command="route.remove",
+        argv=["route", "remove", "EXIT", "ROUTE"],
+        envelope_schema="route-remove-envelope",
+        data_schema="route-mutation",
+        failure_data_schema="empty-data",
+        error_schema="error",
+        statuses=["ok", "failed"],
+        outcomes=_route_mutation_outcomes("the override was removed and applied"),
+        exit_codes=_route_mutation_exit_codes("the override was removed and applied"),
+        machine_flags=["--json", "--yes"],
+        stability="preview",
+        description="Remove one egress override from an exit and apply it.",
     ),
     "relay.check": CommandContract(
         command="relay.check",
