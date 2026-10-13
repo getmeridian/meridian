@@ -39,7 +39,6 @@ class TestFail:
         assert exc_info.value.exit_code == 42
 
     def test_fail_with_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """fail() with hint should include both message and hint in stderr."""
         with pytest.raises(typer.Exit):
             fail("deployment failed", hint="try meridian check")
         captured = capsys.readouterr()
@@ -61,7 +60,6 @@ class TestFail:
         assert "github.com/getmeridian/meridian/issues" in captured.err
 
     def test_fail_hint_type_user_no_github_link(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """hint_type='user' should not show GitHub link."""
         with pytest.raises(typer.Exit):
             fail("Invalid IP address", hint_type="user")
         captured = capsys.readouterr()
@@ -70,7 +68,6 @@ class TestFail:
         assert "diagnostics" not in captured.err
 
     def test_fail_hint_type_system_suggests_diagnostics(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """hint_type='system' should suggest meridian doctor."""
         with pytest.raises(typer.Exit):
             fail("SSH connection failed", hint_type="system")
         captured = capsys.readouterr()
@@ -79,7 +76,6 @@ class TestFail:
         assert "github.com" not in captured.err
 
     def test_fail_hint_type_bug_is_default(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Default hint_type='bug' shows GitHub link."""
         with pytest.raises(typer.Exit):
             fail("unexpected state", hint_type="bug")
         captured = capsys.readouterr()

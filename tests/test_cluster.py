@@ -23,10 +23,6 @@ from meridian.core.errors import LocalStateCorruptedError
 from meridian.setup.single_server import single_server_intent
 from tests.support.topology import reality_path, single_exit_intent
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 _UUID_A = "550e8400-e29b-41d4-a716-446655440000"
 _UUID_B = "660e8400-e29b-41d4-a716-446655440001"
 _UUID_C = "770e8400-e29b-41d4-a716-446655440002"
@@ -48,11 +44,6 @@ def _configured_cluster(**overrides) -> ClusterConfig:
     )
     defaults.update(overrides)
     return ClusterConfig(**defaults)
-
-
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
 
 
 class TestClusterValidation:
@@ -117,11 +108,6 @@ class TestClusterValidation:
         cfg._readonly = True
         with pytest.raises(ValueError, match="newer version"):
             cfg.save(tmp_path / "cluster.yml")
-
-
-# ---------------------------------------------------------------------------
-# YAML round-trip
-# ---------------------------------------------------------------------------
 
 
 class TestClusterYAMLRoundTrip:
@@ -226,7 +212,6 @@ class TestClusterYAMLRoundTrip:
             ClusterConfig.load(p)
 
     def test_load_valid_config_no_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Loading a valid cluster.yml should produce no warnings."""
         cfg = _configured_cluster()
         p = tmp_path / "cluster.yml"
         cfg.save(p)
@@ -259,11 +244,6 @@ class TestTelegramConfigRoundTrip:
         cfg.save(p)
         loaded = ClusterConfig.load(p)
         assert loaded.telegram is None
-
-
-# ---------------------------------------------------------------------------
-# Convenience methods
-# ---------------------------------------------------------------------------
 
 
 class TestClusterConvenience:

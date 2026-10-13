@@ -9,10 +9,6 @@ from meridian.provision.steps import ProvisionContext, Provisioner, StepResult
 from tests.support.mock_connection import MockConnection
 from tests.support.reporters import CaptureReporter
 
-# ---------------------------------------------------------------------------
-# Mock step helpers
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class MockStep:
@@ -26,11 +22,6 @@ class MockStep:
     def run(self, conn, ctx) -> StepResult:
         self.ran = True
         return StepResult(name=self.name, status=self.status, detail=self.detail)
-
-
-# ---------------------------------------------------------------------------
-# ProvisionContext tests
-# ---------------------------------------------------------------------------
 
 
 class TestProvisionContextDomainMode:
@@ -76,11 +67,6 @@ class TestProvisionContextDefaults:
     def test_harden_defaults_true(self):
         ctx = ProvisionContext(ip="198.51.100.10")
         assert ctx.harden is True
-
-
-# ---------------------------------------------------------------------------
-# Provisioner tests
-# ---------------------------------------------------------------------------
 
 
 class TestProvisioner:

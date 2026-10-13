@@ -23,10 +23,6 @@ from meridian.handoff import HandoffLinks
 from meridian.remnawave import RemnawaveError, User
 from tests.support.topology import panel_mock, single_exit_intent
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_v4_cluster(tmp_path: Path, *, users: list[str] | None = None) -> ClusterConfig:
     """Create a configured cluster whose topology declares the given access users."""
@@ -62,11 +58,6 @@ def _make_user(name: str = "alice", status: str = "ACTIVE") -> User:
 
 def _make_panel_mock() -> MagicMock:
     return panel_mock(get_user=_make_user(), list_users=[_make_user("alice"), _make_user("bob")], delete_user=True)
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 class TestRunAdd:
@@ -155,7 +146,6 @@ class TestRunAdd:
         assert "remote state may have changed" in payload["errors"][0]["message"]
 
     def test_add_duplicate_in_batch_fails(self, tmp_home: Path) -> None:
-        """Duplicate names within the same batch should fail validation."""
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             pytest.raises(typer.Exit),
@@ -164,7 +154,6 @@ class TestRunAdd:
             run_add(names=["alice", "alice"])
 
     def test_add_client_empty_name_fails(self, tmp_home: Path) -> None:
-        """Empty client name should fail."""
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             pytest.raises(typer.Exit),
@@ -173,7 +162,6 @@ class TestRunAdd:
             run_add(names=[""])
 
     def test_add_client_no_cluster_fails(self, tmp_home: Path) -> None:
-        """Adding a client without a configured cluster should fail."""
         with (
             patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
             pytest.raises(typer.Exit),
@@ -195,7 +183,6 @@ class TestRunShow:
         assert page_url in output
 
     def test_show_existing_client(self, tmp_home: Path) -> None:
-        """Showing an existing client prints subscription URL."""
         panel = _make_panel_mock()
 
         with (
@@ -242,7 +229,6 @@ class TestRunShow:
         assert "panel-password" not in output
 
     def test_show_nonexistent_client_fails(self, tmp_home: Path) -> None:
-        """Showing a non-existent client should fail."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
@@ -402,7 +388,6 @@ class TestRunList:
         assert "[red]visible[/red]" in capsys.readouterr().err
 
     def test_list_clients(self, tmp_home: Path) -> None:
-        """Listing clients calls panel.list_users."""
         panel = _make_panel_mock()
 
         with (
@@ -437,7 +422,6 @@ class TestRunList:
         assert [client["username"] for client in payload["data"]["clients"]] == ["alice"]
 
     def test_list_empty_clients(self, tmp_home: Path) -> None:
-        """Listing clients when none exist should still succeed."""
         panel = _make_panel_mock()
         panel.list_users.return_value = []
 
@@ -449,7 +433,6 @@ class TestRunList:
             run_list()
 
     def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Client list JSON uses the standard output envelope."""
         panel = _make_panel_mock()
         set_json_mode(True)
         try:
@@ -554,7 +537,6 @@ class TestPanelAPIErrors:
 
 class TestRunEnable:
     def test_enable_existing_client(self, tmp_home: Path) -> None:
-        """Enabling a client calls panel.enable_user with the user's UUID."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="DISABLED")
 
@@ -569,7 +551,6 @@ class TestRunEnable:
         panel.enable_user.assert_called_once_with("101")
 
     def test_enable_nonexistent_client_fails(self, tmp_home: Path) -> None:
-        """Enabling a non-existent client should fail with user hint."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
@@ -584,7 +565,6 @@ class TestRunEnable:
         panel.enable_user.assert_not_called()
 
     def test_enable_api_error_shows_message(self, tmp_home: Path) -> None:
-        """RemnawaveError during enable should be caught and shown to user."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="DISABLED")
         panel.enable_user.side_effect = RemnawaveError("Panel unreachable")
@@ -627,7 +607,6 @@ class TestRunDisable:
         panel.assert_not_called()
 
     def test_disable_existing_client(self, tmp_home: Path) -> None:
-        """Disabling a client calls panel.disable_user with the user's UUID."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="ACTIVE")
 
@@ -642,7 +621,6 @@ class TestRunDisable:
         panel.disable_user.assert_called_once_with("101")
 
     def test_disable_nonexistent_client_fails(self, tmp_home: Path) -> None:
-        """Disabling a non-existent client should fail with user hint."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
@@ -657,7 +635,6 @@ class TestRunDisable:
         panel.disable_user.assert_not_called()
 
     def test_disable_api_error_shows_message(self, tmp_home: Path) -> None:
-        """RemnawaveError during disable should be caught and shown to user."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="ACTIVE")
         panel.disable_user.side_effect = RemnawaveError("Panel unreachable")
@@ -671,14 +648,8 @@ class TestRunDisable:
             run_disable(name="alice")
 
 
-# ---------------------------------------------------------------------------
-# JSON envelope tests
-# ---------------------------------------------------------------------------
-
-
 class TestRunRemoveJson:
     def test_remove_json_refusal_emits_error_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client remove --json emits an error envelope when the client is unknown."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
@@ -723,7 +694,6 @@ class TestRunRemoveJson:
 
 class TestRunEnableJson:
     def test_enable_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client enable --json produces a meridian.output/v1 envelope."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="DISABLED")
 
@@ -746,7 +716,6 @@ class TestRunEnableJson:
         assert payload["data"]["client"]["status"] == "active"
 
     def test_enable_json_error_on_not_found(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client enable --json emits error envelope when client not found."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
@@ -769,7 +738,6 @@ class TestRunEnableJson:
 
 class TestRunDisableJson:
     def test_disable_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client disable --json produces a meridian.output/v1 envelope."""
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("alice", status="ACTIVE")
 
@@ -792,7 +760,6 @@ class TestRunDisableJson:
         assert payload["data"]["client"]["status"] == "disabled"
 
     def test_disable_json_error_on_not_found(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """client disable --json emits error envelope when client not found."""
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 

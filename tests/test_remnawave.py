@@ -17,10 +17,6 @@ from meridian.remnawave import (
 )
 from meridian.remnawave.models import parse_host, parse_inbound, parse_node, parse_user
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _mock_response(status_code: int = 200, json_data: dict | list | None = None) -> MagicMock:
     """Create a mock httpx.Response."""
@@ -64,11 +60,6 @@ def _call(client: MagicMock, index: int = 0) -> tuple[str, str, object]:
     return call.args[0], call.args[1], call.kwargs.get("json")
 
 
-# ---------------------------------------------------------------------------
-# Client construction
-# ---------------------------------------------------------------------------
-
-
 class TestClientConstruction:
     def test_enables_tls_verification_and_applies_timeout(self) -> None:
         raw_http = MagicMock()
@@ -95,11 +86,6 @@ class TestClientConstruction:
         assert raw_client.call_args.kwargs["headers"]["Authorization"] == "Bearer test-token"
 
 
-# ---------------------------------------------------------------------------
-# Finder Methods
-# ---------------------------------------------------------------------------
-
-
 class TestFindNodeByAddress:
     def test_returns_matching_node(self) -> None:
         panel = _make_panel()
@@ -122,16 +108,6 @@ class TestFindNodeByAddress:
         panel = _make_panel()
         panel.list_nodes = MagicMock(return_value=[])
         assert panel.find_node_by_address("198.51.100.1") is None
-
-
-# ---------------------------------------------------------------------------
-# SDK → Dataclass Converters
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# REST payload parsers (Remnawave 3.4 shapes)
-# ---------------------------------------------------------------------------
 
 
 class TestParseUser:
@@ -216,11 +192,6 @@ class TestParseHostAndInbound:
         ib = parse_inbound({"uuid": "ib-1", "tag": "vless-reality", "type": "vless", "security": "reality"})
         assert (ib.uuid, ib.tag, ib.type, ib.security) == ("ib-1", "vless-reality", "vless", "reality")
         assert parse_inbound({}).uuid == ""
-
-
-# ---------------------------------------------------------------------------
-# Retry Logic
-# ---------------------------------------------------------------------------
 
 
 class TestRetryLogic:
@@ -311,10 +282,6 @@ class TestEmptyBodies:
         assert panel._request("POST", "/api/test") is None
 
 
-# Auth Methods
-# ---------------------------------------------------------------------------
-
-
 class TestAuth:
     def test_login_returns_token(self) -> None:
         mock_resp = MagicMock()
@@ -380,13 +347,6 @@ class TestAuth:
         with patch("httpx.post", return_value=mock_resp):
             with pytest.raises(RemnawaveError, match="no token"):
                 MeridianPanel.login("https://198.51.100.1", "admin", "pass")
-
-
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Users (numeric id) and nodes
-# ---------------------------------------------------------------------------
 
 
 class TestUsers:
@@ -600,13 +560,6 @@ class TestCreateHost:
         assert host.inbound_uuid == "00000000-0000-0000-0000-0000000000e1"
 
 
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Config Profiles and inbounds
-# ---------------------------------------------------------------------------
-
-
 class TestConfigProfiles:
     def test_create_config_profile(self) -> None:
         panel, client = _wired_panel(_mock_response(201, {"response": {"uuid": "cp-1", "name": "meridian-default"}}))
@@ -639,10 +592,6 @@ class TestConfigProfiles:
             )
         )
         assert [p.name for p in panel.list_config_profiles()] == ["default", "other"]
-
-
-# Internal Squads (SDK path)
-# ---------------------------------------------------------------------------
 
 
 class TestInternalSquads:
@@ -679,11 +628,6 @@ class TestInternalSquads:
             "/api/internal-squads",
             json={"uuid": "sq-1", "inbounds": ["ib-1"]},
         )
-
-
-# ---------------------------------------------------------------------------
-# Error Subclasses & Safety
-# ---------------------------------------------------------------------------
 
 
 class TestErrorSubclasses:

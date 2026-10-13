@@ -22,10 +22,6 @@ from meridian.provision.common import (
 from meridian.provision.steps import ProvisionContext
 from tests.support.mock_connection import MockConnection
 
-# ---------------------------------------------------------------------------
-# InstallPackages
-# ---------------------------------------------------------------------------
-
 
 def _dpkg(installed: list[str], remembered: tuple[str, ...] = ()) -> str:
     """dpkg-query rows: installed packages, plus ones dpkg only remembers ("un")."""
@@ -45,7 +41,6 @@ class TestInstallPackages:
         mock_conn.assert_called_with_pattern("apt-get install -y -qq python3-systemd")
 
     def test_all_present_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When all packages are already installed, no apt-get install is called."""
         mock_conn.when("dpkg-query", stdout=_dpkg(REQUIRED_PACKAGES))
 
         result = InstallPackages().run(mock_conn, base_ctx)
@@ -54,7 +49,6 @@ class TestInstallPackages:
         mock_conn.assert_not_called_with_pattern("apt-get install")
 
     def test_missing_packages_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When some packages are missing, apt-get install is called and status is changed."""
         # Return only a subset of required packages
         installed = REQUIRED_PACKAGES[:3]
         mock_conn.when("dpkg-query", stdout=_dpkg(installed))
@@ -75,7 +69,6 @@ class TestInstallPackages:
         mock_conn.assert_called_with_pattern("apt-get install -y -qq cron")
 
     def test_apt_fails_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When apt-get install fails, status is failed."""
         mock_conn.when("dpkg-query", stdout="")
         mock_conn.when("apt-get install", rc=1, stderr="E: broken packages")
 
@@ -84,7 +77,6 @@ class TestInstallPackages:
         assert result.status == "failed"
 
     def test_eol_apt_update_gives_actionable_error(self, mock_conn: MockConnection, base_ctx):
-        """When apt-get update fails with EOL Release file error, message suggests LTS."""
         mock_conn.when("dpkg-query", stdout="")
         mock_conn.when(
             "apt-get update",
@@ -102,14 +94,8 @@ class TestInstallPackages:
         assert "Ubuntu LTS" in result.detail
 
 
-# ---------------------------------------------------------------------------
-# EnableAutoUpgrades
-# ---------------------------------------------------------------------------
-
-
 class TestEnableAutoUpgrades:
     def test_already_configured_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When config file already has expected content, nothing is written."""
         mock_conn.when("cat", stdout=AUTO_UPGRADES_CONF)
 
         result = EnableAutoUpgrades().run(mock_conn, base_ctx)
@@ -117,7 +103,6 @@ class TestEnableAutoUpgrades:
         assert result.status == "ok"
 
     def test_writes_config_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When config file is missing or empty, it is written."""
         mock_conn.when("cat /etc/apt", stdout="", rc=1)
         mock_conn.when("cat >", rc=0)
 
@@ -126,14 +111,8 @@ class TestEnableAutoUpgrades:
         assert result.status == "changed"
 
 
-# ---------------------------------------------------------------------------
-# SetTimezone
-# ---------------------------------------------------------------------------
-
-
 class TestSetTimezone:
     def test_already_utc_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When timezone is already UTC, no change is made."""
         mock_conn.when("timedatectl", stdout="UTC")
 
         result = SetTimezone().run(mock_conn, base_ctx)
@@ -141,7 +120,6 @@ class TestSetTimezone:
         assert result.status == "ok"
 
     def test_changes_timezone_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When timezone differs, it is changed to UTC."""
         mock_conn.when("timedatectl show", stdout="America/New_York")
         mock_conn.when("timedatectl set-timezone", rc=0)
 
@@ -150,14 +128,8 @@ class TestSetTimezone:
         assert result.status == "changed"
 
 
-# ---------------------------------------------------------------------------
-# HardenSSH
-# ---------------------------------------------------------------------------
-
-
 class TestHardenSSH:
     def test_already_hardened_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When Meridian's drop-in is present and effective config matches, status is ok."""
         mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", stdout=_SSH_HARDENING_DROPIN)
         mock_conn.when("sshd -t", rc=0)
         mock_conn.when("sshd -T", rc=0)
@@ -167,7 +139,6 @@ class TestHardenSSH:
         assert result.status == "ok"
 
     def test_hardens_ssh_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When drop-in is missing, SSH is hardened and sshd restarted."""
         mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", rc=1)
         mock_conn.when("mkdir -p /etc/ssh/sshd_config.d", rc=0)
         mock_conn.when("rm -f /etc/ssh/sshd_config.d/99-meridian.conf", rc=0)
@@ -180,7 +151,6 @@ class TestHardenSSH:
         mock_conn.assert_called_with_pattern("systemctl restart sshd")
 
     def test_migrates_old_dropin_on_fresh_write(self, mock_conn: MockConnection, base_ctx):
-        """When writing the new 00-hardening.conf, older project-named drop-ins are removed."""
         mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", rc=1)
         mock_conn.when("mkdir -p /etc/ssh/sshd_config.d", rc=0)
         mock_conn.when("rm -f /etc/ssh/sshd_config.d/99-meridian.conf", rc=0)
@@ -194,7 +164,6 @@ class TestHardenSSH:
         mock_conn.assert_called_with_pattern("/etc/ssh/sshd_config.d/00-meridian.conf")
 
     def test_sshd_validation_fails_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When sshd -t validation fails, status is failed."""
         mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", rc=1)
         mock_conn.when("sshd -t", rc=1, stderr="sshd_config: bad configuration")
 
@@ -204,7 +173,6 @@ class TestHardenSSH:
         assert "validation failed" in result.detail
 
     def test_effective_setting_mismatch_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When sshd -T still reports password auth enabled, fail clearly."""
         mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", stdout=_SSH_HARDENING_DROPIN.strip())
         mock_conn.when("sshd -t", rc=0)
         mock_conn.when("sshd -T | grep -q '^passwordauthentication no$'", rc=1)
@@ -229,14 +197,8 @@ class TestHardenSSH:
         assert result.status == "ok"
 
 
-# ---------------------------------------------------------------------------
-# ConfigureFail2ban
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureFail2ban:
     def test_already_running_with_journal_jail_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When the jail is current and fail2ban is active, nothing restarts."""
         mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", stdout="active")
 
@@ -260,7 +222,6 @@ class TestConfigureFail2ban:
         assert mock_conn.write_map["/etc/fail2ban/jail.d/sshd-journal.local"] == FAIL2BAN_JAIL_CONF.encode()
 
     def test_stopped_restarts(self, mock_conn: MockConnection, base_ctx):
-        """When fail2ban is not running, it is enabled and restarted."""
         mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("sleep 2; systemctl is-active fail2ban", stdout="active")
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
@@ -285,7 +246,6 @@ class TestConfigureFail2ban:
         assert "Have not found any log file" in result.detail
 
     def test_enable_failure_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When systemctl enable fails, status is failed."""
         mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
         mock_conn.when("systemctl enable fail2ban", rc=1, stderr="Failed to enable")
@@ -296,7 +256,6 @@ class TestConfigureFail2ban:
         assert "failed to enable" in result.detail
 
     def test_service_start_failure_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When systemctl restart fails, status is failed."""
         mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
         mock_conn.when("systemctl enable fail2ban", rc=0)
@@ -308,14 +267,8 @@ class TestConfigureFail2ban:
         assert "failed to start" in result.detail
 
 
-# ---------------------------------------------------------------------------
-# ConfigureBBR
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureBBR:
     def test_already_enabled_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When BBR and fq qdisc are already active, status is ok."""
         mock_conn.when("net.ipv4.tcp_congestion_control", stdout="bbr")
         mock_conn.when("net.core.default_qdisc", stdout="fq")
 
@@ -324,7 +277,6 @@ class TestConfigureBBR:
         assert result.status == "ok"
 
     def test_enables_bbr_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When congestion control is cubic, BBR is enabled."""
         mock_conn.when("net.ipv4.tcp_congestion_control", stdout="cubic")
 
         result = ConfigureBBR().run(mock_conn, base_ctx)
@@ -333,14 +285,8 @@ class TestConfigureBBR:
         mock_conn.assert_called_with_pattern("sysctl -w")
 
 
-# ---------------------------------------------------------------------------
-# ConfigureFirewall
-# ---------------------------------------------------------------------------
-
-
 class TestConfigureFirewall:
     def test_ufw_not_found_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        """When ufw binary is not found and install fails, status is failed."""
         mock_conn.when("which ufw", rc=1)
         mock_conn.when("apt-get update", stdout="")
         mock_conn.when("apt-get install", stdout="")
@@ -352,7 +298,6 @@ class TestConfigureFirewall:
         mock_conn.assert_called_with_pattern("apt-get install")
 
     def test_ufw_installed_after_retry(self, mock_conn: MockConnection, base_ctx):
-        """When ufw is missing but apt install succeeds, step continues."""
         # First check (with 2>/dev/null) fails; recheck (without) succeeds
         mock_conn.when("which ufw 2>/dev/null", rc=1)
         mock_conn.when("which ufw", rc=0)
@@ -405,7 +350,6 @@ class TestConfigureFirewall:
         assert "443\\/udp" in cleanup and "Anywhere" in cleanup and "sort -rn" in cleanup
 
     def test_already_active_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When ufw is active and rules already exist, status is ok."""
         mock_conn.when("which ufw", rc=0)
         mock_conn.when("ufw status numbered", stdout="")  # no untagged 443/udp rule to drop
         mock_conn.when("ufw status", stdout="Status: active\n22/tcp ALLOW\n443/tcp ALLOW")
@@ -420,7 +364,6 @@ class TestConfigureFirewall:
         assert result.status == "ok"
 
     def test_enables_ufw_returns_changed(self, mock_conn: MockConnection, base_ctx):
-        """When ufw is inactive, it is enabled and status is changed."""
         mock_conn.when("which ufw", rc=0)
         mock_conn.when("ufw status", stdout="Status: inactive")
         mock_conn.when("ufw allow", stdout="Rule added")
@@ -433,7 +376,6 @@ class TestConfigureFirewall:
         assert result.status == "changed"
 
     def test_allows_detected_custom_ssh_port(self, mock_conn: MockConnection, base_ctx):
-        """The firewall must follow the live sshd port instead of hardcoding 22."""
         mock_conn.when("which ufw", rc=0)
         mock_conn.when("sshd -T", stdout="2222\n")
         mock_conn.when("ufw status", stdout="Status: active")
@@ -462,7 +404,6 @@ class TestConfigureFirewall:
         mock_conn.assert_called_with_pattern("ufw allow 22/tcp")
 
     def test_preserves_user_managed_tcp_rules(self, mock_conn: MockConnection, base_ctx):
-        """Custom non-Meridian ports must not be deleted during cleanup."""
         mock_conn.when("which ufw", rc=0)
         mock_conn.when("ufw status", stdout="Status: active\n22/tcp ALLOW\n443/tcp ALLOW\n9100/tcp ALLOW")
         mock_conn.when("ufw allow", stdout="Skipping adding existing rule")

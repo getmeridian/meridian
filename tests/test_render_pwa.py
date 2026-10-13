@@ -17,10 +17,6 @@ from meridian.render import (
     render_pwa_shell,
 )
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 REALITY_URL = (
     "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=reality&sni=www.example.com#Test-Reality"
 )
@@ -34,11 +30,6 @@ def protocol_urls() -> list[ProtocolURL]:
         ProtocolURL(key="reality", label="Primary", url=REALITY_URL, qr_b64="dGVzdA=="),
         ProtocolURL(key="xhttp", label="XHTTP", url=XHTTP_URL, qr_b64="eGh0dHA="),
     ]
-
-
-# ---------------------------------------------------------------------------
-# TestRenderConfigJson
-# ---------------------------------------------------------------------------
 
 
 class TestRenderConfigJson:
@@ -101,11 +92,6 @@ class TestRenderConfigJson:
         assert result["subscription_qr_b64"]
 
 
-# ---------------------------------------------------------------------------
-# TestRenderPWAShell
-# ---------------------------------------------------------------------------
-
-
 class TestRenderPWAShell:
     def test_has_manifest_link(self) -> None:
         html = render_pwa_shell(client_name="test")
@@ -141,11 +127,6 @@ class TestRenderPWAShell:
         html = render_pwa_shell(asset_path="/custom/path")
         assert "/custom/path/app.js" in html
         assert "/custom/path/styles.css" in html
-
-
-# ---------------------------------------------------------------------------
-# TestRenderManifest
-# ---------------------------------------------------------------------------
 
 
 class TestRenderManifest:
@@ -188,14 +169,7 @@ class TestRenderManifest:
         assert 'My "Server"' == parsed["name"]
 
 
-# ---------------------------------------------------------------------------
-# TestConfigJsonSchema — protocol entry field validation (Gap #4)
-# ---------------------------------------------------------------------------
-
-
 class TestConfigJsonSchema:
-    """Verify config.json protocol entries have all required fields."""
-
     def test_protocol_entry_required_fields(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
         required = {"key", "label", "url", "qr_b64", "recommended"}
@@ -216,30 +190,23 @@ class TestConfigJsonSchema:
 
 class TestPWAApps:
     def test_deeplink_templates_contain_url_placeholder(self) -> None:
-        """Every deep link template must include a URL placeholder."""
         for app in _PWA_APPS:
             if "deeplink" in app:
                 has_url = "{url}" in app["deeplink"] or "{url_raw}" in app["deeplink"] or "{url_b64}" in app["deeplink"]
                 assert has_url, f"{app['name']} deeplink missing URL placeholder: {app['deeplink']}"
 
     def test_protocols_field_present(self) -> None:
-        """Every app must have a protocols array."""
         for app in _PWA_APPS:
             assert "protocols" in app, f"{app['name']} missing protocols field"
             assert isinstance(app["protocols"], list), f"{app['name']} protocols must be a list"
             assert len(app["protocols"]) >= 1, f"{app['name']} protocols must not be empty"
 
     def test_protocols_values_valid(self) -> None:
-        """Protocol values must be from the known set."""
         valid = {"reality", "xhttp", "wss"}
         for app in _PWA_APPS:
             for proto in app.get("protocols", []):
                 assert proto in valid, f"{app['name']} has unknown protocol {proto!r}"
 
-
-# ---------------------------------------------------------------------------
-# TestAppCatalog — per-platform recommendations
-# ---------------------------------------------------------------------------
 
 PLATFORMS = ("iOS", "Android", "Windows", "macOS", "Linux")
 
@@ -293,14 +260,7 @@ class TestAppCatalog:
         assert all("icon" in app for app in catalog["apps"])
 
 
-# ---------------------------------------------------------------------------
-# TestUnicodeClientNames — non-ASCII names (Gap #6)
-# ---------------------------------------------------------------------------
-
-
 class TestUnicodeClientNames:
-    """Verify rendering works correctly with non-ASCII client names."""
-
     def test_config_json_cyrillic(self, protocol_urls: list[ProtocolURL]) -> None:
         result = render_config_json(protocol_urls, "198.51.100.1", client_name="\u0410\u043b\u0438\u0441\u0430")
         parsed = json.loads(result)
@@ -318,7 +278,6 @@ class TestUnicodeClientNames:
         assert "\u5c0f\u660e" in result
 
     def test_config_json_emoji_name(self, protocol_urls: list[ProtocolURL]) -> None:
-        """Non-Latin characters should not corrupt JSON."""
         name = "\u0645\u0631\u06cc\u0645"  # Farsi: Maryam
         result = render_config_json(protocol_urls, "198.51.100.1", client_name=name)
         parsed = json.loads(result)
@@ -355,10 +314,6 @@ class TestPWATemplateSource:
         for name in ("app.js", "selfcheck.js"):
             assert "style=" not in (PWA_DIR / name).read_text(), name
 
-
-# ---------------------------------------------------------------------------
-# TestSelfCheck — browser-side checks from the visitor's network
-# ---------------------------------------------------------------------------
 
 PWA_DIR = Path("src/meridian/templates/pwa")
 

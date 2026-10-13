@@ -30,11 +30,6 @@ class _WarpMockConnection(MockConnection):
         return super().run(command, timeout, **kwargs)
 
 
-# ---------------------------------------------------------------------------
-# InstallWarp
-# ---------------------------------------------------------------------------
-
-
 class TestInstallWarp:
     def test_already_connected_returns_ok(self):
         conn = MockConnection()
@@ -92,7 +87,6 @@ class TestInstallWarp:
         assert not any("lsb_release" in command for command in conn._calls)
 
     def test_already_installed_but_disconnected(self):
-        """warp-cli exists but not connected — register and connect."""
         conn = _WarpMockConnection()
         conn.when("command -v warp-cli", stdout="/usr/bin/warp-cli")
         conn.when("systemctl enable", stdout="")

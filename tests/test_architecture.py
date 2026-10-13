@@ -17,11 +17,6 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src" / "meridian"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _imports(path: Path) -> list[str]:
     """Return all module names imported by a Python file (top-level and deferred)."""
     tree = ast.parse(path.read_text(), filename=str(path))
@@ -46,10 +41,6 @@ def _scan_violations(root: Path, forbidden: tuple[str, ...]) -> list[str]:
                 violations.append(f"{path.relative_to(SRC)} imports {module}")
     return violations
 
-
-# ---------------------------------------------------------------------------
-# 1. Layer boundary tests
-# ---------------------------------------------------------------------------
 
 # core/ must never depend on CLI, console, config, or Rich.
 CORE_FORBIDDEN = (
@@ -157,11 +148,6 @@ class TestLayerBoundaries:
         assert violations == [], "Library modules import command-layer symbols:\n" + "\n".join(violations)
 
 
-# ---------------------------------------------------------------------------
-# 2. Contract drift tests
-# ---------------------------------------------------------------------------
-
-
 class TestContractDrift:
     """Catch type/schema drift between layers that define the same concept."""
 
@@ -233,10 +219,6 @@ class TestContractDrift:
         elif ret is not inspect.Parameter.empty:
             assert ret is OperationSnapshot or (hasattr(ret, "__name__") and ret.__name__ == "OperationSnapshot")
 
-
-# ---------------------------------------------------------------------------
-# 3. Structural health tests
-# ---------------------------------------------------------------------------
 
 # File size budget — catches god-modules at 850 lines, not 2500.
 # Files above this limit must be in the allowlist with a reason.

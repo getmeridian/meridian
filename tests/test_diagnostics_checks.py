@@ -17,10 +17,6 @@ from meridian.diagnostics.checks import (
 )
 from tests.support.mock_connection import MockConnection
 
-# ---------------------------------------------------------------------------
-# check_disk_space
-# ---------------------------------------------------------------------------
-
 
 class TestCheckDiskSpace:
     def test_passed_when_enough_space(self) -> None:
@@ -57,11 +53,6 @@ class TestCheckDiskSpace:
         assert result.status == "passed"
 
 
-# ---------------------------------------------------------------------------
-# check_container_running
-# ---------------------------------------------------------------------------
-
-
 class TestCheckContainerRunning:
     def test_passed_when_running(self) -> None:
         conn = MockConnection()
@@ -92,11 +83,6 @@ class TestCheckContainerRunning:
         result = check_container_running(conn, "remnawave-node")
 
         assert result.status == "skipped"
-
-
-# ---------------------------------------------------------------------------
-# check_port_listening
-# ---------------------------------------------------------------------------
 
 
 class TestCheckPortListening:
@@ -140,11 +126,6 @@ class TestCheckPortListening:
         assert any("ss -ulnp" in command for command in conn.calls)
 
 
-# ---------------------------------------------------------------------------
-# check_tls_certificate
-# ---------------------------------------------------------------------------
-
-
 class TestCheckTlsCertificate:
     def test_passed_when_cert_valid(self) -> None:
         conn = MockConnection()
@@ -182,7 +163,6 @@ class TestCheckTlsCertificate:
         assert "expired" in result.detail.lower()
 
     def test_warning_when_cert_expires_soon(self) -> None:
-        """Certificate expiring within 7 days triggers warning."""
         from datetime import datetime, timedelta, timezone
 
         soon = datetime.now(timezone.utc) + timedelta(days=3)
@@ -196,7 +176,6 @@ class TestCheckTlsCertificate:
         assert "days" in result.detail
 
     def test_uses_shlex_quote_on_host(self) -> None:
-        """Verify the host argument is safely quoted in the shell command."""
         conn = MockConnection()
         conn.when("openssl", rc=1)
         check_tls_certificate(conn, "evil; rm -rf /")

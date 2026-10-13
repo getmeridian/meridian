@@ -78,10 +78,7 @@ def _make_pipeline_conn() -> MockConnection:
 
 
 class TestFullPipelineContract:
-    """Verify the data contract across the full deploy pipeline."""
-
     def test_standalone_pipeline_uses_typed_context(self) -> None:
-        """Full standalone pipeline (no domain) uses valid context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             xhttp_enabled=True,
@@ -103,7 +100,6 @@ class TestFullPipelineContract:
                 ) from e
 
     def test_domain_pipeline_uses_typed_context(self) -> None:
-        """Full domain-mode pipeline uses valid context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             domain="example.com",
@@ -124,7 +120,6 @@ class TestFullPipelineContract:
                 raise AssertionError(f"Step '{step.name}' crashed with AttributeError: {e}.") from e
 
     def test_no_harden_pipeline_uses_typed_context(self) -> None:
-        """Pipeline with harden=False still has all needed context fields."""
         ctx = ProvisionContext(
             ip="198.51.100.1",
             harden=False,
@@ -141,7 +136,3 @@ class TestFullPipelineContract:
                 step.run(conn, ctx)
             except AttributeError as e:
                 raise AssertionError(f"Step '{step.name}' crashed: {e}.") from e
-
-
-class TestRelayPipelineContract:
-    """Verify data contract across the relay pipeline."""

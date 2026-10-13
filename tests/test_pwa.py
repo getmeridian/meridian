@@ -133,14 +133,7 @@ class TestLoadPWAStaticAssets:
         assert "CACHE_VERSION" in sw
 
 
-# ---------------------------------------------------------------------------
-# TestUploadClientFiles
-# ---------------------------------------------------------------------------
-
-
 class TestUploadClientFiles:
-    """Tests for upload_client_files() — per-client file deployment."""
-
     @pytest.fixture()
     def sample_files(self) -> dict[str, str]:
         return {
@@ -192,14 +185,7 @@ class TestUploadClientFiles:
             assert f"/var/www/private/550e8400-e29b-41d4-a716-446655440000/{filename}" in written_paths
 
 
-# ---------------------------------------------------------------------------
-# TestUploadPWAAssets
-# ---------------------------------------------------------------------------
-
-
 class TestUploadPWAAssets:
-    """Tests for upload_pwa_assets() — shared static asset deployment."""
-
     def test_returns_empty_on_success(self) -> None:
         conn = MockConnection()
         result = upload_pwa_assets(conn)
@@ -228,7 +214,6 @@ class TestUploadPWAAssets:
         assert all(kwargs["mode"] == "644" for _path, _data, kwargs in conn.writes)
 
     def test_sw_cache_version_is_content_hash(self) -> None:
-        """SW cache version is replaced with a content-derived hash at upload time."""
         conn = MockConnection()
         upload_pwa_assets(conn)
         sw_content = conn.write_map["/var/www/private/pwa/sw.js"].decode()
@@ -238,7 +223,6 @@ class TestUploadPWAAssets:
         assert "pwa-" in sw_content
 
     def test_deploys_to_correct_paths(self) -> None:
-        """Each static file should be written to /var/www/private/pwa/."""
         conn = MockConnection()
         upload_pwa_assets(conn)
         written_paths = {path for path, _data, _kwargs in conn.writes}

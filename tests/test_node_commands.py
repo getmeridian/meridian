@@ -25,10 +25,6 @@ from meridian.core.topology import SetupIntent
 from meridian.remnawave import Node, RemnawaveError
 from tests.support.topology import panel_mock, single_exit_intent
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _configured_cluster() -> ClusterConfig:
     """Create a configured cluster whose topology projects a panel node and an exit node."""
@@ -131,11 +127,6 @@ def _projected_fleet() -> object:
         patch("meridian.verification.deployment_verification_context", return_value=deployment),
     ):
         yield
-
-
-# ---------------------------------------------------------------------------
-# TestNodeAdd
-# ---------------------------------------------------------------------------
 
 
 class TestNodeAdd:
@@ -287,24 +278,8 @@ class TestNodeAdd:
         assert "meridian apply" in output
 
 
-# ---------------------------------------------------------------------------
-# TestNodeCheck
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# TestNodeRemove
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# TestNodeList
-# ---------------------------------------------------------------------------
-
-
 class TestNodeList:
     def test_list_shows_nodes(self, tmp_home: Path) -> None:
-        """Listing nodes should query the panel API and not fail."""
         cluster = _configured_cluster()
         panel = _make_panel_mock()
 
@@ -364,7 +339,6 @@ class TestNodeList:
         assert [item["status"] for item in payload["data"]["nodes"]] == ["unknown", "unknown"]
 
     def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """node list --json produces a meridian.output/v1 envelope."""
         cluster = _configured_cluster()
         panel = _make_panel_mock()
         set_json_mode(True)
@@ -463,13 +437,3 @@ class TestNodeList:
             run_list()
 
         assert "[red]visible[/red]" in capsys.readouterr().err
-
-
-# ---------------------------------------------------------------------------
-# TestRenderCheck (remediation display)
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# TestNodeRemoveContainerCleanup
-# ---------------------------------------------------------------------------

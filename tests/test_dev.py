@@ -94,7 +94,6 @@ class TestRunPreviewOutput:
         assert dirs1 == dirs2
 
     def test_output_writes_redirect_index(self, tmp_path: Path) -> None:
-        """Static output mode writes a redirect index.html at the root."""
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), no_open=True)
 
@@ -105,7 +104,6 @@ class TestRunPreviewOutput:
         assert client_dirs[0].name in root_html
 
     def test_output_disables_service_worker(self, tmp_path: Path) -> None:
-        """Static output mode replaces SW with a no-op."""
         output_dir = tmp_path / "preview"
         run_preview(output=str(output_dir), no_open=True)
 

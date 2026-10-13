@@ -19,8 +19,6 @@ from meridian.ssh import CommandResult, SSHError
 
 
 class TestRedactSecrets:
-    """Verify secret redaction patterns."""
-
     def test_redacts_uuid(self) -> None:
         text = "client id: 550e8400-e29b-41d4-a716-446655440000"
         assert "[UUID-REDACTED]" in _redact_secrets(text)
@@ -66,8 +64,6 @@ class TestRedactSecrets:
 
 
 class TestFormatSections:
-    """Verify markdown formatting."""
-
     def test_formats_as_markdown(self) -> None:
         sections = [("Title", "body text")]
         result = _format_sections(sections)
@@ -82,8 +78,6 @@ class TestFormatSections:
 
 
 class TestCheckCertExpiry:
-    """Verify TLS certificate expiry parsing."""
-
     def test_valid_cert(self) -> None:
         class FakeConn:
             def run(self, cmd: str, timeout: int = 10) -> object:

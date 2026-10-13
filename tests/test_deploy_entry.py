@@ -52,7 +52,6 @@ class TestDetectPublicIP:
         assert ip == ""
 
     def test_tries_fallback_url(self) -> None:
-        """If first URL fails, should try the fallback."""
         calls = []
 
         def side_effect(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
@@ -68,14 +67,10 @@ class TestDetectPublicIP:
 
 
 class TestRunWithExplicitIP:
-    """Test run() behavior when IP is provided explicitly (non-interactive)."""
-
     def test_invalid_ip_exits(self) -> None:
-        """run() with invalid IP should fail."""
         with pytest.raises(typer.Exit):
             run(ip="not-an-ip", yes=True)
 
     def test_server_name_not_found_exits(self, servers_file: Path, tmp_home: Path) -> None:
-        """An unknown name that is not an address should fail."""
         with pytest.raises(typer.Exit):
             run(ip="nonexistent", yes=True)

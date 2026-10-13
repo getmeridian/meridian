@@ -19,10 +19,6 @@ from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel, Topo
 from meridian.remnawave import Node, RemnawaveAuthError, RemnawaveError, User
 from tests.support.topology import panel_mock
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
 _UUID_A = "550e8400-e29b-41d4-a716-446655440000"
 _UUID_B = "660e8400-e29b-41d4-a716-446655440001"
 _UUID_C = "770e8400-e29b-41d4-a716-446655440002"
@@ -31,11 +27,6 @@ _SAMPLE_PRIVATE_KEY = "WDMnPFb3sIZpJGcNhI8jBh7bSCIhRak-bNWDaeqJe1Y"
 _SAMPLE_PUBLIC_KEY = "QfM7gQZ4h_4XfBfNqGShYqzEgXd6xT2c3YhW_F8m9A0"
 _SAMPLE_SHORT_ID = "a1b2c3d4"
 _SAMPLE_SNI = "www.example.com"
-
-
-# ---------------------------------------------------------------------------
-# Factories
-# ---------------------------------------------------------------------------
 
 
 def _node(ip: str, uuid: str, name: str, *, is_panel_host: bool = False) -> TopologyNode:
@@ -167,14 +158,8 @@ def _status_patches(topology: FleetTopology, panel: MagicMock):
     )
 
 
-# ---------------------------------------------------------------------------
-# TestFleetStatus
-# ---------------------------------------------------------------------------
-
-
 class TestFleetStatus:
     def test_status_healthy_panel(self) -> None:
-        """Panel ping succeeds -- shows healthy status without raising."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
@@ -192,7 +177,6 @@ class TestFleetStatus:
         panel.list_nodes.assert_called_once()
 
     def test_status_unreachable_panel(self) -> None:
-        """Panel ping fails -- still completes, shows UNREACHABLE."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=False)
 
@@ -226,7 +210,6 @@ class TestFleetStatus:
         assert exc_info.value.exit_code == 2
 
     def test_status_mixed_node_states(self) -> None:
-        """Nodes in connected, disconnected, and disabled states."""
         topology = _fleet_topology()
         # Add a third node to the cluster for "disabled"
         topology.nodes.append(_node("198.51.100.4", _UUID_C, "node-3"))
@@ -245,7 +228,6 @@ class TestFleetStatus:
         assert exit_code == 4
 
     def test_status_relay_healthy(self) -> None:
-        """Relay health check returns True."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
@@ -264,7 +246,6 @@ class TestFleetStatus:
         mock_health.assert_called_once_with("198.51.100.3", 443, 3.0)
 
     def test_status_relay_unreachable(self) -> None:
-        """Relay health check returns False -- still completes."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
@@ -282,7 +263,6 @@ class TestFleetStatus:
         mock_health.assert_called_once_with("198.51.100.3", 443, 3.0)
 
     def test_status_json_output_structure(self) -> None:
-        """JSON mode outputs dict with panel/nodes/relays/users keys."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
@@ -327,7 +307,6 @@ class TestFleetStatus:
         assert data["summary"]["users"] == 2
 
     def test_status_json_node_statuses(self) -> None:
-        """JSON mode reports correct status strings for each node."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = [
@@ -351,7 +330,6 @@ class TestFleetStatus:
         assert statuses[_UUID_B] == "disconnected"
 
     def test_status_no_nodes(self) -> None:
-        """Cluster with no nodes still runs without error."""
         topology = _fleet_topology().model_copy(update={"nodes": [], "relays": []})
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
@@ -362,7 +340,6 @@ class TestFleetStatus:
             run_status()
 
     def test_status_with_users(self) -> None:
-        """Users are fetched and counted when panel is healthy."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
@@ -379,7 +356,6 @@ class TestFleetStatus:
         panel.list_users.assert_called_once()
 
     def test_status_node_unknown_when_not_in_api(self) -> None:
-        """Node present in cluster but missing from API is shown as unknown."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         # API returns only one of the two cluster nodes
@@ -400,7 +376,6 @@ class TestFleetStatus:
         assert statuses[_UUID_B] == "unknown"
 
     def test_status_list_nodes_api_error_handled(self) -> None:
-        """RemnawaveError from list_nodes is caught gracefully."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = RemnawaveError("API error")
@@ -498,7 +473,6 @@ class TestFleetStatus:
         assert payload.data["summary"]["health"] == "unknown"
 
     def test_status_json_relay_health(self) -> None:
-        """JSON output includes relay health status."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.return_value = []
@@ -543,11 +517,6 @@ class TestFleetStatus:
         assert data["summary"]["users"] == 1
         assert data["nodes"][0]["ip"] == "198.51.100.20"
         assert data["relays"][0]["ip"] == "198.51.100.30"
-
-
-# ---------------------------------------------------------------------------
-# TestFleetInventory
-# ---------------------------------------------------------------------------
 
 
 class TestFleetInventory:

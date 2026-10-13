@@ -34,10 +34,6 @@ from meridian.xray_client import (
     test_connection as run_connection_test,
 )
 
-# ---------------------------------------------------------------------------
-# _parse_dgst
-# ---------------------------------------------------------------------------
-
 
 class TestParseDgst:
     def test_valid_dgst_extracts_hash(self) -> None:

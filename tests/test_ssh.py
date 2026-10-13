@@ -356,8 +356,6 @@ class TestCheckSSH:
 
 
 class TestVerifyHostKey:
-    """Tests for _verify_host_key — host key scanning, verification, and storage."""
-
     SCAN_OUTPUT = (
         "198.51.100.10 ssh-rsa AAAAB3NzaC1yc2EAAA...\n"
         "198.51.100.10 ecdsa-sha2-nistp256 AAAAE2VjZHNh...\n"
@@ -365,7 +363,6 @@ class TestVerifyHostKey:
     )
 
     def test_writes_only_preferred_key_not_all(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Only the verified (preferred) key should be written to known_hosts."""
         ssh_dir = tmp_path / ".ssh"
         ssh_dir.mkdir(mode=0o700)
         known_hosts = ssh_dir / "known_hosts"
@@ -474,7 +471,6 @@ class TestVerifyHostKey:
         assert "ecdsa" not in content
 
     def test_no_tty_fails_instead_of_auto_accept(self) -> None:
-        """Non-interactive mode should refuse host key, not silently accept."""
         scan_result = subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -505,7 +501,6 @@ class TestVerifyHostKey:
                 _verify_host_key("198.51.100.10")
 
     def test_user_rejects_key_returns_false(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """User answering 'n' should return False without writing anything."""
         ssh_dir = tmp_path / ".ssh"
         ssh_dir.mkdir(mode=0o700)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)

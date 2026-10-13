@@ -131,7 +131,6 @@ class TestSavedTarget:
         assert result.user == "ubuntu"
 
     def test_server_ip_not_in_registry(self, servers_file: Path) -> None:
-        """A bare IP resolves even if not registered."""
         reg = ServerRegistry(servers_file)
         result = resolve_server(reg, explicit_ip="198.51.100.99")
         assert result.ip == "198.51.100.99"
@@ -387,8 +386,6 @@ class TestLocalKeyword:
 
 
 class TestResolvedServer:
-    """Test ResolvedServer dataclass properties."""
-
     def test_frozen(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         result = resolve_server(reg, explicit_ip="198.51.100.10")

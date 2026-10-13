@@ -19,10 +19,6 @@ from meridian.branding import (
 )
 from meridian.core.inputs import PAGE_PALETTES, validate_optional_palette_value
 
-# ---------------------------------------------------------------------------
-# Palette validation (core) and normalize_icon
-# ---------------------------------------------------------------------------
-
 
 class TestPalette:
     @pytest.mark.parametrize("raw,expected", [("ocean", "ocean"), (" OCEAN ", "ocean"), ("Slate", "slate"), ("", "")])
@@ -55,11 +51,6 @@ class TestNormalizeIcon:
         with patch("meridian.branding._process_image_url", return_value=""):
             with pytest.raises(ValueError, match="Could not use the image"):
                 normalize_icon("https://example.com/icon.png")
-
-
-# ---------------------------------------------------------------------------
-# _extract_emoji
-# ---------------------------------------------------------------------------
 
 
 class TestExtractEmoji:
@@ -95,11 +86,6 @@ class TestExtractEmoji:
         assert _extract_emoji("") == ""
 
 
-# ---------------------------------------------------------------------------
-# process_icon
-# ---------------------------------------------------------------------------
-
-
 class TestProcessIcon:
     def test_emoji_input_returns_emoji(self) -> None:
         assert process_icon("🚀") == "🚀"
@@ -122,11 +108,6 @@ class TestProcessIcon:
         mock_process.return_value = ""
         process_icon("http://198.51.100.1/icon.png")
         mock_process.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# _is_private_ip
-# ---------------------------------------------------------------------------
 
 
 class TestIsPrivateIp:
@@ -155,11 +136,6 @@ class TestIsPrivateIp:
     def test_gaierror_returns_false(self, mock_getaddrinfo: MagicMock) -> None:
         mock_getaddrinfo.side_effect = socket.gaierror("Name resolution failed")
         assert _is_private_ip("nonexistent.example.com") is False
-
-
-# ---------------------------------------------------------------------------
-# _process_image_url
-# ---------------------------------------------------------------------------
 
 
 def _make_minimal_png() -> bytes:

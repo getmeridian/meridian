@@ -14,10 +14,7 @@ services:
 
 
 class TestDeployComposeStack:
-    """Tests for deploy_compose_stack()."""
-
     def test_success_full_sequence(self) -> None:
-        """Happy path: mkdir -> put_text env/compose -> pull -> up succeeds."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -36,7 +33,6 @@ class TestDeployComposeStack:
         conn.assert_called_with_pattern("docker compose up -d")
 
     def test_mkdir_failure_returns_unchanged(self) -> None:
-        """If mkdir fails, return changed=False with detail."""
         conn = MockConnection()
         conn.when("mkdir", rc=1, stderr="Permission denied")
 
@@ -46,7 +42,6 @@ class TestDeployComposeStack:
         assert "failed to create" in result.detail
 
     def test_compose_write_failure(self) -> None:
-        """If writing docker-compose.yml fails, return changed=False."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -58,7 +53,6 @@ class TestDeployComposeStack:
         assert "docker-compose.yml" in result.detail
 
     def test_pull_failure_returns_unchanged(self) -> None:
-        """Pull failure returns changed=False with error detail."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -81,7 +75,6 @@ class TestDeployComposeStack:
         conn.assert_called_with_pattern("docker compose pull")
 
     def test_compose_up_failure_collects_logs(self) -> None:
-        """If docker compose up fails, logs are collected."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -99,7 +92,6 @@ class TestDeployComposeStack:
         assert "ERROR: something broke" in result.logs
 
     def test_health_check_success(self) -> None:
-        """Health check passes on first call."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -121,7 +113,6 @@ class TestDeployComposeStack:
         assert result.changed is True
 
     def test_health_check_failure_returns_unchanged(self) -> None:
-        """Health check timeout returns changed=False."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -148,7 +139,6 @@ class TestDeployComposeStack:
         assert "test-svc" in result.detail
 
     def test_env_content_written_when_provided(self) -> None:
-        """When env_content is provided, .env is written via put_text."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -172,7 +162,6 @@ class TestDeployComposeStack:
         assert len(env_calls) > 0
 
     def test_env_files_written(self) -> None:
-        """EnvFile objects are written via put_text."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -198,7 +187,6 @@ class TestDeployComposeStack:
         assert len(env_calls) >= 2
 
     def test_extra_dirs_created(self) -> None:
-        """Extra directories are created alongside work_dir."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -222,7 +210,6 @@ class TestDeployComposeStack:
         assert len(mkdir_calls) == 3
 
     def test_no_env_file_when_empty(self) -> None:
-        """When env_content is empty and no env_files, .env is not written."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -238,7 +225,6 @@ class TestDeployComposeStack:
         assert len(env_calls) == 0
 
     def test_stop_first_runs_down(self) -> None:
-        """When stop_first=True, docker compose down is called before pull."""
         conn = MockConnection()
         conn.when("mkdir", rc=0)
         conn.when("chmod", rc=0)
@@ -260,8 +246,6 @@ class TestDeployComposeStack:
 
 
 class TestComposeDeployResult:
-    """Tests for ComposeDeployResult dataclass."""
-
     def test_defaults(self) -> None:
         r = ComposeDeployResult(changed=True)
         assert r.changed is True

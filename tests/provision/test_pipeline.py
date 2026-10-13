@@ -10,19 +10,10 @@ import pytest
 from meridian.provision import build_setup_steps
 from meridian.provision.steps import ProvisionContext
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def step_names(ctx: ProvisionContext) -> list[str]:
     """Return the list of step names for a given context."""
     return [s.name for s in build_setup_steps(ctx)]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -47,11 +38,6 @@ def domain_ctx() -> ProvisionContext:
         xhttp_enabled=True,
         hosted_page=False,
     )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 class TestMinimalPipeline:
@@ -83,8 +69,6 @@ class TestHardenSteps:
 
 
 class TestPipelineHardens:
-    """Hardening must install and configure fail2ban, and skip it otherwise."""
-
     def test_harden_configures_fail2ban_after_ssh_and_before_bbr(self, base_ctx: ProvisionContext) -> None:
         base_ctx.harden = True
         step_names_list = step_names(base_ctx)
@@ -147,7 +131,6 @@ class TestDomainMode:
 
 class TestFullPipeline:
     def test_full_pipeline_has_remnawave_steps(self, domain_ctx: ProvisionContext):
-        """Verify the full pipeline includes Remnawave panel step."""
         names = step_names(domain_ctx)
         assert "Deploy Remnawave panel" in names
         assert "Install Docker" in names

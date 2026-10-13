@@ -12,10 +12,6 @@ from meridian.provision.relay import (
 )
 from tests.support.mock_connection import MockConnection
 
-# ---------------------------------------------------------------------------
-# RelayContext validation
-# ---------------------------------------------------------------------------
-
 
 class TestRelayContextValidation:
     def test_valid_ips_accepted(self):
@@ -49,21 +45,11 @@ class TestRelayContextValidation:
             )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_ctx(**overrides: object) -> RelayContext:
     """Build a RelayContext with RFC 5737 test IPs."""
     defaults = dict(relay_ip="198.51.100.10", exit_ip="198.51.100.1")
     defaults.update(overrides)
     return RelayContext(**defaults)  # type: ignore[arg-type]
-
-
-# ---------------------------------------------------------------------------
-# InstallRealm
-# ---------------------------------------------------------------------------
 
 
 class TestInstallRealm:
