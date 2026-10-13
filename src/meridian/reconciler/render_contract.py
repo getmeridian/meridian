@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "node-compose": "remnawave-node-v2",
     "panel-compose": "remnawave-panel-v2",
     "realm": "hashed-systemd-v1",
-    "xray-workload": "routing-vision-v3",
+    "xray-workload": "reality-min-client-v4",
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)

@@ -101,7 +101,11 @@ def test_renders_exact_reviewed_protocols_and_paths() -> None:
         "privateKey": "private-a",
         "shortIds": ["0123456789abcdef"],
         "fingerprint": "chrome",
+        "minClientVer": "1.8.0",
     }
+    # Left unset, Xray 26.7.11+ requires client 26.3.27 and rejects Mihomo (1.8.2) and sing-box.
+    floor = reality["streamSettings"]["realitySettings"]["minClientVer"]
+    assert tuple(map(int, floor.split("."))) <= (1, 8, 2)
     assert config["inbounds"][1]["streamSettings"]["xhttpSettings"]["path"] == "/xhttp-a"
     assert config["inbounds"][2]["streamSettings"]["wsSettings"]["path"] == "/ws-a"
     hysteria_tls = config["inbounds"][3]["streamSettings"]["tlsSettings"]

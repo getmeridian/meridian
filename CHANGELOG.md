@@ -111,6 +111,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - A copy of `~/.meridian` that is out of date can't undo newer changes. The
   control server records the last change applied, and `apply` refuses to run
   from an older copy or while another machine is applying.
+- Mihomo-based apps (FlClash, Clash Verge, ClashMi) and sing-box routers
+  connect again. By default the Remnawave node's Xray rejects clients that
+  announce a version below 26.3.27, and those apps announce 1.8.x, so their
+  Reality connections failed with "authentication failed". Exits now accept any
+  client that speaks Reality.
 - Setup no longer opens an untagged `443/udp` firewall rule, and the next apply
   removes the one earlier v4 builds left. Removing or moving a node also deletes
   the `remnawave/node` image; Docker itself stays installed.

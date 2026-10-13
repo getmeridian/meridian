@@ -25,6 +25,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Never catch an uncertain driver mutation as an ordinary failure** — raise `UnknownResourceOutcome` so the executor observes before any retry.
 - **Unavailable observation evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Access users are partly operator-owned** — observe/apply only username and squads; status (client disable, panel limits/expiry), description, and quotas belong to the operator, so never re-enable or rewrite them (doing so undid `client disable` and failed every apply after a description edit).
+- **Always render Reality `minClientVer`** — Xray 26.7.11+ defaults it to 26.3.27 and silently rejects Mihomo/sing-box (they announce 1.8.x); Meridian's own Xray-based `test` never notices.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.

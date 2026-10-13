@@ -27,9 +27,9 @@ Which one to paste:
 
 A pasted link is a snapshot. Subscription URLs update on their own, but podkop's FAQ says it has no built-in subscription support, so when you add an exit or relay later, paste the new link.
 
-### Check the client's version first
+### Client versions
 
-Xray-core 26.7.11 and later reject Reality clients older than 26.3.27 unless the server lowers `minClientVer`. sing-box and Mihomo report an older version, so their connections can fail with a plain "REALITY authentication failed", and so can an old Xray core on the router. Meridian does not set `minClientVer` today. If podkop or another sing-box client never connects while `meridian test` passes from your laptop, this is the first thing to suspect. On Keenetic, check which Xray core XKeen installed and update it with `xkeen -ux` if it is older than that.
+Recent Xray servers turn away sing-box (podkop) and Mihomo clients by default, because those clients announce an older version number. Meridian's exits explicitly accept every client that speaks Reality, so this doesn't affect you. If a router still never connects while `meridian test` passes from your laptop, update its proxy core. On Keenetic, `xkeen -ux` updates XKeen's Xray.
 
 ## OpenWrt with podkop
 

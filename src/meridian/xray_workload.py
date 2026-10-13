@@ -16,6 +16,8 @@ from meridian.compiler.models import (
 from meridian.core.errors import MeridianError
 from meridian.provision.warp import WARP_PROXY_PORT
 
+REALITY_MIN_CLIENT_VERSION = "1.8.0"
+
 
 class WorkloadConfigError(MeridianError):
     """A reviewed workload cannot be rendered without rotating or guessing state."""
@@ -156,6 +158,9 @@ def _render_inbound(
                     "privateKey": keys.private_key,
                     "shortIds": [keys.short_id],
                     "fingerprint": "chrome",
+                    # Xray 26.7.11+ defaults this to 26.3.27, which rejects Mihomo and
+                    # sing-box clients (they announce 1.8.x); REALITY began in 1.8.0.
+                    "minClientVer": REALITY_MIN_CLIENT_VERSION,
                 },
             },
         }
