@@ -187,6 +187,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.
+- **Removing or moving an exit cleans up its certificate** — the acme.sh
+  renewal, the certificate files, and (with the server's last certificate)
+  the port-80 challenge listener go, instead of renewing forever.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).

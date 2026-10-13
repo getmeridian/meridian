@@ -286,7 +286,7 @@ class FirewallRuleDriver(retirement.FirewallRetirement):
                 )
 
 
-class CertificateDriver:
+class CertificateDriver(retirement.CertificateRetirement):
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -346,7 +346,7 @@ class CertificateDriver:
         )
         if installed.status == "failed":
             raise ResourceReconcileError(f"Could not install nginx: {installed.detail}")
-        challenge_path = "/etc/nginx/sites-available/meridian-v4-acme.conf"
+        challenge_path = retirement.ACME_CHALLENGE_PATH
         challenge = (
             "# Managed by Meridian v4 for ACME HTTP-01.\n"
             "server {\n"
@@ -367,7 +367,7 @@ class CertificateDriver:
         if not written.ok:
             _raise_if_timeout(action, written.result)
             raise ResourceReconcileError(f"Could not configure ACME challenge listener: {written.detail}")
-        enabled_path = "/etc/nginx/sites-enabled/meridian-v4-acme.conf"
+        enabled_path = challenge_path.replace("/sites-available/", "/sites-enabled/")
         linked = conn.run(
             f"rm -f /etc/nginx/sites-enabled/default && "
             f"ln -sfn {shlex.quote(challenge_path)} {shlex.quote(enabled_path)}",

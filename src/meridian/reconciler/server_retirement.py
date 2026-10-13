@@ -7,7 +7,13 @@ import shlex
 from typing import Any
 
 from meridian.cluster import ManagedResourceBinding
-from meridian.compiler.models import NodeRuntimePayload
+from meridian.compiler.models import (
+    IP_CERTIFICATE_DIRECTORY,
+    CertificatePayload,
+    ControlPlaneRuntimePayload,
+    NodeRuntimePayload,
+    certificate_directory,
+)
 from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.node_deploy import delete_node_api_rules
 from meridian.reconciler.resources import ResourceReconcileError
@@ -24,6 +30,8 @@ from meridian.ssh import ServerConnection
 
 _NODE_REPOSITORY = parse_image(REMNAWAVE_NODE_IMAGE).repository
 _FIREWALL_MARKER = re.compile(r"(?:fw|meridian-v4)-[0-9a-f]{16}")
+_CERTIFICATE = re.compile(r"/etc/ssl/meridian(?:/certs/[0-9a-f]{16})?/fullchain\.pem")
+ACME_CHALLENGE_PATH = "/etc/nginx/sites-available/meridian-v4-acme.conf"
 _NGINX_ARTIFACT = re.compile(
     r"/etc/nginx/(stream\.d|sites-available|meridian-v4-locations)/meridian-v4-[0-9a-f]{16}\.conf"
 )
@@ -83,6 +91,58 @@ class NginxArtifactRetirement:
         )
         if result.returncode != 0:
             raise ResourceReconcileError(f"nginx did not reload after removing {path}: {result.stdout.strip()[:200]}")
+
+
+class CertificateRetirement:
+    """Stop renewing a certificate no Host uses any more and delete its files.
+
+    acme.sh records where it installs each certificate, so the renewal entry is found
+    from the binding's ``fullchain.pem`` path, even for a hashed domain directory. The
+    panel shares the server's IP certificate, so nothing is touched while a control
+    plane runs there or another certificate in the plan has the same files. The ACME
+    challenge listener goes once no certificate is left on the server.
+    """
+
+    context: Any
+
+    def retire(self, binding: ManagedResourceBinding) -> None:
+        fullchain = binding.remote_id
+        if not _CERTIFICATE.fullmatch(fullchain):
+            raise ResourceReconcileError(f"Unexpected certificate path for {binding.logical_id}: {fullchain!r}")
+        conn = _connection(self.context, binding)
+        kept = [
+            resource.payload
+            for resource in self.context.plan.resources
+            if isinstance(resource.payload, CertificatePayload | ControlPlaneRuntimePayload)
+            and resource.payload.server_ref == binding.server_ref
+        ]
+        if any(isinstance(payload, ControlPlaneRuntimePayload) for payload in kept):
+            return
+        directory = fullchain.rsplit("/", 1)[0]
+        if any(
+            isinstance(payload, CertificatePayload) and certificate_directory(payload.hostname) == directory
+            for payload in kept
+        ):
+            return
+        record = shlex.quote(f"Le_RealFullChainPath='{fullchain}'")
+        files = f"{shlex.quote(fullchain)} {shlex.quote(directory + '/key.pem')}"
+        command = (
+            f"for conf in $(grep -l -F {record} /root/.acme.sh/*/*.conf 2>/dev/null);"
+            ' do rm -rf "$(dirname "$conf")" || exit 1; done;'
+            f" rm -f {files}"
+        )
+        if directory != IP_CERTIFICATE_DIRECTORY:
+            command += f" && rmdir --ignore-fail-on-non-empty {shlex.quote(directory)} 2>/dev/null; true"
+        if not kept:
+            enabled = ACME_CHALLENGE_PATH.replace("/sites-available/", "/sites-enabled/")
+            command = (
+                f"({command}) && rm -f {shlex.quote(ACME_CHALLENGE_PATH)} {shlex.quote(enabled)}"
+                " && { ! systemctl is-active --quiet nginx || { nginx -t 2>&1 && systemctl reload nginx; }; }"
+            )
+        result = conn.run(command, timeout=60)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()[:200]
+            raise ResourceReconcileError(f"Could not remove certificate {fullchain}: {detail}")
 
 
 class RealmHopRetirement:

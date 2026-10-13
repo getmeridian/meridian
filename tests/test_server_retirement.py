@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from types import SimpleNamespace
 
 import pytest
 
 from meridian.cluster import ManagedResourceBinding
-from meridian.compiler.models import NodeRuntimePayload
+from meridian.compiler.models import (
+    CertificatePayload,
+    ControlPlaneRuntimePayload,
+    NodeRuntimePayload,
+    certificate_directory,
+)
 from meridian.config import REMNAWAVE_NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
@@ -18,6 +24,7 @@ from meridian.reconciler.server_render import (
     realm_service_name,
 )
 from meridian.reconciler.server_retirement import (
+    CertificateRetirement,
     FirewallRetirement,
     NginxArtifactRetirement,
     NodeRuntimeRetirement,
@@ -234,3 +241,83 @@ def test_node_runtime_refuses_an_unexpected_directory() -> None:
             ManagedResourceBinding(logical_id="node:exit-b", remote_id="/", server_ref="srv-exit-b")
         )
     assert conn.calls == []
+
+
+def _certificate_driver(conn: MockConnection, *payloads: object) -> CertificateRetirement:
+    driver = CertificateRetirement()
+    resources = [SimpleNamespace(payload=payload) for payload in payloads]
+    driver.context = SimpleNamespace(connection=lambda server_ref: conn, plan=SimpleNamespace(resources=resources))
+    return driver
+
+
+_DOMAIN_CERT = f"{certificate_directory('vpn.example.com')}/fullchain.pem"
+
+
+def test_removed_exit_certificate_stops_renewing_and_drops_the_challenge_listener() -> None:
+    conn = MockConnection()
+
+    _certificate_driver(conn).retire(_binding(_DOMAIN_CERT, server_ref="srv-exit-b"))
+
+    (command,) = conn.calls
+    # The acme.sh entry is found by its recorded install path, so renewal stops.
+    record = shlex.quote(f"Le_RealFullChainPath='{_DOMAIN_CERT}'")
+    assert f"grep -l -F {record} /root/.acme.sh/*/*.conf" in command
+    assert 'rm -rf "$(dirname "$conf")"' in command
+    assert f"rm -f {_DOMAIN_CERT} {_DOMAIN_CERT.replace('fullchain', 'key')}" in command
+    challenge = "/etc/nginx/sites-available/meridian-v4-acme.conf /etc/nginx/sites-enabled/meridian-v4-acme.conf"
+    assert f"rm -f {challenge}" in command
+    assert "nginx -t" in command
+
+
+def test_certificate_on_a_server_that_keeps_another_keeps_the_challenge_listener() -> None:
+    conn = MockConnection()
+    other = CertificatePayload(server_ref="srv-exit-b", hostname="other.example.com")
+
+    _certificate_driver(conn, other).retire(_binding(_DOMAIN_CERT, server_ref="srv-exit-b"))
+
+    (command,) = conn.calls
+    assert "Le_RealFullChainPath" in command
+    assert "meridian-v4-acme.conf" not in command
+
+
+def test_the_panel_servers_shared_ip_certificate_is_never_removed() -> None:
+    conn = MockConnection()
+    panel = ControlPlaneRuntimePayload.model_construct(server_ref="srv-a")
+
+    _certificate_driver(conn, panel).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
+
+    assert conn.calls == []
+
+
+def test_a_certificate_still_planned_under_the_same_files_is_only_forgotten() -> None:
+    conn = MockConnection()
+    same = CertificatePayload(server_ref="srv-exit-b", hostname="vpn.example.com")
+
+    _certificate_driver(conn, same).retire(_binding(_DOMAIN_CERT, server_ref="srv-exit-b"))
+
+    assert conn.calls == []
+
+
+def test_certificate_retirement_refuses_unexpected_paths() -> None:
+    conn = MockConnection()
+
+    with pytest.raises(ResourceReconcileError, match="Unexpected certificate path"):
+        _certificate_driver(conn).retire(_binding("/etc/passwd"))
+    assert conn.calls == []
+
+
+def test_certificate_retirement_deletes_only_the_matching_acme_entry(tmp_path) -> None:
+    """Run the real command against a scratch acme.sh home."""
+    acme = tmp_path / "acme"
+    for name, path in (("vpn.example.com_ecc", _DOMAIN_CERT), ("other.example.com_ecc", "/elsewhere/fullchain.pem")):
+        (acme / name).mkdir(parents=True)
+        (acme / name / f"{name}.conf").write_text(f"Le_Domain='{name}'\nLe_RealFullChainPath='{path}'\n")
+    conn = MockConnection()
+    other = CertificatePayload(server_ref="srv-exit-b", hostname="other.example.com")
+    _certificate_driver(conn, other).retire(_binding(_DOMAIN_CERT, server_ref="srv-exit-b"))
+    # Only the acme.sh home moves; removing the absent certificate files is a no-op.
+    command = conn.calls[0].replace("/root/.acme.sh", str(acme))
+
+    subprocess.run(["bash", "-c", command], check=True)
+
+    assert sorted(path.name for path in acme.iterdir()) == ["other.example.com_ecc"]

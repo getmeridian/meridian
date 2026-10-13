@@ -51,8 +51,6 @@ FORGET_ONLY: Mapping[str, str] = {
     "route_rule": "lives inside its config Profile",
     # Probes are read-only checks with nothing to delete.
     "probe": "read-only check",
-    # Certificates stay on disk: they are harmless, and teardown removes them.
-    "certificate": "left on disk for teardown",
     # The baseline installs packages and hardens SSH/UFW. Undoing that could lock
     # the operator out or break unrelated services, so it is never reverted.
     "server_baseline": "packages and SSH/firewall hardening are never reverted",
