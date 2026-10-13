@@ -59,6 +59,9 @@ var T = {
     'sub.refresh': 'Приложение само обновляет подписку. Чтобы обновить её сейчас, откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
     router: 'Роутер',
     'router.desc': 'Подключите всю домашнюю сеть: инструкция по настройке',
+    selfcheck: 'Проверить подключение',
+    'selfcheck.desc': 'Три быстрые проверки с этого устройства и из этой сети: часы, передача данных и подписка. Сначала выключите VPN, чтобы проверка видела вашу настоящую сеть.',
+    'selfcheck.run': 'Запустить проверку',
     'show.qr': 'Показать QR-код',
     'share.page': 'Поделиться этой страницей',
     copied: 'Скопировано',
@@ -125,6 +128,9 @@ var T = {
     'sub.refresh': 'برنامه اشتراک را خودش به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
     router: 'روتر',
     'router.desc': 'کل شبکهٔ خانگی را متصل کنید: راهنمای راه‌اندازی',
+    selfcheck: 'بررسی اتصال من',
+    'selfcheck.desc': 'سه آزمون سریع از همین دستگاه و همین شبکه: ساعت، جریان داده و اشتراک. ابتدا VPN را خاموش کنید تا آزمون شبکهٔ واقعی شما را ببیند.',
+    'selfcheck.run': 'شروع بررسی',
     'show.qr': 'نمایش کد QR',
     'share.page': 'اشتراک\u200Cگذاری این صفحه',
     copied: '\u06A9\u067E\u06CC \u0634\u062F',
@@ -191,6 +197,9 @@ var T = {
     'sub.refresh': '应用会自动刷新订阅。如需立即刷新，请在应用中打开订阅（或配置）列表并点击"更新"。',
     router: '路由器',
     'router.desc': '让整个家庭网络都能连接：设置指南',
+    selfcheck: '检查我的连接',
+    'selfcheck.desc': '从此设备和网络进行三项快速检查：时钟、数据传输和订阅。请先关闭 VPN，让检查看到您真实的网络环境。',
+    'selfcheck.run': '开始检查',
     'show.qr': '显示二维码',
     'share.page': '分享此页面',
     copied: '已复制',
@@ -663,6 +672,14 @@ function renderPage(config) {
   html += '<p data-t="ping.link">Ask the server owner to run meridian test.</p>';
   html += '</div>';
 
+  /* Self-check (selfcheck.js) — runs from the visitor's own network */
+  html += '<div class="card selfcheck">';
+  html += '<h3 data-t="selfcheck">Check my connection</h3>';
+  html += '<p class="card-desc" data-t="selfcheck.desc">Runs three quick tests from this device and network: clock, data flow, and subscription. Turn your VPN off first so the test sees your real network.</p>';
+  html += '<button class="open-btn" data-action="selfcheck-run" data-t="selfcheck.run">Run check</button>';
+  html += '<div class="selfcheck-results" id="selfcheck-results" aria-live="polite"></div>';
+  html += '</div>';
+
   /* Stats (bottom — informational) */
   html += '<div class="stats" id="stats">';
   html += '<div class="stats-title" data-t="stats">Usage</div>';
@@ -687,6 +704,7 @@ function renderPage(config) {
   /* Post-render */
   var primaryUuid = extractUuid(config.protocols);
   if (primaryUuid) loadStats(primaryUuid);
+  loadSelfCheck();
   requestWakeLock();
   applyI18n(config.client_name, config.server_name);
   highlightActiveLang();
@@ -1048,6 +1066,15 @@ function extractUuid(protocols) {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('../pwa/sw.js', { scope: '../' }).catch(function() {});
+}
+
+/* Loaded from here, not the shell, so pages rendered before it existed get it too */
+function loadSelfCheck() {
+  if (document.getElementById('selfcheck-js')) return;
+  var s = document.createElement('script');
+  s.id = 'selfcheck-js';
+  s.src = '../pwa/selfcheck.js';
+  document.body.appendChild(s);
 }
 
 function requestPersistentStorage() {

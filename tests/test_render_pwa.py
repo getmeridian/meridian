@@ -526,5 +526,62 @@ class TestPWATemplateSource:
 
     def test_rendered_markup_has_no_inline_styles(self) -> None:
         """The page CSP has no style-src 'unsafe-inline'; style attributes are dropped."""
-        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        assert "style=" not in app_js
+        for name in ("app.js", "selfcheck.js"):
+            assert "style=" not in (PWA_DIR / name).read_text(), name
+
+
+# ---------------------------------------------------------------------------
+# TestSelfCheck — browser-side checks from the visitor's network
+# ---------------------------------------------------------------------------
+
+PWA_DIR = Path("src/meridian/templates/pwa")
+
+
+def _js_bytes(source: str, name: str) -> int:
+    match = re.search(rf"var {name} = (\d+)(?: \* (\d+))?;", source)
+    assert match, f"{name} not found"
+    return int(match.group(1)) * int(match.group(2) or 1)
+
+
+class TestSelfCheck:
+    def test_thresholds_mirror_cli_blocking_diagnostics(self) -> None:
+        from meridian.diagnostics import blocking
+
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        assert _js_bytes(source, "STALL_CLEARANCE_BYTES") == blocking.STALL_CLEARANCE_BYTES
+        assert _js_bytes(source, "THROTTLE_LOW_BYTES") == blocking._THROTTLE_WINDOW[0]
+        assert _js_bytes(source, "STALL_TIMEOUT_MS") == 5000
+        assert _js_bytes(source, "CLOCK_WARN_MS") == 60_000
+
+    def test_app_renders_the_section_and_loads_the_script(self) -> None:
+        app_js = (PWA_DIR / "app.js").read_text()
+        assert 'data-action="selfcheck-run"' in app_js
+        assert 'id="selfcheck-results"' in app_js
+        assert "s.src = '../pwa/selfcheck.js';" in app_js
+
+    def test_probe_and_subscription_bypass_the_service_worker(self) -> None:
+        sw = (PWA_DIR / "sw.js").read_text()
+        assert "path.indexOf('/sub/') !== -1" in sw
+        assert "path.endsWith('/probe.bin')" in sw
+        assert "event.request.method !== 'GET'" in sw
+        assert "'../pwa/selfcheck.js'" in sw
+
+    def test_requests_skip_the_http_cache(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        assert source.count("cache: 'no-store'") == 3
+        assert "PROBE_PATH + '?t=' + Date.now()" in source
+
+    def test_report_never_carries_links_or_identifiers(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        report = source.split("function buildReport(results) {", 1)[1].split("\n}\n", 1)[0]
+        for forbidden in ("url", "href", "location", "subscription", "_meridianConfig", "client_name"):
+            assert forbidden not in report.lower(), forbidden
+
+    def test_every_language_has_every_string(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        blocks = {
+            lang: source.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0] for lang in ("en", "ru", "fa", "zh")
+        }
+        keys = {lang: set(re.findall(r"'?([\w.]+)'?: '", block)) for lang, block in blocks.items()}
+        for lang in ("ru", "fa", "zh"):
+            assert keys[lang] == keys["en"], f"{lang}: {sorted(keys['en'] ^ keys[lang])}"

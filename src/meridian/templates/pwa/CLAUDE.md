@@ -14,15 +14,15 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 **App catalog** — `_PWA_APPS` entries carry `platforms` (where the app runs) and `recommended` (where the page features it); file order is the recommendation order (Happ, FlClashX, Clash Mi, Throne). The page reads the shared, icon-bearing `pwa/apps.json` and falls back to the icon-free `config.apps`, so catalog edits reach old pages with the next asset upload.
 
+**Self-check** — `selfcheck.js` (injected by `app.js`, so shells rendered before it existed still get it) runs from the visitor's own network: clock vs the server `Date` header (warn above 60 s), a stream of the generated 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text with no links, hostnames, or UUIDs.
+
 **i18n** — English is the HTML default, NOT a translation dict. Non-EN languages swap via `data-t` attributes. Switching back to EN requires full `renderPage()` re-render.
 
-**Subscription QR hero layout** — the subscription QR (Remnawave's URL, imports ALL protocols at once) comes right after the header, with the recommended apps' "Add to" buttons below it. Everything else is secondary: apps list (collapsed for returning visitors), quick setup, individual protocol cards, stats. End users scan and go; power users expand.
+**Subscription QR hero layout** — the subscription QR (Remnawave's URL, imports ALL protocols at once) comes right after the header, with the recommended apps' "Add to" buttons below it. Everything else is secondary: apps list (collapsed for returning visitors), quick setup, individual protocol cards, self-check, stats. End users scan and go; power users expand.
 
 ## What's done well
 
-- **`config.json` decoupling** — credentials change without HTML redeploy.
-- **SW scope trick** — registered with `{scope: '../'}` to control sibling client dirs. Requires nginx `Service-Worker-Allowed: "/"` header.
-- **Graceful offline** — SW caches shell (cache-first), fetches config fresh (network-first with 503 fallback).
+- **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
 - **Color palettes** — six curated presets (ocean, sunset, forest, lavender, rose, slate) with auto dark/light variants. Selected via `config.color`, switches on system theme change.
 - **Clock skew detection** — warns if device clock is >2min behind server. Critical for Reality/XHTTP which need tight time sync. Skipped if page was cached >1h to avoid false positives.
 - **Relay routing** — per-relay protocol cards marked with a star, direct connections labeled as backup. Relay names are HTML-escaped.
@@ -35,5 +35,6 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **`_PWA_APPS` must match `apps.json`** — every field and the order must be identical; regenerate `apps.json` from `_PWA_APPS`. CI validates.
 - **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment` (its `name=` query is ignored), Throne's `addsub` takes standard Base64 only, and v2rayN documents no import scheme (no button).
 - **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes in rendered markup are silently dropped; use classes (CSSOM `el.style` still works).
+- **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW and use `cache: "no-store"`; a browser may reuse the page's warm connection, so a freeze is conclusive but a pass is weaker evidence.
 - **Stats path** — `/stats/{uuid}.json` (sibling, not child of client dir).
 - **Wake lock, install banner, skeleton** — wake lock keeps the screen on for QR scanning and fails gracefully; the `beforeinstallprompt` banner auto-dismisses; the skeleton says "Taking longer than expected" after 10 s.

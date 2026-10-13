@@ -2,8 +2,8 @@
 
 Centralizes the creation and upload of per-client PWA files
 (index.html, config.json, manifest.webmanifest) and
-shared assets (app.js, styles.css, sw.js, icon.svg, plus the generated
-apps.json catalog).
+shared assets (app.js, selfcheck.js, styles.css, sw.js, icon.svg, plus the
+generated apps.json catalog and probe.bin self-check payload).
 
 Called from:
 - ``DeployPWAAssets`` provisioner step (shared static assets)
@@ -30,9 +30,22 @@ if TYPE_CHECKING:
     from meridian.ssh import ServerConnection
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
-_STATIC_FILES = ("app.js", "styles.css", "sw.js", "icon.svg")
+_STATIC_FILES = ("app.js", "selfcheck.js", "styles.css", "sw.js", "icon.svg")
 # Assets whose bytes feed the service worker's cache version.
-_VERSIONED_ASSETS = ("app.js", "styles.css", "apps.json")
+_VERSIONED_ASSETS = ("app.js", "selfcheck.js", "styles.css", "apps.json")
+# Placeholder in sw.js (cache name) and selfcheck.js (reported page version).
+_VERSION_PLACEHOLDER = b"'pwa-v1'"
+
+# The self-check streams this file and watches for a throttling freeze, so it
+# must clear diagnostics.blocking.STALL_CLEARANCE_BYTES with room to spare and
+# stay incompressible (nginx does not gzip octet-stream anyway).
+PROBE_FILE = "probe.bin"
+PROBE_BYTES = 96 * 1024
+
+
+def probe_payload() -> bytes:
+    """Deterministic pseudo-random bytes, so re-uploads are byte-identical."""
+    return hashlib.shake_256(b"meridian-selfcheck").digest(PROBE_BYTES)
 
 
 def _page_marker(user_uuid: str) -> str:
@@ -122,7 +135,7 @@ def upload_client_files(
 
 
 def load_pwa_static_assets() -> dict[str, bytes]:
-    """Load shared PWA assets: package files plus the generated app catalog.
+    """Load shared PWA assets: package files plus the generated catalog and probe.
 
     Returns a dict mapping filename to file content bytes.
     """
@@ -134,18 +147,19 @@ def load_pwa_static_assets() -> dict[str, bytes]:
         resource = pwa_dir / name
         assets[name] = resource.read_bytes()
     assets["apps.json"] = render_apps_catalog().encode("utf-8")
+    assets[PROBE_FILE] = probe_payload()
     return assets
 
 
 def upload_pwa_assets(conn: ServerConnection) -> str:
     """Upload shared PWA static assets to ``/var/www/private/pwa/``.
 
-    Deploys app.js, styles.css, sw.js, icon.svg, and apps.json. These
-    are identical for all clients and shared across connection pages.
+    Deploys every asset from ``load_pwa_static_assets()``. These are
+    identical for all clients and shared across connection pages.
 
-    The service worker's ``CACHE_VERSION`` is replaced with a
-    content-derived hash so browsers automatically invalidate
-    stale caches when assets change.
+    The service worker's ``CACHE_VERSION`` and the self-check's reported
+    page version are replaced with a content-derived hash, so browsers
+    invalidate stale caches and reports name the exact deployed page.
 
     Returns empty string on success, error detail on failure.
     """
@@ -158,9 +172,9 @@ def upload_pwa_assets(conn: ServerConnection) -> str:
             h.update(assets[name])
     cache_version = f"pwa-{h.hexdigest()[:8]}"
 
-    # Inject dynamic cache version into sw.js
-    if "sw.js" in assets:
-        assets["sw.js"] = assets["sw.js"].replace(b"'pwa-v1'", f"'{cache_version}'".encode())
+    for name in ("sw.js", "selfcheck.js"):
+        if name in assets:
+            assets[name] = assets[name].replace(_VERSION_PLACEHOLDER, f"'{cache_version}'".encode())
 
     result = conn.run("mkdir -p /var/www/private/pwa && chown www-data:www-data /var/www/private/pwa", timeout=30)
     if result.returncode != 0:

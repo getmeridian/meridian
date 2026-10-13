@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
+import zlib
 
 import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
+from meridian.diagnostics.blocking import STALL_CLEARANCE_BYTES
 from meridian.models import ProtocolURL, RelayURLSet
 from meridian.pwa import (
+    PROBE_FILE,
     connection_page_deployed,
     generate_client_files,
     load_pwa_static_assets,
@@ -107,6 +111,20 @@ class TestLoadPWAStaticAssets:
         catalog = json.loads(load_pwa_static_assets()["apps.json"])
         assert catalog["apps"][0]["name"] == "Happ"
         assert all(app["icon"].startswith("data:image/webp;base64,") for app in catalog["apps"])
+
+    def test_probe_asset_is_large_and_incompressible(self) -> None:
+        """The self-check needs a >=64 KB asset that clears the throttling freeze point."""
+        probe = load_pwa_static_assets()[PROBE_FILE]
+        assert len(probe) >= 64 * 1024
+        assert len(probe) > 2 * STALL_CLEARANCE_BYTES
+        assert len(zlib.compress(probe)) > 0.99 * len(probe)
+
+    def test_probe_asset_is_deterministic(self) -> None:
+        assert load_pwa_static_assets()[PROBE_FILE] == load_pwa_static_assets()[PROBE_FILE]
+
+    def test_app_js_stays_a_valid_cli_stall_target(self) -> None:
+        """`meridian test --probe` streams pwa/app.js uncompressed and needs it past the freeze point."""
+        assert len(load_pwa_static_assets()["app.js"]) > STALL_CLEARANCE_BYTES
 
     def test_assets_are_bytes(self) -> None:
         assets = load_pwa_static_assets()
@@ -237,8 +255,17 @@ class TestUploadPWAAssets:
         conn = MockConnection()
         upload_pwa_assets(conn)
         written_paths = {path for path, _data, _kwargs in conn.writes}
-        for fname in ("app.js", "styles.css", "sw.js", "icon.svg", "apps.json"):
+        for fname in ("app.js", "selfcheck.js", "styles.css", "sw.js", "icon.svg", "apps.json", "probe.bin"):
             assert f"/var/www/private/pwa/{fname}" in written_paths
+
+    def test_selfcheck_reports_the_deployed_page_version(self) -> None:
+        conn = MockConnection()
+        upload_pwa_assets(conn)
+        sw = conn.write_map["/var/www/private/pwa/sw.js"].decode()
+        selfcheck = conn.write_map["/var/www/private/pwa/selfcheck.js"].decode()
+        version = re.search(r"CACHE_VERSION = '(pwa-[0-9a-f]{8})'", sw)
+        assert version is not None
+        assert f"var PAGE_VERSION = '{version.group(1)}';" in selfcheck
 
     def test_cache_version_follows_the_app_catalog(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A catalog-only change must still roll the service-worker cache."""

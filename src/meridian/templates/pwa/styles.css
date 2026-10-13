@@ -408,6 +408,33 @@ summary::marker{display:none;content:none}
 .app-router strong,.app-note strong{color:var(--tx);font-weight:600;font-size:.78rem}
 
 /* ===================================================================
+ * SELF-CHECK
+ * =================================================================== */
+.selfcheck{margin-top:14px}
+.selfcheck h3{font-size:.86rem;font-weight:600;margin-bottom:4px}
+.selfcheck .open-btn{width:100%;background:var(--accent);color:#fff}
+.selfcheck .open-btn:disabled{opacity:.6;cursor:progress}
+.selfcheck-results:not(:empty){margin-top:12px}
+.selfcheck-row{
+  display:flex;gap:10px;align-items:flex-start;padding:8px 0;
+  border-bottom:1px solid var(--br);font-size:.76rem;line-height:1.45;
+}
+.selfcheck-row div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.selfcheck-row strong{font-weight:600;color:var(--tx)}
+.selfcheck-row span{color:var(--tx2)}
+.selfcheck-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--tx3)}
+.selfcheck-row.is-ok .selfcheck-dot{background:var(--green)}
+.selfcheck-row.is-warn .selfcheck-dot{background:var(--amber)}
+.selfcheck-row.is-bad .selfcheck-dot{background:var(--red)}
+.selfcheck-copy{margin-top:12px}
+.selfcheck-report{
+  margin-top:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--br);
+  border-radius:var(--r);font-family:'JetBrains Mono','SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.6rem;color:var(--tx2);white-space:pre-wrap;word-break:break-word;
+  direction:ltr;text-align:left;
+}
+
+/* ===================================================================
  * LAYOUT HELPERS — the CSP forbids inline style attributes
  * =================================================================== */
 .gap-top{margin-top:8px}
