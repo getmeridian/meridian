@@ -377,9 +377,11 @@ class DeployRemnawavePanel:
         image = effective_image(REMNAWAVE_BACKEND_IMAGE, compose_text)
         sub_page_image = effective_image(REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE, compose_text)
         data_images = {
+            # A PostgreSQL major needs a dump and restore; never move one in place.
             "postgres_image": resolve_data_image(
                 REMNAWAVE_POSTGRES_IMAGE,
                 find_image(compose_text, parse_image(REMNAWAVE_POSTGRES_IMAGE).repository),
+                cross_major=False,
             ),
             "valkey_image": resolve_data_image(
                 REMNAWAVE_VALKEY_IMAGE,

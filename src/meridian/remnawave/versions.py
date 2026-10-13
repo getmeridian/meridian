@@ -9,7 +9,7 @@ digest) the operator chose.
 from __future__ import annotations
 
 import re
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from meridian.config import REMNAWAVE_MIN_VERSION, REMNAWAVE_TESTED_MAJOR
 
@@ -98,13 +98,15 @@ def resolve_image(pinned: str, existing: str | None) -> str:
 _DATA_TAG_RE = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-.*)?$")
 
 
-def resolve_data_image(pinned: str, existing: str | None) -> str:
+def resolve_data_image(pinned: str, existing: str | None, *, cross_major: bool = True) -> str:
     """Choose a data-store image (PostgreSQL, Valkey) without moving data backwards.
 
     Their tags look like ``17.11-alpine`` rather than X.Y.Z, and an older major
     cannot open a newer major's data directory. Keep the existing reference
     when it already names the pinned content, carries a newer numeric tag, or
     has a non-numeric tag Meridian cannot order (``latest``); otherwise pin.
+    With ``cross_major=False`` (PostgreSQL, whose data directory needs a dump
+    and restore between majors) an older major is kept too.
     """
     if not existing:
         return pinned
@@ -120,7 +122,46 @@ def resolve_data_image(pinned: str, existing: str | None) -> str:
         return existing
     current_version = tuple(int(part or 0) for part in current_match.groups())
     pinned_version = tuple(int(part or 0) for part in pin_match.groups())
-    return existing if current_version > pinned_version else pinned
+    if current_version > pinned_version:
+        return existing
+    if not cross_major and current_version[0] != pinned_version[0]:
+        return existing
+    return pinned
+
+
+ImageStatus = Literal["current", "upgrade", "absent", "kept_newer", "kept_unmanaged", "held_major"]
+
+
+def image_status(pinned: str, running: str | None, *, data: bool = False, cross_major: bool = True) -> ImageStatus:
+    """Classify a running image against its pin with the same policy setup applies.
+
+    ``upgrade`` and ``absent`` are what an apply would change; ``kept_*`` are
+    operator choices the policy leaves alone; ``held_major`` is a PostgreSQL
+    major the pin moved past, which needs a manual dump and restore.
+    """
+    if not running:
+        return "absent"
+    if data:
+        chosen = resolve_data_image(pinned, running, cross_major=cross_major)
+        if chosen == running and resolve_data_image(pinned, running) != running:
+            return "held_major"
+    else:
+        chosen = resolve_image(pinned, running)
+    if chosen != running:
+        return "upgrade"
+    current, pin = parse_image(running), parse_image(pinned)
+    if running == pinned or current.same_content(pin):
+        return "current"
+    if data:
+        match = _DATA_TAG_RE.match(current.tag)
+        return "kept_newer" if match is not None else "kept_unmanaged"
+    return "kept_newer" if parse_version(current.tag) is not None else "kept_unmanaged"
+
+
+def data_major(image: str) -> int | None:
+    """The leading numeric tag component of a data-store image (``17`` for ``postgres:17.11-alpine``)."""
+    match = _DATA_TAG_RE.match(parse_image(image).tag)
+    return int(match.group(1)) if match is not None else None
 
 
 def effective_image(pinned: str, compose: str | None) -> str:

@@ -8,9 +8,11 @@ from meridian.remnawave import RemnawaveError
 from meridian.remnawave.versions import (
     ImageRef,
     check_panel_version,
+    data_major,
     effective_image,
     find_image,
     image_below_floor,
+    image_status,
     parse_image,
     parse_version,
     resolve_data_image,
@@ -185,3 +187,45 @@ _PG_PIN_SPELLED_OUT = "docker.io/library/" + _PG_PIN
 )
 def test_resolve_data_image_never_moves_a_database_to_an_older_version(existing: str | None, expected: str) -> None:
     assert resolve_data_image(_PG_PIN, existing) == expected
+
+
+@pytest.mark.parametrize(
+    ("existing", "expected"),
+    [
+        ("postgres:16.9-alpine", "postgres:16.9-alpine"),
+        ("postgres:17.10-alpine", _PG_PIN),
+        ("postgres:18-alpine", "postgres:18-alpine"),
+    ],
+)
+def test_postgres_never_moves_to_a_newer_major_in_place(existing: str, expected: str) -> None:
+    assert resolve_data_image(_PG_PIN, existing, cross_major=False) == expected
+    # Valkey reads older data, so its major still moves.
+    assert resolve_data_image(_PG_PIN, "postgres:16.9-alpine") == _PG_PIN
+
+
+@pytest.mark.parametrize(
+    ("running", "data", "expected"),
+    [
+        (None, False, "absent"),
+        (_DIGEST_PIN, False, "current"),
+        (f"docker.io/remnawave/node@{_DIGEST}", False, "current"),
+        ("remnawave/node:3.4.1", False, "upgrade"),
+        ("remnawave/node:3.4.2", False, "upgrade"),
+        ("remnawave/node:3.5.0", False, "kept_newer"),
+        ("remnawave/node:latest", False, "kept_unmanaged"),
+        ("ghcr.io/remnawave/node:3.4.2", False, "upgrade"),
+        (_PG_PIN, True, "current"),
+        ("postgres:17.10-alpine", True, "upgrade"),
+        ("postgres:18-alpine", True, "kept_newer"),
+        ("postgres:latest", True, "kept_unmanaged"),
+        ("postgres:16.9-alpine", True, "held_major"),
+    ],
+)
+def test_image_status_follows_the_setup_policy(running: str | None, data: bool, expected: str) -> None:
+    pinned = _PG_PIN if data else _DIGEST_PIN
+    assert image_status(pinned, running, data=data, cross_major=not data) == expected
+
+
+def test_data_major_reads_the_leading_tag_number() -> None:
+    assert data_major(_PG_PIN) == 17
+    assert data_major("postgres:latest") is None
