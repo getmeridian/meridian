@@ -10,7 +10,6 @@ CoreEventType = Literal[
     "command.failed",
     "command.cancel_requested",
     "command.cancelled",
-    "plan.computed",
     "plan.action.started",
     "plan.action.completed",
     "plan.action.failed",
@@ -18,9 +17,6 @@ CoreEventType = Literal[
     "provision.step.started",
     "provision.step.completed",
     "provision.step.failed",
-    "ssh.command.completed",
-    "state.loaded",
-    "state.saved",
     "warning",
     "error",
 ]
@@ -31,7 +27,6 @@ COMMAND_FAILED: Final[CoreEventType] = "command.failed"
 COMMAND_CANCEL_REQUESTED: Final[CoreEventType] = "command.cancel_requested"
 COMMAND_CANCELLED: Final[CoreEventType] = "command.cancelled"
 
-PLAN_COMPUTED: Final[CoreEventType] = "plan.computed"
 PLAN_ACTION_STARTED: Final[CoreEventType] = "plan.action.started"
 PLAN_ACTION_COMPLETED: Final[CoreEventType] = "plan.action.completed"
 PLAN_ACTION_FAILED: Final[CoreEventType] = "plan.action.failed"
@@ -41,9 +36,6 @@ PROVISION_STEP_STARTED: Final[CoreEventType] = "provision.step.started"
 PROVISION_STEP_COMPLETED: Final[CoreEventType] = "provision.step.completed"
 PROVISION_STEP_FAILED: Final[CoreEventType] = "provision.step.failed"
 
-SSH_COMMAND_COMPLETED: Final[CoreEventType] = "ssh.command.completed"
-STATE_LOADED: Final[CoreEventType] = "state.loaded"
-STATE_SAVED: Final[CoreEventType] = "state.saved"
 WARNING: Final[CoreEventType] = "warning"
 ERROR: Final[CoreEventType] = "error"
 
@@ -53,7 +45,6 @@ EVENT_TYPES: Final[tuple[CoreEventType, ...]] = (
     COMMAND_FAILED,
     COMMAND_CANCEL_REQUESTED,
     COMMAND_CANCELLED,
-    PLAN_COMPUTED,
     PLAN_ACTION_STARTED,
     PLAN_ACTION_COMPLETED,
     PLAN_ACTION_FAILED,
@@ -61,9 +52,6 @@ EVENT_TYPES: Final[tuple[CoreEventType, ...]] = (
     PROVISION_STEP_STARTED,
     PROVISION_STEP_COMPLETED,
     PROVISION_STEP_FAILED,
-    SSH_COMMAND_COMPLETED,
-    STATE_LOADED,
-    STATE_SAVED,
     WARNING,
     ERROR,
 )

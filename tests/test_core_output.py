@@ -198,7 +198,7 @@ def test_jsonl_events_are_monotonic_and_redacted() -> None:
         message="Install Docker",
     )
     second = events.event(
-        "ssh.command.completed",
+        "command.failed",
         phase="ssh",
         data={"command": "curl -H 'Authorization: Bearer eyJaaaaaaaa.eyJbbbbbbbb.eyJcccccccc'"},
     )

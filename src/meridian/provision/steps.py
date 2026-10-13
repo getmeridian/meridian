@@ -10,6 +10,7 @@ from typing import Protocol as TypingProtocol
 
 from meridian.config import DEFAULT_SNI, REMNAWAVE_BACKEND_IMAGE, REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
 from meridian.core.cancellation import CancellationToken, raise_if_cancelled
+from meridian.core.events import PROVISION_STEP_COMPLETED, PROVISION_STEP_FAILED, PROVISION_STEP_STARTED
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.provision.progress import NoopStepRenderer, StepRenderer
 
@@ -143,7 +144,7 @@ class Provisioner:
             _report_step_event(
                 reporter,
                 operation,
-                "provision.step.started",
+                PROVISION_STEP_STARTED,
                 step.name,
                 index=i + 1,
                 total=total,
@@ -161,7 +162,7 @@ class Provisioner:
                 _report_step_event(
                     reporter,
                     operation,
-                    "provision.step.failed",
+                    PROVISION_STEP_FAILED,
                     result.name,
                     level="error",
                     index=i + 1,
@@ -174,7 +175,7 @@ class Provisioner:
                 _report_step_event(
                     reporter,
                     operation,
-                    "provision.step.completed",
+                    PROVISION_STEP_COMPLETED,
                     result.name,
                     index=i + 1,
                     total=total,
@@ -185,7 +186,7 @@ class Provisioner:
                 _report_step_event(
                     reporter,
                     operation,
-                    "provision.step.completed",
+                    PROVISION_STEP_COMPLETED,
                     result.name,
                     index=i + 1,
                     total=total,

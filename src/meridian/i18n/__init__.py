@@ -42,10 +42,6 @@ def words(key: str) -> set[str]:
     return {form.strip().lower() for value in forms for form in value.split("|") if form.strip()}
 
 
-def current_locale() -> Locale:
-    return _current
-
-
 def set_locale(locale: Locale) -> None:
     global _current
     _current = locale

@@ -9,7 +9,6 @@ export const eventTypeCatalog = {
     "command.failed",
     "command.cancel_requested",
     "command.cancelled",
-    "plan.computed",
     "plan.action.started",
     "plan.action.completed",
     "plan.action.failed",
@@ -17,9 +16,6 @@ export const eventTypeCatalog = {
     "provision.step.started",
     "provision.step.completed",
     "provision.step.failed",
-    "ssh.command.completed",
-    "state.loaded",
-    "state.saved",
     "warning",
     "error"
   ]
