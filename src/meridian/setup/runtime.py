@@ -21,6 +21,7 @@ from meridian.compiler.models import (
     AccessUserPayload,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
+    NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
     canonical_hash,
@@ -736,15 +737,24 @@ def _bootstrap_profile_values(
         "wss": 20443,
     }
     reality_sni = DEFAULT_SNI
+    # Only the exit running on the control server shares its nginx; another exit's
+    # ports would be wrong here, and adding one that sorts first re-ran the bootstrap.
+    control_ref = _control_payload(plan).server_ref
+    local_workloads = {
+        resource.payload.workload_ref
+        for resource in plan.resources
+        if isinstance(resource.payload, NodeRuntimePayload) and resource.payload.server_ref == control_ref
+    }
     for resource in plan.resources:
         payload = resource.payload
-        if not isinstance(payload, ConfigProfilePayload):
+        if not isinstance(payload, ConfigProfilePayload) or payload.workload_kind != "exit":
+            continue
+        if payload.workload_id not in local_workloads:
             continue
         for inbound in payload.inbounds:
             if inbound.protocol in ports:
                 ports[inbound.protocol] = inbound.listen_port
             if inbound.protocol == "reality":
                 reality_sni = inbound.reality_sni
-        if payload.workload_kind == "exit":
-            break
+        break
     return ports, reality_sni

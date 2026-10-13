@@ -19,6 +19,7 @@
 - Existing `plan` and `apply` commands select the same V4 compiler/runtime whenever cluster state contains topology intent.
 
 ## Pitfalls
+- **Control bootstrap values come from the exit on the control server** — taking the first exit in plan order re-ran the bootstrap whenever an exit that sorts earlier was added, and fed another server's ports to the control nginx.
 - Never add credential-shaped fields to `SetupDraft`.
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.

@@ -707,3 +707,26 @@ def test_stale_copy_is_refused_before_its_intent_edit_is_saved(tmp_path, monkeyp
 
     assert saved == []
     assert cluster.topology_intent is None
+
+
+def test_adding_an_exit_that_sorts_first_never_reruns_the_control_bootstrap(tmp_path) -> None:
+    from meridian.setup.runtime import _control_runtime_attestation
+
+    registry = ServerRegistry(tmp_path / "servers.json")
+    _add_servers(registry, relay=True)
+    runtime = SetupRuntime(registry, cluster_loader=ClusterConfig)
+    local_exit = _intent().exits[0].model_copy(update={"server_ref": "srv-control"})
+    base = _intent().model_copy(update={"exits": [local_exit]})
+    remote_exit = ExitIntent(
+        id="aaa-remote",
+        server_ref="srv-relay",
+        paths=[ProtocolPathIntent(id="aaa-reality", protocol="reality", reality_sni="www.example.com")],
+    )
+    grown = base.model_copy(update={"exits": [local_exit, remote_exit]})
+
+    def attestation(intent: SetupIntent) -> str:
+        plan = runtime.review(SetupDraft.from_intent(intent)).plan
+        control = next(item for item in plan.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
+        return _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan)
+
+    assert attestation(grown) == attestation(base)
