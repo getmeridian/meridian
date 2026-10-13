@@ -381,10 +381,12 @@ def _check_cert_expiry(
 
 
 def _redact_secrets(text: str) -> str:
-    """Apply the central free-form redactor plus diagnostics-only UUID masking."""
+    """Apply the central free-form redactor plus diagnostics-only key and UUID masking."""
     text = redact_string(text).replace(REDACTED, "[REDACTED]")
+    # Bare `key=` is too generic for redact_string's public JSON surfaces, but
+    # log lines quoting Xray or Reality keys need it here.
     text = re.sub(
-        r"(?P<key>\b(?:password|passwd|key|secret)\b)(?P<sep>\s*[:=]\s*)[^\s,;]+",
+        r"(?P<key>\bkey\b)(?P<sep>\s*[:=]\s*)[^\s,;]+",
         lambda match: f"{match.group('key')}{match.group('sep')}[REDACTED]",
         text,
         flags=re.IGNORECASE,
