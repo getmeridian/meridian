@@ -101,7 +101,7 @@ When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100
 - **Privacy**: never reference real people's names, server IPs, or domains in commits, code, or docs unless asked
 - **Self-hosted everything**: zero external requests (fonts, JS, CSS). Target regions block CDNs
 - **Commit per change**: each logical change gets its own commit; include `Refs: getmeridian/meridian#NN` footer when resolving an issue
-- **Translations**: use Haiku model agents (`model: "haiku"`) for fast i18n
+- **Translations**: use Sonnet model agents (`model: "sonnet"`) for i18n and ru/fa/zh docs
 - **ctx7 CLI**: check library docs before writing code that depends on external packages
 
 ## Module discipline
