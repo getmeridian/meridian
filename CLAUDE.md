@@ -117,7 +117,7 @@ Rules enforced by `tests/test_architecture.py` — violations fail CI.
 ```bash
 make install     # uv sync --extra dev --reinstall-package meridian-vpn
 uv run meridian  # always use uv run (not system-wide meridian)
-make ci          # lint + format + test + templates + dead-code report
+make ci          # what CI runs: lint, format, tests, mypy, templates, validators, contracts, dead-code report
 make dead-code   # dead / test-only code and unused params (warnings only)
 make system-lab  # multi-node Docker lab (~10-15 min)
 make real-lab    # optional real-VM on Hetzner (local-only, ~€0.01)

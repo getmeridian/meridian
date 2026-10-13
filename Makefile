@@ -1,4 +1,4 @@
-.PHONY: help install sync test lint format check typecheck ci system-lab-preflight system-lab system-lab-fast \
+.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab system-lab-fast \
        templates dead-code ai-docs build publish clean hooks
 
 ## —— Setup ——————————————————————————————————————————————
@@ -37,13 +37,18 @@ check: lint format-check test ## Run all Python checks (lint + format + test)
 templates: ## Validate Jinja2 template rendering
 	uv run python tests/render_templates.py
 
+validate: ## Check CLI docs, app list sync, and generated contracts
+	uv run python tests/validate_cli_docs.py
+	uv run python tests/validate_apps_sync.py
+	uv run python scripts/export_contracts.py --check
+
 dead-code: ## Report dead / test-only code and unused params (warnings, never fails)
 	@echo "  —— Dead-code report (warnings only) ——"
 	-@uv run python scripts/find_dead_code.py
 
 ## —— CI (runs everything) ———————————————————————————————
 
-ci: check templates dead-code ## Run full CI locally
+ci: check typecheck templates validate dead-code ## Run full CI locally
 
 system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
 	bash tests/systemlab/scripts/preflight.sh
