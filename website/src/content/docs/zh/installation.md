@@ -55,7 +55,7 @@ Meridian 4.0 **不是就地升级**。它用 Remnawave 替换 3x-ui 面板，来
   2. 为您的用户提供他们的新连接页面（为每个人运行 `meridian client add NAME`）
   3. 一旦每个人都切换了，用 `meridian teardown OLD_IP` 卸载旧服务器 — 4.0 的卸载也会移除 3x-ui
 
-Meridian 4.0 不读取或改变 `~/.meridian/` 中的 3.x 状态；找到它的集群命令改为解释这些选项。
+Meridian 4.0 把自己的状态保存在 `~/.config/meridian/`，从不读取或改变 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为解释这些选项。
 
 ## 需求
 

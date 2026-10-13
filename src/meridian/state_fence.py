@@ -18,6 +18,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from datetime import UTC, datetime
 
+from meridian.config import HOME_DISPLAY
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -202,7 +203,7 @@ class SSHApplyFence:
         if result.returncode == _CONFLICT_RC:
             raise FleetFenceError(
                 "Another machine changed this fleet's apply fence at the same moment.",
-                hint="Copy ~/.meridian from the machine that applied last, then retry.",
+                hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
                 category="user",
             )
         if result.returncode != 0:

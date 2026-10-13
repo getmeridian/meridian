@@ -13,7 +13,7 @@
   "stage.apply": "设置中",
   "stage.verify": "验证中",
   "stage.handoff": "就绪",
-  "details.servers": "Meridian 将每台服务器保存为可重用的 SSH 连接（地址、用户、端口）在 ~/.meridian 中。它使用你的 SSH 密钥，从不存储密码。'local' 表示运行 Meridian 的机器。",
+  "details.servers": "Meridian 将每台服务器保存为可重用的 SSH 连接（地址、用户、端口）在这台电脑上。它使用你的 SSH 密钥，从不存储密码。'local' 表示运行 Meridian 的机器。",
   "details.roles": "控制服务器运行 Remnawave 面板，管理用户列表并提供订阅链接。出口是用户流量到达互联网的地方。中继 (Relay) 将连接转发到出口而不解密。路由网关 (Xray) 根据目标选择出口，可以在多个出口之间转移。",
   "details.paths": "Reality 始终启用，无需域名。XHTTP、WSS 和 Hysteria2 需要 DNS 指向出口的域名。Hysteria2 使用 UDP，所以无法通过中继。应用会依次尝试这些方法，并自动切换。",
   "details.routing": "路由网关将每个连接发送到一个出口或多个出口的池。规则从上到下检查，首个匹配生效。池会检查出口的健康状况，如果都无响应就停止，而不是泄露流量。",

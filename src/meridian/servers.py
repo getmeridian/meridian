@@ -1,4 +1,4 @@
-"""Server registry — manages the ~/.meridian/servers.json index file."""
+"""Server registry — manages the servers.json index in Meridian's home directory."""
 
 from __future__ import annotations
 

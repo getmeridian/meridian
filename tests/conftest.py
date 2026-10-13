@@ -44,6 +44,14 @@ def servers_file(tmp_home: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_legacy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never let a developer's real 3.x ~/.meridian decide what a test sees."""
+    import meridian.config as cfg
+
+    monkeypatch.setattr(cfg, "LEGACY_HOME", tmp_path / "legacy-home")
+
+
+@pytest.fixture(autouse=True)
 def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exit-country lookups never leave the test process; tests that need one inject a transport."""
     import httpx

@@ -11,7 +11,7 @@ from rich.markup import escape
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
 from meridian.commands._validation import validate_command_input
-from meridian.config import SERVER_PROFILES_FILE
+from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
@@ -76,7 +76,7 @@ def register_server(registry: ServerRegistry, resolved: ResolvedServer, *, name:
     except OSError as exc:
         fail(
             f"Could not save server profile: {exc}",
-            hint="Check ~/.meridian permissions and disk space, then retry.",
+            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     if entry is None:
@@ -129,7 +129,7 @@ def run_remove(query: str, *, yes: bool = False) -> None:
     except OSError as exc:
         fail(
             f"Could not update saved servers: {exc}",
-            hint="Check ~/.meridian permissions and disk space, then retry.",
+            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
 

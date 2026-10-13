@@ -39,3 +39,29 @@ def test_fresh_install_still_says_deploy_first(tmp_home: Path) -> None:
 
     assert "No fleet yet" in click.unstyle(result.output)
     assert "meridian deploy" in click.unstyle(result.output)
+
+
+def test_v4_home_defaults_to_xdg_and_adopts_an_existing_beta_fleet(tmp_path, monkeypatch) -> None:
+    """Beta testers keep their fleet when they move from the meridian4 alias to `meridian`."""
+    import meridian.config as cfg
+
+    monkeypatch.setattr(cfg.Path, "home", classmethod(lambda _cls: tmp_path))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setattr(cfg, "LEGACY_HOME", tmp_path / ".meridian")
+    assert cfg.default_home() == tmp_path / ".config" / "meridian"
+
+    (tmp_path / ".meridian").mkdir()
+    (tmp_path / ".meridian" / "servers").write_text("")  # 3.x state never becomes a 4.x home
+    assert cfg.default_home() == tmp_path / ".config" / "meridian"
+
+    beta = tmp_path / ".meridian-v4"
+    beta.mkdir()
+    (beta / "servers.json").write_text("{}")
+    assert cfg.default_home() == beta
+
+    (tmp_path / ".config" / "meridian").mkdir(parents=True)
+    assert cfg.default_home() == tmp_path / ".config" / "meridian"
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    (tmp_path / "xdg" / "meridian").mkdir(parents=True)
+    assert cfg.default_home() == tmp_path / "xdg" / "meridian"

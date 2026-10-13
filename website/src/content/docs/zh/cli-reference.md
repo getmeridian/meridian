@@ -56,11 +56,11 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | 启动前放弃保存的设置进度 |
 | `--yes`, `-y` | | 批准审核并应用无需询问 |
 
-第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问）、用户、平实语言摘要和应用。在任何提示处你可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
+第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.config/meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问）、用户、平实语言摘要和应用。在任何提示处你可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.config/meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
 
 ### meridian plan
 
-显示 `meridian apply` 会变更什么，比较 `~/.meridian/cluster.yml` 中的拓扑与实时服务器和面板。没有变更任何东西。
+显示 `meridian apply` 会变更什么，比较 `~/.config/meridian/cluster.yml` 中的拓扑与实时服务器和面板。没有变更任何东西。
 
 ```
 meridian plan [--json]
@@ -93,7 +93,7 @@ meridian apply [--yes] [--json]
 | `--yes`, `-y` | | 跳过确认 |
 | `--json` | | 将最终应用结果作为 `meridian.output/v1` 信封发出 |
 
-JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.meridian` 权限，然后再次运行 `plan` 和 `apply`。
+JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.config/meridian` 权限，然后再次运行 `plan` 和 `apply`。
 
 删除用户或协议路径被应用：删除的资源在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。删除出口、中继或路由网关目前被拒绝。
 
@@ -128,7 +128,7 @@ meridian client remove NAME [--yes] [--json]
 
 ### meridian server
 
-管理保存的 SSH 服务器（`~/.meridian/servers.json`）。
+管理保存的 SSH 服务器（`~/.config/meridian/servers.json`）。
 
 ```
 meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]

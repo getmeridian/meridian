@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from meridian.cluster import ClusterConfig, WorkloadBinding
+from meridian.config import HOME_DISPLAY
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
     FleetTopology,
@@ -51,7 +52,7 @@ def topology_from_cluster(
         if servers is None:
             raise LocalStateError(
                 "Saved server profiles are required to read the topology.",
-                hint="Restore ~/.meridian/servers.json, then retry.",
+                hint=f"Restore {HOME_DISPLAY}/servers.json, then retry.",
             )
         server_map = _v4_server_map(cluster, servers)
         nodes = _v4_nodes(cluster, server_map)

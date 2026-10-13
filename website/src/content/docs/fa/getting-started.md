@@ -78,11 +78,11 @@ meridian client add alice
 
 | What | Where |
 |------|-------|
-| Topology، دسترسی پنل و کلیدها | `~/.meridian/cluster.yml` روی ماشین شما |
-| سرورهای SSH ذخیره شده | `~/.meridian/servers.json` روی ماشین شما |
+| Topology، دسترسی پنل و کلیدها | `~/.config/meridian/cluster.yml` روی ماشین شما |
+| سرورهای SSH ذخیره شده | `~/.config/meridian/servers.json` روی ماشین شما |
 | سرویس‌های Proxy | Docker، Xray، nginx روی VPS |
 
-دستورات کلاینت با Remnawave panel API صحبت می‌کنند که در `cluster.yml` ضبط شده است؛ SSH نیاز ندارند. `~/.meridian/` را backup کنید — نحوه مدیریت سرورهای Meridian است.
+دستورات کلاینت با Remnawave panel API صحبت می‌کنند که در `cluster.yml` ضبط شده است؛ SSH نیاز ندارند. `~/.config/meridian/` را backup کنید — نحوه مدیریت سرورهای Meridian است.
 
 ## بیش از یک سرور
 

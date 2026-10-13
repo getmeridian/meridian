@@ -74,9 +74,9 @@ flowchart LR
 
 ## 状态模型
 
-- **拓扑** — `~/.meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
+- **拓扑** — `~/.config/meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
 - **客户端** — 账户、密钥、状态和流量位于控制平面服务器上的 Remnawave 数据库中。
-- **保存的服务器** — `~/.meridian/servers.json` 保存 SSH 连接详情。
+- **保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接详情。
 
 ## 计划和应用
 
@@ -135,9 +135,11 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 - `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）；下一个 `meridian apply` 重命名在较旧的 `meridian-realm-*` 名字下部署的跳跃
 
 ### 在您的机器上
-- `~/.meridian/cluster.yml` — 拓扑、面板访问、密钥
-- `~/.meridian/cluster.yml.bak` — 破坏性操作前的备份
-- `~/.meridian/servers.json` — 保存的 SSH 服务器
-- `~/.meridian/setup.json` — `meridian setup` 进度（无秘密）
-- `~/.meridian/ssh/meridian_ed25519` — 托管 SSH 密钥，生成时
-- `~/.meridian/cache/` — 更新检查缓存
+- `~/.config/meridian/cluster.yml` — 拓扑、面板访问、密钥
+- `~/.config/meridian/cluster.yml.bak` — 破坏性操作前的备份
+- `~/.config/meridian/servers.json` — 保存的 SSH 服务器
+- `~/.config/meridian/setup.json` — `meridian setup` 进度（无秘密）
+- `~/.config/meridian/ssh/meridian_ed25519` — 托管 SSH 密钥，生成时
+- `~/.config/meridian/cache/` — 更新检查缓存
+
+该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。已存放在 `~/.meridian-v4/` 或 `~/.meridian/` 中的 4.0 集群（通过 `servers.json` 识别）会继续从原处使用，直到 `~/.config/meridian/` 出现；`~/.meridian/` 中的 3.x 状态不会被触碰。

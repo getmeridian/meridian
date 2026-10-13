@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from meridian.cluster import ClusterConfig
+from meridian.config import HOME_DISPLAY
 from meridian.core.deploy import DeployPlan, DeployRequest
 from meridian.core.deploy_validation import (
     DeployValidationError,
@@ -86,7 +87,7 @@ def dry_run_deploy_request(
     if cluster.is_configured and cluster.topology_intent is None:
         raise EngineError(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint="Move ~/.meridian/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             category="user",
         )
     entry = registry.find(target.server_ip)

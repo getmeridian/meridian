@@ -78,11 +78,11 @@ meridian client add alice
 
 | 什么 | 位置 |
 |------|------|
-| 拓扑、面板访问和密钥 | 你机器上的 `~/.meridian/cluster.yml` |
-| 保存的 SSH 服务器 | 你机器上的 `~/.meridian/servers.json` |
+| 拓扑、面板访问和密钥 | 你机器上的 `~/.config/meridian/cluster.yml` |
+| 保存的 SSH 服务器 | 你机器上的 `~/.config/meridian/servers.json` |
 | 代理服务 | VPS 上的 Docker、Xray 和 nginx |
 
-客户端命令直接与 `cluster.yml` 中记录的 Remnawave 面板 API 通讯；它们不需要 SSH。备份 `~/.meridian/` — 这是 Meridian 管理你的服务器的方式。
+客户端命令直接与 `cluster.yml` 中记录的 Remnawave 面板 API 通讯；它们不需要 SSH。备份 `~/.config/meridian/` — 这是 Meridian 管理你的服务器的方式。
 
 ## 多个服务器
 

@@ -115,7 +115,7 @@ meridian deploy
 meridian deploy 198.51.100.10
 ```
 
-Meridian 会把凭据保存在 WSL 内的 `~/.meridian/`。后续命令也从同一个 WSL 发行版运行，这样它才能找到缓存的服务器凭据：
+Meridian 会把凭据保存在 WSL 内的 `~/.config/meridian/`。后续命令也从同一个 WSL 发行版运行，这样它才能找到缓存的服务器凭据：
 
 ```bash
 meridian client add alice
@@ -195,7 +195,7 @@ cd ~
 mkdir -p projects
 ```
 
-避免把 `~/.ssh` 或 `~/.meridian` 放在 `/mnt/c/` 下。Windows 挂载路径可能有不同的权限，SSH 会拒绝它们。
+避免把 `~/.ssh` 或 `~/.config/meridian` 放在 `/mnt/c/` 下。Windows 挂载路径可能有不同的权限，SSH 会拒绝它们。
 
 ## 后续步骤
 

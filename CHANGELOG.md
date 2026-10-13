@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 ## [4.0.0] - Unreleased
 
 Meridian 4 is a new foundation: the Remnawave panel replaces 3x-ui, and one
-reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
+reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet.
 
 ### Read first: this is not an in-place upgrade
 - Meridian 4 cannot manage servers deployed by 3.x, and existing client links
@@ -18,6 +18,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - 3.x and 4.0 cannot share a server, since both need port 443. 4.0 refuses to
   deploy onto a server that still runs 3.x (or 2.x) instead of taking it over.
 - Requires Python 3.11+.
+- **Both versions fit on one computer** — 4.0 keeps its state in
+  `~/.config/meridian` (or `$XDG_CONFIG_HOME/meridian`) and leaves 3.x state in
+  `~/.meridian` alone. A fleet set up with a 4.0 beta in `~/.meridian-v4` or
+  `~/.meridian` is found there, so the release manages it without moving files.
 
 ### Working in the Remnawave panel
 - **`meridian panel`** — prints the admin panel URL and login (`--show-password`

@@ -78,11 +78,11 @@ meridian client add alice
 
 | Что | Где |
 |------|-------|
-| Топология, доступ к панели и ключи | `~/.meridian/cluster.yml` на вашей машине |
-| Сохранённые SSH серверы | `~/.meridian/servers.json` на вашей машине |
+| Топология, доступ к панели и ключи | `~/.config/meridian/cluster.yml` на вашей машине |
+| Сохранённые SSH серверы | `~/.config/meridian/servers.json` на вашей машине |
 | Сервисы прокси | Docker, Xray, nginx на VPS |
 
-Команды client говорят с API панели Remnawave записанным в `cluster.yml`; они не требуют SSH. Сделайте резервную копию `~/.meridian/` — это то, как Meridian управляет вашими серверами.
+Команды client говорят с API панели Remnawave записанным в `cluster.yml`; они не требуют SSH. Сделайте резервную копию `~/.config/meridian/` — это то, как Meridian управляет вашими серверами.
 
 ## Более одного сервера
 

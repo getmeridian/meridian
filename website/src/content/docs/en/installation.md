@@ -55,7 +55,7 @@ Your 3.x servers keep working. You have two choices:
   2. Give your users their new connection pages (`meridian client add NAME` for each person)
   3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — 4.0's teardown also removes 3x-ui
 
-Meridian 4.0 does not read or change 3.x state in `~/.meridian/`; fleet commands that find it explain these options instead.
+Meridian 4.0 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
 
 ## Requirements
 

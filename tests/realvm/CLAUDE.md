@@ -11,7 +11,7 @@ Costs real money (~€0.01 per full single-topology run).
 - **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP; planned domain/interactive tiers stay out of manifests until implemented.
 - **Per-cloud SDK, no Terraform/Pulumi** — see `src/meridian/infra/CLAUDE.md` for rationale.
 - **Labs are for journeys, `up` is for claims** — `lab.py` keeps named VMs up with a per-lab key, pinned host keys, ssh wrappers, and `env.sh`; `journey.sh`, `drive_wizard.py`, and `pwa_shots.py` run against it. Only `orchestrator up` verifies topology manifests.
-- **MERIDIAN_HOME isolation per fleet** — orchestrator sets `MERIDIAN_HOME=<fleet-id>/` before invoking `meridian deploy`, so the harness's cluster.yml doesn't clobber the developer's real `~/.meridian/`.
+- **MERIDIAN_HOME isolation per fleet** — orchestrator sets `MERIDIAN_HOME=<fleet-id>/` before invoking `meridian deploy`, so the harness's cluster.yml doesn't clobber the developer's real `~/.config/meridian/`.
 
 ## What's done well
 

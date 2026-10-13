@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from typing import NoReturn
 
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
+from meridian.config import HOME_DISPLAY
 from meridian.console import fail
 from meridian.core.errors import LocalStateError
 from meridian.remnawave import MeridianPanel
@@ -26,10 +27,13 @@ _REVIEWED_APPLY_RECOVERY = (
 
 
 def has_meridian_v3_state() -> bool:
-    """Return True when ~/.meridian still holds Meridian 3.x local state."""
+    """Return True when 3.x left local state in its home (or in an explicit MERIDIAN_HOME)."""
     from meridian import config
 
-    return (config.MERIDIAN_HOME / "credentials").is_dir() or (config.MERIDIAN_HOME / "servers").is_file()
+    return any(
+        (home / "credentials").is_dir() or (home / "servers").is_file()
+        for home in {config.LEGACY_HOME, config.MERIDIAN_HOME}
+    )
 
 
 def fail_meridian_v3_state() -> NoReturn:
@@ -37,11 +41,10 @@ def fail_meridian_v3_state() -> NoReturn:
     fail(
         "Found Meridian 3.x servers, which Meridian 4 cannot manage",
         hint=(
-            "Your 3.x servers keep working. To keep managing them, reinstall 3.x: "
-            "uv tool install 'meridian-vpn<4' (or pipx install 'meridian-vpn<4'). "
-            "Moving to 4.0 needs a fresh deploy, and every client gets a new link: "
-            "https://github.com/getmeridian/meridian/releases. "
-            "To try Meridian 4 next to 3.x, give it its own home: MERIDIAN_HOME=~/.meridian-v4 meridian ..."
+            "Your 3.x servers keep working, and their settings stay in ~/.meridian. "
+            "Manage them with 3.x: uvx --from 'meridian-vpn<4' meridian ... "
+            "Moving to 4 needs a fresh deploy (`meridian deploy IP` or `meridian setup`), "
+            "and every client gets a new link: https://github.com/getmeridian/meridian/releases"
         ),
         hint_type="user",
     )
@@ -57,7 +60,7 @@ def load_topology_cluster() -> ClusterConfig:
     if cluster.is_configured:
         fail(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint="Move ~/.meridian/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             hint_type="user",
         )
     fail(

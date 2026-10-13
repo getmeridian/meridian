@@ -71,20 +71,20 @@ Moving an existing relay to a different exit isn't available yet; deploy a new r
 
 ## Managing from more than one machine
 
-Everything Meridian knows about a fleet lives in `~/.meridian/` on the machine you deploy from. To manage the fleet from a second machine, copy that whole directory over, and copy it again after each change you make elsewhere.
+Everything Meridian knows about a fleet lives in `~/.config/meridian/` on the machine you deploy from. To manage the fleet from a second machine, copy that whole directory over, and copy it again after each change you make elsewhere.
 
 You can't accidentally undo another machine's work. The control server keeps a small record of the last change applied (`/var/lib/meridian/fence.json`). Before changing anything, Meridian compares your copy with that record, and `meridian plan` warns ahead of time if an apply would be refused:
 
-- **"Another machine changed this fleet"**: your copy is out of date. Copy `~/.meridian/` from the machine that applied last, then run the command again.
+- **"Another machine changed this fleet"**: your copy is out of date. Copy `~/.config/meridian/` from the machine that applied last, then run the command again.
 - **"Another apply is running"**: someone is changing the fleet right now. Wait for them to finish. If that run crashed, its claim expires within 30 minutes; a crashed run on your own machine doesn't block you at all.
-- **"This control server belongs to a different copy of the fleet"**: this `~/.meridian/` was never copied from the machine that manages the fleet.
+- **"This control server belongs to a different copy of the fleet"**: this `~/.config/meridian/` was never copied from the machine that manages the fleet.
 
 ## Prepare before a block
 
 1. **Add a relay** on a domestic server: `meridian relay add RELAY_IP --exit EXIT_IP`
 2. **Use a domain** for CDN fallback: deploy with `--domain vpn.example.com`
 3. **Both** — clients then have three ways in: relay (domestic), CDN (Cloudflare), and direct
-4. **Back up `~/.meridian/`** — it is what lets you manage the fleet from another machine
+4. **Back up `~/.config/meridian/`** — it is what lets you manage the fleet from another machine
 
 ## Keep the old server
 

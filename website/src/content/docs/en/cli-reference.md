@@ -56,11 +56,11 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | Discard saved setup progress before starting |
 | `--yes`, `-y` | | Approve the review and apply without asking |
 
-The first question is the language (English, Русский, فارسی, 中文), preselected from your terminal and remembered in `~/.meridian/preferences.json`; `--lang` or `MERIDIAN_LANG` skips it. Then the wizard walks through servers (an IP, `user@IP:port`, or `local` for this machine), what each server does, connection methods, routing (only asked when you have a routing gateway), users, a plain-language summary, and apply. At any prompt you can type `back`, `details`, `save`, or `quit` (or the same words in your language). Running `meridian` with no command in a terminal, before any VPN exists, offers to start the wizard. Progress is saved in `~/.meridian/setup.json` after each stage, so running `meridian setup` again resumes; passwords and private keys are never stored there. `--intent` does not replace an existing draft unless `--restart` is also given. When apply succeeds, setup verifies every node and subscription and prints each user's connection page.
+The first question is the language (English, Русский, فارسی, 中文), preselected from your terminal and remembered in `~/.config/meridian/preferences.json`; `--lang` or `MERIDIAN_LANG` skips it. Then the wizard walks through servers (an IP, `user@IP:port`, or `local` for this machine), what each server does, connection methods, routing (only asked when you have a routing gateway), users, a plain-language summary, and apply. At any prompt you can type `back`, `details`, `save`, or `quit` (or the same words in your language). Running `meridian` with no command in a terminal, before any VPN exists, offers to start the wizard. Progress is saved in `~/.config/meridian/setup.json` after each stage, so running `meridian setup` again resumes; passwords and private keys are never stored there. `--intent` does not replace an existing draft unless `--restart` is also given. When apply succeeds, setup verifies every node and subscription and prints each user's connection page.
 
 ### meridian plan
 
-Show what `meridian apply` would change, comparing the topology in `~/.meridian/cluster.yml` with the live servers and panel. Nothing is changed.
+Show what `meridian apply` would change, comparing the topology in `~/.config/meridian/cluster.yml` with the live servers and panel. Nothing is changed.
 
 ```
 meridian plan [--json]
@@ -93,7 +93,7 @@ meridian apply [--yes] [--json]
 | `--yes`, `-y` | | Skip confirmation |
 | `--json` | | Emit the final apply result as a `meridian.output/v1` envelope |
 
-JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.meridian` permissions, then run `plan` and `apply` again.
+JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.config/meridian` permissions, then run `plan` and `apply` again.
 
 Removing users or protocol paths is applied: the removed resources are deleted after everything still in the plan has converged, and `plan` lists them first. Removing an exit, relay, or routing gateway is refused for now.
 
@@ -128,7 +128,7 @@ meridian client remove NAME [--yes] [--json]
 
 ### meridian server
 
-Manage saved SSH servers (`~/.meridian/servers.json`).
+Manage saved SSH servers (`~/.config/meridian/servers.json`).
 
 ```
 meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]

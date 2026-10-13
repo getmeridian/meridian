@@ -246,7 +246,11 @@ def test_check_explains_a_refusal_without_writing() -> None:
     host = FenceHost()
     host.files[FENCE_FILE] = json.dumps({"fleet_id": _FLEET, "generation": 5, "plan_hash": "b" * 64})
     warning = _fence(host).check(_local(generation=4, plan_hash="a" * 64))
-    assert "Another machine changed this fleet" in warning and "Copy ~/.meridian" in warning
+    assert (
+        "Another machine changed this fleet" in warning
+        and "Copy " in warning
+        and "from the machine that applied last" in warning
+    )
     assert _fence(host).check(_local(generation=5, plan_hash="b" * 64)) == ""
     assert host.swaps == 0 and list(host.files) == [FENCE_FILE]
 
@@ -256,7 +260,7 @@ def test_ensure_raises_the_same_refusal_acquire_would() -> None:
     host.files[FENCE_FILE] = json.dumps({"fleet_id": _FLEET, "generation": 5, "plan_hash": "b" * 64})
     with pytest.raises(FleetFenceError, match="Another machine changed this fleet") as exc_info:
         _fence(host).ensure(_local(generation=4, plan_hash="a" * 64))
-    assert "Copy ~/.meridian" in exc_info.value.hint
+    assert "from the machine that applied last" in exc_info.value.hint
     assert host.swaps == 0
 
 

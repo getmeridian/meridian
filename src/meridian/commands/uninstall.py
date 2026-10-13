@@ -11,7 +11,7 @@ from meridian.commands.resolve import (
     resolve_server,
 )
 from meridian.compiler.deployment import deployment_server_refs
-from meridian.config import SERVER_PROFILES_FILE
+from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError
 from meridian.remnawave import RemnawaveError, RemnawaveNotFoundError
@@ -31,7 +31,7 @@ def _remove_saved_server_or_fail(registry: ServerRegistry, server_ip: str) -> No
     except OSError as exc:
         fail(
             "Remote teardown completed, but the saved server profile was retained",
-            hint=f"{exc} Check ~/.meridian permissions, then run `meridian server remove {server_ip}`.",
+            hint=f"{exc} Check {HOME_DISPLAY} permissions, then run `meridian server remove {server_ip}`.",
             hint_type="system",
         )
 

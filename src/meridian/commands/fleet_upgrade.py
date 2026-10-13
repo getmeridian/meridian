@@ -10,6 +10,7 @@ from rich.markup import escape
 
 from meridian.commands._helpers import load_topology_cluster, persist_reviewed_apply, reviewed_apply_persistence
 from meridian.commands.apply_progress import apply_progress
+from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.diagnostics.images import (
@@ -113,7 +114,7 @@ def _save_pins(cluster: ClusterConfig, overrides: dict[str, str]) -> None:
     try:
         cluster.save()
     except OSError as exc:
-        fail(f"Could not save the image pins: {exc}", hint="Check ~/.meridian permissions.", hint_type="system")
+        fail(f"Could not save the image pins: {exc}", hint=f"Check {HOME_DISPLAY} permissions.", hint_type="system")
 
 
 def _observe(registry: ServerRegistry, intent: SetupIntent, pins: dict[str, str] | None = None) -> list[ServerImages]:

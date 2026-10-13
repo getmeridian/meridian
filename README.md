@@ -96,7 +96,7 @@ meridian node add 198.51.100.11 --name germany          # another exit
 meridian relay add 203.0.113.10 --exit 198.51.100.10 # domestic entry point
 ```
 
-Every change goes through one reviewed topology stored in `~/.meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies it with checkpoints, so an interrupted run resumes where it stopped.
+Every change goes through one reviewed topology stored in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies it with checkpoints, so an interrupted run resumes where it stopped.
 
 ## How it works
 

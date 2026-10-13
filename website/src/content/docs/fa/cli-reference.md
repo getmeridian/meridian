@@ -56,11 +56,11 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | پیشرفت setup ذخیره‌شده را قبل از شروع دور کنید |
 | `--yes`, `-y` | | بررسی و اعمال را بدون پرسش تأیید کنید |
 
-اولین سؤال زبان است (English, Русский, فارسی, 中文)، از ترمینال شما پیش‌انتخاب‌شده و در `~/.meridian/preferences.json` به‌خاطر سپرده می‌شود؛ `--lang` یا `MERIDIAN_LANG` آن را رد می‌کنند. سپس wizard از طریق سروری (یک IP، `user@IP:port` یا `local` برای این ماشین)، آنچه که هر سرور انجام می‌دهد، روش‌های اتصال، مسیریابی (تنها زمانی پرسیده می‌شود که routing gateway داشته باشید)، users، خلاصهٔ ساده‌زبان و اعمال راه‌اندازی می‌شود. در هر prompt می‌توانید `back`، `details`، `save` یا `quit` تایپ کنید (یا همان کلمات به زبان شما). اجرای `meridian` بدون فرمان در یک ترمینال، قبل از آن‌که VPN موجود باشد، برای شروع wizard پیشنهاد می‌دهد. پیشرفت بعد از هر مرحله در `~/.meridian/setup.json` ذخیره می‌شود، بنابراین `meridian setup` دوباره اجرا resume می‌شود؛ رمزهای عبور و کلیدهای خصوصی هرگز در آنجا ذخیره نمی‌شوند. `--intent` draft موجود را جایگزین نمی‌کند مگر `--restart` همچنین داده شود. هنگامی‌که اعمال موفق باشد، setup هر گره و اشتراک را تأیید کرده و صفحه اتصال هر کاربر را چاپ می‌کند.
+اولین سؤال زبان است (English, Русский, فارسی, 中文)، از ترمینال شما پیش‌انتخاب‌شده و در `~/.config/meridian/preferences.json` به‌خاطر سپرده می‌شود؛ `--lang` یا `MERIDIAN_LANG` آن را رد می‌کنند. سپس wizard از طریق سروری (یک IP، `user@IP:port` یا `local` برای این ماشین)، آنچه که هر سرور انجام می‌دهد، روش‌های اتصال، مسیریابی (تنها زمانی پرسیده می‌شود که routing gateway داشته باشید)، users، خلاصهٔ ساده‌زبان و اعمال راه‌اندازی می‌شود. در هر prompt می‌توانید `back`، `details`، `save` یا `quit` تایپ کنید (یا همان کلمات به زبان شما). اجرای `meridian` بدون فرمان در یک ترمینال، قبل از آن‌که VPN موجود باشد، برای شروع wizard پیشنهاد می‌دهد. پیشرفت بعد از هر مرحله در `~/.config/meridian/setup.json` ذخیره می‌شود، بنابراین `meridian setup` دوباره اجرا resume می‌شود؛ رمزهای عبور و کلیدهای خصوصی هرگز در آنجا ذخیره نمی‌شوند. `--intent` draft موجود را جایگزین نمی‌کند مگر `--restart` همچنین داده شود. هنگامی‌که اعمال موفق باشد، setup هر گره و اشتراک را تأیید کرده و صفحه اتصال هر کاربر را چاپ می‌کند.
 
 ### meridian plan
 
-نشان دهید `meridian apply` چه تغییر می‌دهد، توپولوژی در `~/.meridian/cluster.yml` را با سروری زندگی و پنل مقایسه کنید. هیچ چیزی تغییر نمی‌یابد.
+نشان دهید `meridian apply` چه تغییر می‌دهد، توپولوژی در `~/.config/meridian/cluster.yml` را با سروری زندگی و پنل مقایسه کنید. هیچ چیزی تغییر نمی‌یابد.
 
 ```
 meridian plan [--json]
@@ -93,7 +93,7 @@ meridian apply [--yes] [--json]
 | `--yes`, `-y` | | تأیید را رد کنید |
 | `--json` | | نتیجه نهایی اعمال را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
-JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "converged" | "applied" | "failed" | "unknown" | "skipped"` است. JSON mode هرگز پرسش نمی‌کند: بدون `--yes` `MERIDIAN_CONFIRMATION_REQUIRED` را با hash برنامه بازگردانده و exit `2` می‌شود. منابع شکسته exit `3`؛ علت را رفع کنید و اعمال را دوباره اجرا کنید. اگر وضعیت محلی نتوانست بعد از تغییرات راه دور ذخیره شود، اعمال exit `3` و می‌گوید؛ `~/.meridian` permissions را تعمیر کنید، سپس `plan` و `apply` را دوباره اجرا کنید.
+JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "converged" | "applied" | "failed" | "unknown" | "skipped"` است. JSON mode هرگز پرسش نمی‌کند: بدون `--yes` `MERIDIAN_CONFIRMATION_REQUIRED` را با hash برنامه بازگردانده و exit `2` می‌شود. منابع شکسته exit `3`؛ علت را رفع کنید و اعمال را دوباره اجرا کنید. اگر وضعیت محلی نتوانست بعد از تغییرات راه دور ذخیره شود، اعمال exit `3` و می‌گوید؛ `~/.config/meridian` permissions را تعمیر کنید، سپس `plan` و `apply` را دوباره اجرا کنید.
 
 حذف کاربران یا مسیرهای پروتکل اعمال می‌شود: منابع حذف‌شده بعد از اینکه همه چیزی که در برنامه باقی است همگرا شود حذف می‌شود، و `plan` آن‌ها را اول فهرست می‌کند. حذف exit، relay یا routing gateway برای اکنون رد می‌شود.
 
@@ -128,7 +128,7 @@ meridian client remove NAME [--yes] [--json]
 
 ### meridian server
 
-سروری SSH ذخیره‌شده مدیریت کنید (`~/.meridian/servers.json`).
+سروری SSH ذخیره‌شده مدیریت کنید (`~/.config/meridian/servers.json`).
 
 ```
 meridian server add [USER@]IP[:PORT]|local [--name NAME] [--user USER] [--ssh-port PORT]

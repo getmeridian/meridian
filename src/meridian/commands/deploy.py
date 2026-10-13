@@ -28,7 +28,7 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import SERVER_PROFILES_FILE, is_ip
+from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE, is_ip
 from meridian.console import (
     err_console,
     error_context,
@@ -226,7 +226,9 @@ def _execute(
     entry = registry.find(resolved.ip)
     if entry is None or not entry.id:
         fail(
-            "Could not save the server profile", hint="Check ~/.meridian/servers.json permissions.", hint_type="system"
+            "Could not save the server profile",
+            hint=f"Check {HOME_DISPLAY}/servers.json permissions.",
+            hint_type="system",
         )
     # Without --sni, a fresh deploy tries sites next to the server first, then known-good
     # camouflage targets, keeping the first that carries traffic; redeploys keep the saved
@@ -483,7 +485,7 @@ def _refuse_pre_topology_cluster(cluster: ClusterConfig) -> None:
     if cluster.is_configured and cluster.topology_intent is None:
         fail(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint="Move ~/.meridian/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             hint_type="user",
         )
 

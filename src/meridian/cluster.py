@@ -203,7 +203,7 @@ class ActionCheckpoint:
 class ClusterConfig:
     """Fleet-wide configuration — the sole local state for Meridian 4.0.
 
-    Stored at ~/.meridian/cluster.yml. One file replaces per-server proxy.yml.
+    Stored as cluster.yml in Meridian's home directory. One file replaces per-server proxy.yml.
     Client/user state lives in Remnawave's database, not here.
     """
 

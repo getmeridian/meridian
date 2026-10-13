@@ -21,6 +21,7 @@ from meridian.commands._helpers import (
 )
 from meridian.commands._validation import validate_command_input
 from meridian.commands.apply_progress import apply_progress
+from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.errors import LocalStateError
@@ -117,7 +118,7 @@ def run_deploy(
     except OSError as exc:
         fail(
             f"Could not save the V4 relay server profile: {exc}",
-            hint="Check ~/.meridian permissions and disk space, then retry.",
+            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     try:

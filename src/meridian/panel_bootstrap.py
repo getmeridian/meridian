@@ -18,6 +18,7 @@ from meridian.cluster import (
 )
 from meridian.config import (
     DEFAULT_SNI,
+    HOME_DISPLAY,
 )
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import PanelSetupError, ProvisioningError
@@ -243,8 +244,8 @@ def ensure_control_plane_access(
                 raise PanelSetupError(
                     f"{resolved.ip} already runs a Remnawave panel with an administrator Meridian doesn't know",
                     hint=(
-                        "It is probably left from an earlier deploy whose ~/.meridian was lost or moved. "
-                        "To keep its users, restore that ~/.meridian/cluster.yml and run the command again. "
+                        f"It is probably left from an earlier deploy whose {HOME_DISPLAY} was lost or moved. "
+                        f"To keep its users, restore that {HOME_DISPLAY}/cluster.yml and run the command again. "
                         f"To start over, wipe it with `meridian teardown {resolved.ip}` "
                         "(this deletes the panel and every user on it), then deploy again."
                     ),

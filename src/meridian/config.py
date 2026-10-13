@@ -5,7 +5,39 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-MERIDIAN_HOME = Path(os.environ.get("MERIDIAN_HOME", Path.home() / ".meridian"))
+# Meridian 3.x keeps its state here; 4.x never writes to it.
+LEGACY_HOME = Path.home() / ".meridian"
+# Only Meridian 4 writes servers.json (3.x used `servers`), so it marks a 4.x home.
+_V4_MARKER = "servers.json"
+
+
+def default_home() -> Path:
+    """Where Meridian 4 keeps local state when MERIDIAN_HOME is not set.
+
+    The XDG config directory keeps 4.x clear of 3.x's ~/.meridian. A 4.x fleet already
+    kept in ~/.meridian-v4 (the first beta guide) or ~/.meridian (4.0 development builds)
+    stays where it is, so nobody loses access to a fleet or has to move folders.
+    """
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    preferred = (Path(xdg) if os.path.isabs(xdg) else Path.home() / ".config") / "meridian"
+    if preferred.exists():
+        return preferred
+    for earlier in (Path.home() / ".meridian-v4", LEGACY_HOME):
+        if (earlier / _V4_MARKER).is_file():
+            return earlier
+    return preferred
+
+
+def display_path(path: Path) -> str:
+    """Show a path under the home directory as ~/..., the way people type it."""
+    try:
+        return "~/" + path.relative_to(Path.home()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+MERIDIAN_HOME = Path(os.environ["MERIDIAN_HOME"]) if os.environ.get("MERIDIAN_HOME") else default_home()
+HOME_DISPLAY = display_path(MERIDIAN_HOME)
 CLUSTER_CONFIG = MERIDIAN_HOME / "cluster.yml"
 CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
 CACHE_DIR = MERIDIAN_HOME / "cache"

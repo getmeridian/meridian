@@ -78,11 +78,11 @@ Each person gets their own key, connection page, and subscription URL. `meridian
 
 | What | Where |
 |------|-------|
-| Topology, panel access, and keys | `~/.meridian/cluster.yml` on your machine |
-| Saved SSH servers | `~/.meridian/servers.json` on your machine |
+| Topology, panel access, and keys | `~/.config/meridian/cluster.yml` on your machine |
+| Saved SSH servers | `~/.config/meridian/servers.json` on your machine |
 | Proxy services | Docker, Xray, nginx on the VPS |
 
-Client commands talk to the Remnawave panel API recorded in `cluster.yml`; they don't need SSH. Back up `~/.meridian/` — it is how Meridian manages your servers.
+Client commands talk to the Remnawave panel API recorded in `cluster.yml`; they don't need SSH. Back up `~/.config/meridian/` — it is how Meridian manages your servers.
 
 ## More than one server
 

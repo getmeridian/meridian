@@ -82,7 +82,7 @@ meridian client enable alice
 
 ## 客户端数据位于何处
 
-客户端账户（密钥、状态、流量）位于您的控制平面服务器上的 Remnawave 面板数据库中。Meridian 管理的客户端列表是您在 `~/.meridian/cluster.yml` 中的拓扑的一部分。客户端命令使用面板 API 并不需要 SSH；发布连接页面使用对控制平面服务器的 SSH。
+客户端账户（密钥、状态、流量）位于您的控制平面服务器上的 Remnawave 面板数据库中。Meridian 管理的客户端列表是您在 `~/.config/meridian/cluster.yml` 中的拓扑的一部分。客户端命令使用面板 API 并不需要 SSH；发布连接页面使用对控制平面服务器的 SSH。
 
 ## Web 面板
 

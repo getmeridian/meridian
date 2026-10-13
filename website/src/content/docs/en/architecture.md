@@ -74,9 +74,9 @@ A relay forwards raw TCP from a domestic IP to the exit's Reality listener. Encr
 
 ## State model
 
-- **Topology** — `~/.meridian/cluster.yml` on your machine holds the reviewed topology (control plane, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay add` change it; don't edit it by hand.
+- **Topology** — `~/.config/meridian/cluster.yml` on your machine holds the reviewed topology (control plane, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay add` change it; don't edit it by hand.
 - **Clients** — accounts, keys, status, and traffic live in the Remnawave database on the control-plane server.
-- **Saved servers** — `~/.meridian/servers.json` holds SSH connection details.
+- **Saved servers** — `~/.config/meridian/servers.json` holds SSH connection details.
 
 ## Plan and apply
 
@@ -135,9 +135,11 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 - `/etc/netfwd/` — Realm configuration, run from `/usr/local/bin/netfwd` by `netfwd-*` systemd services. Relay hosts carry no Meridian-named units, paths, or firewall comments (`fw-*`); the next `meridian apply` renames hops deployed under the older `meridian-realm-*` names
 
 ### On your machine
-- `~/.meridian/cluster.yml` — topology, panel access, keys
-- `~/.meridian/cluster.yml.bak` — backup taken before destructive operations
-- `~/.meridian/servers.json` — saved SSH servers
-- `~/.meridian/setup.json` — `meridian setup` progress (no secrets)
-- `~/.meridian/ssh/meridian_ed25519` — managed SSH key, when generated
-- `~/.meridian/cache/` — update-check cache
+- `~/.config/meridian/cluster.yml` — topology, panel access, keys
+- `~/.config/meridian/cluster.yml.bak` — backup taken before destructive operations
+- `~/.config/meridian/servers.json` — saved SSH servers
+- `~/.config/meridian/setup.json` — `meridian setup` progress (no secrets)
+- `~/.config/meridian/ssh/meridian_ed25519` — managed SSH key, when generated
+- `~/.config/meridian/cache/` — update-check cache
+
+The directory follows `$XDG_CONFIG_HOME` when it is set, and `MERIDIAN_HOME` overrides it. A 4.0 fleet already kept in `~/.meridian-v4/` or `~/.meridian/` (recognised by its `servers.json`) keeps being used from there until `~/.config/meridian/` exists; 3.x state in `~/.meridian/` is never touched.
