@@ -12,7 +12,7 @@
 - **Deploy planning is pure** - mode, ports, reusable paths, and request validation are computed before adapters perform SSH or panel I/O.
 - **Input models fail early** - CLI and Engine adapters should validate typed core request models at the boundary, then pass trusted objects inward.
 - **Server onboarding is UX-shaped** - collect titles, server IPs, SSH user/port, and stable references before mapping into storage or deploy requests.
-- **Topology uses capabilities plus policy** - a server may be both relay and exit; routing rules decide where traffic exits.
+- **Topology roles compose** - a server may hold several roles (relay and exit); ordered routes decide where traffic exits.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
 - **Verification is four-state** - probe and test share typed passed, failed, warning, and skipped checks; skipped evidence is inconclusive, never a pass.
 - **Cancellation is cooperative** - `core/cancellation.py` owns the token protocol, the typed `OperationCancellation` record, and `OperationCancelledError`; workers poll only at safe points.

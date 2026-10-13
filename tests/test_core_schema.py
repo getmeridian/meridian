@@ -75,16 +75,10 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "server-bootstrap-key-result" in names
     assert "server-connection-draft" in names
     assert "server-profile" in names
-    assert "routing-policy-draft" in names
-    assert "regional-traffic-decision" in names
-    assert "route-card" in names
-    assert "topology-builder-draft" in names
     assert "topology-server-shelf-item" in names
     assert "node-add-request" in names
     assert "server-validate-request" in names
     assert "server-validate-result" in names
-    assert "topology-server-capabilities" in names
-    assert "traffic-route-rule" in names
     assert "relay-deploy-request" in names
     assert "deploy-plan" in names
     assert "deploy-ports" in names
@@ -175,23 +169,16 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     assert deploy["user"]["pattern"] == "^$|" + workflow_answers["user"]["pattern"]
 
 
-def test_topology_schemas_model_capabilities_and_country_routes() -> None:
-    server_capabilities = schema_for("topology-server-capabilities")["properties"]
-    route_rule = schema_for("traffic-route-rule")["properties"]
-    route_card = schema_for("route-card")["properties"]
+def test_topology_schemas_model_server_capabilities() -> None:
+    shelf_item = schema_for("topology-server-shelf-item")["properties"]
 
-    assert server_capabilities["capabilities"]["items"]["enum"] == [
+    assert shelf_item["capabilities"]["items"]["enum"] == [
         "panel",
         "exit",
         "relay",
         "routing_gateway",
     ]
-    assert server_capabilities["region"]["pattern"] == r"^$|^[A-Za-z]{2}$"
-    assert route_rule["action"]["enum"] == ["route", "block"]
-    assert route_rule["country_codes"]["items"]["pattern"] == r"^[A-Za-z]{2}$"
-    assert route_rule["entry_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
-    assert route_rule["exit_server_ref"]["pattern"] == r"^$|^[^\r\n\t]+$"
-    assert route_card["sentence"]["type"] == "string"
+    assert shelf_item["region"]["pattern"] == r"^$|^[A-Za-z]{2}$"
 
 
 def test_connection_test_schema_exposes_scope_and_client() -> None:

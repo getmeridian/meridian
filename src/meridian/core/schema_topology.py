@@ -24,15 +24,9 @@ from meridian.core.topology import (
     ExitIntent,
     OrderedRouteIntent,
     ProtocolPathIntent,
-    RegionalTrafficDecision,
-    RouteCard,
     RoutingGatewayIntent,
-    RoutingPolicyDraft,
     SetupIntent,
-    TopologyBuilderDraft,
-    TopologyServerCapabilities,
     TopologyServerShelfItem,
-    TrafficRouteRule,
     TransparentRelayIntent,
 )
 
@@ -57,11 +51,5 @@ TOPOLOGY_SCHEMAS: dict[str, type[BaseModel]] = {
     "protocol-path-intent": ProtocolPathIntent,
     "routing-gateway-intent": RoutingGatewayIntent,
     "transparent-relay-intent": TransparentRelayIntent,
-    "routing-policy-draft": RoutingPolicyDraft,
-    "regional-traffic-decision": RegionalTrafficDecision,
-    "route-card": RouteCard,
-    "topology-builder-draft": TopologyBuilderDraft,
     "topology-server-shelf-item": TopologyServerShelfItem,
-    "topology-server-capabilities": TopologyServerCapabilities,
-    "traffic-route-rule": TrafficRouteRule,
 }
