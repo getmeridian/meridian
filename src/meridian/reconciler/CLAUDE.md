@@ -33,6 +33,7 @@
 - **Attest server artifacts against their own inputs** — hashing the whole deployment contract makes every fleet edit re-run work on every server; include only the server's own target plus pins and renderer contract.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
 - **Bindings are per generation** — a new generation finds resources by name; when a list endpoint omits content (Templates), GET the record by UUID before comparing or every intent edit rewrites it.
+- **A renamed Host keeps its UUID** — remarks follow fleet shape (a second exit adds exit prefixes), so a new generation adopts the committed binding's Host before looking up by remark; a name-only lookup created twins and stranded the old Host, which retirement never sees because its logical ID survives.
 - **A moved exit keeps its Node** — the Node name derives from the exit ID, so `node replace` must repoint the owned Node's address/port (PATCH), never refuse the drift or create a second Node.
 - **Remnawave deletes Nodes asynchronously** — DELETE only queues the job; `NodeRetirement` polls until the Node is gone so its Profile is not deleted under it.
 - **A server move is a retirement** — `SERVER_PLACED` kinds whose desired `server_ref` changed retire their old placement; the panel Node keeps its UUID and is updated in place, never retired.

@@ -22,6 +22,14 @@ from meridian.compiler.models import (
     canonical_hash,
 )
 from meridian.reconciler import remnawave_retirement as retirement
+from meridian.reconciler.remnawave_projections import (
+    host_projection,
+    inbound_matches,
+    inbound_projection,
+    node_projection,
+    profile_projection,
+    squad_projection,
+)
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -36,7 +44,6 @@ from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.remnawave import (
     ConfigProfile,
     Host,
-    Inbound,
     InternalSquad,
     MeridianPanel,
     Node,
@@ -91,6 +98,13 @@ class RemnawaveDriverContext:
                 category="user",
             )
         return address
+
+    def committed_remote_id(self, kind: str, logical_id: str) -> str:
+        """The remote ID of the active (last committed) binding for *logical_id*, if any."""
+        for binding in self.cluster.managed_bindings.values():
+            if binding.active and binding.resource_kind == kind and binding.logical_id == logical_id:
+                return binding.remote_id
+        return ""
 
     def was_managed(self, logical_id: str, remote_id: str) -> bool:
         if any(
@@ -169,7 +183,7 @@ class ConfigProfileDriver(retirement.ConfigProfileRetirement):
                 action.generation,
                 profile.uuid,
             )
-        return _observed(action, profile.uuid, matches, _profile_projection(profile))
+        return _observed(action, profile.uuid, matches, profile_projection(profile))
 
     def apply(
         self,
@@ -245,7 +259,7 @@ class InboundDriver:
         if not matches:
             return ResourceObservation(exists=False)
         inbound = matches[0]
-        converged = _inbound_matches(inbound, payload, profile_uuid)
+        converged = inbound_matches(inbound, payload, profile_uuid)
         if inbound.uuid:
             self.context.workloads.record_inbound_uuid(
                 payload.workload_ref,
@@ -253,7 +267,7 @@ class InboundDriver:
                 action.resource.logical_id,
                 inbound.uuid,
             )
-        return _observed(action, inbound.uuid, converged, _inbound_projection(inbound))
+        return _observed(action, inbound.uuid, converged, inbound_projection(inbound))
 
     def apply(
         self,
@@ -303,7 +317,7 @@ class NodeBindingDriver(retirement.NodeRetirement):
                 payload.server_ref,
                 node.uuid,
             )
-        return _observed(action, node.uuid, matches, _node_projection(node))
+        return _observed(action, node.uuid, matches, node_projection(node))
 
     def apply(
         self,
@@ -378,7 +392,7 @@ class HostDriver(retirement.HostRetirement):
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
         payload = _payload(action, HostPayload)
-        host = _bound_or_named_host(self.context, payload, binding)
+        host = _bound_or_named_host(self.context, action.resource.logical_id, payload, binding)
         if host is None:
             return ResourceObservation(exists=False)
         profile_uuid, inbound_uuid, workload_id = _resolved_host_dependencies(
@@ -393,7 +407,7 @@ class HostDriver(retirement.HostRetirement):
             profile_uuid=profile_uuid,
             inbound_uuid=inbound_uuid,
         )
-        matches = _host_projection(host) == expected
+        matches = host_projection(host) == expected
         owned = binding is not None or self.context.was_managed(action.resource.logical_id, host.uuid)
         if host.uuid and (matches or owned):
             self.context.workloads.record_host_uuid(
@@ -402,7 +416,7 @@ class HostDriver(retirement.HostRetirement):
                 action.resource.logical_id,
                 host.uuid,
             )
-        return _observed(action, host.uuid, matches, _host_projection(host))
+        return _observed(action, host.uuid, matches, host_projection(host))
 
     def apply(
         self,
@@ -422,7 +436,7 @@ class HostDriver(retirement.HostRetirement):
             profile_uuid=profile_uuid,
             inbound_uuid=inbound_uuid,
         )
-        existing = _bound_or_named_host(self.context, payload, binding)
+        existing = _bound_or_named_host(self.context, action.resource.logical_id, payload, binding)
         kwargs = {
             "remark": payload.remark,
             "address": expected["address"],
@@ -480,7 +494,7 @@ class InternalSquadDriver(retirement.InternalSquadRetirement):
             return ResourceObservation(exists=False)
         inbound_uuids = _resolved_ids(self.context, payload.inbound_refs, action.generation)
         matches = squad.name == payload.name and sorted(squad.inbound_uuids) == sorted(inbound_uuids)
-        return _observed(action, squad.uuid, matches, _squad_projection(squad))
+        return _observed(action, squad.uuid, matches, squad_projection(squad))
 
     def apply(
         self,
@@ -634,11 +648,20 @@ def _bound_or_named_node(
 
 def _bound_or_named_host(
     context: RemnawaveDriverContext,
+    logical_id: str,
     payload: HostPayload,
     binding: ManagedResourceBinding | None,
 ) -> Host | None:
     if binding is not None and binding.remote_id:
         return context.panel.get_host(binding.remote_id)
+    # Remarks follow fleet shape (an exit prefix appears with a second exit), so a
+    # new generation first adopts the committed UUID and renames that Host in place;
+    # a name lookup alone would create a twin and strand the old Host.
+    committed = context.committed_remote_id(payload.kind, logical_id)
+    if committed:
+        host = context.panel.get_host(committed)
+        if host is not None:
+            return host
     matches = [host for host in context.panel.list_hosts() if host.remark == payload.remark]
     return _one_or_none(matches, f"Hosts with remark {payload.remark!r}")
 
@@ -684,47 +707,6 @@ def _observed(
     )
 
 
-def _profile_projection(profile: ConfigProfile) -> dict[str, Any]:
-    return {"name": profile.name, "config": profile.config}
-
-
-def _inbound_projection(inbound: Inbound) -> dict[str, Any]:
-    return {
-        "tag": inbound.tag,
-        "type": inbound.type,
-        "network": inbound.network,
-        "security": inbound.security,
-        "profile_uuid": inbound.profile_uuid,
-        "port": inbound.port,
-    }
-
-
-def _inbound_matches(inbound: Inbound, payload: InboundPayload, profile_uuid: str) -> bool:
-    expected = {
-        "reality": ("vless", "tcp", "reality"),
-        "xhttp": ("vless", "xhttp", "none"),
-        "wss": ("vless", "ws", "none"),
-        "hysteria2": ("hysteria", "hysteria", "tls"),
-    }[payload.protocol]
-    return (
-        inbound.tag == payload.tag
-        and (inbound.type, inbound.network, inbound.security) == expected
-        and inbound.port == payload.listen_port
-        and inbound.profile_uuid in {"", profile_uuid}
-    )
-
-
-def _node_projection(node: Node) -> dict[str, Any]:
-    return {
-        "name": node.name,
-        "address": node.address,
-        "port": node.port,
-        "is_disabled": node.is_disabled,
-        "profile_uuid": node.active_config_profile_uuid,
-        "inbound_uuids": sorted(node.active_inbound_uuids),
-    }
-
-
 def _host_expected(
     context: RemnawaveDriverContext,
     payload: HostPayload,
@@ -759,35 +741,6 @@ def _host_expected(
         "xray_json_template_uuid": template_uuid,
         "exclude_from_subscription_types": sorted(payload.exclude_from_subscription_types),
         "view_position": payload.view_position,
-    }
-
-
-def _host_projection(host: Host) -> dict[str, Any]:
-    return {
-        "remark": host.remark,
-        "address": host.address,
-        "port": host.port,
-        "config_profile_uuid": host.config_profile_uuid,
-        "inbound_uuid": host.inbound_uuid,
-        "sni": host.sni,
-        "host": host.host,
-        "path": host.path,
-        "alpn": host.alpn,
-        "fingerprint": host.fingerprint,
-        "security_layer": host.security_layer,
-        "is_disabled": host.is_disabled,
-        "tags": sorted(host.tags),
-        "is_hidden": host.is_hidden,
-        "xray_json_template_uuid": host.xray_json_template_uuid,
-        "exclude_from_subscription_types": sorted(host.exclude_from_subscription_types),
-        "view_position": host.view_position,
-    }
-
-
-def _squad_projection(squad: InternalSquad) -> dict[str, Any]:
-    return {
-        "name": squad.name,
-        "inbound_uuids": sorted(squad.inbound_uuids),
     }
 
 

@@ -1003,3 +1003,44 @@ def test_intent_change_after_first_apply_converges_with_the_same_keys() -> None:
     second_gen = {item.id: item for item in cluster.workloads if item.generation == 2}
     assert second_gen["exit-a"].reality_keys["srv-exit-a"].private_key == "private-exit-a"
     assert second_gen["exit-b"].reality_keys["srv-exit-b"].private_key == "private-exit-b"
+
+
+def test_adding_an_exit_renames_existing_hosts_in_place_instead_of_twinning_them() -> None:
+    # A second exit prefixes every remark with its exit ID; looking Hosts up by the
+    # new remark alone created twins and stranded the first generation's Hosts.
+    single = _intent().model_copy(update={"exits": [_intent().exits[0]]})
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
+    addresses = {"srv-control": "198.51.100.10", "srv-exit-a": "198.51.100.20", "srv-exit-b": "198.51.100.30"}
+
+    def run(plan: ResourcePlan) -> None:
+        context = RemnawaveDriverContext(
+            panel=cast(MeridianPanel, panel),
+            plan=plan,
+            cluster=cluster,
+            workloads=workloads,
+            server_addresses=addresses,
+        )
+        fallback = AlreadyConvergedDriver()
+        drivers: dict[str, object] = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+        drivers.update(build_remnawave_drivers(context))
+        result = execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None)
+        assert result.all_succeeded, [item.error for item in result.results if item.error]
+
+    run(compile_topology(single))
+    first = {binding.logical_id: binding.remote_id for binding in cluster.managed_bindings.values() if binding.active}
+    first_remarks = {host.uuid: host.remark for host in panel.hosts.values()}
+
+    grown = compile_topology(_intent())
+    run(grown)
+
+    host_count = sum(1 for resource in grown.resources if resource.payload.kind == "host")
+    assert len(panel.hosts) == host_count
+    renamed = [
+        logical_id
+        for logical_id, remote_id in first.items()
+        if logical_id.startswith("host:exit-a:") and panel.hosts[remote_id].remark != first_remarks[remote_id]
+    ]
+    assert renamed
+    assert all(panel.hosts[first[logical_id]].remark.startswith("exit-a · ") for logical_id in renamed)

@@ -195,6 +195,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - Reality keys come from the panel instead of a Docker container or an
   unverified Xray download on the exit, so a fresh exit without `unzip` or
   Docker no longer fails at its Proxy profile.
+- Adding or removing an exit renames existing subscription entries instead of
+  leaving the old ones behind. Before, every entry appeared twice, and a stale
+  Firefox copy slipped into the automatic failover group.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
