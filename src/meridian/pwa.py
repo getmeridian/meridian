@@ -2,7 +2,8 @@
 
 Centralizes the creation and upload of per-client PWA files
 (index.html, config.json, manifest.webmanifest) and
-shared static assets (app.js, styles.css, sw.js, icon.svg).
+shared assets (app.js, styles.css, sw.js, icon.svg, plus the generated
+apps.json catalog).
 
 Called from:
 - ``DeployPWAAssets`` provisioner step (shared static assets)
@@ -17,6 +18,7 @@ import shlex
 from typing import TYPE_CHECKING
 
 from meridian.render import (
+    render_apps_catalog,
     render_config_json,
     render_manifest,
     render_pwa_shell,
@@ -29,6 +31,8 @@ if TYPE_CHECKING:
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
 _STATIC_FILES = ("app.js", "styles.css", "sw.js", "icon.svg")
+# Assets whose bytes feed the service worker's cache version.
+_VERSIONED_ASSETS = ("app.js", "styles.css", "apps.json")
 
 
 def _page_marker(user_uuid: str) -> str:
@@ -118,7 +122,7 @@ def upload_client_files(
 
 
 def load_pwa_static_assets() -> dict[str, bytes]:
-    """Load shared PWA static assets from package data.
+    """Load shared PWA assets: package files plus the generated app catalog.
 
     Returns a dict mapping filename to file content bytes.
     """
@@ -129,14 +133,15 @@ def load_pwa_static_assets() -> dict[str, bytes]:
     for name in _STATIC_FILES:
         resource = pwa_dir / name
         assets[name] = resource.read_bytes()
+    assets["apps.json"] = render_apps_catalog().encode("utf-8")
     return assets
 
 
 def upload_pwa_assets(conn: ServerConnection) -> str:
     """Upload shared PWA static assets to ``/var/www/private/pwa/``.
 
-    Deploys app.js, styles.css, sw.js, and icon.svg. These are
-    identical for all clients and shared across connection pages.
+    Deploys app.js, styles.css, sw.js, icon.svg, and apps.json. These
+    are identical for all clients and shared across connection pages.
 
     The service worker's ``CACHE_VERSION`` is replaced with a
     content-derived hash so browsers automatically invalidate
@@ -148,7 +153,7 @@ def upload_pwa_assets(conn: ServerConnection) -> str:
 
     # Compute content hash from cacheable assets for SW cache busting
     h = hashlib.sha256()
-    for name in ("app.js", "styles.css"):
+    for name in _VERSIONED_ASSETS:
         if name in assets:
             h.update(assets[name])
     cache_version = f"pwa-{h.hexdigest()[:8]}"

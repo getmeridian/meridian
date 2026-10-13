@@ -386,6 +386,34 @@ summary::marker{display:none;content:none}
 .import-btn.detected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--bg2))}
 .import-btn-add{font-size:1rem;font-weight:700;color:var(--accent);line-height:1}
 .import-btn-icon{width:20px;height:20px;border-radius:22%;object-fit:contain;flex-shrink:0}
+.import-label{font-size:.78rem;font-weight:600;margin-bottom:4px}
+.qr-sub{margin:4px auto 12px}
+.card-hint{font-size:.7rem;color:var(--tx3);line-height:1.45;margin-top:10px}
+
+/* ===================================================================
+ * APP CATALOG EXTRAS
+ * =================================================================== */
+.apps-platform{
+  font-size:.66rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--tx3);margin-top:12px;
+}
+.apps-platform + .apps{margin-top:6px}
+.app-router,.app-note{
+  display:flex;flex-direction:column;gap:2px;margin-top:10px;padding:10px 12px;
+  border:1px solid var(--br);border-radius:var(--r);
+  font-size:.74rem;color:var(--tx2);line-height:1.45;
+}
+.app-router{background:var(--bg2);text-decoration:none;transition:border-color .06s}
+.app-router:hover{border-color:var(--tx3)}
+.app-router strong,.app-note strong{color:var(--tx);font-weight:600;font-size:.78rem}
+
+/* ===================================================================
+ * LAYOUT HELPERS — the CSP forbids inline style attributes
+ * =================================================================== */
+.gap-top{margin-top:8px}
+.gap-top-sm{margin-top:6px}
+.center{text-align:center}
+.load-error .open-btn{margin-top:12px}
 
 /* ===================================================================
  * SKELETON LOADING

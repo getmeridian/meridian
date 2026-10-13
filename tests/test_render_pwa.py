@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 from meridian.models import ProtocolURL, RelayURLSet
 from meridian.render import (
     _PWA_APPS,
+    render_apps_catalog,
     render_config_json,
     render_manifest,
     render_pwa_shell,
@@ -404,6 +406,62 @@ class TestPWAAppsSync:
 
 
 # ---------------------------------------------------------------------------
+# TestAppCatalog — per-platform recommendations
+# ---------------------------------------------------------------------------
+
+PLATFORMS = ("iOS", "Android", "Windows", "macOS", "Linux")
+
+
+def _recommended(platform: str) -> list[str]:
+    return [app["name"] for app in _PWA_APPS if platform in app.get("recommended", [])]
+
+
+class TestAppCatalog:
+    def test_every_platform_has_recommended_apps(self) -> None:
+        for platform in PLATFORMS:
+            assert _recommended(platform), f"no recommended app for {platform}"
+
+    def test_happ_leads_every_platform(self) -> None:
+        for platform in PLATFORMS:
+            assert _recommended(platform)[0] == "Happ"
+
+    def test_mihomo_alternatives_and_throne_on_desktop(self) -> None:
+        assert _recommended("iOS") == ["Happ", "Clash Mi"]
+        assert _recommended("Android") == ["Happ", "FlClashX", "Clash Mi"]
+        for platform in ("Windows", "macOS", "Linux"):
+            assert _recommended(platform) == ["Happ", "FlClashX", "Clash Mi", "Throne"]
+
+    def test_recommended_platforms_are_supported(self) -> None:
+        for app in _PWA_APPS:
+            assert set(app["platforms"]) <= set(PLATFORMS), app["name"]
+            assert set(app.get("recommended", [])) <= set(app["platforms"]), app["name"]
+
+    def test_abandoned_nekoray_is_not_listed(self) -> None:
+        assert not any("nekoray" in app["name"].lower() for app in _PWA_APPS)
+
+    def test_deeplinks_use_only_known_placeholders(self) -> None:
+        for app in _PWA_APPS:
+            if "deeplink" in app:
+                assert set(re.findall(r"\{(\w+)\}", app["deeplink"])) <= {"url_raw", "url_b64", "url", "name"}
+
+    def test_download_links_are_https(self) -> None:
+        for app in _PWA_APPS:
+            for url in [app["url"], *app.get("urls", {}).values()]:
+                assert url.startswith("https://"), f"{app['name']}: {url}"
+
+    def test_config_json_apps_carry_no_icons(self, protocol_urls: list[ProtocolURL]) -> None:
+        """Icons ship once in the shared pwa/apps.json, not in every client's config."""
+        result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
+        assert [app["name"] for app in result["apps"]] == [app["name"] for app in _PWA_APPS]
+        assert not any("icon" in app for app in result["apps"])
+
+    def test_shared_catalog_has_an_icon_for_every_app(self) -> None:
+        catalog = json.loads(render_apps_catalog())
+        assert [app["name"] for app in catalog["apps"]] == [app["name"] for app in _PWA_APPS]
+        assert all("icon" in app for app in catalog["apps"])
+
+
+# ---------------------------------------------------------------------------
 # TestUnicodeClientNames — non-ASCII names (Gap #6)
 # ---------------------------------------------------------------------------
 
@@ -449,3 +507,24 @@ class TestPWATemplateSource:
     def test_app_js_has_no_external_ping_dependency(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
         assert "getmeridian.org/ping" not in app_js
+
+    def test_app_js_links_the_localized_router_guide(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        assert "'https://getmeridian.org/docs/{lang}/routers/'" in app_js
+
+    def test_app_js_prefers_the_shared_catalog(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        assert "fetch('../pwa/apps.json')" in app_js
+
+    def test_every_data_t_key_is_translated(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        used = set(re.findall(r'data-t="([^"]+)"', app_js))
+        for lang in ("ru", "fa", "zh"):
+            block = app_js.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0]
+            keys = set(re.findall(r"'?([\w.]+)'?: '", block))
+            assert used <= keys, f"{lang} lacks {sorted(used - keys)}"
+
+    def test_rendered_markup_has_no_inline_styles(self) -> None:
+        """The page CSP has no style-src 'unsafe-inline'; style attributes are dropped."""
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        assert "style=" not in app_js

@@ -57,8 +57,12 @@ def main() -> int:
     for name in sorted(py_only):
         errors.append(f"  {name}: in _PWA_APPS (render.py) but missing from apps.json")
 
+    # File order is the recommendation order on the connection page
+    if not json_only and not py_only and list(json_by_name) != list(py_by_name):
+        errors.append("  order differs: apps.json and _PWA_APPS must list apps in the same order")
+
     # Check matching apps for field differences
-    compare_fields = ("platform", "url", "deeplink", "urls", "protocols")
+    compare_fields = ("platform", "platforms", "recommended", "url", "deeplink", "urls", "protocols")
     for name in sorted(set(json_by_name) & set(py_by_name)):
         j = json_by_name[name]
         p = py_by_name[name]

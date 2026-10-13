@@ -53,6 +53,12 @@ var T = {
     'more.options': 'Другие варианты подключения',
     'import.other': 'Другие платформы',
     'apps.more': 'Другие платформы',
+    'apps.other': 'Другие приложения',
+    'apps.update': 'Обновляйте приложение',
+    'apps.update.desc': 'В новых версиях исправляют проблемы с подключением и учитывают новые блокировки. Включите автообновление в магазине приложений или время от времени заглядывайте на страницу загрузки.',
+    'sub.refresh': 'Приложение само обновляет подписку. Чтобы обновить её сейчас, откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
+    router: 'Роутер',
+    'router.desc': 'Подключите всю домашнюю сеть: инструкция по настройке',
     'show.qr': 'Показать QR-код',
     'share.page': 'Поделиться этой страницей',
     copied: 'Скопировано',
@@ -113,6 +119,12 @@ var T = {
     'more.options': 'گزینه\u200Cهای دیگر',
     'import.other': 'پلتفرم\u200Cهای دیگر',
     'apps.more': 'پلتفرم\u200Cهای دیگر',
+    'apps.other': 'برنامه‌های دیگر',
+    'apps.update': 'برنامه را به‌روز نگه دارید',
+    'apps.update.desc': 'نسخه‌های جدید مشکلات اتصال را برطرف می‌کنند و با روش‌های تازهٔ مسدودسازی همگام می‌مانند. به‌روزرسانی خودکار را در فروشگاه برنامه روشن کنید یا هر از گاهی به صفحهٔ دانلود سر بزنید.',
+    'sub.refresh': 'برنامه اشتراک را خودش به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
+    router: 'روتر',
+    'router.desc': 'کل شبکهٔ خانگی را متصل کنید: راهنمای راه‌اندازی',
     'show.qr': 'نمایش کد QR',
     'share.page': 'اشتراک\u200Cگذاری این صفحه',
     copied: '\u06A9\u067E\u06CC \u0634\u062F',
@@ -173,6 +185,12 @@ var T = {
     'more.options': '更多连接选项',
     'import.other': '其他平台',
     'apps.more': '其他平台',
+    'apps.other': '更多应用',
+    'apps.update': '保持应用为最新版本',
+    'apps.update.desc': '新版本会修复连接问题，并应对新的封锁手段。请在应用商店中开启自动更新，或不时查看下载页面。',
+    'sub.refresh': '应用会自动刷新订阅。如需立即刷新，请在应用中打开订阅（或配置）列表并点击"更新"。',
+    router: '路由器',
+    'router.desc': '让整个家庭网络都能连接：设置指南',
     'show.qr': '显示二维码',
     'share.page': '分享此页面',
     copied: '已复制',
@@ -202,8 +220,43 @@ function detectPlatform() {
 }
 
 /* -----------------------------------------------------------------------
+ * App catalog — where each app runs and where the page recommends it
+ * ----------------------------------------------------------------------- */
+var PLATFORM_KEYS = { ios: 'iOS', android: 'Android', windows: 'Windows', macos: 'macOS', linux: 'Linux' };
+var PLATFORM_ORDER = ['android', 'ios', 'windows', 'macos', 'linux'];
+var ALL_PLATFORMS = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
+var ROUTER_DOCS = 'https://getmeridian.org/docs/{lang}/routers/';
+
+function appPlatforms(a) {
+  if (a.platforms) return a.platforms;
+  /* Older config.json entries carry only a display label */
+  return a.platform === 'All platforms' ? ALL_PLATFORMS : [a.platform];
+}
+
+function appUrl(a, key) {
+  return (a.urls && a.urls[key]) || a.url;
+}
+
+/* Apps that run on `key`: recommended ones in catalog order, then the rest.
+   Catalogs without recommendations put every app in `rec`. */
+function appsFor(apps, key, needDeeplink) {
+  var rec = [], more = [], other = [];
+  for (var i = 0; apps && i < apps.length; i++) {
+    var a = apps[i];
+    if (needDeeplink && !a.deeplink) continue;
+    if (appPlatforms(a).indexOf(key) === -1) other.push(a);
+    else if (a.recommended && a.recommended.indexOf(key) !== -1) rec.push(a);
+    else more.push(a);
+  }
+  if (!rec.length) { rec = more; more = []; }
+  return { rec: rec, more: more, other: other };
+}
+
+/* -----------------------------------------------------------------------
  * Deep link construction
  * ----------------------------------------------------------------------- */
+var iosFallbackUrl = '';
+
 function tryOpenIOS(index) {
   var el = document.querySelector('[data-ios-idx="' + index + '"]');
   if (!el) return;
@@ -212,8 +265,8 @@ function tryOpenIOS(index) {
   var start = Date.now();
   window.location.href = url;
   setTimeout(function() {
-    if (Date.now() - start < 2000) {
-      window.location.href = 'https://apps.apple.com/app/v2raytun/id6476628951';
+    if (iosFallbackUrl && Date.now() - start < 2000) {
+      window.location.href = iosFallbackUrl;
     }
   }, 1500);
 }
@@ -344,12 +397,16 @@ function getSubscriptionUrl(config) {
   return '';
 }
 
+/* Placeholders: {url_raw} as-is, {url_b64} standard Base64, {url} and {name}
+   percent-encoded. Function replacements keep `$` in values literal. */
 function buildDeepLink(template, subUrl, name) {
-  return template
-    .replace('{url_raw}', subUrl)
-    .replace('{url_b64}', btoa(subUrl))
-    .replace('{url}', encodeURIComponent(subUrl))
-    .replace('{name}', encodeURIComponent(name || 'Meridian'));
+  var values = {
+    '{url_raw}': subUrl,
+    '{url_b64}': btoa(subUrl),
+    '{url}': encodeURIComponent(subUrl),
+    '{name}': encodeURIComponent(name || 'Meridian'),
+  };
+  return template.replace(/\{(url_raw|url_b64|url|name)\}/g, function(m) { return values[m]; });
 }
 
 /* -----------------------------------------------------------------------
@@ -534,6 +591,10 @@ function renderPage(config) {
   html += '<button class="install-dismiss" data-action="dismiss">&times;</button>';
   html += '</div>';
 
+  /* iOS "Open in App" falls back to the first recommended iOS app */
+  var iosApps = appsFor(config.apps, 'iOS', false).rec;
+  iosFallbackUrl = iosApps.length ? appUrl(iosApps[0], 'iOS') : '';
+
   /* ---- Subscription QR hero ---- */
   var subUrl = getSubscriptionUrl(config);
   var serverLabel = config.server_name || 'Meridian';
@@ -548,7 +609,7 @@ function renderPage(config) {
   /* ---- Quick Setup (collapsed) ---- */
   html += '<details class="more-options">';
   html += '<summary data-t="setup">Quick Setup</summary>';
-  html += '<div class="card" style="margin-top:8px">';
+  html += '<div class="card gap-top">';
   html += '<div class="steps">';
   html += '<div class="step" data-t="step1">Install a client app from the list above</div>';
   html += '<div class="step" data-t="step2">Tap "Open in App" — the connection imports automatically</div>';
@@ -591,12 +652,12 @@ function renderPage(config) {
   if (allProtocolCards) {
     html += '<details class="more-options">';
     html += '<summary data-t="more.options">Individual connections</summary>';
-    html += '<div class="cards-grid" style="margin-top:8px">' + allProtocolCards + '</div>';
+    html += '<div class="cards-grid">' + allProtocolCards + '</div>';
     html += '</details>';
   }
 
   /* Troubleshooting */
-  html += '<div class="warn" style="border-color:var(--amber-br);background:var(--amber-bg)">';
+  html += '<div class="warn">';
   html += '<h3 data-t="ping">Not connecting?</h3>';
   html += '<p data-t="ping.desc">Check automatic time sync on your device, then try another connection option above.</p>';
   html += '<p data-t="ping.link">Ask the server owner to run meridian test.</p>';
@@ -728,31 +789,27 @@ function renderProtocolCard(proto, platform, opts) {
   return html;
 }
 
-function renderImportCard(apps, subUrl, platform, serverName, subQrB64) {
-  var osMap = {
-    ios: 'iOS', android: 'Android',
-    windows: 'Windows', macos: 'All platforms', linux: 'All platforms',
-  };
-  var detectedOs = osMap[platform] || 'All platforms';
-
-  /* Filter: only apps with deep links AND relevant to this platform */
-  var deepApps = [];
-  var otherDeepApps = [];
-  if (apps) {
-    for (var i = 0; i < apps.length; i++) {
-      if (!apps[i].deeplink) continue;
-      if (apps[i].platform === detectedOs || apps[i].platform === 'All platforms') {
-        deepApps.push(apps[i]);
-      } else {
-        otherDeepApps.push(apps[i]);
-      }
-    }
+function renderImportButton(app, subUrl, serverName, detected) {
+  var href = buildDeepLink(app.deeplink, subUrl, serverName);
+  var html = '<a class="import-btn' + (detected ? ' detected' : '') + '" href="' + escapeHtml(href) + '">';
+  if (app.icon) {
+    html += '<img class="import-btn-icon" src="' + escapeHtml(app.icon) + '" alt="" width="20" height="20">';
+  } else {
+    html += '<span class="import-btn-add">+</span> ';
   }
-  if (!deepApps.length && !otherDeepApps.length) {
+  html += '<span data-t="import.add" data-t-name="' + escapeHtml(app.name) + '">Add to ' + escapeHtml(app.name) + '</span>';
+  html += '</a>';
+  return html;
+}
+
+function renderImportCard(apps, subUrl, platform, serverName, subQrB64) {
+  var groups = appsFor(apps, PLATFORM_KEYS[platform] || 'Linux', true);
+  var html = '';
+  if (!groups.rec.length && !groups.other.length) {
     /* Fallback: show old-style subscription URL if no deep links */
-    var html = '<details class="more-options">';
+    html += '<details class="more-options">';
     html += '<summary data-t="sub.label">Subscription (auto-update)</summary>';
-    html += '<div class="card" style="margin-top:8px">';
+    html += '<div class="card gap-top">';
     html += '<p class="card-desc" data-t="sub.desc">Add this URL as a subscription in your app for automatic updates.</p>';
     html += '<div class="sub-url">';
     html += '<div class="sub-url-value" tabindex="0" role="button" data-action="copy-text">' + escapeHtml(subUrl) + '</div>';
@@ -760,59 +817,51 @@ function renderImportCard(apps, subUrl, platform, serverName, subQrB64) {
     return html;
   }
 
-  var heroClass = (subQrB64 && isValidBase64(subQrB64)) ? ' card-hero' : '';
-  var html = '<div class="card' + heroClass + '">';
+  var hasQr = subQrB64 && isValidBase64(subQrB64);
+  html += '<div class="card' + (hasQr ? ' card-hero' : '') + '">';
 
   /* Subscription QR hero — scan to import all protocols */
-  if (subQrB64 && isValidBase64(subQrB64)) {
-    html += '<div class="qr" style="margin:4px auto 12px"><img src="data:image/png;base64,' + subQrB64 + '" alt="QR" loading="lazy"></div>';
-    html += '<p class="card-desc" style="text-align:center" data-t="import.desc.qr">Scan with any V2Ray app or tap to add. Updates automatically.</p>';
+  if (hasQr) {
+    html += '<div class="qr qr-sub"><img src="data:image/png;base64,' + subQrB64 + '" alt="QR" loading="lazy"></div>';
+    html += '<p class="card-desc center" data-t="import.desc.qr">Scan with any V2Ray app or tap to add. Updates automatically.</p>';
   } else {
-    html += '<div style="font-size:.78rem;font-weight:600;margin-bottom:4px" data-t="import.label">One-Tap Import</div>';
+    html += '<div class="import-label" data-t="import.label">One-Tap Import</div>';
     html += '<p class="card-desc" data-t="import.desc">Add to your app with one tap. Updates automatically.</p>';
   }
 
-  /* Deep link buttons */
+  /* Deep link buttons: recommended apps for this platform, in catalog order */
   html += '<div class="import-grid">';
-
-  for (var j = 0; j < deepApps.length; j++) {
-    var app = deepApps[j];
-    var href = buildDeepLink(app.deeplink, subUrl, serverName);
-    html += '<a class="import-btn detected" href="' + escapeHtml(href) + '">';
-    if (app.icon) {
-      html += '<img class="import-btn-icon" src="' + escapeHtml(app.icon) + '" alt="" width="20" height="20">';
-    } else {
-      html += '<span class="import-btn-add">+</span> ';
-    }
-    html += '<span data-t="import.add" data-t-name="' + escapeHtml(app.name) + '">Add to ' + escapeHtml(app.name) + '</span>';
-    html += '</a>';
+  for (var j = 0; j < groups.rec.length; j++) {
+    html += renderImportButton(groups.rec[j], subUrl, serverName, true);
   }
-
   html += '</div>';
 
-  if (otherDeepApps.length) {
-    html += '<details class="more-options" style="margin-top:6px">';
-    html += '<summary data-t="import.other">Other platforms</summary>';
-    html += '<div class="import-grid" style="margin-top:6px">';
-    for (var m = 0; m < otherDeepApps.length; m++) {
-      var oa = otherDeepApps[m];
-      var ohref = buildDeepLink(oa.deeplink, subUrl, serverName);
-      html += '<a class="import-btn" href="' + escapeHtml(ohref) + '">';
-      if (oa.icon) {
-        html += '<img class="import-btn-icon" src="' + escapeHtml(oa.icon) + '" alt="" width="20" height="20">';
-      } else {
-        html += '<span class="import-btn-add">+</span> ';
-      }
-      html += '<span data-t="import.add" data-t-name="' + escapeHtml(oa.name) + '">Add to ' + escapeHtml(oa.name) + '</span>';
-      html += '</a>';
+  if (groups.more.length) {
+    html += '<details class="more-options gap-top-sm">';
+    html += '<summary data-t="apps.other">More apps</summary>';
+    html += '<div class="import-grid gap-top-sm">';
+    for (var k = 0; k < groups.more.length; k++) {
+      html += renderImportButton(groups.more[k], subUrl, serverName, false);
     }
     html += '</div></details>';
   }
 
+  if (groups.other.length) {
+    html += '<details class="more-options gap-top-sm">';
+    html += '<summary data-t="import.other">Other platforms</summary>';
+    html += '<div class="import-grid gap-top-sm">';
+    for (var m = 0; m < groups.other.length; m++) {
+      html += renderImportButton(groups.other[m], subUrl, serverName, false);
+    }
+    html += '</div></details>';
+  }
+
+  html += '<p class="card-hint" data-t="sub.refresh">Your app refreshes the subscription on its own. To refresh it now, open the subscription (or profile) list in the app and tap Update.</p>';
+
   /* Collapsed subscription URL */
-  html += '<details class="more-options" style="margin-top:8px">';
+  html += '<details class="more-options gap-top">';
   html += '<summary data-t="import.manual">Copy subscription URL</summary>';
-  html += '<div class="sub-url" style="margin-top:6px">';
+  html += '<div class="sub-url gap-top-sm">';
   html += '<div class="sub-url-value" tabindex="0" role="button" data-action="copy-text">' + escapeHtml(subUrl) + '</div>';
   html += '</div>';
   html += '</details>';
@@ -821,68 +870,63 @@ function renderImportCard(apps, subUrl, platform, serverName, subQrB64) {
   return html;
 }
 
+function renderAppTile(a, key, detected) {
+  var html = '<a class="app' + (detected ? ' detected' : '') + '" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
+  if (a.icon) html += '<img class="app-icon" src="' + escapeHtml(a.icon) + '" alt="" width="32" height="32">';
+  html += escapeHtml(a.name);
+  html += '<span>' + escapeHtml(a.platform) + '</span>';
+  html += '</a>';
+  return html;
+}
+
 function renderAppsCard(apps, platform, isReturning) {
   if (!apps || !apps.length) return '';
-
-  var osMap = {
-    ios: 'iOS', android: 'Android',
-    windows: 'Windows', macos: 'All platforms', linux: 'All platforms',
-  };
-  var urlKeyMap = {
-    ios: 'iOS', android: 'Android',
-    windows: 'Windows', macos: 'macOS', linux: 'Linux',
-  };
-  var detectedOs = osMap[platform] || 'All platforms';
-  var urlKey = urlKeyMap[platform] || '';
-
-  /* Split: relevant apps (matching platform) vs others */
-  var relevant = [];
-  var others = [];
-  for (var i = 0; i < apps.length; i++) {
-    var a = apps[i];
-    if (a.platform === detectedOs || a.platform === 'All platforms') {
-      relevant.push(a);
-    } else {
-      others.push(a);
-    }
-  }
-
-  function appUrl(a) {
-    return (a.urls && a.urls[urlKey]) || a.url;
-  }
+  var key = PLATFORM_KEYS[platform] || 'Linux';
+  var groups = appsFor(apps, key, false);
 
   var html = '';
   /* Collapsed for returning visitors, open for first-timers */
   var openAttr = isReturning ? '' : ' open';
   html += '<details class="more-options"' + openAttr + '><summary data-t="apps">Client Apps</summary>';
-  html += '<div class="card" style="margin-top:8px">';
+  html += '<div class="card gap-top">';
   html += '<p class="card-desc" data-t="apps.desc">Install one, then tap an import button above.</p>';
   html += '<div class="apps">';
-
-  for (var j = 0; j < relevant.length; j++) {
-    var r = relevant[j];
-    html += '<a class="app detected" href="' + escapeHtml(appUrl(r)) + '" target="_blank">';
-    if (r.icon) html += '<img class="app-icon" src="' + escapeHtml(r.icon) + '" alt="" width="32" height="32">';
-    html += escapeHtml(r.name);
-    html += '<span>' + escapeHtml(r.platform) + '</span>';
-    html += '</a>';
-  }
+  for (var j = 0; j < groups.rec.length; j++) html += renderAppTile(groups.rec[j], key, true);
   html += '</div>';
 
-  if (others.length) {
-    html += '<details class="more-options" style="margin-top:6px">';
-    html += '<summary data-t="apps.more">Other platforms</summary>';
-    html += '<div class="apps" style="margin-top:6px">';
-    for (var k = 0; k < others.length; k++) {
-      var o = others[k];
-      html += '<a class="app" href="' + escapeHtml(appUrl(o)) + '" target="_blank">';
-      if (o.icon) html += '<img class="app-icon" src="' + escapeHtml(o.icon) + '" alt="" width="32" height="32">';
-      html += escapeHtml(o.name);
-      html += '<span>' + escapeHtml(o.platform) + '</span>';
-      html += '</a>';
-    }
+  if (groups.more.length) {
+    html += '<details class="more-options gap-top-sm">';
+    html += '<summary data-t="apps.other">More apps</summary>';
+    html += '<div class="apps gap-top-sm">';
+    for (var k = 0; k < groups.more.length; k++) html += renderAppTile(groups.more[k], key, false);
     html += '</div></details>';
   }
+
+  /* Other platforms: each one's recommended apps, with that platform's links */
+  html += '<details class="more-options gap-top-sm">';
+  html += '<summary data-t="apps.more">Other platforms</summary>';
+  for (var p = 0; p < PLATFORM_ORDER.length; p++) {
+    var otherKey = PLATFORM_KEYS[PLATFORM_ORDER[p]];
+    if (otherKey === key) continue;
+    var otherApps = appsFor(apps, otherKey, false).rec;
+    if (!otherApps.length) continue;
+    html += '<div class="apps-platform">' + escapeHtml(otherKey) + '</div>';
+    html += '<div class="apps">';
+    for (var q = 0; q < otherApps.length; q++) html += renderAppTile(otherApps[q], otherKey, false);
+    html += '</div>';
+  }
+  html += '</details>';
+
+  var routerHref = ROUTER_DOCS.replace('{lang}', detectLang() || 'en');
+  html += '<a class="app-router" href="' + escapeHtml(routerHref) + '" target="_blank" rel="noopener">';
+  html += '<strong data-t="router">Router</strong>';
+  html += '<span data-t="router.desc">Connect your whole home network: setup guide</span>';
+  html += '</a>';
+
+  html += '<div class="app-note">';
+  html += '<strong data-t="apps.update">Keep your app updated</strong>';
+  html += '<span data-t="apps.update.desc">New versions fix connection problems and keep up with new blocking. Turn on automatic updates in your app store, or check the download page now and then.</span>';
+  html += '</div>';
 
   html += '</div>';
   html += '</details>';
@@ -1084,10 +1128,21 @@ function init() {
     app.appendChild(el);
   }, 10000);
 
+  /* The shared catalog (with icons) wins; config.apps is the offline fallback */
+  var catalog = fetch('../pwa/apps.json')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .catch(function() { return null; });
+
   fetch('config.json')
     .then(function(r) {
       if (!r.ok) throw new Error('config.json fetch failed');
       return r.json();
+    })
+    .then(function(config) {
+      return catalog.then(function(c) {
+        if (c && c.apps && c.apps.length) config.apps = c.apps;
+        return config;
+      });
     })
     .then(function(config) {
       clearTimeout(slowTimer);
@@ -1101,9 +1156,9 @@ function init() {
         var errTitle = (dict && dict['error.title']) || 'Connection Setup';
         var errMsg = (dict && dict['error.msg']) || 'Could not load configuration. Please reload the page.';
         var errRetry = (dict && dict['error.retry']) || 'Retry';
-        app.innerHTML = '<div class="hdr"><h1>' + escapeHtml(errTitle) + '</h1>' +
-          '<p style="color:var(--tx2)">' + escapeHtml(errMsg) + '</p>' +
-          '<button class="open-btn" style="margin-top:12px" data-action="retry">' + escapeHtml(errRetry) + '</button></div>';
+        app.innerHTML = '<div class="hdr load-error"><h1>' + escapeHtml(errTitle) + '</h1>' +
+          '<p>' + escapeHtml(errMsg) + '</p>' +
+          '<button class="open-btn" data-action="retry">' + escapeHtml(errRetry) + '</button></div>';
       }
     });
 }

@@ -1,7 +1,113 @@
 [
   {
+    "name": "Happ",
+    "platform": "All platforms",
+    "platforms": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "recommended": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "url": "https://happ.su/",
+    "urls": {
+      "iOS": "https://apps.apple.com/app/happ-proxy-utility/id6504287215",
+      "Android": "https://play.google.com/store/apps/details?id=com.happproxy",
+      "Windows": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+      "macOS": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+      "Linux": "https://github.com/Happ-proxy/happ-desktop/releases/latest"
+    },
+    "deeplink": "happ://add/{url_raw}",
+    "protocols": [
+      "reality",
+      "xhttp",
+      "wss"
+    ]
+  },
+  {
+    "name": "FlClashX",
+    "platform": "Android, desktop",
+    "platforms": [
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "recommended": [
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "url": "https://github.com/pluralplay/FlClashX/releases/latest",
+    "deeplink": "flclashx://install-config?url={url}",
+    "protocols": [
+      "reality",
+      "wss"
+    ]
+  },
+  {
+    "name": "Clash Mi",
+    "platform": "All platforms",
+    "platforms": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "recommended": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "url": "https://clashmi.app/download",
+    "urls": {
+      "iOS": "https://apps.apple.com/app/clash-mi/id6744321968",
+      "Android": "https://github.com/KaringX/clashmi/releases/latest",
+      "Windows": "https://github.com/KaringX/clashmi/releases/latest"
+    },
+    "deeplink": "clash://install-config?overwrite=no&name={name}&url={url}",
+    "protocols": [
+      "reality",
+      "wss"
+    ]
+  },
+  {
+    "name": "Throne",
+    "platform": "Desktop",
+    "platforms": [
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "recommended": [
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
+    "url": "https://github.com/throneproj/Throne/releases/latest",
+    "deeplink": "throne://addsub/{url_b64}",
+    "protocols": [
+      "reality",
+      "wss"
+    ]
+  },
+  {
     "name": "ShadowRocket",
     "platform": "iOS",
+    "platforms": [
+      "iOS"
+    ],
     "url": "https://apps.apple.com/app/shadowrocket/id932747118",
     "deeplink": "sub://{url_b64}",
     "protocols": [
@@ -13,8 +119,11 @@
   {
     "name": "Streisand",
     "platform": "iOS",
+    "platforms": [
+      "iOS"
+    ],
     "url": "https://apps.apple.com/app/streisand/id6450534064",
-    "deeplink": "streisand://import/{url}#{name}",
+    "deeplink": "streisand://import/{url_raw}#{name}",
     "protocols": [
       "reality",
       "xhttp",
@@ -24,6 +133,9 @@
   {
     "name": "v2RayTun",
     "platform": "iOS",
+    "platforms": [
+      "iOS"
+    ],
     "url": "https://apps.apple.com/app/v2raytun/id6476628951",
     "deeplink": "v2raytun://import/{url}",
     "protocols": [
@@ -35,8 +147,11 @@
   {
     "name": "v2rayNG",
     "platform": "Android",
+    "platforms": [
+      "Android"
+    ],
     "url": "https://github.com/2dust/v2rayNG/releases/latest",
-    "deeplink": "v2rayng://install-sub?url={url}&name={name}",
+    "deeplink": "v2rayng://install-sub?url={url}#{name}",
     "protocols": [
       "reality",
       "xhttp",
@@ -46,6 +161,9 @@
   {
     "name": "NekoBox",
     "platform": "Android",
+    "platforms": [
+      "Android"
+    ],
     "url": "https://github.com/MatsuriDayo/NekoBoxForAndroid/releases/latest",
     "deeplink": "sn://subscription?url={url}&name={name}",
     "protocols": [
@@ -56,7 +174,13 @@
   },
   {
     "name": "FlClash",
-    "platform": "All platforms",
+    "platform": "Android, desktop",
+    "platforms": [
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
     "url": "https://github.com/chen08209/FlClash/releases/latest",
     "deeplink": "flclash://install-config?url={url}",
     "protocols": [
@@ -66,11 +190,17 @@
   },
   {
     "name": "sing-box",
-    "platform": "All platforms",
+    "platform": "iOS, Android, macOS",
+    "platforms": [
+      "iOS",
+      "Android",
+      "macOS"
+    ],
     "url": "https://github.com/SagerNet/sing-box/releases/latest",
     "urls": {
       "iOS": "https://apps.apple.com/app/sing-box-vt/id6673731168",
-      "Android": "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa"
+      "Android": "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa",
+      "macOS": "https://apps.apple.com/app/sing-box-vt/id6673731168"
     },
     "deeplink": "sing-box://import-remote-profile?url={url}#{name}",
     "protocols": [
@@ -82,6 +212,13 @@
   {
     "name": "Hiddify",
     "platform": "All platforms",
+    "platforms": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
     "url": "https://github.com/hiddify/hiddify-app/releases/latest",
     "urls": {
       "iOS": "https://apps.apple.com/app/hiddify-proxy-vpn/id6596777532",
@@ -97,6 +234,13 @@
   {
     "name": "Karing",
     "platform": "All platforms",
+    "platforms": [
+      "iOS",
+      "Android",
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
     "url": "https://github.com/KaringX/karing/releases/latest",
     "urls": {
       "iOS": "https://apps.apple.com/app/karing/id6472431552",
@@ -111,7 +255,11 @@
   },
   {
     "name": "V2Box",
-    "platform": "All platforms",
+    "platform": "iOS, Android",
+    "platforms": [
+      "iOS",
+      "Android"
+    ],
     "url": "https://apps.apple.com/app/v2box-v2ray-client/id6446814690",
     "urls": {
       "iOS": "https://apps.apple.com/app/v2box-v2ray-client/id6446814690",
@@ -125,25 +273,14 @@
     ]
   },
   {
-    "name": "Happ",
-    "platform": "All platforms",
-    "url": "https://happ.su/",
-    "urls": {
-      "iOS": "https://apps.apple.com/app/happ-proxy-utility/id6504287215",
-      "Android": "https://play.google.com/store/apps/details?id=com.happproxy"
-    },
-    "deeplink": "happ://add/{url_raw}",
-    "protocols": [
-      "reality",
-      "xhttp",
-      "wss"
-    ]
-  },
-  {
     "name": "v2rayN",
-    "platform": "Windows",
+    "platform": "Desktop",
+    "platforms": [
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
     "url": "https://github.com/2dust/v2rayN/releases/latest",
-    "deeplink": "v2rayng://install-sub?url={url}&name={name}",
     "protocols": [
       "reality",
       "xhttp",
@@ -152,7 +289,12 @@
   },
   {
     "name": "Clash Verge Rev",
-    "platform": "Windows",
+    "platform": "Desktop",
+    "platforms": [
+      "Windows",
+      "macOS",
+      "Linux"
+    ],
     "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/latest",
     "deeplink": "clash://install-config?url={url}",
     "protocols": [

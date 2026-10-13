@@ -101,6 +101,12 @@ class TestLoadPWAStaticAssets:
         assert "styles.css" in assets
         assert "sw.js" in assets
         assert "icon.svg" in assets
+        assert "apps.json" in assets
+
+    def test_shared_catalog_carries_icons(self) -> None:
+        catalog = json.loads(load_pwa_static_assets()["apps.json"])
+        assert catalog["apps"][0]["name"] == "Happ"
+        assert all(app["icon"].startswith("data:image/webp;base64,") for app in catalog["apps"])
 
     def test_assets_are_bytes(self) -> None:
         assets = load_pwa_static_assets()
@@ -205,10 +211,10 @@ class TestUploadPWAAssets:
         upload_pwa_assets(conn)
         conn.assert_called_with_pattern("mkdir -p /var/www/private/pwa")
 
-    def test_uploads_all_four_static_files(self) -> None:
+    def test_uploads_every_shared_asset(self) -> None:
         conn = MockConnection()
         upload_pwa_assets(conn)
-        assert len(conn.writes) == 4
+        assert len(conn.writes) == len(load_pwa_static_assets())
 
     def test_uses_file_api_for_assets(self) -> None:
         conn = MockConnection()
@@ -231,5 +237,15 @@ class TestUploadPWAAssets:
         conn = MockConnection()
         upload_pwa_assets(conn)
         written_paths = {path for path, _data, _kwargs in conn.writes}
-        for fname in ("app.js", "styles.css", "sw.js", "icon.svg"):
+        for fname in ("app.js", "styles.css", "sw.js", "icon.svg", "apps.json"):
             assert f"/var/www/private/pwa/{fname}" in written_paths
+
+    def test_cache_version_follows_the_app_catalog(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A catalog-only change must still roll the service-worker cache."""
+        conn = MockConnection()
+        upload_pwa_assets(conn)
+        before = conn.write_map["/var/www/private/pwa/sw.js"]
+        monkeypatch.setattr("meridian.pwa.render_apps_catalog", lambda: '{"version": 1, "apps": []}')
+        conn = MockConnection()
+        upload_pwa_assets(conn)
+        assert conn.write_map["/var/www/private/pwa/sw.js"] != before

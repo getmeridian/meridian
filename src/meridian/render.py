@@ -20,11 +20,62 @@ logger = logging.getLogger(__name__)
 # PWA rendering functions
 # ---------------------------------------------------------------------------
 
-# App download links — matches website/src/data/apps.json (single source of truth)
+# App catalog — matches website/src/data/apps.json (single source of truth).
+# ``platforms`` lists where the app runs; ``recommended`` lists where the page
+# features it, in file order (Happ first, then the Mihomo apps, then Throne).
 _PWA_APPS: list[dict[str, Any]] = [
+    {
+        "name": "Happ",
+        "platform": "All platforms",
+        "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
+        "recommended": ["iOS", "Android", "Windows", "macOS", "Linux"],
+        "url": "https://happ.su/",
+        "urls": {
+            "iOS": "https://apps.apple.com/app/happ-proxy-utility/id6504287215",
+            "Android": "https://play.google.com/store/apps/details?id=com.happproxy",
+            "Windows": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+            "macOS": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+            "Linux": "https://github.com/Happ-proxy/happ-desktop/releases/latest",
+        },
+        "deeplink": "happ://add/{url_raw}",
+        "protocols": ["reality", "xhttp", "wss"],
+    },
+    {
+        "name": "FlClashX",
+        "platform": "Android, desktop",
+        "platforms": ["Android", "Windows", "macOS", "Linux"],
+        "recommended": ["Android", "Windows", "macOS", "Linux"],
+        "url": "https://github.com/pluralplay/FlClashX/releases/latest",
+        "deeplink": "flclashx://install-config?url={url}",
+        "protocols": ["reality", "wss"],
+    },
+    {
+        "name": "Clash Mi",
+        "platform": "All platforms",
+        "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
+        "recommended": ["iOS", "Android", "Windows", "macOS", "Linux"],
+        "url": "https://clashmi.app/download",
+        "urls": {
+            "iOS": "https://apps.apple.com/app/clash-mi/id6744321968",
+            "Android": "https://github.com/KaringX/clashmi/releases/latest",
+            "Windows": "https://github.com/KaringX/clashmi/releases/latest",
+        },
+        "deeplink": "clash://install-config?overwrite=no&name={name}&url={url}",
+        "protocols": ["reality", "wss"],
+    },
+    {
+        "name": "Throne",
+        "platform": "Desktop",
+        "platforms": ["Windows", "macOS", "Linux"],
+        "recommended": ["Windows", "macOS", "Linux"],
+        "url": "https://github.com/throneproj/Throne/releases/latest",
+        "deeplink": "throne://addsub/{url_b64}",
+        "protocols": ["reality", "wss"],
+    },
     {
         "name": "ShadowRocket",
         "platform": "iOS",
+        "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/shadowrocket/id932747118",
         "deeplink": "sub://{url_b64}",
         "protocols": ["reality", "xhttp", "wss"],
@@ -32,13 +83,15 @@ _PWA_APPS: list[dict[str, Any]] = [
     {
         "name": "Streisand",
         "platform": "iOS",
+        "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/streisand/id6450534064",
-        "deeplink": "streisand://import/{url}#{name}",
+        "deeplink": "streisand://import/{url_raw}#{name}",
         "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "v2RayTun",
         "platform": "iOS",
+        "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/v2raytun/id6476628951",
         "deeplink": "v2raytun://import/{url}",
         "protocols": ["reality", "xhttp", "wss"],
@@ -46,31 +99,36 @@ _PWA_APPS: list[dict[str, Any]] = [
     {
         "name": "v2rayNG",
         "platform": "Android",
+        "platforms": ["Android"],
         "url": "https://github.com/2dust/v2rayNG/releases/latest",
-        "deeplink": "v2rayng://install-sub?url={url}&name={name}",
+        "deeplink": "v2rayng://install-sub?url={url}#{name}",
         "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "NekoBox",
         "platform": "Android",
+        "platforms": ["Android"],
         "url": "https://github.com/MatsuriDayo/NekoBoxForAndroid/releases/latest",
         "deeplink": "sn://subscription?url={url}&name={name}",
         "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "FlClash",
-        "platform": "All platforms",
+        "platform": "Android, desktop",
+        "platforms": ["Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/chen08209/FlClash/releases/latest",
         "deeplink": "flclash://install-config?url={url}",
         "protocols": ["reality", "wss"],
     },
     {
         "name": "sing-box",
-        "platform": "All platforms",
+        "platform": "iOS, Android, macOS",
+        "platforms": ["iOS", "Android", "macOS"],
         "url": "https://github.com/SagerNet/sing-box/releases/latest",
         "urls": {
             "iOS": "https://apps.apple.com/app/sing-box-vt/id6673731168",
             "Android": "https://play.google.com/store/apps/details?id=io.nekohasekai.sfa",
+            "macOS": "https://apps.apple.com/app/sing-box-vt/id6673731168",
         },
         "deeplink": "sing-box://import-remote-profile?url={url}#{name}",
         "protocols": ["reality", "xhttp", "wss"],
@@ -78,6 +136,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     {
         "name": "Hiddify",
         "platform": "All platforms",
+        "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/hiddify/hiddify-app/releases/latest",
         "urls": {
             "iOS": "https://apps.apple.com/app/hiddify-proxy-vpn/id6596777532",
@@ -89,6 +148,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     {
         "name": "Karing",
         "platform": "All platforms",
+        "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/KaringX/karing/releases/latest",
         "urls": {
             "iOS": "https://apps.apple.com/app/karing/id6472431552",
@@ -99,7 +159,8 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "V2Box",
-        "platform": "All platforms",
+        "platform": "iOS, Android",
+        "platforms": ["iOS", "Android"],
         "url": "https://apps.apple.com/app/v2box-v2ray-client/id6446814690",
         "urls": {
             "iOS": "https://apps.apple.com/app/v2box-v2ray-client/id6446814690",
@@ -109,26 +170,16 @@ _PWA_APPS: list[dict[str, Any]] = [
         "protocols": ["reality", "xhttp", "wss"],
     },
     {
-        "name": "Happ",
-        "platform": "All platforms",
-        "url": "https://happ.su/",
-        "urls": {
-            "iOS": "https://apps.apple.com/app/happ-proxy-utility/id6504287215",
-            "Android": "https://play.google.com/store/apps/details?id=com.happproxy",
-        },
-        "deeplink": "happ://add/{url_raw}",
-        "protocols": ["reality", "xhttp", "wss"],
-    },
-    {
         "name": "v2rayN",
-        "platform": "Windows",
+        "platform": "Desktop",
+        "platforms": ["Windows", "macOS", "Linux"],
         "url": "https://github.com/2dust/v2rayN/releases/latest",
-        "deeplink": "v2rayng://install-sub?url={url}&name={name}",
         "protocols": ["reality", "xhttp", "wss"],
     },
     {
         "name": "Clash Verge Rev",
-        "platform": "Windows",
+        "platform": "Desktop",
+        "platforms": ["Windows", "macOS", "Linux"],
         "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/latest",
         "deeplink": "clash://install-config?url={url}",
         "protocols": ["reality", "wss"],
@@ -138,6 +189,10 @@ _PWA_APPS: list[dict[str, Any]] = [
 # App icon name mapping: app name → icon filename (without extension).
 # Icons stored as optimized WebP in src/meridian/icons/.
 _APP_ICON_NAMES = {
+    "Happ": "happ",
+    "FlClashX": "flclashx",
+    "Clash Mi": "clash-mi",
+    "Throne": "throne",
     "ShadowRocket": "shadowrocket",
     "Streisand": "streisand",
     "v2RayTun": "v2raytun",
@@ -148,7 +203,6 @@ _APP_ICON_NAMES = {
     "Hiddify": "hiddify",
     "Karing": "karing",
     "V2Box": "v2box",
-    "Happ": "happ",
     "v2rayN": "v2rayn",
     "Clash Verge Rev": "clash-verge-rev",
 }
@@ -235,9 +289,6 @@ def render_config_json(
                     }
                 )
 
-    icons = _load_app_icons()
-    apps = [{**app, "icon": icons[app["name"]]} if app["name"] in icons else app for app in _PWA_APPS]
-
     config = {
         "version": 1,
         "client_name": name,
@@ -245,7 +296,8 @@ def render_config_json(
         "domain": domain,
         "protocols": protocols,
         "relays": relays,
-        "apps": apps,
+        # Fallback only: the page prefers the shared, icon-bearing pwa/apps.json.
+        "apps": _PWA_APPS,
         "generated_at": now,
     }
     if server_name:
@@ -260,6 +312,18 @@ def render_config_json(
         config["subscription_url"] = subscription_url
         config["subscription_qr_b64"] = generate_qr_base64(subscription_url)
     return json.dumps(config, indent=2, ensure_ascii=False)
+
+
+def render_apps_catalog() -> str:
+    """Render the shared ``pwa/apps.json`` app catalog with embedded icons.
+
+    One cached copy serves every client page, so catalog updates reach
+    existing pages with the next asset upload and per-client ``config.json``
+    stays small.
+    """
+    icons = _load_app_icons()
+    apps = [{**app, "icon": icons[app["name"]]} if app["name"] in icons else app for app in _PWA_APPS]
+    return json.dumps({"version": 1, "apps": apps}, indent=2, ensure_ascii=False)
 
 
 def render_subscription(
