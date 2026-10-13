@@ -83,7 +83,7 @@ def run_add(
             hint=("Use `meridian setup` to review topology-managed server choices."),
             hint_type="user",
         )
-    if not request.yes and not confirm(f"Add {request.name or request.ip} as a V4 exit?"):
+    if not request.yes and not confirm(f"Add {request.name or request.ip} as an exit?"):
         raise typer.Exit(1)
 
     resolved = ensure_server_connection(target)
@@ -102,7 +102,7 @@ def run_add(
         fail(exc)
     except OSError as exc:
         fail(
-            f"Could not save the V4 node server profile: {exc}",
+            f"Could not save the server profile: {exc}",
             hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )

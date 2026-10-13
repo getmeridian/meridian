@@ -1,4 +1,4 @@
-"""User-facing entry point for the resumable V4 setup journey."""
+"""User-facing entry point for the resumable setup journey."""
 
 from __future__ import annotations
 

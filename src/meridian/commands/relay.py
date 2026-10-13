@@ -107,7 +107,7 @@ def run_deploy(
         fail(exc)
     except OSError as exc:
         fail(
-            f"Could not save the V4 relay server profile: {exc}",
+            f"Could not save the relay server profile: {exc}",
             hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )

@@ -212,7 +212,7 @@ class TestServerRegistry:
             )
         )
 
-        with pytest.raises(LocalStateError, match="V4 control plane"):
+        with pytest.raises(LocalStateError, match="the control plane"):
             registry.remove(entry.id, cluster=cluster)
 
         assert registry.find(entry.id) is not None

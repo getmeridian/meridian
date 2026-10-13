@@ -1,4 +1,4 @@
-"""V4 access-user mutation flow for the client command group."""
+"""Access-user mutation flow for the client command group."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def run_add_v4(
     *,
     publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
 ) -> None:
-    """Add access users through the reviewed V4 compiler and resource drivers."""
+    """Add access users through the reviewed compiler and resource drivers."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import add_access_users_to_intent
@@ -44,7 +44,7 @@ def run_add_v4(
     already_declared = [name for name in names if name in intent.access.users]
     if already_declared:
         fail(
-            "Client(s) already declared in V4 topology: " + ", ".join(already_declared),
+            "Client(s) already declared in the topology: " + ", ".join(already_declared),
             hint="Run `meridian apply` to restore a missing declared client.",
             hint_type="user",
         )
@@ -54,7 +54,7 @@ def run_add_v4(
         for name in names:
             if get_user_or_fail(panel, name, action="check") is not None:
                 fail(
-                    f"Client '{name}' already exists outside the V4 access intent",
+                    f"Client '{name}' already exists in the panel but is not one of your fleet's clients",
                     hint="Rename the unmanaged panel user or recover its Meridian ownership before adding it.",
                     hint_type="user",
                 )
@@ -75,7 +75,7 @@ def run_add_v4(
             user = get_user_or_fail(refreshed_panel, name, action="verify")
             if user is None:
                 fail(
-                    f"V4 client '{name}' was not observable after apply",
+                    f"Client '{name}' is missing from the panel after apply",
                     hint="Retry `meridian apply` and inspect the access-user resource.",
                     hint_type="system",
                 )
@@ -147,7 +147,7 @@ def _report_state_failure(
 
     if observed:
         warning = build_client_persistence_warning(
-            operation="applying V4 client access",
+            operation="applying client access",
             reason=reason,
         )
         if is_json_mode():
@@ -157,7 +157,7 @@ def _report_state_failure(
                     command="client.add",
                     data=result.to_data(),
                     summary=Summary(
-                        text=f"Observed {len(observed)} requested V4 client(s), but local state was not saved",
+                        text=f"Observed {len(observed)} requested client(s), but local state was not saved",
                         changed=True,
                         counts={
                             "added": len(observed),
@@ -172,7 +172,7 @@ def _report_state_failure(
             )
             raise typer.Exit(3)
 
-        ok(f"Requested V4 client(s) now exist: {', '.join(name for name, _user in observed)}")
+        ok(f"Requested client(s) now exist: {', '.join(name for name, _user in observed)}")
         warn(warning.message)
         raise typer.Exit(3)
 

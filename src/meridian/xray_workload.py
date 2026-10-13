@@ -1,4 +1,4 @@
-"""Render one reviewed V4 workload into a Remnawave Xray profile."""
+"""Render one reviewed workload into a Remnawave Xray profile."""
 
 from __future__ import annotations
 

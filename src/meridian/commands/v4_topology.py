@@ -1,4 +1,4 @@
-"""Shared CLI presentation for compiled V4 topology plans."""
+"""CLI presentation for compiled topology plans and applies."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def run_v4_apply(
     json_output: bool,
     operation: OperationContext,
 ) -> None:
-    """Apply compiler-owned V4 topology through the checkpointed executor."""
+    """Apply the compiled topology through the checkpointed executor."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.core.setup import SetupDraft
     from meridian.servers import ServerRegistry
@@ -62,7 +62,7 @@ def run_v4_apply(
             )
             raise typer.Exit(2)
         err_console.print(
-            f"  [bold]V4 topology[/bold]: "
+            f"  [bold]Topology[/bold]: "
             f"{len(review.plan.resources)} managed resources\n"
             f"  [dim]{review.review_hash}[/dim]"
         )
@@ -77,7 +77,7 @@ def run_v4_apply(
         )
     status: OutputStatus = "failed" if not result.all_succeeded else "changed" if result.changed else "no_changes"
     exit_code = 0 if result.all_succeeded else 3
-    summary_text = "V4 topology converged." if result.all_succeeded else "V4 topology apply failed."
+    summary_text = "Topology converged." if result.all_succeeded else "Topology apply failed."
     result_data = build_compiled_apply_result(
         result,
         exit_code=exit_code,
@@ -117,16 +117,16 @@ def run_v4_apply(
         for retirement_error in result.retirement_errors:
             warn(f"Failed: {retirement_error}")
         fail(
-            "V4 topology apply failed.",
+            "Topology apply failed.",
             hint="Fix the failed resource and rerun `meridian apply`.",
             hint_type="system",
         )
     for logical_id in result.retired:
         ok(f"Removed {logical_id}")
     if result.changed:
-        ok("V4 topology applied.")
+        ok("Topology applied.")
     else:
-        ok("No changes needed — V4 topology is converged.")
+        ok("No changes needed — the topology is converged.")
 
 
 def run_v4_plan(
@@ -135,7 +135,7 @@ def run_v4_plan(
     json_output: bool,
     operation: OperationContext,
 ) -> None:
-    """Render the deterministic compiler graph used by V4 apply."""
+    """Render the deterministic compiler graph that apply would execute."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
@@ -166,21 +166,21 @@ def run_v4_plan(
     if json_output:
         if observation_errors:
             summary_text = (
-                f"Could not observe {len(observation_errors)} of {len(resources)} V4 resources; plan is inconclusive."
+                f"Could not observe {len(observation_errors)} of {len(resources)} resources; plan is inconclusive."
             )
         elif converged:
-            summary_text = "V4 topology is converged."
+            summary_text = "Topology is converged."
         elif drifted and state_changes:
             summary_text = (
-                f"{len(drifted)} of {len(resources)} V4 resources require repair; "
+                f"{len(drifted)} of {len(resources)} resources require repair; "
                 "saved generation state also requires activation."
             )
         elif drifted:
-            summary_text = f"{len(drifted)} of {len(resources)} V4 resources require repair."
+            summary_text = f"{len(drifted)} of {len(resources)} resources require repair."
         elif inspection.retiring:
             summary_text = f"{len(inspection.retiring)} resources will be removed."
         else:
-            summary_text = "V4 resources match; saved generation state requires activation."
+            summary_text = "Resources match; saved generation state requires activation."
         result_data = CompiledPlanResult(
             plan_hash=inspection.plan_hash,
             converged=converged,
@@ -244,7 +244,7 @@ def run_v4_plan(
     else:
         state = "[green]converged[/green]" if converged else "[yellow]changes pending[/yellow]"
         reviewed = inspection.review_hash or inspection.plan_hash
-        err_console.print(f"\n  [bold]V4 topology[/bold] — {state}\n  [dim]{reviewed}[/dim]\n")
+        err_console.print(f"\n  [bold]Topology[/bold] — {state}\n  [dim]{reviewed}[/dim]\n")
         for kind_name, count in sorted(counts.items()):
             err_console.print(f"  {kind_name}: {count}")
         for item in drifted:

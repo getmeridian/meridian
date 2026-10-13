@@ -171,7 +171,7 @@ class ServerRegistry:
         self._store.upsert(profile)
 
     def assert_can_add(self, entry: ServerEntry) -> None:
-        """Reject host/title collisions that could retarget a stable V4 reference."""
+        """Reject host/title collisions that could retarget a stable server reference."""
         profiles = self._store.list()
         id_profile = next((profile for profile in profiles if entry.id and profile.id == entry.id), None)
         host_profile = next((profile for profile in profiles if profile.host == entry.host), None)
@@ -183,7 +183,7 @@ class ServerRegistry:
         if id_profile is not None and host_profile is not None and id_profile.id != host_profile.id:
             raise LocalStateError(
                 f"Saved server host {entry.host!r} belongs to '{host_profile.title}', not '{id_profile.title}'.",
-                hint="Use a unique server name and host. Change V4 role assignments through `meridian setup`.",
+                hint="Use a unique server name and host. Change role assignments through `meridian setup`.",
             )
         intended = id_profile or host_profile
         requested_tokens = {entry.host}
@@ -396,24 +396,24 @@ def _cluster_references(profile: ServerProfile, cluster: ClusterConfig) -> list[
     intent = cluster.topology_intent
     if intent is not None:
         if intent.control.server_ref in identities:
-            add("the V4 control plane")
+            add("the control plane")
         for exit_intent in intent.exits:
             if exit_intent.server_ref in identities:
-                add(f"V4 exit '{exit_intent.id}'")
+                add(f"exit '{exit_intent.id}'")
         for relay_intent in intent.transparent_relays:
             if identities.intersection(relay_intent.hop_server_refs):
-                add(f"V4 relay '{relay_intent.id}'")
+                add(f"relay '{relay_intent.id}'")
         for gateway in intent.routing_gateways:
             if gateway.server_ref in identities:
-                add(f"V4 routing gateway '{gateway.id}'")
+                add(f"routing gateway '{gateway.id}'")
 
     active_workloads = [workload for workload in cluster.workloads if workload.active]
     for workload in active_workloads:
         workload_refs = set(workload.server_refs) | set(workload.node_uuids) | set(workload.reality_keys)
         if identities.intersection(workload_refs):
-            add(f"V4 workload '{workload.id}'")
+            add(f"workload '{workload.id}'")
     active_allocation_ids = {inbound_ref for workload in active_workloads for inbound_ref in workload.inbound_uuids}
     for allocation in cluster.allocations.values():
         if allocation.logical_id in active_allocation_ids and allocation.server_ref in identities:
-            add(f"V4 allocation '{allocation.logical_id}'")
+            add(f"allocation '{allocation.logical_id}'")
     return references

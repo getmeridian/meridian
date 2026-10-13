@@ -330,7 +330,7 @@ def resolve_deployment_verification_context(
             if isinstance(exc, LocalStateError):
                 raise
             raise LocalStateError(
-                f"Cannot compile the saved V4 topology: {exc}",
+                f"Cannot compile the saved topology: {exc}",
                 hint="Review the topology with `meridian setup`, then retry.",
             ) from exc
         hint = exc.hint if isinstance(exc, LocalStateError) else "Review the saved topology and retry."
@@ -555,7 +555,7 @@ def _server_addresses(registry: ServerRegistry, server_refs: Iterable[str]) -> d
             addresses[server_ref] = str(ipaddress.ip_address(server_ref))
         else:
             raise LocalStateError(
-                f"V4 topology references missing saved server {server_ref!r}.",
+                f"The topology references missing saved server {server_ref!r}.",
                 hint="Repair the server shelf before running deployment-aware verification.",
             )
     return addresses

@@ -1,4 +1,4 @@
-"""Presentation-only resumable V4 setup journey.
+"""Presentation-only resumable setup journey.
 
 One flow for everyone: questions use the real terms (exit, relay, SNI) and explain
 each in a plain sentence where it first appears. Compilation, apply, and
