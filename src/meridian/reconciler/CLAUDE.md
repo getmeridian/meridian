@@ -9,6 +9,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Server artifacts are per-resource and rollback-safe** — Realm services and nginx files use hashed logical IDs; failed reloads restore previous files before the action fails.
 - **One progress stream** — `execute_resource_plan(reporter=, operation=)` emits `plan.action.started` then exactly one of completed/failed/skipped per action; `SetupRuntime` shares the same reporter and operation with baseline and control-plane provisioner steps, so Rich, JSONL, and Engine clients render one sequenced stream.
 - **Cancellation is cooperative** — the executor polls its token only between actions, before an unknown-outcome retry, and before retirement; the generation stays pending so re-running the same plan resumes from checkpoints.
+- **Applies are fenced on the control server** — `fence.py` decides and `state_fence.py` stores `/var/lib/meridian/fence.json` (fleet ID, last committed generation and plan hash, 30-minute lease) using compare-and-swap; the executor acquires the fence before `_begin_apply`, renews it between actions, commits it after the generation commits, and releases it on every exit.
 - **Server preparation is graph-owned** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; compiled rules alone open public ports.
 
 ## What's done well
@@ -27,6 +28,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
+- **Never apply from a copy behind the fence** — a lower generation or a same-generation hash mismatch refuses; a copy that is ahead heals the record (a lost commit), and only a fresh copy may replace a foreign fleet's fence.
 - **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
 - **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
 - **Attest server artifacts against their own inputs** — hashing the whole deployment contract makes every fleet edit re-run work on every server; include only the server's own target plus pins and renderer contract.

@@ -221,6 +221,9 @@ class ClusterConfig:
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
     connection_page_markers: list[str] = field(default_factory=list)
+    # Random ID shared by every copy of this fleet's state; the control server's
+    # apply fence refuses copies with another ID (see state_fence.py).
+    fleet_id: str = ""
     active_generation: int = 0
     active_plan_hash: str = ""
     pending_generation: int = 0

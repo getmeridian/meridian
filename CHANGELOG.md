@@ -100,6 +100,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
+- A copy of `~/.meridian` that is out of date can't undo newer changes. The
+  control server records the last change applied, and `apply` refuses to run
+  from an older copy or while another machine is applying.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and

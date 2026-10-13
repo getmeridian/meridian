@@ -52,6 +52,7 @@ from meridian.panel_bootstrap import (
     run_provisioner,
 )
 from meridian.provision.ensure import ensure_file_content
+from meridian.reconciler.fence import ApplyFence
 from meridian.reconciler.remnawave_drivers import (
     RemnawaveDriverContext,
     build_remnawave_drivers,
@@ -95,10 +96,12 @@ from meridian.resolve import ResolvedServer, connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.ssh import ServerConnection
+from meridian.state_fence import SSHApplyFence
 
 PersistCluster = Callable[[ClusterConfig], None]
 PanelFactory = Callable[[str, str], MeridianPanel]
 ConnectionBuilder = Callable[[ServerEntry], ServerConnection]
+FenceFactory = Callable[[ServerConnection], ApplyFence | None]
 ControlBootstrap = Callable[
     [ControlPlaneRuntimePayload, ResourcePlan, ClusterConfig, ServerEntry, ServerConnection],
     None,
@@ -181,8 +184,10 @@ class SetupRuntime:
         cancellation: CancellationToken | None = None,
         reporter: Reporter | None = None,
         operation: OperationContext | None = None,
+        fence_factory: FenceFactory | None = None,
     ) -> None:
         self._registry = registry
+        self._fence_factory: FenceFactory = fence_factory or SSHApplyFence
         self._cluster_loader = cluster_loader
         self._persist = persist or (lambda cluster: cluster.save())
         self._panel_factory = panel_factory
@@ -364,6 +369,7 @@ class SetupRuntime:
                 cancellation=self._cancellation,
                 reporter=self._reporter,
                 operation=self._operation,
+                fence=self._fence_factory(connections[control.server_ref]),
             )
         finally:
             panel.close()

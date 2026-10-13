@@ -222,6 +222,7 @@ def test_inspect_intent_reports_unavailable_control_ssh_as_observation_error(
         cluster_loader=lambda: cluster,
         panel_factory=lambda _url, _token: cast(MeridianPanel, panel),
         connection_builder=lambda _entry: connection,
+        fence_factory=lambda _conn: None,
     )
     monkeypatch.setattr(
         "meridian.setup.runtime.build_remnawave_drivers",
@@ -294,6 +295,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
             panel,
         ),
         connection_builder=lambda _entry: connection,
+        fence_factory=lambda _conn: None,
         control_bootstrap=bootstrap,
     )
     monkeypatch.setattr(
@@ -392,6 +394,7 @@ def test_apply_refuses_a_server_running_meridian_3_before_persisting_intent(tmp_
         cluster_loader=lambda: cluster,
         persist=persists.append,
         connection_builder=lambda _entry: connection,
+        fence_factory=lambda _conn: None,
         control_bootstrap=MagicMock(side_effect=AssertionError("must not bootstrap")),
     )
     draft = SetupDraft.from_intent(_intent())
@@ -468,6 +471,7 @@ def test_cancelled_apply_stops_before_remote_work_and_threads_the_token(
         cluster_loader=lambda: cluster,
         persist=lambda _state: None,
         connection_builder=lambda _entry: MagicMock(spec=ServerConnection),
+        fence_factory=lambda _conn: None,
         control_bootstrap=bootstrap,
         cancellation=flag,
     )
@@ -554,6 +558,7 @@ def _retiring_runtime(tmp_path, monkeypatch, cluster, retired, built, reporter=N
         persist=lambda _state: None,
         panel_factory=lambda _url, _token: cast(MeridianPanel, _Panel()),
         connection_builder=lambda entry: built.setdefault(entry.id, connection),
+        fence_factory=lambda _conn: None,
         control_bootstrap=MagicMock(side_effect=repair_control),
     )
 

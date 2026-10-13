@@ -26,6 +26,7 @@ from meridian.core.events import (
 from meridian.core.models import EventLevel, ResourceRef
 from meridian.core.output import OperationContext
 from meridian.core.reporters import Reporter, emit_event
+from meridian.reconciler.fence import ApplyFence, LocalFenceView
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -77,8 +78,13 @@ def execute_resource_plan(
     cancellation: CancellationToken | None = None,
     reporter: Reporter | None = None,
     operation: OperationContext | None = None,
+    fence: ApplyFence | None = None,
 ) -> ResourceExecutionResult:
     """Apply a reviewed plan with durable checkpoints and mandatory observation.
+
+    *fence* (the control server's record of the last committed generation) is
+    taken before anything changes, so a stale or foreign copy of the state
+    refuses instead of rewriting what another machine applied.
 
     *cancellation* is honored only between actions (and between provisioning
     steps inside an action). A started mutation always records its outcome
@@ -93,6 +99,49 @@ def execute_resource_plan(
     validate_resource_plan_transition(plan, cluster)
     save = persist or (lambda state: state.save())
     now = clock or (lambda: datetime.now(UTC))
+    if fence is not None:
+        fleet_id = fence.acquire(
+            LocalFenceView(
+                fleet_id=cluster.fleet_id,
+                active_generation=cluster.active_generation,
+                active_plan_hash=cluster.active_plan_hash,
+                fresh=cluster.active_generation == 0 and not cluster.managed_bindings,
+            )
+        )
+        cluster.fleet_id = fleet_id
+    try:
+        return _execute_fenced(
+            plan,
+            cluster,
+            drivers,
+            save=save,
+            now=now,
+            max_unknown_attempts=max_unknown_attempts,
+            after_apply=after_apply,
+            cancellation=cancellation,
+            reporter=reporter,
+            operation=operation,
+            fence=fence,
+        )
+    finally:
+        if fence is not None:
+            fence.release()
+
+
+def _execute_fenced(
+    plan: ResourcePlan,
+    cluster: ClusterConfig,
+    drivers: ResourceDrivers,
+    *,
+    save: PersistCluster,
+    now: Clock,
+    max_unknown_attempts: int,
+    after_apply: AfterApply | None,
+    cancellation: CancellationToken | None,
+    reporter: Reporter | None,
+    operation: OperationContext | None,
+    fence: ApplyFence | None,
+) -> ResourceExecutionResult:
     generation = _begin_apply(plan, cluster, save)
     actions = build_resource_actions(plan, generation)
     results: list[ResourceActionResult] = []
@@ -100,6 +149,8 @@ def execute_resource_plan(
 
     report = _ActionReporter(reporter, operation, total=len(actions))
     for index, action in enumerate(actions, start=1):
+        if fence is not None:
+            fence.renew()
         if cancellation is not None and cancellation.is_cancelled():
             raise _apply_cancelled(results, len(actions), f"Stopped before {action.resource.logical_id}.")
         blocked = [dependency for dependency in action.resource.dependencies if dependency not in succeeded]
@@ -154,6 +205,8 @@ def execute_resource_plan(
         execution = execution.model_copy(update={"retired": retired, "retirement_errors": errors})
     if execution.all_succeeded:
         _commit_generation(plan, generation, cluster, save)
+        if fence is not None:
+            fence.commit(generation, plan.plan_hash)
     return execution
 
 
