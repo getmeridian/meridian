@@ -420,7 +420,7 @@ def plan_cmd(
 
 @app.command("apply", rich_help_panel=CHECK_AND_FIX)
 def apply_cmd(
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
     json_output: bool = typer.Option(False, "--json", help="Emit final apply result as JSON"),
 ) -> None:
     """Apply the reviewed topology in cluster.yml to your servers
@@ -458,12 +458,7 @@ def setup_cmd(
         "--restart",
         help="Explicitly discard saved setup progress before starting",
     ),
-    yes: bool = typer.Option(
-        False,
-        "--yes",
-        "-y",
-        help="Approve review and apply without confirmation",
-    ),
+    yes: Yes = False,
 ) -> None:
     """Configure one or many servers with a resumable guided wizard
 
@@ -695,7 +690,7 @@ def client_list_cmd(
 @client_app.command("remove")
 def client_remove(
     name: str = typer.Argument(..., help="Client name"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
     """Remove a client permanently; their links stop working"""
@@ -761,7 +756,7 @@ def server_list_cmd() -> None:
 @server_app.command("remove")
 def server_remove_cmd(
     server: str = typer.Argument(..., help="Server name or IP"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
 ) -> None:
     """Remove a known server"""
     from meridian.commands.server import run_remove
@@ -998,7 +993,7 @@ def relay_list_cmd(
 def relay_remove_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
 ) -> None:
     """Remove relay chains through a relay server
 
@@ -1062,7 +1057,7 @@ def route_list_cmd(
 def route_remove_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
     route_id: str = typer.Argument(..., help="Route ID from `meridian route list`"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
     """Remove one egress override; its destinations follow the exit's default again"""
@@ -1150,7 +1145,7 @@ def node_replace_cmd(
 @node_app.command("remove")
 def node_remove_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    yes: Yes = False,
     force: bool = typer.Option(False, "--force", help="Also remove relay chains that route to this exit"),
 ) -> None:
     """Remove an exit or routing gateway from the fleet
