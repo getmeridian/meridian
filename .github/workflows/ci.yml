@@ -59,6 +59,11 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check src/ tests/
 
+      # Findings surface as PR annotations; the step never fails the build.
+      - name: Dead-code report (warnings only)
+        continue-on-error: true
+        run: uv run python scripts/find_dead_code.py
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
