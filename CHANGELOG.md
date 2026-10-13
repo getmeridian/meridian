@@ -145,6 +145,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   installed.
 - Panel and connection-page links typed or copied without the trailing slash
   now open; they used to redirect to an internal port and fail.
+- XHTTP links work. Apps sending the default `chrome` fingerprint speak
+  HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
 - A fresh deploy with `--hysteria2` converges. The node started before its
   certificate existed, so Xray refused to run and the deploy stopped.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never

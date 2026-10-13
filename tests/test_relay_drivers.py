@@ -548,7 +548,7 @@ def _result(
     )
 
 
-def test_v4_http_artifact_redirects_relatively_behind_the_stream_router() -> None:
+def test_v4_http_artifact_redirects_relatively_and_speaks_http2() -> None:
     from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec
     from meridian.reconciler.server_render import render_nginx_artifact
 
@@ -571,3 +571,5 @@ def test_v4_http_artifact_redirects_relatively_behind_the_stream_router() -> Non
     rendered = render_nginx_artifact("nginx:srv-exit:http:8444", payload, ADDRESSES)
     assert "listen 127.0.0.1:8444 ssl;" in rendered
     assert "absolute_redirect off;" in rendered
+    # Xray XHTTP with a browser fingerprint always speaks HTTP/2; HTTP/1.1 replies broke it.
+    assert "    http2 on;\n" in rendered

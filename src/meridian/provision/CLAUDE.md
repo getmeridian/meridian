@@ -37,6 +37,7 @@
 - **nginx stream = dynamic module** — install `libnginx-mod-stream` package.
 - **nginx ≥ 1.25 comes from nginx.org** — `http2 on;` needs it and Ubuntu 24.04 ships 1.24; apt must keep old conffiles (`--force-confdef --force-confold`, a non-TTY conffile prompt aborts dpkg) and the nginx.org `nginx.conf` needs the `sites-enabled` include. The system-lab image pre-installs 1.27 and hides all three.
 - **Internal TLS servers need `absolute_redirect off`** — they listen on 127.0.0.1:8443 behind the 443 stream router, so nginx's automatic `/path` → `/path/` redirect pointed browsers at `:8443`.
+- **Internal TLS servers need `http2 on`** — Xray's XHTTP client with a browser fingerprint speaks HTTP/2 whatever ALPN returns; an HTTP/1.1 reply ("frame too large") broke every default XHTTP link.
 - **`return 444` is banned from HTTPS blocks** — use 403/404 instead (less fingerprintable).
 - **Per-relay nginx files** — relay SNI routing uses per-file config, not monolithic rewrite.
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443; rewriting it duplicates the listener and fails `nginx -t` on every re-bootstrap.

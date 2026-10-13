@@ -220,6 +220,8 @@ def _render_http(
         "# Managed by Meridian v4. Manual edits will be replaced.\n" + "\n".join(upstreams) + "\n"
         "server {\n"
         f"    listen 127.0.0.1:{payload.listener_port} ssl;\n"
+        # XHTTP clients with a browser fingerprint speak HTTP/2 regardless of ALPN.
+        "    http2 on;\n"
         f"    server_name {payload.tls_hostname};\n"
         "    server_tokens off;\n"
         "    absolute_redirect off;\n"
