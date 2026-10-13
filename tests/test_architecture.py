@@ -100,7 +100,6 @@ COMPILER_FORBIDDEN = (
 # from commands/.
 LIBRARY_MODULES = [
     SRC / "panel_bootstrap.py",
-    SRC / "capabilities.py",
     SRC / "node_deploy.py",
     SRC / "reality_keys.py",
 ]

@@ -242,16 +242,10 @@ def run(
             xray_status = "NOT RUNNING - proxy traffic is not flowing"
     sections.append(("Xray Process", xray_status))
 
-    # --- Node capabilities ---
-    from meridian.capabilities import detect_capabilities
-
-    cap_lines = ["not applicable for this server's configured roles"]
     if xray_expected:
-        caps = detect_capabilities(evidence_conn)
-        cap_lines = [f"Xray version: {caps.xray_version or 'unknown'}"]
-        enabled = [k for k in ("reality", "xhttp", "wss", "hysteria2", "finalmask") if getattr(caps, k)]
-        cap_lines.append(f"Enabled: {', '.join(enabled) if enabled else 'none detected'}")
-    sections.append(("Node Capabilities", "\n".join(cap_lines)))
+        sections.append(
+            ("Xray Version", _collect("docker exec remnawave-node rw-core version 2>/dev/null", timeout=15))
+        )
 
     # --- Role-specific runtime evidence ---
     if xray_expected:
