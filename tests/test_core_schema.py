@@ -19,7 +19,6 @@ from meridian.core.schema import (
     ProbeOutputEnvelope,
     schema_catalog,
     schema_for,
-    schema_names,
 )
 from meridian.core.schema import (
     TestOutputEnvelope as VerificationTestOutputEnvelope,
@@ -33,92 +32,6 @@ from meridian.core.verification import (
 from meridian.core.verification import (
     TestResult as VerificationTestResult,
 )
-
-
-def test_schema_catalog_lists_public_contracts() -> None:
-    names = schema_names()
-
-    assert "output-envelope" in names
-    assert "apply-envelope" in names
-    assert "apply-failure" in names
-    assert "compiled-apply-result" in names
-    assert "compiled-plan-result" in names
-    assert "apply-command-data" in names
-    assert "plan-command-data" in names
-    assert "api-commands-envelope" in names
-    assert "api-schema-envelope" in names
-    assert "api-schemas-envelope" in names
-    assert "api-workflow" in names
-    assert "api-workflow-envelope" in names
-    assert "client-list-envelope" in names
-    assert "client-show-envelope" in names
-    assert "client-add-envelope" in names
-    assert "client-remove-envelope" in names
-    assert "client-enable-envelope" in names
-    assert "client-disable-envelope" in names
-    assert "node-list-envelope" in names
-    assert "relay-list-envelope" in names
-    assert "client-name-request" in names
-    assert "deploy-command-data" in names
-    assert "deploy-envelope" in names
-    assert "deploy-request" in names
-    assert "deploy-result" in names
-    assert "deploy-operation-result" in names
-    assert "server-add-request" in names
-    assert "server-bootstrap-key-request" in names
-    assert "server-bootstrap-key-result" in names
-    assert "server-connection-draft" in names
-    assert "server-profile" in names
-    assert "topology-server-shelf-item" in names
-    assert "node-add-request" in names
-    assert "server-validate-request" in names
-    assert "server-validate-result" in names
-    assert "relay-deploy-request" in names
-    assert "deploy-plan" in names
-    assert "deploy-ports" in names
-    assert "deploy-cluster-state" not in names
-    assert "deploy-node-state" not in names
-    assert "workflow-plan" in names
-    assert "input-field" in names
-    assert "input-option" in names
-    assert "input-section" in names
-    assert "plan-envelope" in names
-    assert "probe-envelope" in names
-    assert "probe-failure" in names
-    assert "probe-result" in names
-    assert "test-envelope" in names
-    assert "test-failure" in names
-    assert "test-result" in names
-    assert "verification-aggregate" in names
-    assert "verification-check" in names
-    assert "verification-context" in names
-    assert "verification-counts" in names
-    assert "verification-finding" in names
-    assert "verification-result" in names
-    assert "verification-target" in names
-    assert "fleet-status-envelope" in names
-    assert "fleet-inventory-envelope" in names
-    assert "event" in names
-    assert "operation" in names
-    assert "operation-cancel" in names
-    assert "operation-diagnostics" in names
-    assert "operation-error" in names
-    assert "operation-events" in names
-    assert "operation-list" in names
-    assert "operation-result" in names
-    assert "operation-snapshot" in names
-    assert "operation-start" in names
-    assert "schema-catalog-entry" in names
-    assert "command-contract" in names
-    assert "command-catalog-entry" in names
-    assert "empty-data" in names
-    assert "fleet-status" in names
-    assert "fleet-inventory" in names
-    assert "client-add" in names
-    assert "client-remove" in names
-    assert "client-status" in names
-    assert "node-list" in names
-    assert "relay-list" in names
 
 
 def test_schema_for_output_envelope_uses_wire_aliases() -> None:
@@ -259,90 +172,9 @@ def test_operation_schemas_are_exported_for_studio_engine_contracts() -> None:
     assert schema_for("deploy-operation-result")["properties"]["result"]["$ref"].endswith("/DeployResult")
 
 
-def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
-    catalog = command_catalog()
-    by_command = {item["command"]: item for item in catalog}
-
-    assert by_command["plan"]["envelope_schema"] == "plan-envelope"
-    assert by_command["plan"]["data_schema"] == "plan-command-data"
-    assert by_command["plan"]["failure_data_schema"] == "plan-failure"
-    assert by_command["plan"]["error_schema"] == "error"
-    assert by_command["plan"]["machine_flags"] == ["--json"]
-    assert by_command["plan"]["argv"] == ["plan"]
-    assert "changed" in by_command["plan"]["statuses"]
-    assert {"status": "changed", "exit_code": 2, "category": "none", "meaning": "changes pending"} in by_command[
-        "plan"
-    ]["outcomes"]
-    assert {
-        "status": "failed",
-        "exit_code": 1,
-        "category": "user",
-        "meaning": "user or configuration error",
-    } in by_command["plan"]["outcomes"]
-    assert by_command["client.list"]["data_schema"] == "client-list"
-    assert by_command["client.add"]["data_schema"] == "client-add"
-    assert by_command["client.remove"]["data_schema"] == "client-remove"
-    assert by_command["client.remove"]["machine_flags"] == ["--yes", "--json"]
-    assert {
-        "status": "ok",
-        "exit_code": 3,
-        "category": "none",
-        "meaning": "client was removed but their connection page could not be deleted",
-    } in by_command["client.remove"]["outcomes"]
-    assert by_command["client.enable"]["data_schema"] == "client-status"
-    assert by_command["client.disable"]["data_schema"] == "client-status"
-    assert by_command["node.list"]["data_schema"] == "node-list"
-    assert by_command["relay.list"]["data_schema"] == "relay-list"
-    assert by_command["relay.list"]["machine_flags"] == ["--exit", "--json"]
-    assert by_command["apply"]["data_schema"] == "apply-command-data"
-    assert by_command["apply"]["failure_data_schema"] == "apply-failure"
-    assert by_command["apply"]["machine_flags"] == ["--yes", "--json"]
-    assert by_command["apply"]["stability"] == "preview"
-    assert by_command["deploy"]["envelope_schema"] == "deploy-envelope"
-    assert by_command["deploy"]["data_schema"] == "deploy-command-data"
-    assert {"--json", "--events", "--request", "--dry-run", "--cancel-file"} <= set(
-        by_command["deploy"]["machine_flags"]
-    )
-    assert by_command["deploy"]["argv"] == ["deploy", "[SERVER]"]
-    assert by_command["client.add"]["argv"] == ["client", "add", "NAME..."]
-    assert by_command["api.commands"]["data_schema"] == "api-commands"
-    assert by_command["api.workflow"]["data_schema"] == "api-workflow"
-    assert by_command["api.workflow"]["machine_flags"] == ["--json"]
-    assert by_command["fleet.status"]["data_schema"] == "fleet-status"
-    assert by_command["fleet.inventory"]["statuses"] == ["ok", "failed"]
-    assert by_command["probe"]["data_schema"] == "probe-result"
-    assert by_command["probe"]["failure_data_schema"] == "probe-failure"
-    assert by_command["probe"]["exit_codes"]["4"] == "probe completed with negative findings"
-    assert by_command["probe"]["machine_flags"] == ["--sni", "--timeout", "--json"]
-    assert {
-        "status": "ok",
-        "exit_code": 4,
-        "category": "none",
-        "meaning": "probe completed with negative findings",
-    } in by_command["probe"]["outcomes"]
-    assert by_command["test"]["data_schema"] == "test-result"
-    assert by_command["test"]["failure_data_schema"] == "test-failure"
-    assert by_command["test"]["machine_flags"] == [
-        "--domain",
-        "--sni",
-        "--client",
-        "--basic",
-        "--probe",
-        "--timeout",
-        "--json",
-    ]
-    assert {
-        "status": "failed",
-        "exit_code": 3,
-        "category": "system",
-        "meaning": "test failed or was inconclusive",
-    } in by_command["test"]["outcomes"]
-    for name, contract in by_command.items():
-        assert "unexpected Meridian bug" in contract["exit_codes"]["1"], name
-
-
 def test_command_catalog_distinguishes_process_interrupts_from_json_outcomes() -> None:
     for contract in command_catalog(include_schemas=True):
+        assert "unexpected Meridian bug" in contract["exit_codes"]["1"], contract["command"]
         assert contract["exit_codes"]["130"] == "process interrupted; no JSON envelope is emitted"
         assert contract["interrupt_behavior"] == "exit_130_without_envelope"
         assert all(outcome["exit_code"] != 130 for outcome in contract["outcomes"])

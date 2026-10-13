@@ -28,7 +28,25 @@ from meridian.core.validation import validation_error_hint, wrap_validation_erro
 def test_ip_value_accepts_ipv4_and_ipv6() -> None:
     assert ServerAddRequest(ip="198.51.100.10").ip == "198.51.100.10"
     assert ServerAddRequest(ip="2001:db8::1").ip == "2001:db8::1"
-    assert is_ip("2001:db8::1") is True
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("198.51.100.1", True),
+        ("2001:db8::1", True),
+        ("2001:0db8:0000:0000:0000:0000:0000:0001", True),
+        ("::1", True),
+        ("example.com", False),
+        ("", False),
+        # Brackets are URL notation, not part of the address.
+        ("[2001:db8::1]", False),
+        ("not-an-ip", False),
+        ("256.1.2.3", False),
+    ],
+)
+def test_is_ip(value: str, expected: bool) -> None:
+    assert is_ip(value) is expected
 
 
 def test_ip_value_rejects_typos_with_readable_hint() -> None:
