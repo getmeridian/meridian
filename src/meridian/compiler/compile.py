@@ -390,7 +390,8 @@ def compile_topology(
 
     if intent.forward_client_ips:
         forward_client_ips(builder, ports)
-    assign_host_positions(builder)
+    control_first = sorted(intent.exits, key=lambda item: (item.server_ref != intent.control.server_ref, item.id))
+    assign_host_positions(builder, [exit_.id for exit_ in control_first])
     attach_server_baselines(builder, baseline_ids)
     ordered = builder.ordered()
     intent_hash = canonical_hash(normalized_intent(intent))

@@ -121,6 +121,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - `meridian test` names each path like its subscription entry ("Reality ·
   Chrome", "XHTTP · Firefox", "Hysteria2 · UDP") instead of calling every
   VLESS path "VLESS".
+- With several exits, subscriptions list the first server's entries ahead of
+  later ones within each method instead of sorting them by exit name.
 
 ### Sharing
 - **Connection names show where traffic exits** — entries lead with the exit's

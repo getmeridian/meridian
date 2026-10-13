@@ -1011,3 +1011,24 @@ def test_bare_ip_paths_join_the_panel_on_the_control_and_own_the_no_sni_route_el
         ("srv-b", "198.51.100.20"),
     }
     assert certificate_directory("198.51.100.10") == "/etc/ssl/meridian"
+
+
+def test_hosts_follow_exit_order_within_each_protocol() -> None:
+    """The control server's exit leads even when another exit's ID sorts first ("exit-2" < "main")."""
+    from meridian.setup.editor import add_exit_to_intent
+    from meridian.setup.single_server import single_server_intent
+
+    intent = single_server_intent(None, server_ref="srv-a", sni="www.example.com")
+    intent = add_exit_to_intent(intent, server_ref="srv-b", title="exit-2", reality_sni="www.example.com")
+    assert [exit_.id for exit_ in intent.exits] == ["main", "exit-2"]
+
+    plan = compile_topology(intent)
+
+    hosts = sorted(
+        (resource.payload for resource in plan.resources if isinstance(resource.payload, HostPayload)),
+        key=lambda host: host.view_position,
+    )
+    visible = [host for host in hosts if not host.is_hidden and not host.xray_json_template_ref]
+    reality_owners = [host.owner_ref for host in visible if host.protocol == "reality"]
+    assert reality_owners[0] == "main"
+    assert reality_owners == sorted(reality_owners, key=["main", "exit-2"].index)

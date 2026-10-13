@@ -196,20 +196,25 @@ def _virtual_host(
     )
 
 
-def assign_host_positions(builder: PlanBuilder) -> None:
-    """Order Hosts in every subscription by protocol priority, not by path ID.
+def assign_host_positions(builder: PlanBuilder, exit_ids: list[str]) -> None:
+    """Order Hosts in every subscription by protocol priority, then exit order, not by path ID.
 
     Clients default to the first entry and Mihomo falls back in order, so Reality leads and
-    the UDP Hysteria2 path comes last.
+    the UDP Hysteria2 path comes last. Within a protocol the exits follow *exit_ids* (the
+    control server's exit first), each exit's direct entries before its relays.
     """
     hosts = [
         (resource, resource.payload)
         for resource in builder.resources.values()
         if isinstance(resource.payload, HostPayload)
     ]
+    exit_rank = {exit_id: rank for rank, exit_id in enumerate(exit_ids)}
+    node_rank = {f"node:{exit_id}": rank for exit_id, rank in exit_rank.items()}
     hosts.sort(
         key=lambda item: (
             PROTOCOL_PRIORITY.index(item[1].protocol),
+            node_rank.get(item[1].node_ref, len(node_rank)),
+            item[1].owner_ref not in exit_rank,
             item[0].logical_id.removesuffix(_EDGE_SUFFIX),
             item[0].logical_id,
         )
