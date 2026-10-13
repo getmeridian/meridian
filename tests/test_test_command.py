@@ -331,3 +331,27 @@ def test_bare_fleet_test_emits_one_envelope_with_every_server(monkeypatch: pytes
     assert [one["verdict"] for one in payload["data"]["results"]] == ["passed", "findings"]
     assert payload["data"]["verdict"] == "findings"
     assert payload["summary"]["text"] == "1 of 2 servers had failed checks."
+
+
+def test_fleet_shrunk_to_one_entry_tests_it_while_others_stay_saved(monkeypatch: pytest.MonkeyPatch) -> None:
+    """After `node remove`, the old servers stay saved; bare `test` must not ask which one."""
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr(
+        "meridian.commands.test.fleet_test_targets", lambda: [ServerEntry(host="198.51.100.10", name="exit-a")]
+    )
+    seen: list[str] = []
+
+    def collect(_target: str, _domain: str, _sni: str, server: str, **_kwargs: object) -> CoreTestResult:
+        seen.append(server)
+        return _result("passed")
+
+    monkeypatch.setattr("meridian.commands.test.collect_test_result", collect)
+
+    result = runner.invoke(app, ["test", "--json"])
+
+    from meridian.console import set_json_mode, set_quiet_mode
+
+    set_json_mode(False)
+    set_quiet_mode(False)
+    assert result.exit_code == 0
+    assert seen == ["exit-a"]

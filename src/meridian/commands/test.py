@@ -58,11 +58,13 @@ def run(
                 ]
                 result = FleetTestResult.combine(results)
             else:
+                # A fleet down to one public entry tests it even while other servers stay saved.
+                only = fleet[0].name or fleet[0].host if fleet else ""
                 result = collect_test_result(
                     target_value,
                     domain,
                     sni,
-                    requested_server,
+                    requested_server or only,
                     client=client,
                     basic=basic,
                     timeout=timeout,
@@ -98,7 +100,8 @@ def fleet_test_targets(
     """Public entry servers a bare `meridian test` covers: every exit, then each relay's first hop.
 
     Empty when the command runs on a saved server, only one server is saved, or no
-    topology is saved; those cases keep single-target resolution.
+    topology is saved; those cases keep single-target resolution. One entry means
+    the fleet shrank while other servers stay saved; `run` tests just that one.
     """
     registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
     if local_entry(registry) is not None or len(registry.list()) < 2:
@@ -117,7 +120,7 @@ def fleet_test_targets(
         if entry is None:
             raise VerificationTargetError(
                 f"The fleet uses saved server {ref!r}, which is missing.",
-                hint="Add it back with `meridian server add`, or test one server with --server NAME.",
+                hint="Add it back with `meridian server add`, or test one server with `meridian test NAME`.",
             )
         entries.append(entry)
     return entries

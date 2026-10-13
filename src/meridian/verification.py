@@ -294,7 +294,7 @@ def resolve_verification_target(
     names = ", ".join(entry.name or entry.host for entry in entries)
     raise VerificationTargetError(
         "Multiple saved servers are available.",
-        hint=f"Pass --server NAME. Available: {names}",
+        hint=f"Name one, e.g. `meridian test NAME`. Available: {names}",
     )
 
 
