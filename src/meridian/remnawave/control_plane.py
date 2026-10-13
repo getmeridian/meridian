@@ -146,9 +146,6 @@ class ControlPlaneMixin:
             body["inbounds"] = inbound_uuids
         return parse_internal_squad(self._request("PATCH", "/api/internal-squads", json=body))
 
-    def assign_inbounds_to_squad(self, squad_uuid: str, inbound_uuids: list[str]) -> None:
-        self.update_internal_squad(squad_uuid, inbound_uuids=inbound_uuids)
-
     def delete_internal_squad(self, uuid: str) -> bool:
         return self._delete(f"/api/internal-squads/{quote(uuid, safe='')}")
 
@@ -320,9 +317,6 @@ class ControlPlaneMixin:
         if encoded_template_yaml is not None:
             body["encodedTemplateYaml"] = encoded_template_yaml
         return parse_subscription_template(self._request("PATCH", "/api/subscription-templates", json=body))
-
-    def delete_subscription_template(self, uuid: str) -> bool:
-        return self._delete(f"/api/subscription-templates/{quote(uuid, safe='')}")
 
     # --- Subscription settings and canonical content ---
 

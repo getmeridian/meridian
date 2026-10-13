@@ -195,7 +195,7 @@ def test_access_user_creation_is_owned_and_assigned_to_delivery_squad() -> None:
     assert body["externalSquadUuid"] == "external-1"
 
 
-def test_template_crud_keeps_content_typed() -> None:
+def test_template_create_and_update_keep_content_typed() -> None:
     panel = _panel()
     panel._request.side_effect = [
         {
@@ -210,7 +210,6 @@ def test_template_crud_keeps_content_typed() -> None:
             "templateType": "XRAY_JSON",
             "templateJson": {"outbounds": []},
         },
-        None,
     ]
 
     created = panel.create_subscription_template("Meridian Xray", "XRAY_JSON")
@@ -218,10 +217,8 @@ def test_template_crud_keeps_content_typed() -> None:
         created.uuid,
         template_json={"outbounds": []},
     )
-    deleted = panel.delete_subscription_template(created.uuid)
 
     assert updated.template_json == {"outbounds": []}
-    assert deleted is True
     assert panel._request.call_args_list[1].kwargs["json"] == {
         "uuid": "template-1",
         "templateJson": {"outbounds": []},

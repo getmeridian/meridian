@@ -42,11 +42,6 @@ _DESCRIPTIONS = {
 }
 
 
-def legacy_deployment(connection: ServerConnection) -> str:
-    """Describe the older Meridian deployment on a server, or return an empty string."""
-    return _legacy(_target_lines(connection))
-
-
 def refuse_legacy_deployments(connections: Mapping[str, ServerConnection], addresses: Mapping[str, str]) -> None:
     """Stop before apply when any target server lacks apt or still runs an older Meridian."""
     for server_ref in sorted(connections):

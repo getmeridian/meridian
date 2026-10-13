@@ -160,25 +160,3 @@ class EventStream:
             message=message,
             data=data or {},
         )
-
-    def record(
-        self,
-        event_type: CoreEventType,
-        *,
-        level: EventLevel = "info",
-        phase: str = "",
-        resource: ResourceRef | None = None,
-        message: str = "",
-        data: dict[str, Any] | None = None,
-    ) -> str:
-        """Build the next event and return it serialized as one JSONL record."""
-        return jsonl_dumps(
-            self.event(
-                event_type,
-                level=level,
-                phase=phase,
-                resource=resource,
-                message=message,
-                data=data,
-            )
-        )

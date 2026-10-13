@@ -199,7 +199,6 @@ class TestResourceInspection:
 
         assert result.converged
         assert result.generation == 4
-        assert result.drifted == []
         assert driver.apply_calls == []
         assert {key: value for key, value in vars(cluster).items() if key != "_lock"} == before
 
@@ -218,9 +217,10 @@ class TestResourceInspection:
         )
 
         assert not result.converged
-        assert len(result.drifted) == 2
-        assert result.drifted[0].observation == _missing()
-        assert result.drifted[1].error == ("observation failed: probe unavailable")
+        drifted = [inspection for inspection in result.inspections if not inspection.converged]
+        assert len(drifted) == 2
+        assert drifted[0].observation == _missing()
+        assert drifted[1].error == ("observation failed: probe unavailable")
         assert firewall.apply_calls == []
         assert probe.apply_calls == []
 

@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from meridian.remnawave import (
-    ConfigProfile,
-    Host,
     MeridianPanel,
     Node,
     RemnawaveAuthError,
@@ -124,54 +122,6 @@ class TestFindNodeByAddress:
         panel = _make_panel()
         panel.list_nodes = MagicMock(return_value=[])
         assert panel.find_node_by_address("198.51.100.1") is None
-
-
-class TestFindHostByRemark:
-    def test_returns_matching_host(self) -> None:
-        panel = _make_panel()
-        panel.list_hosts = MagicMock(
-            return_value=[
-                Host(uuid="h1", remark="reality-198.51.100.1"),
-                Host(uuid="h2", remark="xhttp-198.51.100.1"),
-            ]
-        )
-        result = panel.find_host_by_remark("xhttp-198.51.100.1")
-        assert result is not None
-        assert result.uuid == "h2"
-
-    def test_returns_none_when_not_found(self) -> None:
-        panel = _make_panel()
-        panel.list_hosts = MagicMock(return_value=[Host(uuid="h1", remark="reality-198.51.100.1")])
-        assert panel.find_host_by_remark("wss-example.com") is None
-
-    def test_returns_none_on_empty_list(self) -> None:
-        panel = _make_panel()
-        panel.list_hosts = MagicMock(return_value=[])
-        assert panel.find_host_by_remark("reality-198.51.100.1") is None
-
-
-class TestFindConfigProfileByName:
-    def test_returns_matching_profile(self) -> None:
-        panel = _make_panel()
-        panel.list_config_profiles = MagicMock(
-            return_value=[
-                ConfigProfile(uuid="cp-1", name="meridian-default"),
-                ConfigProfile(uuid="cp-2", name="other"),
-            ]
-        )
-        result = panel.find_config_profile_by_name("meridian-default")
-        assert result is not None
-        assert result.uuid == "cp-1"
-
-    def test_returns_none_when_not_found(self) -> None:
-        panel = _make_panel()
-        panel.list_config_profiles = MagicMock(return_value=[ConfigProfile(uuid="cp-1", name="meridian-default")])
-        assert panel.find_config_profile_by_name("nonexistent") is None
-
-    def test_returns_none_on_empty_list(self) -> None:
-        panel = _make_panel()
-        panel.list_config_profiles = MagicMock(return_value=[])
-        assert panel.find_config_profile_by_name("meridian-default") is None
 
 
 # ---------------------------------------------------------------------------
@@ -440,21 +390,6 @@ class TestAuth:
 
 
 class TestUsers:
-    def test_create_user_posts_minimal_body(self) -> None:
-        panel, client = _wired_panel(_mock_response(201, {"response": {"id": 7, "username": "alice"}}))
-        user = panel.create_user("alice")
-        assert user.id == "7"
-        method, path, body = _call(client)
-        assert (method, path) == ("POST", "api/users")
-        assert body == {"username": "alice", "expireAt": "2099-12-31T23:59:59.000Z"}
-
-    def test_create_user_with_squads_and_traffic_limit(self) -> None:
-        panel, client = _wired_panel(_mock_response(201, {"response": {"id": 8, "username": "bob"}}))
-        panel.create_user("bob", traffic_limit_bytes=1073741824, squad_uuids=["sq-1", "sq-2"])
-        body = _call(client)[2]
-        assert body["trafficLimitBytes"] == 1073741824
-        assert body["activeInternalSquads"] == ["sq-1", "sq-2"]
-
     def test_get_user_by_username_and_not_found(self) -> None:
         panel, client = _wired_panel(
             _mock_response(200, {"response": {"id": 1, "username": "alice"}}),
@@ -546,11 +481,6 @@ class TestNodes:
         panel, _ = _wired_panel(_mock_response(200, {"response": [{"uuid": "n-1"}, {"uuid": "n-2"}]}))
         assert [node.uuid for node in panel.list_nodes()] == ["n-1", "n-2"]
 
-    def test_restart_sends_force_restart_and_accepts_202(self) -> None:
-        panel, client = _wired_panel(_empty_response(202))
-        panel.restart_node("n-1")
-        assert _call(client) == ("POST", "api/nodes/n-1/actions/restart", {"forceRestart": False})
-
     def test_delete_node_accepts_204(self) -> None:
         panel, client = _wired_panel(_empty_response(204))
         panel.delete_node("n-1")
@@ -558,14 +488,10 @@ class TestNodes:
 
 
 class TestHostActions:
-    def test_bulk_enable_disable_and_delete_accept_204(self) -> None:
-        panel, client = _wired_panel(_empty_response(204), _empty_response(204), _empty_response(204))
-        panel.enable_host("h-1")
-        panel.disable_host("h-1")
+    def test_delete_host_accepts_204(self) -> None:
+        panel, client = _wired_panel(_empty_response(204))
         panel.delete_host("h-1")
-        assert _call(client, 0) == ("POST", "api/hosts/bulk/enable", {"uuids": ["h-1"]})
-        assert _call(client, 1) == ("POST", "api/hosts/bulk/disable", {"uuids": ["h-1"]})
-        assert _call(client, 2)[:2] == ("DELETE", "api/hosts/h-1")
+        assert _call(client)[:2] == ("DELETE", "api/hosts/h-1")
 
     def test_set_host_positions_sends_only_the_listed_hosts(self) -> None:
         panel, client = _wired_panel(_mock_response(200, {"response": {"isUpdated": True}}))
@@ -714,13 +640,6 @@ class TestConfigProfiles:
         )
         assert [p.name for p in panel.list_config_profiles()] == ["default", "other"]
 
-    def test_list_inbounds(self) -> None:
-        panel, client = _wired_panel(
-            _mock_response(200, {"response": {"total": 1, "inbounds": [{"uuid": "ib-1", "tag": "vless-reality"}]}})
-        )
-        assert [ib.tag for ib in panel.list_inbounds()] == ["vless-reality"]
-        assert _call(client)[1] == "api/config-profiles/inbounds"
-
 
 # Internal Squads (SDK path)
 # ---------------------------------------------------------------------------
@@ -749,11 +668,11 @@ class TestInternalSquads:
         assert squads[0].inbound_uuids == ["ib-1"]
         assert squads[0].members_count == 2
 
-    def test_assign_inbounds_to_squad_uses_typed_rest_shape(self) -> None:
+    def test_update_internal_squad_inbounds_uses_typed_rest_shape(self) -> None:
         panel = _make_panel()
         panel._request = MagicMock(return_value={"uuid": "sq-1", "name": "Default-Squad"})
 
-        panel.assign_inbounds_to_squad("sq-1", ["ib-1"])
+        panel.update_internal_squad("sq-1", inbound_uuids=["ib-1"])
 
         panel._request.assert_called_once_with(
             "PATCH",

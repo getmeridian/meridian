@@ -36,7 +36,6 @@ TOPOLOGY_ID_MAX_LENGTH = 48
 _SERVER_TITLE_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 80, "pattern": r"^[^\r\n\t]+$"}
 _SERVER_REF_SCHEMA = {"type": "string", "minLength": 1, "maxLength": 120, "pattern": r"^[^\r\n\t]+$"}
 _OPTIONAL_SERVER_REF_SCHEMA = {"type": "string", "maxLength": 120, "pattern": r"^$|^[^\r\n\t]+$"}
-_COUNTRY_CODE_SCHEMA = {"type": "string", "minLength": 2, "maxLength": 2, "pattern": r"^[A-Za-z]{2}$"}
 _OPTIONAL_COUNTRY_CODE_SCHEMA = {"type": "string", "maxLength": 2, "pattern": r"^$|^[A-Za-z]{2}$"}
 _HOSTNAME_SCHEMA = {
     "type": "string",
@@ -354,11 +353,6 @@ OptionalServerReferenceValue = Annotated[
     str,
     WithJsonSchema(_OPTIONAL_SERVER_REF_SCHEMA),
     AfterValidator(validate_optional_server_reference_value),
-]
-CountryCodeValue = Annotated[
-    str,
-    WithJsonSchema(_COUNTRY_CODE_SCHEMA),
-    AfterValidator(validate_country_code_value),
 ]
 OptionalCountryCodeValue = Annotated[
     str,

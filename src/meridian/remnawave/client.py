@@ -16,14 +16,12 @@ from .models import (
     ConfigProfile,
     Host,
     HostSecurityLayer,
-    Inbound,
     Node,
     NodeCredentials,
     User,
     is_user_id,
     parse_config_profile,
     parse_host,
-    parse_inbound,
     parse_node,
     parse_user,
     response_items,
@@ -55,17 +53,16 @@ class MeridianPanel(ControlPlaneMixin):
     Domain groups (natural extraction boundaries):
       - Auth (login, register_admin) — classmethods, no client instance
       - System — version metadata and reachability
-      - Users — CRUD for Meridian clients (= Remnawave users, numeric ``id``)
+      - Users — read, enable/disable, delete Meridian clients (= Remnawave users, numeric ``id``)
       - Nodes — register, list, enable/disable, delete proxy nodes
       - Hosts — direct addresses and relay entries in subscriptions
       - Config Profiles — Xray configuration templates
-      - Inbounds — protocol definitions within config profiles
       - Internal Squads — user-to-inbound access control groups
       - Keygen — node mTLS secret bundles
 
     Usage:
         panel = MeridianPanel("https://panel.example.com", "jwt-token")
-        user = panel.create_user("alice")
+        user = panel.get_user("alice")
         nodes = panel.list_nodes()
     """
 
@@ -79,7 +76,6 @@ class MeridianPanel(ControlPlaneMixin):
         verify: bool | str | ssl.SSLContext = True,
     ):
         self._base = base_url.rstrip("/")
-        self._token = api_token
         self._timeout = timeout
         self._max_retries = max_retries
 
@@ -210,25 +206,6 @@ class MeridianPanel(ControlPlaneMixin):
 
     # --- Users (= Meridian clients) ---
 
-    def create_user(
-        self,
-        username: str,
-        *,
-        traffic_limit_bytes: int = 0,
-        expire_at: str = "",
-        squad_uuids: list[str] | None = None,
-    ) -> User:
-        """Create a new user in Remnawave."""
-        body: dict[str, Any] = {
-            "username": username,
-            "expireAt": expire_at or "2099-12-31T23:59:59.000Z",
-        }
-        if traffic_limit_bytes > 0:
-            body["trafficLimitBytes"] = traffic_limit_bytes
-        if squad_uuids:
-            body["activeInternalSquads"] = squad_uuids
-        return parse_user(self._post("/api/users", json=body))
-
     def get_user(self, username: str) -> User | None:
         """Find a user by username. Returns None only if not found (404)."""
         try:
@@ -337,10 +314,6 @@ class MeridianPanel(ControlPlaneMixin):
     def disable_node(self, uuid: str) -> None:
         """Disable a node."""
         self._post(f"/api/nodes/{_segment(uuid)}/actions/disable")
-
-    def restart_node(self, uuid: str) -> None:
-        """Restart Xray on a node (graceful; Remnawave answers 202)."""
-        self._post(f"/api/nodes/{_segment(uuid)}/actions/restart", json={"forceRestart": False})
 
     def delete_node(self, uuid: str) -> None:
         """Deregister a node."""
@@ -470,25 +443,10 @@ class MeridianPanel(ControlPlaneMixin):
         data = self._patch("/api/hosts", json=body)
         return parse_host(data)
 
-    def find_host_by_remark(self, remark: str) -> Host | None:
-        """Find a host by its remark string. Returns None if not found."""
-        for host in self.list_hosts():
-            if host.remark == remark:
-                return host
-        return None
-
     def set_host_positions(self, positions: dict[str, int]) -> None:
         """Set each listed Host's viewPosition; subscriptions list Hosts by it, ascending."""
         items = [{"uuid": host_uuid, "viewPosition": position} for host_uuid, position in positions.items()]
         self._post("/api/hosts/actions/reorder", json={"hosts": items})
-
-    def enable_host(self, uuid: str) -> None:
-        """Enable a disabled host."""
-        self._post("/api/hosts/bulk/enable", json={"uuids": [uuid]})
-
-    def disable_host(self, uuid: str) -> None:
-        """Disable a host (subscriptions auto-exclude)."""
-        self._post("/api/hosts/bulk/disable", json={"uuids": [uuid]})
 
     def delete_host(self, uuid: str) -> None:
         """Delete a host entry."""
@@ -512,20 +470,6 @@ class MeridianPanel(ControlPlaneMixin):
         """List all config profiles."""
         data = self._request("GET", "/api/config-profiles")
         return [parse_config_profile(profile) for profile in response_items(data, "configProfiles")]
-
-    def find_config_profile_by_name(self, name: str) -> ConfigProfile | None:
-        """Find a config profile by name. Returns None if not found."""
-        for profile in self.list_config_profiles():
-            if profile.name == name:
-                return profile
-        return None
-
-    # --- Inbounds ---
-
-    def list_inbounds(self) -> list[Inbound]:
-        """List all inbounds across config profiles."""
-        data = self._request("GET", "/api/config-profiles/inbounds")
-        return [parse_inbound(ib) for ib in response_items(data, "inbounds")]
 
     # --- Keygen ---
 

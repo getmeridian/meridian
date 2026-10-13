@@ -170,10 +170,6 @@ class ResourceInspectionResult(CoreModel):
     def converged(self) -> bool:
         return not self.retiring and all(inspection.converged for inspection in self.inspections)
 
-    @property
-    def drifted(self) -> list[ResourceInspection]:
-        return [inspection for inspection in self.inspections if not inspection.converged]
-
 
 class ResourceDriver(Protocol):
     """Runtime adapter for one finite compiler resource kind."""

@@ -27,10 +27,9 @@ _theme = Theme(
 class ConsoleState:
     """Encapsulates mutable console globals for testability."""
 
-    __slots__ = ("console", "err_console", "json_mode", "quiet_mode")
+    __slots__ = ("err_console", "json_mode", "quiet_mode")
 
     def __init__(self) -> None:
-        self.console = Console(theme=_theme, highlight=False)
         self.err_console = Console(theme=_theme, stderr=True, highlight=False)
         self.json_mode: bool = False
         self.quiet_mode: bool = False
@@ -38,8 +37,7 @@ class ConsoleState:
 
 _state = ConsoleState()
 
-# Shared handles for callers that need direct Rich rendering.
-console = _state.console
+# Shared handle for callers that need direct Rich rendering.
 err_console = _state.err_console
 
 _error_command: ContextVar[str] = ContextVar("meridian_error_command", default="cli.error")

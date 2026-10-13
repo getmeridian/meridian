@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -9,7 +10,7 @@ import pytest
 
 from meridian.core.errors import InfrastructureEvidenceUnavailableError, ProvisioningError
 from meridian.reconciler.resources import ResourceReconcileError
-from meridian.setup.legacy_guard import LEGACY_DEPLOYMENT_CHECK, legacy_deployment, refuse_legacy_deployments
+from meridian.setup.legacy_guard import LEGACY_DEPLOYMENT_CHECK, refuse_legacy_deployments
 
 
 def _conn(stdout: str, returncode: int = 0, stderr: str = "") -> MagicMock:
@@ -18,8 +19,12 @@ def _conn(stdout: str, returncode: int = 0, stderr: str = "") -> MagicMock:
     return conn
 
 
+def _refuse(conn: MagicMock) -> None:
+    refuse_legacy_deployments({"srv-a": conn}, {"srv-a": "198.51.100.10"})
+
+
 def test_clean_server_passes() -> None:
-    assert legacy_deployment(_conn("meridian-legacy-check-done\n")) == ""
+    _refuse(_conn("meridian-legacy-check-done\n"))
 
 
 @pytest.mark.parametrize(
@@ -33,7 +38,8 @@ def test_clean_server_passes() -> None:
     ],
 )
 def test_each_legacy_marker_is_recognized(marker: str, expected: str) -> None:
-    assert expected in legacy_deployment(_conn(f"{marker}\nmeridian-legacy-check-done\n"))
+    with pytest.raises(ProvisioningError, match=re.escape(expected)):
+        _refuse(_conn(f"{marker}\nmeridian-legacy-check-done\n"))
 
 
 def test_check_never_touches_v4_artifacts() -> None:
@@ -43,12 +49,12 @@ def test_check_never_touches_v4_artifacts() -> None:
 
 def test_ssh_failure_is_unavailable_not_clean() -> None:
     with pytest.raises(ResourceReconcileError):
-        legacy_deployment(_conn("", returncode=255, stderr="ssh: connect to host 198.51.100.10 port 22: timed out"))
+        _refuse(_conn("", returncode=255, stderr="ssh: connect to host 198.51.100.10 port 22: timed out"))
 
 
 def test_truncated_output_is_unavailable_not_clean() -> None:
     with pytest.raises(InfrastructureEvidenceUnavailableError):
-        legacy_deployment(_conn(""))
+        _refuse(_conn(""))
 
 
 def test_refusal_names_the_server_and_points_to_teardown() -> None:

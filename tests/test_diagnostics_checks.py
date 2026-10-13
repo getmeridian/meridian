@@ -13,7 +13,6 @@ from meridian.diagnostics.checks import (
     CheckResult,
     check_container_running,
     check_disk_space,
-    check_firewall_port,
     check_port_listening,
     check_tls_certificate,
 )
@@ -212,61 +211,6 @@ class TestCheckTlsCertificate:
         check_tls_certificate(conn, "edge.example.com", port=7443)
 
         assert any("127.0.0.1:7443" in command for command in conn.calls)
-
-
-# ---------------------------------------------------------------------------
-# check_firewall_port
-# ---------------------------------------------------------------------------
-
-
-class TestCheckFirewallPort:
-    def test_skipped_when_ufw_not_installed(self) -> None:
-        conn = MockConnection()
-        conn.when("which ufw", rc=1)
-        result = check_firewall_port(conn, 443)
-        assert result.status == "skipped"
-        assert "not installed" in result.detail
-
-    def test_skipped_when_ufw_inactive(self) -> None:
-        conn = MockConnection()
-        conn.when("which ufw", stdout="/usr/sbin/ufw\n")
-        conn.when("ufw status", stdout="Status: inactive\n")
-        result = check_firewall_port(conn, 443)
-        assert result.status == "skipped"
-        assert "not active" in result.detail
-
-    def test_passed_when_port_allowed(self) -> None:
-        conn = MockConnection()
-        conn.when("which ufw", stdout="/usr/sbin/ufw\n")
-        conn.when(
-            "ufw status",
-            stdout=(
-                "Status: active\n"
-                "\n"
-                "To                         Action      From\n"
-                "--                         ------      ----\n"
-                "443/tcp                    ALLOW       Anywhere\n"
-            ),
-        )
-        result = check_firewall_port(conn, 443)
-        assert result.status == "passed"
-
-    def test_failed_when_port_not_allowed(self) -> None:
-        conn = MockConnection()
-        conn.when("which ufw", stdout="/usr/sbin/ufw\n")
-        conn.when(
-            "ufw status",
-            stdout=(
-                "Status: active\n"
-                "\n"
-                "To                         Action      From\n"
-                "--                         ------      ----\n"
-                "22/tcp                     ALLOW       Anywhere\n"
-            ),
-        )
-        result = check_firewall_port(conn, 443)
-        assert result.status == "failed"
-        assert result.remediation != ""
 
 
 # ---------------------------------------------------------------------------

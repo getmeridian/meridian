@@ -81,7 +81,6 @@ def _make_panel_mock() -> MagicMock:
     panel = MagicMock()
     panel.__enter__ = MagicMock(return_value=panel)
     panel.__exit__ = MagicMock(return_value=False)
-    panel.create_user.return_value = _make_user()
     panel.get_user.return_value = _make_user()
     panel.list_users.return_value = [_make_user("alice"), _make_user("bob")]
     panel.delete_user.return_value = True
@@ -116,7 +115,6 @@ class TestRunAdd:
 
         updated = runtime.apply_intent.call_args.args[0]
         assert updated.access.users == ["default", "alice"]
-        panel.create_user.assert_not_called()
         publish_handoff.assert_called_once_with(cluster, ["alice"])
 
     def test_v4_add_save_failure_returns_observed_partial_json(

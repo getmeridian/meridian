@@ -342,7 +342,6 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     assert first.changed
     assert second.all_succeeded and not second.changed
     assert inspection.converged
-    assert inspection.drifted == []
     assert {key: value for key, value in vars(cluster).items() if key != "_lock"} == before_inspection
     assert len(persists) == persist_count
     assert cluster.active_plan_hash == plan_hash
