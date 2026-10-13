@@ -13,7 +13,7 @@
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
 **One wizard for everyone** — real terms plus one plain sentence each, all text from `meridian.i18n`; `wizard_prompts.py` owns navigation words, yes/no, numbered choices, and the language step. Smart defaults replace questions (exit IDs from server names, random transport paths, routing only with a gateway, delivery formats).
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (add/list/remove), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove), `relay` (add/list/remove), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `panel`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
 
 ## What's done well
 
@@ -29,7 +29,7 @@
 - Removal commands refuse the control server and dependents (relays into an exit, gateways bridged through it) before review; `--force` on `node remove` only extends the edit to those relay chains.
 - Post-mutation local save failures exit 3, say remote state changed, and preserve typed partial data where the command contract supports it.
 - V4 client reads and connectivity tests expose only users declared in `topology_intent.access.users`; never fall back to panel-wide service users.
-- Never render saved panel administrator credentials. Handoff links (`HANDOFF_LINK_KEYS`) appear verbatim only in the final output of the command that produced them (`emit_json(..., reveal=...)`); logs, events, and errors stay redacted.
+- Never render saved panel administrator credentials, except `meridian panel --show-password`, which exists so operators can manage Remnawave themselves. Handoff links (`HANDOFF_LINK_KEYS`) appear verbatim only in the final output of the command that produced them (`emit_json(..., reveal=...)`); logs, events, and errors stay redacted.
 - Doctor reports pass every free-form line through `redact_string()` and render with Rich markup disabled before sharing.
 - A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
 - Do not use `model_copy(update=...)` to apply untrusted request data; rebuild the Pydantic request model.

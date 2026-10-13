@@ -83,6 +83,14 @@ Client accounts (keys, status, traffic) live in the Remnawave panel database on 
 
 ## Web panel
 
-The [Remnawave](https://remna.st/) admin panel shows traffic, users, and nodes in a browser. Its URL and admin login are in the `panel` section of `~/.meridian/cluster.yml`, and deploy prints the URL as "Remnawave panel (advanced)".
+The [Remnawave](https://remna.st/) admin panel shows traffic, users, and nodes in a browser, and you are welcome to use it. `meridian panel` prints its URL and admin username; `meridian panel --show-password` also prints the password.
 
-Use the panel to look; use Meridian to change things. Meridian restores the users, hosts, and templates it manages on the next apply, and `meridian plan` shows any difference first.
+Meridian and the panel split the work so your edits don't get overwritten:
+
+| Meridian manages (the next apply restores its version) | Yours to change (apply never touches these) |
+|---|---|
+| Nodes, config profiles, inbounds, published Hosts, squads | Each client's status: enable/disable, traffic limits, expiry, HWID limits, description |
+| Subscription templates and the settings Meridian sets | Users you create yourself in the panel |
+| Which clients exist, their names, and their squads | Notifications, plugins, IP control, and other panel settings |
+
+`meridian plan` shows any difference in what Meridian manages before anything changes. Users you add in the panel are never listed, changed, or deleted by Meridian; to give someone a Meridian-managed link and connection page, use `meridian client add` instead.

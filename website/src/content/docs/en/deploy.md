@@ -161,8 +161,8 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 ## Management panel
 
-Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. Deploy prints the panel URL as "Remnawave panel (advanced)"; the URL and admin login are in the `panel` section of `~/.meridian/cluster.yml`.
+Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints the URL and admin login (`--show-password` for the password).
 
-Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version.
+Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/docs/en/client-management/#web-panel).
 
 Meridian pins the Remnawave versions it has tested. If you upgrade Remnawave yourself, Meridian does not downgrade it.

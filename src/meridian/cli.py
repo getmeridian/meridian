@@ -738,6 +738,16 @@ def rage_cmd(
     run(ip, sni, user, ai, server, ssh_port=ssh_port)
 
 
+@app.command("panel")
+def panel_cmd(
+    show_password: bool = typer.Option(False, "--show-password", help="Also print the admin password"),
+) -> None:
+    """Show the Remnawave admin panel URL and login, and what Meridian manages there"""
+    from meridian.commands.panel import run
+
+    run(show_password=show_password)
+
+
 @app.command("teardown")
 def teardown_cmd(
     ip: Target = "",

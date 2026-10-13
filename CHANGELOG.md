@@ -20,6 +20,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - Requires Python 3.11+.
 
 ### Working in the Remnawave panel
+- **`meridian panel`** — prints the admin panel URL and login (`--show-password`
+  for the password) and lists what Meridian manages versus what is yours.
 - **Your panel edits stick** — Meridian now owns only each client's existence,
   name, and squads. Disabling a client (with `client disable` or in the panel),
   traffic limits, expiry, and descriptions set in the panel survive every

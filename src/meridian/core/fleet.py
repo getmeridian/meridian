@@ -575,12 +575,7 @@ def build_fleet_status(
     )
     # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
-    if (
-        disconnected_nodes > 0
-        or disabled_nodes > 0
-        or unhealthy_relays > 0
-        or missing_access_users > 0
-    ):
+    if disconnected_nodes > 0 or disabled_nodes > 0 or unhealthy_relays > 0 or missing_access_users > 0:
         health = "degraded"
     elif (
         not panel_healthy

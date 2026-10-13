@@ -285,6 +285,18 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor следует ролям сервера: сервер только ретранслятора не диагностируется как выход, и маршрутизирующие шлюзы помечены отдельно. Отсутствующие инструменты или потерянное SSH подключение делают отчёт неубедительным (выход `3`); уже собранные секции всё ещё показаны.
 
+### meridian panel
+
+<!-- TRANSLATE -->Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+
+```
+meridian panel [--show-password]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--show-password` | | Also print the admin password |
+
 ### meridian teardown
 
 Удалить Meridian с сервера.

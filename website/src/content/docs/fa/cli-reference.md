@@ -285,6 +285,18 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor از نقش‌های سرور پیروی می‌کند: سرور relay-only به عنوان exit تشخیص نمی‌شود، و routing gateways به طور جداگانه برچسب‌گذاری می‌شوند. ابزارهای missing یا اتصال SSH گم گزارش را inconclusive می‌کند (exit `3`)؛ بخش‌های قبلاً جمع‌آوری‌شده همچنان نشان داده می‌شوند.
 
+### meridian panel
+
+<!-- TRANSLATE -->Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+
+```
+meridian panel [--show-password]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--show-password` | | Also print the admin password |
+
 ### meridian teardown
 
 Meridian را از سرور حذف کنید.

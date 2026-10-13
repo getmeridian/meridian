@@ -287,6 +287,18 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 医生遵循服务器的角色：纯中继服务器不诊断为出口，路由网关单独标记。缺失工具或失去 SSH 连接使报告不确定（退出 `3`）；已收集的部分仍显示。
 
+### meridian panel
+
+<!-- TRANSLATE -->Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+
+```
+meridian panel [--show-password]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--show-password` | | Also print the admin password |
+
 ### meridian teardown
 
 从服务器删除 Meridian。

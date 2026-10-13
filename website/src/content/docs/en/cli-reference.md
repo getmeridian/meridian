@@ -285,6 +285,20 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor follows the server's roles: a relay-only server isn't diagnosed as an exit, and routing gateways are labeled separately. Missing tools or a lost SSH connection make the report inconclusive (exit `3`); sections already collected are still shown.
 
+### meridian panel
+
+Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+
+```
+meridian panel [--show-password]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--show-password` | | Also print the admin password |
+
+Edits to client status, traffic limits, expiry, and descriptions, and users you create in the panel, survive every apply. Edits to nodes, profiles, Hosts, squads, and templates Meridian created are reverted by the next apply; `meridian plan` shows them first.
+
 ### meridian teardown
 
 Remove Meridian from a server.
