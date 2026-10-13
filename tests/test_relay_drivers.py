@@ -546,3 +546,28 @@ def _result(
         stdout=stdout,
         stderr=stderr,
     )
+
+
+def test_v4_http_artifact_redirects_relatively_behind_the_stream_router() -> None:
+    from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec
+    from meridian.reconciler.server_render import render_nginx_artifact
+
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=8444,
+        layer="http",
+        tls_hostname="edge.example.com",
+        routes=[
+            NginxRouteSpec(
+                match="host_path",
+                server_names=["edge.example.com"],
+                path="/ws-a",
+                backend_server_ref="srv-exit",
+                backend_port=20443,
+                protocol="wss",
+            )
+        ],
+    )
+    rendered = render_nginx_artifact("nginx:srv-exit:http:8444", payload, ADDRESSES)
+    assert "listen 127.0.0.1:8444 ssl;" in rendered
+    assert "absolute_redirect off;" in rendered

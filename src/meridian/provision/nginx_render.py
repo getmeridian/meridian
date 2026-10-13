@@ -348,6 +348,9 @@ def render_nginx_server_block(
             http2 on;
             server_name {host};
             server_tokens off;
+            # Behind the 443 stream router this server's own port is internal; an
+            # absolute redirect (/<path> -> /<path>/) would send browsers to it.
+            absolute_redirect off;
 
             ssl_certificate     /etc/ssl/meridian/fullchain.pem;
             ssl_certificate_key /etc/ssl/meridian/key.pem;

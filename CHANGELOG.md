@@ -143,6 +143,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   removes the one earlier v4 builds left. Removing or moving a node also deletes
   the `remnawave/node` image and its node API firewall rule; Docker itself stays
   installed.
+- Panel and connection-page links typed or copied without the trailing slash
+  now open; they used to redirect to an internal port and fail.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and

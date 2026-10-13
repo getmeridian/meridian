@@ -222,6 +222,7 @@ def _render_http(
         f"    listen 127.0.0.1:{payload.listener_port} ssl;\n"
         f"    server_name {payload.tls_hostname};\n"
         "    server_tokens off;\n"
+        "    absolute_redirect off;\n"
         "    access_log off;\n"
         f"    ssl_certificate {certificate_dir}/fullchain.pem;\n"
         f"    ssl_certificate_key {certificate_dir}/key.pem;\n"

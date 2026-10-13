@@ -687,6 +687,18 @@ class TestNginxFingerprinting:
         # Both server blocks should have server_tokens off
         assert cfg.count("server_tokens off") == 2
 
+    def test_internal_https_server_redirects_relatively_so_browsers_stay_on_443(self):
+        """`/<panel-path>` without a slash redirected to https://IP:8443/... before."""
+        cfg = render_nginx_ip_config(
+            server_ip="198.51.100.1",
+            nginx_internal_port=8443,
+            panel_web_base_path="secretpanel",
+            panel_internal_port=2053,
+            info_page_path="connect",
+        )
+        https_block = cfg[cfg.index("listen 127.0.0.1:8443 ssl;") :]
+        assert "absolute_redirect off;" in https_block
+
     def test_no_444_in_https_server_block(self):
         """HTTPS block must never use 444 — silent close after TLS is the highest signal."""
         for cfg in [
