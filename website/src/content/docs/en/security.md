@@ -10,7 +10,7 @@ section: reference
 If you discover a security vulnerability in Meridian:
 
 1. **Do NOT open a public issue**
-2. Email the maintainer or use [GitHub Security Advisories](https://github.com/getmeridian/meridian/security/advisories/new)
+2. Report it privately through [GitHub private vulnerability reporting](https://github.com/getmeridian/meridian/security/advisories/new)
 3. Include steps to reproduce and potential impact
 
 We aim to respond within 48 hours and will credit reporters in the fix.
