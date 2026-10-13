@@ -6,11 +6,13 @@ import hashlib
 
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.models import NON_XRAY_JSON_TYPES, CompiledResource, HostPayload, make_resource
+from meridian.compiler.names import REMNAWAVE_HOST_REMARK_MAX_LENGTH
 from meridian.core.topology import PROTOCOL_PRIORITY
 
 _VISIBLE_TAG = "MERIDIAN_V4_VISIBLE"
 _XRAY_EDGE_TAG = "MERIDIAN_V4_XRAY_EDGE"
 _XRAY_VIRTUAL_TAG = "MERIDIAN_V4_XRAY_VIRTUAL"
+_EDGE_SUFFIX = ":xray-edge"
 
 
 def compile_xray_delivery_hosts(
@@ -50,7 +52,7 @@ def compile_xray_delivery_hosts(
             postconditions=resource.postconditions,
         )
 
-        hidden_id = f"{resource.logical_id}:xray-edge"
+        hidden_id = f"{resource.logical_id}{_EDGE_SUFFIX}"
         hidden_ids.append(
             builder.add(
                 hidden_id,
@@ -73,7 +75,7 @@ def compile_xray_delivery_hosts(
         virtual_id,
         primary_payload.model_copy(
             update={
-                "remark": "M4 / automatic fallback",
+                "remark": "Automatic",
                 "tags": [_XRAY_VIRTUAL_TAG],
                 "is_hidden": False,
                 "xray_json_template_ref": template_ref,
@@ -96,7 +98,13 @@ def assign_host_positions(builder: PlanBuilder) -> None:
         for resource in builder.resources.values()
         if isinstance(resource.payload, HostPayload)
     ]
-    hosts.sort(key=lambda item: (PROTOCOL_PRIORITY.index(item[1].protocol), item[0].logical_id))
+    hosts.sort(
+        key=lambda item: (
+            PROTOCOL_PRIORITY.index(item[1].protocol),
+            item[0].logical_id.removesuffix(_EDGE_SUFFIX),
+            item[0].logical_id,
+        )
+    )
     for position, (resource, payload) in enumerate(hosts):
         builder.resources[resource.logical_id] = make_resource(
             resource.logical_id,
@@ -107,8 +115,8 @@ def assign_host_positions(builder: PlanBuilder) -> None:
 
 
 def compact_host_remark(value: str) -> str:
-    """Fit owned Host identities inside Remnawave's 40-character limit."""
-    if len(value) <= 40:
+    """Fit owned Host identities inside Remnawave's 100-character limit."""
+    if len(value) <= REMNAWAVE_HOST_REMARK_MAX_LENGTH:
         return value
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
-    return f"{value[:30].rstrip()}-{digest}"
+    return f"{value[: REMNAWAVE_HOST_REMARK_MAX_LENGTH - 10].rstrip()}-{digest}"

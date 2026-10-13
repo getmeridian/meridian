@@ -165,6 +165,9 @@ def compile_routing_gateways(
         _compile_reality_endpoint(
             builder=builder,
             gateway_ref=gateway.id,
+            remark=" · ".join(
+                part for part in (gateway.id if len(intent.routing_gateways) > 1 else "", "Smart routing") if part
+            ),
             server_ref=gateway.server_ref,
             public_port=entry_path.public_port,
             reality_sni=entry_path.reality_sni,
@@ -242,6 +245,7 @@ def _compile_reality_endpoint(
     *,
     builder: PlanBuilder,
     gateway_ref: str,
+    remark: str,
     server_ref: str,
     public_port: int,
     reality_sni: str,
@@ -281,7 +285,7 @@ def _compile_reality_endpoint(
             host_id,
             HostPayload(
                 owner_ref=gateway_ref,
-                remark=f"Meridian v4 / {gateway_ref} / entry / smart",
+                remark=remark,
                 node_ref=runtime_id,
                 inbound_ref=inbound_id,
                 address_server_ref=server_ref,

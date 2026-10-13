@@ -71,12 +71,16 @@ def test_fingerprint_reaches_every_tcp_path_and_survives_a_plain_redeploy() -> N
         for resource in compile_topology(again).resources
         if isinstance(resource.payload, HostPayload) and not resource.payload.is_hidden
     ]
-    assert {host.protocol: host.fingerprint for host in hosts if not host.xray_json_template_ref} == {
-        "reality": "firefox",
-        "xhttp": "firefox",
-        "wss": "firefox",
-        "hysteria2": "",
-    }
+    published = [(host.protocol, host.fingerprint) for host in hosts if not host.xray_json_template_ref]
+    # The chosen fingerprint leads; direct TLS paths also get the Chrome copy, CDN and QUIC do not.
+    assert sorted(published) == [
+        ("hysteria2", ""),
+        ("reality", "chrome"),
+        ("reality", "firefox"),
+        ("wss", "firefox"),
+        ("xhttp", "chrome"),
+        ("xhttp", "firefox"),
+    ]
 
 
 def test_hysteria2_path_refuses_a_tls_fingerprint() -> None:

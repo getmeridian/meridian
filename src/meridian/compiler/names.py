@@ -13,6 +13,21 @@ REMNAWAVE_USERNAME_PATTERN = r"^[A-Za-z0-9_-]+$"
 REMNAWAVE_SHORT_NAME_MAX_LENGTH = 30
 REMNAWAVE_TEMPLATE_NAME_MAX_LENGTH = 255
 REMNAWAVE_USERNAME_MAX_LENGTH = 36
+REMNAWAVE_HOST_REMARK_MAX_LENGTH = 100
+
+_PROTOCOL_LABELS = {"reality": "Reality", "xhttp": "XHTTP", "wss": "WebSocket", "hysteria2": "Hysteria2"}
+# What tells same-protocol entries apart: the ClientHello, or how the path travels.
+_PATH_DETAILS = {"wss": "CDN", "hysteria2": "UDP"}
+_FINGERPRINT_LABELS = {
+    "chrome": "Chrome",
+    "firefox": "Firefox",
+    "safari": "Safari",
+    "ios": "iOS",
+    "android": "Android",
+    "edge": "Edge",
+    "random": "Random",
+    "randomized": "Randomized",
+}
 
 RemnawaveConfigProfileName = Annotated[
     str,
@@ -95,6 +110,18 @@ def subscription_template_name(template_id: str, template_type: str) -> str:
         identity=f"subscription-template:{template_id}:{template_type}",
         max_length=REMNAWAVE_TEMPLATE_NAME_MAX_LENGTH,
     )
+
+
+def host_remark(protocol: str, *, fingerprint: str = "", place: str = "", via: str = "") -> str:
+    """Name a subscription entry the way a user picks one: method, then what sets it apart.
+
+    *place* names the exit when a fleet has several; *via* names the relay an entry enters
+    through. Examples: ``Reality · Chrome``, ``finland · XHTTP · Firefox``,
+    ``Reality · Chrome via moscow``, ``WebSocket · CDN``, ``Hysteria2 · UDP``.
+    """
+    detail = _PATH_DETAILS.get(protocol) or _FINGERPRINT_LABELS.get(fingerprint, fingerprint)
+    remark = " · ".join(part for part in (place, _PROTOCOL_LABELS[protocol], detail) if part)
+    return f"{remark} via {via}" if via else remark
 
 
 def service_username(edge_id: str) -> str:

@@ -45,6 +45,7 @@ from meridian.compiler.models import (
 )
 from meridian.compiler.names import (
     external_squad_name,
+    host_remark,
     internal_squad_name,
     node_name,
     profile_name,
@@ -57,7 +58,7 @@ from meridian.compiler.routing import (
     exit_outbound_tags,
     exit_override_routes,
 )
-from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent
+from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent, path_fingerprints
 
 
 def compile_topology(
@@ -274,6 +275,8 @@ def compile_topology(
             builder=builder,
             ports=ports,
             exit_=exit_,
+            # Entry names mention the exit only when the subscription has several.
+            place=exit_.id if len(intent.exits) > 1 else "",
             runtime_id=runtime_id,
             inbound_by_path=inbound_by_path,
             allocated_path_ports=allocated_path_ports,
@@ -432,6 +435,7 @@ def _compile_exit_endpoints(
     builder: PlanBuilder,
     ports: PortAllocator,
     exit_: ExitIntent,
+    place: str,
     runtime_id: str,
     inbound_by_path: dict[tuple[str, str], str],
     allocated_path_ports: dict[tuple[str, str], int],
@@ -562,28 +566,32 @@ def _compile_exit_endpoints(
         # which a proxied (orange-cloud) record cannot carry: it dials the
         # server itself and keeps the domain only as its TLS SNI.
         cdn_capable = path.protocol in {"xhttp", "wss"}
-        direct_host_ids.append(
-            builder.add(
-                host_id,
-                HostPayload(
-                    owner_ref=exit_.id,
-                    remark=f"Meridian v4 / {exit_.id} / {path.id} / direct",
-                    node_ref=runtime_id,
-                    inbound_ref=inbound_id,
-                    address_server_ref=exit_.server_ref,
-                    address=(path.host or path.tls_sni) if cdn_capable else "",
-                    public_port=path.public_port,
-                    protocol=path.protocol,
-                    sni=path.reality_sni or path.tls_sni,
-                    host=path.host,
-                    path=f"/{path.path}" if path.path else "",
-                    alpn="h3" if path.protocol == "hysteria2" else "",
-                    fingerprint="" if path.protocol == "hysteria2" else path.fingerprint,
-                    security_layer="TLS" if is_tls else "DEFAULT",
-                ),
-                dependencies=dependencies,
-            )
+        fingerprints: list[str] = (
+            [""] if path.protocol == "hysteria2" else list(path_fingerprints(path.protocol, path.fingerprint))
         )
+        for index, fingerprint in enumerate(fingerprints):
+            direct_host_ids.append(
+                builder.add(
+                    host_id if index == 0 else f"{host_id}:{fingerprint}",
+                    HostPayload(
+                        owner_ref=exit_.id,
+                        remark=host_remark(path.protocol, fingerprint=fingerprint, place=place),
+                        node_ref=runtime_id,
+                        inbound_ref=inbound_id,
+                        address_server_ref=exit_.server_ref,
+                        address=(path.host or path.tls_sni) if cdn_capable else "",
+                        public_port=path.public_port,
+                        protocol=path.protocol,
+                        sni=path.reality_sni or path.tls_sni,
+                        host=path.host,
+                        path=f"/{path.path}" if path.path else "",
+                        alpn="h3" if path.protocol == "hysteria2" else "",
+                        fingerprint=fingerprint,
+                        security_layer="TLS" if is_tls else "DEFAULT",
+                    ),
+                    dependencies=dependencies,
+                )
+            )
 
 
 def _compile_stream_artifacts(

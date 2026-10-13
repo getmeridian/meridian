@@ -35,6 +35,19 @@ PROTOCOL_PRIORITY: Final[tuple[ProtocolKind, ...]] = ("reality", "xhttp", "wss",
 TlsFingerprint = Literal["chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized"]
 # uTLS ClientHello presented on every TCP path unless the operator picks another.
 DEFAULT_TLS_FINGERPRINT: Final[TlsFingerprint] = "chrome"
+# Direct-to-server TLS paths are also published with these ClientHellos, so one blocked
+# fingerprint leaves another entry working. CDN and QUIC paths keep their single fingerprint.
+FINGERPRINT_COPIES: Final[tuple[TlsFingerprint, ...]] = ("chrome", "firefox")
+FINGERPRINT_COPY_PROTOCOLS: Final[frozenset[str]] = frozenset({"reality", "xhttp"})
+
+
+def path_fingerprints(protocol: str, primary: TlsFingerprint) -> list[TlsFingerprint]:
+    """The path's own fingerprint first, then each missing copy for direct TLS paths."""
+    if protocol not in FINGERPRINT_COPY_PROTOCOLS:
+        return [primary]
+    return [primary, *(fingerprint for fingerprint in FINGERPRINT_COPIES if fingerprint != primary)]
+
+
 RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
 EgressStrategy = Literal["least_ping"]
 EgressOverrideMatch = Literal["domain", "geosite", "geoip"]

@@ -7,7 +7,8 @@ from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall
 from meridian.compiler.models import HostPayload, NginxRouteSpec, RealmHopPayload, ResourcePostcondition
-from meridian.core.topology import SetupIntent
+from meridian.compiler.names import host_remark
+from meridian.core.topology import SetupIntent, path_fingerprints
 
 
 def register_relay_ingress(
@@ -122,27 +123,28 @@ def compile_relays(
 
         first_hop_id = hop_ids[0]
         inbound_id = inbound_by_path[(exit_.id, path.id)]
-        host_id = f"host:{relay.id}:{path.id}"
-        host_ids.append(
-            builder.add(
-                host_id,
-                HostPayload(
-                    owner_ref=relay.id,
-                    remark=f"Meridian v4 / {relay.id} / {path.id} / relay",
-                    node_ref=runtime_by_exit[exit_.id],
-                    inbound_ref=inbound_id,
-                    address_server_ref=relay.hop_server_refs[0],
-                    public_port=relay.listen_port,
-                    protocol=path.protocol,
-                    sni=relay.reality_sni or path.reality_sni or path.tls_sni,
-                    host=path.host,
-                    path=f"/{path.path}" if path.path else "",
-                    fingerprint="" if path.protocol == "hysteria2" else path.fingerprint,
-                    security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
-                ),
-                dependencies=[first_hop_id, inbound_id],
+        for index, fingerprint in enumerate(path_fingerprints(path.protocol, path.fingerprint)):
+            host_id = f"host:{relay.id}:{path.id}" + ("" if index == 0 else f":{fingerprint}")
+            host_ids.append(
+                builder.add(
+                    host_id,
+                    HostPayload(
+                        owner_ref=relay.id,
+                        remark=host_remark(path.protocol, fingerprint=fingerprint, via=relay.id),
+                        node_ref=runtime_by_exit[exit_.id],
+                        inbound_ref=inbound_id,
+                        address_server_ref=relay.hop_server_refs[0],
+                        public_port=relay.listen_port,
+                        protocol=path.protocol,
+                        sni=relay.reality_sni or path.reality_sni or path.tls_sni,
+                        host=path.host,
+                        path=f"/{path.path}" if path.path else "",
+                        fingerprint=fingerprint,
+                        security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
+                    ),
+                    dependencies=[first_hop_id, inbound_id],
+                )
             )
-        )
     return host_ids
 
 

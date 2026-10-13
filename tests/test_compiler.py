@@ -708,7 +708,9 @@ class TestPureCompiler:
             and not resource.payload.is_hidden
             and not resource.payload.xray_json_template_ref
         ]
-        assert [host.address_server_ref for host in relay_hosts] == ["srv-relay-edge"]
+        assert {host.address_server_ref for host in relay_hosts} == {"srv-relay-edge"}
+        # A relay into a Reality path is published with each fingerprint copy.
+        assert sorted(host.fingerprint for host in relay_hosts) == ["chrome", "firefox"]
 
     def test_custom_relay_sni_is_accepted_before_its_host_is_published(self) -> None:
         plan = compile_topology(_intent())
@@ -925,3 +927,23 @@ def client_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
         )
         if inbound.purpose == "client"
     ]
+
+
+def test_host_remarks_name_the_method_and_what_sets_each_entry_apart() -> None:
+    from meridian.compiler.names import host_remark
+
+    assert host_remark("reality", fingerprint="chrome") == "Reality · Chrome"
+    assert host_remark("xhttp", fingerprint="firefox", place="finland") == "finland · XHTTP · Firefox"
+    assert host_remark("reality", fingerprint="ios", via="moscow") == "Reality · iOS via moscow"
+    # CDN and QUIC paths are told apart by how they travel, not by a ClientHello.
+    assert host_remark("wss", fingerprint="chrome") == "WebSocket · CDN"
+    assert host_remark("hysteria2") == "Hysteria2 · UDP"
+
+
+def test_fingerprint_copies_cover_direct_tls_paths_only() -> None:
+    from meridian.core.topology import path_fingerprints
+
+    assert path_fingerprints("reality", "chrome") == ["chrome", "firefox"]
+    assert path_fingerprints("xhttp", "firefox") == ["firefox", "chrome"]
+    assert path_fingerprints("reality", "safari") == ["safari", "chrome", "firefox"]
+    assert path_fingerprints("wss", "chrome") == ["chrome"]
