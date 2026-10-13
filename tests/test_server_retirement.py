@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -115,10 +116,39 @@ def test_realm_hop_unit_and_config_are_removed_and_verified_stopped() -> None:
     )
 
     (command,) = conn.calls
-    assert command.index(f"systemctl disable --now {service}") < command.index("rm -f")
+    assert command.index('systemctl disable --now "$unit"') < command.index("rm -f")
     assert f"/etc/systemd/system/{service}.service" in command
     assert realm_config_path("realm:relay-chain:0") in command
     assert "daemon-reload" in command and f"! systemctl is-active --quiet {service}" in command
+
+
+def test_realm_hop_stops_even_when_the_legacy_unit_never_existed(tmp_path) -> None:
+    """A multi-unit `systemctl disable --now` aborts on a missing unit; a real relay kept forwarding."""
+    conn = MockConnection()
+    service = realm_service_name("realm:relay-chain:0")
+    _driver(RealmHopRetirement, conn).retire(
+        ManagedResourceBinding(logical_id="realm:relay-chain:0", remote_id=service, server_ref="srv-relay")
+    )
+    (command,) = conn.calls
+    state = tmp_path / "active"
+    state.write_text(service)
+    fake = tmp_path / "systemctl"
+    fake.write_text(
+        "#!/bin/sh\n"
+        f'state="{state}"\n'
+        'case "$1" in\n'
+        '  disable|stop) shift; [ "$1" = --now ] && shift\n'
+        '    for unit in "$@"; do [ "$unit" = "$(cat "$state")" ] || exit 5; done\n'
+        '    [ "$1" = "$(cat "$state")" ] && : > "$state"; exit 0;;\n'
+        '  is-active) [ "$3" = "$(cat "$state")" ] && [ -n "$3" ];;\n'
+        "  *) exit 0;;\n"
+        "esac\n"
+    )
+    fake.chmod(0o755)
+    runnable = command.replace("rm -f", "true")
+    result = subprocess.run(["sh", "-c", runnable], env={"PATH": f"{tmp_path}:/usr/bin:/bin"}, check=False)
+    assert result.returncode == 0
+    assert state.read_text() == ""
 
 
 def test_pre_rename_realm_hop_binding_removes_both_unit_names() -> None:

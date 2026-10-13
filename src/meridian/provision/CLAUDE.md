@@ -41,6 +41,7 @@
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443; rewriting it duplicates the listener and fails `nginx -t` on every re-bootstrap.
 - **`docker compose restart` keeps the old environment** — after changing an `env_file` (subscription page API token) recreate the service with `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — v4 installs none on servers; an operator-installed copy is how they redeploy.
+- **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing; relay retirement left a running, file-less `netfwd-*` unit.
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
 - **V4 recipes never own public ports** — `build_setup_steps`/`build_node_steps` pass `manage_public_ports=False`; the bootstrap once opened an untagged `443/udp` on every control server, which tagged retirement and teardown could not find. `ConfigureFirewall` now deletes only that bare, comment-less rule.
 - **Baseline checks must exit 1 for absence** — a bare `docker …` exits 127 when Docker is missing, which observation treats as unavailable evidence and blocks a relay from ever becoming an exit.

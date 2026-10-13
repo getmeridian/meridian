@@ -100,10 +100,18 @@ class RealmHopRetirement:
             realm_config_path(binding.logical_id),
             legacy_realm_config_path(binding.logical_id),
         )
+        # One unit per systemctl call: a multi-unit `disable --now` aborts entirely when
+        # either unit is missing (a fresh relay has no legacy unit) and stops nothing.
+        # Stopping again after daemon-reload catches a unit whose file is already gone.
+        stop_each = (
+            f"for unit in {services};"
+            ' do systemctl disable --now "$unit" >/dev/null 2>&1; systemctl stop "$unit" >/dev/null 2>&1; done;'
+        )
         result = conn.run(
-            f"systemctl disable --now {services} >/dev/null 2>&1;"
+            f"{stop_each}"
             f" rm -f {' '.join(shlex.quote(path) for path in paths)}"
-            f" && systemctl daemon-reload && systemctl reset-failed {services} >/dev/null 2>&1;"
+            f" && systemctl daemon-reload && {stop_each}"
+            f" systemctl reset-failed {services} >/dev/null 2>&1;"
             f" ! systemctl is-active --quiet {shlex.quote(current)}"
             f" && ! systemctl is-active --quiet {shlex.quote(legacy)}",
             timeout=60,
