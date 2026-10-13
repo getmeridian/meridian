@@ -120,7 +120,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — 列出客户端带状态、流量、创建时间和最后看到。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
-**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到下次应用（包括重新部署和 `client add`、`node add`、`relay add`），它打开所有声明的客户端。
+**`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
 
 **`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 

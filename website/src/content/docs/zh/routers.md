@@ -116,7 +116,7 @@ xkeen -start
 - **错误的时钟。** 许多路由器启动时时间不对，直到 NTP 响应。TLS 证书检查然后对订阅页面、XHTTP、WSS 和包下载失败。当其安装程序因证书错误失败时，podkop 常见问题建议您先检查路由器的日期。
 - **DNS 泄漏。** podkop 按域名路由，所以设备必须使用路由器作为 DNS 服务器，浏览器不得使用其自己的安全 DNS 绕过它。设备在另一个 DNS 服务器上会解析为真实地址并跳过隧道。根据 podkop 文档，这是"在一台设备上工作，在另一台上不工作"最常见的原因。
 - **设备上的 VPN 应用。** 运行自己的 VPN 应用的手机会跳过路由器的路由。
-- **禁用的客户端。** `meridian client disable home-router` 会切断路由器的连接，直到下一次应用将其打开。
+- **禁用的客户端。** `meridian client disable home-router` 会切断路由器的连接，直到你运行 `meridian client enable home-router`。
 
 ## 验证
 
