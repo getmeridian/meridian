@@ -8,6 +8,9 @@ from dataclasses import dataclass
 
 from meridian.provision.common import (
     AUTO_UPGRADES_CONF,
+    FAIL2BAN_JAIL_CONF,
+    FAIL2BAN_JAIL_PATH,
+    FAIL2BAN_PACKAGES,
     REQUIRED_PACKAGES,
     CheckDiskSpace,
     ConfigureBBR,
@@ -47,7 +50,7 @@ def build_server_baseline_steps(
     manage_public_ports: bool = True,
 ) -> list[Operation]:
     """Build the shared OS baseline, optionally including Docker."""
-    extra_packages = ["fail2ban"] if ctx.harden else []
+    extra_packages = FAIL2BAN_PACKAGES if ctx.harden else []
     operations = [
         op(CheckDiskSpace(), provides=[Resource.DISK_SPACE_CHECKED]),
         op(
@@ -99,10 +102,11 @@ def build_server_baseline_checks(
     manage_public_ports: bool = True,
 ) -> list[BaselineCheck]:
     """Build read-only checks covering every durable baseline effect."""
-    packages = [*REQUIRED_PACKAGES, *(["fail2ban"] if ctx.harden else [])]
+    packages = [*REQUIRED_PACKAGES, *(FAIL2BAN_PACKAGES if ctx.harden else [])]
     package_args = " ".join(shlex.quote(package) for package in packages)
     upgrade_path = "/etc/apt/apt.conf.d/20auto-upgrades"
     upgrade_digest = hashlib.sha256(AUTO_UPGRADES_CONF.encode()).hexdigest()
+    jail_digest = hashlib.sha256(FAIL2BAN_JAIL_CONF.encode()).hexdigest()
     checks = [
         BaselineCheck(
             "packages",
@@ -134,7 +138,11 @@ def build_server_baseline_checks(
                     "sshd -t && sshd -T | grep -qx 'passwordauthentication no' && "
                     "sshd -T | grep -qx 'kbdinteractiveauthentication no'",
                 ),
-                BaselineCheck("fail2ban", "systemctl is-active --quiet fail2ban"),
+                BaselineCheck(
+                    "fail2ban",
+                    f"printf '%s  %s\\n' {shlex.quote(jail_digest)} {shlex.quote(FAIL2BAN_JAIL_PATH)} "
+                    "| sha256sum --check --status - && systemctl is-active --quiet fail2ban",
+                ),
                 BaselineCheck(
                     "firewall",
                     # Absent UFW (stock Debian) is drift to install, not a missing inspection tool.

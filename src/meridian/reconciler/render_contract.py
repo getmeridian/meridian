@@ -13,7 +13,7 @@ _RENDERER_MANIFEST = {
     "node-compose": "remnawave-node-v3",
     "panel-compose": "remnawave-panel-v2",
     "realm": "neutral-systemd-v2",
-    "server-baseline": "neutral-paths-v2",
+    "server-baseline": "fail2ban-journal-v3",
     "xray-workload": "salamander-v6",
 }
 

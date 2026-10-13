@@ -48,6 +48,8 @@
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
 - **V4 recipes never own public ports** — `build_setup_steps`/`build_node_steps` pass `manage_public_ports=False`; the bootstrap once opened an untagged `443/udp` on every control server, which tagged retirement and teardown could not find. `ConfigureFirewall` now deletes only that bare, comment-less rule.
 - **Baseline checks must exit 1 for absence** — a bare `docker …` or `ufw …` exits 127 (stock Debian has no ufw), which observation treats as unavailable evidence and blocks the baseline forever.
+- **fail2ban reads sshd from the journal** — Debian 12 has no `auth.log` and its fail2ban defaults to log files, so it exited 150 ms after every start; `ConfigureFail2ban` writes `jail.d/sshd-journal.local` (needs `python3-systemd`) and re-checks the service after a pause.
+- **"Installed" means `install ok installed`** — `dpkg-query -W` also lists packages dpkg only remembers (`un`, removed); `ServerFacts.installed_packages()` reads `${Status}`, or a never-installed package is skipped forever.
 - **Packages and probes must work on Ubuntu and Debian** — Debian 13 keeps `dnsutils` only as a virtual name `dpkg-query` never reports installed (use `bind9-dnsutils`); minimal images lack `lsb_release`, so read the codename from `ServerFacts.os_release()`.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
 - **WARP belongs in both recipes** — a WARP-enabled exit may be node-only, so `build_node_steps()` must install it after Docker just like first setup.

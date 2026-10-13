@@ -9,6 +9,7 @@ from __future__ import annotations
 from meridian.provision.common import (
     _SSH_HARDENING_DROPIN,
     AUTO_UPGRADES_CONF,
+    FAIL2BAN_JAIL_CONF,
     REQUIRED_PACKAGES,
     ConfigureBBR,
     ConfigureFail2ban,
@@ -26,10 +27,26 @@ from tests.support.mock_connection import MockConnection
 # ---------------------------------------------------------------------------
 
 
+def _dpkg(installed: list[str], remembered: tuple[str, ...] = ()) -> str:
+    """dpkg-query rows: installed packages, plus ones dpkg only remembers ("un")."""
+    rows = [f"{name}\tinstall ok installed" for name in installed]
+    rows += [f"{name}\tunknown ok not-installed" for name in remembered]
+    return "\n".join(rows) + "\n"
+
+
 class TestInstallPackages:
+    def test_package_dpkg_only_remembers_is_installed(self, mock_conn: MockConnection, base_ctx):
+        """Debian lists a never-installed recommended package as "un"; it is still missing."""
+        mock_conn.when("dpkg-query", rc=1, stdout=_dpkg(REQUIRED_PACKAGES, remembered=("python3-systemd",)))
+
+        result = InstallPackages([*REQUIRED_PACKAGES, "python3-systemd"]).run(mock_conn, base_ctx)
+
+        assert result.status == "changed"
+        mock_conn.assert_called_with_pattern("apt-get install -y -qq python3-systemd")
+
     def test_all_present_returns_ok(self, mock_conn: MockConnection, base_ctx):
         """When all packages are already installed, no apt-get install is called."""
-        mock_conn.when("dpkg-query", stdout="\n".join(REQUIRED_PACKAGES) + "\n")
+        mock_conn.when("dpkg-query", stdout=_dpkg(REQUIRED_PACKAGES))
 
         result = InstallPackages().run(mock_conn, base_ctx)
 
@@ -40,7 +57,7 @@ class TestInstallPackages:
         """When some packages are missing, apt-get install is called and status is changed."""
         # Return only a subset of required packages
         installed = REQUIRED_PACKAGES[:3]
-        mock_conn.when("dpkg-query", stdout="\n".join(installed) + "\n")
+        mock_conn.when("dpkg-query", stdout=_dpkg(installed))
 
         result = InstallPackages().run(mock_conn, base_ctx)
 
@@ -50,7 +67,7 @@ class TestInstallPackages:
     def test_installs_cron_for_acme_and_watchdog_jobs(self, mock_conn: MockConnection, base_ctx):
         """Cron is required for cert renewal, stats refresh, and the watchdog."""
         installed = [pkg for pkg in REQUIRED_PACKAGES if pkg != "cron"]
-        mock_conn.when("dpkg-query", stdout="\n".join(installed) + "\n")
+        mock_conn.when("dpkg-query", stdout=_dpkg(installed))
 
         result = InstallPackages().run(mock_conn, base_ctx)
 
@@ -218,16 +235,34 @@ class TestHardenSSH:
 
 
 class TestConfigureFail2ban:
-    def test_already_running_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        """When fail2ban is active, status is ok without restart."""
+    def test_already_running_with_journal_jail_returns_ok(self, mock_conn: MockConnection, base_ctx):
+        """When the jail is current and fail2ban is active, nothing restarts."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", stdout="active")
 
         result = ConfigureFail2ban().run(mock_conn, base_ctx)
 
         assert result.status == "ok"
+        assert not any("restart" in command for command in mock_conn.calls)
+
+    def test_new_jail_restarts_a_running_fail2ban(self, mock_conn: MockConnection, base_ctx):
+        """Debian 12 has no auth.log: the journal jail must take effect even if fail2ban runs."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", rc=1)
+        mock_conn.when("cat >", rc=0)
+        mock_conn.when("systemctl is-active fail2ban", stdout="active")
+        mock_conn.when("systemctl is-enabled fail2ban", stdout="enabled")
+        mock_conn.when("systemctl restart fail2ban", rc=0)
+
+        result = ConfigureFail2ban().run(mock_conn, base_ctx)
+
+        assert result.status == "changed"
+        assert any(command.startswith("systemctl restart fail2ban") for command in mock_conn.calls)
+        assert mock_conn.write_map["/etc/fail2ban/jail.d/sshd-journal.local"] == FAIL2BAN_JAIL_CONF.encode()
 
     def test_stopped_restarts(self, mock_conn: MockConnection, base_ctx):
         """When fail2ban is not running, it is enabled and restarted."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
+        mock_conn.when("sleep 2; systemctl is-active fail2ban", stdout="active")
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
         mock_conn.when("systemctl enable fail2ban", rc=0)
         mock_conn.when("systemctl restart fail2ban", rc=0)
@@ -236,8 +271,22 @@ class TestConfigureFail2ban:
 
         assert result.status == "changed"
 
+    def test_fail2ban_exiting_after_start_fails_with_its_log(self, mock_conn: MockConnection, base_ctx):
+        """A start that systemd accepts but fail2ban abandons must not pass."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
+        mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="failed")
+        mock_conn.when("systemctl enable fail2ban", rc=0)
+        mock_conn.when("systemctl restart fail2ban", rc=0)
+        mock_conn.when("journalctl -u fail2ban", stdout="ERROR Have not found any log file for sshd jail")
+
+        result = ConfigureFail2ban().run(mock_conn, base_ctx)
+
+        assert result.status == "failed"
+        assert "Have not found any log file" in result.detail
+
     def test_enable_failure_returns_failed(self, mock_conn: MockConnection, base_ctx):
         """When systemctl enable fails, status is failed."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
         mock_conn.when("systemctl enable fail2ban", rc=1, stderr="Failed to enable")
 
@@ -248,6 +297,7 @@ class TestConfigureFail2ban:
 
     def test_service_start_failure_returns_failed(self, mock_conn: MockConnection, base_ctx):
         """When systemctl restart fails, status is failed."""
+        mock_conn.when("cat /etc/fail2ban/jail.d/sshd-journal.local", stdout=FAIL2BAN_JAIL_CONF)
         mock_conn.when("systemctl is-active fail2ban", rc=3, stdout="inactive")
         mock_conn.when("systemctl enable fail2ban", rc=0)
         mock_conn.when("systemctl restart fail2ban", rc=1, stderr="Unit not found")

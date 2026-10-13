@@ -13,6 +13,13 @@ from meridian.ssh import ServerConnection
 MIN_DISK_SPACE_MB = 2048
 
 # Packages required by the deployment stack
+# Debian 12 logs only to the journal (no auth.log) while its fail2ban reads log files by
+# default, so the sshd jail found nothing and fail2ban exited; the journal backend works on
+# every supported release and needs the python3-systemd binding.
+FAIL2BAN_PACKAGES = ["fail2ban", "python3-systemd"]
+FAIL2BAN_JAIL_PATH = "/etc/fail2ban/jail.d/sshd-journal.local"
+FAIL2BAN_JAIL_CONF = "[sshd]\nenabled = true\nbackend = systemd\n"
+
 REQUIRED_PACKAGES = [
     "curl",
     "cron",
@@ -274,8 +281,11 @@ class ConfigureFail2ban:
     name = "Configure fail2ban"
 
     def run(self, conn: ServerConnection, ctx: StepContext) -> StepResult:
+        jail = ensure_file_content(conn, FAIL2BAN_JAIL_PATH, FAIL2BAN_JAIL_CONF, mode="644")
+        if not jail.ok:
+            return StepResult(name=self.name, status="failed", detail=f"failed to write the sshd jail: {jail.detail}")
         active = conn.run("systemctl is-active fail2ban", timeout=15)
-        if active.returncode == 0 and active.stdout.strip() == "active":
+        if not jail.changed and active.returncode == 0 and active.stdout.strip() == "active":
             return StepResult(name=self.name, status="ok", detail="already running")
 
         result = ensure_service_running(conn, "fail2ban", restart=True)
@@ -288,11 +298,20 @@ class ConfigureFail2ban:
                 status="failed",
                 detail=f"{prefix}: {result.detail}",
             )
+        # fail2ban reports a successful start, then exits once it fails to load a jail.
+        settled = conn.run("sleep 2; systemctl is-active fail2ban", timeout=20)
+        if settled.returncode != 0 or settled.stdout.strip() != "active":
+            log = conn.run("journalctl -u fail2ban -n 5 --no-pager -o cat", timeout=15)
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=f"fail2ban stopped right after starting: {log.stdout.strip()[-300:]}",
+            )
 
         return StepResult(
             name=self.name,
-            status="changed" if result.changed else "ok",
-            detail=result.detail or ("already running" if not result.changed else ""),
+            status="changed",
+            detail=result.detail or "restarted",
         )
 
 
