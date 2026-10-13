@@ -34,10 +34,10 @@ const dir = locale === 'fa' ? 'rtl' : 'ltr';
 const detailSteps = [
   { title: t('step.1.title', 'Installs Docker'), text: t('step.1.text', ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel') },
   { title: t('step.2.title', 'Generates x25519 keypair'), text: t('step.2.text', ' — unique encryption keys for Reality authentication') },
-  { title: t('step.3.title', 'Hardens the server'), text: t('step.3.text', ' — UFW firewall (ports 22 + 443 only), SSH key-only auth, <strong>BBR</strong> congestion control') },
-  { title: t('step.4.title', 'Configures VLESS+Reality'), text: t('step.4.text', ' on port 443 — impersonates a real TLS server') },
-  { title: t('step.5.title', 'Enables XHTTP transport'), text: t('step.5.text', ' — additional stealth routed through nginx, no extra port') },
-  { title: t('step.6.title', 'Outputs QR codes'), text: t('step.6.text', ' and generates an HTML connection page with setup instructions') },
+  { title: t('step.3.title', 'Hardens the server'), text: t('step.3.text', ' — UFW opens only your SSH port, 443 (TCP and UDP), and 80 for certificates; SSH key-only login, fail2ban, <strong>BBR</strong> congestion control') },
+  { title: t('step.4.title', 'Configures VLESS+Reality'), text: t('step.4.text', " on TCP 443, where probes see a real website's certificate") },
+  { title: t('step.5.title', 'Adds XHTTP and Hysteria2'), text: t('step.5.text', ' — XHTTP through nginx on the same port, Hysteria2 on UDP 443 with salamander obfuscation') },
+  { title: t('step.6.title', 'Outputs QR codes'), text: t('step.6.text', ' and a connection page once real traffic has passed through the new subscription') },
 ];
 
 const hreflangLinks = [
@@ -59,29 +59,12 @@ const hreflangLinks = [
   <main id="main" dir={dir}>
     <Hero locale={locale} />
 
-    <!-- TRUST BAR -->
-    <section class="trust-bar">
-      <div class="container">
-        <div class="trust-items">
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.mit">{t('trust.mit', 'MIT Licensed')}</span>
-          </div>
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.languages">{t('trust.languages', '4 Languages')}</span>
-          </div>
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.oss">{t('trust.oss', '100% Open Source')}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- HOW IT WORKS -->
     <section id="setup" class="reveal">
       <div class="container">
         <div class="section-label" data-t="setup.label">{t('setup.label', 'How it works')}</div>
-        <h2 data-t="setup.title">{t('setup.title', 'Three steps to secure internet')}</h2>
-        <p class="section-desc" data-t="setup.desc">{t('setup.desc', 'You need a VPS (any $5/month server) and a terminal on your laptop. Meridian handles everything else.')}</p>
+        <h2 data-t="setup.title">{t('setup.title', 'Two commands to a working proxy')}</h2>
+        <p class="section-desc" data-t="setup.desc">{t('setup.desc', 'You need a Debian or Ubuntu VPS (a $5/month one is enough) and a terminal on your computer. Meridian sets up the rest.')}</p>
 
         <div class="setup-grid">
           <div class="setup-main">
@@ -101,7 +84,7 @@ const hreflangLinks = [
             <h3 data-t="setup.details">{t('setup.details', 'What happens behind the scenes')}</h3>
             <Timeline steps={detailSteps} />
             <Callout variant="tip" icon="⏱" data-t="setup.idempotent">
-              {t('setup.idempotent', 'Safe to re-run anytime. Fully idempotent — credentials preserved, settings updated in place.')}
+              {t('setup.idempotent', 'Safe to re-run. A second run keeps credentials and keys, and resumes or updates the deployment in place.')}
             </Callout>
           </div>
         </div>
@@ -115,7 +98,7 @@ const hreflangLinks = [
       <div class="container">
         <div class="section-label" data-t="builder.label">{t('builder.label', 'Command builder')}</div>
         <h2 data-t="builder.title">{t('builder.title', 'Build your command')}</h2>
-        <p class="section-desc" data-t="builder.desc">{t('builder.desc', 'Configure flags interactively and copy the full command. Supports all Meridian CLI operations.')}</p>
+        <p class="section-desc" data-t="builder.desc">{t('builder.desc', 'Pick options and copy the full command. Covers deploy, relays, checks, SNI scans, diagnostics, and teardown.')}</p>
 
         <CommandBuilder />
       </div>
@@ -127,19 +110,19 @@ const hreflangLinks = [
     <section id="technology" class="reveal">
       <div class="container">
         <div class="section-label" data-t="tech.label">{t('tech.label', 'Technology')}</div>
-        <h2 data-t="tech.title">{t('tech.title', 'Why censors can\'t detect it')}</h2>
-        <p class="section-desc" data-t="tech.desc">{t('tech.desc', 'Traditional VPNs have distinctive traffic signatures. VLESS+Reality is indistinguishable from normal web browsing.')}</p>
+        <h2 data-t="tech.title">{t('tech.title', 'How it avoids detection')}</h2>
+        <p class="section-desc" data-t="tech.desc">{t('tech.desc', 'OpenVPN and WireGuard have recognizable traffic signatures. A VLESS+Reality connection is hard to tell apart from ordinary HTTPS to a real website.')}</p>
 
         <div class="tech-grid">
           <Accordion title={t('tech.dpi', 'Deep Packet Inspection (DPI)')} open>
             <p>
-              DPI analyzes traffic patterns to identify proxy protocols. VPNs like
-              OpenVPN and WireGuard have distinctive packet signatures that are trivial to block.
+              DPI analyzes traffic patterns to identify proxy protocols. OpenVPN and WireGuard
+              have handshakes that are easy to recognize and block.
             </p>
             <p>
-              <strong>VLESS+Reality</strong> produces traffic byte-for-byte identical to a normal
-              HTTPS connection. No headers, no patterns, no packet sizes that distinguish it from
-              regular web browsing.
+              <strong>VLESS+Reality</strong> runs inside a standard TLS 1.3 connection on port 443,
+              so DPI sees what looks like ordinary HTTPS to the camouflage site. Every server also
+              offers XHTTP and Hysteria2, so a block on one method leaves the others working.
             </p>
           </Accordion>
 
@@ -149,10 +132,10 @@ const hreflangLinks = [
               responds differently than the website it claims to be, it gets blocked.
             </p>
             <p>
-              <strong>Reality</strong> uses the TLS certificate from a real website (e.g., microsoft.com).
-              When a probe connects, your server completes the handshake using Microsoft's actual
-              certificate. The probe sees a legitimate server. Only clients with your private key
-              get the proxy tunnel.
+              <strong>Reality</strong> borrows the TLS identity of a real website: by default a site
+              hosted near your server, or <code>www.google.com</code>. A probe without your key is
+              passed through to that site and sees its genuine certificate. Only clients with your
+              key get the proxy tunnel.
             </p>
           </Accordion>
 
@@ -162,9 +145,9 @@ const hreflangLinks = [
               where the fingerprint doesn't match the claimed application.
             </p>
             <p>
-              Meridian uses <strong>uTLS</strong> to impersonate Chrome's exact TLS fingerprint —
-              the same one used by billions of devices. Your traffic is indistinguishable from
-              someone browsing the web with Chrome.
+              Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome.
+              Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if
+              censors flag one fingerprint, the other keeps working.
             </p>
           </Accordion>
         </div>
@@ -183,7 +166,7 @@ const hreflangLinks = [
         <AppGrid />
 
         <Callout variant="warning" data-t="connect.clock">
-          {t('connect.clock', 'Device clock must be accurate within 30 seconds. Enable automatic date/time in your device settings.')}
+          {t('connect.clock', 'Turn on automatic date and time on every device. Connections fail when the device clock is wrong.')}
         </Callout>
       </div>
     </section>
@@ -199,7 +182,7 @@ const hreflangLinks = [
         <div class="arch-img">
           <img
             src="/img/architecture.svg"
-            alt="Meridian architecture — nginx SNI routing and TLS, Xray Reality"
+            alt="Meridian architecture: nginx routes TCP 443 by SNI to Xray Reality, XHTTP, and the connection pages; Hysteria2 listens on UDP 443"
             loading="lazy"
             width="1200"
             height="780"
@@ -209,11 +192,12 @@ const hreflangLinks = [
         <div class="arch-grid">
           <Accordion title={t('arch.standalone', 'Standalone mode (no domain)')} open>
             <p>
-              <strong>nginx</strong> sits on port 443 and routes traffic by TLS SNI using its stream module.
-              Reality connections route to <strong>Xray</strong>, while nginx's http module
-              handles everything else — serving connection pages over HTTPS with a Let's Encrypt
-              IP certificate (via acme.sh). XHTTP transport runs through nginx via path-based routing — no
-              extra port exposed.
+              <strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its
+              stream module. Reality connections go to <strong>Xray</strong>. Everything else
+              reaches nginx's http module, which serves the connection pages, subscriptions, and
+              XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP
+              (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander
+              obfuscation.
             </p>
             <p>
               The Remnawave admin panel is reverse-proxied by nginx on a secret path —
@@ -222,24 +206,25 @@ const hreflangLinks = [
           </Accordion>
 
           <Accordion title={t('arch.domain', 'Domain mode (CDN fallback)')}>
-            <p>Adds three components on top of standalone:</p>
             <p>
-              <strong>nginx stream</strong> inspects TLS SNI without terminating encryption.
-              <strong>nginx http</strong> terminates TLS with Let's Encrypt certificates managed by acme.sh.
-              <strong>VLESS+WSS</strong> provides a CDN fallback through Cloudflare — works even
-              if your server's IP is blocked.
+              With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and
+              routes that SNI to the domain's paths. XHTTP moves to the domain and
+              <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel
+              through the CDN and keep working if your server's IP is blocked. The panel and
+              connection pages stay on the IP certificate.
             </p>
           </Accordion>
 
           <Accordion title={t('arch.relay', 'Relay mode (domestic entry point)')}>
             <p>
-              A lightweight <strong>Realm</strong> TCP forwarder on a domestic server relays
-              port 443 to your exit server abroad. All protocols work through the relay
-              with end-to-end encryption — the relay never sees your traffic.
+              A <strong>Realm</strong> TCP forwarder on a server inside your country passes
+              connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and
+              Hysteria2 still connect to the exit directly. Encryption runs end to end between
+              the app and the exit, so the relay never sees plaintext.
             </p>
             <p>
-              Deploy with <code>meridian relay add RELAY_IP</code>. Client connection
-              pages are automatically regenerated with relay routes.
+              Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions
+              and connection pages pick up the relay entries automatically.
             </p>
           </Accordion>
         </div>
@@ -250,7 +235,7 @@ const hreflangLinks = [
     <section id="cta" class="reveal cta-section">
       <div class="container cta-content">
         <h2 data-t="cta.title">{t('cta.title', 'Ready to get started?')}</h2>
-        <p class="section-desc cta-desc" data-t="cta.desc">{t('cta.desc', 'Install Meridian, deploy to your server, and share access with the people who need it. The whole process takes about five minutes.')}</p>
+        <p class="section-desc cta-desc" data-t="cta.desc">{t('cta.desc', 'Install Meridian, deploy to your server, and share access with the people who need it. A deploy usually takes 3 to 10 minutes.')}</p>
         <div class="hero__actions cta-actions">
           <a href="#setup" class="hero__btn hero__btn--primary" data-t="cta.install">{t('cta.install', 'Install Meridian')}</a>
           <a href={`/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
@@ -364,27 +349,6 @@ const hreflangLinks = [
     display: block;
     width: 100%;
     height: auto;
-  }
-
-  /* Trust bar */
-  .trust-bar {
-    padding: 0 0 24px;
-  }
-  .trust-items {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    flex-wrap: wrap;
-  }
-  .trust-item {
-    text-align: center;
-  }
-  .trust-value {
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    color: var(--t3);
   }
 
   /* CTA */

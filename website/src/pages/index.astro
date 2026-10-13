@@ -11,10 +11,10 @@ import CommandBuilder from '../components/CommandBuilder.astro';
 const detailSteps = [
   { title: 'Installs Docker', text: ' and deploys <strong>Xray</strong> managed by the <strong>Remnawave</strong> panel', titleKey: 'step.1.title', textKey: 'step.1.text' },
   { title: 'Generates x25519 keypair', text: ' — unique encryption keys for Reality authentication', titleKey: 'step.2.title', textKey: 'step.2.text' },
-  { title: 'Hardens the server', text: ' — UFW firewall (ports 22 + 443 only), SSH key-only auth, <strong>BBR</strong> congestion control', titleKey: 'step.3.title', textKey: 'step.3.text' },
-  { title: 'Configures VLESS+Reality', text: ' on port 443 — impersonates a real TLS server', titleKey: 'step.4.title', textKey: 'step.4.text' },
-  { title: 'Enables XHTTP transport', text: ' — additional stealth routed through nginx, no extra port', titleKey: 'step.5.title', textKey: 'step.5.text' },
-  { title: 'Outputs QR codes', text: ' and generates an HTML connection page with setup instructions', titleKey: 'step.6.title', textKey: 'step.6.text' },
+  { title: 'Hardens the server', text: ' — UFW opens only your SSH port, 443 (TCP and UDP), and 80 for certificates; SSH key-only login, fail2ban, <strong>BBR</strong> congestion control', titleKey: 'step.3.title', textKey: 'step.3.text' },
+  { title: 'Configures VLESS+Reality', text: " on TCP 443, where probes see a real website's certificate", titleKey: 'step.4.title', textKey: 'step.4.text' },
+  { title: 'Adds XHTTP and Hysteria2', text: ' — XHTTP through nginx on the same port, Hysteria2 on UDP 443 with salamander obfuscation', titleKey: 'step.5.title', textKey: 'step.5.text' },
+  { title: 'Outputs QR codes', text: ' and a connection page once real traffic has passed through the new subscription', titleKey: 'step.6.title', textKey: 'step.6.text' },
 ];
 ---
 
@@ -39,10 +39,10 @@ const detailSteps = [
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "How does VLESS+Reality defeat Deep Packet Inspection (DPI)?",
+          "name": "How does VLESS+Reality resist Deep Packet Inspection (DPI)?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "VLESS+Reality produces traffic byte-for-byte identical to a normal HTTPS connection. No headers, no patterns, no packet sizes that distinguish it from regular web browsing. Traditional VPNs like OpenVPN and WireGuard have distinctive packet signatures that are trivial to block.",
+            "text": "A VLESS+Reality connection runs inside a standard TLS 1.3 handshake on port 443 and looks like ordinary HTTPS to a real website, which makes it hard to tell apart from regular browsing. OpenVPN and WireGuard have recognizable handshakes that are easy to block.",
           },
         },
         {
@@ -50,15 +50,15 @@ const detailSteps = [
           "name": "How does Reality protect against active probing?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Reality uses the TLS certificate from a real website (e.g., microsoft.com). When a probe connects, your server completes the handshake using that site's actual certificate. The probe sees a legitimate server. Only clients with your private key get the proxy tunnel.",
+            "text": "Reality borrows the TLS identity of a real website: by default a site hosted near your server, or www.google.com. A probe without your key is passed through to that site and sees its genuine certificate. Only clients with your key get the proxy tunnel.",
           },
         },
         {
           "@type": "Question",
-          "name": "How does Meridian prevent TLS fingerprinting?",
+          "name": "How does Meridian handle TLS fingerprinting?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Meridian uses uTLS to impersonate Chrome's exact TLS fingerprint — the same one used by billions of devices. Your traffic is indistinguishable from someone browsing the web with Chrome.",
+            "text": "Client apps use uTLS to send the same TLS Client Hello as Chrome. Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if censors flag one fingerprint, the other keeps working.",
           },
         },
       ],
@@ -67,30 +67,13 @@ const detailSteps = [
   <main id="main">
     <Hero />
 
-    <!-- TRUST BAR -->
-    <section class="trust-bar">
-      <div class="container">
-        <div class="trust-items">
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.mit">MIT Licensed</span>
-          </div>
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.languages">4 Languages</span>
-          </div>
-          <div class="trust-item">
-            <span class="trust-value" data-t="trust.oss">100% Open Source</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- HOW IT WORKS (simple) -->
     <section id="setup" class="reveal">
       <div class="container">
         <div class="section-label" data-t="setup.label">How it works</div>
-        <h2 data-t="setup.title">Three steps to secure internet</h2>
+        <h2 data-t="setup.title">Two commands to a working proxy</h2>
         <p class="section-desc" data-t="setup.desc">
-          You need a VPS (any $5/month server) and a terminal on your laptop. Meridian handles everything else.
+          You need a Debian or Ubuntu VPS (a $5/month one is enough) and a terminal on your computer. Meridian sets up the rest.
         </p>
 
         <div class="setup-grid">
@@ -114,7 +97,7 @@ const detailSteps = [
             <h3 data-t="setup.details">What happens behind the scenes</h3>
             <Timeline steps={detailSteps} />
             <Callout variant="tip" icon="⏱" data-t="setup.idempotent">
-              Safe to re-run anytime. Fully idempotent — credentials preserved, settings updated in place.
+              Safe to re-run. A second run keeps credentials and keys, and resumes or updates the deployment in place.
             </Callout>
           </div>
         </div>
@@ -129,7 +112,7 @@ const detailSteps = [
         <div class="section-label" data-t="builder.label">Command builder</div>
         <h2 data-t="builder.title">Build your command</h2>
         <p class="section-desc" data-t="builder.desc">
-          Configure flags interactively and copy the full command. Supports all Meridian CLI operations.
+          Pick options and copy the full command. Covers deploy, relays, checks, SNI scans, diagnostics, and teardown.
         </p>
 
         <CommandBuilder />
@@ -142,22 +125,22 @@ const detailSteps = [
     <section id="technology" class="reveal">
       <div class="container">
         <div class="section-label" data-t="tech.label">Technology</div>
-        <h2 data-t="tech.title">Why censors can't detect it</h2>
+        <h2 data-t="tech.title">How it avoids detection</h2>
         <p class="section-desc" data-t="tech.desc">
-          Traditional VPNs have distinctive traffic signatures. VLESS+Reality is
-          indistinguishable from normal web browsing.
+          OpenVPN and WireGuard have recognizable traffic signatures. A VLESS+Reality
+          connection is hard to tell apart from ordinary HTTPS to a real website.
         </p>
 
         <div class="tech-grid">
           <Accordion title="Deep Packet Inspection (DPI)" titleKey="tech.dpi" open>
             <p>
-              DPI analyzes traffic patterns to identify proxy protocols. VPNs like
-              OpenVPN and WireGuard have distinctive packet signatures that are trivial to block.
+              DPI analyzes traffic patterns to identify proxy protocols. OpenVPN and WireGuard
+              have handshakes that are easy to recognize and block.
             </p>
             <p>
-              <strong>VLESS+Reality</strong> produces traffic byte-for-byte identical to a normal
-              HTTPS connection. No headers, no patterns, no packet sizes that distinguish it from
-              regular web browsing.
+              <strong>VLESS+Reality</strong> runs inside a standard TLS 1.3 connection on port 443,
+              so DPI sees what looks like ordinary HTTPS to the camouflage site. Every server also
+              offers XHTTP and Hysteria2, so a block on one method leaves the others working.
             </p>
           </Accordion>
 
@@ -167,10 +150,10 @@ const detailSteps = [
               responds differently than the website it claims to be, it gets blocked.
             </p>
             <p>
-              <strong>Reality</strong> uses the TLS certificate from a real website (e.g., microsoft.com).
-              When a probe connects, your server completes the handshake using Microsoft's actual
-              certificate. The probe sees a legitimate server. Only clients with your private key
-              get the proxy tunnel.
+              <strong>Reality</strong> borrows the TLS identity of a real website: by default a site
+              hosted near your server, or <code>www.google.com</code>. A probe without your key is
+              passed through to that site and sees its genuine certificate. Only clients with your
+              key get the proxy tunnel.
             </p>
           </Accordion>
 
@@ -180,9 +163,9 @@ const detailSteps = [
               where the fingerprint doesn't match the claimed application.
             </p>
             <p>
-              Meridian uses <strong>uTLS</strong> to impersonate Chrome's exact TLS fingerprint —
-              the same one used by billions of devices. Your traffic is indistinguishable from
-              someone browsing the web with Chrome.
+              Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome.
+              Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if
+              censors flag one fingerprint, the other keeps working.
             </p>
           </Accordion>
         </div>
@@ -204,8 +187,8 @@ const detailSteps = [
         <AppGrid />
 
         <Callout variant="warning" data-t="connect.clock">
-          Device clock must be accurate within 30 seconds. Enable automatic date/time
-          in your device settings.
+          Turn on automatic date and time on every device. Connections fail when the
+          device clock is wrong.
         </Callout>
       </div>
     </section>
@@ -221,7 +204,7 @@ const detailSteps = [
         <div class="arch-img">
           <img
             src="/img/architecture.svg"
-            alt="Meridian architecture — nginx SNI routing and TLS, Xray Reality"
+            alt="Meridian architecture: nginx routes TCP 443 by SNI to Xray Reality, XHTTP, and the connection pages; Hysteria2 listens on UDP 443"
             loading="lazy"
             width="1200"
             height="780"
@@ -231,11 +214,12 @@ const detailSteps = [
         <div class="arch-grid">
           <Accordion title="Standalone mode (no domain)" titleKey="arch.standalone" open>
             <p>
-              <strong>nginx</strong> sits on port 443 and routes traffic by TLS SNI using its stream module.
-              Reality connections route to <strong>Xray</strong>, while nginx's http module
-              handles everything else — serving connection pages over HTTPS with a Let's Encrypt
-              IP certificate (via acme.sh). XHTTP transport runs through nginx via path-based routing — no
-              extra port exposed.
+              <strong>nginx</strong> owns TCP port 443 and routes connections by TLS SNI with its
+              stream module. Reality connections go to <strong>Xray</strong>. Everything else
+              reaches nginx's http module, which serves the connection pages, subscriptions, and
+              XHTTP over HTTPS with a short-lived Let's Encrypt certificate for the server's IP
+              (issued by acme.sh). <strong>Hysteria2</strong> listens on UDP 443 with salamander
+              obfuscation.
             </p>
             <p>
               The Remnawave admin panel is reverse-proxied by nginx on a secret path —
@@ -244,24 +228,25 @@ const detailSteps = [
           </Accordion>
 
           <Accordion title="Domain mode (CDN fallback)" titleKey="arch.domain">
-            <p>Adds three components on top of standalone:</p>
             <p>
-              <strong>nginx stream</strong> inspects TLS SNI without terminating encryption.
-              <strong>nginx http</strong> terminates TLS with Let's Encrypt certificates managed by acme.sh.
-              <strong>VLESS+WSS</strong> provides a CDN fallback through Cloudflare — works even
-              if your server's IP is blocked.
+              With <code>--domain</code>, nginx gets a Let's Encrypt certificate for your domain and
+              routes that SNI to the domain's paths. XHTTP moves to the domain and
+              <strong>VLESS+WSS</strong> is added. With Cloudflare proxying the domain, both travel
+              through the CDN and keep working if your server's IP is blocked. The panel and
+              connection pages stay on the IP certificate.
             </p>
           </Accordion>
 
           <Accordion title="Relay mode (domestic entry point)" titleKey="arch.relay">
             <p>
-              A lightweight <strong>Realm</strong> TCP forwarder on a domestic server relays
-              port 443 to your exit server abroad. All protocols work through the relay
-              with end-to-end encryption — the relay never sees your traffic.
+              A <strong>Realm</strong> TCP forwarder on a server inside your country passes
+              connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and
+              Hysteria2 still connect to the exit directly. Encryption runs end to end between
+              the app and the exit, so the relay never sees plaintext.
             </p>
             <p>
-              Deploy with <code>meridian relay add RELAY_IP</code>. Client connection
-              pages are automatically regenerated with relay routes.
+              Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions
+              and connection pages pick up the relay entries automatically.
             </p>
           </Accordion>
         </div>
@@ -274,7 +259,7 @@ const detailSteps = [
         <h2 data-t="cta.title">Ready to get started?</h2>
         <p class="section-desc cta-desc" data-t="cta.desc">
           Install Meridian, deploy to your server, and share access with the
-          people who need it. The whole process takes about five minutes.
+          people who need it. A deploy usually takes 3 to 10 minutes.
         </p>
         <div class="hero__actions cta-actions">
           <a href="#setup" class="hero__btn hero__btn--primary" data-t="cta.install">Install Meridian</a>
@@ -389,27 +374,6 @@ const detailSteps = [
     display: block;
     width: 100%;
     height: auto;
-  }
-
-  /* Trust bar */
-  .trust-bar {
-    padding: 0 0 24px;
-  }
-  .trust-items {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    flex-wrap: wrap;
-  }
-  .trust-item {
-    text-align: center;
-  }
-  .trust-value {
-    font-family: var(--mono);
-    font-size: 0.78rem;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    color: var(--t3);
   }
 
   /* CTA */
