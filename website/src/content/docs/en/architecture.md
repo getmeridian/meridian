@@ -100,7 +100,7 @@ Panel edits to resources Meridian owns show up in `meridian plan` and are restor
 | 3020 | Remnawave subscription page | localhost |
 | 10000+ | Xray Reality (per-exit) | host network, firewalled |
 | 20000+ | Xray WSS (domain mode, per-exit) | host network, firewalled |
-| 30000+ | Xray XHTTP (domain mode, per-exit) | host network, firewalled |
+| 30000+ | Xray XHTTP (per-exit) | host network, firewalled |
 
 Backend Xray ports are reached through nginx; UFW blocks them from the internet. Relay servers open only SSH and their listen port.
 

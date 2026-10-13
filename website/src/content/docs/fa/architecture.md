@@ -100,7 +100,7 @@ Meridian topology را به لیست منابع تبدیل می‌کند: قوا
 | 3020 | Remnawave subscription page | localhost |
 | 10000+ | Xray Reality (per-exit) | host network, firewalled |
 | 20000+ | Xray WSS (domain mode, per-exit) | host network, firewalled |
-| 30000+ | Xray XHTTP (domain mode, per-exit) | host network, firewalled |
+| 30000+ | Xray XHTTP (per-exit) | host network, firewalled |
 
 Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن‌ها را از اینترنت block می‌کند. سرورهای Relay فقط SSH و پورت شنوندگی خود را باز می‌کنند.
 

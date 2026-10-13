@@ -100,7 +100,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 | 3020 | Remnawave 订阅页面 | localhost |
 | 10000+ | Xray Reality（每个出口） | host network，被防火墙阻止 |
 | 20000+ | Xray WSS（域名模式，每个出口） | host network，被防火墙阻止 |
-| 30000+ | Xray XHTTP（域名模式，每个出口） | host network，被防火墙阻止 |
+| 30000+ | Xray XHTTP（每个出口） | host network，被防火墙阻止 |
 
 后端 Xray 端口通过 nginx 到达；UFW 从互联网阻止它们。中继服务器仅打开 SSH 和其监听端口。
 
