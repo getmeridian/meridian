@@ -61,7 +61,6 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 │   └── routes.py                       — FastAPI route handlers
 ├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple
 ├── provision/CLAUDE.md                 — step pipeline + idempotency
-├── infra/CLAUDE.md                     — CloudProvider abstract + per-cloud impls
 ├── reconciler/CLAUDE.md                — checkpointed compiled-resource drivers
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
@@ -69,6 +68,7 @@ tests/CLAUDE.md                         — testing philosophy, MockConnection
 ├── provision/CLAUDE.md                 — mock boundary, idempotency dual-path
 ├── systemlab/CLAUDE.md                 — Docker lab topology, CI boundary
 └── realvm/CLAUDE.md                    — real-VM harness, tier α/β/γ, never-in-CI
+    └── providers/CLAUDE.md             — CloudProvider abstract + Hetzner impl
 
 website/CLAUDE.md                       — Astro + Starlight docs, agent endpoints, i18n
 ├── src/components/CLAUDE.md            — composition pattern
@@ -144,7 +144,7 @@ The `@path` directives below are a Claude Code convention for pulling in extra f
 @src/meridian/CLAUDE.md
 @src/meridian/commands/CLAUDE.md
 @src/meridian/provision/CLAUDE.md
-@src/meridian/infra/CLAUDE.md
 @src/meridian/reconciler/CLAUDE.md
 @tests/CLAUDE.md
 @tests/realvm/CLAUDE.md
+@tests/realvm/providers/CLAUDE.md

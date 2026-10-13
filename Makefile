@@ -83,31 +83,31 @@ real-lab: ## Provision Hetzner VM + verify + destroy (TOPO=single by default)
 		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
 	fi
 	@echo "  NOTE: this provisions a real VM and costs real money (~€0.01 for a full run)."
-	PYTHONUNBUFFERED=1 uv run python -m tests.realvm.orchestrator up $${TOPO:-single}
+	PYTHONUNBUFFERED=1 uv run --group realvm python -m tests.realvm.orchestrator up $${TOPO:-single}
 
 real-lab-keep: ## Provision + verify, but DON'T auto-destroy (useful with TIER=interactive)
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
 	fi
-	PYTHONUNBUFFERED=1 uv run python -m tests.realvm.orchestrator up $${TOPO:-single} --keep
+	PYTHONUNBUFFERED=1 uv run --group realvm python -m tests.realvm.orchestrator up $${TOPO:-single} --keep
 
 real-lab-up: ## Create a lab that stays up (NODES="ctl:hel1 exit:fsn1:debian-13 ..."); see tests/realvm/README.md
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
 	fi
-	PYTHONUNBUFFERED=1 uv run --extra hetzner python -m tests.realvm.lab up $${NODES:-ctl:hel1}
+	PYTHONUNBUFFERED=1 uv run --group realvm python -m tests.realvm.lab up $${NODES:-ctl:hel1}
 
 real-lab-orphans: ## List harness-tagged VMs left behind in the Hetzner project
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set."; exit 2; \
 	fi
-	uv run python -m tests.realvm.orchestrator orphans
+	uv run --group realvm python -m tests.realvm.orchestrator orphans
 
 real-lab-down: ## Destroy ALL harness-tagged VMs in the project (orphan cleanup)
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set."; exit 2; \
 	fi
-	uv run python -m tests.realvm.orchestrator down
+	uv run --group realvm python -m tests.realvm.orchestrator down
 
 ## —— Build & Publish ————————————————————————————————————
 

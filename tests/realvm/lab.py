@@ -28,7 +28,6 @@ import time
 import uuid
 from pathlib import Path
 
-from meridian.infra.providers import VMInstance
 from tests.realvm.orchestrator import (
     FLEET_ID_LABEL,
     HARNESS_LABEL,
@@ -38,6 +37,7 @@ from tests.realvm.orchestrator import (
     make_provider,
     provision,
 )
+from tests.realvm.providers.base import VMInstance
 
 # Outside the checkout: the lab holds private keys, and some synced folders refuse the Unix
 # socket that Meridian keeps under MERIDIAN_HOME for SSH multiplexing.

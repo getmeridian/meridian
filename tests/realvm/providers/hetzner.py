@@ -3,7 +3,7 @@
 Wraps the official ``hcloud`` Python SDK (maintained by Hetzner) behind the
 abstract CloudProvider interface.
 
-Install with: ``pip install meridian-vpn[hetzner]``
+Install with: ``uv sync --group realvm``
 
 Pricing reference (as of early 2026; may drift — harness prints live numbers):
 - CX22 (2 vCPU, 4 GB, 40 GB disk): ~€3.79/month ≈ €0.0053/hour
@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from meridian.infra.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
+from tests.realvm.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
 
 # Deferred hcloud imports — the SDK is optional. These are imported at class
 # level only for type annotations in except clauses; actual constructors
@@ -29,7 +29,7 @@ except ImportError:  # SDK not installed — methods will never be called
     _APIException = Exception  # type: ignore[assignment,misc]
     _ActionException = Exception  # type: ignore[assignment,misc]
 
-logger = logging.getLogger("meridian.infra.hetzner")
+logger = logging.getLogger(__name__)
 
 # Hourly rates in EUR, used by estimate_cost(). Source: Hetzner Cloud pricing page.
 # Kept intentionally conservative (rounded up). Harness prints the figure so
@@ -76,7 +76,7 @@ class HetznerProvider(CloudProvider):
             from hcloud import Client  # type: ignore[import-not-found]
         except ImportError as e:
             raise ProviderError(
-                "hcloud SDK not installed. Install with: pip install meridian-vpn[hetzner]",
+                "hcloud SDK not installed. Install with: uv sync --group realvm",
                 provider=self.name,
                 cause=e,
             ) from e

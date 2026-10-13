@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from meridian.infra.providers import CloudProvider, ProviderError, VMInstance, VMSpec
+from tests.realvm.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
 
 HARNESS_LABEL = "meridian-realvm-test"  # marker label — always "1" on harness VMs
 FLEET_ID_LABEL = "meridian-fleet-id"  # per-run uuid, groups VMs of one run
@@ -73,7 +73,7 @@ def make_provider(name: str) -> CloudProvider:
                 "Get a read-write project token from https://console.hetzner.cloud/projects\n"
                 "then: export HCLOUD_TOKEN=<your-token>"
             )
-        from meridian.infra.providers.hetzner import HetznerProvider
+        from tests.realvm.providers.hetzner import HetznerProvider
 
         return HetznerProvider(token=token)
     _fail(f"Unknown provider: {name!r}. Supported: hetzner")

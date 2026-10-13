@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.infra.providers import CloudProvider, ProviderError, VMInstance, VMSpec
+from tests.realvm.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
 
 
 class TestVMSpec:
@@ -116,7 +116,7 @@ class TestHetznerProviderImportable:
 
     def test_module_imports_without_hcloud(self) -> None:
         # Smoke test — just importing the module must not raise.
-        import meridian.infra.providers.hetzner as mod
+        import tests.realvm.providers.hetzner as mod
 
         assert mod.HetznerProvider is not None
 
@@ -127,7 +127,7 @@ class TestHetznerProviderImportable:
 
         # Pretend hcloud isn't installed by shadowing the import.
         monkeypatch.setitem(sys.modules, "hcloud", None)
-        from meridian.infra.providers.hetzner import HetznerProvider
+        from tests.realvm.providers.hetzner import HetznerProvider
 
         with pytest.raises(ProviderError) as exc_info:
             HetznerProvider(token="x")
@@ -135,14 +135,14 @@ class TestHetznerProviderImportable:
         assert exc_info.value.provider == "hetzner"
 
     def test_empty_token_rejected(self) -> None:
-        from meridian.infra.providers.hetzner import HetznerProvider
+        from tests.realvm.providers.hetzner import HetznerProvider
 
         with pytest.raises(ProviderError) as exc_info:
             HetznerProvider(token="")
         assert "token is empty" in str(exc_info.value).lower()
 
     def test_estimate_cost_known_size(self) -> None:
-        from meridian.infra.providers.hetzner import HetznerProvider
+        from tests.realvm.providers.hetzner import HetznerProvider
 
         # Stub that doesn't need a real token — we only call estimate_cost.
         # Bypass __init__ by constructing through object.__new__.
@@ -154,7 +154,7 @@ class TestHetznerProviderImportable:
         assert 0 < cost < 0.1  # sanity — cheapest tier
 
     def test_estimate_cost_unknown_size(self) -> None:
-        from meridian.infra.providers.hetzner import HetznerProvider
+        from tests.realvm.providers.hetzner import HetznerProvider
 
         p = object.__new__(HetznerProvider)
         spec = VMSpec(name="n", image="i", size="unobtainium-99", region="nbg1")

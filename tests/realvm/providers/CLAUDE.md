@@ -1,14 +1,13 @@
-# infra — Cloud provider abstraction
+# tests/realvm/providers — Cloud provider abstraction
 
-Python-first VM lifecycle. Used by `tests/realvm/` today; designed to power a
-future `meridian deploy --create-vm <provider>`. No Terraform, no Pulumi.
+Python-first VM lifecycle for the real-VM harness. No Terraform, no Pulumi.
 
 ## Design decisions
 
-- **Per-cloud SDK, not an external IaC tool** — keeps end-user UX as "one pip install"; no `terraform` / `pulumi` binary required. Ships with Meridian.
+- **Per-cloud SDK, not an external IaC tool** — no `terraform` / `pulumi` binary or state file; harness-only, never part of the published package.
 - **Label-based discovery, no state file** — every resource is tagged `meridian-realvm-test=1` + `meridian-fleet-id=<uuid>`. Lost context → `list_vms(labels=…)` finds orphans. No fragile state round-trip.
 - **Deferred SDK import** — `HetznerProvider.__init__` validates the token BEFORE importing `hcloud`, so missing optional dependency raises a typed `ProviderError`, not `ImportError`. Unit-testable without the SDK installed.
-- **Optional deps per provider** — `pip install meridian-vpn[hetzner]` pulls only `hcloud>=2.0`. Future `[scaleway]`, `[digitalocean]`, `[vultr]`, `[oracle]`. No forced bloat.
+- **SDKs live in the `realvm` dependency group** — `uv sync --group realvm` pulls `hcloud>=2.0`; `make real-lab*` targets pass `--group realvm`. Add a provider's SDK to that group.
 
 ## What's done well
 

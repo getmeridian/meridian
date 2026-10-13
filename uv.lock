@@ -457,12 +457,14 @@ dev = [
     { name = "types-pyyaml" },
     { name = "uvicorn" },
 ]
-hetzner = [
-    { name = "hcloud" },
-]
 studio = [
     { name = "fastapi" },
     { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+realvm = [
+    { name = "hcloud" },
 ]
 
 [package.metadata]
@@ -470,7 +472,6 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.128" },
     { name = "fastapi", marker = "extra == 'studio'", specifier = ">=0.128" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.31.0" },
-    { name = "hcloud", marker = "extra == 'hetzner'", specifier = ">=2.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
@@ -487,7 +488,10 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'dev'", specifier = ">=0.30" },
     { name = "uvicorn", marker = "extra == 'studio'", specifier = ">=0.30" },
 ]
-provides-extras = ["dev", "hetzner", "studio"]
+provides-extras = ["dev", "studio"]
+
+[package.metadata.requires-dev]
+realvm = [{ name = "hcloud", specifier = ">=2.0" }]
 
 [[package]]
 name = "mypy"

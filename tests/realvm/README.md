@@ -18,8 +18,8 @@ substitute for paying attention.
 ## Quick start
 
 ```bash
-# 1. Install the optional Hetzner dependency
-uv sync --extra hetzner
+# 1. Install the harness-only Hetzner dependency
+uv sync --extra dev --group realvm
 
 # 2. Get a Hetzner API token
 #    https://console.hetzner.cloud → Project → Security → API Tokens
@@ -159,13 +159,11 @@ destroy the fleet and re-run — a fresh VM usually gets a different IP.
 
 ## Why not Terraform / Pulumi?
 
-Short answer: same Python code we use for this harness will eventually power
-a user-facing `meridian deploy --create-vm hetzner` feature. An external IaC
-tool would force end users to install Terraform or Pulumi just to deploy a
-VPN — undesirable UX. Per-cloud SDK + abstract `CloudProvider` class gives
-us:
+Short answer: an external IaC tool would add a binary and a state file to a
+harness that only needs to create and destroy a few VMs. Per-cloud SDK +
+abstract `CloudProvider` class gives us:
 
-- `pip install meridian-vpn[hetzner]` — one dependency
+- `uv sync --group realvm` — one dependency
 - No state file (label-based discovery — crashed run leaves tagged orphans
   that are easy to find)
 - Full access to provider-specific features (Hetzner Primary IPs, /64 IPv6
@@ -173,6 +171,6 @@ us:
 - Under 1 second per API call vs ~5s through a Pulumi state round-trip
 
 The `CloudProvider` abstract class lives at
-`src/meridian/infra/providers/base.py`; Hetzner impl at
-`src/meridian/infra/providers/hetzner.py`. Adding a new provider is one file
-and one `pyproject.toml` optional dep.
+`tests/realvm/providers/base.py`; Hetzner impl at
+`tests/realvm/providers/hetzner.py`. Adding a new provider is one file and
+one entry in the `realvm` dependency group.
