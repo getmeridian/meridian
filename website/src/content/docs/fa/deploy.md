@@ -26,7 +26,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، deploy سایتی را در زیرشبکهٔ خود سرور ترجیح می‌دهد، سپس `www.google.com`، `dl.google.com`، `www.cloudflare.com` |
-| `--domain DOMAIN` | (هیچ) | دامنه شما برای XHTTP و WSS، با fallback CDN Cloudflare |
+| `--domain DOMAIN` | (هیچ) | دامنه شما: XHTTP به آن منتقل می‌شود و WSS اضافه می‌شود، هر دو از طریق CDN Cloudflare |
 | `--hysteria2/--no-hysteria2` | فعال | Hysteria2 را روی UDP/443 به عنوان آخرین fallback ارائه دهید |
 | `--client-name NAME` | default | نام کلاینت اول |
 | `--display-name NAME` | (هیچ) | برچسب برای صفحات اتصال (مثل "VPN علی") |

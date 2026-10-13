@@ -388,7 +388,7 @@ def deploy_cmd(
         "",
         "--domain",
         "-d",
-        help="Your domain: adds XHTTP and WSS methods (with Cloudflare CDN fallback)",
+        help="Your domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN",
     ),
     sni: str = typer.Option(
         "",
@@ -922,7 +922,9 @@ def node_add_cmd(
     name: str = typer.Option("", "--name", help="Friendly name for the node"),
     user: User = "",
     sni: str = typer.Option("", "--sni", help="Reality SNI target"),
-    domain: str = typer.Option("", "--domain", help="Domain for WSS/XHTTP (Cloudflare CDN)"),
+    domain: str = typer.Option(
+        "", "--domain", help="Exit's domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN"
+    ),
     country: str = typer.Option(
         "", "--country", help="Country code shown in connection names (default: the address registry's)"
     ),

@@ -26,7 +26,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，部署会优先选择服务器所在子网内的网站，然后是 `www.google.com`、`dl.google.com`、`www.cloudflare.com` |
-| `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名，带 Cloudflare CDN 回退 |
+| `--domain DOMAIN` | (无) | 你的域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2 作为最后的回退 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
 | `--display-name NAME` | (无) | 连接页面的标签 |

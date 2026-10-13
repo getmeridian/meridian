@@ -18,7 +18,7 @@ meridian deploy [SERVER] [flags]
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، استقرار اول ابتدا سایت‌هایی را در زیرشبکهٔ خود سرور امتحان می‌کند، سپس `www.google.com`، `dl.google.com`، `www.cloudflare.com` را، و از اولین موردی که ترافیک از آن عبور می‌کند استفاده می‌کند؛ بازاستقرار هدف ذخیره‌شده را نگه می‌دارد. `--sni` صریح هرگز جابه‌جا نمی‌شود |
-| `--domain DOMAIN` | (هیچ) | دامنه شما برای XHTTP و WSS (CDN Cloudflare fallback). پنل و صفحات اتصال روی گواهینامه IP می‌مانند |
+| `--domain DOMAIN` | (هیچ) | دامنه شما: XHTTP به آن منتقل می‌شود و WSS اضافه می‌شود، هر دو از طریق CDN Cloudflare (XHTTP بدون دامنه هم روی IP کار می‌کند). پنل و صفحات اتصال روی گواهینامه IP می‌مانند |
 | `--hysteria2/--no-hysteria2` | فعال | Hysteria2 را روی UDP/443، با تعویض salamander ارائه دهید، به عنوان آخرین fallback. دامنه‌ای را استفاده می‌کند یا بدون دامنه IP گواهینامه |
 | `--fingerprint NAME` | chrome | اثر انگشت TLS که کلاینت‌ها در Reality، XHTTP و WSS نشان می‌دهند (`chrome`، `firefox`، `safari`، `ios`، `android`، `edge`، `random`، `randomized`). اگر منطقه شما شروع به پرچم‌گذاری کردن آن کند تغییر دهید؛ بازاستقرار مقدار ذخیره‌شده را نگه می‌دارد |
 | `--client-name NAME` | default | نام کلاینت اول |
@@ -162,7 +162,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 | `--user USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی گره |
 | `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی گره (`node add`, `node replace`) |
 | `--sni HOST` | www.google.com | هدف camouflage Reality برای این گره |
-| `--domain DOMAIN` | (هیچ) | دامنه گره؛ XHTTP، WSS و مسیرهای Hysteria2 را روی آن اضافه می‌کند |
+| `--domain DOMAIN` | (هیچ) | دامنه گره: XHTTP به آن منتقل می‌شود و WSS اضافه می‌شود، هر دو از طریق CDN Cloudflare؛ Hysteria2 از گواهینامه آن استفاده می‌کند |
 | `--country CC` | رجیستری آدرس | کشور نمایش‌داده‌شده در نام اتصال‌ها؛ وقتی رجیستری اشتباه است (anycast یا بازه‌های اجاره‌ای) آن را مشخص کنید |
 | `--harden / --no-harden` | فعال | تقویت سیستم‌عامل، SSH و firewall. سروری فلیت همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
 | `--yes` | | پرسش تأیید را رد کنید |

@@ -26,7 +26,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | Флаг | По умолчанию | Описание |
 |------|---------|-------------|
 | `--sni HOST` | (авто) | Цель маскировки. Без него развёртывание предпочитает сайт из собственной подсети сервера, затем `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
-| `--domain DOMAIN` | (нет) | Ваш домен для XHTTP и WSS с возвратом CDN Cloudflare |
+| `--domain DOMAIN` | (нет) | Ваш домен: XHTTP переносится на него и добавляется WSS, оба через CDN Cloudflare |
 | `--hysteria2/--no-hysteria2` | вкл | Предлагать Hysteria2 на UDP/443 как последний возврат |
 | `--client-name NAME` | default | Имя первого клиента |
 | `--display-name NAME` | (нет) | Ярлык для страниц подключения (например "Alice's VPN") |
