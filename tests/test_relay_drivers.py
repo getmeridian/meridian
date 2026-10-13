@@ -21,6 +21,7 @@ from meridian.compiler.models import (
 )
 from meridian.config import REALM_VERSION
 from meridian.provision.steps import StepResult
+from meridian.reconciler.realm_driver import RealmHopDriver
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
@@ -28,7 +29,7 @@ from meridian.reconciler.resources import (
     build_resource_actions,
     observation_converges,
 )
-from meridian.reconciler.server_drivers import RealmHopDriver, ServerDriverContext
+from meridian.reconciler.server_drivers import ServerDriverContext
 from meridian.reconciler.server_render import (
     realm_config_path,
     realm_service_name,
@@ -207,7 +208,7 @@ def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.Monke
         server_addresses=ADDRESSES,
     )
     monkeypatch.setattr(
-        "meridian.reconciler.server_drivers.InstallRealm.run",
+        "meridian.reconciler.realm_driver.InstallRealm.run",
         lambda *_args, **_kwargs: StepResult(name="Install Realm", status="unchanged"),
     )
 
@@ -389,7 +390,7 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
         server_addresses=ADDRESSES,
     )
     monkeypatch.setattr(
-        "meridian.reconciler.server_drivers.InstallRealm.run",
+        "meridian.reconciler.realm_driver.InstallRealm.run",
         lambda *_args, **_kwargs: StepResult(name="Install Realm", status="unchanged"),
     )
 

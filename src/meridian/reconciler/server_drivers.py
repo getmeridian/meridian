@@ -5,7 +5,6 @@ from __future__ import annotations
 import shlex
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import TypeVar
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
@@ -13,11 +12,10 @@ from meridian.compiler.models import (
     FirewallRulePayload,
     NginxArtifactPayload,
     NodeRuntimePayload,
-    RealmHopPayload,
     ResourcePlan,
     ServerBaselinePayload,
 )
-from meridian.config import REALM_VERSION, REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
@@ -25,8 +23,7 @@ from meridian.node_deploy import deploy_node_container, render_node_compose, wai
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
-from meridian.provision.relay import InstallRealm, RelayContext, parse_realm_version
-from meridian.provision.steps import ProvisionContext, StepResult
+from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert
 from meridian.provision.warp import InstallWarp
 from meridian.reconciler import server_retirement as retirement
@@ -36,7 +33,6 @@ from meridian.reconciler.resources import (
     ResourceDrivers,
     ResourceObservation,
     ResourceReconcileError,
-    UnknownResourceOutcome,
 )
 from meridian.reconciler.server_evidence import (
     assertion_matches,
@@ -57,27 +53,25 @@ from meridian.reconciler.server_render import (
     certificate_directory,
     firewall_marker,
     nginx_artifact_path,
-    realm_config_path,
-    realm_service_name,
     render_firewall_rules,
     render_nginx_artifact,
-    render_realm_config,
-    render_realm_unit,
+)
+from meridian.reconciler.server_support import (
+    payload_of,
+    raise_if_step_timeout,
+    raise_if_timeout,
+    restore_file,
+    runtime_pin,
 )
 from meridian.remnawave import MeridianPanel
 from meridian.remnawave.versions import effective_image
 from meridian.ssh import ServerConnection
 
 ConnectionFactory = Callable[[str], ServerConnection]
-PayloadT = TypeVar(
-    "PayloadT",
-    FirewallRulePayload,
-    CertificatePayload,
-    NginxArtifactPayload,
-    RealmHopPayload,
-    NodeRuntimePayload,
-    ServerBaselinePayload,
-)
+_payload = payload_of
+_runtime_pin = runtime_pin
+_raise_if_timeout = raise_if_timeout
+_raise_if_step_timeout = raise_if_step_timeout
 
 
 @dataclass
@@ -112,6 +106,8 @@ class ServerDriverContext:
 
 def build_server_drivers(context: ServerDriverContext) -> ResourceDrivers:
     """Build SSH drivers shared by exits and transparent relay chains."""
+    from meridian.reconciler.realm_driver import RealmHopDriver
+
     return {
         "server_baseline": ServerBaselineDriver(context),
         "firewall_rule": FirewallRuleDriver(context),
@@ -521,10 +517,7 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         path: str,
         previous_content: str | None,
     ) -> None:
-        if previous_content is None:
-            conn.run(f"rm -f {shlex.quote(path)}", timeout=15)
-            return
-        ensure_file_content(conn, path, previous_content, mode="644", create_parent=True)
+        restore_file(conn, path, previous_content)
 
     @staticmethod
     def _restore_artifact(
@@ -536,144 +529,6 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         NginxArtifactDriver._restore_file(conn, path, previous_content)
         if enabled_path and previous_content is None:
             conn.run(f"rm -f {shlex.quote(enabled_path)}", timeout=15)
-
-
-class RealmHopDriver(retirement.RealmHopRetirement):
-    def __init__(self, context: ServerDriverContext) -> None:
-        self.context = context
-
-    def observe(
-        self,
-        action: ResourceAction,
-        binding: ManagedResourceBinding | None,
-    ) -> ResourceObservation:
-        payload = _payload(action, RealmHopPayload)
-        conn = self.context.connection(payload.server_ref)
-        config_path = realm_config_path(action.resource.logical_id)
-        unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
-        expected_config = render_realm_config(payload, self.context.server_addresses)
-        expected_unit = render_realm_unit(action.resource.logical_id)
-        current_config = conn.get_text(config_path, timeout=15)
-        current_unit = conn.get_text(unit_path, timeout=15)
-        config_content = file_content_or_absent(action.resource.logical_id, current_config, "Realm configuration")
-        unit_content = file_content_or_absent(action.resource.logical_id, current_unit, "Realm systemd unit")
-        service = realm_service_name(action.resource.logical_id)
-        active = conn.run(f"systemctl is-active {shlex.quote(service)}", timeout=15)
-        listening = conn.run("ss -H -lnt 2>/dev/null", timeout=15)
-        version = conn.run("realm --version 2>/dev/null", timeout=15)
-        expected_version = _runtime_pin(self.context.plan, "realm_version", REALM_VERSION)
-        service_active = service_is_active(action.resource.logical_id, active, "Realm service")
-        require_successful_evidence(action.resource.logical_id, listening, "TCP listener inspection")
-        version_output = managed_command_output(action.resource.logical_id, version, "Realm version")
-        exists = config_content is not None and unit_content is not None
-        port_listening = port_is_listening(listening.stdout, payload.listen_port)
-        version_ok = version_output is not None and parse_realm_version(version_output) == expected_version
-        matches = (
-            exists
-            and config_content == expected_config
-            and unit_content == expected_unit
-            and service_active
-            and port_listening
-            and version_ok
-        )
-        satisfied: set[str] = set()
-        if exists:
-            satisfied.add("exists")
-        if port_listening:
-            satisfied.add("listening")
-        return build_observation(
-            action,
-            remote_id=service,
-            exists=exists,
-            matches=matches,
-            projection={
-                "config": config_content or "",
-                "unit": unit_content or "",
-                "active": service_active,
-                "listening": port_listening,
-                "version": (version_output or "").strip(),
-            },
-            satisfied=satisfied,
-        )
-
-    def apply(
-        self,
-        action: ResourceAction,
-        binding: ManagedResourceBinding | None,
-    ) -> ResourceApplyReceipt:
-        payload = _payload(action, RealmHopPayload)
-        conn = self.context.connection(payload.server_ref)
-        relay_context = RelayContext(
-            relay_ip=self.context.address(payload.server_ref),
-            exit_ip=self.context.address(payload.target_server_ref),
-            exit_port=payload.target_port,
-            listen_port=payload.listen_port,
-            realm_version=_runtime_pin(self.context.plan, "realm_version", REALM_VERSION),
-        )
-        installed = InstallRealm().run(conn, relay_context)
-        if installed.status == "failed":
-            _raise_if_step_timeout(action, installed)
-            raise ResourceReconcileError(f"Could not install Realm: {installed.detail}")
-
-        config_path = realm_config_path(action.resource.logical_id)
-        service = realm_service_name(action.resource.logical_id)
-        unit_path = f"/etc/systemd/system/{service}.service"
-        previous_config = conn.get_text(config_path, timeout=15)
-        previous_unit = conn.get_text(unit_path, timeout=15)
-        config = ensure_file_content(
-            conn,
-            config_path,
-            render_realm_config(payload, self.context.server_addresses),
-            mode="600",
-            create_parent=True,
-            sensitive=True,
-        )
-        unit = ensure_file_content(
-            conn,
-            unit_path,
-            render_realm_unit(action.resource.logical_id),
-            mode="644",
-            create_parent=True,
-        )
-        if not config.ok or not unit.ok:
-            _raise_if_timeout(action, config.result)
-            _raise_if_timeout(action, unit.result)
-            self._restore(
-                conn,
-                config_path,
-                previous_config.stdout if previous_config.returncode == 0 else None,
-                unit_path,
-                previous_unit.stdout if previous_unit.returncode == 0 else None,
-            )
-            raise ResourceReconcileError(f"Could not write Realm service {service}.")
-        conn.run("systemctl daemon-reload", timeout=30)
-        enabled = conn.run(f"systemctl enable {shlex.quote(service)}", timeout=15)
-        restarted = conn.run(f"systemctl restart {shlex.quote(service)}", timeout=30)
-        if enabled.returncode != 0 or restarted.returncode != 0:
-            _raise_if_timeout(action, enabled)
-            _raise_if_timeout(action, restarted)
-            self._restore(
-                conn,
-                config_path,
-                previous_config.stdout if previous_config.returncode == 0 else None,
-                unit_path,
-                previous_unit.stdout if previous_unit.returncode == 0 else None,
-            )
-            conn.run("systemctl daemon-reload", timeout=30)
-            conn.run(f"systemctl restart {shlex.quote(service)}", timeout=30)
-            raise ResourceReconcileError(f"Realm service {service} failed; previous configuration restored.")
-        return ResourceApplyReceipt(remote_id=service)
-
-    @staticmethod
-    def _restore(
-        conn: ServerConnection,
-        config_path: str,
-        previous_config: str | None,
-        unit_path: str,
-        previous_unit: str | None,
-    ) -> None:
-        NginxArtifactDriver._restore_file(conn, config_path, previous_config)
-        NginxArtifactDriver._restore_file(conn, unit_path, previous_unit)
 
 
 class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
@@ -763,13 +618,6 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         return ResourceApplyReceipt(remote_id=REMNAWAVE_NODE_DIR)
 
 
-def _payload(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
-    payload = action.resource.payload
-    if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(f"Server driver received {payload.kind}, expected {expected_type.__name__}.")
-    return payload
-
-
 def _baseline_context(
     payload: ServerBaselinePayload,
     conn: ServerConnection,
@@ -781,19 +629,3 @@ def _baseline_context(
         harden=payload.harden,
         is_panel_host=False,
     )
-
-
-def _runtime_pin(plan: ResourcePlan, name: str, fallback: str) -> str:
-    return plan.deployment_contract.runtime_pins.get(name, fallback)
-
-
-def _raise_if_timeout(action: ResourceAction, result: object | None) -> None:
-    if result is not None and getattr(result, "returncode", None) == 124:
-        raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")
-
-
-def _raise_if_step_timeout(action: ResourceAction, result: StepResult) -> None:
-    for command in result.commands:
-        _raise_if_timeout(action, command)
-    if "timed out" in result.detail.casefold() or "timeout" in result.detail.casefold():
-        raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")
