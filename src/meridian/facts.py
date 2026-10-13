@@ -20,6 +20,12 @@ class OsRelease:
     id: str = "ubuntu"
     version_codename: str = "jammy"
     pretty_name: str = ""
+    id_like: tuple[str, ...] = ()
+
+    @property
+    def apt_based(self) -> bool:
+        """Ubuntu, Debian, or a derivative that declares one of them in ID_LIKE."""
+        return bool({self.id, *self.id_like} & {"debian", "ubuntu"})
 
 
 @dataclass(frozen=True)
@@ -79,6 +85,7 @@ def _parse_os_release(text: str) -> OsRelease:
         id=values.get("ID", "ubuntu").lower() or "ubuntu",
         version_codename=values.get("VERSION_CODENAME", "jammy") or "jammy",
         pretty_name=values.get("PRETTY_NAME", ""),
+        id_like=tuple(values.get("ID_LIKE", "").lower().split()),
     )
 
 

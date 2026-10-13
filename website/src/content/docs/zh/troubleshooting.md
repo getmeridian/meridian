@@ -170,7 +170,7 @@ meridian doctor
 | 端口 443 可用性 | 端口 443 是空闲的还是被 Meridian 使用？ | 另一服务在 443 上。停止它或使用干净的服务器 |
 | 端口 443 外部可达性 | 外部世界是否能到达端口 443？ | 云防火墙阻止它。打开端口 443/TCP 入站 |
 | 域 DNS | 域是否解析到服务器 IP？ | 更新 DNS A 记录 |
-| 服务器 OS | 是 Ubuntu/Debian 吗？ | 其他 distros 可能工作但未测试 |
+| 服务器 OS | 是 Ubuntu/Debian 吗？ | 没有 apt 的系统（CentOS、Fedora、Alpine）会失败；请重装 Ubuntu 或 Debian |
 | 磁盘空间 | 至少 2GB 空闲？ | 释放空间 |
 | 时钟同步 | 客户端/服务器漂移 <30 秒？ | 在两个设备上启用 NTP 和自动时间 |
 

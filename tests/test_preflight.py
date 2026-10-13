@@ -259,3 +259,23 @@ def test_preflight_treats_lost_listener_ownership_probe_as_unavailable() -> None
         _run_preflight(connection, external_reachable=True)
 
     assert exc_info.value.exit_code == 3
+
+
+@pytest.mark.parametrize(
+    ("os_release", "status"),
+    [
+        ('PRETTY_NAME="Debian GNU/Linux 13 (trixie)"\nID=debian\n', "passed"),
+        ('PRETTY_NAME="Linux Mint 22"\nID=linuxmint\nID_LIKE="ubuntu debian"\n', "warning"),
+        ('PRETTY_NAME="CentOS Stream 10 (Coughlan)"\nID="centos"\nID_LIKE="rhel fedora"\n', "failed"),
+    ],
+)
+def test_server_os_fails_only_systems_without_apt(os_release: str, status: str) -> None:
+    from meridian.diagnostics.preflight import _server_os
+    from meridian.facts import ServerFacts
+
+    conn = MagicMock()
+    conn.run.return_value = SimpleNamespace(returncode=0, stdout=os_release, stderr="")
+
+    check = _server_os(ServerFacts(conn))
+
+    assert check.findings[0].status == status

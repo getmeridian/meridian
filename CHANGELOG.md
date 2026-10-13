@@ -192,6 +192,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - Stock Debian 13 servers deploy and join as exits. The baseline treated a
   missing `ufw` as an unreadable check, waited for a `dnsutils` package Debian
   no longer ships, and WARP needed `lsb_release`.
+- Servers without apt (CentOS, Fedora, Alpine) are refused by name before
+  anything changes, instead of failing halfway at "apt-get: command not found";
+  `meridian check` reports them as a failure rather than a warning.
 - Reality keys come from the panel instead of a Docker container or an
   unverified Xray download on the exit, so a fresh exit without `unzip` or
   Docker no longer fails at its Proxy profile.

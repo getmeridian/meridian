@@ -61,3 +61,40 @@ def test_refusal_names_the_server_and_points_to_teardown() -> None:
     assert "198.51.100.20 runs a Meridian 3.x proxy" in str(exc_info.value)
     assert exc_info.value.category == "user"
     assert "meridian teardown 198.51.100.20" in exc_info.value.hint
+
+
+def test_a_server_without_apt_is_refused_with_its_os_name() -> None:
+    centos = _conn("unsupported-os:CentOS Stream 10 (Coughlan)\nmeridian-legacy-check-done\n")
+
+    with pytest.raises(ProvisioningError) as exc_info:
+        refuse_legacy_deployments({"srv-a": centos}, {"srv-a": "198.51.100.10"})
+
+    assert "198.51.100.10 runs CentOS Stream 10 (Coughlan)" in str(exc_info.value)
+    assert "Ubuntu and Debian only" in str(exc_info.value)
+    assert exc_info.value.category == "user"
+
+
+def test_os_probe_needs_both_apt_get_and_dpkg_query_in_a_real_shell(tmp_path) -> None:
+    import os
+    import subprocess
+
+    (tmp_path / "apt-get").symlink_to("/bin/echo")  # dpkg-query missing: still unsupported
+    result = subprocess.run(
+        ["/bin/bash", "-c", LEGACY_DEPLOYMENT_CHECK],
+        env={"PATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.stdout.splitlines()[0].startswith("unsupported-os:")
+    assert result.stdout.splitlines()[-1] == "meridian-legacy-check-done"
+
+    (tmp_path / "dpkg-query").symlink_to("/bin/echo")
+    result = subprocess.run(
+        ["/bin/bash", "-c", LEGACY_DEPLOYMENT_CHECK],
+        env={"PATH": f"{tmp_path}{os.pathsep}/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "unsupported-os:" not in result.stdout

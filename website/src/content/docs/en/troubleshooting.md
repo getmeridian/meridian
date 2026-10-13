@@ -170,7 +170,7 @@ See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) secti
 | Port 443 availability | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
 | Port 443 external reachability | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
 | Domain DNS | Does the domain resolve to server IP? | Update DNS A record |
-| Server OS | Is it Ubuntu/Debian? | Other distros may work but are untested |
+| Server OS | Is it Ubuntu/Debian? | Fails without apt (CentOS, Fedora, Alpine); reinstall with Ubuntu or Debian |
 | Disk space | At least 2GB free? | Free up space |
 | Clock sync | Is client/server drift under 30 seconds? | Enable NTP and automatic time on both devices |
 

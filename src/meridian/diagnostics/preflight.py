@@ -290,6 +290,13 @@ def _server_os(facts: ServerFacts) -> VerificationCheck:
         )
     elif "Ubuntu" in name or "Debian" in name:
         found = finding("server_os", "passed", f"Server OS: {name}")
+    elif not release.apt_based:
+        found = finding(
+            "server_os",
+            "failed",
+            f"Server OS: {name} (Meridian supports Ubuntu and Debian only)",
+            "Reinstall the server with Ubuntu 24.04 LTS or Debian 13.",
+        )
     else:
         found = finding("server_os", "warning", f"Server OS: {name} (tested on Ubuntu/Debian only)")
     return finish_check("server_os", "Server OS", [found], started)
