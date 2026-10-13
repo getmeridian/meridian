@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  .flow { display: grid; grid-template-columns: 232px 30px 1fr 30px 232px; align-items: stretch; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .col > .label { margin-bottom: 2px; }
+  .term { background: #1c1e28; color: #e4e2de; border-radius: 12px; padding: 16px 18px; font: 400 14px/1.6 var(--mono); }
+  .term .p { color: #c8933a; }
+  .term .ok { color: #6fcf97; }
+  .term .dim { color: #9a9caa; }
+  .server { background: var(--s1); border: 1px solid var(--b1); border-radius: 14px; padding: 16px; display: grid; gap: 8px; }
+  .layer { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; border: 1px solid var(--b1); border-radius: 10px; padding: 10px 14px; background: var(--bg); }
+  .layer b { font: 600 16px/1.2 var(--heading); }
+  .layer span { color: var(--t2); font-size: 15px; }
+  .layer.hl { border-color: #c8933a66; background: var(--ac-bg); }
+  .people .card { padding: 14px 16px; }
+  .people h4 { font: 600 16.5px/1.25 var(--heading); }
+  .people p { font-size: 14.5px; margin-top: 3px; }
+  .qr { width: 64px; height: 64px; float: right; margin-left: 10px; border-radius: 6px; background:
+    conic-gradient(from 90deg at 30% 30%, var(--t1) 25%, transparent 0) 0 0/16px 16px,
+    var(--s2); border: 4px solid var(--s1); outline: 1px solid var(--b1); }
+  .grow { margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--s2); border: 1px solid var(--b1); border-radius: 12px; padding: 14px 18px; }
+  .grow .label { margin-right: 6px; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">Meridian</div>
+  <h1>One command. Every layer done right.</h1>
+  <p class="lede">Meridian runs on your computer, sets up a fresh Debian or Ubuntu server over SSH, tests it with real traffic, and gives you a link to share.</p>
+  <div class="body">
+    <div class="flow">
+      <div class="col">
+        <div class="label">You</div>
+        <div class="term"><span class="p">$</span> meridian deploy<br>&nbsp;&nbsp;198.51.100.10<br><span class="dim">…</span><br><span class="ok">✓</span> Traffic verified<br><span class="ok">✓</span> Done</div>
+        <div class="card" style="padding:14px 16px"><h4 style="font:600 16.5px/1.25 var(--heading)">Your machine keeps</h4><p style="font-size:14.5px;margin-top:3px">The topology, keys, and panel access in one <code>cluster.yml</code>.</p></div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="col">
+        <div class="label">Your server</div>
+        <div class="server">
+          <div class="layer"><b>Firewall</b><span>UFW denies all; opens SSH, TCP 443, UDP 443</span></div>
+          <div class="layer"><b>SSH</b><span>Key-only, fail2ban, verified effective config</span></div>
+          <div class="layer hl"><b>nginx on 443</b><span>Routes by SNI without decrypting; probes reach a real website</span></div>
+          <div class="layer"><b>Xray</b><span>VLESS+Reality, XHTTP, Hysteria2 on UDP</span></div>
+          <div class="layer"><b>Remnawave</b><span>Panel on a secret path; clients and traffic</span></div>
+          <div class="layer"><b>TLS</b><span>Let's Encrypt certificate for the IP; no domain needed</span></div>
+        </div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="col people">
+        <div class="label">Your people</div>
+        <div class="card"><h4>Connection page</h4><p>Recommended app, one-tap import, QR code.</p></div>
+        <div class="card"><h4>Subscription URL</h4><p>New servers appear on the next refresh. No new link.</p></div>
+        <div class="card"><h4>Every method listed</h4><p>Apps switch to the next one when a method is blocked.</p></div>
+      </div>
+    </div>
+    <div class="grow">
+      <span class="label">Grow later</span>
+      <span class="pill">meridian client add alice</span>
+      <span class="pill">meridian node add IP</span>
+      <span class="pill">meridian relay add IP</span>
+      <span class="pill ac">meridian plan · apply</span>
+    </div>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>Install: curl -sSf https://getmeridian.org/install.sh | bash</span></div>
+</div>
+</body></html>
