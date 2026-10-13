@@ -41,3 +41,14 @@ def tmp_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def servers_file(tmp_home: Path) -> Path:
     """Return the JSON server profile path in the temporary home."""
     return tmp_home / "servers.json"
+
+
+@pytest.fixture(autouse=True)
+def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exit-country lookups never leave the test process; tests that need one inject a transport."""
+    import httpx
+
+    def refuse(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError(f"tests are offline: {request.url}")
+
+    monkeypatch.setattr("meridian.registry_country.DEFAULT_TRANSPORT", httpx.MockTransport(refuse))

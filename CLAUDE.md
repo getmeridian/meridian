@@ -48,6 +48,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── resolve.py                          — ResolvedServer, ensure_server_connection
 ├── cluster_persistence.py              — cluster.yml serialization/deserialization
 ├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
+├── registry_country.py                 — best-effort exit country from RIR RDAP records
 ├── core/CLAUDE.md                      — transport-neutral API contracts
 │   ├── defaults.py                     — core-owned constants (DEFAULT_SNI)
 │   └── errors.py                       — shared error base types

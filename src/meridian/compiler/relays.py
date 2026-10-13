@@ -8,7 +8,7 @@ from meridian.compiler.client_delivery import fingerprint_copy_fields
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall
 from meridian.compiler.models import HostPayload, NginxRouteSpec, RealmHopPayload, ResourcePostcondition
-from meridian.compiler.names import host_remark
+from meridian.compiler.names import exit_places, host_remark
 from meridian.core.topology import SetupIntent, path_fingerprints
 
 
@@ -68,6 +68,7 @@ def compile_relays(
     relay_ingress: dict[str, int],
 ) -> list[str]:
     exits = {exit_.id: exit_ for exit_ in intent.exits}
+    places = exit_places([(exit_.id, exit_.region) for exit_ in intent.exits])
     host_ids: list[str] = []
     relay_listeners: set[tuple[str, int]] = set()
     for relay in sorted(intent.transparent_relays, key=lambda item: item.id):
@@ -131,7 +132,9 @@ def compile_relays(
                     host_id,
                     HostPayload(
                         owner_ref=relay.id,
-                        remark=host_remark(path.protocol, fingerprint=fingerprint, via=relay.id),
+                        remark=host_remark(
+                            path.protocol, fingerprint=fingerprint, place=places[exit_.id], via=relay.id
+                        ),
                         node_ref=runtime_by_exit[exit_.id],
                         inbound_ref=inbound_id,
                         address_server_ref=relay.hop_server_refs[0],

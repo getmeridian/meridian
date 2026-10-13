@@ -39,6 +39,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--warp / --no-warp` | выкл | Отправлять исходящий трафик через Cloudflare WARP |
 | `--geo-block / --no-geo-block` | вкл | Блокировать российские домены и IP на сервере |
 | `--client-ips / --no-client-ips` | выкл | Передавать панели реальный IP каждого клиента (см. [IP клиентов](#ip-клиентов)) |
+| `--country CC` | определяется | Страна в названиях подключений, например `DE`. Meridian определяет её по реестру адресов; задайте флаг, если определено неверно |
 | `--yes` | | Пропустить диалоги подтверждения |
 
 Флаги для скриптов и UI (`--json`, `--events`, `--request`, `--dry-run`) описаны в [CLI reference](/docs/ru/cli-reference/#meridian-deploy).

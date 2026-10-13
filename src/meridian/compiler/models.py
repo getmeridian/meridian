@@ -17,7 +17,13 @@ from meridian.compiler.names import (
     RemnawaveTemplateName,
     RemnawaveUsername,
 )
-from meridian.core.inputs import IPAddressValue, PortValue, ServerReferenceValue, SshUserValue
+from meridian.core.inputs import (
+    IPAddressValue,
+    OptionalCountryCodeValue,
+    PortValue,
+    ServerReferenceValue,
+    SshUserValue,
+)
 from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind as ResourceKind
 from meridian.core.topology import (
@@ -219,6 +225,8 @@ class NodeBindingPayload(CoreModel):
     name: RemnawaveNodeName
     profile_ref: str
     inbound_refs: list[str]
+    # The exit's region; empty leaves the panel's country (an operator choice) alone.
+    country_code: OptionalCountryCodeValue = ""
 
 
 class NodeRuntimePayload(CoreModel):

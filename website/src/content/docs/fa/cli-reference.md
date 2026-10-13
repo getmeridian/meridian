@@ -31,6 +31,7 @@ meridian deploy [SERVER] [flags]
 | `--warp / --no-warp` | خاموش | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
 | `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را در exit block کنید (`geosite:category-ru` + `geoip:ru`). اشتراک‌های Xray JSON و Mihomo قبلاً آن‌ها را مستقیم از دستگاه ارسال می‌کنند |
 | `--client-ips / --no-client-ips` | خاموش | IP واقعی هر کلاینت را به Xray و پنل منتقل می‌کند، برای محدودیت IP و لاگ اتصال هر کاربر. وقتی خاموش است، هر اتصال TCP انگار از خود سرور آمده است |
+| `--country CC` | رجیستری آدرس | کشور دو‌حرفی که در نام اتصال‌ها و به‌صورت پرچم گره در پنل نمایش داده می‌شود. بدون آن، در اولین استقرار از رجیستری اینترنتی منطقه‌ای (RIR) آدرس سرور پرسیده می‌شود (از طریق RDAP bootstrap مربوط به IANA، بدون سرویس geo-IP)؛ در بازاستقرار، کشور ذخیره‌شده حفظ می‌شود |
 | `--yes` | | پرسش تأیید را رد کنید |
 | `--json` | | نتیجه deploy نهایی را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 | `--events=jsonl` | | رویدادهای تعریف‌شده پیشرفت را به عنوان JSONL روی stderr جریان دهید |
@@ -162,6 +163,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 | `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی گره (`node add`, `node replace`) |
 | `--sni HOST` | www.google.com | هدف camouflage Reality برای این گره |
 | `--domain DOMAIN` | (هیچ) | دامنه گره؛ XHTTP، WSS و مسیرهای Hysteria2 را روی آن اضافه می‌کند |
+| `--country CC` | رجیستری آدرس | کشور نمایش‌داده‌شده در نام اتصال‌ها؛ وقتی رجیستری اشتباه است (anycast یا بازه‌های اجاره‌ای) آن را مشخص کنید |
 | `--harden / --no-harden` | فعال | تقویت سیستم‌عامل، SSH و firewall. سروری فلیت همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
 | `--yes` | | پرسش تأیید را رد کنید |
 | `--force` | | `node remove`: همچنین زنجیرهای relay که به این exit مسیریابی می‌کنند را بردارید |

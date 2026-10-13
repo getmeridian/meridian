@@ -46,6 +46,7 @@ def node_projection(node: Node) -> dict[str, Any]:
         "is_disabled": node.is_disabled,
         "profile_uuid": node.active_config_profile_uuid,
         "inbound_uuids": sorted(node.active_inbound_uuids),
+        "country_code": node.country_code,
     }
 
 

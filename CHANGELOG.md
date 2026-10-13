@@ -117,6 +117,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   throttling window suggests moving the relay to another provider.
 
 ### Sharing
+- **Connection names show where traffic exits** — entries lead with the exit's
+  flag and country ("🇩🇪 DE · Reality · Chrome"), and the panel shows the same
+  flag on the node. Deploy, `node add`, and the setup wizard look the country up
+  once from the address's Regional Internet Registry; set `--country` when it is
+  wrong (anycast or leased ranges).
 - Connection pages are built from each user's real subscription, so relays and
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the

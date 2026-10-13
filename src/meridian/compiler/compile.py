@@ -48,6 +48,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.compiler.names import (
+    exit_places,
     external_squad_name,
     host_remark,
     internal_squad_name,
@@ -175,6 +176,7 @@ def compile_topology(
             "can activate only one config profile."
         )
 
+    places = exit_places([(exit_.id, exit_.region) for exit_ in intent.exits])
     for exit_ in sorted(intent.exits, key=lambda item: item.id):
         profile_id = f"profile:{exit_.id}"
         sorted_paths = sorted(exit_.paths, key=lambda item: item.id)
@@ -243,6 +245,7 @@ def compile_topology(
                 name=node_name(exit_.id),
                 profile_ref=profile_id,
                 inbound_refs=path_refs,
+                country_code=exit_.region,
             ),
             dependencies=[profile_id, *path_refs],
         )
@@ -280,8 +283,7 @@ def compile_topology(
             ports=ports,
             exit_=exit_,
             control_server_ref=intent.control.server_ref,
-            # Entry names mention the exit only when the subscription has several.
-            place=exit_.id if len(intent.exits) > 1 else "",
+            place=places[exit_.id],
             runtime_id=runtime_id,
             inbound_by_path=inbound_by_path,
             allocated_path_ports=allocated_path_ports,

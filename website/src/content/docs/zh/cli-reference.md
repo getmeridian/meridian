@@ -31,6 +31,7 @@ meridian deploy [SERVER] [flags]
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
 | `--client-ips / --no-client-ips` | 关 | 把每个客户端的真实 IP 传给 Xray 和面板，供 Remnawave 的按用户 IP 限制和连接日志使用。关闭时，每个 TCP 连接看起来都来自服务器本身 |
+| `--country CC` | 地址注册机构 | 显示在连接名称中、并作为面板节点旗帜的两字母国家代码。不指定时，首次部署会向服务器地址所属的区域互联网注册机构查询（通过 IANA 的 RDAP 引导服务，不使用 geo-IP 服务）；重新部署则沿用已保存的国家 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |
@@ -162,6 +163,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 | `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`、`node replace`） |
 | `--sni HOST` | www.google.com | 此节点的 Reality 伪装目标 |
 | `--domain DOMAIN` | (无) | 节点域；在其上添加 XHTTP、WSS 和 Hysteria2 路径 |
+| `--country CC` | 地址注册机构 | 显示在连接名称中的国家；注册机构信息有误时（任播或租用地址段）请手动指定 |
 | `--harden / --no-harden` | 启 | OS、SSH 和防火墙加固。舰队服务器总是保持它；`--no-harden` 被拒绝 |
 | `--yes` | | 跳过确认提示 |
 | `--force` | | `node remove`：也删除路由到此出口的中继链 |

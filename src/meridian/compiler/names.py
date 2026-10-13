@@ -117,13 +117,37 @@ def subscription_template_name(template_id: str, template_type: str) -> str:
 def host_remark(protocol: str, *, fingerprint: str = "", place: str = "", via: str = "") -> str:
     """Name a subscription entry the way a user picks one: method, then what sets it apart.
 
-    *place* names the exit when a fleet has several; *via* names the relay an entry enters
-    through. Examples: ``Reality · Chrome``, ``finland · XHTTP · Firefox``,
+    *place* names the exit (see :func:`exit_places`); *via* names the relay an entry enters
+    through. Examples: ``🇩🇪 DE · Reality · Chrome``, ``finland · XHTTP · Firefox``,
     ``Reality · Chrome via moscow``, ``WebSocket · CDN``, ``Hysteria2 · UDP``.
     """
     detail = _PATH_DETAILS.get(protocol) or fingerprint_label(fingerprint)
     remark = " · ".join(part for part in (place, _PROTOCOL_LABELS[protocol], detail) if part)
     return f"{remark} via {via}" if via else remark
+
+
+def exit_places(exits: list[tuple[str, str]]) -> dict[str, str]:
+    """Name each exit in its subscription entries from ``(exit_id, region)`` pairs.
+
+    A known country reads ``🇩🇪 DE``; two exits in one country keep the flag and fall
+    back to their IDs (``🇩🇪 main``). Without a country an exit is named by its ID,
+    and only when the fleet has several.
+    """
+    regions = [region for _, region in exits if region]
+    places: dict[str, str] = {}
+    for exit_id, region in exits:
+        if region and regions.count(region) == 1:
+            places[exit_id] = f"{country_flag(region)} {region}"
+        elif region:
+            places[exit_id] = f"{country_flag(region)} {exit_id}"
+        else:
+            places[exit_id] = exit_id if len(exits) > 1 else ""
+    return places
+
+
+def country_flag(code: str) -> str:
+    """The emoji flag for an ISO 3166-1 alpha-2 code (regional indicator pair)."""
+    return "".join(chr(0x1F1E6 + ord(letter) - ord("A")) for letter in code.upper())
 
 
 def fingerprint_label(fingerprint: str) -> str:

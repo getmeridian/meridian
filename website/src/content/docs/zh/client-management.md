@@ -32,7 +32,7 @@ meridian client add alice bob charlie
 - 订阅的二维码
 - “检查我的连接”测试，会复制一份不含链接的报告，方便他们发给你
 
-在应用中，条目按方式命名：“Reality · Chrome”“XHTTP · Chrome”“WebSocket · CDN”“Hysteria2 · UDP”；有多个出口时会加上出口名称，中继条目带有“via relay”。Reality 和 XHTTP 还提供使用另一种 TLS 指纹的“· Firefox”副本，以防某一种指纹被封锁。会自动切换的应用（Xray JSON 应用如 Happ，以及 Mihomo 和 sing-box）会自行选择可用的条目，但不会在不同指纹之间切换；Happ 为此显示一个单独的“Automatic · Firefox”条目。
+在应用中，条目按出口所在国家和方式命名：“🇩🇪 DE · Reality · Chrome”“🇩🇪 DE · XHTTP · Chrome”“🇩🇪 DE · WebSocket · CDN”“🇩🇪 DE · Hysteria2 · UDP”，中继条目另加“via relay”。同一国家有两个出口时，旗帜后显示它们的名称（“🇩🇪 main”）；国家未知的出口在有多个出口时显示其名称。Reality 和 XHTTP 还提供使用另一种 TLS 指纹的“· Firefox”副本，以防某一种指纹被封锁。会自动切换的应用（Xray JSON 应用如 Happ，以及 Mihomo 和 sing-box）会自行选择可用的条目，但不会在不同指纹之间切换；Happ 为此显示一个单独的“Automatic · Firefox”条目。
 
 通过任何信使发送链接。收件人打开它，安装应用，扫描二维码，并连接。
 

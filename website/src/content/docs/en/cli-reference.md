@@ -31,6 +31,7 @@ meridian deploy [SERVER] [flags]
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block` / `--no-geo-block` | on | Refuse Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) at the exit. Xray JSON and Mihomo subscriptions already send them directly from the device |
 | `--client-ips / --no-client-ips` | off | Pass each client's real IP to Xray and the panel, for Remnawave per-user IP limits and connection logs. Off, every TCP connection appears to come from the server itself |
+| `--country CC` | address registry | Two-letter country shown in connection names and as the panel's node flag. Without it, a first deploy asks the server address's Regional Internet Registry (via IANA's RDAP bootstrap, no geo-IP service); a redeploy keeps the saved country |
 | `--yes` | | Skip confirmation prompts |
 | `--json` | | Emit the final deploy result as a `meridian.output/v1` envelope |
 | `--events=jsonl` | | Stream typed progress events as JSONL on stderr |
@@ -162,6 +163,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 | `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`, `node replace`) |
 | `--sni HOST` | www.google.com | Reality camouflage target for this node |
 | `--domain DOMAIN` | (none) | Node domain; adds XHTTP, WSS, and Hysteria2 paths on it |
+| `--country CC` | address registry | Country shown in connection names; set it when the registry is wrong (anycast or leased ranges) |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
 | `--yes` | | Skip confirmation prompts |
 | `--force` | | `node remove`: also remove the relay chains that route to this exit |

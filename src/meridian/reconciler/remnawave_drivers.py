@@ -308,6 +308,7 @@ class NodeBindingDriver(retirement.NodeRetirement):
             and not node.is_disabled
             and node.active_config_profile_uuid == profile_uuid
             and sorted(node.active_inbound_uuids) == sorted(inbound_uuids)
+            and payload.country_code in {"", node.country_code}
         )
         owned = binding is not None or self.context.was_managed(action.resource.logical_id, node.uuid)
         if node.uuid and (matches or owned):
@@ -341,6 +342,7 @@ class NodeBindingDriver(retirement.NodeRetirement):
                     api_port,
                     config_profile_uuid=profile_uuid,
                     inbound_uuids=inbound_uuids,
+                    country_code=payload.country_code or "XX",
                 ),
                 f"create Node {payload.name}",
             )
@@ -373,6 +375,11 @@ class NodeBindingDriver(retirement.NodeRetirement):
             _mutation(
                 lambda: self.context.panel.update_node_name(existing.uuid, payload.name),
                 f"rename Node {payload.name}",
+            )
+        if payload.country_code and existing.country_code != payload.country_code:
+            _mutation(
+                lambda: self.context.panel.update_node_country(existing.uuid, payload.country_code),
+                f"set Node {payload.name} country",
             )
         if existing.is_disabled:
             _mutation(

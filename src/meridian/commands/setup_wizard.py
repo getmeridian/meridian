@@ -40,6 +40,7 @@ from meridian.core.topology import (
     RouteMatchKind,
 )
 from meridian.i18n import t, words
+from meridian.registry_country import registry_country
 from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.runtime import SetupReview, SetupRuntime, SetupVerification
 from meridian.setup.service import SetupDraftService
@@ -206,12 +207,15 @@ class SetupWizard:
         exits: list[SetupExitRole] = []
         # Per-destination overrides are edited with `meridian route`; keep them when an exit is re-asked.
         overrides = {exit_.server_ref: exit_.egress_overrides for exit_ in (draft.roles.exits if draft.roles else [])}
+        regions = {exit_.server_ref: exit_.region for exit_ in (draft.roles.exits if draft.roles else [])}
+        hosts = {item.server_ref: item.host for item in items}
         for ref, role in assignments.items():
             if role != "exit":
                 continue
             exit_id = _unique_id(_resource_id(titles[ref], "exit"), used)
             self.prompt.say(t("roles.exit_header", server=titles[ref]), style="bold")
-            region = self.prompt.ask(t("roles.region"))
+            # The registry lookup runs only for a server without a saved answer.
+            region = self.prompt.ask(t("roles.region"), default=regions.get(ref) or registry_country(hosts[ref]))
             warp = self.prompt.yes_no(t("roles.warp"), default=False, hint=t("roles.warp_hint"))
             geo_block = self.prompt.yes_no(t("roles.geo_block"), default=True, hint=t("roles.geo_block_hint"))
             exits.append(

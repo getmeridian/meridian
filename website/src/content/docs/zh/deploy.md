@@ -39,6 +39,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block / --no-geo-block` | 启 | 通过代理阻止俄罗斯域名和 IP |
 | `--client-ips / --no-client-ips` | 关 | 让面板看到每个客户端的真实 IP（见[客户端 IP](#客户端-ip)） |
+| `--country CC` | 自动查询 | 显示在连接名称中的国家，例如 `DE`。Meridian 根据地址注册机构信息查询；如果不对，请手动指定 |
 | `--yes` | | 跳过确认提示 |
 
 脚本和 UI 的标志（`--json`、`--events`、`--request`、`--dry-run`）在 [CLI 参考](/docs/zh/cli-reference/#meridian-deploy)中描述。

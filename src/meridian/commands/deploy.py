@@ -55,6 +55,7 @@ from meridian.core.topology import SetupIntent
 from meridian.core.validation import wrap_validation_error
 from meridian.engine.deploy import resolve_deploy_target
 from meridian.handoff import HandoffLinks
+from meridian.registry_country import registry_country
 from meridian.renderers import emit_json
 from meridian.resolve import connection_for_entry, merge_target, parse_target
 from meridian.servers import ServerEntry, ServerRegistry
@@ -84,6 +85,7 @@ def run(
     geo_block: bool = True,
     hysteria2: bool = True,
     client_ips: bool = False,
+    country: str = "",
     ssh_port: int = 0,
     fingerprint: str = "",
     request_path: str = "",
@@ -125,6 +127,7 @@ def run(
                 geo_block=geo_block,
                 hysteria2=hysteria2,
                 client_ips=client_ips,
+                country=country,
                 ssh_port=ssh_port,
                 fingerprint=fingerprint,
             )
@@ -225,6 +228,7 @@ def _execute(
         sni_candidates = [request.sni]
     else:
         sni_candidates = _camouflage_candidates(resolved.conn, resolved.ip)
+    request = _with_country(request, cluster.topology_intent, entry.id, resolved.ip)
     raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before changing the server.")
 
     from meridian.setup.runtime import SetupRuntime
@@ -335,6 +339,15 @@ def _execute(
 
 
 TrafficOutcome = Literal["ok", "egress_mismatch", "failed", "inconclusive"]
+
+
+def _with_country(request: DeployRequest, existing: SetupIntent | None, server_ref: str, ip: str) -> DeployRequest:
+    """Fill the exit's country from the address registry unless given or already saved."""
+    saved = next((exit_.region for exit_ in existing.exits if exit_.server_ref == server_ref), "") if existing else ""
+    if request.country or saved:
+        return request
+    country = registry_country(ip)
+    return _build_request(**{**request.model_dump(), "country": country}) if country else request
 
 
 def _camouflage_candidates(conn: ServerConnection, ip: str) -> list[str]:

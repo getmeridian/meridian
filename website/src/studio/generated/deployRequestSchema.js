@@ -20,6 +20,13 @@ export const deployRequestSchema = {
       "title": "Color",
       "type": "string"
     },
+    "country": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Country",
+      "type": "string"
+    },
     "domain": {
       "anyOf": [
         {

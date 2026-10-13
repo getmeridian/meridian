@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type Country = string;
 export type Domain = "" | string;
 export type Harden = boolean;
 export type Ip = string;
@@ -18,6 +19,7 @@ export type Yes = boolean;
  * Request to provision and add an exit node.
  */
 export interface NodeAddRequest {
+  country?: Country;
   domain?: Domain;
   harden?: Harden;
   ip: Ip;

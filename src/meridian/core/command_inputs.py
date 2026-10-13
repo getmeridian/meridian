@@ -5,6 +5,7 @@ from __future__ import annotations
 from meridian.core.inputs import (
     IPAddressValue,
     NameValue,
+    OptionalCountryCodeValue,
     OptionalHostnameValue,
     OptionalSelectorValue,
     OptionalSshUserValue,
@@ -46,6 +47,7 @@ class NodeAddRequest(CoreModel):
     ssh_port: PortValue = 22
     sni: OptionalHostnameValue = ""
     domain: OptionalHostnameValue = ""
+    country: OptionalCountryCodeValue = ""
     harden: bool = True
     yes: bool = False
 

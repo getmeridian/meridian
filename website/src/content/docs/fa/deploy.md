@@ -39,6 +39,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--warp / --no-warp` | غیرفعال | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
 | `--geo-block / --no-geo-block` | فعال | IP‌های روسی و دامنه‌های روسی را روی سرور block کنید |
 | `--client-ips / --no-client-ips` | خاموش | به پنل اجازه می‌دهد IP واقعی هر کلاینت را ببیند (ببینید [IP کلاینت‌ها](#ip-کلاینتها)) |
+| `--country CC` | جست‌وجو می‌شود | کشور نمایش‌داده‌شده در نام اتصال‌ها، مثل `DE`. Meridian آن را از رجیستری آدرس پیدا می‌کند؛ اگر اشتباه بود خودتان مشخص کنید |
 | `--yes` | | پرسش تأیید را رد کنید |
 
 پرچم‌های برای اسکریپت‌ها و UI‌ها (`--json`، `--events`، `--request`، `--dry-run`) در [CLI reference](/docs/fa/cli-reference/#meridian-deploy) توصیف شده‌اند.

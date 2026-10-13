@@ -30,6 +30,7 @@ from meridian.core.fleet import build_node_list_result
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.topology import ExitIntent, RoutingGatewayIntent, SetupIntent
+from meridian.registry_country import registry_country
 from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
@@ -46,6 +47,7 @@ def run_add(
     ssh_port: int = 0,
     sni: str = "",
     domain: str = "",
+    country: str = "",
     harden: bool = True,
     yes: bool = False,
 ) -> None:
@@ -70,6 +72,7 @@ def run_add(
         ssh_port=target.port,
         sni=sni,
         domain=domain,
+        country=country,
         harden=harden,
         yes=yes,
     )
@@ -122,6 +125,7 @@ def run_add(
             reality_sni=request.sni or _neighbor_sni(resolved) or DEFAULT_SNI,
             tls_hostname=request.domain,
             address=resolved.ip,
+            region=request.country or registry_country(resolved.ip),
         )
     else:
         # A failed or interrupted add leaves its exit in the intent; re-running resumes it.
@@ -134,6 +138,19 @@ def run_add(
                 hint_type="user",
             )
         updated = intent
+        if request.country and request.country != existing.region:
+            # Correcting the country of an existing exit is a naming edit, not a conflict.
+            updated = SetupIntent.model_validate(
+                {
+                    **intent.model_dump(mode="json"),
+                    "exits": [
+                        {**exit_.model_dump(mode="json"), "region": request.country}
+                        if exit_.id == existing.id
+                        else exit_.model_dump(mode="json")
+                        for exit_ in intent.exits
+                    ],
+                }
+            )
     try:
         with reviewed_apply_persistence("V4 exit apply"), apply_progress(registry=registry) as reporter:
             result = SetupRuntime(

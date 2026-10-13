@@ -38,6 +38,7 @@ def single_server_intent(
     hysteria2: bool = True,
     fingerprint: TlsFingerprint | None = None,
     address: str = "",
+    region: str = "",
 ) -> SetupIntent:
     """Return the intent for deploying (or redeploying) one server.
 
@@ -49,6 +50,7 @@ def single_server_intent(
         exit_ = ExitIntent(
             id=DEFAULT_EXIT_ID,
             server_ref=server_ref,
+            region=region,
             paths=default_exit_paths(
                 DEFAULT_EXIT_ID,
                 address=address,
@@ -87,6 +89,7 @@ def single_server_intent(
             ),
             "warp": warp,
             "geo_block": geo_block,
+            "region": region or current.region,
         }
     )
     users = list(existing.access.users)
@@ -119,6 +122,7 @@ def request_intent(
         geo_block=request.geo_block,
         hysteria2=request.hysteria2,
         fingerprint=request.fingerprint,
+        region=request.country,
     ).model_copy(update={"harden": request.harden, "forward_client_ips": request.client_ips})
 
 

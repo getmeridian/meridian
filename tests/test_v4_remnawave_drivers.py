@@ -196,6 +196,10 @@ class StatefulPanel:
         self.calls["rename_node"] += 1
         self.nodes[uuid].name = name
 
+    def update_node_country(self, uuid: str, country_code: str) -> None:
+        self.calls["country_node"] += 1
+        self.nodes[uuid].country_code = country_code
+
     def update_node_address(self, uuid: str, address: str, port: int) -> None:
         self.calls["move_node"] += 1
         self.nodes[uuid].address = address
@@ -1044,3 +1048,36 @@ def test_adding_an_exit_renames_existing_hosts_in_place_instead_of_twinning_them
     ]
     assert renamed
     assert all(panel.hosts[first[logical_id]].remark.startswith("exit-a · ") for logical_id in renamed)
+
+
+def test_node_country_follows_the_exit_region_and_otherwise_stays_the_operators() -> None:
+    base = _intent()
+    intent = base.model_copy(update={"exits": [base.exits[0].model_copy(update={"region": "DE"}), base.exits[1]]})
+    plan = compile_topology(intent)
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=workloads,
+        server_addresses={"srv-control": "198.51.100.10", "srv-exit-a": "198.51.100.20", "srv-exit-b": "198.51.100.30"},
+    )
+    fallback = AlreadyConvergedDriver()
+    drivers: dict[str, object] = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+    drivers.update(build_remnawave_drivers(context))
+
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    nodes = {node.name: node for node in panel.nodes.values()}
+    assert nodes["Meridian v4 exit-a"].country_code == "DE"
+    assert nodes["Meridian v4 exit-b"].country_code == "XX"
+
+    nodes["Meridian v4 exit-a"].country_code = "FI"  # drift on a managed country is repaired
+    nodes["Meridian v4 exit-b"].country_code = "SE"  # an operator's choice on an exit without a region stays
+    second = execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None)
+
+    assert second.all_succeeded
+    assert nodes["Meridian v4 exit-a"].country_code == "DE"
+    assert nodes["Meridian v4 exit-b"].country_code == "SE"
+    assert panel.calls["country_node"] == 1

@@ -8,6 +8,7 @@
 export type ClientIps = boolean;
 export type ClientName = string;
 export type Color = string;
+export type Country = string;
 export type Domain = "" | string;
 export type Fingerprint =
   | ("chrome" | "firefox" | "safari" | "ios" | "android" | "edge" | "random" | "randomized")
@@ -32,6 +33,7 @@ export interface DeployRequest {
   client_ips?: ClientIps;
   client_name?: ClientName;
   color?: Color;
+  country?: Country;
   domain?: Domain;
   fingerprint?: Fingerprint;
   geo_block?: GeoBlock;

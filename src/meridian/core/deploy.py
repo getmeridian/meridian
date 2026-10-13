@@ -10,6 +10,7 @@ from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.inputs import (
     DeployIpValue,
     NameValue,
+    OptionalCountryCodeValue,
     OptionalHostnameValue,
     OptionalServerReferenceValue,
     OptionalSshUserValue,
@@ -41,6 +42,7 @@ class DeployRequest(CoreModel):
     geo_block: bool = True
     hysteria2: bool = True
     client_ips: bool = False
+    country: OptionalCountryCodeValue = ""
     ssh_port: int = Field(default=0, ge=0, le=65535)
     fingerprint: TlsFingerprint | None = None
 

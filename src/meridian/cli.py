@@ -483,6 +483,12 @@ def deploy_cmd(
         help="Label for connection pages (e.g. Alice's VPN)",
         rich_help_panel="Branding",
     ),
+    country: str = typer.Option(
+        "",
+        "--country",
+        help="Country code shown in connection names, e.g. DE (default: the address registry's country)",
+        rich_help_panel="Branding",
+    ),
     icon: str = typer.Option("", "--icon", help="Page icon (emoji or image URL)", rich_help_panel="Branding"),
     color: str = typer.Option(
         "", "--color", help="Page color theme (ocean/sunset/forest/lavender/rose/slate)", rich_help_panel="Branding"
@@ -543,6 +549,7 @@ def deploy_cmd(
         geo_block=geo_block,
         hysteria2=hysteria2,
         client_ips=client_ips,
+        country=country,
         ssh_port=ssh_port,
         fingerprint=fingerprint,
         request_path=request_path,
@@ -1066,6 +1073,9 @@ def node_add_cmd(
     user: User = "",
     sni: str = typer.Option("", "--sni", help="Reality SNI target"),
     domain: str = typer.Option("", "--domain", help="Domain for WSS/XHTTP (Cloudflare CDN)"),
+    country: str = typer.Option(
+        "", "--country", help="Country code shown in connection names (default: the address registry's)"
+    ),
     ssh_port: SshPort = 0,
     harden: bool = typer.Option(True, help="Apply OS hardening (fleet servers require it)"),
     yes: Yes = False,
@@ -1079,10 +1089,13 @@ def node_add_cmd(
       [cyan]meridian node add 198.51.100.10[/cyan]
       [cyan]meridian node add 198.51.100.10 --name finland --sni www.google.com[/cyan]
       [cyan]meridian node add 198.51.100.10 --domain proxy.example.com --yes[/cyan]
+      [cyan]meridian node add 198.51.100.10 --country NL[/cyan]   Registry says otherwise
     """
     from meridian.commands.node import run_add
 
-    run_add(ip, name=name, user=user, ssh_port=ssh_port, sni=sni, domain=domain, harden=harden, yes=yes)
+    run_add(
+        ip, name=name, user=user, ssh_port=ssh_port, sni=sni, domain=domain, country=country, harden=harden, yes=yes
+    )
 
 
 @node_app.command("list")

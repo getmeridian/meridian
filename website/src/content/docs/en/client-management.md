@@ -32,7 +32,7 @@ The connection page is built from the person's real subscription, so it lists ex
 - A QR code for the subscription
 - A "Check my connection" test that copies a link-free report they can send you
 
-In the app, entries are named by method: "Reality · Chrome", "XHTTP · Chrome", "WebSocket · CDN", "Hysteria2 · UDP", plus the exit's name when you have several and "via relay" for relay entries. Reality and XHTTP also come as "· Firefox" copies with another TLS fingerprint, for when one fingerprint gets blocked. Apps that switch automatically (Xray JSON apps such as Happ, Mihomo, and sing-box) pick a working entry by themselves but never switch between fingerprints; Happ shows a separate "Automatic · Firefox" entry for that.
+In the app, entries are named by the exit's country and method: "🇩🇪 DE · Reality · Chrome", "🇩🇪 DE · XHTTP · Chrome", "🇩🇪 DE · WebSocket · CDN", "🇩🇪 DE · Hysteria2 · UDP", with "via relay" added for relay entries. Two exits in one country show their names after the flag ("🇩🇪 main"); an exit without a known country shows its name when you have several. Reality and XHTTP also come as "· Firefox" copies with another TLS fingerprint, for when one fingerprint gets blocked. Apps that switch automatically (Xray JSON apps such as Happ, Mihomo, and sing-box) pick a working entry by themselves but never switch between fingerprints; Happ shows a separate "Automatic · Firefox" entry for that.
 
 Send the link through any messenger. The recipient opens it, installs the app, scans the QR code, and connects.
 

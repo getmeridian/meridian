@@ -55,6 +55,7 @@ def add_exit_to_intent(
     reality_sni: str,
     tls_hostname: str = "",
     address: str = "",
+    region: str = "",
 ) -> SetupIntent:
     """Return validated intent with one independent exit workload offering every default method."""
     exit_id = unique_resource_id(
@@ -75,6 +76,7 @@ def add_exit_to_intent(
         ExitIntent(
             id=exit_id,
             server_ref=server_ref,
+            region=region,
             paths=paths,
         ).model_dump(mode="json"),
     ]
