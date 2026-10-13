@@ -77,7 +77,7 @@ topology_intent:
       paths:
         - id: main-reality
           protocol: reality
-          reality_sni: www.microsoft.com
+          reality_sni: www.google.com
       geo_block: true
   transparent_relays:
     - id: relay-moscow

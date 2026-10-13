@@ -38,3 +38,13 @@ def test_cluster_example_yml_validates() -> None:
     cfg = ClusterConfig.load(EXAMPLE)
     errors = cfg.validate()
     assert errors == [], f"cluster.example.yml has validation errors: {errors}"
+
+
+def test_cluster_example_yml_uses_a_working_camouflage_target() -> None:
+    """www.microsoft.com's certificate record exceeds REALITY's 8192-byte limit."""
+    from meridian.core.defaults import REALITY_SNI_CANDIDATES
+
+    exits = ClusterConfig.load(EXAMPLE).topology_intent.exits
+    targets = {path.reality_sni for exit_intent in exits for path in exit_intent.paths if path.reality_sni}
+    assert targets
+    assert targets <= set(REALITY_SNI_CANDIDATES)
