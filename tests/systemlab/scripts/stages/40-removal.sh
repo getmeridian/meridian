@@ -26,7 +26,8 @@ assert payload["command"] == "relay.check", payload["command"]
 data = payload["data"]
 assert data["verdict"] == "passed", data
 assert [hop["hop_index"] for hop in data["hops"]] == [0, 1], data["hops"]
-assert data["counts"]["passed"] == data["counts"]["checks"] == 3, data["counts"]
+# Two Realm hops, each leg's throughput toward its next hop, and the public entry.
+assert data["counts"]["passed"] == data["counts"]["checks"] == 5, data["counts"]
 PYEOF
 pass "relay check passed every hop of relay-chain"
 
