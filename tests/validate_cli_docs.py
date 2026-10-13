@@ -53,6 +53,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "node add": "### meridian node",
     "node list": "### meridian node",
     "node remove": "### meridian node",
+    "node replace": "### meridian node",
     "fleet status": "### meridian fleet",
     "fleet inventory": "### meridian fleet",
     "api schemas": "### meridian api",

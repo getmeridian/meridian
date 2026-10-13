@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Annotated
 
 import typer
 
@@ -922,6 +923,31 @@ def node_check_cmd(
     from meridian.commands.health import run
 
     run(node, user=user, scope="server")
+
+
+@node_app.command("replace")
+def node_replace_cmd(
+    old: Annotated[str, typer.Argument(metavar="EXIT", help="Exit ID, or the saved name/IP of the exit's server")],
+    new: Target,
+    name: str = typer.Option("", "--name", help="Friendly name for the new server"),
+    user: User = "",
+    ssh_port: SshPort = 0,
+    yes: Yes = False,
+) -> None:
+    """Move an exit to another server.
+
+    Keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo
+    settings, and every relay pointing at it. Shows the review (deploy on
+    SERVER, clean up the old one), confirms, and applies it. The control server
+    cannot be moved yet.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian node replace finland 198.51.100.20[/cyan]
+      [cyan]meridian node replace exit-2 admin@198.51.100.21:2222 --name finland-2 --yes[/cyan]
+    """
+    from meridian.commands.node_replace import run_replace
+
+    run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes)
 
 
 @node_app.command("remove")

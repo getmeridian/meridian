@@ -182,6 +182,11 @@ class ServerRegistry:
                     hint="Choose a unique name and host. Existing server identities cannot be retargeted or ambiguous.",
                 )
 
+    def roles(self, query: str, cluster: ClusterConfig) -> tuple[str, ...]:
+        """Deployment roles that still use a saved server (empty for unknown servers)."""
+        profile = self._store.find(query)
+        return tuple(_cluster_references(profile, cluster)) if profile is not None else ()
+
     def remove(self, query: str, *, cluster: ClusterConfig | None = None) -> bool:
         """Remove an unreferenced server by ID, IP, or name."""
         profile = self._store.find(query)

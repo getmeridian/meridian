@@ -33,7 +33,7 @@
 - **Camouflage target**: never recommend apple.com (ASN mismatch with VPS providers).
 - **Do not call `console.fail()` from library modules** (resolve, panel_bootstrap, node_deploy, reality_keys, provision/). Raise a `MeridianError` subclass instead. Enforced by `test_library_modules_do_not_import_console_fail`.
 - **PQ encryption removed in v4** — Xray VLESS PQ requires per-user encryption fields on inbound clients plus Remnawave API support. Do not re-add the flag without both.
-- **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients.
+- **Reality key material is atomic** — redeploy must refuse partial private/public/short-ID state rather than rotate keys and break clients; a workload moved by `node replace` carries its keys to the new server.
 - **Hysteria2 naming boundary** — external keys and URLs use `hysteria2`; Remnawave profiles require protocol/network `hysteria` plus version `2`.
 - **Unknown panel admin is a user error** — register is refused once any admin exists; with no saved credentials and both register and login refused, stop with restore-or-`meridian teardown` guidance instead of retrying.
 - **Remnawave 3.4 API tokens** — creation requires `name` and `expiresInDays`; use wildcard scope for the provisioner token. Tokens are signed with `APP_SECRET` (2.x `JWT_AUTH_SECRET`, carried over on upgrade).

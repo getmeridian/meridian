@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import typer
 from rich.markup import escape
@@ -16,10 +17,13 @@ from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
 from meridian.servers import ServerEntry, ServerRegistry
 
+if TYPE_CHECKING:
+    from meridian.resolve import ResolvedServer
+
 
 def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
     """Register a server after verifying access: over SSH, or locally for `local`/this machine."""
-    from meridian.commands.resolve import ensure_server_connection, resolve_server
+    from meridian.commands.resolve import resolve_server
 
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
@@ -31,11 +35,26 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
         user=resolved.user,
         ssh_port=resolved.port,
     )
+    register_server(registry, resolved, name=request.name)
+    ok(f"Server added: {request.name or request.ip}")
+
+
+def register_server(registry: ServerRegistry, resolved: ResolvedServer, *, name: str = "") -> ServerEntry:
+    """Verify access to a resolved target, then save (or refresh) its profile; return the saved entry.
+
+    A saved server keeps its title unless a new name is given.
+    """
+    from meridian.commands.resolve import ensure_server_connection
+
+    try:
+        saved = registry.find(resolved.ip)
+    except LocalStateError as exc:
+        fail(exc)
     pending_entry = ServerEntry(
-        host=request.ip,
-        user=request.user,
-        name=request.name,
-        port=request.ssh_port,
+        host=resolved.ip,
+        user=resolved.user,
+        name=name or (saved.name if saved is not None else ""),
+        port=resolved.port,
         auth_state="validated",
         machine_id=resolved.machine_id,
     )
@@ -45,12 +64,13 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
         fail(exc)
 
     if not resolved.local_mode:
-        info(f"Connecting to {request.ip}...")
+        info(f"Connecting to {resolved.ip}...")
     ensure_server_connection(resolved)
 
     pending_entry.last_validated_at = datetime.now(UTC).isoformat()
     try:
         registry.add(pending_entry)
+        entry = registry.find(resolved.ip)
     except LocalStateError as exc:
         fail(exc)
     except OSError as exc:
@@ -59,7 +79,9 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
             hint="Check ~/.meridian permissions and disk space, then retry.",
             hint_type="system",
         )
-    ok(f"Server added: {request.name or request.ip}")
+    if entry is None:
+        raise RuntimeError("Validated server was not saved")
+    return entry
 
 
 def run_list() -> None:

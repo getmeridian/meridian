@@ -151,13 +151,14 @@ Manage exit servers. The first server is deployed with `meridian deploy` (or `me
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--name NAME` | (auto) | Friendly name for the node |
 | `--user USER` | saved, else root | SSH user on the node |
-| `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`) |
+| `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`, `node replace`) |
 | `--sni HOST` | www.google.com | Reality camouflage target for this node |
 | `--domain DOMAIN` | (none) | Node domain; adds XHTTP, WSS, and Hysteria2 paths on it |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
@@ -170,6 +171,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 **`node list`** — lists nodes with live panel status, Xray version, and traffic. If panel status is unavailable, configured nodes are shown as `unknown` and the command exits `3`.
 
 **`node remove`** — removes an exit or routing gateway from your topology. It lists every resource that will be deleted (panel node and profile, node container, firewall rules, published Hosts), asks for confirmation, and applies exactly that review; the server stays in your saved servers. It refuses for the control server (use `meridian teardown`), while relays still route to the exit (remove them first or pass `--force`), while a routing gateway enters the fleet through it, and when the result would break the topology (for example an empty egress pool or the default egress). Routing rules scoped to a removed gateway are dropped with it.
+
+**`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (node container, image, and directory; its nginx files, firewall rules, and certificates); Docker and the saved server stay. It refuses for the control server (moving the panel would change every subscription URL) and for a new server that already has a role.
 
 ### meridian relay
 

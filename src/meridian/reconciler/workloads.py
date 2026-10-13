@@ -104,7 +104,7 @@ class WorkloadStateManager:
         if existing is not None:
             return existing
         if not any(
-            item.id == profile.workload_id and item.generation < generation and item.reality_keys.get(server_ref)
+            item.id == profile.workload_id and item.generation < generation and item.reality_keys
             for item in self.cluster.workloads
         ):
             return None
@@ -188,6 +188,9 @@ class WorkloadStateManager:
         )
         for predecessor in predecessors:
             prior = predecessor.reality_keys.get(server_ref)
+            if prior is None and len(predecessor.reality_keys) == 1:
+                # `node replace` moved the workload: its identity, keys included, moves with it.
+                (prior,) = predecessor.reality_keys.values()
             if prior is None:
                 continue
             _require_complete_keys(workload.id, prior)

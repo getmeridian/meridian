@@ -116,6 +116,32 @@ def test_new_generation_reuses_complete_keys_without_calling_factory() -> None:
     assert workload.reality_keys["srv-exit-a"] is not cluster.workloads[0].reality_keys["srv-exit-a"]
 
 
+def test_a_workload_moved_to_another_server_keeps_its_reality_keys() -> None:
+    cluster = ClusterConfig(
+        workloads=[
+            WorkloadBinding(
+                id="exit-a",
+                generation=1,
+                active=True,
+                server_refs=["srv-exit-a"],
+                reality_keys={"srv-exit-a": _keys()},
+                desired_hash=_HASH_A,
+            )
+        ],
+        active_generation=1,
+    )
+
+    def unexpected_factory(_server_ref: str) -> RealityKeyBinding:
+        raise AssertionError("a moved workload keeps its keys; clients behind relays still hold them")
+
+    manager = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=unexpected_factory)
+    seeded = manager.carry_forward(_profile(), generation=2, desired_hash=_HASH_B, server_ref="srv-exit-b")
+
+    assert seeded is not None
+    assert seeded.server_refs == ["srv-exit-b"]
+    assert seeded.reality_keys == {"srv-exit-b": _keys()}
+
+
 def test_partial_predecessor_keys_fail_closed_instead_of_rotating() -> None:
     cluster = ClusterConfig(
         workloads=[

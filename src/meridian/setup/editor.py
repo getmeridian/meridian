@@ -163,6 +163,17 @@ def remove_exit_from_intent(intent: SetupIntent, exit_id: str) -> SetupIntent:
     return _validated(payload)
 
 
+def move_exit_in_intent(intent: SetupIntent, exit_id: str, server_ref: str) -> SetupIntent:
+    """Return validated intent with one exit on another server; its ID, paths, and settings stay."""
+    if not any(exit_.id == exit_id for exit_ in intent.exits):
+        raise ValueError(f"Exit {exit_id!r} is not in the topology.")
+    payload = intent.model_dump(mode="json")
+    for exit_ in payload["exits"]:
+        if exit_["id"] == exit_id:
+            exit_["server_ref"] = server_ref
+    return _validated(payload)
+
+
 def remove_routing_gateway_from_intent(intent: SetupIntent, gateway_id: str) -> SetupIntent:
     """Return validated intent without one routing gateway and the rules scoped to it."""
     if not any(gateway.id == gateway_id for gateway in intent.routing_gateways):
