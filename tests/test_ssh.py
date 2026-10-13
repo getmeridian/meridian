@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from meridian.core.redaction import REDACTED
 from meridian.health import tcp_connect
 from meridian.ssh import CommandResult, ServerConnection, SSHError, _verify_host_key
 
@@ -556,44 +557,45 @@ class TestLocalConnection:
         assert conn.needs_sudo is needs_sudo
 
 
+def _logged_command(command: str) -> str:
+    conn = ServerConnection(ip="198.51.100.10", local_mode=True)
+    with patch("meridian.ssh.subprocess.run") as mock_run:
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        return conn.run(command).redacted_command
+
+
 class TestRedactCommand:
     def test_redacts_secret_key(self) -> None:
-        from meridian.ssh import _redact_command
-
-        cmd = "printf 'SECRET_KEY=eyJhbGciOiJIUzI1NiJ9.abc123' > /opt/remnanode/.env"
-        result = _redact_command(cmd)
+        result = _logged_command("printf 'SECRET_KEY=eyJhbGciOiJIUzI1NiJ9.abc123' > /opt/remnanode/.env")
         assert "eyJhbGciOiJIUzI1NiJ9" not in result
-        assert "SECRET_KEY=***" in result
+        assert f"SECRET_KEY={REDACTED}" in result
 
     def test_redacts_postgres_password(self) -> None:
-        from meridian.ssh import _redact_command
-
-        cmd = "POSTGRES_PASSWORD=supersecret123 docker compose up"
-        result = _redact_command(cmd)
+        result = _logged_command("POSTGRES_PASSWORD=supersecret123 docker compose up")
         assert "supersecret123" not in result
-        assert "POSTGRES_PASSWORD=***" in result
+        assert f"POSTGRES_PASSWORD={REDACTED}" in result
 
     def test_redacts_token_and_database_url(self) -> None:
-        from meridian.ssh import _redact_command
-
-        cmd = "REMNAWAVE_API_TOKEN=abc123 DATABASE_URL=postgres://user:pass@db/app docker compose up"
-        result = _redact_command(cmd)
+        result = _logged_command(
+            "REMNAWAVE_API_TOKEN=abc123 DATABASE_URL=postgres://user:pass@db/app docker compose up"
+        )
         assert "abc123" not in result
-        assert "postgres://user:pass@db/app" not in result
-        assert "REMNAWAVE_API_TOKEN=***" in result
-        assert "DATABASE_URL=***" in result
+        assert "user:pass" not in result
+        assert f"REMNAWAVE_API_TOKEN={REDACTED}" in result
+        assert f"DATABASE_URL={REDACTED}" in result
 
     def test_redacts_jwt_secrets(self) -> None:
-        from meridian.ssh import _redact_command
-
-        cmd = "JWT_AUTH_SECRET=abc123 JWT_API_TOKENS_SECRET=def456"
-        result = _redact_command(cmd)
+        result = _logged_command("JWT_AUTH_SECRET=abc123 JWT_API_TOKENS_SECRET=def456")
         assert "abc123" not in result
         assert "def456" not in result
 
     def test_preserves_non_secret_commands(self) -> None:
-        from meridian.ssh import _redact_command
-
         cmd = "docker ps --format '{{.Names}}'"
-        result = _redact_command(cmd)
-        assert result == cmd
+        assert _logged_command(cmd) == cmd
+
+    def test_sensitive_commands_are_never_logged(self) -> None:
+        conn = ServerConnection(ip="198.51.100.10", local_mode=True)
+        with patch("meridian.ssh.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+            result = conn.run("echo plain", sensitive=True)
+        assert result.redacted_command == "<sensitive command>"

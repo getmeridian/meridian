@@ -20,6 +20,7 @@ from typing import Any, Iterable
 
 from meridian.config import MERIDIAN_HOME
 from meridian.core.errors import MeridianError
+from meridian.core.redaction import redact_string
 from meridian.ssh_auth import (
     _DEFAULT_UI,
     SSHUI,
@@ -37,21 +38,8 @@ class SSHError(MeridianError):
     """Raised when an SSH operation fails."""
 
 
-# Patterns to redact from debug log output (env var assignments with secrets)
-_SECRET_PATTERNS = re.compile(
-    r"((?:"
-    r"SECRET_KEY|PASSWORD|PASS|TOKEN|API_TOKEN|REMNAWAVE_API_TOKEN|"
-    r"JWT_AUTH_SECRET|JWT_API_TOKENS_SECRET|POSTGRES_PASSWORD|METRICS_PASS|"
-    r"DATABASE_URL"
-    r")\s*=\s*)\S+",
-    re.IGNORECASE,
-)
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-def _redact_command(cmd: str) -> str:
-    """Mask secret values in SSH commands for safe debug logging."""
-    return _SECRET_PATTERNS.sub(r"\1***", cmd[:200])
+_LOGGED_COMMAND_LIMIT = 200
 
 
 @dataclass
@@ -265,7 +253,7 @@ class ServerConnection(_FileTransferMixin):
 
         command = self._prepare_command(command, cwd=cwd, env=env)
         use_sudo = sudo if sudo is not None else (self.user != "root")
-        redacted = "<sensitive command>" if sensitive else _redact_command(command)
+        redacted = "<sensitive command>" if sensitive else redact_string(command)[:_LOGGED_COMMAND_LIMIT]
         logger.debug("SSH %s@%s: %s", self.user, self.ip, redacted)
 
         ok_code_set = set(ok_codes)

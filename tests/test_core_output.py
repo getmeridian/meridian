@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from meridian.core.models import ErrorModel, OutputEnvelope, ResourceRef, Summary
 from meridian.core.output import EventStream, OperationTimer, envelope, json_dumps, jsonl_dumps
-from meridian.core.redaction import REDACTED, redact
+from meridian.core.redaction import REDACTED, redact, redact_string
 
 
 def test_output_envelope_has_stable_top_level_contract() -> None:
@@ -114,6 +114,29 @@ def test_emit_json_redacts_sensitive_keys_and_text() -> None:
 
 def test_redact_string_handles_url_userinfo() -> None:
     assert redact("postgres://user:pass@example.org/db") == f"postgres://{REDACTED}@example.org/db"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "POSTGRES_PASSWORD",
+        "REMNAWAVE_API_TOKEN",
+        "JWT_AUTH_SECRET",
+        "JWT_API_TOKENS_SECRET",
+        "APP_SECRET",
+        "METRICS_PASS",
+    ],
+)
+def test_redact_string_masks_environment_style_secrets(name: str) -> None:
+    assert redact_string(f"{name}=s3cr3t-value docker compose up") == f"{name}={REDACTED} docker compose up"
+
+
+def test_redact_string_masks_quoted_environment_values() -> None:
+    assert redact_string("APP_SECRET='two words' next") == f"APP_SECRET={REDACTED} next"
+
+
+def test_redact_string_keeps_environment_names_that_only_contain_a_secret_word() -> None:
+    assert redact_string("BYPASS=1 TOKENSET=2") == "BYPASS=1 TOKENSET=2"
 
 
 def test_json_dumps_redacts_unknown_object_stringification() -> None:

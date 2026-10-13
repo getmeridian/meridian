@@ -85,6 +85,17 @@ _ASSIGNMENT_RE = re.compile(
     r"(?P<value>[^\s,;]+)",
     re.I,
 )
+# Environment-style assignments (`POSTGRES_PASSWORD=...`, `REMNAWAVE_API_TOKEN=...`,
+# `JWT_AUTH_SECRET=...`, `APP_SECRET=...`): one underscore-separated segment of
+# the variable name is a secret word, so `BYPASS=1` stays readable.
+_ENV_ASSIGNMENT_RE = re.compile(
+    r"\b(?P<key>(?:[A-Z0-9]+_)*"
+    r"(?:SECRET|PASSWORD|PASSWD|PASS|TOKEN|API_KEY|PRIVATE_KEY|DATABASE_URL|DB_URL)"
+    r"(?:_[A-Z0-9]+)*)"
+    r"(?P<sep>\s*=\s*)"
+    r"(?P<value>\"[^\"]*\"|'[^']*'|[^\s'\"`]+)",
+    re.I,
+)
 _JSON_SECRET_PAIR_RE = re.compile(
     r"(?P<key>[\"']?(?:api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|"
     r"auth[_-]?token|session[_-]?token|id[_-]?token|token|jwt|password|passwd|"
@@ -134,6 +145,7 @@ def redact_string(value: str) -> str:
         lambda m: f"{m.group('key')}{m.group('quote')}{REDACTED}{m.group('quote')}",
         redacted,
     )
+    redacted = _ENV_ASSIGNMENT_RE.sub(lambda m: f"{m.group('key')}{m.group('sep')}{REDACTED}", redacted)
     return _ASSIGNMENT_RE.sub(lambda m: f"{m.group('key')}{m.group('sep')}{REDACTED}", redacted)
 
 

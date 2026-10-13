@@ -30,6 +30,7 @@
 ## Pitfalls
 - Do not import command modules, `meridian.console`, `meridian.config`, Typer, or Rich here. Core constants live in `core/defaults.py`.
 - Do not emit raw SSH commands, panel tokens, private keys, JWTs, database URLs, or subscription secrets.
+- `redact_string()` is the only secret masker (SSH debug logs included); teach it a new secret form instead of adding a local regex.
 - Keep human wording in adapters; core summaries are short API metadata, not terminal copy.
 - Wrap Pydantic `ValidationError` before rendering; raw model errors are too noisy for non-expert operators.
 - Use `WithJsonSchema` for custom validators that need public schema constraints without replacing readable runtime errors.
