@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from meridian.cluster import ClusterConfig
+from meridian.core.defaults import CLOCK_DRIFT_WARN_SECONDS
 from meridian.core.verification import (
     TransportOutcome,
     TransportResult,
@@ -272,13 +273,15 @@ def check_device_clock(
             ]
         else:
             drift = abs(int(now() - reference))
-            if drift > 30:
+            if drift > CLOCK_DRIFT_WARN_SECONDS:
                 findings = [
                     VerificationFinding(
                         code="CLOCK_DRIFT",
-                        status="failed",
+                        status="warning",
                         message=f"Device clock differs from the target by {drift} seconds",
-                        remediation="Enable automatic date and time before using Reality.",
+                        remediation=(
+                            "Turn on automatic date and time; a clock that keeps drifting breaks certificate checks."
+                        ),
                     )
                 ]
             else:

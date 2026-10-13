@@ -8,7 +8,7 @@ import shlex
 import time
 from collections.abc import Callable
 
-from meridian.core.defaults import REALITY_SNI_CANDIDATES
+from meridian.core.defaults import CLOCK_DRIFT_WARN_SECONDS, REALITY_SNI_CANDIDATES
 from meridian.core.errors import MeridianError
 from meridian.core.execution import ServerConnection
 from meridian.core.verification import VerificationCheck, VerificationFinding
@@ -332,11 +332,11 @@ def _clock_sync(conn: ServerConnection, host: str) -> VerificationCheck:
         found = finding("clock_sync", "skipped", "Could not determine server clock drift")
     else:
         drift = abs(int(server_epoch) - int(time.time()))
-        if drift > 30:
+        if drift > CLOCK_DRIFT_WARN_SECONDS:
             found = finding(
                 "clock_sync",
-                "failed",
-                f"Clock drift: {drift}s between this device and the server (Reality needs <30s)",
+                "warning",
+                f"Clock drift: {drift}s between this device and the server; one of them is not syncing time",
                 f"ssh root@{host} 'timedatectl set-ntp true', and enable automatic time on this device.",
             )
         else:

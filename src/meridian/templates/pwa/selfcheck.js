@@ -20,8 +20,8 @@ var S = {
   en: {
     'clock.label': 'Device clock',
     'clock.ok': 'Correct (off by {t})',
-    'clock.ahead': 'Ahead by {t}. Turn on automatic date and time in your settings; connections fail when the clock is off.',
-    'clock.behind': 'Behind by {t}. Turn on automatic date and time in your settings; connections fail when the clock is off.',
+    'clock.ahead': 'Ahead by {t}. Turn on automatic date and time in your settings; connections can fail when the clock is wrong.',
+    'clock.behind': 'Behind by {t}. Turn on automatic date and time in your settings; connections can fail when the clock is wrong.',
     'clock.skip': 'Could not read the server’s time',
     'flow.label': 'Data flow',
     'flow.ok': 'Received {kb} KB without a freeze, first byte after {ms} ms',
@@ -47,8 +47,8 @@ var S = {
   ru: {
     'clock.label': 'Часы устройства',
     'clock.ok': 'Идут верно (расхождение {t})',
-    'clock.ahead': 'Спешат на {t}. Включите автоматическую установку даты и времени в настройках: при неверных часах подключение не работает.',
-    'clock.behind': 'Отстают на {t}. Включите автоматическую установку даты и времени в настройках: при неверных часах подключение не работает.',
+    'clock.ahead': 'Спешат на {t}. Включите автоматическую установку даты и времени в настройках: при неверных часах подключение может не работать.',
+    'clock.behind': 'Отстают на {t}. Включите автоматическую установку даты и времени в настройках: при неверных часах подключение может не работать.',
     'clock.skip': 'Не удалось узнать время сервера',
     'flow.label': 'Передача данных',
     'flow.ok': 'Получено {kb} КБ без зависаний, первый байт через {ms} мс',
@@ -74,8 +74,8 @@ var S = {
   fa: {
     'clock.label': 'ساعت دستگاه',
     'clock.ok': 'درست است (اختلاف {t})',
-    'clock.ahead': '{t} جلوتر است. تاریخ و ساعت خودکار را در تنظیمات روشن کنید؛ با ساعت نادرست اتصال برقرار نمی‌شود.',
-    'clock.behind': '{t} عقب‌تر است. تاریخ و ساعت خودکار را در تنظیمات روشن کنید؛ با ساعت نادرست اتصال برقرار نمی‌شود.',
+    'clock.ahead': '{t} جلوتر است. تاریخ و ساعت خودکار را در تنظیمات روشن کنید؛ با ساعت نادرست ممکن است اتصال برقرار نشود.',
+    'clock.behind': '{t} عقب‌تر است. تاریخ و ساعت خودکار را در تنظیمات روشن کنید؛ با ساعت نادرست ممکن است اتصال برقرار نشود.',
     'clock.skip': 'زمان سرور خوانده نشد',
     'flow.label': 'جریان داده',
     'flow.ok': '{kb} کیلوبایت بدون توقف دریافت شد، اولین بایت پس از {ms} میلی‌ثانیه',
@@ -101,8 +101,8 @@ var S = {
   zh: {
     'clock.label': '设备时钟',
     'clock.ok': '正常（相差 {t}）',
-    'clock.ahead': '快了 {t}。请在设置中开启自动设置日期和时间；时钟不准会导致连接失败。',
-    'clock.behind': '慢了 {t}。请在设置中开启自动设置日期和时间；时钟不准会导致连接失败。',
+    'clock.ahead': '快了 {t}。请在设置中开启自动设置日期和时间；时钟不准可能导致连接失败。',
+    'clock.behind': '慢了 {t}。请在设置中开启自动设置日期和时间；时钟不准可能导致连接失败。',
     'clock.skip': '无法读取服务器时间',
     'flow.label': '数据传输',
     'flow.ok': '已接收 {kb} KB，没有卡住，首字节用时 {ms} 毫秒',
@@ -170,7 +170,8 @@ function kb(bytes) {
   return (bytes / 1024).toFixed(1);
 }
 
-/* (a) Device clock vs the server's Date header. Reality and TLS break with big skew. */
+/* (a) Device clock vs the server's Date header. A wrong clock breaks certificate
+   checks; CLOCK_WARN_MS matches the CLI (core/defaults.py). */
 function checkClock() {
   var t0 = Date.now();
   return fetch(PROBE_PATH + '?clock=' + t0, { method: 'HEAD', cache: 'no-store' }).then(function(r) {

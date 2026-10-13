@@ -120,6 +120,18 @@ def test_clock_uses_target_date_not_a_third_party() -> None:
     assert request.call_args.kwargs["server_name"] == "www.example.com"
 
 
+def test_clock_drift_past_a_minute_is_a_warning_not_a_failure() -> None:
+    with patch(
+        "meridian.connectivity.https_get",
+        return_value=(403, {"date": "Tue, 21 Jul 2026 12:00:00 GMT"}, b""),
+    ):
+        result = check_device_clock(_IP, server_name=_IP, now=lambda: 1784635200 + 90)
+
+    assert result.status == "warning"
+    assert result.findings[0].code == "CLOCK_DRIFT"
+    assert "automatic date and time" in result.findings[0].remediation
+
+
 def test_missing_clock_evidence_is_inconclusive() -> None:
     with patch("meridian.connectivity.https_get", return_value=(0, {}, b"")):
         result = check_device_clock(_IP, server_name=_IP)

@@ -9,7 +9,7 @@ var T = {
   ru: {
     'primary.rec': 'Рекомендовано',
     clock: 'Синхронизация часов',
-    'clock.desc': 'Часы устройства должны быть точными с отклонением не более 30 секунд. Откройте Настройки > Дата и время > включите «Автоматически».',
+    'clock.desc': 'Часы устройства отстают. При неверных часах подключение может не работать. Откройте Настройки > Дата и время > включите «Автоматически».',
     ping: 'Не подключается?',
     'ping.desc': 'Проверьте автоматическую синхронизацию времени и попробуйте другой вариант подключения выше.',
     'ping.link': 'Попросите владельца сервера запустить meridian test',
@@ -60,7 +60,7 @@ var T = {
   fa: {
     'primary.rec': 'پیشنهادی',
     clock: 'همگام\u200Cسازی ساعت',
-    'clock.desc': 'ساعت دستگاه باید با دقت ۳۰ ثانیه تنظیم باشد. به تنظیمات > تاریخ و ساعت > \u00ABتنظیم خودکار\u00BB بروید.',
+    'clock.desc': 'ساعت دستگاه عقب است. با ساعت نادرست ممکن است اتصال برقرار نشود. به تنظیمات > تاریخ و ساعت > \u00ABتنظیم خودکار\u00BB بروید.',
     ping: '\u0645\u062A\u0635\u0644 \u0646\u0645\u06CC\u200C\u0634\u0648\u06CC\u062F\u061F',
     'ping.desc': 'همگام‌سازی خودکار ساعت را بررسی کنید و یکی از گزینه‌های اتصال بالا را امتحان کنید.',
     'ping.link': 'از صاحب سرور بخواهید meridian test را اجرا کند',
@@ -111,7 +111,7 @@ var T = {
   zh: {
     'primary.rec': '推荐',
     clock: '时钟同步',
-    'clock.desc': '设备时钟必须精确到 30 秒以内。前往设置 > 日期与时间 > 启用"自动设置"。',
+    'clock.desc': '设备时钟慢了。时钟不准可能导致连接失败。前往设置 > 日期与时间 > 启用"自动设置"。',
     ping: '无法连接？',
     'ping.desc': '请确认设备已开启自动校时，然后尝试上面的其他连接方式。',
     'ping.link': '请让服务器所有者运行 meridian test',
@@ -321,6 +321,12 @@ function sharePageUrl() {
 /* -----------------------------------------------------------------------
  * Clock skew detection
  * ----------------------------------------------------------------------- */
+/* Same threshold as selfcheck.js and the CLI (core/defaults.py). A config
+   generated in the device's future means the device clock is behind; a clock
+   ahead looks like an old config here, so selfcheck.js reads the server's
+   Date header for both directions. */
+var CLOCK_WARN_MS = 60000;
+
 function checkClockSkew(generatedAt) {
   if (!generatedAt) return 'ok';
   try {
@@ -328,8 +334,7 @@ function checkClockSkew(generatedAt) {
     var age = Date.now() - serverTime;
     /* If page was generated more than 1h ago, can't reliably detect skew */
     if (Math.abs(age) > 3600000) return 'ok';
-    /* Only warn if the device clock is more than 2 minutes behind */
-    return age < -120000 ? 'bad' : 'ok'; /* device clock is BEHIND server */
+    return age < -CLOCK_WARN_MS ? 'bad' : 'ok';
   } catch (e) { return 'ok'; }
 }
 
@@ -424,7 +429,7 @@ function renderPage(config) {
   if (checkClockSkew(config.generated_at) === 'bad') {
     html += '<div class="notice notice-bad">';
     html += '<strong data-t="clock">Clock Sync Required</strong>';
-    html += '<span data-t="clock.desc">Your device clock is behind. Connections fail when the clock is wrong. Go to Settings &gt; Date &amp; Time &gt; enable "Set Automatically".</span>';
+    html += '<span data-t="clock.desc">Your device clock is behind. Connections can fail when the clock is wrong. Go to Settings &gt; Date &amp; Time &gt; enable "Set Automatically".</span>';
     html += '</div>';
   }
 

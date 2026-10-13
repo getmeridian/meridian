@@ -17,3 +17,13 @@ REALITY_SNI_CANDIDATES: tuple[str, ...] = ("www.google.com", "dl.google.com", "w
 # listener accepts the PROXY protocol header when the fleet forwards client IPs.
 CONTROL_TLS_PORT: int = 8443
 CONTROL_PROXY_TLS_PORT: int = 8444
+
+# Device/server clock drift worth a warning. Nothing Meridian deploys checks the
+# clock to the second: Reality's `maxTimeDiff` is left unset (Xray then skips the
+# client timestamp check), and VLESS and Hysteria2 carry no timestamps. A wrong
+# clock breaks certificate validation instead (Let's Encrypt backdates
+# `notBefore` by an hour; IP certificates live six days), so the failures start
+# at hours, not seconds. A synced clock sits within a second or two, so more
+# than a minute means automatic time is off; warn before the drift grows.
+# Mirrored by `CLOCK_WARN_MS` in the PWA's `selfcheck.js` and `app.js`.
+CLOCK_DRIFT_WARN_SECONDS: int = 60

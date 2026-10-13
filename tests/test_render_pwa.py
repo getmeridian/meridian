@@ -438,7 +438,13 @@ class TestSelfCheck:
         assert _js_bytes(source, "STALL_CLEARANCE_BYTES") == blocking.STALL_CLEARANCE_BYTES
         assert _js_bytes(source, "THROTTLE_LOW_BYTES") == blocking.THROTTLE_WINDOW[0]
         assert _js_bytes(source, "STALL_TIMEOUT_MS") == 5000
-        assert _js_bytes(source, "CLOCK_WARN_MS") == 60_000
+
+    def test_clock_threshold_matches_the_cli_in_both_scripts(self) -> None:
+        from meridian.core.defaults import CLOCK_DRIFT_WARN_SECONDS
+
+        for name in ("selfcheck.js", "app.js"):
+            source = (PWA_DIR / name).read_text()
+            assert _js_bytes(source, "CLOCK_WARN_MS") == CLOCK_DRIFT_WARN_SECONDS * 1000, name
 
     def test_app_renders_the_section_and_loads_the_script(self) -> None:
         app_js = (PWA_DIR / "app.js").read_text()

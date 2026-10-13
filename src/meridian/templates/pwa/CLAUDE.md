@@ -24,7 +24,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 - **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
 - **Color palettes** — six curated presets (ocean, sunset, forest, lavender, rose, slate) with auto dark/light variants. Selected via `config.color`, switches on system theme change.
-- **Clock skew detection** — warns if device clock is >2min behind server; the copy asks for automatic time and states no tolerance (CLI checks use 30 s, `selfcheck.js` 60 s). Skipped if page was cached >1h to avoid false positives.
+- **Clock skew detection** — warns if the device clock is more than `CLOCK_WARN_MS` behind the config's `generated_at`; `CLOCK_WARN_MS` (here and in `selfcheck.js`) mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS` (tested). Nothing breaks at a minute (Reality `maxTimeDiff` is unset), so the copy asks for automatic time and says connections *can* fail. Skipped if page was cached >1h to avoid false positives.
 - **Connection names are the subscription remarks** — rows show the Remnawave remark ("🇩🇪 DE · Reality · Chrome") verbatim; only the protocol hint below it is translated.
 
 ## Pitfalls

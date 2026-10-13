@@ -76,14 +76,12 @@ Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 ## Connection drops after seconds
 
 **Causes:**
-1. System clock skew >30 seconds between client and server
-2. MTU issues on the network path
-3. ISP resetting long-lived TLS sessions
+1. MTU issues on the network path
+2. ISP resetting long-lived TLS sessions
 
 **Fixes:**
-1. Server: `timedatectl set-ntp true`. Client: enable automatic date/time
-2. Try a different network
-3. Use the XHTTP or WSS path (domain mode)
+1. Try a different network
+2. Use the XHTTP or WSS path (domain mode)
 
 ## Deploy fails
 
@@ -172,7 +170,7 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 | Domain DNS | Does the domain resolve to server IP? | Update DNS A record |
 | Server OS | Is it Ubuntu/Debian? | Fails without apt (CentOS, Fedora, Alpine); reinstall with Ubuntu or Debian |
 | Disk space | At least 2GB free? | Free up space |
-| Clock sync | Is client/server drift under 30 seconds? | Enable NTP and automatic time on both devices |
+| Clock sync | Is client/server drift under a minute? | One side is not syncing time. Enable NTP and automatic time on both devices |
 
 ## Interpreting doctor output
 
@@ -202,4 +200,4 @@ The full test rotates independent public IP observers and checks the same observ
 
 The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot certify UDP-only Hysteria traffic.
 
-If all checks pass but the VPN client still can't connect: re-scan the QR code, check device clock is accurate (within 30 seconds), or try another recommended app (Happ, FlClashX, Clash Mi, or Throne on desktop).
+If all checks pass but the VPN client still can't connect: re-scan the QR code, check that the device sets its date and time automatically, or try another recommended app (Happ, FlClashX, Clash Mi, or Throne on desktop).
