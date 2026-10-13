@@ -328,7 +328,7 @@ function checkClockSkew(generatedAt) {
     var age = Date.now() - serverTime;
     /* If page was generated more than 1h ago, can't reliably detect skew */
     if (Math.abs(age) > 3600000) return 'ok';
-    /* Only warn if clock is off by more than 2 minutes (Reality needs ~30s) */
+    /* Only warn if the device clock is more than 2 minutes behind */
     return age < -120000 ? 'bad' : 'ok'; /* device clock is BEHIND server */
   } catch (e) { return 'ok'; }
 }
@@ -424,7 +424,7 @@ function renderPage(config) {
   if (checkClockSkew(config.generated_at) === 'bad') {
     html += '<div class="notice notice-bad">';
     html += '<strong data-t="clock">Clock Sync Required</strong>';
-    html += '<span data-t="clock.desc">Your device clock must be accurate within 30 seconds. Go to Settings &gt; Date &amp; Time &gt; enable "Set Automatically".</span>';
+    html += '<span data-t="clock.desc">Your device clock is behind. Connections fail when the clock is wrong. Go to Settings &gt; Date &amp; Time &gt; enable "Set Automatically".</span>';
     html += '</div>';
   }
 
