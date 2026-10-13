@@ -48,7 +48,7 @@ A relay on a domestic host helps when foreign IPs are blocked, but the person wh
 
 Blocks change quickly, so plan for them:
 
-- Deploy Reality as the primary path, and add [domain mode](/docs/en/domain-mode/) for XHTTP and WSS through Cloudflare, plus `--hysteria2` where QUIC works for your users.
+- Deploy with the defaults (Reality, XHTTP, and Hysteria2), and add [domain mode](/docs/en/domain-mode/) so XHTTP and WSS travel through Cloudflare.
 - Keep a second exit at a different provider and network (`meridian node add`), so one blocked address range doesn't take everything down.
 - Add a relay for networks that block your exit's address.
 

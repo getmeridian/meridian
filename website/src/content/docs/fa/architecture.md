@@ -1,19 +1,20 @@
 ---
 title: معماری
-description: معماری سیستم، جریان ترافیق و توپولوژی سرویس.
+description: معماری سیستم، جریان ترافیک و توپولوژی سرویس.
 order: 9
 section: reference
 ---
 
 ## پشته فناوری
 
-- **VLESS+Reality** (Xray-core) — پروتکل اساسی. خود را به‌عنوان وب‌سایت TLS واقعی جا می‌زند: هر کسی که سرور را probe می‌کند گواهینامه واقعی آن سایت را می‌بیند (برای مثال، گواهینامه Google). فقط کلاینت‌هایی با کلید صحیح به proxy دسترسی دارند.
-- **XHTTP و WSS** (Xray-core) — مسیرهای TLS روی دامنه‌های خود، در حالت domain اضافه شده. با proxying دامنه از طریق Cloudflare، آن‌ها از CDN عبور می‌کنند و از IP block جان سالم به‌در می‌برند.
-- **Hysteria2** (Xray-core) — مسیر اختیاری UDP/443 روی دامنه شما برای شبکه‌های lossy. به‌طور پیش‌فرض خاموش است.
+- **VLESS+Reality** (Xray-core) — پروتکل اساسی. خود را به‌عنوان وب‌سایت TLS واقعی جا می‌زند: هر کسی که سرور را probe می‌کند گواهینامه واقعی آن سایت را می‌بیند (ترجیحاً سایتی که کنار سرور شما میزبانی می‌شود). فقط کلاینت‌هایی با کلید صحیح به proxy دسترسی دارند.
+- **XHTTP** (Xray-core) — یک مسیر TLS روی دامنه شما، یا وقتی دامنه ندارید، روی IP سرور با گواهینامه IP از Let's Encrypt.
+- **WSS** (Xray-core) — یک مسیر TLS روی دامنه خودتان که در حالت domain اضافه می‌شود. وقتی Cloudflare دامنه را proxy می‌کند، این مسیر و XHTTP از CDN عبور می‌کنند و از IP block جان سالم به‌در می‌برند.
+- **Hysteria2** (Xray-core) — آخرین راه‌حل روی UDP/443 برای شبکه‌های lossy که در obfuscation salamander پیچیده شده تا شبیه QUIC نباشد. به‌طور پیش‌فرض روشن است (`--no-hysteria2` آن را خاموش می‌کند).
 - **Remnawave** — پشته پنل: `remnawave/backend` (API و رابط مدیر، با PostgreSQL و Valkey) روی سرور control-plane، `remnawave/node` (Xray را اجرا می‌کند) روی هر exit، و `remnawave/subscription-page`. Meridian نسخه‌های تست‌شده را pin می‌کند و با پنل از طریق REST API صحبت می‌کند.
 - **nginx** — TCP/443 عمومی را در اختیار دارد. ماژول stream بدون خاتمه TLS اتصالات را بر اساس SNI مسیریابی می‌کند؛ ماژول http برای پنل، صفحات اتصال، اشتراک و مسیرهای domain TLS را خاتمه می‌دهد. گواهینامه‌ها از Let's Encrypt از طریق [acme.sh](https://github.com/acmesh-official/acme.sh) می‌آیند.
 - **Realm** — TCP forwarder روی سرورهای relay.
-- **uTLS** — اتصالات کلاینت Chrome's TLS Client Hello را کپی می‌کنند، بنابراین مثل ترافیق معمولی مرورگر به نظر می‌رسند.
+- **uTLS** — اتصالات کلاینت Client Hello TLS یک مرورگر را کپی می‌کنند (Chrome، با نسخه‌های Firefox به‌عنوان ورودی‌های پشتیبان)، بنابراین مثل ترافیک معمولی مرورگر به نظر می‌رسند.
 
 ## توپولوژی سرویس
 
@@ -43,9 +44,10 @@ flowchart TD
     Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality"]
     Nginx -->|"SNI = your domain"| NginxDomain["nginx http<br>(domain certificate)"]
     Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http :8443<br>panel, pages, subscriptions"]
+    NginxHTTP -->|"/xhttp-path (no domain)"| XrayXHTTP
     NginxDomain -->|/xhttp-path| XrayXHTTP["Xray XHTTP"]
     NginxDomain -->|/ws-path| XrayWSS["Xray WSS"]
-    Internet -.->|"UDP 443 (opt-in)"| XrayHy2["Xray Hysteria2"]
+    Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
 دامنه فقط مسیرهای proxy را حمل می‌کند؛ پنل و صفحات روی گواهینامه IP می‌مانند.
@@ -89,9 +91,10 @@ Meridian topology را به لیست منابع تبدیل می‌کند: قوا
 | Port | Service | Scope |
 |------|---------|-------|
 | 443/TCP | nginx stream (SNI router) | Public |
-| 443/UDP | Xray Hysteria2 (opt-in) | Public |
+| 443/UDP | Xray Hysteria2 (on by default) | Public |
 | 80/TCP | nginx (ACME challenges) | Public |
 | 8443 | nginx http (panel, pages, subscriptions) | Internal |
+| 8444 | nginx http, PROXY-protocol listener (used with `--client-ips`) | Internal |
 | 3000 | Remnawave backend (admin UI + API) | localhost |
 | 3010 | Remnawave node API | host network |
 | 3020 | Remnawave subscription page | localhost |

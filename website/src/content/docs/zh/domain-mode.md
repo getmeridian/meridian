@@ -11,14 +11,14 @@ section: guides
 meridian deploy 198.51.100.10 --domain vpn.example.com
 ```
 
-拥有自己的域名，出口在 Reality 旁边提供两个额外的方式：
+没有域名时，出口已经提供 Reality，以及服务器 IP 上的 XHTTP 和 Hysteria2。有了自己的域名，会发生两点变化：
 
-- **XHTTP** 和 **WSS** 在您的域名上，带 Meridian 颁发和续期的 Let's Encrypt 证书（acme.sh）
+- **XHTTP** 移到你的域名上，并在那里新增 **WSS**，使用 Meridian 颁发和续期的 Let's Encrypt 证书（acme.sh）
 - 一旦域名通过 Cloudflare 代理，两条路径都通过 Cloudflare 的 CDN 传输 — 所以即使您的服务器 IP 被阻止它们也继续工作
 
 面板和连接页面保持在服务器的 IP 证书上；域名仅承载代理路径。
 
-添加 `--hysteria2` 也在 UDP/443 上提供 Hysteria2，带域名的证书（见 [Hysteria2 和 Cloudflare](#hysteria2-and-cloudflare)）。
+UDP/443 上的 Hysteria2 也会改用域名的证书（见 [Hysteria2 和 Cloudflare](#hysteria2-和-cloudflare)）；`--no-hysteria2` 可将其关闭。
 
 ## Cloudflare 设置
 
@@ -43,13 +43,13 @@ meridian deploy 198.51.100.10 --domain vpn.example.com
 | Reality | 直接到服务器 IP | 主要 — 最快 |
 | XHTTP | 您的域名（代理时通过 Cloudflare） | Reality 被阻止或节流 |
 | WSS | 您的域名（代理时通过 Cloudflare） | 服务器 IP 被阻止 |
-| Hysteria2（可选） | 通过 UDP/443 连接服务器 IP，使用域名证书 | 丢包或高延迟网络 |
+| Hysteria2 | 通过 UDP/443 连接服务器 IP，使用域名证书 | 丢包或高延迟网络，或所有 TCP 路径都被阻止时 |
 
-导入 Xray JSON 或 Mihomo 订阅的应用在一条路径停止工作时自动在路径间切换。其他应用将每条路径显示为单独条目。
+导入 Xray JSON、Mihomo 或 sing-box 订阅的应用在一条路径停止工作时自动在路径间切换。其他应用将每条路径显示为单独条目。
 
 ## Hysteria2 和 Cloudflare
 
-Hysteria2 通过 UDP 直接连接服务器 IP，域名仅用于其 TLS 证书，因此即使记录经由 Cloudflare 代理（Cloudflare 无法承载这类流量）也能正常工作。部分地区会限速 QUIC；仅在用户确实需要时启用 `--hysteria2`。
+Hysteria2 通过 UDP 直接连接服务器 IP，域名仅用于其 TLS 证书，因此即使记录经由 Cloudflare 代理（Cloudflare 无法承载这类流量）也能正常工作。Salamander 混淆让它的数据包看起来是随机的，而不像 QUIC。在 UDP 被阻止的地方，应用会回退到上面列出的 TCP 路径。
 
 ## 稍后添加域名
 

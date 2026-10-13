@@ -7,13 +7,14 @@ section: reference
 
 ## Стек технологий
 
-- **VLESS+Reality** (Xray-core) — основной протокол. Маскируется под реальный TLS-сайт: любой, кто проверяет сервер, видит подлинный сертификат этого сайта (например, Google). Только клиенты с правильным ключом могут подключиться к прокси.
-- **XHTTP и WSS** (Xray-core) — пути TLS на собственном домене, добавленные в режиме домена. С проксированием Cloudflare домена они проходят через CDN и выживают блокировку IP.
-- **Hysteria2** (Xray-core) — опциональный путь UDP/443 на вашем домене для ненадёжных сетей. Отключен по умолчанию.
+- **VLESS+Reality** (Xray-core) — основной протокол. Маскируется под реальный TLS-сайт: любой, кто проверяет сервер, видит подлинный сертификат этого сайта (лучше всего сайта, размещённого рядом с вашим сервером). Только клиенты с правильным ключом могут подключиться к прокси.
+- **XHTTP** (Xray-core) — путь TLS на вашем домене или, если домена нет, на IP сервера с IP-сертификатом Let's Encrypt.
+- **WSS** (Xray-core) — путь TLS на собственном домене, добавляется в режиме домена. Если домен проксируется через Cloudflare, он и XHTTP проходят через CDN и переживают блокировку IP.
+- **Hysteria2** (Xray-core) — последний резервный путь UDP/443 для ненадёжных сетей, обёрнутый в обфускацию salamander, чтобы не выглядеть как QUIC. Включён по умолчанию (`--no-hysteria2` отключает).
 - **Remnawave** — стек панели: `remnawave/backend` (API и админ-интерфейс, с PostgreSQL и Valkey) на сервере контроль-плана, `remnawave/node` (запускает Xray) на каждом выходе, и `remnawave/subscription-page`. Meridian фиксирует проверенные версии и общается с панелью через REST API.
 - **nginx** — владеет публичным TCP/443. Его модуль stream маршрутизирует соединения по SNI без завершения TLS; его модуль http завершает TLS для панели, страниц подключения, подписок и путей домена. Сертификаты поступают от Let's Encrypt через [acme.sh](https://github.com/acmesh-official/acme.sh).
 - **Realm** — TCP форвардер на серверах-ретрансляторах.
-- **uTLS** — клиентские соединения копируют TLS Client Hello браузера Chrome, поэтому выглядят как обычный браузерный трафик.
+- **uTLS** — клиентские соединения копируют TLS Client Hello браузера (Chrome, а копии Firefox идут запасными записями), поэтому выглядят как обычный браузерный трафик.
 
 ## Топология сервисов
 
@@ -43,9 +44,10 @@ flowchart TD
     Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality"]
     Nginx -->|"SNI = your domain"| NginxDomain["nginx http<br>(domain certificate)"]
     Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http :8443<br>panel, pages, subscriptions"]
+    NginxHTTP -->|"/xhttp-path (без домена)"| XrayXHTTP
     NginxDomain -->|/xhttp-path| XrayXHTTP["Xray XHTTP"]
     NginxDomain -->|/ws-path| XrayWSS["Xray WSS"]
-    Internet -.->|"UDP 443 (opt-in)"| XrayHy2["Xray Hysteria2"]
+    Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
 Домен несёт только пути прокси; панель и страницы остаются на IP-сертификате.
@@ -89,9 +91,10 @@ Meridian преобразует топологию в список ресурс�
 | Порт | Сервис | Область |
 |------|--------|--------|
 | 443/TCP | nginx stream (SNI маршрутизатор) | Публичный |
-| 443/UDP | Xray Hysteria2 (опционально) | Публичный |
+| 443/UDP | Xray Hysteria2 (включён по умолчанию) | Публичный |
 | 80/TCP | nginx (ACME задачи) | Публичный |
 | 8443 | nginx http (панель, страницы, подписки) | Внутренний |
+| 8444 | nginx http, слушатель с протоколом PROXY (используется с `--client-ips`) | Внутренний |
 | 3000 | Backend Remnawave (админ-интерфейс + API) | localhost |
 | 3010 | API узла Remnawave | сеть хоста |
 | 3020 | Страница подписки Remnawave | localhost |

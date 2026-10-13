@@ -7,13 +7,14 @@ section: reference
 
 ## Technology stack
 
-- **VLESS+Reality** (Xray-core) — the primary protocol. It impersonates a real TLS website: anyone probing the server sees that site's genuine certificate (for example, Google's). Only clients with the right key reach the proxy.
-- **XHTTP and WSS** (Xray-core) — TLS paths on your own domain, added in domain mode. With Cloudflare proxying the domain, they travel through the CDN and survive an IP block.
-- **Hysteria2** (Xray-core) — optional UDP/443 path on your domain for lossy networks. Off by default.
+- **VLESS+Reality** (Xray-core) — the primary protocol. It impersonates a real TLS website: anyone probing the server sees that site's genuine certificate (preferably a site hosted next to your server). Only clients with the right key reach the proxy.
+- **XHTTP** (Xray-core) — a TLS path on your domain, or on the server's IP with a Let's Encrypt IP certificate when there is no domain.
+- **WSS** (Xray-core) — a TLS path on your own domain, added in domain mode. With Cloudflare proxying the domain, it and XHTTP travel through the CDN and survive an IP block.
+- **Hysteria2** (Xray-core) — the UDP/443 last resort for lossy networks, wrapped in salamander obfuscation so it doesn't look like QUIC. On by default (`--no-hysteria2` turns it off).
 - **Remnawave** — the panel stack: `remnawave/backend` (API and admin UI, with PostgreSQL and Valkey) on the control-plane server, `remnawave/node` (runs Xray) on every exit, and `remnawave/subscription-page`. Meridian pins tested versions and talks to the panel over its REST API.
 - **nginx** — owns public TCP/443. Its stream module routes connections by SNI without terminating TLS; its http module terminates TLS for the panel, connection pages, subscriptions, and domain paths. Certificates come from Let's Encrypt via [acme.sh](https://github.com/acmesh-official/acme.sh).
 - **Realm** — the TCP forwarder on relay servers.
-- **uTLS** — client connections copy Chrome's TLS Client Hello, so they look like ordinary browser traffic.
+- **uTLS** — client connections copy a browser's TLS Client Hello (Chrome, with Firefox copies as backup entries), so they look like ordinary browser traffic.
 
 ## Service topology
 
@@ -43,9 +44,10 @@ flowchart TD
     Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality"]
     Nginx -->|"SNI = your domain"| NginxDomain["nginx http<br>(domain certificate)"]
     Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http :8443<br>panel, pages, subscriptions"]
+    NginxHTTP -->|"/xhttp-path (no domain)"| XrayXHTTP
     NginxDomain -->|/xhttp-path| XrayXHTTP["Xray XHTTP"]
     NginxDomain -->|/ws-path| XrayWSS["Xray WSS"]
-    Internet -.->|"UDP 443 (opt-in)"| XrayHy2["Xray Hysteria2"]
+    Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
 The domain carries only the proxy paths; the panel and pages stay on the IP certificate.
@@ -89,9 +91,10 @@ Panel edits to resources Meridian owns show up in `meridian plan` and are restor
 | Port | Service | Scope |
 |------|---------|-------|
 | 443/TCP | nginx stream (SNI router) | Public |
-| 443/UDP | Xray Hysteria2 (opt-in) | Public |
+| 443/UDP | Xray Hysteria2 (on by default) | Public |
 | 80/TCP | nginx (ACME challenges) | Public |
 | 8443 | nginx http (panel, pages, subscriptions) | Internal |
+| 8444 | nginx http, PROXY-protocol listener (used with `--client-ips`) | Internal |
 | 3000 | Remnawave backend (admin UI + API) | localhost |
 | 3010 | Remnawave node API | host network |
 | 3020 | Remnawave subscription page | localhost |

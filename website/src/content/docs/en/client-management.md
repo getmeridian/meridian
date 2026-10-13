@@ -26,11 +26,13 @@ Clients belong to your whole fleet, not to one server. Every exit and relay you 
 
 ### What the recipient sees
 
-The connection page is built from the person's real subscription, so it lists exactly the paths their apps receive: direct exits, relays, and Hysteria2 when enabled. It has:
+The connection page is built from the person's real subscription, so it lists exactly what their apps receive: direct exits, relays, and every enabled method. It has:
 
-- Step-by-step instructions for installing an app (v2RayTun, v2rayNG, Hiddify, or v2rayN)
-- A QR code for each connection path
-- One-tap "Open in app" links
+- App recommendations for their platform (Happ first, then FlClashX and Clash Mi, plus Throne on desktop) with one-tap import
+- A QR code for the subscription
+- A "Check my connection" test that copies a link-free report they can send you
+
+In the app, entries are named by method: "Reality · Chrome", "XHTTP · Chrome", "WebSocket · CDN", "Hysteria2 · UDP", plus the exit's name when you have several and "via relay" for relay entries. Reality and XHTTP also come as "· Firefox" copies with another TLS fingerprint, for when one fingerprint gets blocked. Apps that switch automatically (Xray JSON apps such as Happ, Mihomo, and sing-box) pick a working entry by themselves but never switch between fingerprints; Happ shows a separate "Automatic · Firefox" entry for that.
 
 Send the link through any messenger. The recipient opens it, installs the app, scans the QR code, and connects.
 

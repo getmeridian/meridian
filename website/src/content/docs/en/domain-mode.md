@@ -11,14 +11,14 @@ section: guides
 meridian deploy 198.51.100.10 --domain vpn.example.com
 ```
 
-With your own domain, the exit offers two more ways in next to Reality:
+Without a domain, the exit already offers Reality, plus XHTTP and Hysteria2 on the server's IP address. Your own domain changes two things:
 
-- **XHTTP** and **WSS** on your domain, with a Let's Encrypt certificate that Meridian issues and renews (acme.sh)
+- **XHTTP** moves to your domain, and **WSS** is added there, with a Let's Encrypt certificate that Meridian issues and renews (acme.sh)
 - Once the domain is proxied through Cloudflare, both paths travel through Cloudflare's CDN — so they keep working even if your server's IP gets blocked
 
 The panel and the connection pages stay on the server's IP certificate; the domain carries only the proxy paths.
 
-Add `--hysteria2` to also offer Hysteria2 on UDP/443 with the domain's certificate (see [Hysteria2 and Cloudflare](#hysteria2-and-cloudflare)).
+Hysteria2 on UDP/443 switches to the domain's certificate too (see [Hysteria2 and Cloudflare](#hysteria2-and-cloudflare)); `--no-hysteria2` turns it off.
 
 ## Cloudflare setup
 
@@ -43,13 +43,13 @@ Each client's subscription and connection page list every path:
 | Reality | Direct to the server IP | Primary — fastest |
 | XHTTP | Your domain (through Cloudflare when proxied) | Reality is blocked or throttled |
 | WSS | Your domain (through Cloudflare when proxied) | Server IP is blocked |
-| Hysteria2 (opt-in) | Your server's IP over UDP/443, with the domain's certificate | Lossy or high-latency networks |
+| Hysteria2 | Your server's IP over UDP/443, with the domain's certificate | Lossy or high-latency networks, or when every TCP path is blocked |
 
-Apps that import the Xray JSON or Mihomo subscription switch between paths automatically when one stops working. Other apps show each path as a separate entry.
+Apps that import the Xray JSON, Mihomo, or sing-box subscription switch between paths automatically when one stops working. Other apps show each path as a separate entry.
 
 ## Hysteria2 and Cloudflare
 
-Hysteria2 dials your server's IP over UDP and uses the domain only for its TLS certificate, so it keeps working when the record is proxied through Cloudflare (which can't carry it). QUIC is throttled in some regions; enable `--hysteria2` only if your users need it.
+Hysteria2 dials your server's IP over UDP and uses the domain only for its TLS certificate, so it keeps working when the record is proxied through Cloudflare (which can't carry it). Salamander obfuscation makes its packets look random rather than like QUIC. Where UDP is blocked, apps fall back to the TCP paths listed before it.
 
 ## Adding a domain later
 

@@ -7,13 +7,14 @@ section: reference
 
 ## 技术栈
 
-- **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（例如，Google 的）。只有拥有正确密钥的客户端才能到达代理。
-- **XHTTP 和 WSS**（Xray-core）— 在域名模式下添加的自有域上的 TLS 路径。通过 Cloudflare 代理域名，它们经过 CDN 并在 IP 被阻止后仍然可用。
-- **Hysteria2**（Xray-core）— 可选的 UDP/443 路径在您的域名上，用于丢包网络。默认关闭。
+- **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（最好是与你的服务器托管在同一网络的网站）。只有拥有正确密钥的客户端才能到达代理。
+- **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
+- **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被阻止也仍然可用。
+- **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
 - **Remnawave** — 面板堆栈：`remnawave/backend`（API 和管理 UI，带 PostgreSQL 和 Valkey）在控制平面服务器上，`remnawave/node`（运行 Xray）在每个出口上，以及 `remnawave/subscription-page`。Meridian 固定测试版本并通过 REST API 与面板通信。
 - **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为面板、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
 - **Realm** — 中继服务器上的 TCP 转发器。
-- **uTLS** — 客户端连接复制 Chrome 的 TLS Client Hello，所以看起来像普通浏览器流量。
+- **uTLS** — 客户端连接复制浏览器的 TLS Client Hello（以 Chrome 为主，另有 Firefox 副本作为备用条目），所以看起来像普通浏览器流量。
 
 ## 服务拓扑
 
@@ -43,9 +44,10 @@ flowchart TD
     Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality"]
     Nginx -->|"SNI = your domain"| NginxDomain["nginx http<br>(domain certificate)"]
     Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http :8443<br>panel, pages, subscriptions"]
+    NginxHTTP -->|"/xhttp-path (no domain)"| XrayXHTTP
     NginxDomain -->|/xhttp-path| XrayXHTTP["Xray XHTTP"]
     NginxDomain -->|/ws-path| XrayWSS["Xray WSS"]
-    Internet -.->|"UDP 443 (opt-in)"| XrayHy2["Xray Hysteria2"]
+    Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
 域名只承载代理路径；面板和页面留在 IP 证书上。
@@ -89,9 +91,10 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 | 端口 | 服务 | 范围 |
 |------|---------|-------|
 | 443/TCP | nginx stream（SNI 路由器） | 公开 |
-| 443/UDP | Xray Hysteria2（可选） | 公开 |
+| 443/UDP | Xray Hysteria2（默认开启） | 公开 |
 | 80/TCP | nginx（ACME 挑战） | 公开 |
 | 8443 | nginx http（面板、页面、订阅） | 内部 |
+| 8444 | nginx http，PROXY 协议监听器（与 `--client-ips` 配合使用） | 内部 |
 | 3000 | Remnawave 后端（管理 UI + API） | localhost |
 | 3010 | Remnawave 节点 API | host network |
 | 3020 | Remnawave 订阅页面 | localhost |

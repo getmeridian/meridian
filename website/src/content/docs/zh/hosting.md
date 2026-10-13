@@ -48,7 +48,7 @@ Meridian 正确配置服务器，但无法改变服务器所在位置。在用�
 
 块变化很快，所以计划它们：
 
-- 将 Reality 部署为主路径，通过 Cloudflare 添加[域名模式](/docs/zh/domain-mode/)用于 XHTTP 和 WSS，以及 QUIC 对您用户有效的地方添加 `--hysteria2`。
+- 使用默认设置部署（Reality、XHTTP 和 Hysteria2），并添加[域名模式](/docs/zh/domain-mode/)，让 XHTTP 和 WSS 经由 Cloudflare 传输。
 - 在不同的提供商和网络上保持第二个出口（`meridian node add`），所以一个被阻止的地址范围不会导致一切崩溃。
 - 为阻止您出口地址的网络添加中继。
 
@@ -56,4 +56,4 @@ Meridian 正确配置服务器，但无法改变服务器所在位置。在用�
 
 ## 伪装目标
 
-主机的网络也形成了最佳伪装目标。选择与您的服务器相邻看起来自然的网络上具有 TLS 1.3 的流行网站：`meridian scan` 在服务器自己的邻域中查找候选者。不要选择 `apple.com` 或 `icloud.com`（它们的网络与托管提供商不匹配），也不要选择 `www.microsoft.com`：其证书链对 REALITY 来说太大了，所以部署收敛但没有流量通过。请参见[选择伪装目标](/docs/zh/deploy/#choosing-a-camouflage-target)。
+主机的网络也形成了最佳伪装目标。选择与您的服务器相邻看起来自然的网络上具有 TLS 1.3 的流行网站：`meridian scan` 在服务器自己的邻域中查找候选者。不要选择 `apple.com` 或 `icloud.com`（它们的网络与托管提供商不匹配），也不要选择 `www.microsoft.com`：其证书链对 REALITY 来说太大了，所以部署收敛但没有流量通过。请参见[选择伪装目标](/docs/zh/deploy/#选择伪装目标)。
