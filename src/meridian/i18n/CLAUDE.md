@@ -15,4 +15,4 @@
 
 - Never make a reply word equal a value the user types at a choice prompt (`exit`, `relay`, `gateway`, `control`); navigation words are matched first.
 - Persian users may type Persian digits or the Arabic comma `،`; parsing goes through `int()` and normalizes the comma.
-- Translate with Haiku agents; keep commands, protocol names, and `local` untranslated.
+- Translate with Sonnet agents (root CLAUDE.md); keep commands, protocol names, and `local` untranslated.
