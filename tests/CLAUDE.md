@@ -1,42 +1,37 @@
 # tests
 
 ```bash
-make test                              # pytest only (~1000 tests, ~22s)
+make test                              # pytest only (~2000 tests, ~45s)
 make system-lab                        # multi-node Docker lab (~15 min)
 uv run pytest tests/ -k "test_name"    # by pattern
 ```
 
-## Test layers
+## Design decisions
 
-| Layer | What | Where | Speed |
-|-------|------|-------|-------|
-| **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` (pytest) | ~22s |
-| **Deploy** | Mock-based topology setup tests (runtime, editor, persistence, node container) | `tests/test_setup_*.py` (pytest) | <1s |
-| **Command** | Mock-based command tests (node, fleet, client, recover) | `tests/test_*_commands.py` (pytest) | <1s |
-| **System lab** | Real multi-node deploy via Docker: Remnawave panel+node, relay, connection tests | `tests/systemlab/` | ~15 min |
+| Layer | What | Where |
+|-------|------|-------|
+| **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` |
+| **Deploy** | Mock-based topology setup (runtime, editor, persistence, node container) | `tests/test_setup_*.py` |
+| **Command** | Mock-based command tests (node, fleet, client, recover) | `tests/test_*_commands.py` |
+| **System lab** | Real multi-node deploy via Docker: panel+node, relay, connection tests | `tests/systemlab/` |
 
-## Testing philosophy
+**Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
+**MockConnection** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring; first match wins, unmatched commands succeed, so register only what differs.
+**`tmp_home`** isolates the Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store.
+**Shared doubles and builders live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `CancellationFlag`, and `topology.py` (`single_exit_intent`, `resource_plan`, `firewall_resource`, `panel_mock`). Search there before writing a local intent, plan, or panel builder.
 
-**Integration-level verification** — tests ensure contracts hold (API returns X → we handle Y), not that every function has a unit test.
-**MockConnection pattern** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring match. First match wins.
+## What's done well
 
-## Fixture organization
-
-Top-level `conftest.py` provides:
-- **`tmp_home`** — isolates `~/.meridian/` per test via env var + monkeypatch. Both env AND config module constants must be patched.
-- **`servers_file`** — isolated v4 server-profile store.
-**`tests/support/mock_connection.py`** — shared `MockConnection` class. Provision tests import via conftest fixtures; other layers import directly.
-**Test doubles live in `tests/support/`** (`CaptureReporter`, `CancellationFlag`) and system-lab-only subscription helpers in `tests/systemlab/subscription_client.py`; `make dead-code` flags production code only tests use.
-
-## Conventions
-
-- **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation.
-- **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
+- **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation; docstrings only explain a non-obvious why.
+- **Tables over near-duplicates** — cases that differ only in inputs and expected outcome are one `@pytest.mark.parametrize` table with `ids`; each distinct case keeps its own row.
 - **Idempotency dual-path** — provisioner tests verify both "needs change" and "already done" paths.
+- **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
 - **`tmp_home` must patch both** — env var AND `meridian.config` attributes.
 - **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
+- **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
+- **`make dead-code` flags production code only tests use** — keep system-lab-only helpers in `tests/systemlab/subscription_client.py`.
 - **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
-- **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with the label-matched scripted IO, and the real terminal path with `pexpect` (`test_setup_wizard_tty.py`, skipped where pexpect is absent).
+- **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with the label-matched scripted IO, and the real terminal path with `pexpect` (`test_setup_wizard_tty.py`).
 - **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.
