@@ -1,4 +1,4 @@
-"""Verify that a built Meridian wheel contains the generated Studio site."""
+"""Verify that a built Meridian wheel contains the generated Studio site and the agent guide."""
 
 from __future__ import annotations
 
@@ -8,18 +8,19 @@ from zipfile import ZipFile
 
 _REQUIRED_ASSETS = {
     "meridian/studio_assets/studio/index.html",
+    "meridian/data/agents.md",
 }
 
 
 def verify_wheel_assets(wheel: Path) -> None:
-    """Raise ValueError when required Studio assets are absent."""
+    """Raise ValueError when required packaged assets are absent."""
     if not wheel.is_file():
         raise ValueError(f"Wheel does not exist: {wheel}")
 
     with ZipFile(wheel) as archive:
         missing = sorted(_REQUIRED_ASSETS - set(archive.namelist()))
     if missing:
-        raise ValueError(f"Wheel is missing Studio assets: {', '.join(missing)}")
+        raise ValueError(f"Wheel is missing packaged assets: {', '.join(missing)}")
 
 
 def main() -> None:

@@ -398,6 +398,18 @@ meridian api workflow NAME [--json]
 
 **`api workflow NAME`** — 打印一个 UI 可渲染的工作流，例 `meridian api workflow deploy --json`。
 
+### meridian help
+
+向 AI 智能体介绍 Meridian，或显示某条命令的帮助。
+
+```
+meridian help [agents | COMMAND...]
+```
+
+**`meridian help agents`** 打印一份面向 AI 智能体的 Markdown 指南：Meridian 的用途、集群与其已审核拓扑如何配合、状态存放在哪里、安全驱动 CLI 的规则（非交互标志、JSON 信封、先计划后应用、删除前确认、把链接当作机密）、退出码以及常见任务。它始终输出纯 Markdown，因此智能体可以从管道中读取。
+
+**`meridian help COMMAND`** 显示与 `meridian COMMAND --help` 相同的帮助，例如 `meridian help node add`。不带参数时打印顶层帮助。未知主题以退出码 `2` 退出。
+
 ## 全局选项
 
 全局选项在命令之前，例 `meridian --quiet doctor`。命令选项如 `test --json` 在其后。

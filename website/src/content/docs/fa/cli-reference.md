@@ -398,6 +398,18 @@ meridian api workflow NAME [--json]
 
 **`api workflow NAME`** — workflow UI-renderable چاپ می‌کند، مثل `meridian api workflow deploy --json`.
 
+### meridian help
+
+Meridian را به یک عامل هوش مصنوعی معرفی می‌کند، یا راهنمای یک دستور را نشان می‌دهد.
+
+```
+meridian help [agents | COMMAND...]
+```
+
+**`meridian help agents`** یک راهنمای Markdown برای عامل‌های هوش مصنوعی چاپ می‌کند: Meridian چه کاری انجام می‌دهد، fleet و توپولوژی بازبینی‌شده‌اش چطور به هم مربوط‌اند، وضعیت کجا نگه‌داری می‌شود، قواعد اجرای امن CLI (پرچم‌های غیرتعاملی، پاکت‌های JSON، plan پیش از apply، تأیید پیش از حذف، لینک‌ها به‌عنوان رمز)، کدهای خروج و کارهای رایج. خروجی همیشه Markdown ساده است، پس عامل می‌تواند آن را از pipe بخواند.
+
+**`meridian help COMMAND`** همان راهنمای `meridian COMMAND --help` را نشان می‌دهد، مثلاً `meridian help node add`. بدون آرگومان، راهنمای سطح بالا را چاپ می‌کند. موضوع ناشناخته با کد `2` خارج می‌شود.
+
 ## گزینه‌های سراسری
 
 گزینه‌های سراسری قبل دستور می‌روند، مثل `meridian --quiet doctor`. گزینه‌های دستور مثل `test --json` بعد از آن می‌روند.

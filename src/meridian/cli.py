@@ -32,7 +32,7 @@ SERVERS = "Servers"
 CHECK_AND_FIX = "Check & fix"
 ADVANCED = "Advanced"
 _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (GET_STARTED, ("setup", "deploy")),
+    (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server")),
     (CHECK_AND_FIX, ("check", "test", "doctor", "plan", "apply")),
@@ -65,7 +65,10 @@ app = typer.Typer(
         "  [cyan]meridian client add alice[/cyan]       Give another person access\n"
         "  [cyan]meridian check[/cyan]                  Is everything healthy?"
     ),
-    epilog="[dim]Docs: https://getmeridian.org/docs  ·  Help for any command: meridian COMMAND --help[/dim]",
+    epilog=(
+        "[dim]Docs: https://getmeridian.org/docs  ·  Help for any command: meridian help COMMAND  ·  "
+        "For AI agents: meridian help agents[/dim]"
+    ),
     add_completion=True,
     rich_markup_mode="rich",
 )
@@ -316,6 +319,25 @@ def studio_cmd(
         )
 
     run(port=port, assets_dir=assets_dir, no_open=no_open)
+
+
+@app.command("help", rich_help_panel=GET_STARTED)
+def help_cmd(
+    ctx: typer.Context,
+    topic: Annotated[
+        list[str] | None,
+        typer.Argument(help="'agents' for the AI agent guide, or a command such as 'node add'", show_default=False),
+    ] = None,
+) -> None:
+    """Explain Meridian to an AI agent, or show one command's help
+
+    [dim]Examples:[/dim]
+      [cyan]meridian help agents[/cyan]     How Meridian works and how to drive it, for AI agents
+      [cyan]meridian help node add[/cyan]   Same as meridian node add --help
+    """
+    from meridian.commands.help import run
+
+    run(ctx, topic or [])
 
 
 # =============================================================================

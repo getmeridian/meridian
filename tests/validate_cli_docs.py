@@ -31,6 +31,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "apply": "### meridian apply",
     "setup": "### meridian setup",
     "deploy": "### meridian deploy",
+    "help": "### meridian help",
     "client add": "### meridian client",
     "client show": "### meridian client",
     "client list": "### meridian client",

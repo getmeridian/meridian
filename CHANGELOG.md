@@ -34,6 +34,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   no longer mark `fleet status` as degraded.
 
 ### Deploy
+- **Built for AI agents** — `meridian help agents` prints a Markdown guide that
+  explains how Meridian works and how to drive it safely: non-interactive
+  flags, JSON envelopes, plan before apply, exit codes, and which outputs are
+  secrets. `meridian help COMMAND` shows any command's help, git-style.
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
   and proxy, picks a camouflage target the server can actually use, pushes real
   traffic through the delivered subscription, and only then prints "Done" with a

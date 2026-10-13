@@ -164,6 +164,16 @@ meridian doctor --ai        # copies a redacted, AI-ready prompt to your clipboa
 
 Or [open an issue](https://github.com/getmeridian/meridian/issues) with `meridian doctor` output.
 
+## Working with AI agents
+
+Meridian explains itself to coding agents such as Claude Code, Codex, or Cursor:
+
+```bash
+meridian help agents        # how Meridian works and how to drive it safely
+```
+
+Commands that change things accept `--yes`, most print a `meridian.output/v1` JSON envelope with `--json`, and `meridian api` describes every contract. The documentation is indexed for agents at [getmeridian.org/llms.txt](https://getmeridian.org/llms.txt).
+
 ## Docs
 
 Full documentation, interactive command builder, and setup guides:

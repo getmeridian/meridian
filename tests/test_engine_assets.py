@@ -88,6 +88,7 @@ def test_verify_wheel_assets_accepts_packaged_studio(tmp_path: Path) -> None:
     wheel = tmp_path / "meridian.whl"
     with ZipFile(wheel, "w") as archive:
         archive.writestr("meridian/studio_assets/studio/index.html", "<!doctype html>")
+        archive.writestr("meridian/data/agents.md", "# Meridian for AI agents")
 
     verify_wheel_assets(wheel)
 
@@ -97,5 +98,5 @@ def test_verify_wheel_assets_rejects_missing_studio(tmp_path: Path) -> None:
     with ZipFile(wheel, "w"):
         pass
 
-    with pytest.raises(ValueError, match="missing Studio assets"):
+    with pytest.raises(ValueError, match="missing packaged assets"):
         verify_wheel_assets(wheel)

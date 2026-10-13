@@ -398,6 +398,18 @@ meridian api workflow NAME [--json]
 
 **`api workflow NAME`** — prints a UI-renderable workflow, e.g. `meridian api workflow deploy --json`.
 
+### meridian help
+
+Explain Meridian to an AI agent, or show one command's help.
+
+```
+meridian help [agents | COMMAND...]
+```
+
+**`meridian help agents`** prints a Markdown guide for AI agents: what Meridian does, how the fleet and its reviewed topology fit together, where state lives, the rules for driving the CLI safely (non-interactive flags, JSON envelopes, plan before apply, confirmation before removal, links as secrets), exit codes, and common tasks. It always prints plain Markdown, so an agent can read it from a pipe.
+
+**`meridian help COMMAND`** shows the same help as `meridian COMMAND --help`, e.g. `meridian help node add`. Without arguments it prints the top-level help. An unknown topic exits `2`.
+
 ## Global options
 
 Global options go before the command, for example `meridian --quiet doctor`. Command options such as `test --json` go after it.
