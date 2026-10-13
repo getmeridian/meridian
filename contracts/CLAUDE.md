@@ -4,7 +4,7 @@
 
 **Generated, checked in** — `scripts/export_contracts.py` is the source of truth. Do not hand-edit files below `contracts/meridian/`.
 
-**Core imports plus the CLI tree** — contract export imports `meridian.core` services and schemas, and `meridian.cli_catalog` walks the in-process Typer app for `commands.json`; it must not spawn `meridian` or import command modules.
+**Core imports plus the CLI tree** — contract export imports `meridian.core` services and schemas, and `meridian.cli_catalog` walks the in-process Typer app for `commands.json`; it never spawns `meridian`, imports command modules, or hits prompts and process exits.
 
 **Redacted fixtures** — golden fixtures are safe passive artifacts. Operator-visible handoff details remain available through explicit UI/CLI result views.
 
