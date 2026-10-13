@@ -8,7 +8,7 @@
 
 **English-only** — no locale infrastructure. Blog is content marketing, not essential UI for censored users.
 
-**High signal, low noise** — each post earns every paragraph with a fact, mechanism, or decision; claims follow the current docs and code, and claims about other tools are verified or cut. Write durably: no beta notes or year-dated prose. Never use `www.microsoft.com` or `apple.com` as a Reality example.
+**High signal, low noise** — each post earns every paragraph with a fact, mechanism, or decision; claims follow the current docs and code, and claims about other tools are verified or cut. Write durably: no beta notes or year-dated prose. Never use a camouflage target `src/meridian/CLAUDE.md` rules out as a Reality example.
 
 **Figures are HTML** — infographics live as `figures/<post>--<name>.html` (shared look in `figures/shared.css`, self-hosted fonts) and `uv run website/figures/render.py` renders each with Chromium to `src/content/blog/<post>/<name>.webp`. Edit the HTML and re-render; never hand-edit the image. Alt text carries the figure's facts for readers and agents.
 

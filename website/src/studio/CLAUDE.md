@@ -8,7 +8,7 @@
 
 **Static plus local Engine** — Static Studio remains the safe fallback; executable Studio talks to `meridian studio` for localhost-only SSH, files, secrets, operations, and dry-runs.
 
-**Adapters over contracts** — Static, LocalEngine, Mock, Desktop, and Mobile adapters consume generated contracts rather than command modules.
+**Adapters over contracts** — `staticAdapter.js`, `localEngineAdapter.js`, and `storageAdapter.js` consume generated contracts, never command modules.
 
 **Guided cockpit UX** — Keep beginner-facing Studio screens focused on one task. Use the journey rail, contextual help, and command sheet instead of always-visible JSON/CLI panels.
 

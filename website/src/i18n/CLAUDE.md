@@ -2,7 +2,7 @@
 
 ## Design decisions
 
-**Asymmetric by design** — English is baked into HTML at build time. Non-EN languages swap text client-side via `data-t` attributes. This avoids shipping EN translations in JS and keeps build output small.
+**Asymmetric by design** — English is baked into HTML at build time; other languages swap text client-side via `data-t` attributes, so no English dictionary ships in JS. Components and the PWA follow the same model.
 
 **Detection cascade** — `detectLocale()`: localStorage → browser language → English fallback. URL path locale (`/ru/`, `/fa/`, `/zh/`) is detected by the early `<head>` script in Base layout and persisted to localStorage before this code runs.
 
