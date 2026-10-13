@@ -6,11 +6,11 @@ import http.server
 import shutil
 import tempfile
 import threading
-import time
 import uuid
 import webbrowser
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from meridian.console import info, ok, warn
 from meridian.models import ProtocolURL
@@ -22,6 +22,9 @@ DEMO_IP = "198.51.100.1"
 DEMO_UUID = "550e8400-e29b-41d4-a716-446655440000"
 DEMO_SNI = "www.cloudflare.com"
 DEMO_XHTTP_PATH = "xhttp-demo-path"
+DEMO_PAGE_PATH = "connect"
+DEMO_SHORT_UUID = "DemoShortUuid42"
+DEMO_PLACE = "\U0001f1e9\U0001f1ea DE"
 
 # Source directories to watch for changes
 _SRC_ROOT = Path(__file__).parent.parent  # src/meridian/
@@ -34,60 +37,30 @@ def _build_demo_urls(
     server_ip: str = DEMO_IP,
     reality_uuid: str = DEMO_UUID,
     sni: str = DEMO_SNI,
-    *,
-    xhttp: bool = True,
 ) -> list[ProtocolURL]:
-    """Build demo VLESS protocol URLs for preview."""
-    urls: list[ProtocolURL] = []
-
-    # Reality
-    reality_url = (
-        f"vless://{reality_uuid}@{server_ip}:443"
-        f"?security=reality&encryption=none&type=tcp&flow=xtls-rprx-vision"
-        f"&sni={sni}&fp=chrome&pbk=demo-public-key"
-        f"#Meridian-Reality"
+    """Build demo links shaped like a v4 subscription (remarks, fingerprint copies, Hysteria2)."""
+    reality = (
+        f"vless://{reality_uuid}@{server_ip}:443?security=reality&encryption=none&type=tcp"
+        f"&flow=xtls-rprx-vision&sni={sni}&pbk=demo-public-key&sid=0123abcd"
     )
-    urls.append(
-        ProtocolURL(
-            key="reality",
-            label="Primary",
-            url=reality_url,
-            qr_b64=generate_qr_base64(reality_url),
-        )
+    xhttp = (
+        f"vless://{reality_uuid}@{server_ip}:443?security=tls&encryption=none&sni={server_ip}"
+        f"&type=xhttp&mode=packet-up&path=%2F{DEMO_XHTTP_PATH}"
     )
-
-    # XHTTP
-    if xhttp:
-        xhttp_url = (
-            f"vless://{reality_uuid}@{server_ip}:443"
-            f"?security=tls&encryption=none&sni={server_ip}&fp=chrome"
-            f"&type=xhttp&path=/{DEMO_XHTTP_PATH}"
-            f"#Meridian-XHTTP"
-        )
-        urls.append(
-            ProtocolURL(
-                key="xhttp",
-                label="XHTTP",
-                url=xhttp_url,
-                qr_b64=generate_qr_base64(xhttp_url),
-            )
-        )
-
-    return urls
+    hysteria = f"hysteria2://{reality_uuid}@{server_ip}:443?sni={server_ip}&obfs=salamander&obfs-password=demo"
+    links = [
+        ("reality", f"{reality}&fp=chrome", f"{DEMO_PLACE} · Reality · Chrome"),
+        ("reality", f"{reality}&fp=firefox", f"{DEMO_PLACE} · Reality · Firefox"),
+        ("xhttp", f"{xhttp}&fp=chrome", f"{DEMO_PLACE} · XHTTP · Chrome"),
+        ("xhttp", f"{xhttp}&fp=firefox", f"{DEMO_PLACE} · XHTTP · Firefox"),
+        ("hysteria2", hysteria, f"{DEMO_PLACE} · Hysteria2 · UDP"),
+    ]
+    urls = [(key, f"{url}#{quote(label)}", label) for key, url, label in links]
+    return [ProtocolURL(key=key, label=label, url=url, qr_b64=generate_qr_base64(url)) for key, url, label in urls]
 
 
-def _write_mock_stats(output_dir: Path, client_uuid: str) -> None:
-    """Write a mock stats JSON file for the preview."""
-    import json
-
-    stats_dir = output_dir / "stats"
-    stats_dir.mkdir(exist_ok=True)
-    stats = {
-        "up": 1_234_567_890,
-        "down": 9_876_543_210,
-        "lastOnline": int(time.time() * 1000) - 300_000,  # 5 min ago
-    }
-    (stats_dir / f"{client_uuid}.json").write_text(json.dumps(stats))
+def _demo_subscription_url(server_ip: str) -> str:
+    return f"https://{server_ip}/{DEMO_PAGE_PATH}/sub/{DEMO_SHORT_UUID}"
 
 
 def _write_preview_files(
@@ -106,6 +79,7 @@ def _write_preview_files(
         protocol_urls,
         server_ip=server_ip,
         client_name=client_name,
+        subscription_url=_demo_subscription_url(server_ip),
     )
 
     static_assets = load_pwa_static_assets()
@@ -130,8 +104,6 @@ def _write_preview_files(
             # Inject live-reload script into HTML
             text = text.replace("</body>", _LIVE_RELOAD_SCRIPT + "</body>")
         (client_dir / name).write_text(text)
-
-    _write_mock_stats(output_dir, client_uuid)
 
     # Write redirect index.html at root for static hosting
     if disable_sw:
@@ -297,6 +269,7 @@ def _regen(
             protocol_urls,
             server_ip=server_ip,
             client_name=client_name,
+            subscription_url=_demo_subscription_url(server_ip),
         )
         static_assets = load_fn()  # type: ignore[operator]
 

@@ -4,7 +4,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 ## Design decisions
 
-**Vanilla ES5, no build step** — zero external dependencies, no CDN requests. Target users live in censored regions where external resources are blocked. The whole app is ~1200 lines in an IIFE.
+**Vanilla ES5, no build step** — zero external dependencies, no CDN requests. Target users live in censored regions where external resources are blocked. The whole app is ~900 lines in an IIFE.
 
 **Runtime config** — `config.json` fetched at load, not baked into HTML. Enables server-side credential rotation without redeploying pages.
 
@@ -18,14 +18,14 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 **i18n** — English is the HTML default, NOT a translation dict. Non-EN languages swap via `data-t` attributes. Switching back to EN requires full `renderPage()` re-render.
 
-**Subscription QR hero layout** — the subscription QR (Remnawave's URL, imports ALL protocols at once) comes right after the header, with the recommended apps' "Add to" buttons below it. Everything else is secondary: apps list (collapsed for returning visitors), quick setup, individual protocol cards, self-check, stats. End users scan and go; power users expand.
+**Two-step setup card** — step 1 lists the platform's recommended apps ("Get" opens the store page), step 2 their "Add to" deep links for the canonical subscription. The subscription QR sits beside the steps on desktop (setting up a phone) and folds away on iOS/Android. Everything else is one list of quiet panels: all connections (Open/Copy/QR per link), "Not connecting?" (tips plus self-check), router guide.
 
 ## What's done well
 
 - **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
 - **Color palettes** — six curated presets (ocean, sunset, forest, lavender, rose, slate) with auto dark/light variants. Selected via `config.color`, switches on system theme change.
 - **Clock skew detection** — warns if device clock is >2min behind server. Critical for Reality/XHTTP which need tight time sync. Skipped if page was cached >1h to avoid false positives.
-- **Relay routing** — per-relay protocol cards marked with a star, direct connections labeled as backup. Relay names are HTML-escaped.
+- **Connection names are the subscription remarks** — rows show the Remnawave remark ("🇩🇪 DE · Reality · Chrome") verbatim; only the protocol hint below it is translated.
 
 ## Pitfalls
 
@@ -36,5 +36,5 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment` (its `name=` query is ignored), Throne's `addsub` takes standard Base64 only, and v2rayN documents no import scheme (no button).
 - **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes in rendered markup are silently dropped; use classes (CSSOM `el.style` still works).
 - **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW and use `cache: "no-store"`; a browser may reuse the page's warm connection, so a freeze is conclusive but a pass is weaker evidence.
-- **Stats path** — `/stats/{uuid}.json` (sibling, not child of client dir).
+- **Never put `data-t` on data** — a translated key swaps the element's whole text; the old cards replaced the first link's remark with "Основной" in Russian.
 - **Wake lock, install banner, skeleton** — wake lock keeps the screen on for QR scanning and fails gracefully; the `beforeinstallprompt` banner auto-dismisses; the skeleton says "Taking longer than expected" after 10 s.

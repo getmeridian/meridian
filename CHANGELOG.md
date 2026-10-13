@@ -122,6 +122,13 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   flag on the node. Deploy, `node add`, and the setup wizard look the country up
   once from the address's Regional Internet Registry; set `--country` when it is
   wrong (anycast or leased ranges).
+- **A redesigned connection page** — two clear steps (install an app, add the
+  connection with one tap), the subscription QR beside them on a computer for
+  setting up a phone, and everything else folded into quiet panels: every
+  individual connection with Open, Copy, and QR, "Not connecting?" tips with
+  the self-check, and the router guide. Russian pages no longer rename the
+  first connection "Основной", and `meridian dev preview` shows a realistic
+  page.
 - Connection pages are built from each user's real subscription, so relays and
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the
