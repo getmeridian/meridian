@@ -152,9 +152,18 @@ def parse_mihomo_subscription(content: str) -> dict[str, Any]:
     if not fallback_names:
         raise ValueError("Canonical Mihomo subscription has no populated fallback group")
 
+    groups_by_name = {group.get("name"): group for group in groups if isinstance(group, dict)}
+
+    def reaches_fallback(target: str) -> bool:
+        # A select group starts on its first member, so one led by a fallback group routes through it.
+        group = groups_by_name.get(target)
+        members = group.get("proxies") if isinstance(group, dict) and group.get("type") == "select" else None
+        leader = members[0] if isinstance(members, list) and members else None
+        return target in fallback_names or leader in fallback_names
+
     rules = parsed.get("rules")
     if not isinstance(rules, list) or not any(
-        isinstance(rule, str) and rule.startswith("MATCH,") and rule.removeprefix("MATCH,") in fallback_names
+        isinstance(rule, str) and rule.startswith("MATCH,") and reaches_fallback(rule.removeprefix("MATCH,"))
         for rule in rules
     ):
         raise ValueError("Canonical Mihomo subscription does not route through its fallback group")

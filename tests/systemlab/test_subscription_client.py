@@ -224,3 +224,15 @@ def test_assigns_distinct_local_ports_to_every_inbound() -> None:
 
     assert socks_port == 12000
     assert [inbound["port"] for inbound in runnable["inbounds"]] == [12000, 12001]
+
+
+def test_mihomo_select_group_led_by_fallback_routes_through_it() -> None:
+    """Meridian's profile matches into a hand-pick group whose default is the fallback group."""
+    config = _mihomo_config()
+    config["proxy-groups"].insert(0, {"name": "Meridian", "type": "select", "proxies": ["MERIDIAN AUTO", "exit-a"]})
+    config["rules"] = ["MATCH,Meridian"]
+    parse_mihomo_subscription(yaml.safe_dump(config))
+
+    config["proxy-groups"][0]["proxies"] = ["exit-a", "MERIDIAN AUTO"]
+    with pytest.raises(ValueError, match="fallback group"):
+        parse_mihomo_subscription(yaml.safe_dump(config))
