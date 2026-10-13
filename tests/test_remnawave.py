@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from meridian.remnawave import (
@@ -99,15 +100,11 @@ class TestFindNodeByAddress:
         assert result is not None
         assert result.uuid == "uuid-2"
 
-    def test_returns_none_when_not_found(self) -> None:
+    @pytest.mark.parametrize("nodes", [[Node(uuid="uuid-1", address="198.51.100.1")], []], ids=["other", "empty"])
+    def test_returns_none_without_a_match(self, nodes: list[Node]) -> None:
         panel = _make_panel()
-        panel.list_nodes = MagicMock(return_value=[Node(uuid="uuid-1", address="198.51.100.1")])
+        panel.list_nodes = MagicMock(return_value=nodes)
         assert panel.find_node_by_address("198.51.100.99") is None
-
-    def test_returns_none_on_empty_list(self) -> None:
-        panel = _make_panel()
-        panel.list_nodes = MagicMock(return_value=[])
-        assert panel.find_node_by_address("198.51.100.1") is None
 
 
 class TestParseUser:
@@ -195,91 +192,72 @@ class TestParseHostAndInbound:
 
 
 class TestRetryLogic:
-    def test_retries_on_500_error(self) -> None:
-        mock_client = MagicMock()
-        resp_500 = _mock_response(500, {"error": "internal"})
-        resp_200 = _mock_response(200, {"response": {"ok": True}})
-        mock_client.request.side_effect = [resp_500, resp_200]
-        panel = _make_panel(mock_client)
-        result = panel._request("GET", "/api/test")
-        assert result == {"ok": True}
-        assert mock_client.request.call_count == 2
+    @pytest.fixture(autouse=True)
+    def _no_backoff(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("meridian.remnawave.client.time.sleep", lambda _seconds: None)
 
-    def test_no_retry_on_401(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(401)
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveError, match="401"):
+    @pytest.mark.parametrize(
+        "first",
+        [_mock_response(500, {"error": "internal"}), httpx.ConnectError("refused"), httpx.ReadTimeout("slow")],
+        ids=["status-500", "connect-error", "read-timeout"],
+    )
+    def test_transient_failure_is_retried(self, first: object) -> None:
+        panel, client = _wired_panel(first, _mock_response(200, {"response": "ok"}))
+        assert panel._request("GET", "/api/test") == "ok"
+        assert client.request.call_count == 2
+
+    @pytest.mark.parametrize(
+        ("status", "error", "match"),
+        [(401, RemnawaveAuthError, "401"), (403, RemnawaveAuthError, "403"), (404, RemnawaveNotFoundError, None)],
+    )
+    def test_client_errors_raise_typed_errors_without_retry(self, status: int, error: type[Exception], match) -> None:
+        panel, client = _wired_panel(_mock_response(status))
+        with pytest.raises(error, match=match):
             panel._request("GET", "/api/test")
-        assert mock_client.request.call_count == 1
+        assert client.request.call_count == 1
 
-    def test_no_retry_on_403(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(403)
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveError, match="403"):
-            panel._request("GET", "/api/test")
-        assert mock_client.request.call_count == 1
-
-    def test_retries_on_connect_error(self) -> None:
-        import httpx
-
-        mock_client = MagicMock()
-        mock_client.request.side_effect = [
-            httpx.ConnectError("refused"),
-            _mock_response(200, {"response": "ok"}),
-        ]
-        panel = _make_panel(mock_client)
-        result = panel._request("GET", "/api/test")
-        assert result == "ok"
-
-    def test_retries_on_timeout(self) -> None:
-        import httpx
-
-        mock_client = MagicMock()
-        mock_client.request.side_effect = [
-            httpx.ReadTimeout("slow"),
-            _mock_response(200, {"response": "ok"}),
-        ]
-        panel = _make_panel(mock_client)
-        result = panel._request("GET", "/api/test")
-        assert result == "ok"
-
-    def test_max_retries_exceeded_raises(self) -> None:
-        import httpx
-
-        mock_client = MagicMock()
-        mock_client.request.side_effect = httpx.ConnectError("down")
-        panel = _make_panel(mock_client)
+    @pytest.mark.parametrize(
+        ("failure", "match"), [(httpx.ConnectError("refused"), "Cannot connect"), (httpx.ReadTimeout("slow"), None)]
+    )
+    def test_exhausted_retries_raise_network_error(self, failure: Exception, match: str | None) -> None:
+        client = MagicMock()
+        client.request.side_effect = failure
+        panel = _make_panel(client)
         panel._max_retries = 2
-        with pytest.raises(RemnawaveError, match="Cannot connect"):
+        with pytest.raises(RemnawaveNetworkError, match=match):
             panel._request("GET", "/api/test")
-        assert mock_client.request.call_count == 2
+        assert client.request.call_count == 2
 
-    def test_unwraps_response_wrapper(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(200, {"response": {"users": [{"uuid": "u-1"}]}})
-        panel = _make_panel(mock_client)
-        result = panel._request("GET", "/api/users")
-        assert result == {"users": [{"uuid": "u-1"}]}
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            ({"response": {"users": [{"uuid": "u-1"}]}}, {"users": [{"uuid": "u-1"}]}),
+            ([{"uuid": "u-1"}], [{"uuid": "u-1"}]),
+        ],
+        ids=["wrapped", "bare"],
+    )
+    def test_unwraps_the_response_envelope_only_when_present(self, payload: object, expected: object) -> None:
+        panel, _ = _wired_panel(_mock_response(200, payload))
+        assert panel._request("GET", "/api/users") == expected
 
-    def test_passes_through_non_wrapped(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(200, [{"uuid": "u-1"}])
-        panel = _make_panel(mock_client)
-        result = panel._request("GET", "/api/users")
-        assert result == [{"uuid": "u-1"}]
+    def test_json_decode_error_raises_remnawave_error(self) -> None:
+        resp = _mock_response(200)
+        resp.json.side_effect = ValueError("Expecting value")
+        resp.content = b"<html>truncated"
+        panel, _ = _wired_panel(resp)
+        with pytest.raises(RemnawaveError, match="invalid JSON"):
+            panel._request("GET", "/api/test")
+
+    @pytest.mark.parametrize("error", [RemnawaveNotFoundError, RemnawaveAuthError, RemnawaveNetworkError])
+    def test_typed_errors_are_remnawave_errors(self, error: type[Exception]) -> None:
+        assert issubclass(error, RemnawaveError)
 
 
 class TestEmptyBodies:
-    @pytest.mark.parametrize("status_code", [202, 204])
-    def test_empty_success_returns_none(self, status_code: int) -> None:
+    @pytest.mark.parametrize(("method", "status_code"), [("DELETE", 202), ("DELETE", 204), ("POST", 200)])
+    def test_empty_success_returns_none(self, method: str, status_code: int) -> None:
         panel, _ = _wired_panel(_empty_response(status_code))
-        assert panel._request("DELETE", "/api/test") is None
-
-    def test_empty_200_body_returns_none(self) -> None:
-        panel, _ = _wired_panel(_empty_response(200))
-        assert panel._request("POST", "/api/test") is None
+        assert panel._request(method, "/api/test") is None
 
 
 class TestAuth:
@@ -319,25 +297,15 @@ class TestAuth:
             with pytest.raises(RemnawaveError, match="login failed"):
                 MeridianPanel.login("https://198.51.100.1", "admin", "wrong")
 
-    def test_register_admin_returns_token(self) -> None:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 201
-        mock_resp.json.return_value = {"response": {"accessToken": "jwt-456"}}
+    @pytest.mark.parametrize(
+        ("status", "body"), [(201, {"accessToken": "jwt-456"}), (200, {"token": "jwt-456"})], ids=["201", "200-token"]
+    )
+    def test_register_admin_returns_token(self, status: int, body: dict) -> None:
+        mock_resp = MagicMock(status_code=status)
+        mock_resp.json.return_value = {"response": body}
 
         with patch("httpx.post", return_value=mock_resp):
-            token = MeridianPanel.register_admin("https://198.51.100.1", "admin", "pass")
-
-        assert token == "jwt-456"
-
-    def test_register_admin_accepts_200(self) -> None:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {"response": {"token": "jwt-789"}}
-
-        with patch("httpx.post", return_value=mock_resp):
-            token = MeridianPanel.register_admin("https://198.51.100.1", "admin", "pass")
-
-        assert token == "jwt-789"
+            assert MeridianPanel.register_admin("https://198.51.100.1", "admin", "pass") == "jwt-456"
 
     def test_login_no_token_in_response(self) -> None:
         mock_resp = MagicMock()
@@ -628,65 +596,3 @@ class TestInternalSquads:
             "/api/internal-squads",
             json={"uuid": "sq-1", "inbounds": ["ib-1"]},
         )
-
-
-class TestErrorSubclasses:
-    def test_not_found_is_remnawave_error(self) -> None:
-        assert issubclass(RemnawaveNotFoundError, RemnawaveError)
-
-    def test_auth_is_remnawave_error(self) -> None:
-        assert issubclass(RemnawaveAuthError, RemnawaveError)
-
-    def test_network_is_remnawave_error(self) -> None:
-        assert issubclass(RemnawaveNetworkError, RemnawaveError)
-
-    def test_404_raises_not_found(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(404)
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveNotFoundError):
-            panel._request("GET", "/api/test")
-
-    def test_401_raises_auth_error(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(401)
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveAuthError):
-            panel._request("GET", "/api/test")
-
-    def test_403_raises_auth_error(self) -> None:
-        mock_client = MagicMock()
-        mock_client.request.return_value = _mock_response(403)
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveAuthError):
-            panel._request("GET", "/api/test")
-
-    def test_connect_error_raises_network_error(self) -> None:
-        import httpx
-
-        mock_client = MagicMock()
-        mock_client.request.side_effect = httpx.ConnectError("refused")
-        panel = _make_panel(mock_client)
-        panel._max_retries = 1
-        with pytest.raises(RemnawaveNetworkError):
-            panel._request("GET", "/api/test")
-
-    def test_timeout_raises_network_error(self) -> None:
-        import httpx
-
-        mock_client = MagicMock()
-        mock_client.request.side_effect = httpx.ReadTimeout("slow")
-        panel = _make_panel(mock_client)
-        panel._max_retries = 1
-        with pytest.raises(RemnawaveNetworkError):
-            panel._request("GET", "/api/test")
-
-    def test_json_decode_error_raises_remnawave_error(self) -> None:
-        mock_client = MagicMock()
-        resp = _mock_response(200)
-        resp.json.side_effect = ValueError("Expecting value")
-        resp.content = b"<html>truncated"
-        mock_client.request.return_value = resp
-        panel = _make_panel(mock_client)
-        with pytest.raises(RemnawaveError, match="invalid JSON"):
-            panel._request("GET", "/api/test")
