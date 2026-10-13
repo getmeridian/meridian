@@ -180,7 +180,7 @@ function detectPlatform() {
 var PLATFORM_KEYS = { ios: 'iOS', android: 'Android', windows: 'Windows', macos: 'macOS', linux: 'Linux' };
 var PLATFORM_ORDER = ['android', 'ios', 'windows', 'macos', 'linux'];
 var ALL_PLATFORMS = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
-var ROUTER_DOCS = 'https://getmeridian.org/docs/{lang}/routers/';
+var ROUTER_DOCS = 'https://getmeridian.org/{lang}/routers/';
 
 function appPlatforms(a) {
   if (a.platforms) return a.platforms;

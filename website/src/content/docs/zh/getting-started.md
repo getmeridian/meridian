@@ -11,7 +11,7 @@ section: guides
 
 你需要：
 - 运行 Debian 或 Ubuntu 的 **VPS**，可通过 SSH 密钥以 root 或无密码 sudo 用户身份访问
-- 你自己机器上的**终端**（macOS、Linux 或 [Windows 上的 WSL](/docs/zh/wsl/)）
+- 你自己机器上的**终端**（macOS、Linux 或 [Windows 上的 WSL](/zh/wsl/)）
 
 ## 安装 CLI
 
@@ -19,11 +19,11 @@ section: guides
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-这会通过 [uv](https://docs.astral.sh/uv/) 或 pipx 作为备选方案安装 `meridian` 命令。详见[安装](/docs/zh/installation/)了解其他选项。
+这会通过 [uv](https://docs.astral.sh/uv/) 或 pipx 作为备选方案安装 `meridian` 命令。详见[安装](/zh/installation/)了解其他选项。
 
 在自己的机器上运行 Meridian，而不是在 VPS 上：它通过 SSH 连接，将凭证保存在你的设备上，让 `meridian test` 从外部检查服务器。
 
-> 从 Meridian 3.x 升级？4.0 不是就地升级。先阅读[从 3.x 升级](/docs/zh/installation/#从-3x-升级)。
+> 从 Meridian 3.x 升级？4.0 不是就地升级。先阅读[从 3.x 升级](/zh/installation/#从-3x-升级)。
 
 ## 部署
 
@@ -72,7 +72,7 @@ meridian test 198.51.100.10
 meridian client add alice
 ```
 
-每个人都有自己的密钥、连接页面和订阅 URL。`meridian client list` 显示所有人，`meridian client disable alice` 立即切断某人。详见[客户端管理](/docs/zh/client-management/)。
+每个人都有自己的密钥、连接页面和订阅 URL。`meridian client list` 显示所有人，`meridian client disable alice` 立即切断某人。详见[客户端管理](/zh/client-management/)。
 
 ## 文件位置
 
@@ -96,8 +96,8 @@ meridian setup
 
 ## 后续步骤
 
-- [部署指南](/docs/zh/deploy/) — 每个部署选项、伪装目标、重新部署
-- [域名模式](/docs/zh/domain-mode/) — 通过你的域名添加 Cloudflare CDN 回退
-- [中继节点](/docs/zh/relay/) — 给用户一个国内入口点
-- [IP 被阻止了？](/docs/zh/recovery/) — 服务器被阻止时的处理方法
-- [故障排除](/docs/zh/troubleshooting/) — 常见问题和修复
+- [部署指南](/zh/deploy/) — 每个部署选项、伪装目标、重新部署
+- [域名模式](/zh/domain-mode/) — 通过你的域名添加 Cloudflare CDN 回退
+- [中继节点](/zh/relay/) — 给用户一个国内入口点
+- [IP 被阻止了？](/zh/recovery/) — 服务器被阻止时的处理方法
+- [故障排除](/zh/troubleshooting/) — 常见问题和修复

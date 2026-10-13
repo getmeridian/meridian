@@ -1,0 +1,61 @@
+/*
+ * Starlight theme for the docs, mapped onto the Meridian palette in tokens.css.
+ * Starlight's scale runs from --sl-color-white (strongest text) to --sl-color-black
+ * (page background) in both themes, so light mode inverts the values.
+ */
+:root {
+  --sl-font: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --sl-content-width: 46rem;
+
+  /* Dark */
+  --sl-color-accent-low: #3a2f1c;
+  --sl-color-accent: #d4a24e;
+  --sl-color-accent-high: #f0d9a8;
+  --sl-color-white: #f4f2ee;
+  --sl-color-gray-1: #e4e2de;
+  --sl-color-gray-2: #c4c3c8;
+  --sl-color-gray-3: #9a9caa;
+  --sl-color-gray-4: #6b6e7e;
+  --sl-color-gray-5: #3a3e52;
+  --sl-color-gray-6: #252836;
+  --sl-color-black: #1c1e28;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #f3e3c3;
+  --sl-color-accent: #9a6a1c;
+  --sl-color-accent-high: #5c3f0e;
+  --sl-color-white: #1a1d2e;
+  --sl-color-gray-1: #2a2d3e;
+  --sl-color-gray-2: #444859;
+  --sl-color-gray-3: #6b7084;
+  --sl-color-gray-4: #9095a4;
+  --sl-color-gray-5: #d5cfc3;
+  --sl-color-gray-6: #f5f0e8;
+  --sl-color-gray-7: #fbf8f3;
+  --sl-color-black: #fdfaf6;
+}
+
+.sl-markdown-content :is(h1, h2, h3),
+h1#_top,
+.site-title span {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.site-title {
+  color: var(--sl-color-white);
+}
+
+.sl-markdown-content a {
+  text-underline-offset: 0.2em;
+}
+
+pre.mermaid {
+  display: flex;
+  justify-content: center;
+  background: transparent;
+  border: none;
+}

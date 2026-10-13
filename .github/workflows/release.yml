@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          # Starlight dates each docs page from its last commit.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:

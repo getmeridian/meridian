@@ -1,14 +1,31 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { i18nLoader } from '@astrojs/starlight/loaders';
+import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 
 const docs = defineCollection({
-  // [a-z]* excludes CLAUDE.md (uppercase) from the content collection
+  // [a-z]* excludes the contributor notes (CLAUDE.md) from the docs
   loader: glob({ pattern: '**/[a-z]*.md', base: './src/content/docs' }),
-  schema: z.object({
-    title: z.string(),
-    description: z.string().optional(),
-    order: z.number().optional(),
-    section: z.string().optional(),
+  schema: docsSchema({
+    extend: z.object({
+      order: z.number().optional(),
+      section: z.enum(['guides', 'reference']).optional(),
+    }),
+  }),
+});
+
+const i18n = defineCollection({
+  loader: i18nLoader(),
+  schema: i18nSchema({
+    extend: z.object({
+      'meridian.nav.blog': z.string(),
+      'meridian.nav.demo': z.string(),
+      'meridian.page.copy': z.string(),
+      'meridian.page.copied': z.string(),
+      'meridian.page.view': z.string(),
+      'meridian.page.open': z.string(),
+      'meridian.page.prompt': z.string(),
+    }),
   }),
 });
 
@@ -25,4 +42,4 @@ const blog = defineCollection({
   }),
 });
 
-export const collections = { docs, blog };
+export const collections = { docs, i18n, blog };

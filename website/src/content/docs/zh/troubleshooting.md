@@ -129,7 +129,7 @@ section: guides
 
 **最常见的原因：** 服务器 IP 被阻止。运行 `meridian test IP`；其发现区分网络可达性、TLS、订阅和代理执行失败。TCP 失败也可能意味着云防火墙或离线服务器。
 
-见 [IP 被阻止恢复指南](/docs/zh/recovery/) 了解恢复选项（替代出口、中继、CDN 回退）。
+见 [IP 被阻止恢复指南](/zh/recovery/) 了解恢复选项（替代出口、中继、CDN 回退）。
 
 其他原因：
 - 服务器重启且服务未启动 → `meridian plan` 显示什么在关闭，`meridian apply` 修复它。手工操作：在 `/opt/remnawave` 和 `/opt/remnanode` 中运行 `docker compose up -d`，然后 `systemctl restart nginx`
@@ -160,7 +160,7 @@ meridian doctor
 
 ## 中继不工作
 
-见 [Relay 指南 — 故障排除](/docs/zh/relay/#troubleshooting) 部分了解中继特定的问题（端口冲突、防火墙、出口无法到达、服务未启动）。
+见 [Relay 指南 — 故障排除](/zh/relay/#故障排查) 部分了解中继特定的问题（端口冲突、防火墙、出口无法到达、服务未启动）。
 
 ## 解释预检输出
 

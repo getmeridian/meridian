@@ -103,7 +103,7 @@ During some mobile internet restrictions in Russia, operators let through only a
 
 - **Networks differ.** Some seem to look only at the server name (SNI) a connection announces. Others also check the destination IP. Where only the name is checked, a direct Reality path with an allowed name can pass. Where the IP is checked too, the first hop has to be an address on the list.
 - **Domestic cloud addresses are the usual first hop.** Not every address from a provider is listed: people describe one subnet of a provider's range being allowed while another from the same provider is not. Providers may also limit private customers, cap how often you can recreate a server, or shape bandwidth.
-- **Foreign CDN addresses are generally not allowed on mobile networks.** Treat [domain mode](/docs/en/domain-mode/) through Cloudflare as a fallback for home connections, not as a whitelist answer.
+- **Foreign CDN addresses are generally not allowed on mobile networks.** Treat [domain mode](/en/domain-mode/) through Cloudflare as a fallback for home connections, not as a whitelist answer.
 - **The relay-to-exit link can be disrupted too.** A relay that reaches users can still lose its connection to a foreign exit.
 
 ### A relay on an allowed address

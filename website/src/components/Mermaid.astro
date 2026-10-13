@@ -1,30 +1,18 @@
 ---
 /**
- * Client-side Mermaid diagram renderer.
- * Astro's Shiki highlighter converts ```mermaid blocks into
- * <pre class="astro-code" data-language="mermaid"><code>...</code></pre>.
- * This script extracts the text, replaces the block with a <pre class="mermaid">,
- * and dynamically imports mermaid.js to render them as SVG.
+ * Client-side Mermaid diagram renderer for docs pages.
+ * The remark plugin in astro.config.mjs turns ```mermaid blocks into <pre class="mermaid">,
+ * so they skip code highlighting. This script renders them as SVG.
  *
- * The dynamic import ensures the 481KB mermaid bundle is only fetched
- * on pages that actually contain mermaid diagrams.
+ * The dynamic import ensures the mermaid bundle is only fetched
+ * on pages that actually contain diagrams.
  */
 ---
 
 <script>
-  // Convert Shiki-highlighted mermaid blocks to plain <pre class="mermaid">
-  const blocks = document.querySelectorAll('pre[data-language="mermaid"]');
-  if (blocks.length > 0) {
-    blocks.forEach((pre) => {
-      const code = pre.querySelector('code');
-      if (!code) return;
-      const mermaidPre = document.createElement('pre');
-      mermaidPre.className = 'mermaid';
-      mermaidPre.textContent = code.textContent || '';
-      pre.replaceWith(mermaidPre);
-    });
-
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const nodes = document.querySelectorAll<HTMLElement>('pre.mermaid');
+  if (nodes.length > 0) {
+    const isDark = document.documentElement.dataset.theme === 'dark';
 
     // Meridian design tokens mapped to mermaid theme variables
     const theme = isDark ? {
@@ -39,7 +27,6 @@
       actorBkg: '#FFFFFF', actorBorder: '#D5CFC3',
     };
 
-    const nodes = document.querySelectorAll<HTMLElement>('pre.mermaid');
 
     const { default: mermaid } = await import('mermaid');
     mermaid.initialize({

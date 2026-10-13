@@ -11,7 +11,7 @@ section: guides
 
 Вам нужны:
 - **VPS** работающий Debian или Ubuntu, которого вы можете достичь по SSH с ключом, как root или пользователь с passwordless sudo
-- **Терминал** на вашей собственной машине (macOS, Linux или [WSL на Windows](/docs/ru/wsl/))
+- **Терминал** на вашей собственной машине (macOS, Linux или [WSL на Windows](/ru/wsl/))
 
 ## Установить CLI
 
@@ -19,11 +19,11 @@ section: guides
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-Это устанавливает команду `meridian` с [uv](https://docs.astral.sh/uv/) (или pipx как возврат). См. [Installation](/docs/ru/installation/) для других вариантов.
+Это устанавливает команду `meridian` с [uv](https://docs.astral.sh/uv/) (или pipx как возврат). См. [Installation](/ru/installation/) для других вариантов.
 
 Запустите Meridian на вашей собственной машине вместо на VPS: он подключается по SSH, сохраняет учётные данные на вашем устройстве и позволяет `meridian test` проверить сервер снаружи.
 
-> Приходит из Meridian 3.x? 4.0 не является обновлением на месте. Прочитайте [Upgrading from 3.x](/docs/ru/installation/#upgrading-from-3x) сначала.
+> Приходит из Meridian 3.x? 4.0 не является обновлением на месте. Прочитайте [Upgrading from 3.x](/ru/installation/#обновление-с-3x) сначала.
 
 ## Развернуть
 
@@ -72,7 +72,7 @@ meridian test 198.51.100.10
 meridian client add alice
 ```
 
-Каждый человек получает свой собственный ключ, страницу подключения и URL подписки. `meridian client list` показывает всех, и `meridian client disable alice` отключает кого-то немедленно. См. [Client management](/docs/ru/client-management/).
+Каждый человек получает свой собственный ключ, страницу подключения и URL подписки. `meridian client list` показывает всех, и `meridian client disable alice` отключает кого-то немедленно. См. [Client management](/ru/client-management/).
 
 ## Где вещи живут
 
@@ -96,8 +96,8 @@ meridian setup
 
 ## Следующие шаги
 
-- [Deploy guide](/docs/ru/deploy/) — каждый вариант развёртывания, цели маскировки, переразворачивания
-- [Domain mode](/docs/ru/domain-mode/) — добавьте возврат CDN Cloudflare с вашим собственным доменом
-- [Relay nodes](/docs/ru/relay/) — дайте пользователям внутреннюю точку входа
-- [IP blocked?](/docs/ru/recovery/) — что делать когда сервер заблокирован
-- [Troubleshooting](/docs/ru/troubleshooting/) — обычные проблемы и исправления
+- [Deploy guide](/ru/deploy/) — каждый вариант развёртывания, цели маскировки, переразворачивания
+- [Domain mode](/ru/domain-mode/) — добавьте возврат CDN Cloudflare с вашим собственным доменом
+- [Relay nodes](/ru/relay/) — дайте пользователям внутреннюю точку входа
+- [IP blocked?](/ru/recovery/) — что делать когда сервер заблокирован
+- [Troubleshooting](/ru/troubleshooting/) — обычные проблемы и исправления

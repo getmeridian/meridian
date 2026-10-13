@@ -54,7 +54,7 @@ uv tool install meridian-vpn    # recommended
 pipx install meridian-vpn       # alternative
 ```
 
-> **Upgrading from 3.x?** Meridian 4.0 is not an in-place upgrade: it replaces 3x-ui with Remnawave, and every user needs a new link. Your 3.x servers keep working. See [Upgrading from 3.x](https://getmeridian.org/docs/en/installation/#upgrading-from-3x).
+> **Upgrading from 3.x?** Meridian 4.0 is not an in-place upgrade: it replaces 3x-ui with Remnawave, and every user needs a new link. Your 3.x servers keep working. See [Upgrading from 3.x](https://getmeridian.org/en/installation/#upgrading-from-3x).
 
 ## Quick start
 
@@ -129,10 +129,11 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 | `meridian deploy [IP\|local]` | Deploy one server and get a shareable link |
 | `meridian setup` | Guided, resumable wizard for several servers |
 | `meridian plan` / `meridian apply` | Review and apply the topology in `cluster.yml` |
-| `meridian client add\|show\|list\|enable\|disable` | Manage the people who connect |
-| `meridian node add\|list\|remove` | Manage exit servers |
+| `meridian client add\|show\|list\|enable\|disable\|remove` | Manage the people who connect |
+| `meridian node add\|list\|replace\|remove` | Manage exit servers |
 | `meridian relay add\|list\|remove` | Manage relays |
-| `meridian fleet status\|inventory` | Fleet health and inventory |
+| `meridian route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
+| `meridian fleet status\|inventory\|upgrade` | Fleet health, inventory, and Remnawave upgrades |
 | `meridian test [IP]` | Push real traffic through the delivered subscription (no SSH) |
 | `meridian check [IP]` | Check fleet health, or whether a new server can run Meridian |
 | `meridian test [IP] --probe` | Look at your server the way a censor would |
@@ -140,8 +141,9 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 | `meridian doctor [IP]` | Collect diagnostics for bug reports |
 | `meridian teardown [IP]` | Remove Meridian from a server |
 | `meridian update` | Update the CLI |
+| `meridian help agents` | Explain Meridian to an AI agent |
 
-`client remove` revokes a client permanently; removing a node or relay isn't available yet. Most commands support `--json` for scripting. See the [CLI reference](https://getmeridian.org/docs/en/cli-reference/) for every command and flag.
+Removal commands change the topology and clean up what disappears; `client remove` revokes that person's access for good. Most commands support `--json` for scripting. See the [CLI reference](https://getmeridian.org/en/cli-reference/) for every command and flag.
 
 ## Client apps
 
@@ -154,7 +156,7 @@ Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protoc
 
 ## Troubleshooting
 
-Not connecting? Run `meridian test 198.51.100.10` from your machine, or use the [web-based ping tool](https://getmeridian.org/ping). IP blocked? See the [recovery guide](https://getmeridian.org/docs/en/recovery/).
+Not connecting? Run `meridian test 198.51.100.10` from your machine, or use the [web-based ping tool](https://getmeridian.org/ping). IP blocked? See the [recovery guide](https://getmeridian.org/en/recovery/).
 
 Something else? Get AI-ready diagnostics:
 
@@ -172,7 +174,7 @@ Meridian explains itself to coding agents such as Claude Code, Codex, or Cursor:
 meridian help agents        # how Meridian works and how to drive it safely
 ```
 
-Commands that change things accept `--yes`, most print a `meridian.output/v1` JSON envelope with `--json`, and `meridian api` describes every contract. The documentation is indexed for agents at [getmeridian.org/llms.txt](https://getmeridian.org/llms.txt).
+Commands that change things accept `--yes`, most print a `meridian.output/v1` JSON envelope with `--json`, and `meridian api` describes every contract. Every docs page is also available as Markdown, indexed at [getmeridian.org/llms.txt](https://getmeridian.org/llms.txt); see [AI agents](https://getmeridian.org/en/agents/).
 
 ## Docs
 

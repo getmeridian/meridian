@@ -38,6 +38,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   explains how Meridian works and how to drive it safely: non-interactive
   flags, JSON envelopes, plan before apply, exit codes, and which outputs are
   secrets. `meridian help COMMAND` shows any command's help, git-style.
+- **Docs for people and agents** — getmeridian.org's docs have search, a
+  per-page table of contents, and proper right-to-left Persian. Every page is
+  also served as Markdown (add `.md` to its address), with Copy page and Open
+  in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
+  links redirect.
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
   and proxy, picks a camouflage target the server can actually use, pushes real
   traffic through the delivered subscription, and only then prints "Done" with a

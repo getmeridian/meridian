@@ -199,6 +199,6 @@ mkdir -p projects
 
 ## قدم‌های بعدی
 
-- [شروع کار](/docs/fa/getting-started/) — اولین سرور خود را deploy کنید
-- [نصب](/docs/fa/installation/) — گزینه‌های نصب CLI
-- [عیب‌یابی](/docs/fa/troubleshooting/) — مشکلات رایج deploy و اتصال
+- [شروع کار](/fa/getting-started/) — اولین سرور خود را deploy کنید
+- [نصب](/fa/installation/) — گزینه‌های نصب CLI
+- [عیب‌یابی](/fa/troubleshooting/) — مشکلات رایج deploy و اتصال

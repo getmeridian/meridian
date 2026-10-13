@@ -1,0 +1,9 @@
+{
+  "meridian.nav.blog": "博客",
+  "meridian.nav.demo": "演示",
+  "meridian.page.copy": "复制页面",
+  "meridian.page.copied": "已复制",
+  "meridian.page.view": "以 Markdown 查看",
+  "meridian.page.open": "在 {{assistant}} 中打开",
+  "meridian.page.prompt": "阅读 {{url}}，帮我使用 Meridian。"
+}

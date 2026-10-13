@@ -10,7 +10,7 @@ Meridian configures the server correctly, but it can't change where the server l
 You rent two kinds of servers, and they have different needs:
 
 - **Exit**: carries all traffic to the open internet. It should be outside the censored country.
-- **Relay**: a small TCP forwarder in front of an exit, see [Relay nodes](/docs/en/relay/). It needs a clean address that users can reach, and little else.
+- **Relay**: a small TCP forwarder in front of an exit, see [Relay nodes](/en/relay/). It needs a clean address that users can reach, and little else.
 
 ## What to look at
 
@@ -34,7 +34,7 @@ You rent two kinds of servers, and they have different needs:
 4. Leave it running for a few days and test again. Some addresses work at first and get throttled later.
 5. If it fails, delete the server and rent another address, then test again. Hourly billing makes this cheap.
 
-When a server stops working after it was fine, see [IP blocked recovery](/docs/en/recovery/).
+When a server stops working after it was fine, see [IP blocked recovery](/en/recovery/).
 
 ## Where not to put an exit
 
@@ -48,7 +48,7 @@ A relay on a domestic host helps when foreign IPs are blocked, but the person wh
 
 Blocks change quickly, so plan for them:
 
-- Deploy with the defaults (Reality, XHTTP, and Hysteria2), and add [domain mode](/docs/en/domain-mode/) so XHTTP and WSS travel through Cloudflare.
+- Deploy with the defaults (Reality, XHTTP, and Hysteria2), and add [domain mode](/en/domain-mode/) so XHTTP and WSS travel through Cloudflare.
 - Keep a second exit at a different provider and network (`meridian node add`), so one blocked address range doesn't take everything down.
 - Add a relay for networks that block your exit's address.
 
@@ -56,4 +56,4 @@ Every client's subscription lists all of them, and apps that use the Xray JSON o
 
 ## Camouflage target
 
-The host's network also shapes the best camouflage target. Pick a popular site with TLS 1.3 that sits on a network that looks natural next to your server: `meridian scan` finds candidates in the server's own neighborhood. Don't choose `apple.com` or `icloud.com` (their networks don't match hosting providers), and don't choose `www.microsoft.com`: its certificate chain is too large for REALITY, so the deploy converges but no traffic passes. See [Choosing a camouflage target](/docs/en/deploy/#choosing-a-camouflage-target).
+The host's network also shapes the best camouflage target. Pick a popular site with TLS 1.3 that sits on a network that looks natural next to your server: `meridian scan` finds candidates in the server's own neighborhood. Don't choose `apple.com` or `icloud.com` (their networks don't match hosting providers), and don't choose `www.microsoft.com`: its certificate chain is too large for REALITY, so the deploy converges but no traffic passes. See [Choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).

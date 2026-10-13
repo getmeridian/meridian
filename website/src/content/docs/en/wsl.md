@@ -199,6 +199,6 @@ Avoid storing `~/.ssh` or `~/.config/meridian` under `/mnt/c/`. Windows-mounted 
 
 ## Next steps
 
-- [Getting Started](/docs/en/getting-started/) — deploy your first server
-- [Installation](/docs/en/installation/) — CLI install options
-- [Troubleshooting](/docs/en/troubleshooting/) — common deployment and connection issues
+- [Getting Started](/en/getting-started/) — deploy your first server
+- [Installation](/en/installation/) — CLI install options
+- [Troubleshooting](/en/troubleshooting/) — common deployment and connection issues

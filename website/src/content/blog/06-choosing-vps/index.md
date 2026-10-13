@@ -79,4 +79,4 @@ No matter how carefully you choose your server, there is always a chance that it
 
 This is where Meridian’s fleet workflow helps. While the existing panel remains reachable, spin up a new VPS and run `meridian node add NEW_IP --name replacement`. Existing clients receive the new exit on their next subscription refresh, without recreating accounts or share links. See the recovery guide for panel-host and relay cases.
 
-For more details on getting started, deploying your first server, or setting up a relay, check out the [Meridian documentation](https://getmeridian.org/docs/en/getting-started). You can also read our guides on [sharing access with your tech-averse friends](/blog/03-tech-friend-guide/) and the [deep-dive into Meridian's architecture](/blog/04-meridian-architecture/).
+For more details on getting started, deploying your first server, or setting up a relay, check out the [Meridian documentation](https://getmeridian.org/en/getting-started). You can also read our guides on [sharing access with your tech-averse friends](/blog/03-tech-friend-guide/) and the [deep-dive into Meridian's architecture](/blog/04-meridian-architecture/).

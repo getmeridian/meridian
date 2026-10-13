@@ -129,7 +129,7 @@ The certificate for your domain can only be issued once the domain's A record po
 
 **Most common cause:** Server IP got blocked. Run `meridian test IP`; its findings distinguish network reachability from TLS, subscription, and proxy execution failures. A TCP failure can also mean a cloud firewall or an offline server.
 
-See the [IP Blocked Recovery guide](/docs/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
+See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
 
 Other causes:
 - Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/remnawave` and `/opt/remnanode`, then `systemctl restart nginx`
@@ -160,7 +160,7 @@ meridian doctor
 
 ## Relay not working
 
-See the [Relay guide — Troubleshooting](/docs/en/relay/#troubleshooting) section for relay-specific issues (port conflict, firewall, exit unreachable, service not started).
+See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section for relay-specific issues (port conflict, firewall, exit unreachable, service not started).
 
 ## Interpreting pre-flight checks
 

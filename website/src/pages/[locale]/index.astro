@@ -93,7 +93,7 @@ const hreflangLinks = [
 
             <CodeBlock code="meridian deploy" label={t('setup.step2.label', 'Step 2 — Deploy')} />
 
-            <p class="setup-hint" data-t="setup.hint" set:html={t('setup.hint', `The wizard asks for your server IP and handles the rest. Or pass flags directly — see the <a href="/docs/${locale}/cli-reference/" data-astro-prefetch>CLI reference</a>.`)} />
+            <p class="setup-hint" data-t="setup.hint" set:html={t('setup.hint', `The wizard asks for your server IP and handles the rest. Or pass flags directly — see the <a href="/${locale}/cli-reference/" data-astro-prefetch>CLI reference</a>.`)} />
           </div>
 
           <div class="setup-aside">
@@ -253,7 +253,7 @@ const hreflangLinks = [
         <p class="section-desc cta-desc" data-t="cta.desc">{t('cta.desc', 'Install Meridian, deploy to your server, and share access with the people who need it. The whole process takes about five minutes.')}</p>
         <div class="hero__actions cta-actions">
           <a href="#setup" class="hero__btn hero__btn--primary" data-t="cta.install">{t('cta.install', 'Install Meridian')}</a>
-          <a href={`/docs/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
+          <a href={`/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
             {t('hero.docs', 'Read the docs')}
           </a>
         </div>

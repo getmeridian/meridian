@@ -5,7 +5,7 @@ order: 3
 section: guides
 ---
 
-این راهنما تمام گزینه‌های `meridian deploy` را پوشش می‌دهد. اگر این استقرار اول شما است، با [Getting Started](/docs/fa/getting-started/) شروع کنید.
+این راهنما تمام گزینه‌های `meridian deploy` را پوشش می‌دهد. اگر این استقرار اول شما است، با [Getting Started](/fa/getting-started/) شروع کنید.
 
 ## استقرار بنیادی
 
@@ -13,7 +13,7 @@ section: guides
 meridian deploy 198.51.100.10
 ```
 
-یک سرور هم به صورت control plane (پنل Remnawave) و هم به عنوان exit تبدیل می‌شود که ترافیک را حمل می‌کند. Meridian توپولوژی بررسی‌شده‌ای را ایجاد می‌کند که [`meridian setup`](/docs/fa/cli-reference/#meridian-setup) تولید می‌کند و آن را با نقاط checkpoint اعمال می‌کند. قبل از اینکه "Done" چاپ کند، ترافیق واقعی را از طریق اشتراک تحویل‌داده‌شده هدایت می‌کند.
+یک سرور هم به صورت control plane (پنل Remnawave) و هم به عنوان exit تبدیل می‌شود که ترافیک را حمل می‌کند. Meridian توپولوژی بررسی‌شده‌ای را ایجاد می‌کند که [`meridian setup`](/fa/cli-reference/#meridian-setup) تولید می‌کند و آن را با نقاط checkpoint اعمال می‌کند. قبل از اینکه "Done" چاپ کند، ترافیق واقعی را از طریق اشتراک تحویل‌داده‌شده هدایت می‌کند.
 
 `meridian deploy` را بدون IP اجرا کنید و آن برای شما درخواست می‌کند. برای رد کردن تأیید‌ها `--yes` اضافه کنید:
 
@@ -42,7 +42,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--country CC` | جست‌وجو می‌شود | کشور نمایش‌داده‌شده در نام اتصال‌ها، مثل `DE`. Meridian آن را از رجیستری آدرس پیدا می‌کند؛ اگر اشتباه بود خودتان مشخص کنید |
 | `--yes` | | پرسش تأیید را رد کنید |
 
-پرچم‌های برای اسکریپت‌ها و UI‌ها (`--json`، `--events`، `--request`، `--dry-run`) در [CLI reference](/docs/fa/cli-reference/#meridian-deploy) توصیف شده‌اند.
+پرچم‌های برای اسکریپت‌ها و UI‌ها (`--json`، `--events`، `--request`، `--dry-run`) در [CLI reference](/fa/cli-reference/#meridian-deploy) توصیف شده‌اند.
 
 ## انتخاب هدف camouflage
 
@@ -69,7 +69,7 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 ### هدف camouflage در مقابل دامنه
 
 - **هدف camouflage** (`--sni`) — یک وب‌سایت محبوب که **مالک آن نیستید**. Reality آن را شخصیت‌سازی می‌کند.
-- **دامنه** (`--domain`) — دامنه‌ای که **مالک آن هستید**، که به سرور شما اشاره می‌کند. XHTTP و Hysteria2 به آن منتقل می‌شوند، و آن مسیر WSS را از طریق CDN Cloudflare اضافه می‌کند. [Domain mode](/docs/fa/domain-mode/) را ببینید.
+- **دامنه** (`--domain`) — دامنه‌ای که **مالک آن هستید**، که به سرور شما اشاره می‌کند. XHTTP و Hysteria2 به آن منتقل می‌شوند، و آن مسیر WSS را از طریق CDN Cloudflare اضافه می‌کند. [Domain mode](/fa/domain-mode/) را ببینید.
 
 ## Hysteria2
 
@@ -166,7 +166,7 @@ meridian route remove exit-1 warp
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-برای راهی برای باز کردن سایت‌های روسی بطور مستقیم در حالی‌که مسدودسازی را نگه می‌دارید، [Split routing](/docs/fa/split-routing/) را ببینید.
+برای راهی برای باز کردن سایت‌های روسی بطور مستقیم در حالی‌که مسدودسازی را نگه می‌دارید، [Split routing](/fa/split-routing/) را ببینید.
 
 ## IP کلاینت‌ها
 
@@ -182,7 +182,7 @@ meridian deploy 198.51.100.10 --client-ips
 
 ## افزودن relay
 
-پس از اجرای exit، یک relay روی سرور داخلی اضافه کنید تا کاربران زمانی‌که IP خروج مسدود می‌شود راه ورودی داشته باشند. [راهنمای Relay](/docs/fa/relay/) را ببینید.
+پس از اجرای exit، یک relay روی سرور داخلی اضافه کنید تا کاربران زمانی‌که IP خروج مسدود می‌شود راه ورودی داشته باشند. [راهنمای Relay](/fa/relay/) را ببینید.
 
 ```
 meridian relay add 203.0.113.10 --exit 198.51.100.10
@@ -192,6 +192,6 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 Meridian [Remnawave](https://remna.st/) را به عنوان پنل آن نصب می‌کند. پنل توسط nginx روی مسیر مخفی تصادفی، جدا از مسیر صفحه اتصال، پروکسی معکوس می‌شود، بنابراین لینک‌های که اشتراک می‌کنید هرگز آن را فاش نمی‌کنند. `meridian panel` URL و ورود را چاپ می‌کند (`--show-password` برای رمز عبور).
 
-مسیر پنل را مثل رمز عبور رفتار کنید. CLI از همان API پنل استفاده می‌کند، بنابراین تغییرات CLI در پنل نمایش داده می‌شوند. Meridian میزبان‌ها، profile‌ها و template‌های را که ایجاد می‌کند مالک است: اگر آن‌ها را در پنل ویرایش کنید، `meridian plan` تفاوت را گزارش می‌دهد و بعدی اعمال نسخه Meridian را بازگردانده. وضعیت client، محدودیت‌ها، انقضا و کاربرانی که خود اضافه می‌کنید مال شما هستند؛ [Web panel](/docs/fa/client-management/#web-panel) را ببینید.
+مسیر پنل را مثل رمز عبور رفتار کنید. CLI از همان API پنل استفاده می‌کند، بنابراین تغییرات CLI در پنل نمایش داده می‌شوند. Meridian میزبان‌ها، profile‌ها و template‌های را که ایجاد می‌کند مالک است: اگر آن‌ها را در پنل ویرایش کنید، `meridian plan` تفاوت را گزارش می‌دهد و بعدی اعمال نسخه Meridian را بازگردانده. وضعیت client، محدودیت‌ها، انقضا و کاربرانی که خود اضافه می‌کنید مال شما هستند؛ [Web panel](/fa/client-management/#پنل-وب) را ببینید.
 
 Meridian نسخه‌های Remnawave را که تست کرده است pin می‌کند. `meridian fleet upgrade` سرورهای شما را بدون انتظار برای به‌روزرسانی Meridian به جدیدترین نسخه Remnawave در همان major می‌برد. اگر خودتان Remnawave را ارتقا دهید، Meridian آن را downgrade نمی‌کند.

@@ -5,7 +5,7 @@ order: 3
 section: guides
 ---
 
-This guide covers every option of `meridian deploy`. If this is your first deployment, start with [Getting Started](/docs/en/getting-started/).
+This guide covers every option of `meridian deploy`. If this is your first deployment, start with [Getting Started](/en/getting-started/).
 
 ## Basic deployment
 
@@ -13,7 +13,7 @@ This guide covers every option of `meridian deploy`. If this is your first deplo
 meridian deploy 198.51.100.10
 ```
 
-One server becomes both the control plane (the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/docs/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
+One server becomes both the control plane (the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
 
 Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip confirmations:
 
@@ -42,7 +42,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--country CC` | looked up | Country shown in connection names, such as `DE`. Meridian looks it up from the address registry; set it if that is wrong |
 | `--yes` | | Skip confirmation prompts |
 
-Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are described in the [CLI reference](/docs/en/cli-reference/#meridian-deploy).
+Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are described in the [CLI reference](/en/cli-reference/#meridian-deploy).
 
 ## Choosing a camouflage target
 
@@ -69,7 +69,7 @@ To check one target by hand, run `meridian check 198.51.100.10 --sni HOST`. Avoi
 ### Camouflage target vs. domain
 
 - **Camouflage target** (`--sni`) — a popular website you **don't** own. Reality impersonates it.
-- **Domain** (`--domain`) — a domain you **do** own, pointed at your server. XHTTP and Hysteria2 move to it, and it adds a WSS path through Cloudflare's CDN. See [Domain mode](/docs/en/domain-mode/).
+- **Domain** (`--domain`) — a domain you **do** own, pointed at your server. XHTTP and Hysteria2 move to it, and it adds a WSS path through Cloudflare's CDN. See [Domain mode](/en/domain-mode/).
 
 ## Hysteria2
 
@@ -166,7 +166,7 @@ Turn it off if your users need those sites through Meridian:
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-For a way to open Russian sites directly while keeping the block, see [Split routing](/docs/en/split-routing/).
+For a way to open Russian sites directly while keeping the block, see [Split routing](/en/split-routing/).
 
 ## Client IPs
 
@@ -182,7 +182,7 @@ nginx then passes each client's address to Xray and the panel. Hysteria2 is dire
 
 ## Adding a relay
 
-After the exit is running, add a relay on a domestic server so users keep a way in if the exit IP gets blocked. See the [Relay guide](/docs/en/relay/).
+After the exit is running, add a relay on a domestic server so users keep a way in if the exit IP gets blocked. See the [Relay guide](/en/relay/).
 
 ```
 meridian relay add 203.0.113.10 --exit 198.51.100.10
@@ -192,6 +192,6 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints the URL and admin login (`--show-password` for the password).
 
-Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/docs/en/client-management/#web-panel).
+Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/en/client-management/#web-panel).
 
 Meridian pins the Remnawave versions it has tested. `meridian fleet upgrade` moves your servers to the newest Remnawave release in the same major, without waiting for a Meridian update. If you upgrade Remnawave yourself, Meridian does not downgrade it.

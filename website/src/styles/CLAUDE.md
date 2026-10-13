@@ -12,6 +12,8 @@
 
 **Color naming is generic** — `--ac` (accent), `--t1` (text primary), `--s1` (surface). Requires familiarity but keeps the token set small and composable.
 
+**Starlight theme** — `starlight.css` maps the palette onto Starlight's `--sl-color-*` scale (white = strongest text, black = page background, inverted for light mode) and applies Fraunces to headings. Change both files when the palette moves.
+
 ## What's done well
 
 - **Dark mode is a full token remap** — every property has a dark variant. Dual-selector approach: `@media (prefers-color-scheme: dark) :root:not([data-theme="light"])` + `[data-theme="dark"]`.

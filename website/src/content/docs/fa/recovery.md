@@ -53,7 +53,7 @@ meridian node replace exit-1 198.51.100.20
 meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-مراحل Cloudflare را ببینید [حالت دامنه](/docs/fa/domain-mode/).
+مراحل Cloudflare را ببینید [حالت دامنه](/fa/domain-mode/).
 
 ### اضافه کردن relay
 

@@ -40,7 +40,7 @@ const dir = locale === 'fa' ? 'rtl' : 'ltr';
           var l=localStorage.getItem('meridian-lang');
           if(l){document.documentElement.lang=l;if(l==='fa')document.documentElement.dir='rtl';}
         }
-        var t=localStorage.getItem('meridian-theme');
+        var t=localStorage.getItem('starlight-theme')||localStorage.getItem('meridian-theme');
         if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
       })();
     </script>
@@ -80,47 +80,19 @@ const dir = locale === 'fa' ? 'rtl' : 'ltr';
 
       function updateDocsLinks(lang: string) {
         if (lang === 'en') return;
-        document.querySelectorAll<HTMLAnchorElement>('a[href*="/docs/en/"]').forEach((a) => {
-          a.href = a.href.replace('/docs/en/', `/docs/${lang}/`);
+        // Docs links on English pages point at /en/...; follow the reader's language.
+        document.querySelectorAll<HTMLAnchorElement>('a[href^="/en/"]').forEach((a) => {
+          a.setAttribute('href', a.getAttribute('href')!.replace(/^\/en\//, `/${lang}/`));
         });
-      }
-
-      /**
-       * On docs pages, read available locales from the embedded JSON and
-       * update the header LanguagePicker: disable unavailable languages,
-       * highlight the current locale.
-       */
-      function initDocsLocales(currentLang: string) {
-        const el = document.getElementById('docs-locales');
-        if (!el) return null;
-        try {
-          const locales = JSON.parse(el.textContent || '[]') as { code: string; label: string; href: string }[];
-          const available = new Set(locales.map((l) => l.code));
-          // Update picker button states
-          document.querySelectorAll('.lang-picker__btn').forEach((btn) => {
-            const code = (btn as HTMLElement).dataset.lang!;
-            if (!available.has(code)) {
-              btn.classList.add('lang-picker__btn--unavailable');
-            } else {
-              btn.classList.remove('lang-picker__btn--unavailable');
-            }
-            btn.classList.toggle('lang-picker__btn--active', code === currentLang);
-          });
-          return locales;
-        } catch {
-          return null;
-        }
       }
 
       // Auto-detect and apply language on load
       const lang = detectLocale();
-      const docsLocales = initDocsLocales(lang);
 
       if (lang !== 'en') {
         setLang(lang, translations);
         updateDocsLinks(lang);
-      } else if (!docsLocales) {
-        // Non-docs page: still update picker active state for English
+      } else {
         document.querySelectorAll('.lang-picker__btn').forEach((btn) => {
           btn.classList.toggle('lang-picker__btn--active', (btn as HTMLElement).dataset.lang === 'en');
         });
@@ -133,21 +105,6 @@ const dir = locale === 'fa' ? 'rtl' : 'ltr';
         const lang = btn.dataset.lang as 'en' | 'ru' | 'fa' | 'zh';
         if (!lang) return;
 
-        // On docs pages, navigate to the locale-specific URL
-        const localesEl = document.getElementById('docs-locales');
-        if (localesEl) {
-          try {
-            const locales = JSON.parse(localesEl.textContent || '[]') as { code: string; href: string }[];
-            const target = locales.find((l) => l.code === lang);
-            if (target) {
-              localStorage.setItem('meridian-lang', lang);
-              location.href = target.href;
-              return;
-            }
-          } catch {}
-        }
-
-        // Non-docs pages: existing behavior
         if (lang === 'en') {
           localStorage.setItem('meridian-lang', 'en');
           location.reload();

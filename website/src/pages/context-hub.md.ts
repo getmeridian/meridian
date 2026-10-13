@@ -1,17 +1,15 @@
 import type { APIRoute } from 'astro';
-import { getCollection } from 'astro:content';
+import { docBody, docsInOrder, markdownResponse } from '../lib/docs-markdown';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const GET: APIRoute = async () => {
-  const docs = await getCollection('docs');
-  const enDocs = docs.filter(doc => doc.id.startsWith('en/'));
-  const sorted = enDocs.sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99));
+  const sorted = await docsInOrder('en');
 
   // Read version from VERSION file
   let version = '0.0.0';
   try {
-    version = fs.readFileSync(path.resolve('../../VERSION'), 'utf-8').trim();
+    version = fs.readFileSync(path.resolve('../VERSION'), 'utf-8').trim();
   } catch {
     // fallback
   }
@@ -41,18 +39,8 @@ export const GET: APIRoute = async () => {
   ];
 
   for (const doc of sorted) {
-    const filePath = path.resolve(`src/content/docs/${doc.id}.md`);
-    try {
-      const raw = fs.readFileSync(filePath, 'utf-8');
-      let content = raw.replace(/^---[\s\S]*?---\n/, '');
-      content = content.replace(/\(\/docs\//g, '(/md/');
-      sections.push(`## ${doc.data.title}\n\n${content.trim()}\n`);
-    } catch {
-      sections.push(`## ${doc.data.title}\n\n(Content not available)\n`);
-    }
+    sections.push(`## ${doc.data.title}\n\n${docBody(doc)}\n`);
   }
 
-  return new Response(sections.join('\n'), {
-    headers: { 'Content-Type': 'text/markdown; charset=utf-8' },
-  });
+  return markdownResponse(sections.join('\n'));
 };

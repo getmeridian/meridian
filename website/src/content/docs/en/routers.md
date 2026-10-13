@@ -108,7 +108,7 @@ xkeen -start
 
 ## Domestic sites stay direct
 
-By default the exit refuses traffic to Russian domains and IP ranges (`--geo-block`). A router that sends everything through the tunnel would break Russian sites. Send them directly from the router instead; podkop does this by design, and with XKeen you choose the second routing mode above. [Split routing](/docs/en/split-routing/) explains the layers.
+By default the exit refuses traffic to Russian domains and IP ranges (`--geo-block`). A router that sends everything through the tunnel would break Russian sites. Send them directly from the router instead; podkop does this by design, and with XKeen you choose the second routing mode above. [Split routing](/en/split-routing/) explains the layers.
 
 ## Pitfalls
 
@@ -120,4 +120,4 @@ By default the exit refuses traffic to Russian domains and IP ranges (`--geo-blo
 
 ## Verify
 
-From a device behind the router, open an IP-checking page: it should show your exit's address. From your own machine, `meridian test` checks the delivered subscription end to end, and `meridian check` confirms the server side. See [Troubleshooting](/docs/en/troubleshooting/) if they disagree.
+From a device behind the router, open an IP-checking page: it should show your exit's address. From your own machine, `meridian test` checks the delivered subscription end to end, and `meridian check` confirms the server side. See [Troubleshooting](/en/troubleshooting/) if they disagree.

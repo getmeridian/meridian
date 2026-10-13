@@ -10,7 +10,7 @@ section: reference
 - **باگ؟** از [الگوی گزارش باگ](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) استفاده کنید — ابتدا `meridian doctor` را اجرا کنید
 - **مسئله اتصال؟** از [الگوی مسئله اتصال](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) استفاده کنید — ابتدا `meridian test` و `meridian check` را اجرا کنید
 - **ایده ویژگی؟** از [الگوی درخواست ویژگی](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml) استفاده کنید
-- **آسیب‌پذیری امنیتی؟** ببینید [Security](/docs/fa/security/) — issue عمومی نباز نکنید
+- **آسیب‌پذیری امنیتی؟** ببینید [Security](/fa/security/) — issue عمومی نباز نکنید
 
 ## راه‌اندازی توسعه
 

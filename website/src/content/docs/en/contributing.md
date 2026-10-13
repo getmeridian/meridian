@@ -10,7 +10,7 @@ section: reference
 - **Bug?** Use the [bug report template](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — run `meridian doctor` first
 - **Connection issue?** Use the [connection issue template](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — run `meridian test` and `meridian check` first
 - **Feature idea?** Use the [feature request template](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
-- **Security vulnerability?** See [Security](/docs/en/security/) — do NOT open a public issue
+- **Security vulnerability?** See [Security](/en/security/) — do NOT open a public issue
 
 ## Development setup
 

@@ -99,7 +99,7 @@ A critical differentiator between these tools is what they secure by default. A 
 | **BBR Congestion Control** | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Reverse Proxy** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
 
-As the table shows, most tools leave critical hardening tasks to the user. Meridian and, to a lesser extent, Hiddify are the exceptions, aiming to provide a secure-by-default experience. This is a core part of Meridian's philosophy, which you can read more about in our [security documentation](https://getmeridian.org/docs/en/security).
+As the table shows, most tools leave critical hardening tasks to the user. Meridian and, to a lesser extent, Hiddify are the exceptions, aiming to provide a secure-by-default experience. This is a core part of Meridian's philosophy, which you can read more about in our [security documentation](https://getmeridian.org/en/security).
 
 ## Honest gaps: what Meridian doesn't do
 
@@ -107,7 +107,7 @@ No tool is perfect for every situation, and an honest comparison requires acknow
 
 First, it does not have a web UI for management. This is a deliberate design choice. A command-line interface is more easily scripted, audited, and has a significantly smaller attack surface than a complex web application. Second, Meridian does not have its own dedicated client app. It uses the rich ecosystem of existing V2Ray/Xray clients, which are available for every major platform. This avoids vendor lock-in and allows users to choose the client they prefer.
 
-Third, Meridian focuses exclusively on the [VLESS+Reality protocol](/blog/01-why-vless-reality/). Rather than supporting dozens of protocols, we focus on making one highly effective and resilient protocol as robust as possible. Finally, Meridian is a newer project with a smaller community than the more established panels. This means fewer tutorials and community resources, though we are working hard to build this out with our comprehensive [documentation](https://getmeridian.org/docs/en/getting-started).
+Third, Meridian focuses exclusively on the [VLESS+Reality protocol](/blog/01-why-vless-reality/). Rather than supporting dozens of protocols, we focus on making one highly effective and resilient protocol as robust as possible. Finally, Meridian is a newer project with a smaller community than the more established panels. This means fewer tutorials and community resources, though we are working hard to build this out with our comprehensive [documentation](https://getmeridian.org/en/getting-started).
 
 ## Picking the right tool for your situation
 
@@ -117,4 +117,4 @@ If you want a graphical interface above all else and are comfortable with manual
 
 If you are the designated "tech friend" for your circle and need a tool that is both powerful for you and simple for your users, we built **Meridian** for you. It automates the difficult parts of server administration while providing a seamless sharing experience, giving you a hardened, resilient proxy server with a single command. 
 
-Ready to give it a try? Get started with our [installation guide](https://getmeridian.org/docs/en/getting-started).
+Ready to give it a try? Get started with our [installation guide](https://getmeridian.org/en/getting-started).

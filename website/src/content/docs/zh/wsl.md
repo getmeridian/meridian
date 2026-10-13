@@ -199,6 +199,6 @@ mkdir -p projects
 
 ## 后续步骤
 
-- [快速开始](/docs/zh/getting-started/) — 部署您的第一台服务器
-- [安装](/docs/zh/installation/) — CLI 安装选项
-- [故障排除](/docs/zh/troubleshooting/) — 常见部署和连接问题
+- [快速开始](/zh/getting-started/) — 部署您的第一台服务器
+- [安装](/zh/installation/) — CLI 安装选项
+- [故障排除](/zh/troubleshooting/) — 常见部署和连接问题

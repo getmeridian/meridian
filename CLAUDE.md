@@ -17,7 +17,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan / apply` compile it and reconcile resource drivers. Website/Studio live in Astro; static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); emerging topology contracts model server capabilities plus routing policy so a server can be both relay and exit. Every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan / apply` compile it and reconcile resource drivers. Website/Studio live in Astro, with docs on Starlight (every page also served as Markdown for agents); static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
 
 ## Per-folder CLAUDE.md — the knowledge system
 
@@ -70,12 +70,12 @@ tests/CLAUDE.md                         — testing philosophy, MockConnection
 ├── systemlab/CLAUDE.md                 — Docker lab topology, CI boundary
 └── realvm/CLAUDE.md                    — real-VM harness, tier α/β/γ, never-in-CI
 
-website/CLAUDE.md                       — Astro rationale, i18n strategy
+website/CLAUDE.md                       — Astro + Starlight docs, agent endpoints, i18n
 ├── src/components/CLAUDE.md            — composition pattern
 ├── src/content/docs/CLAUDE.md          — locale parity, frontmatter schema
 ├── src/i18n/CLAUDE.md                  — asymmetric i18n, detection cascade
-├── src/layouts/CLAUDE.md               — Base/Docs/BlogPost shells, RTL
-├── src/pages/CLAUDE.md                 — dynamic routing, machine-readable endpoints
+├── src/layouts/CLAUDE.md               — Base/BlogPost shells, early theme + locale
+├── src/pages/CLAUDE.md                 — docs entry, Markdown twins, machine-readable endpoints
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
 ├── src/studio/CLAUDE.md                — generated Studio contracts, future adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette

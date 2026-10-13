@@ -11,7 +11,7 @@ section: guides
 
 شما نیاز دارید:
 - **VPS** درحال اجرای Debian یا Ubuntu که می‌توانید از طریق SSH با کلید، به‌عنوان root یا کاربر با sudo بدون گذرواژه دسترسی داشته باشید
-- **ترمینال** روی کامپیوتر خود (macOS، Linux یا [WSL روی Windows](/docs/fa/wsl/))
+- **ترمینال** روی کامپیوتر خود (macOS، Linux یا [WSL روی Windows](/fa/wsl/))
 
 ## نصب CLI
 
@@ -19,11 +19,11 @@ section: guides
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-این دستور `meridian` را با [uv](https://docs.astral.sh/uv/) (یا pipx به‌عنوان fallback) نصب می‌کند. گزینه‌های دیگر را در [Installation](/docs/fa/installation/) ببینید.
+این دستور `meridian` را با [uv](https://docs.astral.sh/uv/) (یا pipx به‌عنوان fallback) نصب می‌کند. گزینه‌های دیگر را در [Installation](/fa/installation/) ببینید.
 
 Meridian را روی ماشین خود (نه روی VPS) اجرا کنید: روی SSH متصل می‌شود، اعتبارنامه‌ها را روی دستگاه نگه می‌دارد و `meridian test` سرور را از خارج بررسی می‌کند.
 
-> از Meridian 3.x می‌آیید؟ 4.0 ارتقا درجا **نیست**. ابتدا [Upgrading from 3.x](/docs/fa/installation/#upgrading-from-3x) را بخوانید.
+> از Meridian 3.x می‌آیید؟ 4.0 ارتقا درجا **نیست**. ابتدا [Upgrading from 3.x](/fa/installation/#ارتقا-از-3x) را بخوانید.
 
 ## Deploy
 
@@ -72,7 +72,7 @@ meridian test 198.51.100.10
 meridian client add alice
 ```
 
-هر شخص کلید خود، صفحه اتصال و URL اشتراک دارند. `meridian client list` همه را نشان می‌دهد و `meridian client disable alice` کسی را فوری قطع می‌کند. [Client management](/docs/fa/client-management/) را ببینید.
+هر شخص کلید خود، صفحه اتصال و URL اشتراک دارند. `meridian client list` همه را نشان می‌دهد و `meridian client disable alice` کسی را فوری قطع می‌کند. [Client management](/fa/client-management/) را ببینید.
 
 ## محل اقامت چیزها
 
@@ -96,8 +96,8 @@ meridian setup
 
 ## مراحل بعدی
 
-- [Deploy guide](/docs/fa/deploy/) — هر گزینه deploy، camouflage targets، redeploys
-- [Domain mode](/docs/fa/domain-mode/) — CDN Cloudflare fallback با دامنه خود اضافه کنید
-- [Relay nodes](/docs/fa/relay/) — به کاربران نقطه‌ورود داخلی دهید
-- [IP blocked?](/docs/fa/recovery/) — وقتی سرور block شود چه کنید
-- [Troubleshooting](/docs/fa/troubleshooting/) — مسائل و راه‌حل‌های رایج
+- [Deploy guide](/fa/deploy/) — هر گزینه deploy، camouflage targets، redeploys
+- [Domain mode](/fa/domain-mode/) — CDN Cloudflare fallback با دامنه خود اضافه کنید
+- [Relay nodes](/fa/relay/) — به کاربران نقطه‌ورود داخلی دهید
+- [IP blocked?](/fa/recovery/) — وقتی سرور block شود چه کنید
+- [Troubleshooting](/fa/troubleshooting/) — مسائل و راه‌حل‌های رایج

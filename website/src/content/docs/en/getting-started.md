@@ -11,7 +11,7 @@ One command turns a fresh VPS into a hardened, undetectable proxy and gives you 
 
 You need:
 - A **VPS** running Debian or Ubuntu that you can reach over SSH with a key, as root or a user with passwordless sudo
-- A **terminal** on your own machine (macOS, Linux, or [WSL on Windows](/docs/en/wsl/))
+- A **terminal** on your own machine (macOS, Linux, or [WSL on Windows](/en/wsl/))
 
 ## Install the CLI
 
@@ -19,11 +19,11 @@ You need:
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-This installs the `meridian` command with [uv](https://docs.astral.sh/uv/) (or pipx as a fallback). See [Installation](/docs/en/installation/) for other options.
+This installs the `meridian` command with [uv](https://docs.astral.sh/uv/) (or pipx as a fallback). See [Installation](/en/installation/) for other options.
 
 Run Meridian on your own machine rather than on the VPS: it connects over SSH, keeps credentials on your device, and lets `meridian test` check the server from the outside.
 
-> Coming from Meridian 3.x? 4.0 is not an in-place upgrade. Read [Upgrading from 3.x](/docs/en/installation/#upgrading-from-3x) first.
+> Coming from Meridian 3.x? 4.0 is not an in-place upgrade. Read [Upgrading from 3.x](/en/installation/#upgrading-from-3x) first.
 
 ## Deploy
 
@@ -72,7 +72,7 @@ meridian test 198.51.100.10
 meridian client add alice
 ```
 
-Each person gets their own key, connection page, and subscription URL. `meridian client list` shows everyone, and `meridian client disable alice` cuts someone off immediately. See [Client management](/docs/en/client-management/).
+Each person gets their own key, connection page, and subscription URL. `meridian client list` shows everyone, and `meridian client disable alice` cuts someone off immediately. See [Client management](/en/client-management/).
 
 ## Where things live
 
@@ -96,8 +96,8 @@ You can also grow a deployment one step at a time with `meridian node add` and `
 
 ## Next steps
 
-- [Deploy guide](/docs/en/deploy/) — every deploy option, camouflage targets, redeploys
-- [Domain mode](/docs/en/domain-mode/) — add a Cloudflare CDN fallback with your own domain
-- [Relay nodes](/docs/en/relay/) — give users a domestic entry point
-- [IP blocked?](/docs/en/recovery/) — what to do when the server gets blocked
-- [Troubleshooting](/docs/en/troubleshooting/) — common issues and fixes
+- [Deploy guide](/en/deploy/) — every deploy option, camouflage targets, redeploys
+- [Domain mode](/en/domain-mode/) — add a Cloudflare CDN fallback with your own domain
+- [Relay nodes](/en/relay/) — give users a domestic entry point
+- [IP blocked?](/en/recovery/) — what to do when the server gets blocked
+- [Troubleshooting](/en/troubleshooting/) — common issues and fixes

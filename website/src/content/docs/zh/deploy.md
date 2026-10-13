@@ -5,7 +5,7 @@ order: 3
 section: guides
 ---
 
-本指南涵盖 `meridian deploy` 的每个选项。如果这是你的第一次部署，从[快速开始](/docs/zh/getting-started/)开始。
+本指南涵盖 `meridian deploy` 的每个选项。如果这是你的第一次部署，从[快速开始](/zh/getting-started/)开始。
 
 ## 基本部署
 
@@ -13,7 +13,7 @@ section: guides
 meridian deploy 198.51.100.10
 ```
 
-一个服务器既是控制平面（Remnawave 面板）又是出口。Meridian 构建 [`meridian setup`](/docs/zh/cli-reference/#meridian-setup) 生成的同样已审核拓扑，并用检查点应用它。在打印"完成"之前，它会通过交付的订阅推送真实流量。
+一个服务器既是控制平面（Remnawave 面板）又是出口。Meridian 构建 [`meridian setup`](/zh/cli-reference/#meridian-setup) 生成的同样已审核拓扑，并用检查点应用它。在打印"完成"之前，它会通过交付的订阅推送真实流量。
 
 不指定 IP 直接运行 `meridian deploy`，它会提示。添加 `--yes` 跳过确认：
 
@@ -42,7 +42,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--country CC` | 自动查询 | 显示在连接名称中的国家，例如 `DE`。Meridian 根据地址注册机构信息查询；如果不对，请手动指定 |
 | `--yes` | | 跳过确认提示 |
 
-脚本和 UI 的标志（`--json`、`--events`、`--request`、`--dry-run`）在 [CLI 参考](/docs/zh/cli-reference/#meridian-deploy)中描述。
+脚本和 UI 的标志（`--json`、`--events`、`--request`、`--dry-run`）在 [CLI 参考](/zh/cli-reference/#meridian-deploy)中描述。
 
 ## 选择伪装目标
 
@@ -69,7 +69,7 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 ### 伪装目标 vs 域名
 
 - **伪装目标** (`--sni`) — 你**不**拥有的真实网站。Reality 模仿它。
-- **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。XHTTP 和 Hysteria2 移到它，它还添加通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/docs/zh/domain-mode/)。
+- **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。XHTTP 和 Hysteria2 移到它，它还添加通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/zh/domain-mode/)。
 
 ## Hysteria2
 
@@ -166,7 +166,7 @@ meridian route remove exit-1 warp
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-要在保持阻止的同时打开俄罗斯网站直接访问，详见[分流路由](/docs/zh/split-routing/)。
+要在保持阻止的同时打开俄罗斯网站直接访问，详见[分流路由](/zh/split-routing/)。
 
 ## 客户端 IP
 
@@ -182,7 +182,7 @@ nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是�
 
 ## 添加中继
 
-出口运行后，在国内服务器上添加中继，这样如果出口 IP 被阻止，用户保持有访问方式。详见[中继指南](/docs/zh/relay/)。
+出口运行后，在国内服务器上添加中继，这样如果出口 IP 被阻止，用户保持有访问方式。详见[中继指南](/zh/relay/)。
 
 ```
 meridian relay add 203.0.113.10 --exit 198.51.100.10
@@ -192,6 +192,6 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx 在随机秘密路径上反向代理，与连接页面路径分开，所以你分享的链接永不显示它。`meridian panel` 打印 URL 和管理员登录（`--show-password` 用于密码）。
 
-像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。客户端状态、限制、过期和您自己添加的用户是您的；详见 [Web 面板](/docs/zh/client-management/#web-panel)。
+像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。客户端状态、限制、过期和您自己添加的用户是您的；详见 [Web 面板](/zh/client-management/#web-面板)。
 
 Meridian 固定了它已测试的 Remnawave 版本。`meridian fleet upgrade` 会把你的服务器升级到同一主版本内最新的 Remnawave，无需等待 Meridian 更新。如果你自己升级 Remnawave，Meridian 不会降级它。

@@ -53,7 +53,7 @@ meridian node replace exit-1 198.51.100.20
 meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-См. [Domain mode](/docs/ru/domain-mode/) для шагов Cloudflare.
+См. [Domain mode](/ru/domain-mode/) для шагов Cloudflare.
 
 ### Добавить ретранслятор
 

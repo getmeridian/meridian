@@ -49,7 +49,7 @@ Following the installation, you can begin the deployment process:
 meridian deploy
 ```
 
-The tool will then prompt you for a few configuration details, such as a password for the administrative panel. Once you provide the necessary information, Meridian will proceed to install all the required software components, configure the firewall, set up automatic TLS certificates, and implement various [security hardening measures](/blog/02-proxy-server-hardening-2026/). Within approximately five minutes, you will receive a confirmation that the deployment has been successfully completed, along with the connection details for your new proxy server. The full deployment process is covered in our [getting started documentation](https://getmeridian.org/docs/en/getting-started).
+The tool will then prompt you for a few configuration details, such as a password for the administrative panel. Once you provide the necessary information, Meridian will proceed to install all the required software components, configure the firewall, set up automatic TLS certificates, and implement various [security hardening measures](/blog/02-proxy-server-hardening-2026/). Within approximately five minutes, you will receive a confirmation that the deployment has been successfully completed, along with the connection details for your new proxy server. The full deployment process is covered in our [getting started documentation](https://getmeridian.org/en/getting-started).
 
 ### Solving the handoff problem
 
@@ -69,7 +69,7 @@ flowchart TD
 
 ### Managing access to your server
 
-Creating individual configurations for each user is a fundamental aspect of maintaining good security and effective management. If all users share the same access key, it becomes impossible to determine who is using the service, and you cannot revoke access for a single individual without disrupting the service for everyone else. Meridian simplifies the process of managing individual clients, as detailed in our [client management documentation](https://getmeridian.org/docs/en/client-management).
+Creating individual configurations for each user is a fundamental aspect of maintaining good security and effective management. If all users share the same access key, it becomes impossible to determine who is using the service, and you cannot revoke access for a single individual without disrupting the service for everyone else. Meridian simplifies the process of managing individual clients, as detailed in our [client management documentation](https://getmeridian.org/en/client-management).
 
 You can add a new client using a straightforward command:
 
@@ -94,7 +94,7 @@ graph TD
 
 ### What to do when things go wrong
 
-Even with a well-configured setup, occasional issues can arise. The most common problem is the server's IP address being blocked by network administrators or online services. With a commercial VPN, you would typically need to contact customer support and wait for a resolution. With a self-hosted proxy, you can add a replacement exit while the existing panel remains reachable. Our [recovery documentation](https://getmeridian.org/docs/en/recovery/) explains panel-host and relay cases in more detail.
+Even with a well-configured setup, occasional issues can arise. The most common problem is the server's IP address being blocked by network administrators or online services. With a commercial VPN, you would typically need to contact customer support and wait for a resolution. With a self-hosted proxy, you can add a replacement exit while the existing panel remains reachable. Our [recovery documentation](https://getmeridian.org/en/recovery/) explains panel-host and relay cases in more detail.
 
 ```bash
 meridian node add <NEW_IP_ADDRESS> --name replacement
@@ -106,4 +106,4 @@ Existing clients receive the replacement exit on their next subscription refresh
 
 Finally, let's consider the financial aspect. A dependable VPS from a reputable provider such as DigitalOcean or Vultr typically costs around $5 per month. This single server can comfortably accommodate 5-10 users, depending on their individual usage patterns. When you compare this to the cost of multiple commercial VPN subscriptions, the financial savings become readily apparent. You are not only obtaining a superior and more private solution, but you are also doing so at a significantly lower cost. This is the power of disintermediation – removing the middleman and taking control of your own infrastructure.
 
-Being the designated tech expert for your friends and family is a responsibility, but it is also an opportunity to provide meaningful assistance to the people you care about. With the appropriate tools, you can offer them a secure and private gateway to the internet, free from the compromises and limitations of commercial services. For more detailed information on getting started with your own private proxy server, please refer to the [Meridian documentation](https://getmeridian.org/docs/en/getting-started).
+Being the designated tech expert for your friends and family is a responsibility, but it is also an opportunity to provide meaningful assistance to the people you care about. With the appropriate tools, you can offer them a secure and private gateway to the internet, free from the compromises and limitations of commercial services. For more detailed information on getting started with your own private proxy server, please refer to the [Meridian documentation](https://getmeridian.org/en/getting-started).

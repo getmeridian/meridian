@@ -53,7 +53,7 @@ If you weren't using a domain, add one to the new exit:
 meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-See [Domain mode](/docs/en/domain-mode/) for the Cloudflare steps.
+See [Domain mode](/en/domain-mode/) for the Cloudflare steps.
 
 ### Add a relay
 

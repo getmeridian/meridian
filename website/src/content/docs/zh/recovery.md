@@ -53,7 +53,7 @@ meridian node replace exit-1 198.51.100.20
 meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-见 [Domain mode](/docs/en/domain-mode/) 的 Cloudflare 步骤。
+见 [Domain mode](/en/domain-mode/) 的 Cloudflare 步骤。
 
 ### 添加中继
 

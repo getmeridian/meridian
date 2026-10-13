@@ -10,6 +10,8 @@
 
 **Fast animations, always visible** — CSS transitions should feel instant (most under 100ms; decorative transforms like accordion chevron rotation can be slightly longer). Never hide interactive elements behind hover — components must be visible at all times. Hover states are for visual feedback, not for revealing content.
 
+**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`). Wrap Starlight's default component instead of copying it.
+
 ## What's done well
 
 - **Accordion `> summary` rule** — child combinator prevents style leaking into nested `<details>`. Learned from a real bug where parent chevrons appeared on nested toggles.

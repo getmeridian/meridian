@@ -510,7 +510,7 @@ class TestPWATemplateSource:
 
     def test_app_js_links_the_localized_router_guide(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        assert "'https://getmeridian.org/docs/{lang}/routers/'" in app_js
+        assert "'https://getmeridian.org/{lang}/routers/'" in app_js
 
     def test_app_js_prefers_the_shared_catalog(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()

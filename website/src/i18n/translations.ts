@@ -36,7 +36,7 @@ export const translations: Record<string, Record<string, string>> = {
     'setup.step1.label': 'Шаг 1 — Установка',
     'setup.step2.label': 'Шаг 2 — Развёртывание',
     'setup.then': 'затем',
-    'setup.hint': 'Мастер спросит IP сервера и настроит всё. Или передайте флаги напрямую — смотрите <a href="/docs/ru/cli-reference/">справочник CLI</a>.',
+    'setup.hint': 'Мастер спросит IP сервера и настроит всё. Или передайте флаги напрямую — смотрите <a href="/ru/cli-reference/">справочник CLI</a>.',
     'setup.details': 'Что происходит за кулисами',
     'setup.idempotent': 'Безопасно перезапускать. Полная идемпотентность — данные сохраняются, настройки обновляются на месте.',
 
@@ -158,7 +158,7 @@ export const translations: Record<string, Record<string, string>> = {
     'setup.step1.label': 'مرحله ۱ — نصب',
     'setup.step2.label': 'مرحله ۲ — راه‌اندازی',
     'setup.then': 'سپس',
-    'setup.hint': 'ویزارد IP سرور را می‌پرسد و بقیه را انجام می‌دهد. یا فلگ‌ها را مستقیم وارد کنید — <a href="/docs/fa/cli-reference/">مرجع CLI</a> را ببینید.',
+    'setup.hint': 'ویزارد IP سرور را می‌پرسد و بقیه را انجام می‌دهد. یا فلگ‌ها را مستقیم وارد کنید — <a href="/fa/cli-reference/">مرجع CLI</a> را ببینید.',
     'setup.details': 'آنچه پشت صحنه اتفاق می‌افتد',
     'setup.idempotent': 'می‌توان هر زمان دوباره اجرا کرد. کاملاً idempotent — اعتبارنامه‌ها حفظ و تنظیمات در جا به‌روز می‌شوند.',
 
@@ -275,7 +275,7 @@ export const translations: Record<string, Record<string, string>> = {
     'setup.step1.label': '步骤 1 — 安装',
     'setup.step2.label': '步骤 2 — 部署',
     'setup.then': '然后',
-    'setup.hint': '向导会询问服务器 IP 并处理其余事项。或直接传递参数 — 查看 <a href="/docs/zh/cli-reference/">CLI 参考</a>。',
+    'setup.hint': '向导会询问服务器 IP 并处理其余事项。或直接传递参数 — 查看 <a href="/zh/cli-reference/">CLI 参考</a>。',
     'setup.details': '幕后发生了什么',
     'setup.idempotent': '可随时安全重新运行。完全幂等——凭证保留，设置原地更新。',
 
