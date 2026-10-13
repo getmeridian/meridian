@@ -128,7 +128,6 @@ app = typer.Typer(
     rich_markup_mode="rich",
 )
 
-# Subcommand groups
 client_app = typer.Typer(help="Manage who can connect: add, show, list, enable, disable, remove", no_args_is_help=True)
 server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
 node_app = typer.Typer(help="Add, list, replace, or remove exit servers", no_args_is_help=True)
@@ -221,11 +220,9 @@ def main_callback(
         _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))
         raise typer.Exit()
 
-    # Show banner before subcommands (but not for --help)
     if not machine_output and "--help" not in sys.argv and "-h" not in sys.argv:
         banner(__version__)
 
-    # Auto-update check (skip for meta commands)
     if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update",):
         from meridian.update import check_for_update
 
@@ -342,11 +339,6 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
     return positionals[0] == "api"
 
 
-# =============================================================================
-# Studio
-# =============================================================================
-
-
 @app.command("studio", rich_help_panel=ADVANCED)
 def studio_cmd(
     port: int = typer.Option(
@@ -393,11 +385,6 @@ def help_cmd(
     run(ctx, topic or [])
 
 
-# =============================================================================
-# Plan / Apply (declarative workflow)
-# =============================================================================
-
-
 @app.command("plan", rich_help_panel=CHECK_AND_FIX)
 def plan_cmd(
     json_output: bool = typer.Option(False, "--json", help="Emit plan as JSON for CI consumption"),
@@ -439,11 +426,6 @@ def apply_cmd(
     if json_enabled:
         _enable_json_output()
     run(yes=yes, json_output=json_enabled)
-
-
-# =============================================================================
-# Setup and deploy
-# =============================================================================
 
 
 @app.command("setup", rich_help_panel=GET_STARTED)
@@ -630,11 +612,6 @@ def deploy_cmd(
     )
 
 
-# =============================================================================
-# Client
-# =============================================================================
-
-
 @client_app.command("add")
 def client_add(
     names: list[str] = typer.Argument(..., help="Client name(s) to add"),
@@ -727,11 +704,6 @@ def client_disable_cmd(
     run_disable(name)
 
 
-# =============================================================================
-# Server
-# =============================================================================
-
-
 @server_app.command("add")
 def server_add_cmd(
     ip: NewServer,
@@ -762,11 +734,6 @@ def server_remove_cmd(
     from meridian.commands.server import run_remove
 
     run_remove(server, yes=yes)
-
-
-# =============================================================================
-# Check / Scan / Test
-# =============================================================================
 
 
 @app.command("check", rich_help_panel=CHECK_AND_FIX)
@@ -876,11 +843,6 @@ def probe_cmd(
     run(ip, sni, timeout)
 
 
-# =============================================================================
-# Doctor / Teardown / Update
-# =============================================================================
-
-
 @app.command("doctor", rich_help_panel=CHECK_AND_FIX)
 def doctor_cmd(
     ip: Target = "",
@@ -942,11 +904,6 @@ def update_cmd(
     exit_code = run_self_update(major=major)
     if exit_code:
         raise typer.Exit(exit_code)
-
-
-# =============================================================================
-# Relay
-# =============================================================================
 
 
 @relay_app.command("add")
@@ -1011,11 +968,6 @@ def relay_remove_cmd(
     run_remove(relay_ip, exit, yes)
 
 
-# =============================================================================
-# Route (per-destination egress overrides on exits)
-# =============================================================================
-
-
 @route_app.command("add")
 def route_add_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
@@ -1066,11 +1018,6 @@ def route_remove_cmd(
     if json_mode:
         _enable_json_output()
     run_remove(exit, route_id, yes=yes)
-
-
-# =============================================================================
-# Node (multi-node fleet management)
-# =============================================================================
 
 
 @node_app.command("add")
@@ -1164,11 +1111,6 @@ def node_remove_cmd(
     run_remove(node, yes=yes, force=force)
 
 
-# =============================================================================
-# Fleet (health & recovery)
-# =============================================================================
-
-
 @fleet_app.command("status")
 def fleet_status_cmd(
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
@@ -1217,11 +1159,6 @@ def fleet_upgrade_cmd(
     from meridian.commands.fleet_upgrade import run_upgrade
 
     run_upgrade(yes=yes, tested=tested)
-
-
-# =============================================================================
-# API contracts
-# =============================================================================
 
 
 @api_app.command("schemas")
@@ -1275,11 +1212,6 @@ def api_workflow_cmd(
     if json_mode:
         _enable_json_output()
     run_workflow(name, json_output=json_mode)
-
-
-# =============================================================================
-# Dev tools
-# =============================================================================
 
 
 @dev_app.command("preview")
