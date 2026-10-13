@@ -80,6 +80,7 @@ def _write_preview_files(
         server_ip=server_ip,
         client_name=client_name,
         subscription_url=_demo_subscription_url(server_ip),
+        exit_countries=["DE", "NL"],
     )
 
     static_assets = load_pwa_static_assets()

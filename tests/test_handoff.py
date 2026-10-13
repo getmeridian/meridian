@@ -66,3 +66,36 @@ def test_missing_page_path_reports_instead_of_publishing() -> None:
 
     assert links.page_url == "" and links.error
     assert conn.writes == []
+
+
+def test_page_names_exit_countries_in_subscription_order() -> None:
+    """The control server's exit country leads; a second exit in the same country is not repeated."""
+    from meridian.setup.editor import add_exit_to_intent
+    from meridian.setup.single_server import single_server_intent
+
+    intent = single_server_intent(None, server_ref="srv-a", sni="www.example.com", region="NL")
+    for ref, title, region in (("srv-b", "exit-2", "DE"), ("srv-c", "exit-3", "NL")):
+        intent = add_exit_to_intent(intent, server_ref=ref, title=title, reality_sni="www.example.com", region=region)
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.1/adminsecret", server_ip="198.51.100.1", sub_path="pages"),
+        topology_intent=intent,
+    )
+    panel = SimpleNamespace(fetch_subscription=lambda _short: SimpleNamespace(content=_subscription()))
+    conn = MockConnection()
+
+    publish_connection_page(cluster, panel, conn, _user())  # type: ignore[arg-type]
+
+    config = json.loads(conn.write_map["/var/www/private/vless-1/config.json"])
+    assert config["exit_countries"] == ["NL", "DE"]
+
+
+def test_page_without_known_countries_omits_them() -> None:
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.1/adminsecret", server_ip="198.51.100.1", sub_path="pages")
+    )
+    panel = SimpleNamespace(fetch_subscription=lambda _short: SimpleNamespace(content=_subscription()))
+    conn = MockConnection()
+
+    publish_connection_page(cluster, panel, conn, _user())  # type: ignore[arg-type]
+
+    assert "exit_countries" not in json.loads(conn.write_map["/var/www/private/vless-1/config.json"])

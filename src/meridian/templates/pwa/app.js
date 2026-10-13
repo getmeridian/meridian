@@ -495,6 +495,8 @@ function renderHero(config) {
     html += '<h1>' + escapeHtml(config.server_name) + '</h1>';
   } else {
     html += '<h1 data-t="hero.title">Your connection</h1>';
+    var codes = validCountries(config.exit_countries);
+    if (codes.length) html += '<p class="hero-place" data-countries="' + codes.join(',') + '"></p>';
   }
   if (isPersonalName(config.client_name)) {
     html += '<p data-t="hero.for">Set up for ' + escapeHtml(capitalize(config.client_name)) + '</p>';
@@ -502,6 +504,35 @@ function renderHero(config) {
     html += '<p data-t="hero.sub">Two steps, about a minute.</p>';
   }
   return html + '</div></header>';
+}
+
+function validCountries(list) {
+  var codes = [];
+  for (var i = 0; list && i < list.length; i++) {
+    if (typeof list[i] === 'string' && /^[A-Z]{2}$/.test(list[i])) codes.push(list[i]);
+  }
+  return codes;
+}
+
+function countryFlag(code) {
+  return String.fromCharCode(0xD83C, 0xDDE6 + code.charCodeAt(0) - 65, 0xD83C, 0xDDE6 + code.charCodeAt(1) - 65);
+}
+
+function countryName(code, lang) {
+  try {
+    if (window.Intl && Intl.DisplayNames) return new Intl.DisplayNames([lang], { type: 'region' }).of(code) || code;
+  } catch (e) { /* unknown locale or region: keep the code */ }
+  return code;
+}
+
+/* Exit countries are data: named in the page language, never via data-t */
+function fillPlaces(lang) {
+  document.querySelectorAll('[data-countries]').forEach(function(el) {
+    var codes = el.dataset.countries.split(',');
+    var parts = [];
+    for (var i = 0; i < codes.length; i++) parts.push(countryFlag(codes[i]) + ' ' + countryName(codes[i], lang));
+    el.textContent = parts.join(' · ');
+  });
 }
 
 /* -----------------------------------------------------------------------
@@ -738,6 +769,7 @@ function highlightActiveLang() {
 
 function applyI18n(clientName, serverName) {
   currentLang = detectLang();
+  fillPlaces(currentLang || 'en');
   if (!currentLang) { currentLang = 'en'; highlightActiveLang(); updatePageMeta(clientName, serverName); return; }
   var dict = T[currentLang];
   if (!dict) { highlightActiveLang(); updatePageMeta(clientName, serverName); return; }

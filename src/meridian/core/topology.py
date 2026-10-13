@@ -304,6 +304,10 @@ class SetupIntent(CoreModel):
     # Off by default: Remnawave then never stores where users connect from.
     forward_client_ips: bool = False
 
+    def exits_in_delivery_order(self) -> list[ExitIntent]:
+        """Exits as clients see them: the control server's first, then the rest by ID."""
+        return sorted(self.exits, key=lambda item: (item.server_ref != self.control.server_ref, item.id))
+
     @model_validator(mode="after")
     def validate_references(self) -> Self:
         resources = [

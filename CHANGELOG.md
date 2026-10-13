@@ -136,7 +136,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   individual connection with Open, Copy, and QR, "Not connecting?" tips with
   the self-check, and the router guide. Russian pages no longer rename the
   first connection "Основной", and `meridian dev preview` shows a realistic
-  page.
+  page. Without a `--server-name`, the header names the exit countries
+  ("🇩🇪 Germany · 🇳🇱 Netherlands") in the page's language.
 - Connection pages are built from each user's real subscription, so relays and
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the

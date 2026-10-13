@@ -77,6 +77,18 @@ def page_url(cluster: ClusterConfig, user: PanelUserLike) -> str:
     return f"{parsed.scheme}://{parsed.netloc}/{cluster.panel.sub_path}/{user.vless_uuid}/"
 
 
+def exit_countries(cluster: ClusterConfig) -> list[str]:
+    """Distinct exit countries in subscription order, for the page header."""
+    intent = cluster.topology_intent
+    if intent is None:
+        return []
+    countries: list[str] = []
+    for exit_ in intent.exits_in_delivery_order():
+        if exit_.region and exit_.region not in countries:
+            countries.append(exit_.region)
+    return countries
+
+
 def publish_connection_page(
     cluster: ClusterConfig,
     panel: MeridianPanel,
@@ -108,6 +120,7 @@ def publish_connection_page(
         server_icon=cluster.branding.icon,
         color=cluster.branding.color,
         subscription_url=subscription_url,
+        exit_countries=exit_countries(cluster),
     )
     error = upload_client_files(conn, user.vless_uuid, files)
     if error:

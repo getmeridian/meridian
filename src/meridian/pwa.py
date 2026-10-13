@@ -79,6 +79,7 @@ def generate_client_files(
     server_icon: str = "",
     color: str = "",
     subscription_url: str = "",
+    exit_countries: list[str] | None = None,
 ) -> dict[str, str]:
     """Generate all per-client PWA files as a {filename: content} dict.
 
@@ -97,6 +98,7 @@ def generate_client_files(
             server_icon=server_icon,
             color=color,
             subscription_url=subscription_url,
+            exit_countries=exit_countries,
         ),
         "manifest.webmanifest": render_manifest(client_name=client_name, server_name=server_name),
     }

@@ -36,5 +36,6 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment` (its `name=` query is ignored), Throne's `addsub` takes standard Base64 only, and v2rayN documents no import scheme (no button).
 - **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes in rendered markup are silently dropped; use classes (CSSOM `el.style` still works).
 - **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW and use `cache: "no-store"`; a browser may reuse the page's warm connection, so a freeze is conclusive but a pass is weaker evidence.
+- **Exit countries are data** — `config.exit_countries` (ISO codes, subscription order) render as flag plus `Intl.DisplayNames` name and refresh in `applyI18n`; the page validates codes before building flags.
 - **Never put `data-t` on data** — a translated key swaps the element's whole text; the old cards replaced the first link's remark with "Основной" in Russian.
 - **Wake lock, install banner, skeleton** — wake lock keeps the screen on for QR scanning and fails gracefully; the `beforeinstallprompt` banner auto-dismisses; the skeleton says "Taking longer than expected" after 10 s.

@@ -75,6 +75,7 @@ svg{flex-shrink:0}
 .hero-text{min-width:0}
 .hero h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em;line-height:1.2;overflow-wrap:anywhere}
 .hero p{font-size:.92rem;color:var(--tx2);margin-top:2px}
+.hero .hero-place{color:var(--tx);font-weight:500}
 
 /* ===================================================================
  * NOTICES

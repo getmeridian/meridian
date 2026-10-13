@@ -7,7 +7,7 @@ from meridian.compiler.models import COMPILER_VERSION, canonical_hash
 _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
-    "pwa": "connection-page-v4",
+    "pwa": "connection-page-v5",
     "firewall": "ufw-comment-v2",
     "nginx": "upload-size-v9",
     "node-compose": "remnawave-node-v3",
