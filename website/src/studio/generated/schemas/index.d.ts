@@ -46,7 +46,6 @@ export * as DeployPlanSchema from "./deploy-plan.schema";
 export * as DeployPortsSchema from "./deploy-ports.schema";
 export * as DeployRequestSchema from "./deploy-request.schema";
 export * as DeployResultSchema from "./deploy-result.schema";
-export * as DeployWorkflowAnswersSchema from "./deploy-workflow-answers.schema";
 export * as EgressOverrideIntentSchema from "./egress-override-intent.schema";
 export * as EgressPoolIntentSchema from "./egress-pool-intent.schema";
 export * as EmptyDataSchema from "./empty-data.schema";

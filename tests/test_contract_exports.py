@@ -8,7 +8,7 @@ from pathlib import Path
 from meridian.core.events import EVENT_TYPES
 from meridian.core.models import Event
 from meridian.core.schema import DeployOutputEnvelope, command_catalog, schema_names
-from meridian.core.services import collect_workflow, workflow_catalog
+from meridian.core.services.workflows import collect_workflow, workflow_catalog
 from scripts.export_contracts import check_contracts, write_contracts
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -39,7 +39,7 @@ from meridian.core.command_inputs import (
     ServerAddRequest,
     ServerRemoveRequest,
 )
-from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult, DeployWorkflowAnswers
+from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
 from meridian.core.health import HealthCheckResult
@@ -563,7 +563,6 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "deploy-envelope": DeployOutputEnvelope,
     "deploy-request": DeployRequest,
     "deploy-result": DeployResult,
-    "deploy-workflow-answers": DeployWorkflowAnswers,
     "deploy-plan": DeployPlan,
     "deploy-ports": DeployPorts,
     "workflow-plan": WorkflowPlan,

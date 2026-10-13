@@ -20,7 +20,7 @@ from meridian.core.schema import (
     schema_names,
     validate_command_envelope,
 )
-from meridian.core.services import collect_workflow, workflow_catalog
+from meridian.core.services.workflows import collect_workflow, workflow_catalog
 from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_server_deploy
 
 ROOT = Path(__file__).resolve().parents[1]

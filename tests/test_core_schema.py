@@ -69,7 +69,6 @@ def test_schema_catalog_lists_public_contracts() -> None:
     assert "deploy-request" in names
     assert "deploy-result" in names
     assert "deploy-operation-result" in names
-    assert "deploy-workflow-answers" in names
     assert "server-add-request" in names
     assert "server-bootstrap-key-request" in names
     assert "server-bootstrap-key-result" in names
@@ -140,7 +139,6 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     server_draft = schema_for("server-connection-draft")["properties"]
     server_profile = schema_for("server-profile")["properties"]
     deploy = schema_for("deploy-request")["properties"]
-    workflow_answers = schema_for("deploy-workflow-answers")["properties"]
 
     assert server_add["ip"]["anyOf"] == [
         {"format": "ipv4", "type": "string"},
@@ -164,9 +162,8 @@ def test_request_schemas_expose_model_validation_constraints() -> None:
     ]
     assert deploy["client_name"]["pattern"] == r"^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
     assert deploy["requested_server"]["pattern"] == r"^$|^[^\r\n\t]+$"
-    assert workflow_answers["ip"]["anyOf"] == deploy["ip"]["anyOf"]
     # Deploy requests leave the user empty to mean "saved, else root".
-    assert deploy["user"]["pattern"] == "^$|" + workflow_answers["user"]["pattern"]
+    assert deploy["user"]["pattern"] == "^$|" + server_add["user"]["pattern"]
 
 
 def test_topology_schemas_model_server_capabilities() -> None:

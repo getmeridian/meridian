@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.core.services import WorkflowNotFoundError, collect_workflow
+from meridian.core.services.workflows import WorkflowNotFoundError, collect_workflow
 
 
 def test_collect_workflow_returns_deploy_plan() -> None:

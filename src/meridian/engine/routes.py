@@ -26,7 +26,7 @@ from meridian.core.servers import (
     ServerKeyPolicy,
     ServerValidateRequest,
 )
-from meridian.core.services import collect_workflow, workflow_catalog
+from meridian.core.services.workflows import collect_workflow, workflow_catalog
 from meridian.engine.deploy import dry_run_deploy_request, resolve_deploy_target
 from meridian.engine.operations import ActiveDeployOperationError, OperationManager
 from meridian.engine.servers import (

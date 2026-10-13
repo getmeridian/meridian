@@ -16,7 +16,6 @@ from meridian.core.inputs import (
     OptionalPaletteValue,
     OptionalServerReferenceValue,
     OptionalSshUserValue,
-    SshUserValue,
 )
 from meridian.core.models import CoreModel
 from meridian.core.serde import to_plain
@@ -52,23 +51,6 @@ class DeployRequest(CoreModel):
     @classmethod
     def blank_fingerprint_keeps_saved(cls, value: object) -> object:
         return None if value == "" else value
-
-
-class DeployWorkflowAnswers(CoreModel):
-    """Answers collected by a deploy wizard renderer."""
-
-    ip: DeployIpValue = ""
-    user: SshUserValue = "root"
-    sni: OptionalHostnameValue = ""
-    domain: OptionalHostnameValue = ""
-    harden: bool = True
-    client_name: NameValue = ""
-    server_name: str = ""
-    icon: str = ""
-    color: OptionalPaletteValue = ""
-    warp: bool = False
-    geo_block: bool = True
-    confirm: bool = False
 
 
 class DeployPorts(CoreModel):
@@ -133,28 +115,6 @@ def build_deploy_workflow(request: DeployRequest) -> WorkflowPlan:
         sections=_deploy_input_sections(fields) if needs_input else [],
         ready_request_schema="deploy-request",
     )
-
-
-def apply_deploy_workflow_answers(request: DeployRequest, answers: DeployWorkflowAnswers) -> DeployRequest:
-    """Return a deploy request updated with renderer-collected wizard answers."""
-    data = request.model_dump(mode="python")
-    data.update(
-        {
-            "ip": answers.ip,
-            "domain": answers.domain,
-            "sni": answers.sni,
-            "client_name": answers.client_name,
-            "user": answers.user,
-            "harden": answers.harden,
-            "server_name": answers.server_name,
-            "icon": answers.icon,
-            "color": answers.color,
-            "warp": answers.warp,
-            "geo_block": answers.geo_block,
-            "yes": request.yes or answers.confirm,
-        }
-    )
-    return DeployRequest.model_validate(data)
 
 
 def _deploy_input_fields(request: DeployRequest) -> list[InputField]:

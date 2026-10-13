@@ -23,7 +23,6 @@ from meridian.core.topology import (
     SetupIntent,
     TransparentRelayIntent,
 )
-from meridian.reconciler.contract_drivers import ContractResourceDriver
 from meridian.reconciler.fence import FleetFenceError
 from meridian.reconciler.resources import ResourceDrivers
 from meridian.remnawave import MeridianPanel, RemnawaveError
@@ -31,6 +30,7 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.setup.runtime import SetupRuntime
 from meridian.ssh import ServerConnection
+from tests.support.contract_driver import ContractResourceDriver
 
 
 @pytest.fixture(autouse=True)
