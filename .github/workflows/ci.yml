@@ -10,6 +10,12 @@ on:
   # branches on the fork before opening an upstream PR.
   workflow_dispatch:
 
+# A new push to a PR supersedes its running checks; main keeps every run so
+# each merge still reaches the Release workflow.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   python-test:
     name: Python Tests

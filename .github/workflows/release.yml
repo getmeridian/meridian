@@ -11,6 +11,8 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+    # Only main's CI can release; without this, every PR run queued a skipped Release run.
+    branches: [main]
   # Pre-releases (betas) are published by pushing their tag, e.g. v4.0.0b1.
   # Tag pushes run this file from the tagged commit, so a beta branch ships
   # with its own packaging steps; workflow_run always uses main's copy.
