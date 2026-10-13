@@ -1,22 +1,20 @@
-"""Tests for PWA rendering functions (config.json, subscription, shell, manifest)."""
+"""Tests for PWA rendering functions (config.json, shell, manifest)."""
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 from pathlib import Path
 
 import pytest
 
-from meridian.models import ProtocolURL, RelayURLSet
+from meridian.models import ProtocolURL
 from meridian.render import (
     _PWA_APPS,
     render_apps_catalog,
     render_config_json,
     render_manifest,
     render_pwa_shell,
-    render_subscription,
 )
 
 # ---------------------------------------------------------------------------
@@ -28,9 +26,6 @@ REALITY_URL = (
 )
 XHTTP_URL = "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=tls&type=xhttp#Test-XHTTP"
 WSS_URL = "vless://660e8400-e29b-41d4-a716-446655440000@example.com:443?security=tls&type=ws#Test-WSS"
-RELAY_URL = (
-    "vless://550e8400-e29b-41d4-a716-446655440000@203.0.113.10:443?security=reality&sni=www.example.com#Test-Relay"
-)
 
 
 @pytest.fixture()
@@ -38,17 +33,6 @@ def protocol_urls() -> list[ProtocolURL]:
     return [
         ProtocolURL(key="reality", label="Primary", url=REALITY_URL, qr_b64="dGVzdA=="),
         ProtocolURL(key="xhttp", label="XHTTP", url=XHTTP_URL, qr_b64="eGh0dHA="),
-    ]
-
-
-@pytest.fixture()
-def relay_entries() -> list[RelayURLSet]:
-    return [
-        RelayURLSet(
-            relay_ip="203.0.113.10",
-            relay_name="ru-moscow",
-            urls=[ProtocolURL(key="reality", label="Primary (via relay)", url=RELAY_URL, qr_b64="cmVsYXk=")],
-        ),
     ]
 
 
@@ -68,7 +52,6 @@ class TestRenderConfigJson:
         assert result["version"] == 1
         assert result["server_ip"] == "198.51.100.1"
         assert "protocols" in result
-        assert "relays" in result
         assert "apps" in result
         assert "generated_at" in result
 
@@ -82,16 +65,6 @@ class TestRenderConfigJson:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
         assert result["protocols"][0]["recommended"] is True
         assert result["protocols"][1]["recommended"] is False
-
-    def test_relay_entries_included(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        assert len(result["relays"]) == 1
-        assert result["relays"][0]["name"] == "ru-moscow"
-        assert result["relays"][0]["ip"] == "203.0.113.10"
 
     def test_client_name(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1", client_name="alice"))
@@ -126,62 +99,6 @@ class TestRenderConfigJson:
         )
         assert result["subscription_url"] == "https://example.com/custom/subscription.txt"
         assert result["subscription_qr_b64"]
-
-
-# ---------------------------------------------------------------------------
-# TestRenderSubscription
-# ---------------------------------------------------------------------------
-
-
-class TestRenderSubscription:
-    def test_base64_encoded(self, protocol_urls: list[ProtocolURL]) -> None:
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result)
-        assert isinstance(decoded, bytes)
-
-    def test_decodes_to_urls(self, protocol_urls: list[ProtocolURL]) -> None:
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert len(lines) == 2
-        assert lines[0].startswith("vless://")
-        assert lines[1].startswith("vless://")
-
-    def test_includes_relay_urls(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = render_subscription(protocol_urls, relay_entries=relay_entries)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        # 1 relay + 2 direct = 3
-        assert len(lines) == 3
-        assert "203.0.113.10" in lines[0]  # relay URL comes first
-
-    def test_relay_urls_first(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = render_subscription(protocol_urls, relay_entries=relay_entries)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert "203.0.113.10" in lines[0]
-
-    def test_empty_urls(self) -> None:
-        result = render_subscription([])
-        assert result == ""
-
-    def test_excludes_empty_urls(self) -> None:
-        urls = [
-            ProtocolURL(key="reality", label="Primary", url=REALITY_URL),
-            ProtocolURL(key="wss", label="WSS", url=""),
-        ]
-        result = render_subscription(urls)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert len(lines) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +194,7 @@ class TestRenderManifest:
 
 
 class TestConfigJsonSchema:
-    """Verify config.json protocol and relay entries have all required fields."""
+    """Verify config.json protocol entries have all required fields."""
 
     def test_protocol_entry_required_fields(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
@@ -295,30 +212,6 @@ class TestConfigJsonSchema:
         required = {"name", "platform", "url"}
         for app in result["apps"]:
             assert required.issubset(app.keys()), f"App missing fields: {required - app.keys()}"
-
-    def test_relay_entry_structure(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        for relay in result["relays"]:
-            assert "name" in relay
-            assert "ip" in relay
-            assert "urls" in relay
-            assert isinstance(relay["urls"], list)
-            assert len(relay["urls"]) >= 1
-
-    def test_relay_url_entry_fields(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        required = {"key", "label", "url", "qr_b64"}
-        for relay in result["relays"]:
-            for url_entry in relay["urls"]:
-                assert required.issubset(url_entry.keys()), f"Relay URL missing fields: {required - url_entry.keys()}"
 
 
 # ---------------------------------------------------------------------------
@@ -491,12 +384,6 @@ class TestUnicodeClientNames:
         result = render_config_json(protocol_urls, "198.51.100.1", client_name=name)
         parsed = json.loads(result)
         assert parsed["client_name"] == name
-
-    def test_subscription_unaffected_by_unicode_name(self, protocol_urls: list[ProtocolURL]) -> None:
-        """Subscription rendering doesn't use client_name, but verify no crash."""
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result).decode()
-        assert "vless://" in decoded
 
 
 class TestPWATemplateSource:

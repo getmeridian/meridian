@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from meridian.models import ProtocolURL, RelayURLSet, derive_client_name
+from meridian.models import ProtocolURL
 
 if TYPE_CHECKING:
     from jinja2 import Environment
@@ -238,7 +238,6 @@ def render_config_json(
     domain: str = "",
     *,
     client_name: str = "",
-    relay_entries: list[RelayURLSet] | None = None,
     server_name: str = "",
     server_icon: str = "",
     color: str = "",
@@ -251,7 +250,6 @@ def render_config_json(
     PWA's app.js needs to populate the page at runtime.
     """
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    name = client_name or derive_client_name(protocol_urls)
 
     protocols = []
     for i, p in enumerate(protocol_urls):
@@ -267,36 +265,12 @@ def render_config_json(
             }
         )
 
-    relays = []
-    if relay_entries:
-        for relay_set in relay_entries:
-            relay_urls = []
-            for purl in relay_set.urls:
-                if purl.url:
-                    relay_urls.append(
-                        {
-                            "key": purl.key,
-                            "label": purl.label,
-                            "url": purl.url,
-                            "qr_b64": purl.qr_b64,
-                        }
-                    )
-            if relay_urls:
-                relays.append(
-                    {
-                        "ip": relay_set.relay_ip,
-                        "name": relay_set.relay_name,
-                        "urls": relay_urls,
-                    }
-                )
-
     config = {
         "version": 1,
-        "client_name": name,
+        "client_name": client_name,
         "server_ip": server_ip,
         "domain": domain,
         "protocols": protocols,
-        "relays": relays,
         # Fallback only: the page prefers the shared, icon-bearing pwa/apps.json.
         "apps": _PWA_APPS,
         "generated_at": now,
@@ -327,32 +301,6 @@ def render_apps_catalog() -> str:
     icons = _load_app_icons()
     apps = [{**app, "icon": icons[app["name"]]} if app["name"] in icons else app for app in _PWA_APPS]
     return json.dumps({"version": 1, "apps": apps}, indent=2, ensure_ascii=False)
-
-
-def render_subscription(
-    protocol_urls: list[ProtocolURL],
-    *,
-    relay_entries: list[RelayURLSet] | None = None,
-) -> str:
-    """Render a V2Ray subscription file (base64-encoded URL list).
-
-    Standard format: base64(url1\\nurl2\\n...). Compatible with v2rayNG,
-    Hiddify, and other V2Ray clients that support subscription import.
-    """
-    urls: list[str] = []
-    # Relay URLs first (recommended)
-    if relay_entries:
-        for relay_set in relay_entries:
-            for purl in relay_set.urls:
-                if purl.url:
-                    urls.append(purl.url)
-    # Direct URLs
-    for p in protocol_urls:
-        if p.url:
-            urls.append(p.url)
-    if not urls:
-        return ""
-    return base64.b64encode("\n".join(urls).encode()).decode()
 
 
 def render_pwa_shell(

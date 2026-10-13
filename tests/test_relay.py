@@ -14,7 +14,6 @@ from meridian.commands._helpers import ReviewedApplyPersistenceError
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetTopology, TopologyPanel, TopologyRelay
 from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
-from meridian.models import ProtocolURL, RelayURLSet
 from meridian.remnawave import RemnawaveError
 
 
@@ -31,25 +30,6 @@ def _intent() -> SetupIntent:
         default_egress_ref="exit-a",
         access=AccessIntent(users=["default"]),
     )
-
-
-class TestRelayURLSet:
-    def test_frozen(self) -> None:
-        url_set = RelayURLSet(
-            relay_ip="203.0.113.10",
-            relay_name="relay-a",
-            urls=[
-                ProtocolURL(
-                    key="reality",
-                    label="Primary",
-                    url="vless://test@203.0.113.10:443",
-                )
-            ],
-        )
-
-        assert url_set.relay_ip == "203.0.113.10"
-        assert url_set.relay_name == "relay-a"
-        assert len(url_set.urls) == 1
 
 
 class TestRelayCLI:

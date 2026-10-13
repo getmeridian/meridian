@@ -26,7 +26,7 @@ from meridian.render import (
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
-    from meridian.models import ProtocolURL, RelayURLSet
+    from meridian.models import ProtocolURL
     from meridian.ssh import ServerConnection
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
@@ -74,7 +74,6 @@ def generate_client_files(
     domain: str = "",
     *,
     client_name: str = "",
-    relay_entries: list[RelayURLSet] | None = None,
     server_name: str = "",
     server_icon: str = "",
     color: str = "",
@@ -93,7 +92,6 @@ def generate_client_files(
             server_ip=server_ip,
             domain=domain,
             client_name=client_name,
-            relay_entries=relay_entries,
             server_name=server_name,
             server_icon=server_icon,
             color=color,

@@ -10,7 +10,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.diagnostics.blocking import STALL_CLEARANCE_BYTES
-from meridian.models import ProtocolURL, RelayURLSet
+from meridian.models import ProtocolURL
 from meridian.pwa import (
     PROBE_FILE,
     connection_page_deployed,
@@ -66,19 +66,6 @@ class TestGenerateClientFiles:
 
         config = json.loads(files["config.json"])
         assert config["subscription_url"] == canonical_url
-
-    def test_relay_entries_in_config(self, protocol_urls: list[ProtocolURL]) -> None:
-        relays = [
-            RelayURLSet(
-                relay_ip="203.0.113.10",
-                relay_name="test-relay",
-                urls=[ProtocolURL(key="reality", label="Via relay", url=REALITY_URL)],
-            ),
-        ]
-        files = generate_client_files(protocol_urls, "198.51.100.1", relay_entries=relays)
-        config = json.loads(files["config.json"])
-        assert len(config["relays"]) == 1
-        assert config["relays"][0]["name"] == "test-relay"
 
 
 class TestConnectionPageMarkers:
