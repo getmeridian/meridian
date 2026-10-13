@@ -392,7 +392,7 @@ meridian api workflow NAME [--json]
 
 **`api schemas`** — выводит имена схем, такие как `output-envelope`, `deploy-request`, `deploy-result`, `deploy-plan`, `plan-envelope`, `apply-envelope`, `client-list-envelope`, `fleet-status-envelope` и `event`.
 
-**`api commands`** — выводит контракты команд: argv, схемы конверта и данных, возможные статусы и результаты, значения кодов выхода, машинные флаги и `interrupt_behavior`. Ctrl-C выходит `130` без конверта JSON (`interrupt_behavior: "exit_130_without_envelope"`).
+**`api commands`** — выводит контракты команд: argv, схемы конверта и данных, возможные статусы и результаты, значения кодов выхода, все опции, которые принимает команда (`machine_flags`), и `interrupt_behavior`. Аргументы, опции и описания читаются из самого CLI. Ctrl-C выходит `130` без конверта JSON (`interrupt_behavior: "exit_130_without_envelope"`).
 
 **`api schema NAME`** — выводит одну JSON Schema, например `meridian api schema output-envelope`.
 
@@ -424,7 +424,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | Установить завершение оболочки для текущей оболочки |
 | `--show-completion` | Выводить скрипт завершения для текущей оболочки |
 
-JSON вывод использует конверт `meridian.output/v1` (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). Он поддерживается развёртыванием, планом, применением, тестом, зондом, всеми командами client, статусом/инвентарём флота, списками узла/ретранслятора и командами api. Секреты отредактированы перед выходом JSON из процесса. Запустите `meridian api commands --json` для открытия контрактов.
+JSON вывод использует конверт `meridian.output/v1` (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). Он поддерживается каждой командой, у которой есть `--json`: deploy, plan, apply, check, test, probe, все команды client и route, статус/инвентарь флота, списки узла/ретранслятора и команды api. Глобальный `--json` и собственный `--json` команды взаимозаменяемы. Секреты отредактированы перед выходом JSON из процесса. Запустите `meridian api commands --json` для открытия контрактов.
 
 ## Обычные параметры сервера
 

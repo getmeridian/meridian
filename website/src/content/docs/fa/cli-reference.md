@@ -392,7 +392,7 @@ meridian api workflow NAME [--json]
 
 **`api schemas`** — نام‌های schema مثل `output-envelope`، `deploy-request`، `deploy-result`، `deploy-plan`، `plan-envelope`، `apply-envelope`، `client-list-envelope`، `fleet-status-envelope` و `event` را فهرست می‌کند.
 
-**`api commands`** — قرارداد دستور را فهرست می‌کند: argv، schema envelope و data، statuses و outcomes ممکن، معانی کد خروج، پرچم‌های machine و `interrupt_behavior`. Ctrl-C exit `130` بدون JSON envelope می‌شود (`interrupt_behavior: "exit_130_without_envelope"`).
+**`api commands`** — قرارداد دستورها را فهرست می‌کند: argv، schema envelope و data، statusها و outcomeهای ممکن، معانی کد خروج، همه گزینه‌هایی که دستور می‌پذیرد (`machine_flags`) و `interrupt_behavior`. آرگومان‌ها، گزینه‌ها و توضیحات از خود CLI خوانده می‌شوند. Ctrl-C بدون JSON envelope با کد `130` خارج می‌شود (`interrupt_behavior: "exit_130_without_envelope"`).
 
 **`api schema NAME`** — یک JSON Schema چاپ می‌کند، مثل `meridian api schema output-envelope`.
 
@@ -424,7 +424,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | shell completion برای shell فعلی نصب کنید |
 | `--show-completion` | completion script برای shell فعلی چاپ کنید |
 
-JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`schema`، `command`، `operation_id`، `status`، `summary`، `data`، `warnings`، `errors`). توسط deploy، plan، apply، test، probe، تمام client commands، fleet status/inventory، node/relay list و api commands پشتیبانی می‌شود. اسرار قبل از JSON خروج process redacted می‌شوند. `meridian api commands --json` را برای اکتشاف قرارداد اجرا کنید.
+JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`schema`، `command`، `operation_id`، `status`، `summary`، `data`، `warnings`، `errors`). هر دستوری که `--json` دارد از آن پشتیبانی می‌کند: deploy، plan، apply، check، test، probe، تمام client و route commands، fleet status/inventory، node/relay list و api commands. `--json` سراسری و `--json` خود دستور به‌جای هم قابل استفاده‌اند. اسرار قبل از JSON خروج process redacted می‌شوند. `meridian api commands --json` را برای اکتشاف قرارداد اجرا کنید.
 
 ## گزینه‌های سرور معمول
 

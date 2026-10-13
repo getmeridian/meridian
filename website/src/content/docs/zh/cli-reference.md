@@ -392,7 +392,7 @@ meridian api workflow NAME [--json]
 
 **`api schemas`** — 列出模式名称如 `output-envelope`、`deploy-request`、`deploy-result`、`deploy-plan`、`plan-envelope`、`apply-envelope`、`client-list-envelope`、`fleet-status-envelope` 和 `event`。
 
-**`api commands`** — 列出命令契约：argv、信封和数据模式、可能的状态和结果、退出码含义、机器标志和 `interrupt_behavior`。Ctrl-C 退出 `130` 无 JSON 信封（`interrupt_behavior: "exit_130_without_envelope"`）。
+**`api commands`** — 列出命令契约：argv、信封和数据模式、可能的状态和结果、退出码含义、命令接受的每个选项（`machine_flags`）以及 `interrupt_behavior`。参数、选项和说明都读取自 CLI 本身。Ctrl-C 退出 `130` 无 JSON 信封（`interrupt_behavior: "exit_130_without_envelope"`）。
 
 **`api schema NAME`** — 打印一个 JSON Schema，例 `meridian api schema output-envelope`。
 
@@ -424,7 +424,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | 为当前 shell 安装补全 |
 | `--show-completion` | 为当前 shell 打印补全脚本 |
 
-JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。它由 deploy、plan、apply、test、probe、所有客户端命令、舰队状态/库存、节点/中继列表和 api 命令支持。在 JSON 离开进程前秘密被编辑。运行 `meridian api commands --json` 发现契约。
+JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。每个列出 `--json` 的命令都支持它：deploy、plan、apply、check、test、probe、所有客户端和 route 命令、舰队状态/库存、节点/中继列表和 api 命令。全局 `--json` 与命令自己的 `--json` 可互换使用。在 JSON 离开进程前秘密被编辑。运行 `meridian api commands --json` 发现契约。
 
 ## 常见服务器选项
 
