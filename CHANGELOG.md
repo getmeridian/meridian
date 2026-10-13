@@ -145,6 +145,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   installed.
 - Panel and connection-page links typed or copied without the trailing slash
   now open; they used to redirect to an internal port and fail.
+- Subscriptions list Reality first, then XHTTP, WSS, and Hysteria2 last. Apps
+  use the first entry by default, and Hysteria2 (UDP, often blocked) used to
+  lead. sing-box and Stash no longer show a duplicate "automatic fallback"
+  server.
 - XHTTP links work. Apps sending the default `chrome` fingerprint speak
   HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
 - A fresh deploy with `--hysteria2` converges. The node started before its

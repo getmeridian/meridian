@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 
 from meridian.compiler.builder import PlanBuilder
-from meridian.compiler.models import CompiledResource, HostPayload, make_resource
+from meridian.compiler.models import NON_XRAY_JSON_TYPES, CompiledResource, HostPayload, make_resource
+from meridian.core.topology import PROTOCOL_PRIORITY
 
 _VISIBLE_TAG = "MERIDIAN_V4_VISIBLE"
 _XRAY_EDGE_TAG = "MERIDIAN_V4_XRAY_EDGE"
@@ -23,7 +24,8 @@ def compile_xray_delivery_hosts(
         payload = resource.payload
         if isinstance(payload, HostPayload) and payload.advertised and not payload.is_hidden:
             source_resources.append((resource, payload))
-    source_resources.sort(key=lambda item: item[0].logical_id)
+    # The first source becomes the Xray JSON virtual Host, so it follows protocol priority too.
+    source_resources.sort(key=lambda item: (PROTOCOL_PRIORITY.index(item[1].protocol), item[0].logical_id))
     if not source_resources:
         return []
 
@@ -58,10 +60,7 @@ def compile_xray_delivery_hosts(
                         "tags": [_XRAY_EDGE_TAG],
                         "is_hidden": True,
                         "xray_json_template_ref": "",
-                        "exclude_from_subscription_types": [
-                            "MIHOMO",
-                            "XRAY_BASE64",
-                        ],
+                        "exclude_from_subscription_types": list(NON_XRAY_JSON_TYPES),
                     }
                 ),
                 dependencies=resource.dependencies,
@@ -78,15 +77,33 @@ def compile_xray_delivery_hosts(
                 "tags": [_XRAY_VIRTUAL_TAG],
                 "is_hidden": False,
                 "xray_json_template_ref": template_ref,
-                "exclude_from_subscription_types": [
-                    "MIHOMO",
-                    "XRAY_BASE64",
-                ],
+                "exclude_from_subscription_types": list(NON_XRAY_JSON_TYPES),
             }
         ),
         dependencies=sorted({*primary.dependencies, template_ref}),
     )
     return [*hidden_ids, virtual_id]
+
+
+def assign_host_positions(builder: PlanBuilder) -> None:
+    """Order Hosts in every subscription by protocol priority, not by path ID.
+
+    Clients default to the first entry and Mihomo falls back in order, so Reality leads and
+    the UDP Hysteria2 path comes last.
+    """
+    hosts = [
+        (resource, resource.payload)
+        for resource in builder.resources.values()
+        if isinstance(resource.payload, HostPayload)
+    ]
+    hosts.sort(key=lambda item: (PROTOCOL_PRIORITY.index(item[1].protocol), item[0].logical_id))
+    for position, (resource, payload) in enumerate(hosts):
+        builder.resources[resource.logical_id] = make_resource(
+            resource.logical_id,
+            payload.model_copy(update={"view_position": position}),
+            dependencies=resource.dependencies,
+            postconditions=resource.postconditions,
+        )
 
 
 def compact_host_remark(value: str) -> str:

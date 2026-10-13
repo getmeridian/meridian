@@ -10,7 +10,7 @@ from meridian.compiler.baselines import (
     compile_server_baselines,
 )
 from meridian.compiler.builder import PlanBuilder
-from meridian.compiler.client_delivery import compile_xray_delivery_hosts
+from meridian.compiler.client_delivery import assign_host_positions, compile_xray_delivery_hosts
 from meridian.compiler.delivery import mihomo_template, xray_json_template
 from meridian.compiler.deployment import (
     normalized_intent,
@@ -409,6 +409,7 @@ def compile_topology(
         gateway_ids=gateway_ids,
     )
 
+    assign_host_positions(builder)
     attach_server_baselines(builder, baseline_ids)
     ordered = builder.ordered()
     intent_hash = canonical_hash(normalized_intent(intent))

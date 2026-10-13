@@ -31,7 +31,9 @@ from meridian.core.topology import (
 
 COMPILER_VERSION: Literal["v4.1"] = "v4.1"
 OwnershipMarker = Literal["meridian/v4"]
-SubscriptionType = Literal["XRAY_JSON", "XRAY_BASE64", "MIHOMO"]
+SubscriptionType = Literal["XRAY_JSON", "XRAY_BASE64", "MIHOMO", "STASH", "CLASH", "SINGBOX"]
+# Every format except Xray JSON: hosts that exist only for Xray JSON injection hide from these.
+NON_XRAY_JSON_TYPES: tuple[SubscriptionType, ...] = ("XRAY_BASE64", "MIHOMO", "STASH", "CLASH", "SINGBOX")
 RuntimePinName = Annotated[
     str,
     Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9_.-]*$"),
@@ -246,6 +248,7 @@ class HostPayload(CoreModel):
     is_hidden: bool = False
     xray_json_template_ref: str = ""
     exclude_from_subscription_types: list[SubscriptionType] = Field(default_factory=list)
+    view_position: int = 0
 
 
 class InternalSquadPayload(CoreModel):

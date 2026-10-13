@@ -561,10 +561,11 @@ class TestHostActions:
         assert _call(client, 1) == ("POST", "api/hosts/bulk/disable", {"uuids": ["h-1"]})
         assert _call(client, 2)[:2] == ("DELETE", "api/hosts/h-1")
 
-    def test_reorder_hosts_sends_view_positions(self) -> None:
+    def test_set_host_positions_sends_only_the_listed_hosts(self) -> None:
         panel, client = _wired_panel(_mock_response(200, {"response": {"isUpdated": True}}))
-        panel.reorder_hosts(["h-2", "h-1"])
-        assert _call(client)[2] == {"hosts": [{"uuid": "h-2", "viewPosition": 0}, {"uuid": "h-1", "viewPosition": 1}]}
+        panel.set_host_positions({"h-2": 3})
+        assert _call(client)[:2] == ("POST", "api/hosts/actions/reorder")
+        assert _call(client)[2] == {"hosts": [{"uuid": "h-2", "viewPosition": 3}]}
 
     def test_list_hosts_reads_bare_array(self) -> None:
         panel, _ = _wired_panel(_mock_response(200, {"response": [{"uuid": "h-1", "remark": "r"}]}))

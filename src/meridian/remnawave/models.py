@@ -97,6 +97,7 @@ class Host:
     is_hidden: bool = False
     xray_json_template_uuid: str = ""
     exclude_from_subscription_types: list[str] = field(default_factory=list)
+    view_position: int = 0
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
@@ -226,6 +227,7 @@ def parse_host(data: Any) -> Host:
         is_hidden=bool(data.get("isHidden", False)),
         xray_json_template_uuid=str(data.get("xrayJsonTemplateUuid") or ""),
         exclude_from_subscription_types=[str(value) for value in (data.get("excludeFromSubscriptionTypes") or [])],
+        view_position=int(data.get("viewPosition") or 0),
         _raw=data,
     )
 

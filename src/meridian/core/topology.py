@@ -30,6 +30,8 @@ TrafficScope = Literal["default", "country"]
 TrafficRouteAction = Literal["route", "block"]
 RegionalTrafficMode = Literal["block", "regional_exit", "default_exit"]
 ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
+# Subscription order: the most censorship-resistant TCP path first, the UDP fallback last.
+PROTOCOL_PRIORITY: Final[tuple[ProtocolKind, ...]] = ("reality", "xhttp", "wss", "hysteria2")
 TlsFingerprint = Literal["chrome", "firefox", "safari", "ios", "android", "edge", "random", "randomized"]
 # uTLS ClientHello presented on every TCP path unless the operator picks another.
 DEFAULT_TLS_FINGERPRINT: Final[TlsFingerprint] = "chrome"

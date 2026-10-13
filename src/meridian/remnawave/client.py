@@ -473,14 +473,9 @@ class MeridianPanel(ControlPlaneMixin):
                 return host
         return None
 
-    def reorder_hosts(self, ordered_uuids: list[str]) -> None:
-        """Set explicit viewPosition for hosts to enforce subscription ordering.
-
-        Hosts appear in subscriptions ordered by viewPosition ASC. This
-        ensures safest-first ordering (Reality → XHTTP → WSS) regardless
-        of creation order or manual panel UI reordering.
-        """
-        items = [{"uuid": host_uuid, "viewPosition": i} for i, host_uuid in enumerate(ordered_uuids)]
+    def set_host_positions(self, positions: dict[str, int]) -> None:
+        """Set each listed Host's viewPosition; subscriptions list Hosts by it, ascending."""
+        items = [{"uuid": host_uuid, "viewPosition": position} for host_uuid, position in positions.items()]
         self._post("/api/hosts/actions/reorder", json={"hosts": items})
 
     def enable_host(self, uuid: str) -> None:

@@ -12,7 +12,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding, WorkloadBinding
 from meridian.compiler import compile_topology
-from meridian.compiler.models import ConfigProfilePayload, ResourcePlan
+from meridian.compiler.models import NON_XRAY_JSON_TYPES, ConfigProfilePayload, ResourcePlan
 from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
     AccessIntent,
@@ -214,8 +214,14 @@ class StatefulPanel:
     def update_host(self, uuid: str, **kwargs: object) -> Host:
         self.calls["update_host"] += 1
         host = self._host_from_kwargs(uuid, kwargs)
+        host.view_position = self.hosts[uuid].view_position  # the panel keeps positions on update
         self.hosts[uuid] = host
         return host
+
+    def set_host_positions(self, positions: dict[str, int]) -> None:
+        self.calls["position_host"] += 1
+        for uuid, position in positions.items():
+            self.hosts[uuid].view_position = position
 
     def get_host(self, uuid: str) -> Host | None:
         return self.hosts.get(uuid)
@@ -741,7 +747,9 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     assert all(host.fingerprint == ("" if host.alpn == "h3" else "chrome") for host in direct_hosts)
     assert all(host.tags == ["MERIDIAN_V4_VISIBLE"] for host in direct_hosts)
     assert all(host.tags == ["MERIDIAN_V4_XRAY_EDGE"] for host in hidden_edges)
-    assert all(host.exclude_from_subscription_types == ["MIHOMO", "XRAY_BASE64"] for host in hidden_edges)
+    assert all(set(host.exclude_from_subscription_types) == set(NON_XRAY_JSON_TYPES) for host in hidden_edges)
+    # Each owned Host carries its compiled subscription position.
+    assert sorted(host.view_position for host in hosts) == list(range(len(hosts)))
     assert virtual_hosts[0].tags == ["MERIDIAN_V4_XRAY_VIRTUAL"]
     assert all(not host.is_disabled for host in hosts)
     assert all(len(host.remark) <= 40 for host in hosts)

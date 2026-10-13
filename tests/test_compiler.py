@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from meridian.compiler import TopologyCompileError, compile_topology
 from meridian.compiler.models import (
     COMPILER_VERSION,
+    NON_XRAY_JSON_TYPES,
     AccessUserPayload,
     CertificatePayload,
     ConfigProfilePayload,
@@ -48,6 +49,7 @@ from meridian.compiler.names import (
 )
 from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
+    PROTOCOL_PRIORITY,
     AccessIntent,
     ControlPlaneIntent,
     DeliveryIntent,
@@ -478,11 +480,15 @@ class TestPureCompiler:
         assert len(hidden_edges) == len(direct_hosts)
         assert len(virtual_hosts) == 1
         assert all("XRAY_JSON" in host.exclude_from_subscription_types for host in direct_hosts)
-        assert all(host.exclude_from_subscription_types == ["MIHOMO", "XRAY_BASE64"] for host in hidden_edges)
-        assert virtual_hosts[0].exclude_from_subscription_types == [
-            "MIHOMO",
-            "XRAY_BASE64",
-        ]
+        assert all(set(host.exclude_from_subscription_types) == set(NON_XRAY_JSON_TYPES) for host in hidden_edges)
+        # The Xray JSON fallback Host must not leak into sing-box, Stash, or Clash as a duplicate.
+        assert set(virtual_hosts[0].exclude_from_subscription_types) == set(NON_XRAY_JSON_TYPES)
+        # Subscriptions list Reality first and the UDP Hysteria2 path last, whatever the path IDs.
+        ranked = sorted(hosts, key=lambda host: host.view_position)
+        assert [host.view_position for host in ranked] == list(range(len(hosts)))
+        assert virtual_hosts[0].protocol == "reality"
+        protocols = [host.protocol for host in ranked]
+        assert protocols == sorted(protocols, key=PROTOCOL_PRIORITY.index)
         assert len(external.template_refs) == 2
         assert settings.profile_title == "Family VPN"
 

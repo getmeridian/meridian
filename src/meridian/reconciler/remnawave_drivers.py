@@ -457,6 +457,11 @@ class HostDriver(retirement.HostRetirement):
                 lambda: self.context.panel.update_host(existing.uuid, **kwargs),
                 f"update Host {payload.remark}",
             )
+        if host.view_position != payload.view_position:
+            _mutation(
+                lambda: self.context.panel.set_host_positions({host.uuid: payload.view_position}),
+                f"position Host {payload.remark}",
+            )
         return ResourceApplyReceipt(remote_id=host.uuid)
 
 
@@ -753,6 +758,7 @@ def _host_expected(
         "is_hidden": payload.is_hidden,
         "xray_json_template_uuid": template_uuid,
         "exclude_from_subscription_types": sorted(payload.exclude_from_subscription_types),
+        "view_position": payload.view_position,
     }
 
 
@@ -774,6 +780,7 @@ def _host_projection(host: Host) -> dict[str, Any]:
         "is_hidden": host.is_hidden,
         "xray_json_template_uuid": host.xray_json_template_uuid,
         "exclude_from_subscription_types": sorted(host.exclude_from_subscription_types),
+        "view_position": host.view_position,
     }
 
 
