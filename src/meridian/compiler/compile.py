@@ -71,19 +71,23 @@ def compile_topology(
     builder = PlanBuilder()
     ports = PortAllocator()
     baseline_ids = compile_server_baselines(builder, intent)
+    # The bootstrap's ACME HTTP-01 challenge needs port 80 open before it runs.
+    control_web_ports = [
+        add_firewall(builder, intent.control.server_ref, "tcp", 80),
+        add_firewall(builder, intent.control.server_ref, "tcp", 443),
+    ]
     control_id = builder.add(
         "control:runtime",
         ControlPlaneRuntimePayload(
             server_ref=intent.control.server_ref,
             public_hostname=intent.control.public_hostname,
         ),
+        dependencies=control_web_ports,
         postconditions=[
             _exists("control:runtime"),
             ResourcePostcondition(kind="listening", target_ref="control:runtime", detail="HTTPS control plane"),
         ],
     )
-    add_firewall(builder, intent.control.server_ref, "tcp", 80)
-    add_firewall(builder, intent.control.server_ref, "tcp", 443)
 
     inbound_by_path: dict[tuple[str, str], str] = {}
     runtime_by_exit: dict[str, str] = {}

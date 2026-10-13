@@ -183,6 +183,22 @@ class TestPureCompiler:
         assert len(first.intent_hash) == 64
         assert len(first.plan_hash) == 64
 
+    def test_control_bootstrap_waits_for_its_web_ports_so_acme_can_answer(self) -> None:
+        plan = compile_topology(_intent())
+        order = [resource.logical_id for resource in plan.resources]
+        control = next(resource for resource in plan.resources if resource.logical_id == "control:runtime")
+        web_rules = [
+            resource.logical_id
+            for resource in plan.resources
+            if isinstance(resource.payload, FirewallRulePayload)
+            and resource.payload.server_ref == control.payload.server_ref
+            and resource.payload.port in (80, 443)
+            and not resource.payload.source_server_refs
+        ]
+        assert len(web_rules) == 2
+        assert set(web_rules) <= set(control.dependencies)
+        assert all(order.index(rule) < order.index("control:runtime") for rule in web_rules)
+
     def test_default_deployment_contract_is_explicit_empty_and_deterministic(self) -> None:
         implicit = compile_topology(_intent())
         explicit = compile_topology(_intent(), deployment_contract=DeploymentContract())

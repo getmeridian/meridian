@@ -25,6 +25,7 @@
 - Xray client failover uses one virtual template Host plus hidden tagged edge Hosts; Base64 and Mihomo keep normal visible alternatives.
 
 ## Pitfalls
+- **The control bootstrap depends on its public 80/443 rules** — ACME HTTP-01 runs inside it; without the edges a fresh server requests its certificate with port 80 still closed.
 - Never import SSH, HTTP, commands, console, config, Remnawave, or randomness here.
 - Raise `TopologyCompileError` for unsupported intent so CLI and Engine adapters preserve a typed user failure.
 - Do not put generated credentials or private Reality keys in a resource plan.
