@@ -24,7 +24,7 @@ def _make_pipeline_conn() -> MockConnection:
     conn = MockConnection()
 
     # InstallPackages: all present
-    conn.when("dpkg-query -W", stdout="curl\tok\nwget\tok\nsocat\tok\n")
+    conn.when("dpkg-query -W", stdout="".join(f"{name}\tinstall ok installed\n" for name in ("curl", "wget", "socat")))
 
     # EnableAutoUpgrades: already configured
     conn.when(

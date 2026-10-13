@@ -160,8 +160,14 @@ class ServerFacts:
         if not packages:
             return set()
         q_packages = " ".join(shlex.quote(p) for p in packages)
-        result = self.conn.run(f"dpkg-query -W -f='${{Package}}\\n' {q_packages} 2>/dev/null", timeout=15)
-        return set(result.stdout.strip().splitlines()) if result.returncode == 0 else set()
+        # dpkg also lists packages it merely remembers (removed, or "un" for a recommended
+        # package never installed); only "install ok installed" counts. Exit 1 just means
+        # some package is unknown, so the listed ones still count.
+        result = self.conn.run(f"dpkg-query -W -f='${{Package}}\\t${{Status}}\\n' {q_packages} 2>/dev/null", timeout=15)
+        if result.returncode not in (0, 1):
+            return set()
+        rows = (line.split("\t", 1) for line in result.stdout.splitlines() if "\t" in line)
+        return {name for name, status in rows if status == "install ok installed"}
 
     def docker_state(self) -> DockerState:
         if "docker_state" not in self._cache:
