@@ -132,3 +132,27 @@ def test_panel_server_always_offers_a_proxy_protocol_listener() -> None:
     assert "listen 127.0.0.1:8443 ssl;" in rendered
     assert "listen 127.0.0.1:8444 ssl proxy_protocol;" in rendered
     assert "real_ip_header proxy_protocol;" in rendered
+
+
+def test_xhttp_locations_never_cap_the_upload_body() -> None:
+    """nginx's 1m default counts a streamed request body and cut uploads off after a few MB."""
+    payload = NginxArtifactPayload(
+        server_ref="srv-a",
+        listener_port=18001,
+        layer="http",
+        tls_hostname="vpn.example.com",
+        routes=[
+            NginxRouteSpec(
+                match="host_path",
+                server_names=["vpn.example.com"],
+                path="/x",
+                backend_server_ref="srv-a",
+                backend_port=20443,
+                protocol="xhttp",
+            )
+        ],
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-a:http", payload, ADDRESSES)
+
+    assert rendered.count("client_max_body_size 0;") == 2

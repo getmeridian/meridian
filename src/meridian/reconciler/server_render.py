@@ -292,6 +292,8 @@ def _render_http_route(route: NginxRouteSpec, upstream: str, *, forward_ip: bool
         "        proxy_send_timeout 86400s;\n"
         "        proxy_buffering off;\n"
         "        proxy_request_buffering off;\n"
+        # nginx's 1m default counts a whole streamed body and cut uploads off mid-file.
+        "        client_max_body_size 0;\n"
     )
     return f"    location = {path} {{\n{block}    }}\n    location {path}/ {{\n{block}    }}\n"
 

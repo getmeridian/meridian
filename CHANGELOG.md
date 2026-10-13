@@ -179,6 +179,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   sing-box has no XHTTP, so those entries are left out.
 
 ### Security and correctness
+- **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
+  default cut long uploads off on 3.x when a client chose a streaming XHTTP
+  mode. 4.0 serves packet-up only and now also lifts the limit.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
