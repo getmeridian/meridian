@@ -15,7 +15,7 @@ def load_ai_docs() -> str:
     ref = pkg_files("meridian") / "data" / "ai-reference.md"
     try:
         return ref.read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError):
+    except OSError:
         return ""
 
 

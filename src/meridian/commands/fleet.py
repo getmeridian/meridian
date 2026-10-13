@@ -16,7 +16,7 @@ from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.fleet import FleetStatus, TopologyRelay
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -101,10 +101,8 @@ def _run_inventory(*, operation: OperationContext) -> None:
             make_panel(cluster),
             classify_error=_classify_panel_error,
         )
-    except RemnawaveAuthError as exc:
+    except MeridianError as exc:
         fail(exc)
-    except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
-        fail(f"Could not collect fleet inventory: {exc}", hint_type="bug")
 
     inventory = result.inventory
     warnings = result.warnings
@@ -294,10 +292,8 @@ def _run_status(*, operation: OperationContext) -> int:
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
         )
-    except RemnawaveAuthError as exc:
+    except MeridianError as exc:
         fail(exc)
-    except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
-        fail(f"Could not collect fleet status: {exc}", hint_type="bug")
 
     status = result.status
     warnings = result.warnings

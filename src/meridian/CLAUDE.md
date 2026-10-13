@@ -47,4 +47,6 @@
 - **The Xray JSON subscription is an array** — one config per virtual Host in view order (primary "Automatic", then the fingerprint copy); `parse_xray_subscription()` validates every entry and returns the first.
 - **Xray downloads are checksum-verified** — a missing, malformed, or mismatched release SHA2-256 sidecar makes connection verification inconclusive; never execute that archive.
 - **Whatever adds a firewall rule retires it** — node retirement deletes the Docker-internal node API rule (`fw-node-api`, plus its pre-rename comment); a leftover once named Meridian on a server reused as a relay.
+- **Readiness checks name their transient errors** — pass `poll_until_ready(transient=...)` for the failures a booting service raises; anything else is a bug and propagates instead of timing out silently.
+- **A missing PWA template raises** — `render._render_pwa_template()` never returns a blank page to upload.
 - **Fleet role contracts are finite** — do not project routing gateways as exits or source-restricted internal relay hops as public endpoints.

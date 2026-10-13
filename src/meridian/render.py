@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import json
-import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -12,8 +11,6 @@ from meridian.models import ProtocolURL
 
 if TYPE_CHECKING:
     from jinja2 import Environment
-
-logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +223,7 @@ def _load_app_icons() -> dict[str, str]:
             data = resource.read_bytes()
             b64 = base64.b64encode(data).decode()
             result[app_name] = f"data:image/webp;base64,{b64}"
-        except (FileNotFoundError, OSError):
+        except OSError:
             pass
     _app_icons_cache = result
     return result
@@ -343,28 +340,17 @@ def _render_pwa_template(
     **variables: object,
 ) -> str:
     """Load and render a Jinja2 template from templates/pwa/."""
-    try:
-        from importlib.resources import files
+    from importlib.resources import files
 
-        template_text = (files("meridian") / "templates" / "pwa" / filename).read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError) as exc:
-        logger.warning("Failed to load PWA template %s: %s", filename, exc)
-        return ""
-
-    from jinja2 import TemplateError
-
+    # A missing packaged template is a broken install; never upload a blank page.
+    template_text = (files("meridian") / "templates" / "pwa" / filename).read_text(encoding="utf-8")
     # HTML templates get autoescape; JSON manifests do not
     use_autoescape = filename.endswith(".html.j2")
     env = _create_jinja_env(autoescape=use_autoescape)
     env.filters["capitalize"] = lambda v: str(v).capitalize()
     env.filters["tojson"] = lambda v: json.dumps(str(v), ensure_ascii=False)[1:-1]
 
-    try:
-        tmpl = env.from_string(template_text)
-        return tmpl.render(**variables)
-    except TemplateError as exc:
-        logger.warning("Failed to render PWA template %s: %s", filename, exc)
-        return ""
+    return env.from_string(template_text).render(**variables)
 
 
 # ---------------------------------------------------------------------------

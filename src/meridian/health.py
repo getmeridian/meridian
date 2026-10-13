@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import socket
 import time
 from typing import Callable
 
@@ -25,20 +26,11 @@ def poll_until_ready(
     timeout: float = 60,
     interval: float = 2.0,
     description: str = "service",
+    transient: tuple[type[Exception], ...] = (),
 ) -> int:
-    """Poll a readiness check until it passes or timeout expires.
+    """Poll ``check`` every ``interval`` seconds; return the attempt count or raise ``ReadinessTimeout``.
 
-    Args:
-        check: Callable returning True when the service is ready.
-        timeout: Maximum seconds to wait before raising.
-        interval: Seconds between attempts.
-        description: Human-readable label for error messages.
-
-    Returns:
-        The number of attempts taken.
-
-    Raises:
-        ReadinessTimeout: If the check never passes within *timeout*.
+    Exceptions listed in ``transient`` count as not ready yet; any other exception propagates.
     """
     start = time.monotonic()
     attempts = 0
@@ -46,8 +38,8 @@ def poll_until_ready(
         attempts += 1
         try:
             ready = check()
-        except Exception:
-            logger.debug("%s readiness check raised on attempt %d", description, attempts)
+        except transient as exc:
+            logger.debug("%s not ready on attempt %d: %s", description, attempts, exc)
             ready = False
         if ready:
             logger.debug("%s ready after %d attempt(s)", description, attempts)
@@ -60,12 +52,9 @@ def poll_until_ready(
 
 
 def tcp_connect(host: str, port: int, timeout: float = 5) -> bool:
-    """Test TCP connectivity to host:port using a Python socket."""
-    import socket as _socket
-
+    """Whether a TCP connection to host:port opens within ``timeout`` seconds."""
     try:
-        conn = _socket.create_connection((host, port), timeout=timeout)
-        conn.close()
-        return True
-    except (OSError, _socket.timeout):
+        socket.create_connection((host, port), timeout=timeout).close()
+    except OSError:
         return False
+    return True

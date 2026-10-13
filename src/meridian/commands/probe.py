@@ -53,8 +53,6 @@ def run(
                 hint="Check local file permissions and network access, then retry.",
                 hint_type="system",
             )
-        except Exception as exc:  # Command boundary: unexpected errors are bugs.
-            fail(f"Probe failed unexpectedly: {exc}", hint_type="bug")
 
     if is_json_mode():
         _emit_json_result(result, operation=operation)

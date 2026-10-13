@@ -119,7 +119,7 @@ class _FileTransferMixin:
                         redacted_command=redacted,
                         operation_name=operation_name,
                     )
-                except (FileNotFoundError, OSError) as e:
+                except OSError as e:
                     return self._synthetic_result(
                         args=cmd,
                         returncode=1,
@@ -179,7 +179,7 @@ class _FileTransferMixin:
                 redacted_command=redacted,
                 operation_name=operation_name,
             )
-        except (FileNotFoundError, OSError) as e:
+        except OSError as e:
             return self._synthetic_result(
                 args=cmd,
                 returncode=1,

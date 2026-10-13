@@ -618,11 +618,7 @@ class TestCheckPanelApiReady:
 
         # retries=3, delay=5.0 → timeout=15.0
         mock_mono.side_effect = [0.0, 0.0, 5.0, 5.0, 10.0, 10.0, 15.0]
-        mock_get.side_effect = [
-            httpx.ConnectError("refused"),
-            httpx.ConnectError("refused"),
-            httpx.ConnectError("refused"),
-        ]
+        mock_get.side_effect = httpx.ConnectError("refused")
         result = check_panel_api_ready("https://198.51.100.2", retries=3, delay=5.0)
         assert result is False
         assert mock_sleep.call_count >= 2

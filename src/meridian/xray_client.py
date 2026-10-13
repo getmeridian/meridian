@@ -538,6 +538,7 @@ def test_connection(
             timeout=min(5.0, operation_timeout),
             interval=0.2,
             description=f"localhost:{socks_port}",
+            transient=(OSError,),
         )
 
         # Test connectivity. A node can report connected just before its active

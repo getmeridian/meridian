@@ -418,7 +418,7 @@ class TestFleetStatus:
             run_status()  # should not raise
 
     def test_status_list_nodes_unexpected_error_is_bug(self) -> None:
-        """Unexpected adapter bugs must not be reported as successful partial status."""
+        """Unexpected adapter bugs surface instead of being reported as partial status."""
         topology = _fleet_topology()
         panel = _make_panel_mock(ping_ok=True)
         panel.list_nodes.side_effect = ValueError("bad adapter")
@@ -428,11 +428,9 @@ class TestFleetStatus:
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
+            pytest.raises(ValueError, match="bad adapter"),
         ):
-            with pytest.raises(typer.Exit) as exc_info:
-                run_status()
-
-        assert exc_info.value.exit_code == 1
+            run_status()
 
     def test_status_json_preserves_partial_panel_failures(self) -> None:
         """JSON mode reports source availability and warnings for partial API failures."""
@@ -661,11 +659,9 @@ class TestFleetInventory:
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
+            pytest.raises(TypeError, match="adapter shape changed"),
         ):
-            with pytest.raises(typer.Exit) as exc_info:
-                run_inventory()
-
-        assert exc_info.value.exit_code == 1
+            run_inventory()
 
 
 class TestPanelVersionWarnings:

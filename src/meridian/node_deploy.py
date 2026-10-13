@@ -12,7 +12,7 @@ import shlex
 
 from meridian.config import REMNAWAVE_NODE_API_PORT
 from meridian.core.errors import PanelSetupError
-from meridian.remnawave import MeridianPanel
+from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,7 @@ def check_panel_api_ready(base_url: str, retries: int = 20, delay: float = 3.0) 
             timeout=retries * delay,
             interval=delay,
             description="panel API",
+            transient=(httpx.HTTPError,),
         )
         return True
     except ReadinessTimeout:
@@ -142,6 +143,7 @@ def wait_for_node_connected(
             timeout=timeout,
             interval=interval,
             description=f"Remnawave node {node_uuid}",
+            transient=(RemnawaveError,),
         )
         return True
     except ReadinessTimeout:
