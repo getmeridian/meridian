@@ -118,6 +118,21 @@ def test_renders_exact_reviewed_protocols_and_paths() -> None:
     assert [outbound["tag"] for outbound in config["outbounds"]] == ["direct", "block"]
 
 
+def test_hysteria2_hides_quic_behind_a_stable_salamander_password() -> None:
+    from meridian.xray_workload import salamander_password
+
+    config = render_workload_config(_profile(), reality_keys=_keys())
+    mask = config["inbounds"][3]["streamSettings"]["finalmask"]
+
+    assert mask == {"udp": [{"type": "salamander", "settings": {"password": salamander_password(_keys())}}]}
+    password = mask["udp"][0]["settings"]["password"]
+    # Same keys, same password on every render: observation must never see drift.
+    assert render_workload_config(_profile(), reality_keys=_keys()) == config
+    assert len(password) == 32 and "private-a" not in password
+    rotated = RealityKeyBinding(public_key="public-b", private_key="private-b", short_id="0123456789abcdef")
+    assert salamander_password(rotated) != password
+
+
 def test_geo_block_refuses_russian_destinations_only_when_reviewed() -> None:
     plain = render_workload_config(_profile(), reality_keys=_keys())
     blocked = render_workload_config(_profile().model_copy(update={"geo_block": True}), reality_keys=_keys())

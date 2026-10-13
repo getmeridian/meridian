@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 from dataclasses import dataclass
 from typing import Any
 
@@ -194,6 +196,7 @@ def _render_inbound(
         }
     if not inbound.tls_sni:
         raise WorkloadConfigError(f"Hysteria2 inbound {inbound.tag} has no TLS hostname.")
+    keys = _require_complete_reality_keys(reality_keys, inbound)
     certificate_dir = certificate_directory(inbound.tls_sni)
     return {
         "tag": inbound.tag,
@@ -214,8 +217,21 @@ def _render_inbound(
                 ],
                 "alpn": ["h3"],
             },
+            # Salamander turns QUIC (and its visible SNI) into random-looking UDP. Remnawave
+            # copies the inbound's finalmask into every client format.
+            "finalmask": {"udp": [{"type": "salamander", "settings": {"password": salamander_password(keys)}}]},
         },
     }
+
+
+def salamander_password(keys: RealityKeyBinding) -> str:
+    """Derive the workload's stable Hysteria2 obfuscation password from its Reality private key.
+
+    Nothing new to store or rotate: the password follows the key triple, which never rotates
+    and moves with ``node replace``. The HMAC reveals nothing about the private key.
+    """
+    digest = hmac.new(keys.private_key.encode("utf-8"), b"meridian-hysteria2-salamander", hashlib.sha256)
+    return digest.hexdigest()[:32]
 
 
 def _render_service_outbound(

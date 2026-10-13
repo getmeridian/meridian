@@ -122,6 +122,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   keeps flowing (the throttling freeze), and the subscription from the
   visitor's own network, then copies a report without links or secrets that
   they can send you.
+- **Hysteria2 is disguised** — its UDP traffic is wrapped in salamander
+  obfuscation, so censors see random packets instead of QUIC with a readable
+  server name. Every subscription format carries the setting automatically.
 - **Entries have readable names** — apps show "Reality · Chrome", "XHTTP ·
   Firefox", "WebSocket · CDN", or "Hysteria2 · UDP" (plus the exit's name when
   you have several, and "via relay" for relay entries) instead of internal IDs.
