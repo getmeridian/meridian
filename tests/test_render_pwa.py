@@ -549,7 +549,7 @@ class TestSelfCheck:
 
         source = (PWA_DIR / "selfcheck.js").read_text()
         assert _js_bytes(source, "STALL_CLEARANCE_BYTES") == blocking.STALL_CLEARANCE_BYTES
-        assert _js_bytes(source, "THROTTLE_LOW_BYTES") == blocking._THROTTLE_WINDOW[0]
+        assert _js_bytes(source, "THROTTLE_LOW_BYTES") == blocking.THROTTLE_WINDOW[0]
         assert _js_bytes(source, "STALL_TIMEOUT_MS") == 5000
         assert _js_bytes(source, "CLOCK_WARN_MS") == 60_000
 
