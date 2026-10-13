@@ -1,18 +1,12 @@
-"""`meridian relay check` -- per-hop health of relay chains."""
+"""Per-hop health of relay chains, collected for `meridian check RELAY`."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
-import typer
-
 from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands._validation import validate_command_input
-from meridian.commands.check_render import emit_verification_json, render_verification
-from meridian.console import error_context, fail, is_json_mode
+from meridian.console import fail
 from meridian.core.command_inputs import RelayTargetRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.output import OperationContext
 from meridian.core.relay_check import RelayCheckResult, RelayHopTarget
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.core.verification import VerificationCheck, aggregate_verification
@@ -20,35 +14,9 @@ from meridian.resolve import connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.ssh import ServerConnection
 
-ConnectionFactory = Callable[[ServerEntry], ServerConnection]
 
-
-def run_check(
-    relay_ip: str,
-    exit_arg: str = "",
-    user: str = "",
-    *,
-    connection_factory: ConnectionFactory | None = None,
-) -> None:
-    """Check every Realm hop a relay server runs (or every hop of one chain)."""
-    operation = OperationContext()
-    with error_context("relay.check", timer=operation.timer):
-        result = collect_relay_check(relay_ip, exit_arg, user, connection_factory=connection_factory)
-    if is_json_mode():
-        _emit_json(result, operation)
-    else:
-        _render(result)
-    if result.exit_code:
-        raise typer.Exit(result.exit_code)
-
-
-def collect_relay_check(
-    relay_ip: str,
-    exit_arg: str,
-    user: str,
-    *,
-    connection_factory: ConnectionFactory | None,
-) -> RelayCheckResult:
+def collect_relay_check(relay_ip: str, user: str = "") -> RelayCheckResult:
+    """Check every Realm hop a relay server runs: unit state, next-hop TCP, and the public entry."""
     from meridian.commands.relay import select_relay_chains
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.diagnostics.relay import check_realm_hop, check_relay_leg, check_relay_listener
@@ -57,19 +25,17 @@ def collect_relay_check(
         RelayTargetRequest,
         "Invalid relay check request",
         relay_ip=relay_ip,
-        exit_arg=exit_arg,
         user=user,
     )
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
-    chains, server_ref, _label = select_relay_chains(intent, registry, request.relay_ip, request.exit_arg)
+    chains, server_ref, _label = select_relay_chains(intent, registry, request.relay_ip, "")
     try:
         hops = relay_hop_targets(intent, chains, registry, server_ref=server_ref)
     except LocalStateError as exc:
         fail(exc)
 
-    connect = connection_factory or _connection_for(request.user)
     connections: dict[str, ServerConnection] = {}
     checks: list[VerificationCheck] = []
     for hop in hops:
@@ -79,7 +45,7 @@ def collect_relay_check(
             entry = registry.find(hop.server_ref)
             if entry is None:  # relay_hop_targets already resolved it
                 raise RuntimeError(f"Saved server {hop.server_ref} disappeared during the check")
-            connections[hop.server_ref] = connect(entry)
+            connections[hop.server_ref] = connection_for_entry(entry, user=request.user)
         checks.append(check_realm_hop(connections[hop.server_ref], hop))
         checks.append(check_relay_leg(connections[hop.server_ref], hop))
     aggregate = aggregate_verification(checks)
@@ -154,39 +120,3 @@ def _entry(registry: ServerRegistry, server_ref: str) -> ServerEntry:
             hint="Add the server back with its SSH details, then rerun the check.",
         )
     return entry
-
-
-def _connection_for(user_override: str) -> ConnectionFactory:
-    def connect(entry: ServerEntry) -> ServerConnection:
-        return connection_for_entry(entry, user=user_override)
-
-    return connect
-
-
-def _summary(result: RelayCheckResult) -> str:
-    if result.verdict == "passed":
-        return f"All {result.counts.checks} relay checks passed."
-    if result.verdict == "findings":
-        problems = result.counts.failed + result.counts.warnings
-        return f"{problems} of {result.counts.checks} relay checks found problems."
-    return f"{result.counts.skipped} of {result.counts.checks} relay checks could not collect evidence."
-
-
-def _emit_json(result: RelayCheckResult, operation: OperationContext) -> None:
-    emit_verification_json(
-        command="relay.check",
-        data=result.to_data(),
-        verdict=result.verdict,
-        counts=result.counts,
-        exit_code=result.exit_code,
-        summary=_summary(result),
-        timer=operation.timer,
-        inconclusive_code="MERIDIAN_RELAY_CHECK_INCONCLUSIVE",
-        inconclusive_hint="Restore SSH access to every relay hop, then rerun the check.",
-    )
-
-
-def _render(result: RelayCheckResult) -> None:
-    render_verification(
-        "Relay check", f"{result.relay} - {', '.join(result.chains)}", result.checks, result.verdict, _summary(result)
-    )

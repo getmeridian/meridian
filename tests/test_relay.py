@@ -183,20 +183,17 @@ class TestRelayCLI:
         assert "add" in result.output
         assert "list" in result.output
         assert "remove" in result.output
-        # `relay check` is a hidden alias of `meridian check RELAY` for one release.
-        assert CliRunner().invoke(app, ["relay", "check", "--help"]).exit_code == 0
 
-    def test_relay_add_help_and_hidden_deploy_alias(self) -> None:
+    def test_relay_add_help(self) -> None:
         from typer.testing import CliRunner
 
         from meridian.cli import app
 
-        for command in ("add", "deploy"):
-            result = CliRunner().invoke(app, ["relay", command, "--help"])
+        result = CliRunner().invoke(app, ["relay", "add", "--help"])
 
-            assert result.exit_code == 0
-            assert "SERVER" in result.output
-            assert "Exit server" in result.output
+        assert result.exit_code == 0
+        assert "SERVER" in result.output
+        assert "Exit server" in result.output
 
 
 class TestNginxStreamRelay:

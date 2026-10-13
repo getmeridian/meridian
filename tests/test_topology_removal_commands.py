@@ -1,8 +1,7 @@
-"""`node remove`, `relay remove`, and `relay check` as topology intent edits plus reviewed apply."""
+"""`node remove` and `relay remove` as topology intent edits plus reviewed apply, and relay hop checks."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -13,8 +12,7 @@ import typer
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands.node import run_remove as node_remove
 from meridian.commands.relay import run_remove as relay_remove
-from meridian.commands.relay_check import run_check
-from meridian.console import set_json_mode
+from meridian.commands.relay_check import collect_relay_check
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
@@ -204,13 +202,13 @@ class TestRelayCheck:
         cluster = ClusterConfig(topology_intent=_intent())
         with (
             patch("meridian.commands.relay_check.load_topology_cluster", return_value=cluster),
+            patch("meridian.commands.relay_check.connection_for_entry", lambda entry, user: connections[entry.host]),
             patch("meridian.diagnostics.relay.tcp_connect", return_value=listener_open),
         ):
             try:
-                run_check(query, connection_factory=lambda entry: connections[entry.host])
+                return collect_relay_check(query).exit_code
             except typer.Exit as exc:
                 return int(exc.exit_code)
-        return 0
 
     @staticmethod
     def _hop(probe_status: int = 0, leg_bytes: int = 98304, leg_status: int = 0) -> MockConnection:
@@ -259,25 +257,10 @@ class TestRelayCheck:
 
         assert self._check("relay-a", connections, listener_open=False) == 4
 
-    def test_ssh_failure_is_inconclusive_json(
-        self,
-        registry: ServerRegistry,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
+    def test_ssh_failure_is_inconclusive(self, registry: ServerRegistry) -> None:
         unreachable = MockConnection().when("", rc=255)
-        set_json_mode(True)
-        try:
-            code = self._check("relay-a", {"198.51.100.13": self._healthy(), "198.51.100.14": unreachable})
-        finally:
-            set_json_mode(False)
 
-        assert code == 3
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["command"] == "relay.check"
-        assert payload["status"] == "failed"
-        assert payload["errors"][0]["code"] == "MERIDIAN_RELAY_CHECK_INCONCLUSIVE"
-        assert payload["data"]["verdict"] == "inconclusive"
-        assert [hop["hop_index"] for hop in payload["data"]["hops"]] == [0, 1]
+        assert self._check("relay-a", {"198.51.100.13": self._healthy(), "198.51.100.14": unreachable}) == 3
 
     def test_unknown_relay_fails_before_ssh(self, registry: ServerRegistry) -> None:
         assert self._check("198.51.100.99", {}) == 2

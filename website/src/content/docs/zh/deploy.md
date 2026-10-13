@@ -34,7 +34,6 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--color PALETTE` | ocean | 页面色彩主题 (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH 用户（非 root 用户需无密码 sudo） |
 | `--ssh-port PORT` | 22 | SSH 端口（如果不是 22） |
-| `--server NAME` | | 保存的服务器来部署到（名称或 IP） |
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block / --no-geo-block` | 启 | 通过代理阻止俄罗斯域名和 IP |

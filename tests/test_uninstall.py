@@ -24,10 +24,10 @@ def test_teardown_bad_server_selector_fails_without_prompt_fallback() -> None:
         patch("meridian.commands.uninstall.resolve_server", side_effect=typer.Exit(2)) as resolve,
         pytest.raises(typer.Exit) as exc_info,
     ):
-        run(requested_server="typo", yes=True)
+        run("typo", yes=True)
 
     assert exc_info.value.exit_code == 2
-    resolve.assert_called_once_with(registry, requested_server="typo", explicit_ip="", user="", port=0)
+    resolve.assert_called_once_with(registry, explicit_ip="typo", user="", port=0)
 
 
 def test_teardown_declined_confirmation_exits_one() -> None:

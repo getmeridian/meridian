@@ -123,7 +123,7 @@ def test_no_target_checks_every_fleet_server_including_relay_hops(fleet: SimpleN
     mocks = _run(fleet)
 
     assert mocks.containers.call_count == 5
-    mocks.relay_check.assert_called_once_with("198.51.100.20", "", "", connection_factory=None)
+    mocks.relay_check.assert_called_once_with("198.51.100.20", "")
 
 
 def test_a_server_outside_the_fleet_gets_preflight(fleet: SimpleNamespace) -> None:
@@ -132,13 +132,6 @@ def test_a_server_outside_the_fleet_gets_preflight(fleet: SimpleNamespace) -> No
         _run(fleet, "198.51.100.99")
 
     assert preflight.call_args.args[1] == "198.51.100.99"
-
-
-def test_node_check_alias_refuses_a_server_outside_the_fleet(fleet: SimpleNamespace) -> None:
-    with pytest.raises(typer.Exit) as exc_info:
-        _run(fleet, "198.51.100.99", scope="server")
-
-    assert exc_info.value.exit_code == 2
 
 
 def test_json_output_is_one_check_envelope_for_the_whole_fleet(
@@ -167,7 +160,7 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
         public_tls_ports=(7443,),
         https_routes=(SimpleNamespace(port=7443, tls_sni="edge.example.com", host_header=""),),
     )
-    mocks = _run(fleet, "exit-a", scope="server")
+    mocks = _run(fleet, "exit-a")
 
     assert mocks.ports.call_args_list == [
         call(fleet.conn, 7443, transport="tcp"),
@@ -178,14 +171,14 @@ def test_listener_checks_follow_compiled_public_and_internal_ports(fleet: Simple
 
 
 def test_remote_check_measures_data_flow_from_the_deployer_without_the_differential(fleet: SimpleNamespace) -> None:
-    mocks = _run(fleet, "exit-a", scope="server")
+    mocks = _run(fleet, "exit-a")
 
     mocks.blocking.assert_called_once_with("198.51.100.10", fleet.deployment, differential=False)
 
 
 def test_on_server_check_skips_deployer_vantage_data_flow(fleet: SimpleNamespace) -> None:
     fleet.conn.local_mode = True
-    mocks = _run(fleet, "exit-a", scope="server")
+    mocks = _run(fleet, "exit-a")
 
     mocks.blocking.assert_not_called()
 

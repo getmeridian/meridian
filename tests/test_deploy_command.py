@@ -223,4 +223,4 @@ def test_interactive_prompt_takes_the_same_target_syntax_as_the_argument(monkeyp
     value = deploy._prompt_server_target()
 
     assert value == "ubuntu@198.51.100.10:2222"
-    assert deploy._split_target(value, "", "", 0) == ("198.51.100.10", "", "ubuntu", 2222)
+    assert deploy._split_target(value, "", 0) == ("198.51.100.10", "", "ubuntu", 2222)

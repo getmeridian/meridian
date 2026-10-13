@@ -99,11 +99,11 @@ class TestHelpSections:
 
         assert public == set(cli._HELP_ORDER)
 
-    def test_hidden_aliases_stay_out_of_top_level_help(self) -> None:
+    def test_hidden_dev_app_stays_out_of_top_level_help(self) -> None:
         output = _strip_ansi(runner.invoke(app, ["--help"]).output)
 
-        for alias in ("preflight", "probe", "rage", "dev"):
-            assert not re.search(rf"│ {alias}\s", output)
+        assert not re.search(r"│ dev\s", output)
+        assert re.search(r"│ probe\s", output)
 
     def test_deploy_help_groups_options_into_panels(self) -> None:
         output = _strip_ansi(runner.invoke(app, ["deploy", "--help"]).output)
@@ -119,6 +119,47 @@ class TestHelpSections:
         output = _strip_ansi(runner.invoke(app, ["deploy", "--help"]).output)
 
         assert "\\'" not in output
+
+
+class TestRenamedSpellings:
+    def test_every_old_command_spelling_fails_with_a_pointer_to_the_new_one(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        for old, new in cli.RENAMED.items():
+            result = runner.invoke(app, [*old.split(), "198.51.100.10"])
+
+            assert result.exit_code == 2, old
+            assert f"meridian {old}` is now `meridian {new}`" in _strip_ansi(result.output)
+
+    def test_old_spellings_are_not_commands_any_more(self) -> None:
+        group = typer.main.get_command(app)
+        for old in cli.RENAMED:
+            command: object = group
+            for name in old.split():
+                command = command.commands.get(name) if isinstance(command, typer.core.TyperGroup) else None  # type: ignore[attr-defined]
+            assert command is None, old
+
+    def test_server_option_points_at_the_positional_target(self, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        result = runner.invoke(app, ["doctor", "--server", "mybox"])
+
+        assert result.exit_code == 2
+        assert "`--server` is now the first argument: `meridian doctor SERVER`" in _strip_ansi(result.output)
+
+    def test_renamed_command_in_json_mode_is_an_error_envelope(self, monkeypatch) -> None:
+        _reset_output_modes()
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+
+        result = runner.invoke(app, ["relay", "check", "relay-a", "--json"])
+
+        _reset_output_modes()
+        assert result.exit_code == 2
+        payload = json.loads(result.output)
+        assert payload["command"] == "relay.check"
+        assert payload["status"] == "failed"
+        assert payload["errors"][0]["category"] == "user"
+        assert "meridian check" in payload["errors"][0]["message"]
 
 
 class TestSubcommandHelp:
@@ -339,19 +380,8 @@ class TestSubcommandHelp:
         assert called["json"] is True
         assert called["json_output"] is True
 
-    def test_preflight_help(self) -> None:
-        result = runner.invoke(app, ["preflight", "--help"])
-        assert result.exit_code == 0
-        assert "--ai" in _strip_ansi(result.output)
-        assert "--ssh-port" in _strip_ansi(result.output)
-
     def test_doctor_help(self) -> None:
         result = runner.invoke(app, ["doctor", "--help"])
-        assert result.exit_code == 0
-        assert "--ai" in _strip_ansi(result.output)
-
-    def test_rage_alias(self) -> None:
-        result = runner.invoke(app, ["rage", "--help"])
         assert result.exit_code == 0
         assert "--ai" in _strip_ansi(result.output)
 

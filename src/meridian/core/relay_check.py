@@ -1,4 +1,4 @@
-"""Typed per-hop relay health result for `meridian relay check`."""
+"""Typed per-hop relay health result, collected for `meridian check RELAY`."""
 
 from __future__ import annotations
 

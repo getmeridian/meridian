@@ -34,7 +34,7 @@ def test_bare_help_matches_the_top_level_help() -> None:
 
 
 def test_unknown_and_hidden_topics_are_user_errors() -> None:
-    for topic in (["nope"], ["probe"], ["node", "nope"]):
+    for topic in (["nope"], ["dev"], ["node", "nope"]):
         result = runner.invoke(app, ["help", *topic])
         assert result.exit_code == 2, topic
 

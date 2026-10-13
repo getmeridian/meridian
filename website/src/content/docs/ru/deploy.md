@@ -34,7 +34,6 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--color PALETTE` | ocean | Тема цвета страницы (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH пользователь (не-root пользователи требуют passwordless sudo) |
 | `--ssh-port PORT` | 22 | SSH портс, если не 22 |
-| `--server NAME` | | Сохранённый сервер для развёртывания (имя или IP) |
 | `--harden / --no-harden` | вкл | SSH только по ключу, fail2ban и брандмауэр UFW. Используйте `--no-harden` на сервере, общем с другими сервисами |
 | `--warp / --no-warp` | выкл | Отправлять исходящий трафик через Cloudflare WARP |
 | `--geo-block / --no-geo-block` | вкл | Блокировать российские домены и IP на сервере |

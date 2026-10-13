@@ -83,9 +83,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   containers (including Docker health, so a crash-looping service is flagged),
   every compiled port, TLS, and disk for control, exit, and gateway servers;
   and each Realm hop for relays. With no server it checks the whole fleet, and
-  `--json` returns one typed report. `meridian test --probe` replaces `meridian
-  probe`. `preflight`, `node check`, `relay check`, and `probe` still work for
-  one release.
+  `--json` returns one typed report. `meridian test --probe` (short form:
+  `meridian probe`) shows a server the way a censor's scanner would.
+  `preflight`, `rage`, `node check`, and `relay check` are gone: each now stops
+  with a one-line pointer to the new command (exit 2, or a JSON error envelope
+  with `--json`).
 - **"What is blocked?"** — `meridian test --probe` now tells a blocked server
   IP from a blocked camouflage SNI by comparing the server with and without the
   SNI against the real camouflage site, and inconclusive stays inconclusive.
@@ -99,9 +101,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including
-  `deploy`, `node add`, `relay add`, and `server add`. `--server NAME` still works.
+  `deploy`, `node add`, `relay add`, and `server add`. The old `--server NAME`
+  option stops with a pointer to the positional target.
 - **`relay deploy` is now `relay add`**, matching `node add`, `client add`, and
-  `server add`. The old name keeps working.
+  `server add`. The old name stops with a pointer to the new one.
 - **Run Meridian on the server itself** — after `meridian deploy local` (or on
   any saved server whose IP is on this machine), later commands such as
   `client add`, `doctor`, and `node add` run locally with sudo instead of

@@ -35,13 +35,12 @@ def scan_for_sni(conn: ServerConnection, ip: str, *, strict: bool = False) -> li
 def run(
     ip: str = "",
     user: str = "",
-    requested_server: str = "",
     *,
     ssh_port: int = 0,
 ) -> None:
     """Download RealiTLScanner, scan the server's subnet, and let user pick an SNI target."""
     registry = ServerRegistry(SERVER_PROFILES_FILE)
-    resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user, port=ssh_port)
+    resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
 
     resolved = ensure_server_connection(resolved)
 

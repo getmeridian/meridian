@@ -37,7 +37,6 @@ def run(
     target_value: str = "",
     domain: str = "",
     sni: str = "",
-    requested_server: str = "",
     client: str = "",
     basic: bool = False,
     timeout: float | str = 5,
@@ -46,7 +45,7 @@ def run(
     operation = OperationContext()
     with error_context("test", timer=operation.timer):
         try:
-            fleet = [] if target_value or requested_server or domain or sni else fleet_test_targets()
+            fleet = [] if target_value or domain or sni else fleet_test_targets()
             result: TestResult | FleetTestResult
             if len(fleet) > 1:
                 results = [
@@ -63,7 +62,7 @@ def run(
                     target_value,
                     domain,
                     sni,
-                    requested_server or only,
+                    only,
                     client=client,
                     basic=basic,
                     timeout=timeout,

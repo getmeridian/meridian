@@ -22,7 +22,7 @@ from meridian.config import DEFAULT_SNI
 from meridian.console import err_console, error_context, fail, info, is_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import TopologyNode
-from meridian.core.health import HealthCheckResult, HealthReport, HealthScope, combine_health_reports, health_report
+from meridian.core.health import HealthCheckResult, HealthReport, combine_health_reports, health_report
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
 from meridian.core.topology import SetupIntent
@@ -56,7 +56,6 @@ def run(
     sni: str = "",
     domain: str = "",
     ai: bool = False,
-    scope: HealthScope | None = None,
 ) -> None:
     """Check one server (or the whole fleet) and exit 0 / 4 findings / 3 inconclusive."""
     try:
@@ -70,8 +69,8 @@ def run(
     operation = OperationContext()
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     with error_context("check", timer=operation.timer):
-        cluster = ClusterConfig() if scope == "preflight" else load_cluster()
-        reports = _collect(cluster, registry, target, user=user, port=ssh_port, sni=sni, domain=domain, scope=scope)
+        cluster = load_cluster()
+        reports = _collect(cluster, registry, target, user=user, port=ssh_port, sni=sni, domain=domain)
     result = combine_health_reports(reports)
     summary = _summary("Health check" if len(reports) > 1 else _TITLES[reports[0].scope], result.verdict, result.counts)
     if is_json_mode():
@@ -103,21 +102,14 @@ def _collect(
     port: int,
     sni: str,
     domain: str,
-    scope: HealthScope | None,
 ) -> list[HealthReport]:
     intent = cluster.topology_intent
-    if scope == "preflight" or intent is None:
+    if intent is None:
         return [_preflight_report(registry, target, user=user, port=port, sni=sni, domain=domain)]
     if target:
         entry = _saved_entry(registry, target, user=user, port=port)
         roles = server_roles(intent, entry.id) if entry is not None else []
         if entry is None or not roles:
-            if scope == "server":
-                fail(
-                    f"{target} is not a server in the fleet",
-                    hint="See the fleet: meridian fleet inventory",
-                    hint_type="user",
-                )
             return [_preflight_report(registry, target, user=user, port=port, sni=sni, domain=domain)]
         servers = [(entry, roles)]
     else:
@@ -137,12 +129,12 @@ def _collect(
     with ExitStack() as stack:
         panel = _PanelSession(cluster, stack)
         for entry, roles in servers:
-            if scope in (None, "server") and set(roles) - {"relay"}:
+            if set(roles) - {"relay"}:
                 _announce(entry)
                 reports.append(
                     _server_report(cluster, registry, entry, roles, nodes.get(entry.host), panel, user=user, port=port)
                 )
-            if scope is None and "relay" in roles:
+            if "relay" in roles:
                 reports.append(_relay_report(entry, roles, user=user))
     return reports
 
@@ -317,7 +309,7 @@ def _server_report(
 def _relay_report(entry: ServerEntry, roles: list[str], *, user: str) -> HealthReport:
     from meridian.commands.relay_check import collect_relay_check
 
-    relay = collect_relay_check(entry.host, "", user, connection_factory=None)
+    relay = collect_relay_check(entry.host, user)
     return health_report(entry.name or entry.host, "relay", relay.checks, server_ref=entry.id, roles=roles)
 
 

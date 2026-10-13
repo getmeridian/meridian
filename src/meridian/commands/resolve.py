@@ -30,14 +30,13 @@ __all__ = [
 
 def _resolve_server(
     registry: ServerRegistry,
-    requested_server: str = "",
     explicit_ip: str = "",
     user: str = "",
     port: int = 0,
 ) -> ResolvedServer:
     """Resolve which server to target.
 
-    The target (positional, or the legacy ``--server``) is parsed like ssh:
+    The target is parsed like ssh:
     ``[user@]host[:port]``, a saved name, or ``local``. Priority: that target >
     local mode (root) > single registered > fail.
 
@@ -46,14 +45,8 @@ def _resolve_server(
     If port is 0, it's auto-resolved from the server registry (default 22).
     If port is explicitly set (non-zero), it overrides the registry value.
     """
-    if explicit_ip and requested_server and explicit_ip != requested_server:
-        fail(
-            f"Two servers given: {explicit_ip} and --server {requested_server}",
-            hint="Name the server once, as the first argument.",
-            hint_type="user",
-        )
     try:
-        target = _resolve_lib.merge_target(explicit_ip or requested_server, user=user, port=port)
+        target = _resolve_lib.merge_target(explicit_ip, user=user, port=port)
     except ValueError as exc:
         fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
     user, port = target.user, target.port
@@ -172,7 +165,6 @@ def _resolve_server(
 
 def resolve_server(
     registry: ServerRegistry,
-    requested_server: str = "",
     explicit_ip: str = "",
     user: str = "",
     port: int = 0,
@@ -181,7 +173,6 @@ def resolve_server(
     try:
         return _resolve_server(
             registry,
-            requested_server=requested_server,
             explicit_ip=explicit_ip,
             user=user,
             port=port,

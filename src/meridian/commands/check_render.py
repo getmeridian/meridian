@@ -1,4 +1,4 @@
-"""One rendering of verification checks for check, test, probe, and relay check."""
+"""One rendering of verification checks for check, test, and probe."""
 
 from __future__ import annotations
 

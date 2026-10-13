@@ -1018,9 +1018,8 @@ export const commandCatalog = {
     },
     {
       "argv": [
-        "test",
-        "TARGET",
-        "--probe"
+        "probe",
+        "TARGET"
       ],
       "command": "probe",
       "data_schema": "probe-result",
@@ -1039,7 +1038,6 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--server",
         "--sni",
         "--timeout"
       ],
@@ -1066,70 +1064,6 @@ export const commandCatalog = {
           "category": "system",
           "exit_code": 3,
           "meaning": "probe failed or was inconclusive",
-          "status": "failed"
-        },
-        {
-          "category": "bug",
-          "exit_code": 1,
-          "meaning": "unexpected Meridian bug",
-          "status": "failed"
-        }
-      ],
-      "stability": "stable",
-      "statuses": [
-        "ok",
-        "failed"
-      ]
-    },
-    {
-      "argv": [
-        "relay",
-        "check",
-        "RELAY"
-      ],
-      "command": "relay.check",
-      "data_schema": "relay-check",
-      "description": "Check every Realm hop of a relay chain: unit state, next-hop TCP, and the public listener.",
-      "envelope_schema": "relay-check-envelope",
-      "error_schema": "error",
-      "exit_codes": {
-        "0": "relay check completed and every hop passed",
-        "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "system failure, or SSH/tool evidence was unavailable for a hop",
-        "4": "relay check completed with negative findings",
-        "130": "process interrupted; no JSON envelope is emitted"
-      },
-      "failure_data_schema": "relay-check-failure",
-      "interrupt_behavior": "exit_130_without_envelope",
-      "machine_flags": [
-        "--json",
-        "--exit",
-        "--user"
-      ],
-      "outcomes": [
-        {
-          "category": "none",
-          "exit_code": 0,
-          "meaning": "relay check completed and passed",
-          "status": "ok"
-        },
-        {
-          "category": "none",
-          "exit_code": 4,
-          "meaning": "relay check completed with negative findings",
-          "status": "ok"
-        },
-        {
-          "category": "user",
-          "exit_code": 2,
-          "meaning": "user or configuration error",
-          "status": "failed"
-        },
-        {
-          "category": "system",
-          "exit_code": 3,
-          "meaning": "relay check failed or was inconclusive",
           "status": "failed"
         },
         {
@@ -1390,7 +1324,6 @@ export const commandCatalog = {
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
         "--json",
-        "--server",
         "--domain",
         "--sni",
         "--client",

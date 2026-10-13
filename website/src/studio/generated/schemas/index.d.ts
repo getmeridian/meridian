@@ -83,8 +83,6 @@ export * as ProbeEnvelopeSchema from "./probe-envelope.schema";
 export * as ProbeFailureSchema from "./probe-failure.schema";
 export * as ProbeResultSchema from "./probe-result.schema";
 export * as ProtocolPathIntentSchema from "./protocol-path-intent.schema";
-export * as RelayCheckEnvelopeSchema from "./relay-check-envelope.schema";
-export * as RelayCheckFailureSchema from "./relay-check-failure.schema";
 export * as RelayCheckSchema from "./relay-check.schema";
 export * as RelayDeployRequestSchema from "./relay-deploy-request.schema";
 export * as RelayListEnvelopeSchema from "./relay-list-envelope.schema";

@@ -309,9 +309,11 @@ Checks follow the real deployment: public and internal port exposure, HTTP/TLS b
 
 `--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes.
 
+`meridian probe [SERVER|DOMAIN] [--sni NAME] [--timeout SECONDS] [--json]` is the same as `meridian test IP --probe`.
+
 ### meridian doctor
 
-Collect system diagnostics for bug reports. Alias: `meridian rage`.
+Collect system diagnostics for bug reports.
 
 ```
 meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]

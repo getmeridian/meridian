@@ -34,7 +34,6 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--color PALETTE` | ocean | Page color theme (ocean/sunset/forest/lavender/rose/slate) |
 | `--user USER` | root | SSH user (non-root users need passwordless sudo) |
 | `--ssh-port PORT` | 22 | SSH port, if not 22 |
-| `--server NAME` | | Saved server to deploy to (name or IP) |
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. Use `--no-harden` on a server shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block / --no-geo-block` | on | Block Russian domains and IPs on the server |

@@ -20,7 +20,7 @@ uv run pytest tests/systemlab/ -q
 - Remnawave's single delivered Xray config is executed directly; Base64 and Mihomo documents are parsed and endpoint-checked instead of treated as opaque strings.
 - The `ifconfig.me` probe explicitly targets the `leastPing` pool; resilience proves both one-exit-down directions and fail-closed all-down behavior.
 - Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real managed Host mutation but before observation.
-- Removal runs `relay check`, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent on its server or in the panel.
+- Removal runs `check` on both relay servers, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent on its server or in the panel.
 
 ## Pitfalls
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` leaves the fleet and controller up; rerun a stage with `docker compose exec controller bash /workspace/tests/systemlab/scripts/stages/40-removal.sh` (copy edited scripts in with `docker compose cp`).

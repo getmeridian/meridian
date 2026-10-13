@@ -233,7 +233,7 @@ def resolve_verification_target(
     requested_server = requested_server.strip()
     if value and requested_server:
         raise VerificationTargetError(
-            "Choose either a target argument or --server, not both.",
+            "Choose either a target address or a saved server, not both.",
             hint="Remove one target selector and retry.",
         )
 
@@ -246,7 +246,7 @@ def resolve_verification_target(
         if not allow_domain:
             raise VerificationTargetError(
                 f"Target {value!r} is not an IP address.",
-                hint="Pass an IP address or select a saved server with --server NAME.",
+                hint="Pass an IP address or a saved server name.",
             )
         try:
             domain = validate_hostname_value(value)

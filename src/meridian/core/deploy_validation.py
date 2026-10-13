@@ -36,7 +36,7 @@ def validate_deploy_target(target: str) -> None:
     if not target:
         raise DeployValidationError(
             "Deploy target is required",
-            hint="Enter a server IP address or use --server with a registered server.",
+            hint="Enter a server IP address or the name of a saved server.",
         )
     if not is_local_deploy_target(target) and not is_ip(target):
         raise DeployValidationError(
@@ -49,8 +49,8 @@ def normalize_deploy_request(request: DeployRequest) -> DeployRequest:
     """Validate request-level deploy invariants and return a normalized copy."""
     if request.ip and request.requested_server:
         raise DeployValidationError(
-            "Use either the IP address or --server, not both.",
-            hint="Example: meridian deploy 198.51.100.10 OR meridian deploy --server mybox",
+            "Use either the IP address or a saved server, not both.",
+            hint="Example: meridian deploy 198.51.100.10 OR meridian deploy mybox",
         )
     if not request.ip and not request.requested_server:
         raise DeployValidationError(

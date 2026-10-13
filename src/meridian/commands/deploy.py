@@ -78,7 +78,6 @@ def run(
     user: str = "",
     yes: bool = False,
     harden: bool = True,
-    requested_server: str = "",
     *,
     server_name: str = "",
     icon: str = "",
@@ -108,8 +107,9 @@ def run(
     with error_context("deploy", timer=operation.timer), _quiet_machine_output(final_json):
         if events and events != "jsonl":
             fail(f"Unsupported --events value: {events}", hint="Use: --events=jsonl", hint_type="user")
+        requested_server = ""
         if ip and not request_path:
-            ip, requested_server, user, ssh_port = _split_target(ip, requested_server, user, ssh_port)
+            ip, requested_server, user, ssh_port = _split_target(ip, user, ssh_port)
         request = (
             _load_request(request_path)
             if request_path
@@ -143,7 +143,7 @@ def run(
                     hint_type="user",
                 )
             ip, requested_server, user, ssh_port = _split_target(
-                _prompt_server_target(), request.requested_server, request.user, request.ssh_port
+                _prompt_server_target(), request.user, request.ssh_port
             )
             request = _build_request(
                 **{
@@ -617,19 +617,17 @@ def _load_request(source: str) -> DeployRequest:
         fail(str(error), hint=error.hint, hint_type="user")
 
 
-def _split_target(ip: str, requested_server: str, user: str, ssh_port: int) -> tuple[str, str, str, int]:
-    """Map the positional ``[user@]host[:port]`` / saved name / ``local`` onto request fields."""
+def _split_target(ip: str, user: str, ssh_port: int) -> tuple[str, str, str, int]:
+    """Map the positional ``[user@]host[:port]`` / saved name / ``local`` onto request ip, server, user, port."""
     try:
         target = merge_target(ip, user=user, port=ssh_port)
     except ValueError as exc:
         fail(str(exc), hint="Use IP, saved name, user@host[:port], or 'local'.", hint_type="user")
     if target.local:
-        return ip, requested_server, target.user, target.port
+        return ip, "", target.user, target.port
     if not is_ip(target.host) and ServerRegistry(SERVER_PROFILES_FILE).find(target.host) is not None:
-        if requested_server and requested_server != target.host:
-            fail(f"Two servers given: {target.host} and --server {requested_server}", hint_type="user")
         return "", target.host, target.user, target.port
-    return target.host, requested_server, target.user, target.port
+    return target.host, "", target.user, target.port
 
 
 def _build_request(**fields: Any) -> DeployRequest:

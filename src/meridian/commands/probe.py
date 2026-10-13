@@ -31,7 +31,6 @@ from meridian.verification import (
 
 def run(
     target_value: str = "",
-    requested_server: str = "",
     sni: str = "",
     timeout: float | str = 5,
 ) -> None:
@@ -41,7 +40,7 @@ def run(
         try:
             result = collect_probe_result(
                 target_value,
-                requested_server,
+                "",
                 sni=sni,
                 timeout=timeout,
             )

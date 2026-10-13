@@ -309,9 +309,11 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 `--probe` 还回答「什么被阻止了？」。它使用其伪装 SNI 打开到服务器的 TLS；如果失败，它将重试而不使用 SNI 并直接打开真实的伪装站点，然后报告**服务器 IP** 或**伪装 SNI** 是否看起来被阻止。如果也无法连接到真实站点，结果是不确定的而不是一个发现。在控制服务器上，它还下载连接页面的脚本（约 50 KB）并监视传输在约 16-24 KB 后冻结的情况，这是受限外部 IP 的行为方式。当 WSS 路径通过 CDN 时，相同的下载通过 CDN 运行。这些结果仅在从审查网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 结合使用。退出码与 `test` 相同；跳过的检查从不报告为通过。
 
+`meridian probe [SERVER|DOMAIN] [--sni NAME] [--timeout SECONDS] [--json]` 等同于 `meridian test IP --probe`。
+
 ### meridian doctor
 
-为错误报告收集系统诊断。别名：`meridian rage`。
+为错误报告收集系统诊断。
 
 ```
 meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]

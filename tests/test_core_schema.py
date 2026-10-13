@@ -320,7 +320,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["probe"]["data_schema"] == "probe-result"
     assert by_command["probe"]["failure_data_schema"] == "probe-failure"
     assert by_command["probe"]["exit_codes"]["4"] == "probe completed with negative findings"
-    assert by_command["probe"]["machine_flags"] == ["--json", "--server", "--sni", "--timeout"]
+    assert by_command["probe"]["machine_flags"] == ["--json", "--sni", "--timeout"]
     assert {
         "status": "ok",
         "exit_code": 4,
@@ -331,7 +331,6 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["test"]["failure_data_schema"] == "test-failure"
     assert by_command["test"]["machine_flags"] == [
         "--json",
-        "--server",
         "--domain",
         "--sni",
         "--client",

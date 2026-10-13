@@ -113,40 +113,40 @@ class TestTargetSyntax:
             resolve_server(ServerRegistry(servers_file), explicit_ip="mybox")
 
 
-class TestServerFlag:
-    """Path 2: --server flag (by name or IP)."""
+class TestSavedTarget:
+    """Path 2: a saved name or IP as the target."""
 
     def test_server_by_name(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "root", "mybox"))
-        result = resolve_server(reg, requested_server="mybox")
+        result = resolve_server(reg, explicit_ip="mybox")
         assert result.ip == "198.51.100.10"
         assert result.user == "root"
 
     def test_server_by_ip(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "ubuntu", "mybox"))
-        result = resolve_server(reg, requested_server="198.51.100.10")
+        result = resolve_server(reg, explicit_ip="198.51.100.10")
         assert result.ip == "198.51.100.10"
         assert result.user == "ubuntu"
 
     def test_server_ip_not_in_registry(self, servers_file: Path) -> None:
-        """Bare IP via --server should still resolve even if not registered."""
+        """A bare IP resolves even if not registered."""
         reg = ServerRegistry(servers_file)
-        result = resolve_server(reg, requested_server="198.51.100.99")
+        result = resolve_server(reg, explicit_ip="198.51.100.99")
         assert result.ip == "198.51.100.99"
         assert result.user == "root"
 
     def test_server_name_not_found_exits(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         with pytest.raises(typer.Exit) as exc_info:
-            resolve_server(reg, requested_server="nonexistent")
+            resolve_server(reg, explicit_ip="nonexistent")
         assert exc_info.value.exit_code != 0
 
     def test_server_by_name_inherits_user(self, servers_file: Path) -> None:
         reg = ServerRegistry(servers_file)
         reg.add(ServerEntry("198.51.100.10", "deploy", "prod"))
-        result = resolve_server(reg, requested_server="prod")
+        result = resolve_server(reg, explicit_ip="prod")
         assert result.user == "deploy"
 
     def test_server_by_profile_uses_saved_key_path(self, servers_file: Path) -> None:
@@ -156,7 +156,7 @@ class TestServerFlag:
         ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
         reg = ServerRegistry(servers_file)
 
-        result = resolve_server(reg, requested_server=profile.id)
+        result = resolve_server(reg, explicit_ip=profile.id)
 
         assert result.ip == "198.51.100.10"
         assert result.user == "ubuntu"
@@ -170,7 +170,7 @@ class TestServerFlag:
         ServerProfileStore(servers_file.with_suffix(".json")).upsert(profile)
         reg = ServerRegistry(servers_file)
 
-        result = resolve_server(reg, requested_server=profile.id, user="admin")
+        result = resolve_server(reg, explicit_ip=profile.id, user="admin")
 
         assert result.user == "admin"
         assert result.conn.identity_file == ""
@@ -363,16 +363,6 @@ class TestLocalKeyword:
         reg = ServerRegistry(servers_file)
         result = resolve_server(reg, explicit_ip="locally")
         assert result.ip == "203.0.113.10"
-        assert result.local_mode is True
-
-    def test_server_flag_local_keyword(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(
-            "meridian.resolve.detect_public_ip",
-            lambda: "203.0.113.20",
-        )
-        reg = ServerRegistry(servers_file)
-        result = resolve_server(reg, requested_server="local")
-        assert result.ip == "203.0.113.20"
         assert result.local_mode is True
 
     def test_local_keyword_fails_without_public_ip(self, servers_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:

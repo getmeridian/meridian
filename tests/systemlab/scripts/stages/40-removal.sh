@@ -11,25 +11,30 @@ SNAPSHOT=/tmp/meridian-systemlab-bindings.json
 RELAY_CHECK_OUT=/tmp/meridian-systemlab-relay-check.json
 TEST_OUT=/tmp/meridian-systemlab-test.json
 
-if ! meridian --json relay check relay-chain >"$RELAY_CHECK_OUT"; then
-  cat "$RELAY_CHECK_OUT"
-  echo "relay check did not pass before removal" >&2
-  exit 1
-fi
-python3 - "$RELAY_CHECK_OUT" <<'PYEOF'
+for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
+  if ! meridian --json check "$host" >"$RELAY_CHECK_OUT-$host"; then
+    cat "$RELAY_CHECK_OUT-$host"
+    echo "check of relay $host did not pass before removal" >&2
+    exit 1
+  fi
+done
+python3 - "$RELAY_CHECK_OUT-$RELAY_A_IP" "$RELAY_CHECK_OUT-$RELAY_B_IP" <<'PYEOF'
 import json
 import sys
 
-with open(sys.argv[1], encoding="utf-8") as handle:
-    payload = json.load(handle)
-assert payload["command"] == "relay.check", payload["command"]
-data = payload["data"]
-assert data["verdict"] == "passed", data
-assert [hop["hop_index"] for hop in data["hops"]] == [0, 1], data["hops"]
+reports = []
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["command"] == "check", payload["command"]
+    reports.extend(payload["data"]["reports"])
+assert [report["scope"] for report in reports] == ["relay", "relay"], reports
+assert all(report["verdict"] == "passed" for report in reports), reports
 # Two Realm hops, each leg's throughput toward its next hop, and the public entry.
-assert data["counts"]["passed"] == data["counts"]["checks"] == 5, data["counts"]
+assert sum(report["counts"]["passed"] for report in reports) == 5, reports
+assert sum(report["counts"]["checks"] for report in reports) == 5, reports
 PYEOF
-pass "relay check passed every hop of relay-chain"
+pass "check passed every hop of relay-chain"
 
 python3 "$ASSERT_RETIRED" snapshot "$SNAPSHOT"
 meridian relay remove "$RELAY_A_IP" --yes
@@ -48,14 +53,17 @@ for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
 done
 
 set +e
-meridian relay check relay-chain >/dev/null 2>&1
-CHECK_STATUS=$?
+meridian --json check "$RELAY_A_IP" >"$RELAY_CHECK_OUT-$RELAY_A_IP"
 set -e
-if [ "$CHECK_STATUS" -ne 2 ]; then
-  echo "relay check of a removed chain exited $CHECK_STATUS instead of 2" >&2
-  exit 1
-fi
-pass "removed relay chain is no longer checkable"
+python3 - "$RELAY_CHECK_OUT-$RELAY_A_IP" <<'PYEOF'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+assert [report["scope"] for report in payload["data"]["reports"]] == ["preflight"], payload["data"]
+PYEOF
+pass "the removed relay server is no longer checked as a relay"
 
 meridian plan
 pass "plan converged after relay removal"

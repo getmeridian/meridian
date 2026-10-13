@@ -20,8 +20,6 @@ SshPort = Annotated[
     int,
     typer.Option("--ssh-port", min=0, max=65535, help=SSH_PORT_HELP, show_default=False),
 ]
-# Kept so older scripts keep working; the server now goes first, like ssh.
-ServerAlias = Annotated[str, typer.Option("--server", hidden=True, help=TARGET_HELP)]
 # A string so bad values reach the command's validation and keep the JSON error envelope.
 Timeout = Annotated[
     str, typer.Option("--timeout", metavar="SECONDS", help="Per-network-operation timeout, 1-30 seconds")

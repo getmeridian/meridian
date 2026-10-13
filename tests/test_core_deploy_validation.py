@@ -49,7 +49,7 @@ def test_deploy_request_rejects_invalid_ssh_port_at_model_boundary() -> None:
 
 
 def test_normalize_deploy_request_rejects_ip_and_server_together() -> None:
-    with pytest.raises(DeployValidationError, match="either the IP address or --server"):
+    with pytest.raises(DeployValidationError, match="either the IP address or a saved server"):
         normalize_deploy_request(DeployRequest(ip="198.51.100.10", requested_server="edge"))
 
 

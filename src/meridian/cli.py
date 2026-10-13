@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import sys
-from typing import Annotated
+from typing import Annotated, NoReturn
 
+import click
 import typer
 from typer.core import TyperGroup
 
@@ -14,7 +15,6 @@ from meridian.cli_options import (
     USER_HELP,
     YES_HELP,
     NewServer,
-    ServerAlias,
     SshPort,
     Target,
     Timeout,
@@ -35,7 +35,7 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server")),
-    (CHECK_AND_FIX, ("check", "test", "doctor", "plan", "apply")),
+    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "plan", "apply")),
     (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
@@ -45,12 +45,67 @@ AUTOMATION = "Automation"
 _HELP_ORDER = [name for _panel, names in _HELP_LAYOUT for name in names]
 
 
-class _SectionedGroup(TyperGroup):
-    """Lists commands in the `_HELP_LAYOUT` order; anything unlisted (hidden aliases) goes last."""
+# Old spellings refused with a pointer to the new one, so scripts fail loudly instead of
+# hitting Click's bare "No such command".
+RENAMED: dict[str, str] = {
+    "preflight": "check",
+    "rage": "doctor",
+    "node check": "check",
+    "relay check": "check",
+    "relay deploy": "relay add",
+}
+RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
 
-    def list_commands(self, ctx: typer.Context) -> list[str]:  # type: ignore[override]
+
+class _SectionedGroup(TyperGroup):
+    """Lists commands in the `_HELP_LAYOUT` order; anything unlisted (the hidden `dev` app) goes last."""
+
+    def list_commands(self, ctx: click.Context) -> list[str]:
         names = super().list_commands(ctx)
         return sorted(names, key=lambda name: _HELP_ORDER.index(name) if name in _HELP_ORDER else len(_HELP_ORDER))
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        if not ctx.resilient_parsing:
+            _refuse_renamed(ctx, args)
+        return super().resolve_command(ctx, args)
+
+
+def _refuse_renamed(ctx: click.Context, args: list[str]) -> None:
+    """Fail with exit 2 and a one-line hint when `args` use a spelling from `RENAMED`."""
+    group: click.Command | None = ctx.command
+    path: list[str] = []
+    rest = list(args)
+    while isinstance(group, click.Group):
+        index = next((i for i, arg in enumerate(rest) if not arg.startswith("-")), None)
+        if index is None:
+            return
+        path.append(rest[index])
+        rest = rest[index + 1 :]
+        old = " ".join(path)
+        if old in RENAMED:
+            _fail_renamed(ctx, old, f"`meridian {old}` is now `meridian {RENAMED[old]}`", rest)
+        group = group.get_command(ctx, path[-1])
+    if group is None:
+        return
+    for arg in rest:
+        if arg == "--":
+            return
+        option = arg.split("=", 1)[0]
+        if option in RENAMED_OPTIONS:
+            command = " ".join(path)
+            message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {command} SERVER`"
+            _fail_renamed(ctx, command, message, rest)
+
+
+def _fail_renamed(ctx: click.Context, command: str, message: str, rest: list[str]) -> NoReturn:
+    from meridian.console import error_context, fail, set_json_mode
+
+    if ctx.params.get("json_mode") or "--json" in rest:
+        set_json_mode(True)
+    with error_context(command.replace(" ", ".")):
+        fail(message, hint_type="user")
 
 
 app = typer.Typer(
@@ -227,7 +282,6 @@ def _argv_positionals(args: list[str] | None = None) -> list[str]:
     value_options = {
         "--config",
         "--domain",
-        "--server",
         "--sni",
         "--user",
         "--ssh-port",
@@ -283,7 +337,6 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
         ["fleet", "inventory"],
         ["node", "list"],
         ["relay", "list"],
-        ["relay", "check"],
     ):
         return True
     return positionals[0] == "api"
@@ -500,7 +553,6 @@ def deploy_cmd(
         "--client-ips/--no-client-ips",
         help="Let the panel see each client's real IP (for per-user IP limits); off keeps it private",
     ),
-    server: ServerAlias = "",
     display_name: str = typer.Option(
         "",
         "--display-name",
@@ -565,7 +617,6 @@ def deploy_cmd(
         user,
         yes,
         harden,
-        server,
         server_name=display_name,
         icon=icon,
         color=color,
@@ -731,7 +782,6 @@ def check_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
     ai: bool = typer.Option(False, "--ai", help="Copy an AI-ready diagnostic prompt to the clipboard"),
-    server: ServerAlias = "",
     json_output: bool = typer.Option(False, "--json", help="Output a typed check result as JSON"),
 ) -> None:
     """Check server health, or whether a new server can run Meridian
@@ -750,31 +800,13 @@ def check_cmd(
 
     if json_output:
         _enable_json_output()
-    run(target or server, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai)
-
-
-# Kept for one release: `check` runs these checks on servers outside the fleet.
-@app.command("preflight", hidden=True)
-def preflight_cmd(
-    ip: Target = "",
-    domain: str = typer.Option("", "--domain", "-d", help="Domain to check"),
-    sni: str = typer.Option("", "--sni", "-s", help="SNI target to verify"),
-    user: User = "",
-    ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: ServerAlias = "",
-    ssh_port: SshPort = 0,
-) -> None:
-    """Validate server compatibility before deploying (use: meridian check)"""
-    from meridian.commands.health import run
-
-    run(ip or server, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai, scope="preflight")
+    run(target, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai)
 
 
 @app.command("scan", rich_help_panel=ADVANCED)
 def scan_cmd(
     ip: Target = "",
     user: User = "",
-    server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
     """Find camouflage (SNI) sites that suit your server
@@ -788,7 +820,7 @@ def scan_cmd(
     """
     from meridian.commands.scan import run
 
-    run(ip, user, server, ssh_port=ssh_port)
+    run(ip, user, ssh_port=ssh_port)
 
 
 @app.command("test", rich_help_panel=CHECK_AND_FIX)
@@ -796,7 +828,6 @@ def test_cmd(
     ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to test"),
-    server: ServerAlias = "",
     client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
     basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
     probe: bool = typer.Option(False, "--probe", help="Look at the server the way a censor's scanner would"),
@@ -823,28 +854,31 @@ def test_cmd(
 
         if basic or client or domain:
             fail("--probe cannot be combined with --basic, --client, or --domain", hint_type="user")
-        run_probe(ip, server, sni, timeout)
+        run_probe(ip, sni, timeout)
         return
     from meridian.commands.test import run
 
-    run(ip, domain, sni, server, client, basic, timeout)
+    run(ip, domain, sni, client, basic, timeout)
 
 
-# Kept for one release: now `meridian test --probe`.
-@app.command("probe", hidden=True)
+@app.command("probe", rich_help_panel=CHECK_AND_FIX)
 def probe_cmd(
     ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
-    server: ServerAlias = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI to use for generic probes"),
     timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
-    """Probe your server as a censor would (use: meridian test --probe)"""
+    """Look at a server the way a censor's scanner would (same as test --probe)
+
+    [dim]Examples:[/dim]
+      [cyan]meridian probe 198.51.100.10[/cyan]
+      [cyan]meridian probe vpn.example --json[/cyan]
+    """
     from meridian.commands.probe import run
 
     if json_output:
         _enable_json_output()
-    run(ip, server, sni, timeout)
+    run(ip, sni, timeout)
 
 
 # =============================================================================
@@ -858,7 +892,6 @@ def doctor_cmd(
     sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
     user: User = "",
     ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
     """Collect a redacted diagnostic report for bug reports
@@ -869,23 +902,7 @@ def doctor_cmd(
     """
     from meridian.commands.diagnostics import run
 
-    run(ip, sni, user, ai, server, ssh_port=ssh_port)
-
-
-# Alias: rage → doctor
-@app.command("rage", hidden=True)
-def rage_cmd(
-    ip: Target = "",
-    sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
-    user: User = "",
-    ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
-    server: ServerAlias = "",
-    ssh_port: SshPort = 0,
-) -> None:
-    """Alias for doctor"""
-    from meridian.commands.diagnostics import run
-
-    run(ip, sni, user, ai, server, ssh_port=ssh_port)
+    run(ip, sni, user, ai, ssh_port=ssh_port)
 
 
 @app.command("panel", rich_help_panel=ADVANCED)
@@ -903,7 +920,6 @@ def teardown_cmd(
     ip: Target = "",
     user: User = "",
     yes: Yes = False,
-    server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
     """Remove Meridian from a server
@@ -918,7 +934,7 @@ def teardown_cmd(
     """
     from meridian.commands.uninstall import run
 
-    run(ip, user, yes, server, ssh_port=ssh_port)
+    run(ip, user, yes, ssh_port=ssh_port)
 
 
 @app.command("update", rich_help_panel=ADVANCED)
@@ -965,10 +981,6 @@ def relay_add_cmd(
     run_deploy(relay_ip, exit, user, name, port, yes, sni=sni, ssh_port=ssh_port)
 
 
-# Earlier name for `relay add`; kept so existing scripts keep working.
-relay_app.command("deploy", hidden=True)(relay_add_cmd)
-
-
 @relay_app.command("list")
 def relay_list_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Filter by exit server IP or name"),
@@ -1002,30 +1014,6 @@ def relay_remove_cmd(
     from meridian.commands.relay import run_remove
 
     run_remove(relay_ip, exit, yes)
-
-
-# Kept for one release: `meridian check RELAY` checks the same hops.
-@relay_app.command("check", hidden=True)
-def relay_check_cmd(
-    relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
-    exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
-    user: User = "",
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
-) -> None:
-    """Check relay hops: Realm unit, next-hop TCP, and the public entry.
-
-    Exits 0 when every check passes, 4 on negative findings, and 3 when
-    a hop could not be inspected.
-
-    [dim]Examples:[/dim]
-      [cyan]meridian relay check 198.51.100.20[/cyan]
-      [cyan]meridian relay check relay-chain --json[/cyan]
-    """
-    from meridian.commands.relay_check import run_check
-
-    if json_mode:
-        _enable_json_output()
-    run_check(relay_ip, exit, user)
 
 
 # =============================================================================
@@ -1132,18 +1120,6 @@ def node_list_cmd(
     if json_mode:
         _enable_json_output()
     run_list()
-
-
-# Kept for one release: now `meridian check NODE`.
-@node_app.command("check", hidden=True)
-def node_check_cmd(
-    node: str = typer.Argument(..., help="Node IP or name"),
-    user: User = "",
-) -> None:
-    """Run health checks on a node (use: meridian check NODE)"""
-    from meridian.commands.health import run
-
-    run(node, user=user, scope="server")
 
 
 @node_app.command("replace")

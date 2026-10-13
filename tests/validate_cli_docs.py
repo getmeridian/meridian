@@ -44,6 +44,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "check": "### meridian check",
     "scan": "### meridian scan",
     "test": "### meridian test",
+    "probe": "### meridian test",
     "doctor": "### meridian doctor",
     "panel": "### meridian panel",
     "teardown": "### meridian teardown",

@@ -75,24 +75,7 @@ class TestRunWithExplicitIP:
         with pytest.raises(typer.Exit):
             run(ip="not-an-ip", yes=True)
 
-    def test_both_ip_and_server_flag_fails(self, tmp_home: Path) -> None:
-        """Cannot use both positional IP and --server flag."""
-        with pytest.raises(typer.Exit):
-            run(ip="198.51.100.10", requested_server="mybox", yes=True)
-
-    def test_server_flag_resolves_ip_from_registry(self, servers_file: Path, tmp_home: Path) -> None:
-        """--server flag with a known name should resolve to its IP."""
-        from meridian.servers import ServerEntry, ServerRegistry
-
-        reg = ServerRegistry(servers_file)
-        reg.add(ServerEntry("198.51.100.10", "root", "prod"))
-
-        entry = reg.find("prod")
-        assert entry is not None
-        assert entry.host == "198.51.100.10"
-        assert entry.user == "root"
-
     def test_server_name_not_found_exits(self, servers_file: Path, tmp_home: Path) -> None:
-        """--server with unknown name and non-IP string should fail."""
+        """An unknown name that is not an address should fail."""
         with pytest.raises(typer.Exit):
-            run(requested_server="nonexistent", yes=True)
+            run(ip="nonexistent", yes=True)

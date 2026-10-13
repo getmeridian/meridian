@@ -85,7 +85,7 @@ def _run_preflight(
         patch("meridian.diagnostics.preflight.ServerFacts", return_value=facts),
         patch("meridian.diagnostics.preflight.tcp_connect", return_value=external_reachable),
     ):
-        run_check(resolved.ip, sni="cdn.test", scope="preflight")
+        run_check(resolved.ip, sni="cdn.test")
 
 
 def test_preflight_resolves_registered_hostname_for_external_probe() -> None:
@@ -103,7 +103,7 @@ def test_preflight_connects_on_the_requested_ssh_port() -> None:
         patch("meridian.commands.health.resolve_server", side_effect=SystemExit) as resolve,
         pytest.raises(SystemExit),
     ):
-        run_check(resolved.ip, ssh_port=2222, scope="preflight")
+        run_check(resolved.ip, ssh_port=2222)
 
     assert resolve.call_args.kwargs["port"] == 2222
 
