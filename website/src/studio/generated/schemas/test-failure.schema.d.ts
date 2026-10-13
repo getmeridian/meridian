@@ -35,6 +35,11 @@ export type Scope = "basic" | "full";
 export type Requested = string;
 export type ResolvedIp = string;
 export type ServerRef = string;
+export type CheckId = string;
+export type FirstByteMs = number | null;
+export type Label = string;
+export type Outcome = "ok" | "no_traffic" | "unreachable" | "failed" | "egress_mismatch" | "inconclusive" | "invalid";
+export type Transports = TransportResult[];
 export type Verdict = "passed" | "findings" | "inconclusive";
 
 /**
@@ -48,6 +53,7 @@ export interface TestResult {
   exit_code: ExitCode;
   scope?: Scope;
   target: VerificationTarget;
+  transports?: Transports;
   verdict: Verdict;
 }
 /**
@@ -96,6 +102,18 @@ export interface VerificationTarget {
   requested: Requested;
   resolved_ip?: ResolvedIp;
   server_ref?: ServerRef;
+}
+/**
+ * One delivered transport's traffic outcome, linked to its check by ID.
+ *
+ * ``no_traffic`` means the endpoint accepts TCP but the proxy session carries
+ * nothing; ``unreachable`` means the endpoint does not accept TCP at all.
+ */
+export interface TransportResult {
+  check_id: CheckId;
+  first_byte_ms?: FirstByteMs;
+  label: Label;
+  outcome: Outcome;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

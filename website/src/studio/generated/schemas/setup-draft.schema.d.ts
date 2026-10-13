@@ -47,6 +47,7 @@ export type ExitRef = string;
  * @minItems 1
  */
 export type Paths = [ProtocolPathIntent, ...ProtocolPathIntent[]];
+export type Fingerprint = "chrome" | "firefox" | "safari" | "ios" | "android" | "edge" | "random" | "randomized";
 export type Host = "" | string;
 export type Id = string;
 export type ListenPort = number;
@@ -64,14 +65,22 @@ export type Title = string;
  * @minItems 1
  */
 export type Exits1 = [SetupExitRole, ...SetupExitRole[]];
-export type GeoBlock = boolean;
+export type Action = "warp" | "direct" | "block";
 export type Id1 = string;
+export type Match = "domain" | "geosite" | "geoip";
+/**
+ * @minItems 1
+ */
+export type Values = [string, ...string[]];
+export type EgressOverrides = EgressOverrideIntent[];
+export type GeoBlock = boolean;
+export type Id2 = string;
 export type Region = string;
 export type ServerRef1 = string;
 export type Warp = boolean;
 export type Harden = boolean;
 export type BridgePathRef = string;
-export type Id2 = string;
+export type Id3 = string;
 export type ServerRef2 = string;
 export type RoutingGateways = SetupGatewayRole[];
 export type ExitRef1 = string;
@@ -79,7 +88,7 @@ export type ExitRef1 = string;
  * @minItems 1
  */
 export type HopServerRefs = [string, ...string[]];
-export type Id3 = string;
+export type Id4 = string;
 export type ListenPort1 = number;
 export type ProtocolPathRef = string;
 export type RealitySni1 = "" | string;
@@ -90,14 +99,14 @@ export type DefaultEgressRef = string;
  */
 export type ExitRefs = [string, ...string[]];
 export type FailClosed = boolean;
-export type Id4 = string;
+export type Id5 = string;
 export type ProbeUrl = string;
 export type Strategy = "least_ping";
 export type EgressPools = EgressPoolIntent[];
-export type Action = "route" | "block";
+export type Action1 = "route" | "block";
 export type Enabled = boolean;
-export type Id5 = string;
-export type Match = "all" | "country" | "domain" | "ip" | "network";
+export type Id6 = string;
+export type Match1 = "all" | "country" | "domain" | "ip" | "network";
 export type MatchValues = string[];
 export type Priority = number;
 export type SourceGatewayRef = string;
@@ -165,6 +174,7 @@ export interface SetupExitPaths {
  * One protocol-specific public path backed by an exit workload.
  */
 export interface ProtocolPathIntent {
+  fingerprint?: Fingerprint;
   host?: Host;
   id: Id;
   listen_port?: ListenPort;
@@ -196,18 +206,28 @@ export interface ControlPlaneIntent {
  * One saved server assigned an exit workload ID.
  */
 export interface SetupExitRole {
+  egress_overrides?: EgressOverrides;
   geo_block?: GeoBlock;
-  id: Id1;
+  id: Id2;
   region?: Region;
   server_ref: ServerRef1;
   warp?: Warp;
+}
+/**
+ * Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.
+ */
+export interface EgressOverrideIntent {
+  action: Action;
+  id: Id1;
+  match: Match;
+  values: Values;
 }
 /**
  * One saved server assigned an Xray routing-gateway workload.
  */
 export interface SetupGatewayRole {
   bridge_path_ref: BridgePathRef;
-  id: Id2;
+  id: Id3;
   server_ref: ServerRef2;
 }
 /**
@@ -216,7 +236,7 @@ export interface SetupGatewayRole {
 export interface SetupRelayRole {
   exit_ref: ExitRef1;
   hop_server_refs: HopServerRefs;
-  id: Id3;
+  id: Id4;
   listen_port?: ListenPort1;
   protocol_path_ref: ProtocolPathRef;
   reality_sni?: RealitySni1;
@@ -235,7 +255,7 @@ export interface SetupRoutingSelection {
 export interface EgressPoolIntent {
   exit_refs: ExitRefs;
   fail_closed?: FailClosed;
-  id: Id4;
+  id: Id5;
   probe_url?: ProbeUrl;
   strategy?: Strategy;
 }
@@ -243,10 +263,10 @@ export interface EgressPoolIntent {
  * One explicit first-match routing rule.
  */
 export interface OrderedRouteIntent {
-  action?: Action;
+  action?: Action1;
   enabled?: Enabled;
-  id: Id5;
-  match?: Match;
+  id: Id6;
+  match?: Match1;
   match_values?: MatchValues;
   priority: Priority;
   source_gateway_ref?: SourceGatewayRef;

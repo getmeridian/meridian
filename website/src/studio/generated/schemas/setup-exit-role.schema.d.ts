@@ -5,8 +5,16 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type GeoBlock = boolean;
+export type Action = "warp" | "direct" | "block";
 export type Id = string;
+export type Match = "domain" | "geosite" | "geoip";
+/**
+ * @minItems 1
+ */
+export type Values = [string, ...string[]];
+export type EgressOverrides = EgressOverrideIntent[];
+export type GeoBlock = boolean;
+export type Id1 = string;
 export type Region = string;
 export type ServerRef = string;
 export type Warp = boolean;
@@ -15,9 +23,19 @@ export type Warp = boolean;
  * One saved server assigned an exit workload ID.
  */
 export interface SetupExitRole {
+  egress_overrides?: EgressOverrides;
   geo_block?: GeoBlock;
-  id: Id;
+  id: Id1;
   region?: Region;
   server_ref: ServerRef;
   warp?: Warp;
+}
+/**
+ * Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.
+ */
+export interface EgressOverrideIntent {
+  action: Action;
+  id: Id;
+  match: Match;
+  values: Values;
 }

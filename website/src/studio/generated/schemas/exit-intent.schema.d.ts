@@ -5,14 +5,23 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type GeoBlock = boolean;
+export type Action = "warp" | "direct" | "block";
 export type Id = string;
+export type Match = "domain" | "geosite" | "geoip";
+/**
+ * @minItems 1
+ */
+export type Values = [string, ...string[]];
+export type EgressOverrides = EgressOverrideIntent[];
+export type GeoBlock = boolean;
+export type Id1 = string;
 /**
  * @minItems 1
  */
 export type Paths = [ProtocolPathIntent, ...ProtocolPathIntent[]];
+export type Fingerprint = "chrome" | "firefox" | "safari" | "ios" | "android" | "edge" | "random" | "randomized";
 export type Host = "" | string;
-export type Id1 = string;
+export type Id2 = string;
 export type ListenPort = number;
 export type Path = string;
 export type Protocol = "reality" | "xhttp" | "wss" | "hysteria2";
@@ -27,19 +36,30 @@ export type Warp = boolean;
  * One independent Xray exit workload and its public protocol paths.
  */
 export interface ExitIntent {
+  egress_overrides?: EgressOverrides;
   geo_block?: GeoBlock;
-  id: Id;
+  id: Id1;
   paths: Paths;
   region?: Region;
   server_ref: ServerRef;
   warp?: Warp;
 }
 /**
+ * Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.
+ */
+export interface EgressOverrideIntent {
+  action: Action;
+  id: Id;
+  match: Match;
+  values: Values;
+}
+/**
  * One protocol-specific public path backed by an exit workload.
  */
 export interface ProtocolPathIntent {
+  fingerprint?: Fingerprint;
   host?: Host;
-  id: Id1;
+  id: Id2;
   listen_port?: ListenPort;
   path?: Path;
   protocol: Protocol;

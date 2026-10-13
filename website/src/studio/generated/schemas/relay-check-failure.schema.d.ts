@@ -26,9 +26,11 @@ export type Passed = number;
 export type Skipped = number;
 export type Warnings = number;
 export type ExitCode = 0 | 3 | 4;
+export type CamouflageSni = string;
 export type ChainRef = string;
 export type HopIndex = number;
 export type Host = string;
+export type LegacyService = string;
 export type ListenPort = number;
 export type LogicalId = string;
 export type NextHost = string;
@@ -85,9 +87,11 @@ export interface VerificationCounts {
  * One Realm hop of a relay chain, resolved from the compiled topology.
  */
 export interface RelayHopTarget {
+  camouflage_sni?: CamouflageSni;
   chain_ref: ChainRef;
   hop_index: HopIndex;
   host: Host;
+  legacy_service?: LegacyService;
   listen_port: ListenPort;
   logical_id: LogicalId;
   next_host: NextHost;

@@ -8,6 +8,9 @@
 export type ClientName = string;
 export type Color = string;
 export type Domain = "" | string;
+export type Fingerprint =
+  | ("chrome" | "firefox" | "safari" | "ios" | "android" | "edge" | "random" | "randomized")
+  | null;
 export type GeoBlock = boolean;
 export type Harden = boolean;
 export type Hysteria2 = boolean;
@@ -28,6 +31,7 @@ export interface DeployRequest {
   client_name?: ClientName;
   color?: Color;
   domain?: Domain;
+  fingerprint?: Fingerprint;
   geo_block?: GeoBlock;
   harden?: Harden;
   hysteria2?: Hysteria2;

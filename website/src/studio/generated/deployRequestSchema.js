@@ -31,6 +31,28 @@ export const deployRequestSchema = {
       "default": "",
       "title": "Domain"
     },
+    "fingerprint": {
+      "anyOf": [
+        {
+          "enum": [
+            "chrome",
+            "firefox",
+            "safari",
+            "ios",
+            "android",
+            "edge",
+            "random",
+            "randomized"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fingerprint"
+    },
     "geo_block": {
       "default": true,
       "title": "Geo Block",
@@ -98,16 +120,15 @@ export const deployRequestSchema = {
       "title": "Sni"
     },
     "ssh_port": {
-      "default": 22,
+      "default": 0,
       "maximum": 65535,
-      "minimum": 1,
+      "minimum": 0,
       "title": "Ssh Port",
       "type": "integer"
     },
     "user": {
-      "default": "root",
-      "minLength": 1,
-      "pattern": "^[a-zA-Z0-9._-]+$",
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9._-]+$",
       "title": "User",
       "type": "string"
     },

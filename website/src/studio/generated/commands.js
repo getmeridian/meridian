@@ -285,6 +285,71 @@ export const commandCatalog = {
     },
     {
       "argv": [
+        "check",
+        "SERVER"
+      ],
+      "command": "check",
+      "data_schema": "check",
+      "description": "Check fleet servers by role (or a new server's readiness) and return one typed report per scope.",
+      "envelope_schema": "check-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "every checked server passed",
+        "1": "unexpected Meridian bug",
+        "2": "user/config error",
+        "3": "system failure, or SSH/panel evidence was unavailable",
+        "4": "check completed with negative findings",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "check-failure",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--user",
+        "--ssh-port",
+        "--sni",
+        "--domain"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "check completed and passed",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 4,
+          "meaning": "check completed with negative findings",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "check failed or was inconclusive",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
         "client",
         "add",
         "NAME..."
@@ -953,8 +1018,9 @@ export const commandCatalog = {
     },
     {
       "argv": [
-        "probe",
-        "TARGET"
+        "test",
+        "TARGET",
+        "--probe"
       ],
       "command": "probe",
       "data_schema": "probe-result",
@@ -1135,6 +1201,168 @@ export const commandCatalog = {
         }
       ],
       "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "route",
+        "add",
+        "EXIT",
+        "VALUE..."
+      ],
+      "command": "route.add",
+      "data_schema": "route-mutation",
+      "description": "Add a per-destination egress override (WARP, direct, block) to an exit and apply it.",
+      "envelope_schema": "route-add-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the override was added and applied",
+        "1": "unexpected Meridian bug",
+        "2": "unknown exit or route, or invalid values",
+        "3": "apply or local-state failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--via",
+        "--name"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the override was added and applied",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "unknown exit or route, or invalid values",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "apply or local-state failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "route",
+        "list"
+      ],
+      "command": "route.list",
+      "data_schema": "route-list",
+      "description": "List every exit's default egress and its overrides in first-match order.",
+      "envelope_schema": "route-list-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "overrides were listed",
+        "1": "unexpected Meridian bug",
+        "2": "unknown exit or configuration error",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "overrides were listed",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "unknown exit or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "route",
+        "remove",
+        "EXIT",
+        "ROUTE"
+      ],
+      "command": "route.remove",
+      "data_schema": "route-mutation",
+      "description": "Remove one egress override from an exit and apply it.",
+      "envelope_schema": "route-remove-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the override was removed and applied",
+        "1": "unexpected Meridian bug",
+        "2": "unknown exit or route, or invalid values",
+        "3": "apply or local-state failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--yes"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the override was removed and applied",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "unknown exit or route, or invalid values",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "apply or local-state failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
       "statuses": [
         "ok",
         "failed"

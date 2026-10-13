@@ -12,14 +12,22 @@ export type Title = string;
  * @minItems 1
  */
 export type Exits = [SetupExitRole, ...SetupExitRole[]];
-export type GeoBlock = boolean;
+export type Action = "warp" | "direct" | "block";
 export type Id = string;
+export type Match = "domain" | "geosite" | "geoip";
+/**
+ * @minItems 1
+ */
+export type Values = [string, ...string[]];
+export type EgressOverrides = EgressOverrideIntent[];
+export type GeoBlock = boolean;
+export type Id1 = string;
 export type Region = string;
 export type ServerRef1 = string;
 export type Warp = boolean;
 export type Harden = boolean;
 export type BridgePathRef = string;
-export type Id1 = string;
+export type Id2 = string;
 export type ServerRef2 = string;
 export type RoutingGateways = SetupGatewayRole[];
 export type ExitRef = string;
@@ -27,7 +35,7 @@ export type ExitRef = string;
  * @minItems 1
  */
 export type HopServerRefs = [string, ...string[]];
-export type Id2 = string;
+export type Id3 = string;
 export type ListenPort = number;
 export type ProtocolPathRef = string;
 export type RealitySni = "" | string;
@@ -55,18 +63,28 @@ export interface ControlPlaneIntent {
  * One saved server assigned an exit workload ID.
  */
 export interface SetupExitRole {
+  egress_overrides?: EgressOverrides;
   geo_block?: GeoBlock;
-  id: Id;
+  id: Id1;
   region?: Region;
   server_ref: ServerRef1;
   warp?: Warp;
+}
+/**
+ * Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.
+ */
+export interface EgressOverrideIntent {
+  action: Action;
+  id: Id;
+  match: Match;
+  values: Values;
 }
 /**
  * One saved server assigned an Xray routing-gateway workload.
  */
 export interface SetupGatewayRole {
   bridge_path_ref: BridgePathRef;
-  id: Id1;
+  id: Id2;
   server_ref: ServerRef2;
 }
 /**
@@ -75,7 +93,7 @@ export interface SetupGatewayRole {
 export interface SetupRelayRole {
   exit_ref: ExitRef;
   hop_server_refs: HopServerRefs;
-  id: Id2;
+  id: Id3;
   listen_port?: ListenPort;
   protocol_path_ref: ProtocolPathRef;
   reality_sni?: RealitySni;

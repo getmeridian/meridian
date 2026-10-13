@@ -11,6 +11,10 @@ export type Id = string;
 export type KeyPath = string;
 export type LastError = string;
 export type LastValidatedAt = string;
+/**
+ * The server's /etc/machine-id, recorded when Meridian ran on it. On that machine Meridian runs commands locally instead of over SSH.
+ */
+export type MachineId = string;
 export type Source = "manual" | "engine";
 export type SshPort = number;
 export type SshUser = string;
@@ -26,6 +30,7 @@ export interface ServerProfile {
   key_path?: KeyPath;
   last_error?: LastError;
   last_validated_at?: LastValidatedAt;
+  machine_id?: MachineId;
   source?: Source;
   ssh_port?: SshPort;
   ssh_user?: SshUser;

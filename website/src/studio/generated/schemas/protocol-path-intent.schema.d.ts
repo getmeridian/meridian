@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type Fingerprint = "chrome" | "firefox" | "safari" | "ios" | "android" | "edge" | "random" | "randomized";
 export type Host = "" | string;
 export type Id = string;
 export type ListenPort = number;
@@ -18,6 +19,7 @@ export type TlsSni = "" | string;
  * One protocol-specific public path backed by an exit workload.
  */
 export interface ProtocolPathIntent {
+  fingerprint?: Fingerprint;
   host?: Host;
   id: Id;
   listen_port?: ListenPort;
