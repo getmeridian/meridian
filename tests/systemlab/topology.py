@@ -99,6 +99,6 @@ def build_systemlab_intent(
         delivery=DeliveryIntent(
             profile_title="Meridian system lab",
             template_name="meridian-system-lab",
-            formats=["base64", "xray_json", "mihomo"],
+            formats=["base64", "xray_json", "mihomo", "singbox"],
         ),
     )

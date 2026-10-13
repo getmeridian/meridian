@@ -448,6 +448,16 @@ class TestPureCompiler:
         assert "GEOSITE,category-ru,DIRECT" in mihomo["rules"]
         assert "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT" in mihomo["rules"]
 
+        # sing-box will not start if a remote rule set can't be fetched, so it gets inline matchers only.
+        singbox = templates["SINGBOX"].template_json
+        assert singbox is not None
+        sb_rules = singbox["route"]["rules"]
+        assert {"ip_is_private": True, "outbound": "direct"} in sb_rules
+        assert {"domain_suffix": [".ru", ".su", ".xn--p1ai"], "outbound": "direct"} in sb_rules
+        assert {"network": ["udp"], "port": [443], "action": "reject"} in sb_rules
+        assert "rule_set" not in singbox["route"]
+        assert "external_ui" not in singbox["experimental"]["clash_api"]
+
     def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
         plan = compile_topology(_intent())
         templates = [
@@ -463,6 +473,7 @@ class TestPureCompiler:
         assert {template.template_type for template in templates} == {
             "XRAY_JSON",
             "MIHOMO",
+            "SINGBOX",
         }
         xray = next(template for template in templates if template.template_type == "XRAY_JSON")
         assert xray.template_json is not None
@@ -473,6 +484,13 @@ class TestPureCompiler:
         assert mihomo is not None
         assert "type: fallback" in mihomo
         assert mihomo.count("# LEAVE THIS LINE!") == 2
+        singbox = next(template.template_json for template in templates if template.template_type == "SINGBOX")
+        assert singbox is not None
+        # Remnawave fills both groups with the user's proxies; Automatic is the default pick.
+        groups = {outbound["tag"]: outbound for outbound in singbox["outbounds"]}
+        assert groups["Meridian"]["outbounds"] is None and groups["Meridian"]["default"] == "Automatic"
+        assert groups["Automatic"]["type"] == "urltest" and groups["Automatic"]["outbounds"] is None
+        assert singbox["route"]["final"] == "Meridian"
         hosts = [resource.payload for resource in plan.resources if isinstance(resource.payload, HostPayload)]
         direct_hosts = [host for host in hosts if not host.is_hidden and not host.xray_json_template_ref]
         hidden_edges = [host for host in hosts if host.is_hidden]
@@ -489,7 +507,7 @@ class TestPureCompiler:
         assert virtual_hosts[0].protocol == "reality"
         protocols = [host.protocol for host in ranked]
         assert protocols == sorted(protocols, key=PROTOCOL_PRIORITY.index)
-        assert len(external.template_refs) == 2
+        assert len(external.template_refs) == 3
         assert settings.profile_title == "Family VPN"
 
     def test_base64_delivery_publishes_alternatives_without_fake_failover_template(self) -> None:

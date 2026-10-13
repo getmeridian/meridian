@@ -11,7 +11,7 @@ from meridian.compiler.baselines import (
 )
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import assign_host_positions, compile_xray_delivery_hosts
-from meridian.compiler.delivery import mihomo_template, xray_json_template
+from meridian.compiler.delivery import mihomo_template, singbox_template, xray_json_template
 from meridian.compiler.deployment import (
     normalized_intent,
     validate_deployment_contract,
@@ -368,6 +368,19 @@ def compile_topology(
                     profile_title=intent.delivery.profile_title,
                     template_type="MIHOMO",
                     template_yaml=mihomo_template(),
+                ),
+                dependencies=[control_id],
+            )
+        )
+    if "singbox" in intent.delivery.formats:
+        template_ids.append(
+            builder.add(
+                f"template:{intent.delivery.template_name}:singbox",
+                SubscriptionTemplatePayload(
+                    name=subscription_template_name(intent.delivery.template_name, "SINGBOX"),
+                    profile_title=intent.delivery.profile_title,
+                    template_type="SINGBOX",
+                    template_json=singbox_template(),
                 ),
                 dependencies=[control_id],
             )

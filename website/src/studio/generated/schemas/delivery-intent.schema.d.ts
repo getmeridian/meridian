@@ -8,7 +8,10 @@
 /**
  * @minItems 1
  */
-export type Formats = ["base64" | "xray_json" | "mihomo", ...("base64" | "xray_json" | "mihomo")[]];
+export type Formats = [
+  "base64" | "xray_json" | "mihomo" | "singbox",
+  ...("base64" | "xray_json" | "mihomo" | "singbox")[]
+];
 export type ProfileTitle = string;
 export type TemplateName = string;
 

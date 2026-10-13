@@ -49,6 +49,10 @@ export type RetiringResources = string[];
 export type ReviewHash = string;
 export type StateChanges = string[];
 export type Summary = string;
+/**
+ * Conditions that will make apply refuse, such as a stale state copy.
+ */
+export type Warnings = string[];
 
 /**
  * Read-only drift result for a V4 compiler plan.
@@ -64,6 +68,7 @@ export interface CompiledPlanResult {
   review_hash?: ReviewHash;
   state_changes?: StateChanges;
   summary: Summary;
+  warnings?: Warnings;
 }
 /**
  * One V4 compiler resource that does not match remote state.

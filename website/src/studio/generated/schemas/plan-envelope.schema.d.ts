@@ -50,6 +50,10 @@ export type RetiringResources = string[];
 export type ReviewHash = string;
 export type StateChanges = string[];
 export type Summary = string;
+/**
+ * Conditions that will make apply refuse, such as a stale state copy.
+ */
+export type Warnings = string[];
 export type DurationMs = number;
 /**
  * @maxItems 0
@@ -69,7 +73,7 @@ export type ExitCode2 = number;
 export type Hint = string;
 export type Message = string;
 export type Retryable = boolean;
-export type Warnings = MeridianError[];
+export type Warnings1 = MeridianError[];
 export type Command1 = "plan";
 export type Data = CompiledPlanResult | EmptyData;
 export type Converged1 = boolean;
@@ -85,6 +89,10 @@ export type RetiringResources1 = string[];
 export type ReviewHash1 = string;
 export type StateChanges1 = string[];
 export type Summary2 = string;
+/**
+ * Conditions that will make apply refuse, such as a stale state copy.
+ */
+export type Warnings2 = string[];
 export type DurationMs1 = number;
 /**
  * @minItems 1
@@ -96,7 +104,7 @@ export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
 export type StartedAt1 = string;
 export type Status1 = "failed";
-export type Warnings1 = MeridianError[];
+export type Warnings3 = MeridianError[];
 
 export interface _PlanSuccessEnvelope {
   command: Command;
@@ -110,7 +118,7 @@ export interface _PlanSuccessEnvelope {
   started_at: StartedAt;
   status: Status;
   summary: Summary1;
-  warnings: Warnings;
+  warnings: Warnings1;
 }
 /**
  * Success data returned by plan execution.
@@ -126,6 +134,7 @@ export interface PlanCommandData {
   review_hash?: ReviewHash;
   state_changes?: StateChanges;
   summary: Summary;
+  warnings?: Warnings;
 }
 /**
  * One V4 compiler resource that does not match remote state.
@@ -185,7 +194,7 @@ export interface _PlanTerminalEnvelope {
   started_at: StartedAt1;
   status: Status1;
   summary: Summary1;
-  warnings: Warnings1;
+  warnings: Warnings3;
 }
 /**
  * Read-only drift result for a V4 compiler plan.
@@ -201,6 +210,7 @@ export interface CompiledPlanResult {
   review_hash?: ReviewHash1;
   state_changes?: StateChanges1;
   summary: Summary2;
+  warnings?: Warnings2;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

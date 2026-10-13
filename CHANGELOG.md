@@ -141,6 +141,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
   traffic directly and refuse foreign QUIC, while the exit's block stays as a
   safety net. Plain Base64 imports still need the app's own routing settings.
+- **sing-box apps get a Meridian profile** — sing-box-based apps (SFA, SFI,
+  Karing) pick the fastest working entry automatically, can still choose one
+  by hand, and send local-network and `.ru`/`.su`/`.рф` sites directly. Nothing
+  is downloaded at startup, so the app starts even when GitHub is blocked.
+  sing-box has no XHTTP, so those entries are left out.
 
 ### Security and correctness
 - No request logging on Meridian's web server; panel secrets are never rotated

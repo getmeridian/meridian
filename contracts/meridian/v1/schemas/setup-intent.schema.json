@@ -81,7 +81,8 @@
             "enum": [
               "base64",
               "xray_json",
-              "mihomo"
+              "mihomo",
+              "singbox"
             ],
             "type": "string"
           },

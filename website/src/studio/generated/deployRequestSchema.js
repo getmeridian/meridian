@@ -64,7 +64,7 @@ export const deployRequestSchema = {
       "type": "boolean"
     },
     "hysteria2": {
-      "default": false,
+      "default": true,
       "title": "Hysteria2",
       "type": "boolean"
     },

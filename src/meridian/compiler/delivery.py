@@ -69,6 +69,25 @@ def mihomo_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES)
     return rules
 
 
+def singbox_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -> list[dict[str, Any]]:
+    """Render client routes as sing-box rules, inline matchers only.
+
+    sing-box refuses to start when a remote rule set cannot be fetched, which a
+    mobile whitelist guarantees, so geosite/geoip lists other than private are skipped.
+    """
+    rules: list[dict[str, Any]] = []
+    for route in routes:
+        action: dict[str, Any] = {"outbound": "direct"} if route.action == "direct" else {"action": "reject"}
+        suffixes = [f".{value}" for kind, _, value in (m.partition(":") for m in route.domains) if kind == "domain"]
+        if suffixes:
+            rules.append({"domain_suffix": suffixes, **action})
+        if "geoip:private" in route.ips:
+            rules.append({"ip_is_private": True, **action})
+        if route.network:
+            rules.append({"network": [route.network], "port": [int(route.port)], **action})
+    return rules
+
+
 def _mihomo_domain(matcher: str) -> str:
     kind, _, value = matcher.partition(":")
     if kind == "geosite":
@@ -183,3 +202,68 @@ proxy-groups:
 rules:
 {rules}  - MATCH,MERIDIAN AUTO
 """
+
+
+def singbox_template() -> dict[str, Any]:
+    """Pick the lowest-latency working Host automatically, with every Host also selectable.
+
+    Remnawave fills each selector and urltest with the user's proxies; it skips XHTTP,
+    which sing-box does not speak. Nothing is downloaded at startup.
+    """
+    return {
+        "log": {"level": "warn", "timestamp": True},
+        "dns": {
+            "servers": [
+                {"tag": "cf-dns", "type": "tls", "server": "1.1.1.1"},
+                {"tag": "local", "type": "udp", "server": "1.1.1.1"},
+                {"tag": "remote", "type": "fakeip", "inet4_range": "198.18.0.0/15", "inet6_range": "fc00::/18"},
+            ],
+            "rules": [{"query_type": ["A", "AAAA"], "server": "remote"}],
+        },
+        "inbounds": [
+            {
+                "tag": "tun-in",
+                "type": "tun",
+                "address": ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+                "mtu": 9000,
+                "auto_route": True,
+                "strict_route": True,
+                "stack": "mixed",
+                "platform": {"http_proxy": {"enabled": True, "server": "127.0.0.1", "server_port": 2412}},
+            },
+            {"tag": "mixed-in", "type": "mixed", "listen": "127.0.0.1", "listen_port": 2412},
+        ],
+        "outbounds": [
+            {
+                "tag": "Meridian",
+                "type": "selector",
+                "outbounds": None,
+                "default": "Automatic",
+                "interrupt_exist_connections": True,
+            },
+            {
+                "tag": "Automatic",
+                "type": "urltest",
+                "outbounds": None,
+                "url": _PROBE_URL,
+                "interval": "3m",
+                "tolerance": 50,
+                "interrupt_exist_connections": True,
+            },
+            {"tag": "direct", "type": "direct"},
+        ],
+        "route": {
+            "rules": [
+                {"action": "sniff"},
+                {"protocol": "dns", "action": "hijack-dns"},
+                *singbox_client_rules(),
+            ],
+            "final": "Meridian",
+            "auto_detect_interface": True,
+            "default_domain_resolver": "local",
+        },
+        "experimental": {
+            "cache_file": {"enabled": True, "store_fakeip": True},
+            "clash_api": {"external_controller": "127.0.0.1:9090", "default_mode": "rule"},
+        },
+    }

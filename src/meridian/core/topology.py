@@ -54,11 +54,11 @@ EgressOverrideMatch = Literal["domain", "geosite", "geoip"]
 EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
-DeliveryFormat = Literal["base64", "xray_json", "mihomo"]
+DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
 
 
 def _default_delivery_formats() -> list[DeliveryFormat]:
-    return ["base64", "xray_json", "mihomo"]
+    return ["base64", "xray_json", "mihomo", "singbox"]
 
 
 class ControlPlaneIntent(CoreModel):

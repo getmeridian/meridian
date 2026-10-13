@@ -105,6 +105,8 @@ def subscription_template_name(template_id: str, template_type: str) -> str:
     label = template_type.replace("_", " ").title()
     if template_type == "XRAY_JSON":
         label = "Xray JSON"
+    elif template_type == "SINGBOX":
+        label = "sing-box"
     return _bounded_display_name(
         f"Meridian v4 {template_id} {label}",
         identity=f"subscription-template:{template_id}:{template_type}",

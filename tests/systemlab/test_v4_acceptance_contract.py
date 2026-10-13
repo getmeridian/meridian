@@ -97,7 +97,7 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
             SubscriptionTemplatePayload,
         )
     ]
-    assert sorted(templates) == ["MIHOMO", "XRAY_JSON"]
+    assert sorted(templates) == ["MIHOMO", "SINGBOX", "XRAY_JSON"]
 
 
 def test_compose_provides_every_isolated_topology_server() -> None:

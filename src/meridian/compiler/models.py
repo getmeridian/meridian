@@ -284,7 +284,7 @@ class SubscriptionTemplatePayload(CoreModel):
     kind: Literal["subscription_template"] = "subscription_template"
     name: RemnawaveTemplateName
     profile_title: str
-    template_type: Literal["XRAY_JSON", "MIHOMO"]
+    template_type: Literal["XRAY_JSON", "MIHOMO", "SINGBOX"]
     template_json: dict[str, Any] | None = None
     template_yaml: str = ""
 

@@ -384,7 +384,7 @@ def _template_matches(
 ) -> bool:
     if template.name != payload.name or template.template_type != payload.template_type:
         return False
-    if payload.template_type == "XRAY_JSON":
+    if payload.template_json is not None:
         return template.template_json == payload.template_json
     return template.encoded_template_yaml == _encoded_yaml(payload)
 
