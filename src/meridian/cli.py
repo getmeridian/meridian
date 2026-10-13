@@ -608,7 +608,7 @@ def client_add(
 
     if json_mode:
         _enable_json_output()
-    run_add(names, json_mode=json_mode)
+    run_add(names)
 
 
 @client_app.command("show")
@@ -652,7 +652,7 @@ def client_remove(
 
     if json_mode:
         _enable_json_output()
-    run_remove(name, yes=yes, json_mode=json_mode)
+    run_remove(name, yes=yes)
 
 
 @client_app.command("enable")
@@ -665,7 +665,7 @@ def client_enable_cmd(
 
     if json_mode:
         _enable_json_output()
-    run_enable(name, json_mode=json_mode)
+    run_enable(name)
 
 
 @client_app.command("disable")
@@ -678,7 +678,7 @@ def client_disable_cmd(
 
     if json_mode:
         _enable_json_output()
-    run_disable(name, json_mode=json_mode)
+    run_disable(name)
 
 
 # =============================================================================

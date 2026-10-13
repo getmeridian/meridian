@@ -108,7 +108,7 @@ class TestRunAdd:
             patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
             patch("meridian.servers.ServerRegistry"),
             patch(
-                "meridian.commands.client._publish_handoff",
+                "meridian.commands.client.publish_connection_pages",
                 return_value=[HandoffLinks("alice", subscription_url="https://198.51.100.1/pages/sub/abc123")],
             ) as publish_handoff,
         ):
@@ -139,7 +139,7 @@ class TestRunAdd:
                 patch("meridian.servers.ServerRegistry"),
                 pytest.raises(typer.Exit) as exc_info,
             ):
-                run_add(names=["alice"], json_mode=True)
+                run_add(names=["alice"])
         finally:
             set_json_mode(False)
 
@@ -170,7 +170,7 @@ class TestRunAdd:
                 patch("meridian.servers.ServerRegistry"),
                 pytest.raises(typer.Exit) as exc_info,
             ):
-                run_add(names=["alice"], json_mode=True)
+                run_add(names=["alice"])
         finally:
             set_json_mode(False)
 
@@ -342,7 +342,7 @@ class TestShowConnectionPage:
                 "meridian.handoff.publish_connection_pages",
                 return_value=[HandoffLinks("alice", page_url=page_url)],
             ) as publish,
-            patch("meridian.commands.client._print_handoff_links") as print_links,
+            patch("meridian.commands.client.print_handoff_links") as print_links,
         ):
             run_show(name="alice", repair_page=True)
 
@@ -563,11 +563,11 @@ class TestPanelAPIErrors:
                 pytest.raises(typer.Exit) as exc_info,
             ):
                 if command == "add":
-                    run_add(names=["carol"], json_mode=True)
+                    run_add(names=["carol"])
                 elif command == "enable":
-                    run_enable(name="alice", json_mode=True)
+                    run_enable(name="alice")
                 else:
-                    run_disable(name="alice", json_mode=True)
+                    run_disable(name="alice")
         finally:
             set_json_mode(False)
 
@@ -716,7 +716,7 @@ class TestRunRemoveJson:
                 pytest.raises(typer.Exit),
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_remove(name="nonexistent", yes=True, json_mode=True)
+                run_remove(name="nonexistent", yes=True)
         finally:
             set_json_mode(False)
 
@@ -736,7 +736,7 @@ class TestRunRemoveJson:
                 pytest.raises(typer.Exit) as exc_info,
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_remove(name="alice", yes=False, json_mode=True)
+                run_remove(name="alice", yes=False)
         finally:
             set_json_mode(False)
 
@@ -760,7 +760,7 @@ class TestRunEnableJson:
                 patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_enable(name="alice", json_mode=True)
+                run_enable(name="alice")
         finally:
             set_json_mode(False)
 
@@ -784,7 +784,7 @@ class TestRunEnableJson:
                 pytest.raises(typer.Exit),
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_enable(name="nonexistent", json_mode=True)
+                run_enable(name="nonexistent")
         finally:
             set_json_mode(False)
 
@@ -806,7 +806,7 @@ class TestRunDisableJson:
                 patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_disable(name="alice", json_mode=True)
+                run_disable(name="alice")
         finally:
             set_json_mode(False)
 
@@ -830,7 +830,7 @@ class TestRunDisableJson:
                 pytest.raises(typer.Exit),
             ):
                 mock_load.return_value = _make_cluster(tmp_home)
-                run_disable(name="nonexistent", json_mode=True)
+                run_disable(name="nonexistent")
         finally:
             set_json_mode(False)
 
