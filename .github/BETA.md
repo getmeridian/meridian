@@ -12,18 +12,20 @@ alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --fro
 meridian4 deploy 198.51.100.10        # IP of the separate server
 ```
 
-The alias always runs the newest beta. Then, **from a device inside the censored network**, run:
+Prefer questions to flags? `meridian4 setup` walks you through one server or several (exits in other countries, relays) in English, Russian, Persian, or Chinese. The alias always runs the newest beta; after a new one comes out, `meridian4 apply` brings your servers up to date.
+
+**Keep `~/.meridian-v4`.** It is how the beta manages your servers, and there is no recovery command yet: lose it and you have to tear down and deploy again. Then, **from a device inside the censored network**, run:
 
 ```bash
 meridian4 test 198.51.100.10          # does real traffic pass from here?
-meridian4 probe 198.51.100.10         # does the server look like a proxy from here?
+meridian4 test --probe 198.51.100.10  # does the server look like a proxy from here?
 ```
 
 Known gaps: a server you remove must still be reachable, or the change cannot finish; removing a node leaves Docker installed on it.
 
 ### Tell us what you see
 
-Open a [Meridian 4 beta report](https://github.com/getmeridian/meridian/issues/new?template=v4_beta.yml). The most useful details: your country and network type (home ISP or mobile operator), whether your client app connects, and the output of `meridian4 test`. Outputs hide secrets, but replace IPs, domains, and links before posting.
+Open a [Meridian 4 beta report](https://github.com/getmeridian/meridian/issues/new?template=v4_beta.yml). The most useful details: your country and network type (home ISP or mobile operator), whether your client app connects, and the output of `meridian4 test`; for deploy problems add `meridian4 doctor`. People you shared a connection page with can open "Not connecting?" on it, run the check, and send you the copied report: it contains no links or addresses. Outputs hide secrets, but replace IPs, domains, and links before posting.
 
 ---
 
@@ -41,15 +43,17 @@ alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --fro
 meridian4 deploy 198.51.100.10        # IP отдельного сервера
 ```
 
-Алиас всегда запускает самую свежую бету. Затем **с устройства внутри сети с блокировками** выполните:
+Удобнее отвечать на вопросы, чем писать флаги? `meridian4 setup` проведёт через настройку одного сервера или нескольких (выходы в других странах, реле) на русском, английском, персидском или китайском. Алиас всегда запускает самую свежую бету; после выхода новой `meridian4 apply` обновит ваши серверы.
+
+**Не удаляйте `~/.meridian-v4`.** Через эту папку бета управляет вашими серверами, а команды восстановления пока нет: без неё придётся всё удалить и развернуть заново. Затем **с устройства внутри сети с блокировками** выполните:
 
 ```bash
 meridian4 test 198.51.100.10          # проходит ли реальный трафик отсюда?
-meridian4 probe 198.51.100.10         # похож ли сервер на прокси, если смотреть отсюда?
+meridian4 test --probe 198.51.100.10  # похож ли сервер на прокси, если смотреть отсюда?
 ```
 
 Известные ограничения: удаляемый сервер должен быть доступен, иначе изменение не завершится; после удаления узла на сервере остаётся Docker.
 
 ### Расскажите, что получилось
 
-Откройте [отчёт о бете Meridian 4](https://github.com/getmeridian/meridian/issues/new?template=v4_beta.yml). Важнее всего: страна и тип сети (домашний провайдер или мобильный оператор), подключается ли клиентское приложение, и вывод `meridian4 test`. Секреты в выводе скрыты, но перед публикацией замените IP-адреса, домены и ссылки.
+Откройте [отчёт о бете Meridian 4](https://github.com/getmeridian/meridian/issues/new?template=v4_beta.yml). Важнее всего: страна и тип сети (домашний провайдер или мобильный оператор), подключается ли клиентское приложение, и вывод `meridian4 test`; при проблемах с развёртыванием добавьте `meridian4 doctor`. Те, с кем вы поделились страницей подключения, могут открыть на ней «Не подключается?», запустить проверку и прислать вам скопированный отчёт: в нём нет ссылок и адресов. Секреты в выводе скрыты, но перед публикацией замените IP-адреса, домены и ссылки.
