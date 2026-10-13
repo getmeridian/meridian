@@ -126,5 +126,4 @@ prints a guide for Claude Code, Codex, Cursor, and other agents: how Meridian wo
 - **Upgrading from 3.x:** Meridian 4 replaces 3x-ui with Remnawave and is not an in-place upgrade; every user gets a new link. [How to move](https://getmeridian.org/en/installation/#upgrading-from-3x).
 - **Security:** [SECURITY.md](SECURITY.md) covers the threat model, including what Meridian does not protect against.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [issues](https://github.com/getmeridian/meridian/issues) (attach `meridian doctor` output)
-- **Community:** [launch post on Вастрик.Клуб](https://vas3k.club/project/31264/)
 - **License:** [MIT](LICENSE)
