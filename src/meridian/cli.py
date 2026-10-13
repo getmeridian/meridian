@@ -435,7 +435,9 @@ def deploy_cmd(
     fingerprint: str = typer.Option(
         "",
         "--fingerprint",
-        help="TLS fingerprint clients present: chrome (default), firefox, safari, ios, android, edge, random",
+        help=(
+            "TLS fingerprint clients present: chrome (default), firefox, safari, ios, android, edge, random, randomized"
+        ),
         rich_help_panel=METHODS,
     ),
     warp: bool = typer.Option(

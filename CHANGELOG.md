@@ -190,6 +190,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Removing or moving an exit cleans up its certificate** — the acme.sh
   renewal, the certificate files, and (with the server's last certificate)
   the port-80 challenge listener go, instead of renewing forever.
+- **Page branding is checked before anything changes** — an unknown `--color`
+  or an `--icon` that is neither an emoji nor a reachable image stops deploy
+  with the valid choices; a redeploy that names only some branding flags keeps
+  the rest. `client disable --json` no longer claims the next apply re-enables
+  the client.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).

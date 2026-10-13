@@ -201,6 +201,17 @@ def validate_country_code_value(value: str) -> str:
     return normalized
 
 
+PAGE_PALETTES = ("ocean", "sunset", "forest", "lavender", "rose", "slate")
+
+
+def validate_optional_palette_value(value: str) -> str:
+    """Validate an optional connection-page palette name and normalize to lowercase."""
+    normalized = value.strip().lower()
+    if normalized and normalized not in PAGE_PALETTES:
+        raise ValueError(f"Use one of: {', '.join(PAGE_PALETTES)}.")
+    return normalized
+
+
 def validate_optional_country_code_value(value: str) -> str:
     """Validate an optional ISO-3166 alpha-2 country code."""
     if not value:
@@ -353,6 +364,11 @@ OptionalCountryCodeValue = Annotated[
     str,
     WithJsonSchema(_OPTIONAL_COUNTRY_CODE_SCHEMA),
     AfterValidator(validate_optional_country_code_value),
+]
+OptionalPaletteValue = Annotated[
+    str,
+    WithJsonSchema({"type": "string", "enum": ["", *PAGE_PALETTES]}),
+    AfterValidator(validate_optional_palette_value),
 ]
 HostnameValue = Annotated[
     str,

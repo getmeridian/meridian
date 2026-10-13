@@ -8,10 +8,12 @@ from pydantic import Field, field_validator
 
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.inputs import (
+    PAGE_PALETTES,
     DeployIpValue,
     NameValue,
     OptionalCountryCodeValue,
     OptionalHostnameValue,
+    OptionalPaletteValue,
     OptionalServerReferenceValue,
     OptionalSshUserValue,
     SshUserValue,
@@ -37,7 +39,7 @@ class DeployRequest(CoreModel):
     requested_server: OptionalServerReferenceValue = ""
     server_name: str = ""
     icon: str = ""
-    color: str = ""
+    color: OptionalPaletteValue = ""
     warp: bool = False
     geo_block: bool = True
     hysteria2: bool = True
@@ -63,7 +65,7 @@ class DeployWorkflowAnswers(CoreModel):
     client_name: NameValue = ""
     server_name: str = ""
     icon: str = ""
-    color: str = ""
+    color: OptionalPaletteValue = ""
     warp: bool = False
     geo_block: bool = True
     confirm: bool = False
@@ -214,14 +216,7 @@ def _deploy_input_fields(request: DeployRequest) -> list[InputField]:
             label="Color palette",
             kind="choice",
             default=request.color or "ocean",
-            options=[
-                InputOption(value="ocean", label="Ocean"),
-                InputOption(value="sunset", label="Sunset"),
-                InputOption(value="forest", label="Forest"),
-                InputOption(value="lavender", label="Lavender"),
-                InputOption(value="rose", label="Rose"),
-                InputOption(value="slate", label="Slate"),
-            ],
+            options=[InputOption(value=palette, label=palette.capitalize()) for palette in PAGE_PALETTES],
         ),
         InputField(
             id="client_name",

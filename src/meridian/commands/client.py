@@ -421,21 +421,11 @@ def _run_disable(
 
         if is_json_mode():
             result = build_client_status_result(name, "disabled")
-            warnings = [
-                MeridianError(
-                    code="MERIDIAN_V4_CLIENT_DISABLE_TEMPORARY",
-                    category="user",
-                    message=f"Client '{name}' is disabled only until the next V4 apply.",
-                    hint="V4 access intent declares managed users active.",
-                    exit_code=0,
-                )
-            ]
             emit_json(
                 command_envelope(
                     command="client.disable",
                     data=result.to_data(),
-                    summary=Summary(text=f"Temporarily disabled V4 client '{name}'", changed=True),
-                    warnings=warnings,
+                    summary=Summary(text=f"Disabled client '{name}'", changed=True),
                     timer=operation.timer,
                 )
             )

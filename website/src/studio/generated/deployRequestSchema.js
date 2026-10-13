@@ -17,6 +17,15 @@ export const deployRequestSchema = {
     },
     "color": {
       "default": "",
+      "enum": [
+        "",
+        "ocean",
+        "sunset",
+        "forest",
+        "lavender",
+        "rose",
+        "slate"
+      ],
       "title": "Color",
       "type": "string"
     },

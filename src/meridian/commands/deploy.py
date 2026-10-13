@@ -21,6 +21,7 @@ from rich.markup import escape
 
 from meridian.adapters import JsonlReporter
 from meridian.adapters.cancellation import FileCancellationToken
+from meridian.branding import normalize_icon
 from meridian.cluster import BrandingConfig, ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
 from meridian.commands.apply_progress import apply_progress
@@ -156,6 +157,12 @@ def run(
             request = normalize_deploy_request(request)
         except DeployValidationError as exc:
             fail(str(exc), hint=exc.hint, hint_type="user")
+        if request.icon:
+            try:
+                icon = normalize_icon(request.icon)
+            except ValueError as exc:
+                fail(f"Invalid --icon: {exc}", hint_type="user")
+            request = _build_request(**{**request.model_dump(), "icon": icon})
 
         emit_event(
             reporter,
@@ -482,10 +489,16 @@ def _refuse_pre_topology_cluster(cluster: ClusterConfig) -> None:
 
 
 def _save_branding(request: DeployRequest) -> None:
+    """Save the branding flags given; omitted ones keep their saved values."""
     if not (request.server_name or request.icon or request.color):
         return
     cluster = ClusterConfig.load()
-    cluster.branding = BrandingConfig(server_name=request.server_name, icon=request.icon, color=request.color)
+    saved = cluster.branding
+    cluster.branding = BrandingConfig(
+        server_name=request.server_name or saved.server_name,
+        icon=request.icon or saved.icon,
+        color=request.color or saved.color,
+    )
     persist_reviewed_apply(cluster)
 
 

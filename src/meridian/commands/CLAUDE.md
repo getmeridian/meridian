@@ -41,3 +41,4 @@
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.
 - A new public command needs an entry in `_HELP_LAYOUT` and a `rich_help_panel`, or it appears in a bare `Commands` list above the sections.
 - Entry points convert library `MeridianError`s with `fail(exc)`; an uncaught one prints a traceback (`setup --intent MISSING` did).
+- Page palettes live in `core.inputs.PAGE_PALETTES` (must match `app.js`, tested); `deploy` normalizes `--icon` with `branding.normalize_icon()` before any SSH, and a redeploy merges unnamed branding flags from the saved values.

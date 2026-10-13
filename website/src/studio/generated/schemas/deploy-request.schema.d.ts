@@ -7,7 +7,7 @@
 
 export type ClientIps = boolean;
 export type ClientName = string;
-export type Color = string;
+export type Color = "" | "ocean" | "sunset" | "forest" | "lavender" | "rose" | "slate";
 export type Country = string;
 export type Domain = "" | string;
 export type Fingerprint =

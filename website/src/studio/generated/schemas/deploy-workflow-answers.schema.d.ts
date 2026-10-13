@@ -6,7 +6,7 @@
  */
 
 export type ClientName = string;
-export type Color = string;
+export type Color = "" | "ocean" | "sunset" | "forest" | "lavender" | "rose" | "slate";
 export type Confirm = boolean;
 export type Domain = "" | string;
 export type GeoBlock = boolean;
