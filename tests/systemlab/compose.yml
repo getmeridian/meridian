@@ -158,6 +158,8 @@ services:
       MERIDIAN_DISABLE_UPDATE_CHECK: "1"
       MERIDIAN_ACME_SERVER: "https://pebble:14000/dir"
       PYTHONUNBUFFERED: "1"
+      SYSTEMLAB_STAGES: "${SYSTEMLAB_STAGES:-}"
+      SYSTEMLAB_KEEP: "${SYSTEMLAB_KEEP:-}"
     command: ["bash", "/workspace/tests/systemlab/scripts/controller-run.sh"]
 
 networks:

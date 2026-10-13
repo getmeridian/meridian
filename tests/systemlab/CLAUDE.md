@@ -23,6 +23,7 @@ uv run pytest tests/systemlab/ -q
 - Removal runs `relay check`, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent on its server or in the panel.
 
 ## Pitfalls
+- **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` leaves the fleet and controller up; rerun a stage with `docker compose exec controller bash /workspace/tests/systemlab/scripts/stages/40-removal.sh` (copy edited scripts in with `docker compose cp`).
 - `scripts/panel-ui-check.py` is the only browser-level proof that the panel UI works behind the secret path; run it locally after every backend bump (never in CI). Remnawave's UI itself fetches `ungh.cc` star counts — not a Meridian leak.
 
 - A running node API precedes panel `is_connected`; preserve the stage grace period and runtime polling through the asynchronous handshake.
