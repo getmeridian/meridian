@@ -163,7 +163,7 @@ const hreflangLinks = [
         <h2 data-t="connect.title">{t('connect.title', 'Scan and go')}</h2>
         <p class="section-desc" data-t="connect.desc">{t('connect.desc', 'After deploying, you get a connection page with QR codes. Send it to whoever needs it — they tap once and connect.')}</p>
 
-        <AppGrid />
+        <AppGrid locale={locale} />
 
         <Callout variant="warning" data-t="connect.clock">
           {t('connect.clock', 'Turn on automatic date and time on every device. Connections fail when the device clock is wrong.')}
