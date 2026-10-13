@@ -62,7 +62,9 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Operation]:
     """
     from meridian.provision.remnawave_panel import DeployRemnawavePanel
 
-    operations = build_server_baseline_steps(ctx, install_docker=True)
+    # The reviewed plan's tagged firewall rules own every public port; the
+    # bootstrap must not add untagged ones (it used to open 443/udp always).
+    operations = build_server_baseline_steps(ctx, install_docker=True, manage_public_ports=False)
 
     # -- Remnawave panel (node deployed after API setup, not here) --
     operations.append(
@@ -148,7 +150,7 @@ def build_node_steps(ctx: ProvisionContext) -> list[Operation]:
     from meridian.provision.warp import InstallWarp
 
     operations = [
-        *build_server_baseline_steps(ctx, install_docker=True),
+        *build_server_baseline_steps(ctx, install_docker=True, manage_public_ports=False),
         op(
             InstallWarp(),
             requires=[Resource.DOCKER_INSTALLED],

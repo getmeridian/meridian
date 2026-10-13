@@ -42,6 +42,7 @@
 - **`docker compose restart` keeps the old environment** — after changing an `env_file` (subscription page API token) recreate the service with `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — v4 installs none on servers; an operator-installed copy is how they redeploy.
 - **Firewall must follow the effective sshd port** — never assume `22/tcp`.
+- **V4 recipes never own public ports** — `build_setup_steps`/`build_node_steps` pass `manage_public_ports=False`; the bootstrap once opened an untagged `443/udp` on every control server, which tagged retirement and teardown could not find. `ConfigureFirewall` now deletes only that bare, comment-less rule.
 - **Baseline checks must exit 1 for absence** — a bare `docker …` exits 127 when Docker is missing, which observation treats as unavailable evidence and blocks a relay from ever becoming an exit.
 - **Generated file content stays off shell commands** — use `conn.put_text()`/`put_bytes()` with mode/owner/sensitive flags, not heredocs or `printf`.
 - **WARP belongs in both recipes** — a WARP-enabled exit may be node-only, so `build_node_steps()` must install it after Docker just like first setup.

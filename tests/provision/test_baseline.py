@@ -95,7 +95,7 @@ def test_deploy_recipes_keep_baseline_as_their_prefix(
     builder: Callable[[ProvisionContext], list[Operation]],
 ) -> None:
     ctx = ProvisionContext(ip="198.51.100.1", harden=harden)
-    baseline = build_server_baseline_steps(ctx, install_docker=True)
+    baseline = build_server_baseline_steps(ctx, install_docker=True, manage_public_ports=False)
 
     steps = builder(ctx)
 
@@ -126,3 +126,16 @@ def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) 
 
     assert result.returncode == 1
     assert "not found" not in result.stderr
+
+
+def test_control_plane_bootstrap_leaves_public_ports_to_the_reviewed_plan() -> None:
+    from meridian.provision import build_setup_steps
+    from meridian.provision.common import ConfigureFirewall, EnsurePort443
+
+    for harden in (False, True):
+        ctx = ProvisionContext(ip="198.51.100.1", hysteria2=True, is_panel_host=True, harden=harden)
+        steps = [operation.step for operation in build_setup_steps(ctx)]
+
+        firewalls = [step for step in steps if isinstance(step, ConfigureFirewall)]
+        assert len(firewalls) == int(harden) and not any(step.manage_public_ports for step in firewalls)
+        assert not any(isinstance(step, EnsurePort443) for step in steps)

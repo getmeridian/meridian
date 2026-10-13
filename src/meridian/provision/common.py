@@ -374,6 +374,15 @@ class EnsurePort443:
         )
 
 
+# Prints and deletes (highest number first) bare `443/udp ALLOW IN Anywhere` rules
+# with no comment; tagged meridian-v4 rules and narrower operator rules stay.
+_DELETE_UNTAGGED_UDP_443 = (
+    "ufw status numbered 2>/dev/null"
+    r" | sed -n 's/^\[ *\([0-9][0-9]*\)\] 443\/udp\( (v6)\)\{0,1\} *ALLOW IN *Anywhere\( (v6)\)\{0,1\} *$/\1/p'"
+    ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null && echo "$rule"; done; true'
+)
+
+
 class ConfigureFirewall:
     """Configure UFW firewall rules."""
 
@@ -472,9 +481,18 @@ class ConfigureFirewall:
                 if result.ok and result.result and "Could not" not in result.result.stdout and result.changed:
                     changed = True
 
+        else:
+            # Earlier 4.0 betas let the control-plane bootstrap open an untagged
+            # 443/udp rule even without Hysteria2; compiled rules always carry a
+            # meridian-v4 comment, so only the untagged one is removed.
+            stale = conn.run(_DELETE_UNTAGGED_UDP_443, timeout=30)
+            commands.append(stale)
+            if stale.returncode == 0 and stale.stdout.strip():
+                changed = True
+
         # Do not delete arbitrary user-managed rules. Meridian only owns the
         # standard public ports it opens itself (22/80/443), so cleanup is
-        # limited to the stale port-80 rule above when web serving is disabled.
+        # limited to the stale port-80 and untagged 443/udp rules above.
 
         # Set default policies and enable
         default_incoming = conn.run("ufw default deny incoming", timeout=15)

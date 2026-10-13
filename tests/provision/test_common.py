@@ -350,6 +350,23 @@ class TestConfigureFirewall:
 
         assert not any("443/udp" in call for call in mock_conn.calls)
 
+    def test_v4_baseline_opens_no_public_port_and_drops_the_untagged_udp_443_rule(self, mock_conn: MockConnection):
+        """Earlier 4.0 betas opened an untagged 443/udp from the control-plane bootstrap."""
+        mock_conn.when("which ufw", rc=0)
+        mock_conn.when("ufw status numbered", stdout="5\n2\n")
+        mock_conn.when("ufw status", stdout="Status: active")
+        mock_conn.when("ufw allow", stdout="Skipping adding existing rule")
+        mock_conn.when("ufw default", rc=0)
+
+        result = ConfigureFirewall(manage_public_ports=False).run(
+            mock_conn, ProvisionContext(ip="198.51.100.1", hysteria2=True)
+        )
+
+        assert result.status == "changed"
+        assert not any("ufw allow 443" in call or "allow 80/tcp" in call for call in mock_conn.calls)
+        cleanup = next(call for call in mock_conn.calls if "ufw status numbered" in call)
+        assert "443\\/udp" in cleanup and "Anywhere" in cleanup and "sort -rn" in cleanup
+
     def test_already_active_returns_ok(self, mock_conn: MockConnection, base_ctx):
         """When ufw is active and rules already exist, status is ok."""
         mock_conn.when("which ufw", rc=0)

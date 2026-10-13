@@ -57,10 +57,10 @@ def domain_ctx() -> ProvisionContext:
 class TestMinimalPipeline:
     def test_minimal_step_count(self, base_ctx: ProvisionContext):
         """Minimal config: disk check, packages, auto-upgrades, timezone, BBR,
-        ensure port 443, docker, remnawave panel = 8 steps (no nginx without hosted_page)."""
+        docker, remnawave panel = 7 steps (no nginx without hosted_page; the plan owns public ports)."""
         steps = build_setup_steps(base_ctx)
         names = [s.name for s in steps]
-        assert len(steps) == 8, f"Expected 8 minimal steps, got {len(steps)}: {names}"
+        assert len(steps) == 7, f"Expected 7 minimal steps, got {len(steps)}: {names}"
 
     def test_no_services_without_domain_or_hosted_page(self, base_ctx: ProvisionContext):
         names = step_names(base_ctx)
@@ -75,13 +75,14 @@ class TestHardenSteps:
         names_without = step_names(base_ctx)
         base_ctx.harden = True
         names_with = step_names(base_ctx)
-        # harden=True replaces EnsurePort443 with HardenSSH + ConfigureFail2ban + ConfigureFirewall (+2 net)
+        # harden=True adds HardenSSH + ConfigureFail2ban + ConfigureFirewall; public
+        # ports belong to the reviewed plan, so neither recipe runs EnsurePort443.
         assert "Harden SSH configuration" in names_with
         assert "Configure fail2ban" in names_with
         assert "Configure firewall" in names_with
         assert "Ensure port 443" not in names_with
-        assert "Ensure port 443" in names_without
-        assert len(names_with) == len(names_without) + 2
+        assert "Ensure port 443" not in names_without
+        assert len(names_with) == len(names_without) + 3
 
 
 class TestNodePipelineHardens:
