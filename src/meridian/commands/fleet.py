@@ -78,9 +78,6 @@ def _version_warning(message: str, hint: str) -> ErrorModel:
     return ErrorModel(code="MERIDIAN_PANEL_VERSION", category="user", message=message, hint=hint, exit_code=0)
 
 
-# -- Fleet Inventory --
-
-
 def run_inventory() -> None:
     """Show the configured fleet inventory without exposing secrets."""
     operation = OperationContext()
@@ -89,7 +86,6 @@ def run_inventory() -> None:
 
 
 def _run_inventory(*, operation: OperationContext) -> None:
-    """Implementation for inventory with command metadata already attached."""
     cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)
@@ -198,9 +194,6 @@ def _run_inventory(*, operation: OperationContext) -> None:
         raise typer.Exit(exit_code)
 
 
-# -- Fleet Status --
-
-
 def _render_status(status: FleetStatus) -> None:
     """Render fleet status for humans from the typed core result."""
     err_console.print()
@@ -279,7 +272,6 @@ def run_status() -> int:
 
 
 def _run_status(*, operation: OperationContext) -> int:
-    """Implementation for status with command metadata already attached."""
     cluster = load_topology_cluster()
     try:
         topology = topology_from_local_cluster(cluster)

@@ -132,8 +132,7 @@ class SetupWizard:
         }
         return handlers[stage](draft)
 
-    # -- 1. servers ---------------------------------------------------------
-
+    # 1. servers
     def _servers(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("servers.explain"))
         adding = not self.shelf.items(draft.roles)
@@ -183,8 +182,7 @@ class SetupWizard:
             return False
         return True
 
-    # -- 2. roles -----------------------------------------------------------
-
+    # 2. roles
     def _roles(self, draft: SetupDraft) -> None:
         items = [item for item in self.shelf.items(draft.roles) if item.server_ref in draft.server_refs]
         titles = {item.server_ref: item.title for item in items}
@@ -282,8 +280,7 @@ class SetupWizard:
             return choices[0].value
         return self.prompt.choose(label, choices)
 
-    # -- 3. connection methods ----------------------------------------------
-
+    # 3. connection methods
     def _paths(self, draft: SetupDraft) -> None:
         if draft.roles is None:
             raise LocalStateError("Server roles are missing.")
@@ -308,8 +305,7 @@ class SetupWizard:
             selections.append(SetupExitPaths(exit_ref=exit_.id, paths=paths))
         self.service.configure_paths(SetupPathSelection(exits=selections))
 
-    # -- 4. routing (only routing gateways use it) ---------------------------
-
+    # 4. routing (only routing gateways use it)
     def _routing(self, draft: SetupDraft) -> None:
         if draft.roles is None:
             raise LocalStateError("Server roles are missing.")
@@ -352,8 +348,7 @@ class SetupWizard:
             SetupRoutingSelection(default_egress_ref=default_target, egress_pools=pools, routes=routes)
         )
 
-    # -- 5. users -------------------------------------------------------------
-
+    # 5. users
     def _access(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("access.explain"))
         users = [value.strip() for value in self.prompt.ask(t("access.users"), default="default").split(",")]
@@ -365,8 +360,7 @@ class SetupWizard:
             )
         )
 
-    # -- 6-9. review, apply, verify, handoff ------------------------------------
-
+    # 6-9. review, apply, verify, handoff
     def _review(self, draft: SetupDraft) -> None:
         review = self.runtime.review(draft)
         self._write_summary(draft, review)

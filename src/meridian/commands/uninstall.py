@@ -133,7 +133,6 @@ def run(
     info(f"Removing Meridian from {resolved.ip}...")
     err_console.print()
 
-    # Run uninstall via provisioner
     from meridian.provision.progress import RichStepRenderer
     from meridian.provision.steps import ProvisionContext, Provisioner
     from meridian.provision.uninstall import Uninstall

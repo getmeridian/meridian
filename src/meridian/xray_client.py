@@ -219,11 +219,6 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-# ---------------------------------------------------------------------------
-# Canonical subscription handling
-# ---------------------------------------------------------------------------
-
-
 def parse_xray_subscription(content: str) -> dict[str, Any]:
     """Decode a canonical Remnawave Xray subscription and return its primary config.
 
@@ -431,11 +426,6 @@ def _validate_local_inbounds(config: dict[str, Any]) -> list[dict[str, Any]]:
     if not any(inbound.get("protocol") == "socks" for inbound in validated):
         raise ValueError("Canonical Xray subscription has no SOCKS inbound")
     return validated
-
-
-# ---------------------------------------------------------------------------
-# Connection testing
-# ---------------------------------------------------------------------------
 
 
 def _validate_xray_config(xray_bin: Path, config_file: str, *, timeout: float) -> None:

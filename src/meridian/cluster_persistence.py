@@ -32,9 +32,7 @@ from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 logger = logging.getLogger("meridian.cluster")
 
 
-# ---------------------------------------------------------------------------
-# Field-set derivation (must live after dataclass imports)
-# ---------------------------------------------------------------------------
+# Field sets derive from the dataclasses, so they must follow those imports.
 
 
 def _public_fields(cls: type) -> set[str]:
@@ -50,11 +48,6 @@ _KNOWN_TOP = _public_fields(ClusterConfig)
 
 _SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
 """Default panel SSH credentials, omitted from YAML when unchanged."""
-
-
-# ---------------------------------------------------------------------------
-# Serialization helpers
-# ---------------------------------------------------------------------------
 
 
 def _strip_ssh_defaults(d: dict[str, Any]) -> None:
@@ -142,11 +135,6 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
             out[k] = v
 
     return out
-
-
-# ---------------------------------------------------------------------------
-# Loading helpers
-# ---------------------------------------------------------------------------
 
 
 def _load_dataclass(
@@ -273,11 +261,6 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         pending_plan_hash=v3.pending_plan_hash,
         _extra=extra,
     )
-
-
-# ---------------------------------------------------------------------------
-# Public free functions
-# ---------------------------------------------------------------------------
 
 
 def _state_error(path: Path, reason: str) -> LocalStateCorruptedError:

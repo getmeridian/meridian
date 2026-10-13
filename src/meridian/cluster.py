@@ -42,11 +42,6 @@ class ClusterConfigExternallyModifiedError(RuntimeError):
     """
 
 
-# ---------------------------------------------------------------------------
-# Dataclasses
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class PanelConfig:
     """Remnawave panel connection details."""
@@ -246,8 +241,6 @@ class ClusterConfig:
             # one locked region don't deadlock against save()'s own lock.
             self._lock = threading.RLock()
 
-    # --- Persistence ---
-
     @classmethod
     def load(cls, path: Path | None = None) -> ClusterConfig:
         """Load from cluster.yml. Returns empty config if file doesn't exist."""
@@ -274,8 +267,6 @@ class ClusterConfig:
             self,
             {id(self._lock): threading.RLock()},
         )
-
-    # --- Convenience ---
 
     def validate(self) -> list[str]:
         """Validate cluster config consistency. Returns list of error strings (empty = valid)."""
@@ -387,11 +378,6 @@ class ClusterConfig:
     def is_configured(self) -> bool:
         """Whether the cluster has a panel configured."""
         return bool(self.panel.url and self.panel.api_token)
-
-
-# ---------------------------------------------------------------------------
-# Validation helpers
-# ---------------------------------------------------------------------------
 
 
 def _is_valid_ip(s: str) -> bool:

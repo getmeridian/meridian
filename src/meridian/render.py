@@ -13,10 +13,6 @@ if TYPE_CHECKING:
     from jinja2 import Environment
 
 
-# ---------------------------------------------------------------------------
-# PWA rendering functions
-# ---------------------------------------------------------------------------
-
 # App catalog — matches website/src/data/apps.json (single source of truth).
 # ``platforms`` lists where the app runs; ``recommended`` lists where the page
 # features it, in file order (Happ first, then the Mihomo apps, then Throne).
@@ -351,11 +347,6 @@ def _render_pwa_template(
     env.filters["tojson"] = lambda v: json.dumps(str(v), ensure_ascii=False)[1:-1]
 
     return env.from_string(template_text).render(**variables)
-
-
-# ---------------------------------------------------------------------------
-# PWA template helper
-# ---------------------------------------------------------------------------
 
 
 def _create_jinja_env(*, autoescape: bool = True) -> Environment:

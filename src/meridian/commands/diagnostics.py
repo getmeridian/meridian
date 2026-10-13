@@ -90,10 +90,8 @@ def run(
         output = evidence_conn.run(cmd, timeout=timeout).stdout.strip() or fallback
         return f"$ {cmd}\n{output}"
 
-    # --- Local Machine ---
     local_os = platform.platform()
 
-    # Check deployed version
     cluster = load_cluster()
     deployed_with = (cluster.panel.deployed_with if cluster.panel.server_ip == resolved.ip else "") or "unknown"
 
@@ -106,7 +104,7 @@ def run(
         )
     )
 
-    # --- Deployment context (for AI enrichment) ---
+    # Deployment context, for AI enrichment.
     domain = ""
     saved_sni = ""
     roles: set[str] = set()
@@ -211,7 +209,6 @@ def run(
     ]
     sections.append(("Server Facts", "\n".join(fact_parts)))
 
-    # --- Server info ---
     server_parts = [
         _collect("cat /etc/os-release 2>/dev/null | grep PRETTY_NAME"),
         _collect("uname -r"),
@@ -221,14 +218,12 @@ def run(
     ]
     sections.append(("Server", "\n".join(server_parts)))
 
-    # --- Docker ---
     docker_parts = [
         _collect("docker --version 2>&1", fallback="not installed"),
         _collect("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1", fallback="no containers"),
     ]
     sections.append(("Docker", "\n".join(docker_parts)))
 
-    # --- Xray process ---
     if not xray_expected:
         xray_status = "not expected for this server's configured roles"
     else:
@@ -247,7 +242,6 @@ def run(
             ("Xray Version", _collect("docker exec remnawave-node rw-core version 2>/dev/null", timeout=15))
         )
 
-    # --- Role-specific runtime evidence ---
     if xray_expected:
         log_cmd = "docker logs remnawave-node --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
         xray_logs = evidence_conn.run(log_cmd, timeout=15).stdout.strip() or "container not running"
@@ -273,7 +267,6 @@ def run(
         cert_expiry = _check_cert_expiry(evidence_conn, port=cert_port, server_name=cert_sni)
         sections.append(("TLS Certificate", cert_expiry))
 
-    # --- Listening Ports ---
     listener_ports = set(relay_ports)
     socket_flags = "-tlnp"
     if deployment is not None and deployment.kind == "v4":
@@ -288,15 +281,12 @@ def run(
     listener_command = f"ss {q_socket_flags} {port_filter} 2>&1" if port_filter else f"ss {q_socket_flags} 2>&1"
     sections.append(("Listening Ports", _collect(listener_command)))
 
-    # --- Firewall ---
     sections.append(("Firewall (UFW)", _collect("ufw status verbose 2>&1", fallback="ufw not available")))
 
-    # --- Geo-blocking ---
     if xray_expected:
         geo_status = "managed by Remnawave (check panel settings)"
         sections.append(("Geo-blocking", geo_status))
 
-    # --- SNI Target ---
     if xray_expected:
         sni_host = sni or saved_sni or DEFAULT_SNI
         q_sni = shlex.quote(sni_host)
@@ -307,7 +297,6 @@ def run(
         sni_check = evidence_conn.run(sni_cmd, timeout=10).stdout.strip() or "unreachable"
         sections.append((f"Camouflage Target ({sni_host})", f"$ {sni_cmd}\n{sni_check}"))
 
-    # --- Domain DNS ---
     if domain:
         q_domain = shlex.quote(domain)
         sections.append(
@@ -320,7 +309,6 @@ def run(
             )
         )
 
-    # --- Output ---
     err_console.print()
     line()
     err_console.print()

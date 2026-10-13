@@ -165,7 +165,6 @@ def _run_list(
     exit_arg: str = "",
     operation: OperationContext,
 ) -> None:
-    """Implementation for relay list with command metadata attached."""
     from rich.box import ROUNDED
     from rich.table import Table
 
@@ -197,7 +196,6 @@ def _run_list(
         err_console.print("\n  [dim]Deploy one: meridian relay add RELAY_IP --exit EXIT_IP[/dim]\n")
         return
 
-    # Optionally check host status from panel
     host_status: dict[tuple[str, int], bool | None] = {}
     warnings: list[ErrorModel] = []
     if relays:
@@ -224,7 +222,6 @@ def _run_list(
             if not is_json_mode():
                 warn("Panel host status is unavailable; relay rows are shown as unknown")
 
-    # JSON output
     if is_json_mode():
         from meridian.renderers import emit_json
 

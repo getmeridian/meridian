@@ -36,8 +36,6 @@ from meridian.renderers import emit_json
 if TYPE_CHECKING:
     from meridian.resolve import ResolvedServer
 
-# -- Node Add --
-
 
 def run_add(
     ip: str,
@@ -157,12 +155,6 @@ def run_add(
     ok(f"Exit {request.name or resolved.ip} {'added' if result.changed else 'already converged'}")
 
 
-# -- Node Check --
-
-
-# -- Node List --
-
-
 def run_list() -> None:
     """List all nodes with health status from the panel."""
     from meridian.console import error_context
@@ -173,7 +165,6 @@ def run_list() -> None:
 
 
 def _run_list(*, operation: OperationContext) -> None:
-    """Implementation for node list with command metadata attached."""
     from rich.box import ROUNDED
     from rich.table import Table
 
@@ -203,7 +194,6 @@ def _run_list(*, operation: OperationContext) -> None:
         if not is_json_mode():
             warn("Panel node status is unavailable; configured nodes are shown as unknown")
 
-    # Index API nodes by UUID for quick lookup
     api_by_uuid = {n.uuid: n for n in api_nodes}
 
     if is_json_mode():
@@ -276,9 +266,6 @@ def _run_list(*, operation: OperationContext) -> None:
     err_console.print()
     if warnings:
         raise typer.Exit(3)
-
-
-# -- Node Remove --
 
 
 def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:

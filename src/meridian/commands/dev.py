@@ -26,7 +26,6 @@ DEMO_PAGE_PATH = "connect"
 DEMO_SHORT_UUID = "DemoShortUuid42"
 DEMO_PLACE = "\U0001f1e9\U0001f1ea DE"
 
-# Source directories to watch for changes
 _SRC_ROOT = Path(__file__).parent.parent  # src/meridian/
 _WATCH_DIRS = [
     _SRC_ROOT / "templates" / "pwa",
@@ -87,7 +86,6 @@ def _write_preview_files(
 
     neuter_sw = watch or disable_sw
 
-    # Write shared PWA assets
     pwa_dir = output_dir / "pwa"
     pwa_dir.mkdir(exist_ok=True)
     for name, content in static_assets.items():
@@ -97,7 +95,6 @@ def _write_preview_files(
         else:
             (pwa_dir / name).write_bytes(content)
 
-    # Write per-client files
     client_dir = output_dir / client_uuid
     client_dir.mkdir(exist_ok=True)
     for name, text in client_files.items():
@@ -168,7 +165,6 @@ def run_preview(
     """
     client_uuid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"meridian-preview-{client_name}"))
 
-    # Determine output directory
     if output:
         output_dir = Path(output)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -195,7 +191,6 @@ def run_preview(
             info(f"Serve with: python -m http.server {port} -d {output_dir}")
             return
 
-        # Track source mtime for reload detection
         last_mtime = _get_source_mtime()
 
         # Custom handler with reload endpoint and watch-mode regeneration
@@ -211,7 +206,6 @@ def run_preview(
                         current = _get_source_mtime()
                         if current != last_mtime:
                             last_mtime = current
-                            # Reimport to pick up source changes
                             import importlib
 
                             import meridian.pwa
