@@ -27,6 +27,7 @@
   "servers.pick": "这个 VPN 运行在哪些服务器上？输入用逗号分隔的编号、「全部」或「添加」",
   "servers.address": "服务器地址：IP、user@IP:port 或 'local' 表示此机器",
   "servers.name": "此服务器的简称",
+  "servers.name_ideas": "名称灵感：{names}",
   "servers.retry": "修复上面的问题后重试，或输入退出。",
   "servers.more": "再添加一台服务器？",
   "servers.more_hint": "一台服务器足够开始。第二台可以是另一个国家的出口，或在你的国家内作为中继以应对外国 IP 被封的情况。",

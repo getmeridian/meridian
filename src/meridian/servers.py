@@ -8,8 +8,10 @@ import ipaddress
 import json
 import os
 import re
+import secrets
 import socket
 import tempfile
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -27,6 +29,23 @@ from meridian.core.servers import (
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
+
+# Short, neutral words that are easy to type and say; exit IDs derive from them.
+SERVER_NAME_IDEAS = (
+    "astra", "boba", "foxtrot", "tango", "echo", "kilo", "lima", "oscar", "sierra", "zulu",
+    "nova", "orbit", "comet", "pixel", "mango", "kiwi", "maple", "cedar", "birch", "aspen",
+    "willow", "river", "harbor", "summit", "meadow", "pebble", "coral", "amber", "indigo", "cobalt",
+    "ember", "frost", "breeze", "lumen", "vega", "lyra", "orion", "atlas", "polaris", "nimbus",
+    "zephyr", "falcon", "otter", "panda", "koala", "lynx", "heron", "robin", "mochi", "waffle",
+)  # fmt: skip
+
+
+def suggest_server_names(taken: Iterable[str], count: int = 5) -> list[str]:
+    """Up to ``count`` random name ideas that no saved server uses yet."""
+    used = {name.lower() for name in taken}
+    free = [word for word in SERVER_NAME_IDEAS if word not in used]
+    return secrets.SystemRandom().sample(free, min(count, len(free)))
+
 
 SERVER_REGISTRY_SCHEMA = "meridian.servers/v3"
 _SUPPORTED_SERVER_REGISTRY_SCHEMAS = {"meridian.servers/v2", SERVER_REGISTRY_SCHEMA}

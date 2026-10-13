@@ -27,6 +27,7 @@
   "servers.pick": "Which servers should this VPN run on? Numbers separated by commas, 'all', or 'add'",
   "servers.address": "Server address: IP, user@IP:port, or 'local' for this machine",
   "servers.name": "Short name for this server",
+  "servers.name_ideas": "Name ideas: {names}",
   "servers.retry": "Fix the problem above and try again, or type quit.",
   "servers.more": "Add another server?",
   "servers.more_hint": "One server is enough to start. A second one can be an exit in another country, or a relay inside your country for when foreign IP addresses get blocked.",

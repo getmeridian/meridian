@@ -39,7 +39,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   gateways with failover). It speaks English, Russian, Persian, and Chinese
   (asked first, remembered, or `--lang`), explains each term in one plain
   sentence, accepts `local` for the machine you are on, skips routing questions
-  unless you have a gateway, and ends with a plain summary before anything
+  unless you have a gateway, suggests five short server names (astra, boba,
+  foxtrot…), and ends with a plain summary before anything
   changes. Running `meridian` alone in a terminal offers to start it.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).

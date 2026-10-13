@@ -41,6 +41,7 @@ from meridian.core.topology import (
 )
 from meridian.i18n import t, words
 from meridian.registry_country import registry_country
+from meridian.servers import suggest_server_names
 from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.runtime import SetupReview, SetupRuntime, SetupVerification
 from meridian.setup.service import SetupDraftService
@@ -152,7 +153,7 @@ class SetupWizard:
                 )
                 self.service.select_servers([items[index - 1].server_ref for index in indices])
                 return
-            if not self._add_server(len(items)):
+            if not self._add_server([item.title for item in items]):
                 continue
             if self.prompt.yes_no(t("servers.more"), default=False, hint=t("servers.more_hint")):
                 continue
@@ -162,11 +163,17 @@ class SetupWizard:
                 return
             adding = False
 
-    def _add_server(self, count: int) -> bool:
+    def _add_server(self, taken: list[str]) -> bool:
         address = self.prompt.ask(t("servers.address"))
         if not address:
             raise ValueError(t("error.address_required"))
-        default_name = "this-server" if address.lower() == "local" else f"server-{count + 1}"
+        ideas = suggest_server_names(taken)
+        if address.lower() == "local":
+            default_name = "this-server"
+        else:
+            default_name = ideas[0] if ideas else f"server-{len(taken) + 1}"
+        if ideas:
+            self.prompt.say(t("servers.name_ideas", names=", ".join(ideas)), style="dim")
         name = self.prompt.ask(t("servers.name"), default=default_name)
         try:
             self.register_server(address, name, "", 0)

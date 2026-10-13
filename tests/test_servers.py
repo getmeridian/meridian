@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -483,3 +484,20 @@ def test_server_add_local_records_this_machine_without_ssh(servers_file: Path) -
     assert entry is not None
     assert entry.host == "198.51.100.30"
     assert entry.machine_id == "0123456789abcdef0123456789abcdef"
+
+
+def test_server_name_ideas_are_fifty_distinct_valid_ids() -> None:
+    from meridian.servers import SERVER_NAME_IDEAS
+
+    assert len(set(SERVER_NAME_IDEAS)) == len(SERVER_NAME_IDEAS) == 50
+    assert all(re.fullmatch(r"[a-z]+", word) for word in SERVER_NAME_IDEAS)
+
+
+def test_server_name_suggestions_skip_taken_names_case_insensitively() -> None:
+    from meridian.servers import SERVER_NAME_IDEAS, suggest_server_names
+
+    ideas = suggest_server_names(["Astra", "boba"])
+    assert len(ideas) == 5 == len(set(ideas))
+    assert not {"astra", "boba"} & set(ideas)
+    assert suggest_server_names(SERVER_NAME_IDEAS[1:]) == [SERVER_NAME_IDEAS[0]]
+    assert suggest_server_names(SERVER_NAME_IDEAS) == []

@@ -476,3 +476,21 @@ def test_camouflage_default_is_what_the_exit_can_reach_and_warns_when_nothing_is
         assert probed == ["srv-exit"]
         warned = any("could not reach the usual camouflage sites" in line for line in io.output)
         assert warned is (not suggestion)
+
+
+def test_new_remote_server_defaults_to_an_unused_name_idea(tmp_path) -> None:
+    from meridian.servers import SERVER_NAME_IDEAS
+
+    registry = ServerRegistry(tmp_path / "servers.json")
+    shelf = ServerShelf(registry)
+    service = SetupDraftService(SetupDraftStore(tmp_path / "setup.json"), shelf)
+    registered: list[str] = []
+    io = _ScriptedIO([("Server address", "198.51.100.31"), ("Short name", "")])
+    wizard = _wizard(service, shelf, io, lambda _address, name, _user, _port: registered.append(name))
+
+    assert wizard._add_server(["astra"])
+
+    [name] = registered
+    assert name in SERVER_NAME_IDEAS and name != "astra"
+    [ideas] = [line for line in io.output if "Name ideas:" in line]
+    assert name in ideas and "astra" not in ideas
