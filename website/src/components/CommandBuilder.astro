@@ -33,7 +33,7 @@ const tabs = [
   <div class="builder__body">
     <!-- Tab description -->
     <p class="builder__desc" id="builder-desc" data-t="builder.desc.deploy">
-      Deploy VLESS+Reality proxy. Configures Docker, Xray, firewall, and TLS automatically.
+      Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.
     </p>
 
     <!-- Fields -->
@@ -62,7 +62,7 @@ const tabs = [
           <span data-t="builder.field.domain">Domain</span>
         </label>
         <input id="f-domain" type="text" placeholder="example.com" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.domain.hint">Optional. Adds CDN fallback via Cloudflare and web panel access.</span>
+        <span class="builder__hint" data-t="builder.field.domain.hint">Optional. Moves XHTTP to your domain and adds WSS; both can run through the Cloudflare CDN.</span>
       </div>
 
       <div class="builder__field" id="row-sni">
@@ -155,7 +155,7 @@ const tabs = [
 <script>
   const TAB_CONFIG: Record<string, { desc: string; show: string[]; cmd: string; descKey: string }> = {
     install: {
-      desc: 'Deploy VLESS+Reality proxy. Configures Docker, Xray, firewall, and TLS automatically.',
+      desc: 'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.',
       show: ['ip', 'user', 'domain', 'sni', 'name', 'display-name', 'icon', 'color', 'yes'],
       cmd: 'deploy',
       descKey: 'builder.desc.deploy',
@@ -185,7 +185,7 @@ const tabs = [
       descKey: 'builder.desc.doctor',
     },
     uninstall: {
-      desc: 'Remove proxy container, configs, and firewall rules. Docker and system packages are kept.',
+      desc: 'Remove the panel and node containers, nginx files, certificates, and firewall rules. Docker and system packages stay.',
       show: ['ip', 'user', 'yes'],
       cmd: 'teardown',
       descKey: 'builder.desc.teardown',
@@ -292,14 +292,15 @@ const tabs = [
       } else {
         wizard.style.display = 'none';
         if (/^locally?$/i.test(ip)) {
-          status.textContent = 'Deploys on this server without SSH. Must run as root on the VPS.';
+          status.textContent = 'Deploys on this server without SSH. Run it on the VPS as root or with passwordless sudo.';
           status.className = 'builder__status builder__status--ok';
         } else if (domOn && !dom) {
           status.textContent = 'Enter a domain or uncheck to skip.';
           status.className = 'builder__status';
         } else {
-          const mode = domOn ? 'Reality + CDN fallback' : 'Reality-only';
-          status.textContent = 'Deploys ' + mode + '.';
+          status.textContent = domOn
+            ? 'Deploys Reality, XHTTP, and Hysteria2, plus WSS on your domain.'
+            : 'Deploys Reality, XHTTP, and Hysteria2.';
           status.className = 'builder__status builder__status--ok';
         }
       }
@@ -310,7 +311,7 @@ const tabs = [
           status.textContent = 'Enter the relay IP and exit server. The exit server must be deployed first.';
           status.className = 'builder__status';
         } else {
-          status.textContent = 'Routes traffic through the relay to your exit server.';
+          status.textContent = 'Adds Reality entries that enter through the relay; other methods still connect to the exit.';
           status.className = 'builder__status builder__status--ok';
         }
       } else if (curTab === 'check') {
@@ -325,7 +326,7 @@ const tabs = [
           : 'Enter your server IP to collect diagnostics.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       } else {
-        status.textContent = ip ? 'Removes Meridian. Docker and system packages are kept.' : 'IP is auto-detected from saved credentials if omitted.';
+        status.textContent = ip ? 'Removes Meridian. Docker and system packages stay.' : 'Uses your saved server when you have only one.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       }
     }
