@@ -12,3 +12,8 @@ DEFAULT_SNI: str = "www.google.com"
 # because Reality handshakes through it failed in the system lab while these
 # succeeded with identical keys and config.
 REALITY_SNI_CANDIDATES: tuple[str, ...] = ("www.google.com", "dl.google.com", "www.cloudflare.com")
+
+# The control server's panel TLS server behind the 443 stream router. The second
+# listener accepts the PROXY protocol header when the fleet forwards client IPs.
+CONTROL_TLS_PORT: int = 8443
+CONTROL_PROXY_TLS_PORT: int = 8444

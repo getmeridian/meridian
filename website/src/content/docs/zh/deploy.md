@@ -38,6 +38,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block / --no-geo-block` | 启 | 通过代理阻止俄罗斯域名和 IP |
+| `--client-ips / --no-client-ips` | 关 | 让面板看到每个客户端的真实 IP（见[客户端 IP](#客户端-ip)） |
 | `--yes` | | 跳过确认提示 |
 
 脚本和 UI 的标志（`--json`、`--events`、`--request`、`--dry-run`）在 [CLI 参考](/docs/zh/cli-reference/#meridian-deploy)中描述。
@@ -163,6 +164,18 @@ meridian deploy 198.51.100.10 --no-geo-block
 ```
 
 要在保持阻止的同时打开俄罗斯网站直接访问，详见[分流路由](/docs/zh/split-routing/)。
+
+## 客户端 IP
+
+默认情况下，面板永不了解你的用户从哪里连接：每个 TCP 连接通过服务器上的 nginx 到达 Xray，所以 Remnawave 记录服务器自己的地址。这是隐私选择，关于用户位置的任何信息都不被存储。
+
+Remnawave 的按用户 IP 限制和连接日志需要真实地址。用以下启用它们：
+
+```
+meridian deploy 198.51.100.10 --client-ips
+```
+
+nginx 随后将每个客户端的地址传递给 Xray 和面板。Hysteria2 是直接 UDP 并始终显示真实地址。通过中继的连接显示中继的地址，通过 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的。设置应用于整个舰队；不带标志重新部署以关闭它。
 
 ## 添加中继
 

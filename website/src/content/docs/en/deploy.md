@@ -38,6 +38,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. Use `--no-harden` on a server shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block / --no-geo-block` | on | Block Russian domains and IPs on the server |
+| `--client-ips / --no-client-ips` | off | Let the panel see each client's real IP (see [Client IPs](#client-ips)) |
 | `--yes` | | Skip confirmation prompts |
 
 Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are described in the [CLI reference](/docs/en/cli-reference/#meridian-deploy).
@@ -163,6 +164,18 @@ meridian deploy 198.51.100.10 --no-geo-block
 ```
 
 For a way to open Russian sites directly while keeping the block, see [Split routing](/docs/en/split-routing/).
+
+## Client IPs
+
+By default the panel never learns where your users connect from: every TCP connection reaches Xray through nginx on the server, so Remnawave records the server's own address. That is the private choice, and nothing about users' locations is stored.
+
+Remnawave's per-user IP limits and connection logs need the real addresses. Turn them on with:
+
+```
+meridian deploy 198.51.100.10 --client-ips
+```
+
+nginx then passes each client's address to Xray and the panel. Hysteria2 is direct UDP and always shows the real address. Connections through a relay show the relay's address, and WebSocket or XHTTP through the Cloudflare CDN show Cloudflare's. The setting applies to the whole fleet; redeploy without the flag to turn it off.
 
 ## Adding a relay
 

@@ -257,6 +257,11 @@
       "title": "Exits",
       "type": "array"
     },
+    "forward_client_ips": {
+      "default": false,
+      "title": "Forward Client Ips",
+      "type": "boolean"
+    },
     "harden": {
       "default": true,
       "title": "Harden",

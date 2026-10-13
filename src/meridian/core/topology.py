@@ -300,6 +300,9 @@ class SetupIntent(CoreModel):
     access: AccessIntent
     delivery: DeliveryIntent = Field(default_factory=DeliveryIntent)
     harden: bool = True  # SSH key-only auth + fail2ban; off when other services share the servers
+    # Pass each client's real address to Xray and the panel (PROXY protocol, X-Forwarded-For).
+    # Off by default: Remnawave then never stores where users connect from.
+    forward_client_ips: bool = False
 
     @model_validator(mode="after")
     def validate_references(self) -> Self:

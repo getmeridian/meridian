@@ -471,6 +471,11 @@ def deploy_cmd(
         help="Harden SSH and firewall (disable if other services share the server)",
         rich_help_panel=SERVER_ACCESS,
     ),
+    client_ips: bool = typer.Option(
+        False,
+        "--client-ips/--no-client-ips",
+        help="Let the panel see each client's real IP (for per-user IP limits); off keeps it private",
+    ),
     server: ServerAlias = "",
     display_name: str = typer.Option(
         "",
@@ -537,6 +542,7 @@ def deploy_cmd(
         warp=warp,
         geo_block=geo_block,
         hysteria2=hysteria2,
+        client_ips=client_ips,
         ssh_port=ssh_port,
         fingerprint=fingerprint,
         request_path=request_path,

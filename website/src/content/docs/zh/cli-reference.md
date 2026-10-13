@@ -30,6 +30,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
+| `--client-ips / --no-client-ips` | 关 | 将每个客户端的真实 IP 传递给 Xray 和面板，用于 Remnawave 按用户 IP 限制和连接日志。关闭时，每个 TCP 连接看起来来自服务器本身 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |

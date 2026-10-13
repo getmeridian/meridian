@@ -173,7 +173,19 @@ def _render_stream(
         )
         for (server_ref, port), name in target_names.items()
     ]
-    if payload.fallback_server_name:
+    strip_server = ""
+    if payload.fallback_server_name and payload.fallback_strip_port:
+        # The camouflage site must never see a PROXY header: a local hop reads and drops it.
+        upstreams.append(_render_stream_upstream(fallback_name, "127.0.0.1", payload.fallback_strip_port))
+        strip_server = (
+            "server {\n"
+            f"    listen 127.0.0.1:{payload.fallback_strip_port} proxy_protocol;\n"
+            f"    proxy_pass {_endpoint(payload.fallback_server_name, 443)};\n"
+            "    proxy_connect_timeout 5s;\n"
+            "    proxy_timeout 30m;\n"
+            "}\n"
+        )
+    elif payload.fallback_server_name:
         upstreams.append(
             _render_stream_upstream(
                 fallback_name,
@@ -196,10 +208,11 @@ def _render_stream(
         f"    listen [::]:{payload.listener_port};\n"
         "    ssl_preread on;\n"
         f"    proxy_pass ${variable};\n"
-        "    proxy_connect_timeout 5s;\n"
+        + ("    proxy_protocol on;\n" if payload.forward_client_ip else "")
+        + "    proxy_connect_timeout 5s;\n"
         "    proxy_timeout 30m;\n"
         "    proxy_socket_keepalive on;\n"
-        "}\n"
+        "}\n" + strip_server
     )
 
 
@@ -220,13 +233,16 @@ def _render_http(
         upstream = f"meridian_http_{token}_{index}"
         host = _backend_address(payload.server_ref, route.backend_server_ref, addresses)
         upstreams.append(f"upstream {upstream} {{\n    server {_endpoint(host, route.backend_port)};\n}}\n")
-        locations.append(_render_http_route(route, upstream))
+        locations.append(_render_http_route(route, upstream, forward_ip=payload.forward_client_ip))
+    proxy_protocol = " proxy_protocol" if payload.forward_client_ip else ""
+    real_ip = "    set_real_ip_from 127.0.0.1;\n    real_ip_header proxy_protocol;\n" if proxy_protocol else ""
     return (
         "# Managed by Meridian v4. Manual edits will be replaced.\n" + "\n".join(upstreams) + "\n"
         "server {\n"
-        f"    listen 127.0.0.1:{payload.listener_port} ssl;\n"
+        f"    listen 127.0.0.1:{payload.listener_port} ssl{proxy_protocol};\n"
+        + real_ip
         # XHTTP clients with a browser fingerprint speak HTTP/2 regardless of ALPN.
-        "    http2 on;\n"
+        + "    http2 on;\n"
         f"    server_name {payload.tls_hostname};\n"
         "    server_tokens off;\n"
         "    absolute_redirect off;\n"
@@ -245,14 +261,17 @@ def _render_locations(payload: NginxArtifactPayload, addresses: Mapping[str, str
         _render_http_route(
             route,
             _endpoint(_backend_address(payload.server_ref, route.backend_server_ref, addresses), route.backend_port),
+            forward_ip=payload.forward_client_ip,
         )
         for route in payload.routes
     ]
     return "# Managed by Meridian v4. Manual edits will be replaced.\n" + "\n".join(locations)
 
 
-def _render_http_route(route: NginxRouteSpec, upstream: str) -> str:
+def _render_http_route(route: NginxRouteSpec, upstream: str, *, forward_ip: bool = False) -> str:
     path = route.path if route.path.startswith("/") else f"/{route.path}"
+    # Overwrite, never append: a client-supplied header must not reach Xray's trusted list.
+    forwarded = "        proxy_set_header X-Forwarded-For $remote_addr;\n" if forward_ip else ""
     if route.protocol == "wss":
         return (
             f"    location {path} {{\n"
@@ -260,29 +279,21 @@ def _render_http_route(route: NginxRouteSpec, upstream: str) -> str:
             "        proxy_http_version 1.1;\n"
             "        proxy_set_header Upgrade $http_upgrade;\n"
             '        proxy_set_header Connection "upgrade";\n'
+            f"{forwarded}"
             "        proxy_read_timeout 360s;\n"
             "    }\n"
         )
-    return (
-        f"    location = {path} {{\n"
+    block = (
         f"        proxy_pass http://{upstream};\n"
         "        proxy_http_version 1.1;\n"
         '        proxy_set_header Connection "";\n'
+        f"{forwarded}"
         "        proxy_read_timeout 86400s;\n"
         "        proxy_send_timeout 86400s;\n"
         "        proxy_buffering off;\n"
         "        proxy_request_buffering off;\n"
-        "    }\n"
-        f"    location {path}/ {{\n"
-        f"        proxy_pass http://{upstream};\n"
-        "        proxy_http_version 1.1;\n"
-        '        proxy_set_header Connection "";\n'
-        "        proxy_read_timeout 86400s;\n"
-        "        proxy_send_timeout 86400s;\n"
-        "        proxy_buffering off;\n"
-        "        proxy_request_buffering off;\n"
-        "    }\n"
     )
+    return f"    location = {path} {{\n{block}    }}\n    location {path}/ {{\n{block}    }}\n"
 
 
 def _backend_address(

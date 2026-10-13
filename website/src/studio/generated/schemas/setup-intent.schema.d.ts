@@ -62,6 +62,7 @@ export type TlsSni = "" | string;
 export type Region = string;
 export type ServerRef1 = string;
 export type Warp = boolean;
+export type ForwardClientIps = boolean;
 export type Harden = boolean;
 export type Action1 = "route" | "block";
 export type Enabled = boolean;
@@ -97,6 +98,7 @@ export interface SetupIntent {
   delivery?: DeliveryIntent;
   egress_pools?: EgressPools;
   exits: Exits;
+  forward_client_ips?: ForwardClientIps;
   harden?: Harden;
   routes?: Routes;
   routing_gateways?: RoutingGateways;

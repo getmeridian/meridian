@@ -126,6 +126,8 @@ class InboundPayload(CoreModel):
     tls_sni: str = ""
     host: str = ""
     path: str = ""
+    # nginx in front passes the client's address (PROXY protocol or X-Forwarded-For).
+    trust_forwarded_ip: bool = False
 
     @model_validator(mode="after")
     def validate_reality_names(self) -> InboundPayload:
@@ -314,6 +316,10 @@ class NginxArtifactPayload(CoreModel):
     tls_hostname: str = ""
     fallback_server_name: str = ""
     routes: list[NginxRouteSpec]
+    # Streams send the PROXY protocol header; TLS servers read it and set X-Forwarded-For.
+    forward_client_ip: bool = False
+    # Local listener that strips the header before the external camouflage fallback.
+    fallback_strip_port: int = 0
 
 
 class RealmHopPayload(CoreModel):

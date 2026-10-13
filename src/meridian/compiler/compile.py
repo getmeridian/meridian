@@ -15,6 +15,7 @@ from meridian.compiler.client_delivery import (
     compile_delivery_templates,
     fingerprint_copy_fields,
 )
+from meridian.compiler.client_ips import forward_client_ips
 from meridian.compiler.deployment import (
     normalized_intent,
     validate_deployment_contract,
@@ -60,10 +61,8 @@ from meridian.compiler.routing import (
     exit_outbound_tags,
     exit_override_routes,
 )
+from meridian.core.defaults import CONTROL_TLS_PORT
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent, path_fingerprints
-
-# The control server's panel TLS server, behind the 443 stream router's no-SNI route.
-CONTROL_TLS_PORT = 8443
 
 
 def compile_topology(
@@ -387,6 +386,8 @@ def compile_topology(
         gateway_ids=gateway_ids,
     )
 
+    if intent.forward_client_ips:
+        forward_client_ips(builder, ports)
     assign_host_positions(builder)
     attach_server_baselines(builder, baseline_ids)
     ordered = builder.ordered()

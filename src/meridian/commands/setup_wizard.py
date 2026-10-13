@@ -260,6 +260,9 @@ class SetupWizard:
                 exits=exits,
                 transparent_relays=relays,
                 routing_gateways=gateways,
+                # Fleet settings the wizard never asks about survive re-answering the roles.
+                harden=draft.roles.harden if draft.roles else True,
+                forward_client_ips=draft.roles.forward_client_ips if draft.roles else False,
             )
         )
 

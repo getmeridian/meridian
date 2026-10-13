@@ -30,6 +30,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. `--no-harden` is for servers shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block` / `--no-geo-block` | on | Refuse Russian domains and IPs (`geosite:category-ru` + `geoip:ru`) at the exit. Xray JSON and Mihomo subscriptions already send them directly from the device |
+| `--client-ips / --no-client-ips` | off | Pass each client's real IP to Xray and the panel, for Remnawave per-user IP limits and connection logs. Off, every TCP connection appears to come from the server itself |
 | `--yes` | | Skip confirmation prompts |
 | `--json` | | Emit the final deploy result as a `meridian.output/v1` envelope |
 | `--events=jsonl` | | Stream typed progress events as JSONL on stderr |

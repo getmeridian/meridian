@@ -4,6 +4,11 @@ export const deployRequestSchema = {
   "additionalProperties": false,
   "description": "Trusted local request for deploying or redeploying a Meridian server.",
   "properties": {
+    "client_ips": {
+      "default": false,
+      "title": "Client Ips",
+      "type": "boolean"
+    },
     "client_name": {
       "default": "",
       "pattern": "^$|^[a-zA-Z0-9][a-zA-Z0-9_-]*$",

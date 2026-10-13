@@ -119,7 +119,7 @@ def request_intent(
         geo_block=request.geo_block,
         hysteria2=request.hysteria2,
         fingerprint=request.fingerprint,
-    ).model_copy(update={"harden": request.harden})
+    ).model_copy(update={"harden": request.harden, "forward_client_ips": request.client_ips})
 
 
 def preview_single_server_deploy(

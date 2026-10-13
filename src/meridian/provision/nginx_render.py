@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import textwrap
 
+from meridian.core.defaults import CONTROL_PROXY_TLS_PORT
+
 # ---------------------------------------------------------------------------
 # nginx stream configuration (SNI routing — replaces HAProxy)
 # ---------------------------------------------------------------------------
@@ -349,6 +351,10 @@ def render_nginx_server_block(
     {upstream_blocks}
         server {{
             listen 127.0.0.1:{nginx_internal_port} ssl;
+            # Fleets that forward client IPs route the 443 stream here with a PROXY header.
+            listen 127.0.0.1:{CONTROL_PROXY_TLS_PORT} ssl proxy_protocol;
+            set_real_ip_from 127.0.0.1;
+            real_ip_header proxy_protocol;
             http2 on;
             server_name {host};
             server_tokens off;

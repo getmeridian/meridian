@@ -142,6 +142,23 @@ def _render_inbound(
     *,
     reality_keys: RealityKeyBinding | None,
 ) -> dict[str, Any]:
+    rendered = _render_inbound_body(inbound, reality_keys=reality_keys)
+    if inbound.trust_forwarded_ip:
+        # Reality sits behind the 443 stream (PROXY protocol); XHTTP/WS behind an nginx TLS server.
+        sockopt: dict[str, Any] = (
+            {"acceptProxyProtocol": True}
+            if inbound.protocol == "reality"
+            else {"trustedXForwardedFor": ["X-Forwarded-For"]}
+        )
+        rendered["streamSettings"]["sockopt"] = sockopt
+    return rendered
+
+
+def _render_inbound_body(
+    inbound: InboundPayload,
+    *,
+    reality_keys: RealityKeyBinding | None,
+) -> dict[str, Any]:
     listen_address = inbound.listen_address or ("0.0.0.0" if inbound.protocol == "hysteria2" else "127.0.0.1")
     if inbound.protocol == "reality":
         keys = _require_complete_reality_keys(reality_keys, inbound)

@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type ClientIps = boolean;
 export type ClientName = string;
 export type Color = string;
 export type Domain = "" | string;
@@ -28,6 +29,7 @@ export type Yes = boolean;
  * Trusted local request for deploying or redeploying a Meridian server.
  */
 export interface DeployRequest {
+  client_ips?: ClientIps;
   client_name?: ClientName;
   color?: Color;
   domain?: Domain;

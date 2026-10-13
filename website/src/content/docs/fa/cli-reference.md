@@ -30,6 +30,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | فعال | ورود تنهای کلید SSH، fail2ban و firewall UFW. `--no-harden` برای سروری که سرویس‌های دیگری روی آن دارند است |
 | `--warp / --no-warp` | خاموش | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
 | `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را در exit block کنید (`geosite:category-ru` + `geoip:ru`). اشتراک‌های Xray JSON و Mihomo قبلاً آن‌ها را مستقیم از دستگاه ارسال می‌کنند |
+| `--client-ips / --no-client-ips` | خاموش | IP واقعی هر کلاینت را برای Xray و پنل منتقل کنید، برای محدودیت‌های IP و لاگ‌های اتصال هر کاربر. خاموش، هر اتصال TCP از خود سرور می‌آید |
 | `--yes` | | پرسش تأیید را رد کنید |
 | `--json` | | نتیجه deploy نهایی را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 | `--events=jsonl` | | رویدادهای تعریف‌شده پیشرفت را به عنوان JSONL روی stderr جریان دهید |

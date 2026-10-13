@@ -83,6 +83,7 @@ def run(
     warp: bool = False,
     geo_block: bool = True,
     hysteria2: bool = True,
+    client_ips: bool = False,
     ssh_port: int = 0,
     fingerprint: str = "",
     request_path: str = "",
@@ -123,6 +124,7 @@ def run(
                 warp=warp,
                 geo_block=geo_block,
                 hysteria2=hysteria2,
+                client_ips=client_ips,
                 ssh_port=ssh_port,
                 fingerprint=fingerprint,
             )
@@ -530,6 +532,8 @@ def _redeploy_command(server_ip: str, request: DeployRequest) -> str:
         parts.append(f"--domain {shlex.quote(request.domain)}")
     if not request.hysteria2:
         parts.append("--no-hysteria2")
+    if request.client_ips:
+        parts.append("--client-ips")
     if request.client_name and request.client_name != DEFAULT_CLIENT:
         parts.append(f"--client-name {shlex.quote(request.client_name)}")
     if not request.harden:

@@ -12,6 +12,8 @@
 
 **Default paths are invisible-first** — `default_exit_paths()` is the one builder for deploy, `node add`, and the wizard: Reality always, XHTTP and Hysteria2 on the domain or else the IPv4 address (IP certificate), WebSocket only with a domain. Redeploys keep saved SNI, fingerprint, and transport paths.
 
+**Client IPs are a fleet setting** — `SetupIntent.forward_client_ips` (off: Remnawave sees only 127.0.0.1) turns on `compiler/client_ips.py`'s post-pass: streams send PROXY, a local hop strips it before the camouflage fallback, the panel takes it on `CONTROL_PROXY_TLS_PORT`, and nginx-fronted inbounds trust it. Bridges and Hysteria2 never change.
+
 **Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and only the bootstrap's own inputs (control target, runtime pins, renderer contract, profile ports/SNI, hardening) to a remote marker.
 
 ## What's done well

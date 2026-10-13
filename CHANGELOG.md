@@ -46,6 +46,12 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
   adds WSS (Cloudflare CDN fallback). Blocking Russian destinations stays on
   by default (`--no-geo-block` to turn it off).
+- **Client IPs stay private unless you ask** — by default the panel records
+  the server's own address for every TCP connection, so it never stores where
+  users connect from. `--client-ips` (or `forward_client_ips` in the topology)
+  passes real addresses to Xray and the panel, through the PROXY protocol and
+  X-Forwarded-For, for Remnawave's per-user IP limits; the camouflage site
+  never sees the header.
 - **TLS fingerprint is a setting** — every Reality, XHTTP, and WSS link presents
   the `chrome` fingerprint by default (XHTTP and WSS used to send none, which
   exposed the client library); `--fingerprint` or the topology's path

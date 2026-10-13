@@ -88,6 +88,7 @@ class SetupRoleSelection(CoreModel):
     transparent_relays: list[SetupRelayRole] = Field(default_factory=list)
     routing_gateways: list[SetupGatewayRole] = Field(default_factory=list)
     harden: bool = True
+    forward_client_ips: bool = False
 
     @model_validator(mode="after")
     def reject_duplicate_ids(self) -> Self:
@@ -173,6 +174,7 @@ class SetupDraft(CoreModel):
         roles = SetupRoleSelection(
             control=intent.control,
             harden=intent.harden,
+            forward_client_ips=intent.forward_client_ips,
             exits=[
                 SetupExitRole(
                     id=exit_.id,
@@ -347,6 +349,7 @@ class SetupDraft(CoreModel):
             access=self.access.access,
             delivery=self.access.delivery,
             harden=self.roles.harden,
+            forward_client_ips=self.roles.forward_client_ips,
         )
 
     def _require_current_stage_data(self) -> None:
