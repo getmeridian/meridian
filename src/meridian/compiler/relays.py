@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from meridian.compiler.allocations import PortAllocator
 from meridian.compiler.builder import PlanBuilder
+from meridian.compiler.client_delivery import fingerprint_copy_fields
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall
 from meridian.compiler.models import HostPayload, NginxRouteSpec, RealmHopPayload, ResourcePostcondition
@@ -141,6 +142,7 @@ def compile_relays(
                         path=f"/{path.path}" if path.path else "",
                         fingerprint=fingerprint,
                         security_layer="TLS" if path.protocol in {"xhttp", "wss"} else "DEFAULT",
+                        **fingerprint_copy_fields(index),
                     ),
                     dependencies=[first_hop_id, inbound_id],
                 )

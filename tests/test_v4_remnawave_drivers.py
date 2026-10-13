@@ -733,7 +733,7 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     assert set(nodes["Meridian v4 exit-a"].active_inbound_uuids) == {item.uuid for item in exit_a_profile.inbounds}
     assert set(nodes["Meridian v4 exit-b"].active_inbound_uuids) == {item.uuid for item in exit_b_profile.inbounds}
 
-    assert len(panel.hosts) == 17
+    assert len(panel.hosts) == 18
     hosts = list(panel.hosts.values())
     direct_hosts = [host for host in hosts if not host.is_hidden and not host.xray_json_template_uuid]
     hidden_edges = [host for host in hosts if host.is_hidden]
@@ -741,17 +741,22 @@ def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:
     # Reality and XHTTP entries are published with a Chrome and a Firefox copy.
     assert len(direct_hosts) == 8
     assert len(hidden_edges) == 8
-    assert len(virtual_hosts) == 1
+    # One balancer per fingerprint: Chrome entries and their Firefox copies never mix.
+    assert sorted(host.remark for host in virtual_hosts) == ["Automatic", "Automatic · Firefox"]
     assert any(host.path == "/xhttp-a" for host in direct_hosts)
     assert any(host.path == "/ws-b" for host in direct_hosts)
     assert any(host.alpn == "h3" for host in direct_hosts)
     assert all(host.fingerprint in ({""} if host.alpn == "h3" else {"chrome", "firefox"}) for host in direct_hosts)
-    assert all(host.tags == ["MERIDIAN_V4_VISIBLE"] for host in direct_hosts)
-    assert all(host.tags == ["MERIDIAN_V4_XRAY_EDGE"] for host in hidden_edges)
+    copies = [host for host in direct_hosts if host.fingerprint == "firefox"]
+    assert all(host.tags == ["MERIDIAN_V4_ALT_FINGERPRINT", "MERIDIAN_V4_VISIBLE"] for host in copies)
+    assert all(host.tags == ["MERIDIAN_V4_VISIBLE"] for host in direct_hosts if host not in copies)
+    assert all("SINGBOX" in host.exclude_from_subscription_types for host in copies)
+    edge_tags = sorted(tag for host in hidden_edges for tag in host.tags)
+    assert Counter(edge_tags) == {"MERIDIAN_V4_XRAY_ALT_EDGE": len(copies), "MERIDIAN_V4_XRAY_EDGE": 8 - len(copies)}
     assert all(set(host.exclude_from_subscription_types) == set(NON_XRAY_JSON_TYPES) for host in hidden_edges)
     # Each owned Host carries its compiled subscription position.
     assert sorted(host.view_position for host in hosts) == list(range(len(hosts)))
-    assert virtual_hosts[0].tags == ["MERIDIAN_V4_XRAY_VIRTUAL"]
+    assert all(host.tags == ["MERIDIAN_V4_XRAY_VIRTUAL"] for host in virtual_hosts)
     assert all(not host.is_disabled for host in hosts)
     assert all(len(host.remark) <= 100 for host in hosts)
 

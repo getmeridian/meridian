@@ -10,8 +10,11 @@ from meridian.compiler.baselines import (
     compile_server_baselines,
 )
 from meridian.compiler.builder import PlanBuilder
-from meridian.compiler.client_delivery import assign_host_positions, compile_xray_delivery_hosts
-from meridian.compiler.delivery import mihomo_template, singbox_template, xray_json_template
+from meridian.compiler.client_delivery import (
+    assign_host_positions,
+    compile_delivery_templates,
+    fingerprint_copy_fields,
+)
 from meridian.compiler.deployment import (
     normalized_intent,
     validate_deployment_contract,
@@ -38,7 +41,6 @@ from meridian.compiler.models import (
     ResourcePlan,
     ResourcePostcondition,
     SubscriptionSettingsPayload,
-    SubscriptionTemplatePayload,
     canonical_hash,
     compute_plan_hash,
     is_ip_address,
@@ -50,7 +52,6 @@ from meridian.compiler.names import (
     internal_squad_name,
     node_name,
     profile_name,
-    subscription_template_name,
 )
 from meridian.compiler.relays import compile_relays, register_relay_ingress
 from meridian.compiler.routing import (
@@ -345,51 +346,7 @@ def compile_topology(
         ),
         dependencies=all_inbounds,
     )
-    template_ids: list[str] = []
-    xray_template_id = ""
-    if "xray_json" in intent.delivery.formats:
-        xray_template_id = builder.add(
-            f"template:{intent.delivery.template_name}:xray-json",
-            SubscriptionTemplatePayload(
-                name=subscription_template_name(intent.delivery.template_name, "XRAY_JSON"),
-                profile_title=intent.delivery.profile_title,
-                template_type="XRAY_JSON",
-                template_json=xray_json_template(),
-            ),
-            dependencies=[control_id],
-        )
-        template_ids.append(xray_template_id)
-    if "mihomo" in intent.delivery.formats:
-        template_ids.append(
-            builder.add(
-                f"template:{intent.delivery.template_name}:mihomo",
-                SubscriptionTemplatePayload(
-                    name=subscription_template_name(intent.delivery.template_name, "MIHOMO"),
-                    profile_title=intent.delivery.profile_title,
-                    template_type="MIHOMO",
-                    template_yaml=mihomo_template(),
-                ),
-                dependencies=[control_id],
-            )
-        )
-    if "singbox" in intent.delivery.formats:
-        template_ids.append(
-            builder.add(
-                f"template:{intent.delivery.template_name}:singbox",
-                SubscriptionTemplatePayload(
-                    name=subscription_template_name(intent.delivery.template_name, "SINGBOX"),
-                    profile_title=intent.delivery.profile_title,
-                    template_type="SINGBOX",
-                    template_json=singbox_template(),
-                ),
-                dependencies=[control_id],
-            )
-        )
-    if xray_template_id:
-        compile_xray_delivery_hosts(
-            builder,
-            template_ref=xray_template_id,
-        )
+    template_ids = compile_delivery_templates(builder, intent.delivery, control_id=control_id)
     external_squad_id = ""
     if template_ids:
         external_squad_id = builder.add(
@@ -629,6 +586,7 @@ def _compile_exit_endpoints(
                         alpn="h3" if path.protocol == "hysteria2" else "",
                         fingerprint=fingerprint,
                         security_layer="TLS" if is_tls else "DEFAULT",
+                        **fingerprint_copy_fields(index),
                     ),
                     dependencies=dependencies,
                 )

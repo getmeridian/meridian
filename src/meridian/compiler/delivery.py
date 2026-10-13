@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
 _PROBE_URL = "https://www.apple.com/library/test/success.html"
+
+_REGEX_SPECIAL = frozenset("\\.^$|?*+()[]{}")
 
 ClientRouteAction = Literal["direct", "block"]
 
@@ -104,15 +108,15 @@ def _mihomo_ip(matcher: str) -> str:
     raise ValueError(f"Unsupported client IP matcher: {matcher}")
 
 
-def xray_json_template() -> dict[str, Any]:
-    """Route through generated Meridian Host outbounds and block all-down."""
+def xray_json_template(edge_tag: str = "MERIDIAN_V4_XRAY_EDGE") -> dict[str, Any]:
+    """Route through the hidden edge Hosts tagged *edge_tag* and block all-down."""
     return {
         "remnawave": {
             "injectHosts": [
                 {
                     "selector": {
                         "type": "tagRegex",
-                        "pattern": "^MERIDIAN_V4_XRAY_EDGE$",
+                        "pattern": f"^{edge_tag}$",
                     },
                     "selectFrom": "HIDDEN",
                     "tagPrefix": "MERIDIAN_PROXY",
@@ -182,9 +186,17 @@ def xray_json_template() -> dict[str, Any]:
     }
 
 
-def mihomo_template() -> str:
-    """Use all generated Hosts in one ordered health-checked fallback group."""
+def mihomo_template(exclude_from_failover: Sequence[str] = ()) -> str:
+    """Pick entries by hand or let an ordered, health-checked fallback group choose.
+
+    Remnawave appends every entry to both groups; *exclude_from_failover* names entries the
+    fallback group must skip (fingerprint copies), matched exactly.
+    """
     rules = "".join(f"  - {rule}\n" for rule in mihomo_client_rules())
+    exclude = ""
+    if exclude_from_failover:
+        pattern = "|".join(_regex_literal(name) for name in exclude_from_failover)
+        exclude = f"    exclude-filter: {json.dumps(f'^({pattern})$', ensure_ascii=False)}\n"
     return f"""\
 mixed-port: 7890
 allow-lan: false
@@ -193,15 +205,23 @@ log-level: warning
 ipv6: true
 proxies: # LEAVE THIS LINE!
 proxy-groups:
-  - name: MERIDIAN AUTO
+  - name: Meridian
+    type: select
+    proxies: # LEAVE THIS LINE!
+      - Automatic
+  - name: Automatic
     type: fallback
-    url: https://www.apple.com/library/test/success.html
+    url: {_PROBE_URL}
     interval: 300
     lazy: true
-    proxies: # LEAVE THIS LINE!
+{exclude}    proxies: # LEAVE THIS LINE!
 rules:
-{rules}  - MATCH,MERIDIAN AUTO
+{rules}  - MATCH,Meridian
 """
+
+
+def _regex_literal(value: str) -> str:
+    return "".join(f"\\{char}" if char in _REGEX_SPECIAL else char for char in value)
 
 
 def singbox_template() -> dict[str, Any]:

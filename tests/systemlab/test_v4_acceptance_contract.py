@@ -97,7 +97,8 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
             SubscriptionTemplatePayload,
         )
     ]
-    assert sorted(templates) == ["MIHOMO", "SINGBOX", "XRAY_JSON"]
+    # The second Xray JSON template balances the alternate-fingerprint copies.
+    assert sorted(templates) == ["MIHOMO", "SINGBOX", "XRAY_JSON", "XRAY_JSON"]
 
 
 def test_compose_provides_every_isolated_topology_server() -> None:

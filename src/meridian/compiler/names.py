@@ -121,9 +121,14 @@ def host_remark(protocol: str, *, fingerprint: str = "", place: str = "", via: s
     through. Examples: ``Reality · Chrome``, ``finland · XHTTP · Firefox``,
     ``Reality · Chrome via moscow``, ``WebSocket · CDN``, ``Hysteria2 · UDP``.
     """
-    detail = _PATH_DETAILS.get(protocol) or _FINGERPRINT_LABELS.get(fingerprint, fingerprint)
+    detail = _PATH_DETAILS.get(protocol) or fingerprint_label(fingerprint)
     remark = " · ".join(part for part in (place, _PROTOCOL_LABELS[protocol], detail) if part)
     return f"{remark} via {via}" if via else remark
+
+
+def fingerprint_label(fingerprint: str) -> str:
+    """Display name of a TLS fingerprint, as subscription entries show it."""
+    return _FINGERPRINT_LABELS.get(fingerprint, fingerprint)
 
 
 def service_username(edge_id: str) -> str:

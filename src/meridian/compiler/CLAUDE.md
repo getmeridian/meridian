@@ -22,7 +22,7 @@
 - Realm hops are emitted downstream-first through graph dependencies.
 - Custom relay Reality SNI is added to both the Profile’s accepted server names and the exit stream route before the relay Host.
 - Routing gateway bridges use dedicated service Users and source-restricted firewall rules.
-- Xray client failover uses one virtual template Host plus hidden tagged edge Hosts; Base64 and Mihomo keep normal visible alternatives.
+- Xray client failover uses a virtual template Host plus hidden tagged edge Hosts; Base64 and Mihomo keep visible alternatives. Health-checked groups never mix fingerprints (TSPU escalates a freeze when one changes): copies carry `ALT_FINGERPRINT_TAG`, get their own Xray balancer and Mihomo `exclude-filter`, and skip sing-box.
 
 ## Pitfalls
 - **The control bootstrap depends on its public 80/443 rules** — ACME HTTP-01 runs inside it; without the edges a fresh server requests its certificate with port 80 still closed.

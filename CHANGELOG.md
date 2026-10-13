@@ -136,7 +136,12 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   you have several, and "via relay" for relay entries) instead of internal IDs.
 - **Every direct TLS method comes in two fingerprints** — Reality and XHTTP
   are offered with both a Chrome and a Firefox TLS fingerprint, so if
-  censors block one fingerprint, the other entry keeps working.
+  censors block one fingerprint, the other entry keeps working. Automatic
+  switching never mixes the two: Russian filtering reportedly stretches a
+  2-minute freeze to 10 minutes when a new fingerprint arrives during it.
+  Xray JSON apps get a separate "Automatic · Firefox" entry, Mihomo apps can
+  pick the copies by hand, and sing-box apps (which can't keep them out of
+  automatic switching) don't get them.
 - **Russian sites work with the VPN on** — Xray JSON and Mihomo subscriptions
   send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
   traffic directly and refuse foreign QUIC, while the exit's block stays as a

@@ -443,7 +443,7 @@ class TestPureCompiler:
         assert all(inbound["sniffing"]["routeOnly"] for inbound in xray["inbounds"])
 
         mihomo = yaml.safe_load(templates["MIHOMO"].template_yaml.replace("# LEAVE THIS LINE!", ""))
-        assert mihomo["rules"][-1] == "MATCH,MERIDIAN AUTO"
+        assert mihomo["rules"][-1] == "MATCH,Meridian"
         assert "GEOIP,RU,DIRECT,no-resolve" in mihomo["rules"]
         assert "GEOSITE,category-ru,DIRECT" in mihomo["rules"]
         assert "AND,((NETWORK,UDP),(DST-PORT,443)),REJECT" in mihomo["rules"]
@@ -459,6 +459,8 @@ class TestPureCompiler:
         assert "external_ui" not in singbox["experimental"]["clash_api"]
 
     def test_delivery_compiles_owned_templates_and_client_capability_truth(self) -> None:
+        import yaml
+
         plan = compile_topology(_intent())
         templates = [
             resource.payload for resource in plan.resources if isinstance(resource.payload, SubscriptionTemplatePayload)
@@ -482,8 +484,19 @@ class TestPureCompiler:
         assert xray.template_json["burstObservatory"]["pingConfig"]["destination"].startswith("https://")
         mihomo = next(template.template_yaml for template in templates if template.template_type == "MIHOMO")
         assert mihomo is not None
-        assert "type: fallback" in mihomo
-        assert mihomo.count("# LEAVE THIS LINE!") == 2
+        groups = {group["name"]: group for group in yaml.safe_load(mihomo)["proxy-groups"]}
+        assert groups["Meridian"]["type"] == "select" and groups["Meridian"]["proxies"] == ["Automatic"]
+        assert groups["Automatic"]["type"] == "fallback"
+        # The fallback group skips fingerprint copies by exact name; they stay selectable by hand.
+        copies = sorted(
+            host.remark
+            for resource in plan.resources
+            if isinstance(host := resource.payload, HostPayload) and "MERIDIAN_V4_ALT_FINGERPRINT" in host.tags
+        )
+        assert copies and all("Firefox" in remark for remark in copies)
+        excluded = re.compile(groups["Automatic"]["exclude-filter"])
+        assert all(excluded.fullmatch(remark) for remark in copies)
+        assert not excluded.fullmatch(copies[0].replace("Firefox", "Chrome"))
         singbox = next(template.template_json for template in templates if template.template_type == "SINGBOX")
         assert singbox is not None
         # Remnawave fills both groups with the user's proxies; Automatic is the default pick.
@@ -496,7 +509,10 @@ class TestPureCompiler:
         hidden_edges = [host for host in hosts if host.is_hidden]
         virtual_hosts = [host for host in hosts if host.xray_json_template_ref]
         assert len(hidden_edges) == len(direct_hosts)
-        assert len(virtual_hosts) == 1
+        assert [host.remark for host in virtual_hosts] == ["Automatic", "Automatic · Firefox"]
+        alt = next(template for template in templates if template.name.endswith("alt Xray JSON"))
+        assert alt.template_json is not None
+        assert alt.template_json["remnawave"]["injectHosts"][0]["selector"]["pattern"] == "^MERIDIAN_V4_XRAY_ALT_EDGE$"
         assert all("XRAY_JSON" in host.exclude_from_subscription_types for host in direct_hosts)
         assert all(set(host.exclude_from_subscription_types) == set(NON_XRAY_JSON_TYPES) for host in hidden_edges)
         # The Xray JSON fallback Host must not leak into sing-box, Stash, or Clash as a duplicate.
@@ -504,7 +520,7 @@ class TestPureCompiler:
         # Subscriptions list Reality first and the UDP Hysteria2 path last, whatever the path IDs.
         ranked = sorted(hosts, key=lambda host: host.view_position)
         assert [host.view_position for host in ranked] == list(range(len(hosts)))
-        assert virtual_hosts[0].protocol == "reality"
+        assert all(host.protocol == "reality" for host in virtual_hosts)
         protocols = [host.protocol for host in ranked]
         assert protocols == sorted(protocols, key=PROTOCOL_PRIORITY.index)
         assert len(external.template_refs) == 3
