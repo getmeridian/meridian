@@ -26,6 +26,7 @@ Top-level `conftest.py` provides:
 - **`tmp_home`** — isolates `~/.meridian/` per test via env var + monkeypatch. Both env AND config module constants must be patched.
 - **`servers_file`** — isolated v4 server-profile store.
 **`tests/support/mock_connection.py`** — shared `MockConnection` class. Provision tests import via conftest fixtures; other layers import directly.
+**Test doubles live in `tests/support/`** (`CaptureReporter`, `CancellationFlag`) and system-lab-only subscription helpers in `tests/systemlab/subscription_client.py`; `make dead-code` flags production code only tests use.
 
 ## Conventions
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from meridian.core.output import OperationContext
-from meridian.core.reporters import CaptureReporter
 from meridian.provision.steps import ProvisionContext, Provisioner, StepResult
 from tests.support.mock_connection import MockConnection
+from tests.support.reporters import CaptureReporter
 
 # ---------------------------------------------------------------------------
 # Mock step helpers

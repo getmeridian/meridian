@@ -8,7 +8,6 @@ records its own outcome before the token is honored.
 
 from __future__ import annotations
 
-import threading
 from typing import Literal, Protocol
 
 from meridian.core.errors import MeridianError
@@ -24,19 +23,6 @@ class CancellationToken(Protocol):
 
     def is_cancelled(self) -> bool:
         """Return True once cancellation has been requested."""
-
-
-class CancellationFlag:
-    """Thread-safe in-memory cancellation token."""
-
-    def __init__(self) -> None:
-        self._event = threading.Event()
-
-    def cancel(self) -> None:
-        self._event.set()
-
-    def is_cancelled(self) -> bool:
-        return self._event.is_set()
 
 
 class OperationCancellation(CoreModel):

@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from meridian.core.cancellation import (
-    CancellationFlag,
     OperationCancellation,
     OperationCancelledError,
     raise_if_cancelled,
 )
 from meridian.core.events import COMMAND_CANCEL_REQUESTED, COMMAND_CANCELLED, EVENT_TYPES
 from meridian.core.output import command_envelope
+from tests.support.cancellation import CancellationFlag
 
 
 def test_raise_if_cancelled_is_a_no_op_until_the_flag_is_set() -> None:

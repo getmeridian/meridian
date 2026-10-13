@@ -16,7 +16,6 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
-from meridian.core.reporters import CaptureReporter
 from meridian.reconciler.resource_executor import (
     environment_after_apply_barrier,
     execute_resource_plan,
@@ -34,6 +33,7 @@ from meridian.reconciler.resources import (
     build_resource_actions,
     postcondition_key,
 )
+from tests.support.reporters import CaptureReporter
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64

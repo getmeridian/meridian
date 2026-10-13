@@ -21,7 +21,6 @@ from meridian.xray_client import (
     _find_free_port,
     _parse_dgst,
     _validate_xray_config,
-    endpoint_addresses,
     ensure_xray_binary,
     is_supported_proxy_outbound,
     outbound_address,
@@ -29,7 +28,6 @@ from meridian.xray_client import (
     parse_xray_subscription,
     proxy_outbounds,
     route_only,
-    select_outbound,
     use_free_local_ports,
 )
 from meridian.xray_client import (
@@ -124,7 +122,6 @@ def test_parses_canonical_vless_and_hysteria_v2_outbounds() -> None:
         "MERIDIAN_PROXY_LEGACY_HY",
     ]
     assert [is_supported_proxy_outbound(outbound) for outbound in outbounds] == [True, True, False]
-    assert endpoint_addresses(parsed) == {"198.51.100.10", "198.51.100.20"}
     assert outbound_address(outbounds[0]) == "198.51.100.10"
     assert outbound_address(outbounds[1]) == "198.51.100.20"
     assert outbound_label(outbounds[0]) == "VLESS 198.51.100.10"
@@ -147,9 +144,8 @@ def test_vless_labels_name_the_method_and_fingerprint_like_the_entry() -> None:
 
 def test_pins_a_canonical_hysteria_outbound_without_rebuilding_it() -> None:
     canonical = _canonical_subscription_config()
-    tag = select_outbound(canonical, "198.51.100.20")
 
-    selected = route_only(canonical, tag)
+    selected = route_only(canonical, "MERIDIAN_PROXY_HY2")
 
     assert selected["routing"]["rules"][-1]["outboundTag"] == "MERIDIAN_PROXY_HY2"
     assert selected["outbounds"][1] == canonical["outbounds"][1]

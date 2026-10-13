@@ -14,12 +14,10 @@ import yaml
 
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel, SubscriptionDocument
 from meridian.xray_client import (
-    endpoint_addresses,
     outbound_address,
     parse_xray_subscription,
     proxy_outbounds,
     route_only,
-    select_outbound,
     use_free_local_ports,
 )
 
@@ -42,6 +40,21 @@ __all__ = [
     "use_free_local_ports",
     "xray_vless_user_ids",
 ]
+
+
+def endpoint_addresses(config: dict[str, Any]) -> set[str]:
+    """Return concrete endpoint addresses from managed proxy outbounds."""
+    return {address for outbound in proxy_outbounds(config) if (address := outbound_address(outbound))}
+
+
+def select_outbound(config: dict[str, Any], address: str) -> str:
+    """Return the managed outbound tag for one delivered endpoint address."""
+    for outbound in proxy_outbounds(config):
+        if outbound_address(outbound) == address:
+            tag = outbound.get("tag")
+            if isinstance(tag, str) and tag:
+                return tag
+    raise ValueError(f"Canonical subscription has no endpoint for {address}")
 
 
 def fetch_canonical_xray(

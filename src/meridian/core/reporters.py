@@ -22,16 +22,6 @@ class NoopReporter:
         return None
 
 
-class CaptureReporter:
-    """In-memory reporter for tests and embedded clients."""
-
-    def __init__(self) -> None:
-        self.events: list[Event] = []
-
-    def emit(self, event: Event) -> None:
-        self.events.append(event)
-
-
 def emit_event(
     reporter: Reporter,
     operation: OperationContext,

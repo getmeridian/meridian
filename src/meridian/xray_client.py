@@ -344,21 +344,6 @@ def _safe_label_component(value: object) -> str:
     return "".join(character for character in value.strip() if character.isprintable() and character not in "[]")[:160]
 
 
-def endpoint_addresses(config: dict[str, Any]) -> set[str]:
-    """Return concrete endpoint addresses from managed proxy outbounds."""
-    return {address for outbound in proxy_outbounds(config) if (address := outbound_address(outbound))}
-
-
-def select_outbound(config: dict[str, Any], address: str) -> str:
-    """Return the managed outbound tag for one delivered endpoint address."""
-    for outbound in proxy_outbounds(config):
-        if outbound_address(outbound) == address:
-            tag = outbound.get("tag")
-            if isinstance(tag, str) and tag:
-                return tag
-    raise ValueError(f"Canonical subscription has no endpoint for {address}")
-
-
 def route_only(config: dict[str, Any], outbound_tag: str) -> dict[str, Any]:
     """Pin a canonical config to one managed outbound without rebuilding it."""
     known_tags = {str(outbound.get("tag", "")) for outbound in proxy_outbounds(config)}

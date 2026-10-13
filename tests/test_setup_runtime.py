@@ -11,9 +11,8 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
-from meridian.core.cancellation import CancellationFlag, OperationCancelledError
+from meridian.core.cancellation import OperationCancelledError
 from meridian.core.errors import LocalStateError, ProvisioningError
-from meridian.core.reporters import CaptureReporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
     AccessIntent,
@@ -30,7 +29,9 @@ from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.legacy_guard import refuse_legacy_deployments
 from meridian.setup.runtime import SetupRuntime
 from meridian.ssh import ServerConnection
+from tests.support.cancellation import CancellationFlag
 from tests.support.contract_driver import ContractResourceDriver
+from tests.support.reporters import CaptureReporter
 
 
 @pytest.fixture(autouse=True)

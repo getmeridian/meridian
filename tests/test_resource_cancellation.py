@@ -18,7 +18,6 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.core.cancellation import (
-    CancellationFlag,
     OperationCancellation,
     OperationCancelledError,
 )
@@ -31,6 +30,7 @@ from meridian.reconciler.resources import (
     UnknownResourceOutcome,
     postcondition_key,
 )
+from tests.support.cancellation import CancellationFlag
 
 _NOW = datetime(2026, 7, 14, 15, 0, tzinfo=UTC)
 
