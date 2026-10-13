@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -32,10 +33,27 @@ def test_resolve_studio_assets_uses_packaged_resource(monkeypatch, tmp_path: Pat
     (dist / "studio" / "index.html").write_text("<!doctype html><title>Studio</title>", encoding="utf-8")
 
     monkeypatch.setattr(assets_module, "_PACKAGED_ASSETS", None)
-    monkeypatch.setattr(assets_module, "_PACKAGED_ASSETS_CONTEXT", None)
     monkeypatch.setattr(assets_module.resources, "files", lambda _package: tmp_path)
 
     assert resolve_studio_assets() == dist.resolve()
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="as_file extracts directories from 3.12")
+def test_zipped_packaged_assets_stay_extracted_after_lookup(monkeypatch, tmp_path: Path) -> None:
+    import zipfile
+
+    archive = tmp_path / "meridian.zip"
+    with ZipFile(archive, "w") as bundle:
+        bundle.writestr("studio_assets/studio/index.html", "<!doctype html><title>Studio</title>")
+
+    monkeypatch.setattr(assets_module, "_PACKAGED_ASSETS", None)
+    monkeypatch.setattr(assets_module.resources, "files", lambda _package: zipfile.Path(archive))
+
+    found = resolve_studio_assets()
+
+    assert found is not None
+    assert not found.is_relative_to(Path(assets_module.__file__).resolve().parents[3])  # not the checkout's dist
+    assert (found / "studio" / "index.html").is_file()
 
 
 def _build_hook(root: Path, target_name: str) -> CustomBuildHook:

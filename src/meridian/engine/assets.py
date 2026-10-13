@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import atexit
 import os
+from contextlib import ExitStack
 from importlib import resources
 from pathlib import Path
-from typing import Any
 
 _PACKAGED_ASSETS: Path | None = None
-_PACKAGED_ASSETS_CONTEXT: Any = None
+# A zipped wheel extracts Studio to a temporary directory that lives as long as
+# its `as_file` context, so keep that context open until the process exits.
+_EXTRACTED_ASSETS = ExitStack()
+atexit.register(_EXTRACTED_ASSETS.close)
 
 
 def resolve_studio_assets(explicit: str = "") -> Path | None:
@@ -40,7 +44,7 @@ def _is_studio_assets_dir(path: Path) -> bool:
 
 def _packaged_studio_assets() -> Path | None:
     """Return packaged Studio assets when running from an installed wheel."""
-    global _PACKAGED_ASSETS, _PACKAGED_ASSETS_CONTEXT
+    global _PACKAGED_ASSETS
 
     if _PACKAGED_ASSETS is not None:
         return _PACKAGED_ASSETS if _is_studio_assets_dir(_PACKAGED_ASSETS) else None
@@ -60,11 +64,10 @@ def _packaged_studio_assets() -> Path | None:
     if not traversable.joinpath("studio", "index.html").is_file():
         return None
 
-    context = resources.as_file(traversable)
-    candidate = Path(context.__enter__())
-    if _is_studio_assets_dir(candidate):
-        _PACKAGED_ASSETS_CONTEXT = context
-        _PACKAGED_ASSETS = candidate
-        return _PACKAGED_ASSETS
-    context.__exit__(None, None, None)
-    return None
+    with ExitStack() as attempt:
+        candidate = Path(attempt.enter_context(resources.as_file(traversable)))
+        if not _is_studio_assets_dir(candidate):
+            return None
+        _EXTRACTED_ASSETS.enter_context(attempt.pop_all())
+    _PACKAGED_ASSETS = candidate
+    return _PACKAGED_ASSETS
