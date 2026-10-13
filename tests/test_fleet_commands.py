@@ -590,9 +590,7 @@ class TestFleetInventory:
         }
         assert data["servers"][0]["roles"] == ["panel", "exit"]
         assert data["nodes"][0]["panel_status"] == "connected"
-        assert data["nodes"][0]["desired"] is None
         assert data["nodes"][0]["protocols"] == ["reality", "xhttp", "hysteria2"]
-        assert data["relays"][0]["desired"] is None
 
     def test_inventory_uses_v4_topology_projection(self) -> None:
         topology = _v4_projected_topology()

@@ -117,7 +117,6 @@ def _run_inventory(*, operation: OperationContext) -> None:
                     counts={
                         "nodes": inventory.summary.nodes,
                         "relays": inventory.summary.relays,
-                        "pending_desired_resources": inventory.summary.pending,
                     },
                 ),
                 status="ok",
@@ -154,14 +153,11 @@ def _run_inventory(*, operation: OperationContext) -> None:
     if not inventory.nodes:
         err_console.print("    [dim]none[/dim]")
     for display_node in inventory.nodes:
-        desired = (
-            "" if display_node.desired is None else "  desired" if display_node.desired else "  [yellow]extra[/yellow]"
-        )
         domain = f"  domain={escape(display_node.domain)}" if display_node.domain else ""
         err_console.print(
             f"    {escape(display_node.ip)}  {escape(display_node.name) if display_node.name else '-'}  "
             f"{display_node.role}  "
-            f"{display_node.panel_status}{domain}{desired}"
+            f"{display_node.panel_status}{domain}"
         )
 
     err_console.print()
@@ -170,25 +166,11 @@ def _run_inventory(*, operation: OperationContext) -> None:
         err_console.print("    [dim]none[/dim]")
     for display_relay in inventory.relays:
         target = display_relay.exit_node_name or display_relay.exit_node_ip
-        desired = (
-            ""
-            if display_relay.desired is None
-            else "  desired"
-            if display_relay.desired
-            else "  [yellow]extra[/yellow]"
-        )
         err_console.print(
             f"    {escape(display_relay.ip)}  {escape(display_relay.name) if display_relay.name else '-'}  "
-            f":{display_relay.port} -> {escape(target)}{desired}"
+            f":{display_relay.port} -> {escape(target)}"
         )
 
-    if inventory.summary.desired_nodes or inventory.summary.desired_relays:
-        err_console.print()
-        err_console.print(
-            "  [bold]Desired[/bold] "
-            f"{inventory.summary.desired_nodes} node(s), {inventory.summary.desired_relays} relay(s); "
-            f"{inventory.summary.pending} pending"
-        )
     err_console.print()
     if exit_code:
         raise typer.Exit(exit_code)

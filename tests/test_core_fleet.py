@@ -15,8 +15,6 @@ from meridian.cluster import (
 )
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
-    DesiredNodeSpec,
-    DesiredRelaySpec,
     FleetSources,
     FleetTopology,
     TopologyNode,
@@ -317,7 +315,7 @@ def test_inventory_is_redacted_and_role_protocol_aware() -> None:
     assert data["nodes"][0]["protocols"] == ["reality", "xhttp", "hysteria2"]
     assert data["nodes"][0]["panel_status"] == "connected"
     assert data["relays"][0]["exit_node_name"] == "exit-a"
-    assert data["summary"]["pending_desired_resources"] == 0
+    assert data["summary"] == {"nodes": 1, "relays": 1}
 
 
 def test_server_inventory_includes_panel_only_host() -> None:
@@ -343,34 +341,6 @@ def test_server_inventory_includes_panel_only_host() -> None:
             "relay_hops": [],
         }
     ]
-
-
-def test_inventory_desired_matching_uses_host_identity() -> None:
-    topology = _topology(
-        nodes=[_node("198.51.100.1", uuid="node-a", name="reused-name")],
-        relays=[_relay("198.51.100.2", name="reused-relay")],
-        desired_nodes=[
-            DesiredNodeSpec(
-                host="198.51.100.9", name="reused-name", ssh_user="root", ssh_port=22, domain="", sni="", warp=None
-            )
-        ],
-        desired_relays=[
-            DesiredRelaySpec(
-                host="198.51.100.8", name="reused-relay", ssh_user="root", ssh_port=22, exit_node="reused-name", sni=""
-            )
-        ],
-    )
-
-    inventory = build_fleet_inventory(topology, panel_healthy=False)
-    data = inventory.to_data()
-
-    assert data["nodes"][0]["desired"] is False
-    assert data["relays"][0]["desired"] is False
-    assert data["desired_nodes"][0]["present"] is False
-    assert data["desired_relays"][0]["present"] is False
-    assert data["summary"]["unapplied_desired_nodes"] == 1
-    assert data["summary"]["unapplied_desired_relays"] == 1
-    assert data["summary"]["pending_desired_resources"] == 2
 
 
 def test_status_summarizes_nodes_relays_and_users() -> None:

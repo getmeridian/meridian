@@ -6,44 +6,25 @@
  */
 
 export type Domain = string;
-export type Host = string;
-export type Name = string;
-export type Present = boolean;
-export type Sni = string;
-export type SshPort = number;
-export type SshUser = string;
-export type Warp = boolean | null;
-export type DesiredNodes = DesiredNodeInventory[];
-export type ExitNode = string;
-export type Host1 = string;
-export type Name1 = string;
-export type Present1 = boolean;
-export type Sni1 = string;
-export type SshPort1 = number;
-export type SshUser1 = string;
-export type DesiredRelays = DesiredRelayInventory[];
-export type Desired = boolean | null;
-export type Domain1 = string;
 export type Ip = string;
-export type Name2 = string;
+export type Name = string;
 export type PanelStatus = "connected" | "disconnected" | "disabled" | "unknown";
 export type Protocols = string[];
 export type Role = "panel+node" | "node" | "relay" | "panel+routing_gateway" | "routing_gateway";
-export type Sni2 = string;
-export type SshPort2 = number;
-export type SshUser2 = string;
+export type Sni = string;
+export type SshPort = number;
+export type SshUser = string;
 export type Uuid = string;
 export type XrayVersion = string;
 export type Nodes = NodeInventory[];
 export type DeployedWith = string;
 export type Healthy = boolean;
 export type ServerIp = string;
-export type SshPort3 = number;
-export type SshUser3 = string;
+export type SshPort1 = number;
+export type SshUser1 = string;
 export type Enabled = boolean;
 export type Path = string;
 export type Url = string;
-export type Desired1 = boolean | null;
 export type ExitNodeIp = string;
 export type ExitNodeName = string;
 export type HostCount = number;
@@ -51,40 +32,33 @@ export type Protocol = string;
 export type Uuid1 = string;
 export type HostRefs = RelayHostRef[];
 export type Ip1 = string;
-export type Name3 = string;
+export type Name1 = string;
 export type Port = number;
 export type Role1 = "panel+node" | "node" | "relay" | "panel+routing_gateway" | "routing_gateway";
-export type Sni3 = string;
-export type SshPort4 = number;
-export type SshUser4 = string;
+export type Sni1 = string;
+export type SshPort2 = number;
+export type SshUser2 = string;
 export type Relays = RelayInventory[];
 export type Id = string;
 export type Ip2 = string;
-export type Name4 = string;
+export type Name2 = string;
 export type Advertised = boolean;
 export type Chain = string;
 export type Health = "healthy" | "unhealthy" | "unknown";
 export type Position = number;
 export type RelayHops = RelayHopMembership[];
 export type Roles = ("panel" | "exit" | "relay" | "routing_gateway")[];
-export type SshPort5 = number;
-export type SshUser5 = string;
+export type SshPort3 = number;
+export type SshUser3 = string;
 export type Servers = ServerInventory[];
 export type Nodes1 = "available" | "unavailable" | "not_requested" | "unknown";
 export type Panel = "available" | "unavailable" | "not_requested" | "unknown";
 export type Relays1 = "available" | "unavailable" | "not_requested" | "unknown";
 export type Users = "available" | "unavailable" | "not_requested" | "unknown";
-export type DesiredNodes1 = number;
-export type DesiredRelays1 = number;
 export type Nodes2 = number;
-export type PendingDesiredResources = number;
 export type Relays2 = number;
-export type UnappliedDesiredNodes = number;
-export type UnappliedDesiredRelays = number;
 
 export interface FleetInventory {
-  desired_nodes?: DesiredNodes;
-  desired_relays?: DesiredRelays;
   nodes?: Nodes;
   panel: PanelInventory;
   relays?: Relays;
@@ -92,36 +66,16 @@ export interface FleetInventory {
   sources?: FleetSources;
   summary: FleetInventorySummary;
 }
-export interface DesiredNodeInventory {
-  domain: Domain;
-  host: Host;
-  name: Name;
-  present: Present;
-  sni: Sni;
-  ssh_port: SshPort;
-  ssh_user: SshUser;
-  warp: Warp;
-}
-export interface DesiredRelayInventory {
-  exit_node: ExitNode;
-  host: Host1;
-  name: Name1;
-  present: Present1;
-  sni: Sni1;
-  ssh_port: SshPort1;
-  ssh_user: SshUser1;
-}
 export interface NodeInventory {
-  desired: Desired;
-  domain: Domain1;
+  domain: Domain;
   ip: Ip;
-  name: Name2;
+  name: Name;
   panel_status: PanelStatus;
   protocols: Protocols;
   role: Role;
-  sni: Sni2;
-  ssh_port: SshPort2;
-  ssh_user: SshUser2;
+  sni: Sni;
+  ssh_port: SshPort;
+  ssh_user: SshUser;
   uuid: Uuid;
   xray_version: XrayVersion;
 }
@@ -129,8 +83,8 @@ export interface PanelInventory {
   deployed_with: DeployedWith;
   healthy: Healthy;
   server_ip: ServerIp;
-  ssh_port: SshPort3;
-  ssh_user: SshUser3;
+  ssh_port: SshPort1;
+  ssh_user: SshUser1;
   subscription_page: SubscriptionPageInventory;
   url: Url;
 }
@@ -139,18 +93,17 @@ export interface SubscriptionPageInventory {
   path: Path;
 }
 export interface RelayInventory {
-  desired: Desired1;
   exit_node_ip: ExitNodeIp;
   exit_node_name: ExitNodeName;
   host_count: HostCount;
   host_refs?: HostRefs;
   ip: Ip1;
-  name: Name3;
+  name: Name1;
   port: Port;
   role: Role1;
-  sni: Sni3;
-  ssh_port: SshPort4;
-  ssh_user: SshUser4;
+  sni: Sni1;
+  ssh_port: SshPort2;
+  ssh_user: SshUser2;
 }
 export interface RelayHostRef {
   protocol: Protocol;
@@ -159,11 +112,11 @@ export interface RelayHostRef {
 export interface ServerInventory {
   id: Id;
   ip: Ip2;
-  name: Name4;
+  name: Name2;
   relay_hops?: RelayHops;
   roles: Roles;
-  ssh_port: SshPort5;
-  ssh_user: SshUser5;
+  ssh_port: SshPort3;
+  ssh_user: SshUser3;
 }
 export interface RelayHopMembership {
   advertised: Advertised;
@@ -178,11 +131,6 @@ export interface FleetSources {
   users?: Users;
 }
 export interface FleetInventorySummary {
-  desired_nodes: DesiredNodes1;
-  desired_relays: DesiredRelays1;
   nodes: Nodes2;
-  pending_desired_resources: PendingDesiredResources;
   relays: Relays2;
-  unapplied_desired_nodes: UnappliedDesiredNodes;
-  unapplied_desired_relays: UnappliedDesiredRelays;
 }

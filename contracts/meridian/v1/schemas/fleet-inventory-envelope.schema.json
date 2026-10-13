@@ -1,105 +1,5 @@
 {
   "$defs": {
-    "DesiredNodeInventory": {
-      "additionalProperties": false,
-      "properties": {
-        "domain": {
-          "title": "Domain",
-          "type": "string"
-        },
-        "host": {
-          "title": "Host",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "present": {
-          "title": "Present",
-          "type": "boolean"
-        },
-        "sni": {
-          "title": "Sni",
-          "type": "string"
-        },
-        "ssh_port": {
-          "title": "Ssh Port",
-          "type": "integer"
-        },
-        "ssh_user": {
-          "title": "Ssh User",
-          "type": "string"
-        },
-        "warp": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Warp"
-        }
-      },
-      "required": [
-        "host",
-        "name",
-        "ssh_user",
-        "ssh_port",
-        "domain",
-        "sni",
-        "warp",
-        "present"
-      ],
-      "title": "DesiredNodeInventory",
-      "type": "object"
-    },
-    "DesiredRelayInventory": {
-      "additionalProperties": false,
-      "properties": {
-        "exit_node": {
-          "title": "Exit Node",
-          "type": "string"
-        },
-        "host": {
-          "title": "Host",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "present": {
-          "title": "Present",
-          "type": "boolean"
-        },
-        "sni": {
-          "title": "Sni",
-          "type": "string"
-        },
-        "ssh_port": {
-          "title": "Ssh Port",
-          "type": "integer"
-        },
-        "ssh_user": {
-          "title": "Ssh User",
-          "type": "string"
-        }
-      },
-      "required": [
-        "host",
-        "name",
-        "ssh_user",
-        "ssh_port",
-        "exit_node",
-        "sni",
-        "present"
-      ],
-      "title": "DesiredRelayInventory",
-      "type": "object"
-    },
     "EmptyData": {
       "additionalProperties": false,
       "description": "Empty data object used by envelopes without command-specific failure data.",
@@ -166,20 +66,6 @@
     "FleetInventory": {
       "additionalProperties": false,
       "properties": {
-        "desired_nodes": {
-          "items": {
-            "$ref": "#/$defs/DesiredNodeInventory"
-          },
-          "title": "Desired Nodes",
-          "type": "array"
-        },
-        "desired_relays": {
-          "items": {
-            "$ref": "#/$defs/DesiredRelayInventory"
-          },
-          "title": "Desired Relays",
-          "type": "array"
-        },
         "nodes": {
           "items": {
             "$ref": "#/$defs/NodeInventory"
@@ -221,43 +107,18 @@
     "FleetInventorySummary": {
       "additionalProperties": false,
       "properties": {
-        "desired_nodes": {
-          "title": "Desired Nodes",
-          "type": "integer"
-        },
-        "desired_relays": {
-          "title": "Desired Relays",
-          "type": "integer"
-        },
         "nodes": {
           "title": "Nodes",
-          "type": "integer"
-        },
-        "pending_desired_resources": {
-          "title": "Pending Desired Resources",
           "type": "integer"
         },
         "relays": {
           "title": "Relays",
           "type": "integer"
-        },
-        "unapplied_desired_nodes": {
-          "title": "Unapplied Desired Nodes",
-          "type": "integer"
-        },
-        "unapplied_desired_relays": {
-          "title": "Unapplied Desired Relays",
-          "type": "integer"
         }
       },
       "required": [
         "nodes",
-        "relays",
-        "desired_nodes",
-        "desired_relays",
-        "unapplied_desired_nodes",
-        "unapplied_desired_relays",
-        "pending_desired_resources"
+        "relays"
       ],
       "title": "FleetInventorySummary",
       "type": "object"
@@ -316,17 +177,6 @@
     "NodeInventory": {
       "additionalProperties": false,
       "properties": {
-        "desired": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Desired"
-        },
         "domain": {
           "title": "Domain",
           "type": "string"
@@ -398,7 +248,6 @@
         "domain",
         "sni",
         "protocols",
-        "desired",
         "panel_status",
         "xray_version"
       ],
@@ -505,17 +354,6 @@
     "RelayInventory": {
       "additionalProperties": false,
       "properties": {
-        "desired": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Desired"
-        },
         "exit_node_ip": {
           "title": "Exit Node Ip",
           "type": "string"
@@ -581,8 +419,7 @@
         "exit_node_ip",
         "exit_node_name",
         "sni",
-        "host_count",
-        "desired"
+        "host_count"
       ],
       "title": "RelayInventory",
       "type": "object"

@@ -106,25 +106,6 @@ class TopologyServerMember(CoreModel):
     relay_hops: list[RelayHopMembership] = Field(default_factory=list)
 
 
-class DesiredNodeSpec(CoreModel):
-    host: str
-    name: str
-    ssh_user: str
-    ssh_port: int
-    domain: str
-    sni: str
-    warp: bool | None
-
-
-class DesiredRelaySpec(CoreModel):
-    host: str
-    name: str
-    ssh_user: str
-    ssh_port: int
-    exit_node: str
-    sni: str
-
-
 class FleetTopology(CoreModel):
     panel: TopologyPanel
     subscription_page: TopologySubscriptionPage | None = None
@@ -132,8 +113,6 @@ class FleetTopology(CoreModel):
     relays: list[TopologyRelay] = Field(default_factory=list)
     servers: list[TopologyServerMember] = Field(default_factory=list)
     access_users: list[str] | None = None
-    desired_nodes: list[DesiredNodeSpec] | None = None
-    desired_relays: list[DesiredRelaySpec] | None = None
 
     @property
     def panel_url(self) -> str:
@@ -185,7 +164,6 @@ class NodeInventory(CoreModel):
     domain: str
     sni: str
     protocols: list[str]
-    desired: bool | None
     panel_status: NodeStatus
     xray_version: str
 
@@ -202,46 +180,15 @@ class RelayInventory(CoreModel):
     sni: str
     host_refs: list[RelayHostRef] = Field(default_factory=list)
     host_count: int
-    desired: bool | None
-
-
-class DesiredNodeInventory(CoreModel):
-    host: str
-    name: str
-    ssh_user: str
-    ssh_port: int
-    domain: str
-    sni: str
-    warp: bool | None
-    present: bool
-
-
-class DesiredRelayInventory(CoreModel):
-    host: str
-    name: str
-    ssh_user: str
-    ssh_port: int
-    exit_node: str
-    sni: str
-    present: bool
 
 
 class FleetInventorySummary(CoreModel):
     nodes: int
     relays: int
-    desired_nodes: int
-    desired_relays: int
-    unapplied_desired_nodes: int
-    unapplied_desired_relays: int
-    pending_desired_resources: int
-
-    @property
-    def pending(self) -> int:
-        return self.pending_desired_resources
 
     @property
     def text(self) -> str:
-        return f"{self.nodes} node(s), {self.relays} relay(s), {self.pending} pending desired resource(s)"
+        return f"{self.nodes} node(s), {self.relays} relay(s)"
 
 
 class FleetInventory(CoreModel):
@@ -251,8 +198,6 @@ class FleetInventory(CoreModel):
     servers: list[ServerInventory] = Field(default_factory=list)
     nodes: list[NodeInventory] = Field(default_factory=list)
     relays: list[RelayInventory] = Field(default_factory=list)
-    desired_nodes: list[DesiredNodeInventory] = Field(default_factory=list)
-    desired_relays: list[DesiredRelayInventory] = Field(default_factory=list)
 
     def to_data(self) -> dict[str, Any]:
         from meridian.core.serde import to_plain
@@ -441,18 +386,6 @@ def node_protocols(node: TopologyNode) -> list[str]:
     return protocols
 
 
-def node_desired(node: TopologyNode, desired_nodes: list[DesiredNodeSpec] | None) -> bool | None:
-    if desired_nodes is None:
-        return None
-    return any(node.ip == desired.host for desired in desired_nodes)
-
-
-def relay_desired(relay: TopologyRelay, desired_relays: list[DesiredRelaySpec] | None) -> bool | None:
-    if desired_relays is None:
-        return None
-    return any(relay.ip == desired.host for desired in desired_relays)
-
-
 def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
     """Build a role-oriented server list for graph/UI clients."""
     if topology.servers:
@@ -627,10 +560,6 @@ def build_fleet_inventory(
     """Build a redacted fleet inventory from local state plus panel status."""
     api_by_uuid = {node.uuid: node for node in api_nodes or []}
     sources = sources or FleetSources()
-    desired_node_hosts = {desired.host for desired in topology.desired_nodes or [] if desired.host}
-    desired_relay_hosts = {desired.host for desired in topology.desired_relays or [] if desired.host}
-    actual_node_hosts = {node.ip for node in topology.nodes if node.ip}
-    actual_relay_hosts = {relay.ip for relay in topology.relays if relay.ip}
 
     panel = PanelInventory(
         url=topology.panel_url,
@@ -667,7 +596,6 @@ def build_fleet_inventory(
                 domain=node.domain,
                 sni=node.sni,
                 protocols=node_protocols(node),
-                desired=node_desired(node, topology.desired_nodes),
                 panel_status=node_api_status(api_node),
                 xray_version=getattr(api_node, "xray_version", "") if api_node else "",
             )
@@ -689,45 +617,12 @@ def build_fleet_inventory(
                 sni=relay.sni,
                 host_refs=relay.host_refs,
                 host_count=len(relay.host_refs),
-                desired=relay_desired(relay, topology.desired_relays),
             )
         )
-
-    desired_nodes = [
-        DesiredNodeInventory(
-            host=desired.host,
-            name=desired.name,
-            ssh_user=desired.ssh_user,
-            ssh_port=desired.ssh_port,
-            domain=desired.domain,
-            sni=desired.sni,
-            warp=desired.warp,
-            present=bool(desired.host and desired.host in actual_node_hosts),
-        )
-        for desired in topology.desired_nodes or []
-    ]
-    desired_relays = [
-        DesiredRelayInventory(
-            host=desired.host,
-            name=desired.name,
-            ssh_user=desired.ssh_user,
-            ssh_port=desired.ssh_port,
-            exit_node=desired.exit_node,
-            sni=desired.sni,
-            present=bool(desired.host and desired.host in actual_relay_hosts),
-        )
-        for desired in topology.desired_relays or []
-    ]
 
     summary = FleetInventorySummary(
         nodes=len(topology.nodes),
         relays=len(topology.relays),
-        desired_nodes=len(topology.desired_nodes or []),
-        desired_relays=len(topology.desired_relays or []),
-        unapplied_desired_nodes=len(desired_node_hosts - actual_node_hosts),
-        unapplied_desired_relays=len(desired_relay_hosts - actual_relay_hosts),
-        pending_desired_resources=len(desired_node_hosts - actual_node_hosts)
-        + len(desired_relay_hosts - actual_relay_hosts),
     )
     return FleetInventory(
         panel=panel,
@@ -736,6 +631,4 @@ def build_fleet_inventory(
         servers=build_server_inventory(topology),
         nodes=nodes,
         relays=relays,
-        desired_nodes=desired_nodes,
-        desired_relays=desired_relays,
     )
