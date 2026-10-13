@@ -821,8 +821,11 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
         "meridian-exit-b-bridge-gateway-a",
     }
 
+    # Operator-owned fields: a disabled (or limited/expired) user and an edited
+    # description survive apply, and apply still converges.
     access_user = next(user for user in panel.users.values() if user.description == "Managed by Meridian access")
     access_user.status = "DISABLED"
+    access_user.description = "Grandma's tablet"
     restored = execute_resource_plan(
         plan,
         cluster,
@@ -830,9 +833,10 @@ def test_gateway_reconciles_service_edges_ordered_routes_and_fail_closed_pool() 
         persist=lambda _state: None,
     )
     assert restored.all_succeeded
-    assert restored.changed
-    assert access_user.status == "ACTIVE"
-    assert panel.calls["enable_user"] == 1
+    assert not restored.changed
+    assert access_user.status == "DISABLED"
+    assert access_user.description == "Grandma's tablet"
+    assert panel.calls["enable_user"] == 0
 
     mutation_counts = panel.calls.copy()
     second = execute_resource_plan(

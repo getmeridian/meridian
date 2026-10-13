@@ -19,6 +19,14 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   deploy onto a server that still runs 3.x (or 2.x) instead of taking it over.
 - Requires Python 3.11+.
 
+### Working in the Remnawave panel
+- **Your panel edits stick** — Meridian now owns only each client's existence,
+  name, and squads. Disabling a client (with `client disable` or in the panel),
+  traffic limits, expiry, and descriptions set in the panel survive every
+  `apply`; before, the next apply re-enabled disabled or limited clients, and a
+  description edit made every apply fail. Disabled, limited, or expired clients
+  no longer mark `fleet status` as degraded.
+
 ### Deploy
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
   and proxy, picks a camouflage target the server can actually use, pushes real

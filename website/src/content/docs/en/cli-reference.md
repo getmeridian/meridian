@@ -211,7 +211,7 @@ meridian fleet inventory [--json]
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope |
 
-**`fleet status`** — panel health, node heartbeats, relay listeners, and client counts. Missing or inactive declared clients degrade health. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
+**`fleet status`** — panel health, node heartbeats, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live panel status when reachable. It never prints the panel API token or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 

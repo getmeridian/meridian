@@ -573,13 +573,13 @@ def build_fleet_status(
     missing_required_sources = (
         sources.panel == "unavailable" or sources.nodes == "unavailable" or sources.users == "unavailable"
     )
+    # Disabled, limited, or expired clients are operator or panel decisions, not faults.
     health: FleetHealth
     if (
         disconnected_nodes > 0
         or disabled_nodes > 0
         or unhealthy_relays > 0
         or missing_access_users > 0
-        or nonactive_access_users > 0
     ):
         health = "degraded"
     elif (

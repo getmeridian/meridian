@@ -65,10 +65,10 @@ class AccessUserDriver:
             payload.external_squad_ref,
             action.generation,
         )
+        # Meridian owns a user's existence, name, and squads. Status (client disable, panel
+        # limits and expiry), description, and quotas belong to the operator and the panel.
         matches = (
             user.username == payload.username
-            and user.status == "ACTIVE"
-            and user.description == "Managed by Meridian access"
             and sorted(user.active_internal_squad_uuids) == sorted(squads)
             and user.external_squad_uuid == external
         )
@@ -100,17 +100,13 @@ class AccessUserDriver:
             if (
                 binding is None
                 and existing.description != "Managed by Meridian access"
+                and "MERIDIAN_ACCESS" not in _user_tags(existing)
                 and not self.context.was_managed(action.resource.logical_id, existing.id)
             ):
                 raise ResourceReconcileError(
                     f"Unmanaged User collides with requested username {payload.username!r}.",
                     hint="Rename the unmanaged User or explicitly recover its Meridian binding.",
                     category="user",
-                )
-            if existing.status != "ACTIVE":
-                _mutation(
-                    lambda: self.context.panel.enable_user(existing.id),
-                    f"enable access User {payload.username}",
                 )
             user = _mutation(
                 lambda: self.context.panel.update_access_user(
@@ -447,6 +443,11 @@ def _user_projection(user: User) -> dict[str, object]:
         "squads": sorted(user.active_internal_squad_uuids),
         "external_squad_uuid": user.external_squad_uuid,
     }
+
+
+def _user_tags(user: User) -> set[str]:
+    tag = user._raw.get("tag") if isinstance(user._raw, dict) else None
+    return {tag} if isinstance(tag, str) and tag else set()
 
 
 def _template_projection(template: SubscriptionTemplate) -> dict[str, object]:

@@ -428,13 +428,19 @@ def test_reachable_relay_listener_does_not_certify_route_health() -> None:
 
 
 @pytest.mark.parametrize(
-    ("users", "missing", "nonactive"),
-    [([], 1, 0), ([ApiUser(username="alice", status="DISABLED")], 0, 1)],
+    ("users", "missing", "nonactive", "health"),
+    [
+        ([], 1, 0, "degraded"),
+        # Disabled, limited, or expired is an operator/panel decision, not a fault.
+        ([ApiUser(username="alice", status="DISABLED")], 0, 1, "healthy"),
+        ([ApiUser(username="alice", status="LIMITED")], 0, 1, "healthy"),
+    ],
 )
-def test_v4_declared_access_user_defects_degrade_fleet(
+def test_v4_missing_access_user_degrades_fleet_but_disabled_one_does_not(
     users: list[ApiUser],
     missing: int,
     nonactive: int,
+    health: str,
 ) -> None:
     topology = _topology(
         nodes=[_node("198.51.100.1", uuid="node-a", name="exit-a", is_panel_host=True)],
@@ -451,7 +457,7 @@ def test_v4_declared_access_user_defects_degrade_fleet(
 
     assert status.summary.missing_access_users == missing
     assert status.summary.nonactive_access_users == nonactive
-    assert status.summary.health == "degraded"
+    assert status.summary.health == health
 
 
 def test_status_marks_health_unknown_when_required_node_source_unavailable() -> None:
