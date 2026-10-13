@@ -8,13 +8,9 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
     DeploymentTarget,
-    FirewallRulePayload,
     ResourceKind,
     ResourcePlan,
-    compute_plan_hash,
-    make_resource,
 )
 from meridian.reconciler.resource_executor import validate_resource_plan_transition
 from meridian.reconciler.resources import UnsupportedResourceRetirementError
@@ -26,20 +22,13 @@ from meridian.reconciler.retirement import (
     retirement_review_hash,
     retiring_server_refs,
 )
+from tests.support.topology import firewall_resource, resource_plan
 
 TEARDOWN_OWNED = {"control_plane_runtime", "subscription_template", "subscription_settings"}
 
 
 def _plan() -> ResourcePlan:
-    resources = [
-        make_resource("firewall:srv-a:tcp:443", FirewallRulePayload(server_ref="srv-a", transport="tcp", port=443))
-    ]
-    intent_hash = "1" * 64
-    return ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(compiler_version=COMPILER_VERSION, intent_hash=intent_hash, resources=resources),
-        resources=resources,
-    )
+    return resource_plan(firewall_resource(server_ref="srv-a"))
 
 
 def _binding(kind: str, name: str = "gone", *, server_ref: str = "", active: bool = True) -> ManagedResourceBinding:

@@ -14,11 +14,7 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
-    FirewallRulePayload,
     ResourcePlan,
-    compute_plan_hash,
-    make_resource,
 )
 from meridian.reconciler.fence import (
     LEASE_DURATION,
@@ -30,6 +26,7 @@ from meridian.reconciler.fence import (
 from meridian.reconciler.resource_executor import execute_resource_plan
 from meridian.reconciler.resources import ResourceAction, ResourceApplyReceipt, ResourceObservation
 from meridian.state_fence import FENCE_FILE, SSHApplyFence, apply_holder, holder_gone
+from tests.support.topology import firewall_resource, resource_plan
 
 _NOW = datetime(2026, 10, 13, 3, 0, tzinfo=UTC)
 _FLEET = "11111111-1111-4111-8111-111111111111"
@@ -292,15 +289,7 @@ def test_lost_commit_tells_the_operator_to_rerun() -> None:
 
 
 def _plan(port: int = 443) -> ResourcePlan:
-    firewall = make_resource(
-        f"firewall:srv-exit:tcp:{port}", FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=port)
-    )
-    intent_hash = "1" * 64
-    return ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(compiler_version=COMPILER_VERSION, intent_hash=intent_hash, resources=[firewall]),
-        resources=[firewall],
-    )
+    return resource_plan(firewall_resource(port))
 
 
 class _Driver:

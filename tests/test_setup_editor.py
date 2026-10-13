@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from meridian.core.topology import (
-    AccessIntent,
     ControlPlaneIntent,
     DeliveryIntent,
     ExitIntent,
@@ -17,6 +16,7 @@ from meridian.setup.editor import (
     remove_exit_from_intent,
     remove_relays_from_intent,
 )
+from tests.support.topology import reality_path, single_exit_intent
 
 
 def test_add_access_users_preserves_existing_order() -> None:
@@ -31,26 +31,14 @@ def test_add_access_users_rejects_existing_name() -> None:
 
 
 def _intent() -> SetupIntent:
-    return SetupIntent(
+    return single_exit_intent(
         control=ControlPlaneIntent(
             server_ref="srv-control",
             public_hostname="panel.example.com",
         ),
-        exits=[
-            ExitIntent(
-                id="exit-primary",
-                server_ref="srv-exit",
-                paths=[
-                    ProtocolPathIntent(
-                        id="path-primary",
-                        protocol="reality",
-                        reality_sni="www.example.com",
-                    )
-                ],
-            )
-        ],
-        default_egress_ref="exit-primary",
-        access=AccessIntent(users=["alice"]),
+        exit_id="exit-primary",
+        paths=[reality_path("path-primary")],
+        users=["alice"],
         delivery=DeliveryIntent(formats=["xray_json"]),
     )
 

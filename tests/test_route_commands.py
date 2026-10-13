@@ -13,15 +13,12 @@ from meridian.cluster import ClusterConfig
 from meridian.commands.route import run_add, run_list, run_remove
 from meridian.console import set_json_mode
 from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
     EgressOverrideIntent,
-    ExitIntent,
-    ProtocolPathIntent,
     SetupIntent,
 )
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
+from tests.support.topology import single_exit_intent
 
 
 class _Runtime:
@@ -48,19 +45,7 @@ def _json_off():
 
 
 def _intent(overrides: list[EgressOverrideIntent] | None = None) -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-exit"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-                egress_overrides=overrides or [],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["alice"]),
-    )
+    return single_exit_intent(control="srv-exit", users=["alice"], exit_fields={"egress_overrides": overrides or []})
 
 
 def _run(call, intent: SetupIntent, runtime: _Runtime | None = None, **patches) -> int:

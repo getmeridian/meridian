@@ -39,6 +39,7 @@ from meridian.diagnostics.external import (
 from meridian.diagnostics.network import https_get
 from meridian.diagnostics.probe import run_probe_checks
 from meridian.verification import DeploymentVerificationContext, VerificationHttpsRoute
+from tests.support.topology import single_exit_intent
 
 _IP = "198.51.100.20"
 runner = CliRunner()
@@ -594,31 +595,11 @@ def test_explicit_external_probe_reports_corrupt_v4_registry_as_inconclusive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from meridian.cluster import ClusterConfig
-    from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
     from meridian.servers import ServerRegistry
 
     registry_path = tmp_path / "servers.json"
     registry_path.write_text("broken", encoding="utf-8")
-    cluster = ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
-        )
-    )
+    cluster = ClusterConfig(topology_intent=single_exit_intent(control="control", exit_ref="exit"))
     monkeypatch.setattr("meridian.commands.probe.run_probe_checks", lambda *_args, **_kwargs: [_check("passed")])
 
     result = collect_probe_result(

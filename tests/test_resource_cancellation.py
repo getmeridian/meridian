@@ -10,11 +10,8 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
-    FirewallRulePayload,
     ProbePayload,
     ResourcePlan,
-    compute_plan_hash,
     make_resource,
 )
 from meridian.core.cancellation import (
@@ -31,6 +28,7 @@ from meridian.reconciler.resources import (
     postcondition_key,
 )
 from tests.support.cancellation import CancellationFlag
+from tests.support.topology import firewall_resource, resource_plan
 
 _NOW = datetime(2026, 7, 14, 15, 0, tzinfo=UTC)
 
@@ -40,22 +38,13 @@ def _clock() -> datetime:
 
 
 def _plan(*, public_port: int = 443) -> ResourcePlan:
-    firewall = make_resource(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=public_port),
-    )
+    firewall = firewall_resource(public_port, logical_id="firewall:srv-exit:tcp:443")
     probe = make_resource(
         "probe:firewall",
         ProbePayload(probe="listener", target_ref=firewall.logical_id, expected="reachable"),
         dependencies=[firewall.logical_id],
     )
-    resources = [firewall, probe]
-    intent_hash = "1" * 64
-    return ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(compiler_version=COMPILER_VERSION, intent_hash=intent_hash, resources=resources),
-        resources=resources,
-    )
+    return resource_plan(firewall, probe)
 
 
 class RemoteState:

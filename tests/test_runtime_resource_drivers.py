@@ -10,16 +10,13 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
     AccessUserPayload,
     ControlPlaneRuntimePayload,
     HostPayload,
     NodeBindingPayload,
     NodeRuntimePayload,
     ProbePayload,
-    ResourcePlan,
     RoutingGatewayPayload,
-    compute_plan_hash,
     make_resource,
 )
 from meridian.reconciler.resources import (
@@ -37,19 +34,7 @@ from meridian.reconciler.runtime_drivers import (
     ProbeDriverContext,
     xray_subscription_is_valid,
 )
-
-
-def _plan(*resources) -> ResourcePlan:
-    intent_hash = "1" * 64
-    return ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=list(resources),
-        ),
-        resources=list(resources),
-    )
+from tests.support.topology import resource_plan
 
 
 def test_control_runtime_bootstraps_then_requires_panel_readiness() -> None:
@@ -57,7 +42,7 @@ def test_control_runtime_bootstraps_then_requires_panel_readiness() -> None:
         "control:runtime",
         ControlPlaneRuntimePayload(server_ref="srv-control"),
     )
-    plan = _plan(resource)
+    plan = resource_plan(resource)
     action = build_resource_actions(plan, 1)[0]
     ready = False
 
@@ -82,7 +67,7 @@ def test_control_runtime_preserves_unknown_outcome_on_bootstrap_timeout() -> Non
         "control:runtime",
         ControlPlaneRuntimePayload(server_ref="srv-control"),
     )
-    action = build_resource_actions(_plan(resource), 1)[0]
+    action = build_resource_actions(resource_plan(resource), 1)[0]
 
     def timeout(_action) -> None:
         raise TimeoutError("bootstrap timed out")
@@ -134,7 +119,7 @@ def _listener_probe_driver(
         ),
         dependencies=[host.logical_id],
     )
-    plan = _plan(host, probe)
+    plan = resource_plan(host, probe)
     action = build_resource_actions(plan, 1)[1]
     connection = MagicMock()
     connection.run.return_value = SimpleNamespace(
@@ -187,7 +172,7 @@ def test_subscription_probe_fetches_the_canonical_document() -> None:
         ProbePayload(probe="subscription", target_ref=user.logical_id),
         dependencies=[user.logical_id],
     )
-    plan = _plan(user, probe)
+    plan = resource_plan(user, probe)
     action = build_resource_actions(plan, 1)[1]
     panel = MagicMock()
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
@@ -233,7 +218,7 @@ def test_subscription_probe_rejects_noncanonical_html() -> None:
         ProbePayload(probe="subscription", target_ref=user.logical_id),
         dependencies=[user.logical_id],
     )
-    plan = _plan(user, probe)
+    plan = resource_plan(user, probe)
     panel = MagicMock()
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
     panel.fetch_subscription.return_value = SimpleNamespace(
@@ -264,7 +249,7 @@ def test_subscription_probe_rejects_multiple_xray_configs() -> None:
         ProbePayload(probe="subscription", target_ref=user.logical_id),
         dependencies=[user.logical_id],
     )
-    plan = _plan(user, probe)
+    plan = resource_plan(user, probe)
     config = '{"outbounds": [{"tag": "MERIDIAN_PROXY", "protocol": "vless"}]}'
     panel = MagicMock()
     panel.get_user.return_value = SimpleNamespace(short_uuid="short-access")
@@ -354,7 +339,7 @@ def test_gateway_probe_requires_connected_node_on_reviewed_profile() -> None:
         ProbePayload(probe="route", target_ref=gateway.logical_id),
         dependencies=[gateway.logical_id],
     )
-    plan = _plan(binding, runtime, gateway, probe)
+    plan = resource_plan(binding, runtime, gateway, probe)
     node_binding = ManagedResourceBinding(
         logical_id=binding.logical_id,
         resource_kind="node_binding",

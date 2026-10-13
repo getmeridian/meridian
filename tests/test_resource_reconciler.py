@@ -9,11 +9,8 @@ import pytest
 
 from meridian.cluster import ActionCheckpoint, ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
-    FirewallRulePayload,
     ProbePayload,
     ResourcePlan,
-    compute_plan_hash,
     make_resource,
 )
 from meridian.reconciler.resource_executor import (
@@ -34,6 +31,7 @@ from meridian.reconciler.resources import (
     postcondition_key,
 )
 from tests.support.reporters import CaptureReporter
+from tests.support.topology import firewall_resource, resource_plan
 
 _HASH_A = "a" * 64
 _HASH_B = "b" * 64
@@ -80,37 +78,15 @@ class ScriptedDriver:
 
 
 def _plan(*, with_probe: bool = False, public_port: int = 443) -> ResourcePlan:
-    firewall = make_resource(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(
-            server_ref="srv-exit",
-            transport="tcp",
-            port=public_port,
-        ),
+    firewall = firewall_resource(public_port, logical_id="firewall:srv-exit:tcp:443")
+    if not with_probe:
+        return resource_plan(firewall)
+    probe = make_resource(
+        "probe:firewall",
+        ProbePayload(probe="listener", target_ref=firewall.logical_id, expected="reachable"),
+        dependencies=[firewall.logical_id],
     )
-    resources = [firewall]
-    if with_probe:
-        resources.append(
-            make_resource(
-                "probe:firewall",
-                ProbePayload(
-                    probe="listener",
-                    target_ref=firewall.logical_id,
-                    expected="reachable",
-                ),
-                dependencies=[firewall.logical_id],
-            )
-        )
-    intent_hash = "1" * 64
-    return ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=resources,
-        ),
-        resources=resources,
-    )
+    return resource_plan(firewall, probe)
 
 
 def _missing() -> ResourceObservation:

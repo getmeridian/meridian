@@ -20,38 +20,13 @@ from meridian.compiler import TopologyCompileError
 from meridian.console import set_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.output import OperationContext
-from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
-    ExitIntent,
-    ProtocolPathIntent,
-    SetupIntent,
-)
+from tests.support.topology import reality_path, single_exit_intent
 
 _PLAN_HASH = "a" * 64
 
 
 def _cluster() -> ClusterConfig:
-    return ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality",
-                            protocol="reality",
-                            reality_sni="www.microsoft.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
-        )
-    )
+    return ClusterConfig(topology_intent=single_exit_intent(paths=[reality_path("reality", "www.microsoft.com")]))
 
 
 def _resource(logical_id: str = "firewall:srv-exit:443") -> SimpleNamespace:

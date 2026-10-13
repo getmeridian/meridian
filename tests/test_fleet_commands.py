@@ -17,6 +17,7 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.fleet import run_inventory, run_status
 from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel, TopologyRelay
 from meridian.remnawave import Node, RemnawaveAuthError, RemnawaveError, User
+from tests.support.topology import panel_mock
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -114,15 +115,7 @@ def _api_user(name: str = "alice", status: str = "ACTIVE") -> User:
 
 
 def _make_panel_mock(*, ping_ok: bool = True) -> MagicMock:
-    """Create a MeridianPanel mock with context-manager support."""
-    panel = MagicMock()
-    panel.__enter__ = MagicMock(return_value=panel)
-    panel.__exit__ = MagicMock(return_value=False)
-    panel.ping.return_value = ping_ok
-    panel.get_version.return_value = "3.4.5"
-    panel.list_nodes.return_value = []
-    panel.list_users.return_value = []
-    return panel
+    return panel_mock(ping=ping_ok, get_version="3.4.5", list_nodes=[], list_users=[])
 
 
 def _v4_projected_topology() -> FleetTopology:

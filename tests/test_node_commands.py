@@ -21,8 +21,9 @@ from meridian.commands.node import run_add, run_list
 from meridian.console import set_json_mode
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetTopology, TopologyNode, TopologyPanel
-from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+from meridian.core.topology import SetupIntent
 from meridian.remnawave import Node, RemnawaveError
+from tests.support.topology import panel_mock, single_exit_intent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -58,24 +59,7 @@ def _topology_node(ip: str, uuid: str, name: str, *, is_panel_host: bool = False
 
 
 def _minimal_v4_intent() -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[
-                    ProtocolPathIntent(
-                        id="reality-a",
-                        protocol="reality",
-                        reality_sni="www.example.com",
-                    )
-                ],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["default"]),
-    )
+    return single_exit_intent()
 
 
 def _projected_topology(*nodes: TopologyNode) -> FleetTopology:
@@ -111,18 +95,15 @@ def _make_api_node(
 
 
 def _make_panel_mock() -> MagicMock:
-    """Create a MeridianPanel mock with sensible defaults."""
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.list_nodes.return_value = [
-        _make_api_node(uuid="550e8400-e29b-41d4-a716-446655440001"),
-        _make_api_node(uuid="550e8400-e29b-41d4-a716-446655440002"),
-    ]
-    panel.get_node.return_value = _make_api_node()
-    panel.disable_node.return_value = None
-    panel.delete_node.return_value = None
-    panel.ping.return_value = True
-    return panel
+    return panel_mock(
+        list_nodes=[
+            _make_api_node(uuid="550e8400-e29b-41d4-a716-446655440001"),
+            _make_api_node(uuid="550e8400-e29b-41d4-a716-446655440002"),
+        ],
+        get_node=_make_api_node(),
+        disable_node=None,
+        delete_node=None,
+    )
 
 
 def _ssh_result(stdout: str = "", rc: int = 0) -> subprocess.CompletedProcess[str]:

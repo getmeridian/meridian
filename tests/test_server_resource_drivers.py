@@ -9,7 +9,6 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
-    COMPILER_VERSION,
     CertificatePayload,
     DeploymentContract,
     DeploymentTarget,
@@ -20,7 +19,6 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
-    compute_plan_hash,
     make_resource,
 )
 from meridian.provision.steps import StepResult
@@ -42,6 +40,7 @@ from meridian.reconciler.server_drivers import (
 from meridian.reconciler.server_evidence import baseline_attestation
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
+from tests.support.topology import resource_plan
 
 
 def _action(*, install_docker: bool = True):
@@ -52,16 +51,7 @@ def _action(*, install_docker: bool = True):
             install_docker=install_docker,
         ),
     )
-    intent_hash = "1" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[resource],
-        ),
-        resources=[resource],
-    )
+    plan = resource_plan(resource)
     return plan, build_resource_actions(plan, 1)[0]
 
 
@@ -71,16 +61,7 @@ def _result(*, returncode: int = 0, stdout: str = "", stderr: str = "") -> Simpl
 
 def _single_action(logical_id: str, payload):
     resource = make_resource(logical_id, payload)
-    intent_hash = "1" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[resource],
-        ),
-        resources=[resource],
-    )
+    plan = resource_plan(resource)
     return plan, build_resource_actions(plan, 1)[0]
 
 
@@ -284,16 +265,7 @@ def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
             port=443,
         ),
     )
-    intent_hash = "1" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[resource],
-        ),
-        resources=[resource],
-    )
+    plan = resource_plan(resource)
     action = build_resource_actions(plan, 1)[0]
     marker = f"fw-{artifact_token(resource.logical_id)}"
     connection = MagicMock(spec=ServerConnection)
@@ -528,16 +500,7 @@ def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, Resour
         ),
         dependencies=[binding.logical_id],
     )
-    intent_hash = "1" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[binding, runtime],
-        ),
-        resources=[binding, runtime],
-    )
+    plan = resource_plan(binding, runtime)
     action = build_resource_actions(plan, 1)[1]
     cluster = ClusterConfig(
         managed_bindings={
@@ -670,16 +633,7 @@ def test_port_443_stream_apply_retires_the_legacy_artifact(
             ],
         ),
     )
-    intent_hash = "1" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[resource],
-        ),
-        resources=[resource],
-    )
+    plan = resource_plan(resource)
     action = build_resource_actions(plan, 1)[0]
     connection = MagicMock(spec=ServerConnection)
     artifact_path = nginx_artifact_path(resource.logical_id, "stream")

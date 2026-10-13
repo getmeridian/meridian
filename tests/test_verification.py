@@ -11,9 +11,7 @@ import pytest
 from meridian.cluster import ClusterConfig, PanelConfig, ResourceAllocation
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
-    AccessIntent,
     ControlPlaneIntent,
-    ExitIntent,
     ProtocolPathIntent,
     RoutingGatewayIntent,
     SetupIntent,
@@ -28,6 +26,7 @@ from meridian.verification import (
     resolve_domain,
     resolve_verification_target,
 )
+from tests.support.topology import reality_path, single_exit_intent
 
 
 def _registry(path: Path) -> ServerRegistry:
@@ -43,32 +42,25 @@ def _registry(path: Path) -> ServerRegistry:
 
 
 def _intent() -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[
-                    ProtocolPathIntent(
-                        id="reality-a",
-                        protocol="reality",
-                        reality_sni="www.example.com",
-                    ),
-                    ProtocolPathIntent(
-                        id="xhttp-a",
-                        protocol="xhttp",
-                        tls_sni="tls.example.com",
-                        host="edge.example.com",
-                        path="transport-a",
-                    ),
-                    ProtocolPathIntent(
-                        id="hysteria-a",
-                        protocol="hysteria2",
-                        tls_sni="edge.example.com",
-                    ),
-                ],
-            )
+    return single_exit_intent(
+        paths=[
+            ProtocolPathIntent(
+                id="reality-a",
+                protocol="reality",
+                reality_sni="www.example.com",
+            ),
+            ProtocolPathIntent(
+                id="xhttp-a",
+                protocol="xhttp",
+                tls_sni="tls.example.com",
+                host="edge.example.com",
+                path="transport-a",
+            ),
+            ProtocolPathIntent(
+                id="hysteria-a",
+                protocol="hysteria2",
+                tls_sni="edge.example.com",
+            ),
         ],
         transparent_relays=[
             TransparentRelayIntent(
@@ -78,8 +70,6 @@ def _intent() -> SetupIntent:
                 protocol_path_ref="reality-a",
             )
         ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["default"]),
     )
 
 
@@ -123,20 +113,7 @@ def test_explicit_external_target_survives_unrelated_corrupt_cluster(
 def test_explicit_target_turns_v4_compile_failure_into_skipped_context(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    cluster = ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[ProtocolPathIntent(id="reality", protocol="reality", reality_sni="www.example.com")],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
-        )
-    )
+    cluster = ClusterConfig(topology_intent=single_exit_intent(paths=[reality_path("reality")]))
     monkeypatch.setattr(
         "meridian.verification.compile_topology",
         lambda _intent: (_ for _ in ()).throw(ValueError("bad plan")),

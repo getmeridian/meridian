@@ -27,6 +27,7 @@ from meridian.core.verification import (
     aggregate_verification,
 )
 from meridian.servers import ServerEntry, ServerRegistry
+from tests.support.topology import single_exit_intent
 
 _IP = "198.51.100.20"
 runner = CliRunner()
@@ -122,37 +123,28 @@ def test_basic_scope_rejects_explicit_client_as_json_user_error(monkeypatch: pyt
 
 def test_known_host_domain_reuses_its_configured_tls_sni(tmp_path: Path) -> None:
     from meridian.cluster import ClusterConfig
-    from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+    from meridian.core.topology import ProtocolPathIntent
     from meridian.servers import ServerEntry
 
     registry = ServerRegistry(tmp_path / "servers.json")
     registry.add(ServerEntry(id="srv-control", host="198.51.100.10", name="control"))
     registry.add(ServerEntry(id="srv-exit", host=_IP, name="exit"))
     cluster = ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        ),
-                        ProtocolPathIntent(
-                            id="xhttp-a",
-                            protocol="xhttp",
-                            tls_sni="tls.example.com",
-                            host="edge.example.com",
-                            path="transport-a",
-                        ),
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
+        topology_intent=single_exit_intent(
+            paths=[
+                ProtocolPathIntent(
+                    id="reality-a",
+                    protocol="reality",
+                    reality_sni="www.example.com",
+                ),
+                ProtocolPathIntent(
+                    id="xhttp-a",
+                    protocol="xhttp",
+                    tls_sni="tls.example.com",
+                    host="edge.example.com",
+                    path="transport-a",
+                ),
+            ]
         )
     )
 

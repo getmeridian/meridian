@@ -10,10 +10,10 @@ import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.uninstall import _remove_saved_server_or_fail, _topology_references, run
-from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
 from meridian.remnawave import RemnawaveError
 from meridian.servers import ServerEntry
 from meridian.setup.single_server import single_server_intent
+from tests.support.topology import panel_mock, single_exit_intent
 
 
 def test_teardown_bad_server_selector_fails_without_prompt_fallback() -> None:
@@ -95,26 +95,7 @@ def test_panel_teardown_local_state_failure_reports_remote_completion(failure_po
 
 
 def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
-    cluster = ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["alice"]),
-        )
-    )
+    cluster = ClusterConfig(topology_intent=single_exit_intent(users=["alice"]))
     registry = MagicMock()
     registry.find.return_value = ServerEntry(
         id="srv-exit",
@@ -172,26 +153,7 @@ def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> No
 
 
 def test_v4_teardown_allows_server_after_role_and_workload_are_retired() -> None:
-    cluster = ClusterConfig(
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-current-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["alice"]),
-        )
-    )
+    cluster = ClusterConfig(topology_intent=single_exit_intent(exit_ref="srv-current-exit", users=["alice"]))
     retired = ServerEntry(id="srv-retired", host="198.51.100.9", name="retired")
 
     assert _topology_references(cluster, retired) == []
@@ -222,9 +184,7 @@ def _run_roleless_teardown(cluster: ClusterConfig, panel: MagicMock, registry: M
 def test_roleless_server_teardown_deregisters_its_stale_panel_node() -> None:
     cluster = _roleless_server_cluster()
     registry = MagicMock()
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.find_node_by_address.return_value = SimpleNamespace(uuid="node-spare")
+    panel = panel_mock(find_node_by_address=SimpleNamespace(uuid="node-spare"))
 
     _run_roleless_teardown(cluster, panel, registry)
 
@@ -236,9 +196,7 @@ def test_roleless_server_teardown_deregisters_its_stale_panel_node() -> None:
 def test_panel_cleanup_failure_after_uninstall_retains_saved_server() -> None:
     cluster = _roleless_server_cluster()
     registry = MagicMock()
-    panel = MagicMock()
-    panel.__enter__.return_value = panel
-    panel.find_node_by_address.return_value = SimpleNamespace(uuid="node-spare")
+    panel = panel_mock(find_node_by_address=SimpleNamespace(uuid="node-spare"))
     panel.delete_node.side_effect = RemnawaveError("panel unavailable")
 
     with pytest.raises(typer.Exit) as exc_info:

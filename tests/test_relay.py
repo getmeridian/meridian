@@ -13,51 +13,16 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetTopology, TopologyPanel, TopologyRelay
-from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+from meridian.core.topology import SetupIntent
 from meridian.remnawave import RemnawaveError
-
-
-def _intent() -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["default"]),
-    )
+from tests.support.topology import panel_mock, single_exit_intent
 
 
 class TestRelayCLI:
-    @staticmethod
-    def _v4_intent() -> SetupIntent:
-        return SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
-        )
-
     def test_v4_deploy_state_error_is_rendered_at_command_boundary(self) -> None:
         from meridian.commands.relay import run_deploy
 
-        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        cluster = ClusterConfig(topology_intent=single_exit_intent())
         registry = MagicMock()
         registry.find.side_effect = [
             SimpleNamespace(id="srv-exit", host="198.51.100.10", name="exit-a"),
@@ -113,7 +78,7 @@ class TestRelayCLI:
         from meridian.setup.editor import add_relay_to_intent
 
         return add_relay_to_intent(
-            self._v4_intent(), server_ref="srv-relay", title="relay-a", exit_ref="exit-a", listen_port=443
+            single_exit_intent(), server_ref="srv-relay", title="relay-a", exit_ref="exit-a", listen_port=443
         )
 
     def test_rerunning_relay_add_resumes_the_declared_relay(self) -> None:
@@ -144,7 +109,7 @@ class TestRelayCLI:
     ) -> None:
         from meridian.commands.relay import run_deploy
 
-        cluster = ClusterConfig(topology_intent=self._v4_intent())
+        cluster = ClusterConfig(topology_intent=single_exit_intent())
         registry = MagicMock()
         registry.find.side_effect = [
             SimpleNamespace(id="srv-exit", host="198.51.100.10", name="exit-a"),
@@ -248,7 +213,7 @@ class TestRelayListJsonEnvelope:
         try:
             cluster = ClusterConfig(
                 panel=PanelConfig(url="https://198.51.100.10/panel", api_token="token"),
-                topology_intent=_intent(),
+                topology_intent=single_exit_intent(),
             )
             topology = FleetTopology(
                 panel=TopologyPanel(
@@ -287,7 +252,7 @@ class TestRelayListJsonEnvelope:
                 server_ip="198.51.100.10",
                 secret_path="/secret",
             ),
-            topology_intent=_intent(),
+            topology_intent=single_exit_intent(),
         )
         topology = FleetTopology(
             panel=TopologyPanel(
@@ -310,9 +275,7 @@ class TestRelayListJsonEnvelope:
                 )
             ],
         )
-        panel = MagicMock()
-        panel.__enter__.return_value = panel
-        panel.__exit__.return_value = False
+        panel = panel_mock()
         panel.list_hosts.side_effect = RemnawaveError("Panel unreachable")
 
         set_json_mode(True)
@@ -353,7 +316,7 @@ class TestRelayListJsonEnvelope:
                 url="https://198.51.100.10/panel",
                 api_token="tok",
             ),
-            topology_intent=_intent(),
+            topology_intent=single_exit_intent(),
         )
         topology = FleetTopology(
             panel=TopologyPanel(
@@ -420,7 +383,7 @@ class TestRelayListJsonEnvelope:
 
         cluster = ClusterConfig(
             panel=PanelConfig(url="https://198.51.100.10/panel", api_token="tok"),
-            topology_intent=_intent(),
+            topology_intent=single_exit_intent(),
         )
         topology = FleetTopology(
             panel=TopologyPanel(
@@ -454,9 +417,7 @@ class TestRelayListJsonEnvelope:
                 ),
             ],
         )
-        panel = MagicMock()
-        panel.__enter__.return_value = panel
-        panel.__exit__.return_value = False
+        panel = panel_mock()
         panel.list_hosts.return_value = [Host(uuid="host-a"), Host(uuid="host-b", is_disabled=True)]
 
         set_json_mode(True)

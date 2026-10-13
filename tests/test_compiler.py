@@ -61,6 +61,7 @@ from meridian.core.topology import (
     SetupIntent,
     TransparentRelayIntent,
 )
+from tests.support.topology import single_exit_intent
 
 
 def _reality(path_id: str, sni: str) -> ProtocolPathIntent:
@@ -391,17 +392,8 @@ class TestPureCompiler:
         assert all(http_rules[resource.payload.server_ref] in resource.dependencies for resource in certificates)
 
     def test_control_and_exit_share_one_complete_port_443_stream_owner(self) -> None:
-        intent = SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-shared"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-shared",
-                    paths=[_reality("exit-a-reality", "www.microsoft.com")],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
+        intent = single_exit_intent(
+            control="srv-shared", exit_ref="srv-shared", paths=[_reality("exit-a-reality", "www.microsoft.com")]
         )
 
         plan = compile_topology(intent)
@@ -915,20 +907,12 @@ class TestCompilerFailures:
             compile_topology(intent)
 
     def test_same_sni_cannot_route_to_two_backends_on_one_listener(self) -> None:
-        intent = SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-shared",
-                    paths=[
-                        _reality("reality-a", "www.microsoft.com"),
-                        _xhttp("xhttp-a", "www.microsoft.com", "xhttp-a"),
-                    ],
-                ),
+        intent = single_exit_intent(
+            exit_ref="srv-shared",
+            paths=[
+                _reality("reality-a", "www.microsoft.com"),
+                _xhttp("xhttp-a", "www.microsoft.com", "xhttp-a"),
             ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=["default"]),
         )
 
         with pytest.raises(TopologyCompileError, match="cannot route SNI"):

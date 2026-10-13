@@ -16,12 +16,9 @@ from meridian.cluster import (
 )
 from meridian.core.errors import LocalStateCorruptedError
 from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
-    ExitIntent,
-    ProtocolPathIntent,
     SetupIntent,
 )
+from tests.support.topology import reality_path, single_exit_intent
 
 _PROFILE_UUID = "550e8400-e29b-41d4-a716-446655440000"
 _NODE_UUID = "660e8400-e29b-41d4-a716-446655440001"
@@ -33,24 +30,7 @@ _HASH_B = "b" * 64
 
 
 def _intent() -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[
-                    ProtocolPathIntent(
-                        id="reality",
-                        protocol="reality",
-                        reality_sni="www.microsoft.com",
-                    )
-                ],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["default"]),
-    )
+    return single_exit_intent(paths=[reality_path("reality", "www.microsoft.com")])
 
 
 class TestV3RoundTrip:

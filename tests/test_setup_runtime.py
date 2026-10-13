@@ -15,8 +15,6 @@ from meridian.core.cancellation import OperationCancelledError
 from meridian.core.errors import LocalStateError, ProvisioningError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
     ExitIntent,
     ProtocolPathIntent,
     SetupIntent,
@@ -32,6 +30,7 @@ from meridian.ssh import ServerConnection
 from tests.support.cancellation import CancellationFlag
 from tests.support.contract_driver import ContractResourceDriver
 from tests.support.reporters import CaptureReporter
+from tests.support.topology import reality_path, single_exit_intent
 
 
 @pytest.fixture(autouse=True)
@@ -92,24 +91,7 @@ class _Panel:
 
 
 def _intent() -> SetupIntent:
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[
-                    ProtocolPathIntent(
-                        id="exit-a-reality",
-                        protocol="reality",
-                        reality_sni="www.microsoft.com",
-                    )
-                ],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["default"]),
-    )
+    return single_exit_intent(paths=[reality_path("exit-a-reality", "www.microsoft.com")])
 
 
 def _drivers(plan: ResourcePlan) -> ResourceDrivers:

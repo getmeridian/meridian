@@ -26,6 +26,7 @@ from meridian.core.topology import (
     SetupIntent,
     TransparentRelayIntent,
 )
+from tests.support.topology import single_exit_intent
 
 
 def _reality(path_id: str = "reality-primary") -> ProtocolPathIntent:
@@ -200,15 +201,8 @@ class TestSetupIntent:
 
     def test_relay_chain_rejects_exit_server_as_a_hop(self) -> None:
         with pytest.raises(ValidationError, match="cannot include its exit server"):
-            SetupIntent(
-                control=ControlPlaneIntent(server_ref="srv-control"),
-                exits=[
-                    ExitIntent(
-                        id="exit-a",
-                        server_ref="srv-exit",
-                        paths=[_reality()],
-                    )
-                ],
+            single_exit_intent(
+                paths=[_reality()],
                 transparent_relays=[
                     TransparentRelayIntent(
                         id="relay-a",
@@ -217,8 +211,6 @@ class TestSetupIntent:
                         protocol_path_ref="reality-primary",
                     )
                 ],
-                default_egress_ref="exit-a",
-                access=AccessIntent(users=["default"]),
             )
 
     def test_failover_pool_is_fail_closed(self) -> None:

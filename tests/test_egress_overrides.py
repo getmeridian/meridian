@@ -10,32 +10,19 @@ from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload, NodeRuntimePayload
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
     EgressOverrideIntent,
-    ExitIntent,
-    ProtocolPathIntent,
     SetupIntent,
 )
 from meridian.setup.editor import add_egress_override_to_intent, remove_egress_override_from_intent
 from meridian.xray_workload import render_workload_config
+from tests.support.topology import single_exit_intent
 
 
 def _intent(*, warp: bool = False, geo_block: bool = False, overrides: list[EgressOverrideIntent] | None = None):
-    return SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-exit"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-                warp=warp,
-                geo_block=geo_block,
-                egress_overrides=overrides or [],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["alice"]),
+    return single_exit_intent(
+        control="srv-exit",
+        users=["alice"],
+        exit_fields={"warp": warp, "geo_block": geo_block, "egress_overrides": overrides or []},
     )
 
 

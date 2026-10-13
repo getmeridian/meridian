@@ -14,14 +14,8 @@ from meridian.commands.server import run_add, run_list, run_remove
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.errors import LocalStateCorruptedError, LocalStateError
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
-from meridian.core.topology import (
-    AccessIntent,
-    ControlPlaneIntent,
-    ExitIntent,
-    ProtocolPathIntent,
-    SetupIntent,
-)
 from meridian.servers import SERVER_REGISTRY_SCHEMA, ServerEntry, ServerProfileStore, ServerRegistry
+from tests.support.topology import single_exit_intent
 
 
 class TestServerEntry:
@@ -191,26 +185,7 @@ class TestServerRegistry:
         registry.add(ServerEntry("198.51.100.10", "root", "control"))
         entry = registry.find("control")
         assert entry is not None
-        cluster = ClusterConfig(
-            topology_intent=SetupIntent(
-                control=ControlPlaneIntent(server_ref=entry.id),
-                exits=[
-                    ExitIntent(
-                        id="exit-a",
-                        server_ref="srv-exit",
-                        paths=[
-                            ProtocolPathIntent(
-                                id="reality-a",
-                                protocol="reality",
-                                reality_sni="www.example.com",
-                            )
-                        ],
-                    )
-                ],
-                default_egress_ref="exit-a",
-                access=AccessIntent(users=["alice"]),
-            )
-        )
+        cluster = ClusterConfig(topology_intent=single_exit_intent(control=entry.id, users=["alice"]))
 
         with pytest.raises(LocalStateError, match="the control plane"):
             registry.remove(entry.id, cluster=cluster)

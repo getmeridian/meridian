@@ -10,13 +10,11 @@ import pytest
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler.models import (
-    COMPILER_VERSION,
     NginxArtifactPayload,
     NginxRouteSpec,
     RealmHopPayload,
     ResourcePlan,
     ResourcePostcondition,
-    compute_plan_hash,
     make_resource,
 )
 from meridian.config import REALM_VERSION, RELAY_BINARY_PATH
@@ -41,6 +39,7 @@ from meridian.reconciler.server_render import (
 )
 from meridian.remnawave import MeridianPanel
 from meridian.ssh import ServerConnection
+from tests.support.topology import resource_plan
 
 ADDRESSES = {
     "srv-exit": "198.51.100.10",
@@ -521,16 +520,7 @@ def _realm_plan_and_action() -> tuple[ResourcePlan, ResourceAction]:
             )
         ],
     )
-    intent_hash = "a" * 64
-    plan = ResourcePlan(
-        intent_hash=intent_hash,
-        plan_hash=compute_plan_hash(
-            compiler_version=COMPILER_VERSION,
-            intent_hash=intent_hash,
-            resources=[resource],
-        ),
-        resources=[resource],
-    )
+    plan = resource_plan(resource)
     return plan, build_resource_actions(plan, 1)[0]
 
 

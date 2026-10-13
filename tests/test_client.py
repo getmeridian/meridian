@@ -18,9 +18,10 @@ from meridian.cluster import ClusterConfig, PanelConfig
 from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_remove, run_show
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.console import set_json_mode
-from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
+from meridian.core.topology import AccessIntent
 from meridian.handoff import HandoffLinks
 from meridian.remnawave import RemnawaveError, User
+from tests.support.topology import panel_mock, single_exit_intent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -36,24 +37,7 @@ def _make_v4_cluster(tmp_path: Path, *, users: list[str] | None = None) -> Clust
             server_ip="198.51.100.1",
             sub_path="pages",
         ),
-        topology_intent=SetupIntent(
-            control=ControlPlaneIntent(server_ref="srv-control"),
-            exits=[
-                ExitIntent(
-                    id="exit-a",
-                    server_ref="srv-exit",
-                    paths=[
-                        ProtocolPathIntent(
-                            id="reality-a",
-                            protocol="reality",
-                            reality_sni="www.example.com",
-                        )
-                    ],
-                )
-            ],
-            default_egress_ref="exit-a",
-            access=AccessIntent(users=users or ["default"]),
-        ),
+        topology_intent=single_exit_intent(users=users or ["default"]),
     )
     cluster.save(tmp_path / "cluster.yml")
     return cluster
@@ -77,15 +61,7 @@ def _make_user(name: str = "alice", status: str = "ACTIVE") -> User:
 
 
 def _make_panel_mock() -> MagicMock:
-    """Create a mock MeridianPanel."""
-    panel = MagicMock()
-    panel.__enter__ = MagicMock(return_value=panel)
-    panel.__exit__ = MagicMock(return_value=False)
-    panel.get_user.return_value = _make_user()
-    panel.list_users.return_value = [_make_user("alice"), _make_user("bob")]
-    panel.delete_user.return_value = True
-    panel.ping.return_value = True
-    return panel
+    return panel_mock(get_user=_make_user(), list_users=[_make_user("alice"), _make_user("bob")], delete_user=True)
 
 
 # ---------------------------------------------------------------------------

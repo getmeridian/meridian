@@ -17,11 +17,11 @@ from meridian.connectivity import (
     execute_xray_config,
     select_active_client,
 )
-from meridian.core.topology import AccessIntent, ControlPlaneIntent, ExitIntent, ProtocolPathIntent, SetupIntent
 from meridian.core.verification import VerificationFinding, aggregate_verification, build_verification_check
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError, RemnawaveNetworkError, SubscriptionDocument, User
 from meridian.verification import DeploymentVerificationContext, VerificationHttpsRoute
 from meridian.xray_client import ConnectionAttempt
+from tests.support.topology import single_exit_intent
 
 
 def _canonical(*args, **kwargs):
@@ -235,18 +235,7 @@ def test_basic_test_checks_managed_certificate_alongside_reality() -> None:
 
 
 def test_client_selection_prefers_v4_access_order() -> None:
-    intent = SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["preferred", "fallback"]),
-    )
+    intent = single_exit_intent(users=["preferred", "fallback"])
     panel = FakePanel(
         [
             User(username="fallback", status="ACTIVE", short_uuid="short-fallback"),
@@ -261,18 +250,7 @@ def test_client_selection_prefers_v4_access_order() -> None:
 
 
 def test_v4_default_client_selection_never_falls_back_to_service_users() -> None:
-    intent = SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["alice"]),
-    )
+    intent = single_exit_intent(users=["alice"])
     panel = FakePanel(
         [
             User(username="alice", status="DISABLED", short_uuid="short-alice"),
@@ -286,18 +264,7 @@ def test_v4_default_client_selection_never_falls_back_to_service_users() -> None
 
 
 def test_v4_requested_client_selection_rejects_service_user_without_lookup() -> None:
-    intent = SetupIntent(
-        control=ControlPlaneIntent(server_ref="srv-control"),
-        exits=[
-            ExitIntent(
-                id="exit-a",
-                server_ref="srv-exit",
-                paths=[ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.com")],
-            )
-        ],
-        default_egress_ref="exit-a",
-        access=AccessIntent(users=["alice"]),
-    )
+    intent = single_exit_intent(users=["alice"])
     panel = FakePanel([User(username="meridian-route-123", status="ACTIVE", short_uuid="short-service")])
     with patch.object(panel, "get_user", wraps=panel.get_user) as get_user:
         selected = select_active_client(
