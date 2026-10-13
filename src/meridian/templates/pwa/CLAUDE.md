@@ -4,38 +4,30 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 
 ## Design decisions
 
-**Vanilla ES5, no build step** — zero external dependencies, no CDN requests. Target users live in censored regions where external resources are blocked. The whole app is ~900 lines in an IIFE.
-
-**Runtime config** — `config.json` fetched at load, not baked into HTML. Enables server-side credential rotation without redeploying pages.
-
-**Shared/per-client split** — static assets (`app.js`, `styles.css`, `sw.js`, `icon.svg`, generated `apps.json`) deploy once to `/pwa/`; per-client shell/config files live in `/{uuid}/`. `config.json` points at Remnawave's canonical subscription URL; Meridian never rebuilds it.
-
-**Security model** — all user/config data goes through `escapeHtml()` (uses `textContent` via dummy div). QR base64 validated with `/^[A-Za-z0-9+/=]+$/` before `<img src>` injection. iOS deep links stored in `data-` attributes, never inline JS strings.
-
-**App catalog** — `_PWA_APPS` entries carry `platforms` (where the app runs) and `recommended` (where the page features it); file order is the recommendation order (Happ, FlClashX, Clash Mi, Throne). The page reads the shared, icon-bearing `pwa/apps.json` and falls back to the icon-free `config.apps`, so catalog edits reach old pages with the next asset upload.
-
-**Self-check** — `selfcheck.js` (injected by `app.js`, so shells rendered before it existed still get it) runs from the visitor's own network: clock vs the server `Date` header (warn above 60 s), a stream of the generated 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text with no links, hostnames, or UUIDs.
-
-**i18n** — English is the HTML default, NOT a translation dict. Non-EN languages swap via `data-t` attributes. Switching back to EN requires full `renderPage()` re-render.
-
-**Two-step setup card** — step 1 lists the platform's recommended apps ("Get" opens the store page), step 2 their "Add to" deep links for the canonical subscription. The subscription QR sits beside the steps on desktop (setting up a phone) and folds away on iOS/Android. Everything else is one list of quiet panels: all connections (Open/Copy/QR per link), "Not connecting?" (tips plus self-check), router guide.
+**Vanilla ES5, no build step** — one IIFE with zero dependencies; the self-hosting rule (root `CLAUDE.md`) applies to every asset.
+**Runtime config** — `config.json` is fetched at load, not baked into HTML, so credentials rotate without redeploying pages; it points at Remnawave's canonical subscription URL, which Meridian never rebuilds.
+**Shared/per-client split** — static assets (`app.js`, `selfcheck.js`, `styles.css`, `sw.js`, `icon.svg`, generated `apps.json` and `probe.bin`) deploy once to `/pwa/`; per-client shell and config live in `/{uuid}/`.
+**Security model** — all user/config data goes through `escapeHtml()`; QR base64 is validated before `<img src>` injection; iOS deep links live in `data-` attributes, never inline JS strings.
+**App catalog** — `_PWA_APPS` entries carry `platforms` (where it runs) and `recommended` (where the page features it), in recommendation order. The page reads the shared, icon-bearing `pwa/apps.json` and falls back to `config.apps`, so catalog edits reach old pages with the next asset upload.
+**Self-check** — `selfcheck.js` (injected by `app.js`, so older shells get it) runs from the visitor's network: clock vs the server `Date` header, a stream of the 96 KB `probe.bin` (freeze window and timeouts mirror `diagnostics/blocking.py`), and the subscription's HTTP status. "Copy report" yields English text without links, hostnames, or UUIDs.
+**i18n** — the website's asymmetric model (`website/src/i18n/CLAUDE.md`): English HTML, `data-t` swaps, and a full `renderPage()` to return to English.
+**Two-step setup card** — step 1 lists the platform's recommended apps, step 2 their "Add to" deep links; the subscription QR sits beside them on desktop and folds away on phones. Everything else is quiet panels: all connections, "Not connecting?", router guide.
 
 ## What's done well
 
 - **SW scope trick + graceful offline** — registered with `{scope: '../'}` to control sibling client dirs (needs nginx `Service-Worker-Allowed: "/"`); shell is stale-while-revalidate, config network-first with a 503 fallback.
-- **Color palettes** — six curated presets (ocean, sunset, forest, lavender, rose, slate) with auto dark/light variants. Selected via `config.color`, switches on system theme change.
-- **Clock skew detection** — warns if the device clock is more than `CLOCK_WARN_MS` behind the config's `generated_at`; `CLOCK_WARN_MS` (here and in `selfcheck.js`) mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS` (tested). Nothing breaks at a minute (Reality `maxTimeDiff` is unset), so the copy asks for automatic time and says connections *can* fail. Skipped if page was cached >1h to avoid false positives.
-- **Connection names are the subscription remarks** — rows show the Remnawave remark ("🇩🇪 DE · Reality · Chrome") verbatim; only the protocol hint below it is translated.
+- **Clock warnings share one threshold** — `CLOCK_WARN_MS` in `app.js` and `selfcheck.js` mirrors `core.defaults.CLOCK_DRIFT_WARN_SECONDS` (tested); the page check is skipped when the config is over an hour old, and the copy says connections *can* fail (Reality `maxTimeDiff` is unset).
+- **Connection names are the subscription remarks** — rows show the Remnawave remark verbatim; only the protocol hint below it is translated.
+- **Graceful extras** — wake lock for QR scanning fails quietly, the install banner auto-dismisses, and the skeleton admits a slow load after 10 s.
 
 ## Pitfalls
 
-- **Nested `<details>` CSS** — ALWAYS use `> summary` child combinator, never bare `summary`. Parent styles leak into nested summaries otherwise. This was a real bug.
-- **`<details>` markers need THREE rules** — `list-style:none`, `::-webkit-details-marker{display:none}`, `::marker{content:none}`. Missing any one leaves native triangles in some browsers.
-- **SW caches stale files** — use `--watch` mode during dev (disables SW, injects reload script).
-- **`_PWA_APPS` must match `apps.json`** — every field and the order must be identical; regenerate `apps.json` from `_PWA_APPS`. CI validates.
-- **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment` (its `name=` query is ignored), Throne's `addsub` takes standard Base64 only, and v2rayN documents no import scheme (no button).
-- **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes in rendered markup are silently dropped; use classes (CSSOM `el.style` still works).
-- **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW and use `cache: "no-store"`; a browser may reuse the page's warm connection, so a freeze is conclusive but a pass is weaker evidence.
-- **Exit countries are data** — `config.exit_countries` (ISO codes, subscription order) render as flag plus `Intl.DisplayNames` name and refresh in `applyI18n`; the page validates codes before building flags.
-- **Never put `data-t` on data** — a translated key swaps the element's whole text; the old cards replaced the first link's remark with "Основной" in Russian.
-- **Wake lock, install banner, skeleton** — wake lock keeps the screen on for QR scanning and fails gracefully; the `beforeinstallprompt` banner auto-dismisses; the skeleton says "Taking longer than expected" after 10 s.
+- **Nested `<details>` CSS** — always use the `> summary` child combinator; bare `summary` leaks parent styles into nested toggles.
+- **`<details>` markers need three rules** — `list-style:none`, `::-webkit-details-marker{display:none}`, `::marker{content:none}`.
+- **The SW caches stale files** — develop with `meridian dev preview --watch` (disables the SW, injects a reload script).
+- **`_PWA_APPS` must match `website/src/data/apps.json`** field for field and in order; CI validates.
+- **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment`, Throne's `addsub` takes standard Base64 only, and v2rayN has no import scheme (no button).
+- **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes are silently dropped; use classes (CSSOM `el.style` still works).
+- **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW with `cache: "no-store"`; a warm connection may be reused, so a freeze is conclusive but a pass is weaker evidence.
+- **Exit countries are data** — validate `config.exit_countries` ISO codes before building flags; names come from `Intl.DisplayNames` and refresh in `applyI18n`.
+- **Never put `data-t` on data** — a translated key replaces the element's whole text, remark included.
