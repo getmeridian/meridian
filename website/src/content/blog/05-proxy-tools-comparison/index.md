@@ -71,6 +71,8 @@ Fleets grow from the same CLI. `meridian node add` adds exits. `meridian relay a
 
 ## How to choose
 
+![Start from what you need: 3x-ui for many protocols in a browser, Remnawave for every knob with your own proxy and domain, Outline or Amnezia for setup from a desktop app, reality-ezpz for one Reality server, Meridian for a correctly set up fleet with relays and reviewed plans.](./how-to-choose.webp)
+
 - Many protocols and per-user controls in a browser: 3x-ui.
 - Every Remnawave knob, with your own reverse proxy and domain: Remnawave.
 - Setup from a desktop app: Outline or Amnezia.

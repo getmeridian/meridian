@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  .flow { display: grid; grid-template-columns: 1fr 28px 1fr 28px 1fr 28px 1fr; align-items: stretch; }
+  .stage { background: var(--s1); border: 1px solid var(--b1); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; }
+  .stage .label { margin-bottom: 8px; }
+  .stage h3 { font: 600 20px/1.2 var(--heading); }
+  .stage p { color: var(--t2); font-size: 15.5px; margin-top: 8px; }
+  .stage .pills { margin-top: auto; padding-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .stage.hl { border-color: #c8933a66; background: linear-gradient(var(--ac-bg), var(--ac-bg)), var(--s1); }
+  .guards { margin-top: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .guards .card { padding: 16px 18px; }
+  .guards h4 { font: 600 16.5px/1.25 var(--heading); }
+  .guards p { font-size: 15px; margin-top: 4px; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">Architecture</div>
+  <h1>Every change is an edit, a plan, and an apply</h1>
+  <p class="lede">Commands never touch the panel or a server directly. They edit the topology; apply makes the fleet match it.</p>
+  <div class="body">
+    <div class="flow">
+      <div class="stage"><div class="label">1 · Edit</div><h3>Topology in <code>cluster.yml</code></h3><p>Servers, roles, protocol paths, users, generated keys.</p><div class="pills"><span class="pill">deploy</span><span class="pill">node add</span><span class="pill">client add</span><span class="pill">route add</span></div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="label">2 · Compile</div><h3>Typed resources</h3><p>Firewall rules, nginx files, certificates, containers, Remnawave objects, ordered by dependency.</p><div class="pills"><span class="pill">pure: no I/O, no secrets</span></div></div>
+      <div class="arrow">→</div>
+      <div class="stage hl"><div class="label">3 · Plan</div><h3>Observe and diff</h3><p>Each resource is checked on the live servers and panel. You review what differs.</p><div class="pills"><span class="pill ac">plan hash</span></div></div>
+      <div class="arrow">→</div>
+      <div class="stage"><div class="label">4 · Apply</div><h3>Exactly that plan</h3><p>Checkpointed per step. What left the topology is deleted only after the rest converges.</p><div class="pills"><span class="pill ok">resumes if interrupted</span></div></div>
+    </div>
+    <div class="guards">
+      <div class="card"><h4>Unknown outcome? Look first</h4><p>A timed-out change is observed again before any retry.</p></div>
+      <div class="card"><h4>Fenced on the control server</h4><p>A stale copy of <code>cluster.yml</code> refuses to apply over newer state.</p></div>
+      <div class="card"><h4>Panel edits to owned resources revert</h4><p>Client status, limits, and expiry stay yours.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>meridian plan · meridian apply</span></div>
+</div>
+</body></html>

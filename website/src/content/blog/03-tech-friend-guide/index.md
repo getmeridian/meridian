@@ -72,6 +72,8 @@ Treat each link like a key: anyone who has it can connect. If one leaks, remove 
 
 If `meridian test` fails from your network but works from another network, the server's IP is probably blocked where you are.
 
+![Four troubleshooting steps in order: they tap Check my connection and send the report; they refresh the subscription and fix the clock; you run meridian test; you run meridian check, then meridian doctor.](./when-it-breaks.webp)
+
 ## Managing access
 
 ```bash

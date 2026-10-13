@@ -90,7 +90,9 @@ The best camouflage target is a site hosted in the server's own network, because
 
 **Hysteria2** is the UDP last resort for lossy networks. Xray listens on UDP 443 directly; nginx is not involved. Salamander obfuscation makes the packets look random instead of like QUIC. It is on by default, and `--no-hysteria2` turns it off.
 
-Every subscription lists all methods in order. Apps that import the Xray JSON, Mihomo, or sing-box format switch to the next method when one stops working. Other apps show each method as a separate entry. Users install apps such as Happ, v2RayTun, or Hiddify from their connection page and scan a QR code. There is no Meridian client app.
+Every subscription lists all methods in order. Apps that import the Xray JSON, Mihomo, or sing-box format switch to the next method when one stops working. Other apps show each method as a separate entry. Users install apps such as Happ, FlClashX, or Clash Mi from their connection page and scan a QR code. There is no Meridian client app.
+
+![Four connection methods in subscription order: Reality on TCP 443, the only one a relay carries; XHTTP on a secret path, through Cloudflare in domain mode; WSS, which needs a domain; and Hysteria2 on UDP 443 as the last resort.](./connection-methods.webp)
 
 ## Domain mode
 
@@ -109,6 +111,8 @@ A relay can announce its own SNI with `--sni`. The exit adds that name to its Re
 `cluster.yml` on your machine holds the topology: control server, exits, relays, gateways, protocol paths, the list of users, and the keys Meridian generated. Commands that change the fleet (`deploy`, `setup`, `node add`, `relay add`, `client add`, `route add`) edit that topology. None of them changes the panel or a server directly.
 
 A pure compiler turns the topology into typed resources: firewall rules, nginx files, certificates, containers, and Remnawave profiles, hosts, users, and templates. They are ordered by dependency and identified by a plan hash. The compiler does no I/O and generates no secrets.
+
+![Every change is an edit, a plan, and an apply: commands edit the topology in cluster.yml, a pure compiler turns it into typed resources, plan observes and diffs them with a plan hash, and apply runs exactly that plan with checkpoints.](./plan-apply.webp)
 
 `meridian plan` observes each resource on the live servers and panel and reports what differs. `meridian apply` shows the plan hash, then applies exactly that plan, checkpointing every step so an interrupted apply resumes. If a change times out, Meridian observes the resource again before retrying. Resources that left the topology are deleted only after the new plan converges. If you edit a resource Meridian owns in the panel, the next apply restores it. Client status, limits, and expiry stay yours.
 

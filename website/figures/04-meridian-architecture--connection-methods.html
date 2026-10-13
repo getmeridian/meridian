@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--s1); border: 1px solid var(--b1); border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 14px 16px; border-top: 1px solid var(--b1); vertical-align: top; }
+  thead th { border-top: none; background: var(--s2); font: 500 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--t2); }
+  tbody th { font: 600 19px/1.2 var(--heading); width: 190px; }
+  code { white-space: nowrap; }
+  tbody th small { display: block; font: 400 14px/1.3 var(--body); color: var(--t2); margin-top: 4px; }
+  td { font-size: 16px; color: var(--t2); }
+  td .yes, td .no { font-size: 16px; }
+  .order { font: 500 12px/1 var(--mono); color: var(--ac-ink); display: block; margin-bottom: 6px; letter-spacing: .08em; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">Architecture</div>
+  <h1>Four connection methods, one subscription</h1>
+  <p class="lede">Every subscription lists the methods in this order. Apps that import Xray JSON, Mihomo, or sing-box switch to the next one when a method stops working.</p>
+  <div class="body">
+    <table>
+      <thead><tr><th>Method</th><th>Wire</th><th>Who terminates TLS</th><th>Through a relay</th><th>Through Cloudflare</th><th>Needs</th></tr></thead>
+      <tbody>
+        <tr><th><span class="order">1 · PRIMARY</span>Reality<small>VLESS, uTLS Chrome + Firefox copies</small></th><td>TCP 443, routed by SNI</td><td>Xray, with the exit's x25519 key</td><td><span class="yes">Yes</span><br>relays carry Reality only</td><td><span class="no">No</span><br>dials the server IP</td><td>Nothing</td></tr>
+        <tr><th><span class="order">2</span>XHTTP<small>VLESS in HTTPS requests</small></th><td>TCP 443, secret path</td><td>nginx: IP certificate, or your domain's</td><td><span class="no">No</span></td><td><span class="yes">Yes</span>, in domain mode</td><td>Nothing</td></tr>
+        <tr><th><span class="order">3</span>WSS<small>VLESS over WebSocket</small></th><td>TCP 443, secret path</td><td>nginx, domain certificate</td><td><span class="no">No</span></td><td><span class="yes">Yes</span></td><td><code>--domain</code></td></tr>
+        <tr><th><span class="order">4 · LAST RESORT</span>Hysteria2<small>salamander, not QUIC-shaped</small></th><td>UDP 443, no nginx</td><td>Xray</td><td><span class="no">No</span></td><td><span class="no">No</span><br>Cloudflare can't carry UDP</td><td>On by default<br><code>--no-hysteria2</code> turns it off</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>Domain mode does not hide the server: Reality and Hysteria2 still dial its IP</span></div>
+</div>
+</body></html>

@@ -47,6 +47,8 @@ Docker writes its own iptables rules for published ports, and those rules match 
 
 Meridian avoids the problem by never publishing a public container port. The Remnawave backend binds `127.0.0.1:3000` and the subscription page `127.0.0.1:3020`. PostgreSQL and Valkey publish nothing; they sit on a private bridge network. The Remnawave node runs Xray in host networking, so its listeners go through the normal input chain, where UFW blocks them.
 
+![What a Meridian server exposes: SSH, TCP 443, UDP 443 for Hysteria2, TCP 80 for ACME, and a relay's listen port are opened by role. The Remnawave backend, subscription page, internal nginx TLS server, Xray backends, PostgreSQL and Valkey stay local or private, and the node API accepts only the control server.](./exposure-map.webp)
+
 ## One public port, routed by SNI
 
 nginx owns TCP/443. Its stream module reads the SNI from the TLS Client Hello and forwards the raw TCP stream without decrypting it:

@@ -40,6 +40,8 @@ Reality, part of Xray-core, uses TLS 1.3, the most common protocol on port 443, 
 
 Step 4 is the answer to active probing. A probe has no "wrong" response to trigger: it talks to a real website. Step 2 hides the authentication inside a field every TLS 1.3 Client Hello already contains.
 
+![One Client Hello, two outcomes: the censor sees the same TLS 1.3 Client Hello either way. A client with the exit's key gets a VLESS tunnel; a prober without a valid token is relayed to the real site and gets its genuine certificate.](./two-outcomes.webp)
+
 The client side matters too. A Go program's default TLS stack has its own Client Hello fingerprint, so Xray clients use **uTLS** to copy a browser's Client Hello byte for byte. Meridian defaults to Chrome and adds Firefox copies as backup entries in each subscription. `meridian deploy --fingerprint` switches to `safari`, `ios`, `android`, `edge`, or `random` if a region starts flagging the current one.
 
 ### The target has to fit the server

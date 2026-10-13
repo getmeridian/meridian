@@ -17,6 +17,8 @@ readingTime: 5
 
 Meridian configures the server correctly, but it can't change where the server lives. A perfect Reality setup on an address your users' network blocks still doesn't connect.
 
+![VPS checklist: the control server needs 2 GB RAM and 2 cores, an extra exit 1 GB and 1 core, a relay the smallest plan. Before deploying: public IPv4, TCP and UDP 443 open, fresh Debian or Ubuntu LTS, 2 GB free disk, clock within 30 seconds, hourly billing, no exit inside the censored country. Then test from inside users' networks.](./checklist.webp)
+
 ## Two kinds of servers
 
 - **Exit**: carries all traffic to the open internet. It goes outside the censored country.
