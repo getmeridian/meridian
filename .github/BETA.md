@@ -5,9 +5,10 @@
 
 ### Try it next to 3.x
 
-You need [uv](https://docs.astral.sh/uv/getting-started/installation/). On your computer the beta keeps its own state, so your 3.x command and `~/.meridian` stay untouched:
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) (macOS or Linux; on Windows use WSL). On your computer the beta keeps its own state, so your 3.x command and `~/.meridian` stay untouched:
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv and uvx; open a new terminal afterwards
 alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --from meridian-vpn@latest meridian'
 meridian4 deploy 198.51.100.10        # IP of the separate server
 ```
@@ -36,9 +37,10 @@ Open a [Meridian 4 beta report](https://github.com/getmeridian/meridian/issues/n
 
 ### Как попробовать рядом с 3.x
 
-Нужен [uv](https://docs.astral.sh/uv/getting-started/installation/). На вашем компьютере бета хранит своё состояние отдельно, поэтому команда 3.x и папка `~/.meridian` останутся как есть:
+Нужен [uv](https://docs.astral.sh/uv/getting-started/installation/) (macOS или Linux; на Windows через WSL). На вашем компьютере бета хранит своё состояние отдельно, поэтому команда 3.x и папка `~/.meridian` останутся как есть:
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh   # ставит uv и uvx; затем откройте новый терминал
 alias meridian4='MERIDIAN_HOME="$HOME/.meridian-v4" uvx --prerelease allow --from meridian-vpn@latest meridian'
 meridian4 deploy 198.51.100.10        # IP отдельного сервера
 ```
