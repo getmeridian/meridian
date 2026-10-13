@@ -75,13 +75,14 @@ def test_malformed_cluster_emits_one_typed_envelope(command, runner, code) -> No
     buf = io.StringIO()
     error = LocalStateCorruptedError("Cannot safely load cluster.yml", hint="Restore a backup.")
 
+    set_json_mode(True)
     try:
         with (
             patch.object(ClusterConfig, "load", side_effect=error),
             redirect_stdout(buf),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            runner(json_output=True)
+            runner()
     finally:
         set_json_mode(False)
 

@@ -63,7 +63,7 @@
       ],
       "command": "api.schema",
       "data_schema": "api-schema",
-      "description": "Print one meridian-core JSON schema",
+      "description": "Print one meridian-core JSON schema (raw JSON Schema unless --envelope or --json)",
       "envelope_schema": "api-schema-envelope",
       "error_schema": "error",
       "exit_codes": {

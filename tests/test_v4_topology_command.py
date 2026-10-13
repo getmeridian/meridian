@@ -183,7 +183,7 @@ def test_v4_apply_json_confirmation_returns_typed_preview() -> None:
 def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error: Exception) -> None:
     output = io.StringIO()
     target = f"meridian.commands.{command}.run_v4_{command}"
-    kwargs = {"yes": True, "json_output": True} if command == "apply" else {"json_output": True}
+    kwargs = {"yes": True} if command == "apply" else {}
     runner = run_apply_command if command == "apply" else run_plan_command
     set_json_mode(True)
     try:
@@ -220,7 +220,7 @@ def test_v4_apply_persistence_failure_is_typed_system_error() -> None:
             redirect_stdout(output),
             pytest.raises(typer.Exit) as exc_info,
         ):
-            run_apply_command(yes=True, json_output=True)
+            run_apply_command(yes=True)
     finally:
         set_json_mode(False)
 

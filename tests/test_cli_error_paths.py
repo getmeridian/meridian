@@ -36,7 +36,6 @@ class TestEntryPointErrors:
 
     def test_check_json_validation_error_names_the_check_command(self, monkeypatch, tmp_home) -> None:
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "check", "--domain", "bad_domain", "--json"])
         _reset_output_modes()
         try:
             result = runner.invoke(app, ["check", "--domain", "bad_domain", "--json"])

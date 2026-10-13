@@ -7,13 +7,13 @@ from the CLI; `core.command_catalog.COMMAND_OUTPUTS` adds only what Typer cannot
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import click
 from typer.main import get_command
 
-from meridian.core.command_catalog import COMMAND_OUTPUTS, CommandCatalogEntry, CommandContract, command_contract
-from meridian.core.schema import schema_for
+if TYPE_CHECKING:
+    from meridian.core.command_catalog import CommandContract
 
 
 def cli_root() -> click.Group:
@@ -53,6 +53,48 @@ def long_options(command: click.Command, *, include_hidden: bool = True) -> list
     return flags
 
 
+def supports_json(command: click.Command) -> bool:
+    """A command emits a JSON envelope exactly when it declares `--json`."""
+    return "--json" in long_options(command)
+
+
+def command_path(ctx: click.Context, args: list[str]) -> tuple[list[str], click.Command | None, list[str]]:
+    """Walk `args` from `ctx.command` down to the command they name.
+
+    Returns the names consumed (including an unknown last name), the command reached
+    (None when the last name is unknown), and the arguments left for it.
+    """
+    command: click.Command | None = ctx.command
+    path: list[str] = []
+    rest = list(args)
+    while isinstance(command, click.Group):
+        index = next((i for i, arg in enumerate(rest) if not arg.startswith("-")), None)
+        if index is None:
+            break
+        path.append(rest[index])
+        rest = rest[index + 1 :]
+        command = command.get_command(ctx, path[-1])
+    return path, command, rest
+
+
+def requests_machine_output(ctx: click.Context, name: str, command: click.Command, args: list[str]) -> bool:
+    """Whether `args` turn on one of the command's machine-output options.
+
+    Click parses them leniently (no callbacks fire, errors are ignored), so value-taking
+    options never pass for flags; machine-output options are those whose callback is
+    `cli_options.enable_json_output`.
+    """
+    from meridian.cli_options import enable_json_output
+
+    parsed = command.make_context(name, list(args), parent=ctx, resilient_parsing=True)
+    return any(
+        isinstance(param, click.Option)
+        and getattr(param.callback, "__wrapped__", param.callback) is enable_json_output
+        and bool(parsed.params.get(param.name or ""))
+        for param in command.params
+    )
+
+
 def command_argv(path: str, command: click.Command) -> list[str]:
     """The command path plus its arguments: `NAME`, `NAME...` when repeated, `[NAME]` when optional."""
     argv = path.split(".")
@@ -73,6 +115,8 @@ def _summary(command: click.Command) -> str:
 
 def command_contracts(root: click.Group | None = None) -> list[CommandContract]:
     """Contracts of every JSON command, in stable command-name order."""
+    from meridian.core.command_catalog import COMMAND_OUTPUTS, command_contract
+
     contracts = []
     for path, command in public_commands(root).items():
         output = COMMAND_OUTPUTS.get(path)
@@ -91,6 +135,9 @@ def command_contracts(root: click.Group | None = None) -> list[CommandContract]:
 
 def command_catalog(*, include_schemas: bool = False) -> list[dict[str, Any]]:
     """Command contract metadata, optionally embedding envelope, data, failure, and error schemas."""
+    from meridian.core.command_catalog import CommandCatalogEntry
+    from meridian.core.schema import schema_for
+
     catalog: list[dict[str, Any]] = []
     for contract in command_contracts():
         entry = CommandCatalogEntry(

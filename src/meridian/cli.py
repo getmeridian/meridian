@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 from typing import Annotated, NoReturn
 
 import click
@@ -10,16 +11,20 @@ import typer
 from typer.core import TyperGroup
 
 from meridian import __version__
+from meridian.cli_catalog import command_path, requests_machine_output, supports_json
 from meridian.cli_options import (
+    JSON_HELP,
     SSH_PORT_HELP,
     USER_HELP,
     YES_HELP,
+    Json,
     NewServer,
     SshPort,
     Target,
     Timeout,
     User,
     Yes,
+    enable_json_output,
 )
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner
@@ -57,8 +62,25 @@ RENAMED: dict[str, str] = {
 RENAMED_OPTIONS: dict[str, str] = {"--server": "the first argument"}
 
 
+@dataclass(frozen=True)
+class _Invocation:
+    """The command an argv names, resolved through Click before the root callback runs."""
+
+    name: str
+    supports_json: bool
+    machine_output: bool
+    help_requested: bool
+
+
+_INVOCATION = "meridian.invocation"
+
+
 class _SectionedGroup(TyperGroup):
-    """Lists commands in the `_HELP_LAYOUT` order; anything unlisted (the hidden `dev` app) goes last."""
+    """Lists commands in the `_HELP_LAYOUT` order; anything unlisted (the hidden `dev` app) goes last.
+
+    Resolving a command also records what it is (`_Invocation`) for the root callback,
+    which runs before Click parses the command's own options, and refuses `RENAMED` spellings.
+    """
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         names = super().list_commands(ctx)
@@ -68,35 +90,32 @@ class _SectionedGroup(TyperGroup):
         self, ctx: click.Context, args: list[str]
     ) -> tuple[str | None, click.Command | None, list[str]]:
         if not ctx.resilient_parsing:
-            _refuse_renamed(ctx, args)
+            path, command, rest = command_path(ctx, args)
+            _refuse_renamed(ctx, path, command, rest)
+            leaf = command if command is not None and not isinstance(command, click.Group) else None
+            ctx.meta[_INVOCATION] = _Invocation(
+                name=".".join(path),
+                supports_json=leaf is not None and supports_json(leaf),
+                machine_output=leaf is not None and requests_machine_output(ctx, path[-1], leaf, rest),
+                help_requested=any(arg in ctx.help_option_names for arg in args),
+            )
         return super().resolve_command(ctx, args)
 
 
-def _refuse_renamed(ctx: click.Context, args: list[str]) -> None:
-    """Fail with exit 2 and a one-line hint when `args` use a spelling from `RENAMED`."""
-    group: click.Command | None = ctx.command
-    path: list[str] = []
-    rest = list(args)
-    while isinstance(group, click.Group):
-        index = next((i for i, arg in enumerate(rest) if not arg.startswith("-")), None)
-        if index is None:
-            return
-        path.append(rest[index])
-        rest = rest[index + 1 :]
-        old = " ".join(path)
-        if old in RENAMED:
-            _fail_renamed(ctx, old, f"`meridian {old}` is now `meridian {RENAMED[old]}`", rest)
-        group = group.get_command(ctx, path[-1])
-    if group is None:
+def _refuse_renamed(ctx: click.Context, path: list[str], command: click.Command | None, rest: list[str]) -> None:
+    """Fail with exit 2 and a one-line hint when the argv uses a spelling from `RENAMED`."""
+    old = " ".join(path)
+    if old in RENAMED:
+        _fail_renamed(ctx, old, f"`meridian {old}` is now `meridian {RENAMED[old]}`", rest)
+    if command is None or isinstance(command, click.Group):
         return
     for arg in rest:
         if arg == "--":
             return
         option = arg.split("=", 1)[0]
         if option in RENAMED_OPTIONS:
-            command = " ".join(path)
-            message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {command} SERVER`"
-            _fail_renamed(ctx, command, message, rest)
+            message = f"`{option}` is now {RENAMED_OPTIONS[option]}: `meridian {old} SERVER`"
+            _fail_renamed(ctx, old, message, rest)
 
 
 def _fail_renamed(ctx: click.Context, command: str, message: str, rest: list[str]) -> NoReturn:
@@ -180,11 +199,10 @@ def main_callback(
             handlers=[logging.StreamHandler(sys.stderr)],
         )
 
+    invocation: _Invocation | None = ctx.meta.get(_INVOCATION)
+    # `api schema NAME` prints raw JSON Schema even without a flag, so every api command is machine output.
     machine_output = (
-        json_mode
-        or ctx.invoked_subcommand == "api"
-        or _argv_requests_machine_output()
-        or _argv_requests_machine_output(list(ctx.args))
+        json_mode or ctx.invoked_subcommand == "api" or (invocation is not None and invocation.machine_output)
     )
     if machine_output:
         from meridian.console import set_quiet_mode
@@ -195,14 +213,11 @@ def main_callback(
         from meridian.console import error_context, fail, set_json_mode
 
         set_json_mode(True)
-        candidate_args = [list(ctx.args), sys.argv[1:]]
-        if ctx.invoked_subcommand:
-            candidate_args.append([ctx.invoked_subcommand])
-        if not any(args and _argv_supports_global_json(args) for args in candidate_args):
-            command = next((_argv_command_name(args) for args in candidate_args if args), "cli")
+        if invocation is None or not invocation.supports_json:
+            command = invocation.name if invocation is not None else "cli"
             with error_context(command):
                 fail(
-                    f"JSON output is not yet supported for `{command}`",
+                    f"JSON output is not yet supported for `{command.replace('.', ' ')}`",
                     hint="Run `meridian api commands --json` to list supported machine-readable commands.",
                     hint_type="user",
                 )
@@ -220,21 +235,13 @@ def main_callback(
         _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))
         raise typer.Exit()
 
-    if not machine_output and "--help" not in sys.argv and "-h" not in sys.argv:
+    if not machine_output and not (invocation is not None and invocation.help_requested):
         banner(__version__)
 
     if not DISABLE_UPDATE_CHECK and not machine_output and ctx.invoked_subcommand not in ("update",):
         from meridian.update import check_for_update
 
         check_for_update(__version__)
-
-
-def _enable_json_output() -> None:
-    """Enable JSON output from command-local --json flags."""
-    from meridian.console import set_json_mode, set_quiet_mode
-
-    set_json_mode(True)
-    set_quiet_mode(True)
 
 
 def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
@@ -256,87 +263,6 @@ def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
             setup_v4.run()
             return
     typer.echo(ctx.get_help())
-
-
-def _argv_requests_machine_output(args: list[str] | None = None) -> bool:
-    """Detect command-local machine-output flags before Typer enters subcommands."""
-    args = args or sys.argv[1:]
-    if "--json" in args or "--envelope" in args:
-        return True
-    if "--events" in args or any(arg.startswith("--events=") for arg in args):
-        return True
-
-    # `meridian api schema NAME` writes raw JSON Schema even without a flag.
-    positionals = [arg for arg in args if not arg.startswith("-")]
-    return len(positionals) >= 2 and positionals[:2] == ["api", "schema"]
-
-
-def _argv_positionals(args: list[str] | None = None) -> list[str]:
-    """Return argv tokens that identify the command path."""
-    args = args or sys.argv[1:]
-    positionals: list[str] = []
-    skip_next = False
-    value_options = {
-        "--config",
-        "--domain",
-        "--sni",
-        "--user",
-        "--ssh-port",
-        "--port",
-        "--assets-dir",
-        "--parallel",
-        "--request",
-        "--cancel-file",
-        "--events",
-        "--timeout",
-        "--client",
-    }
-    for arg in args:
-        if skip_next:
-            skip_next = False
-            continue
-        if arg in value_options:
-            skip_next = True
-            continue
-        if arg.startswith("-"):
-            continue
-        positionals.append(arg)
-    return positionals
-
-
-def _argv_command_name(args: list[str] | None = None) -> str:
-    """Best-effort command name for early global JSON validation."""
-    positionals = _argv_positionals(args)
-    if not positionals:
-        return "cli"
-    if positionals[0] in {"client", "fleet", "api", "node", "relay"} and len(positionals) >= 2:
-        return f"{positionals[0]}.{positionals[1]}"
-    return positionals[0]
-
-
-def _argv_supports_global_json(args: list[str] | None = None) -> bool:
-    """Return True when global --json maps to a command envelope."""
-    positionals = _argv_positionals(args)
-    if not positionals:
-        return False
-    if positionals[0] in {"plan", "apply", "probe", "test"}:
-        return True
-    if positionals[0] == "deploy":
-        return True
-    if positionals[:2] in (
-        ["client", "list"],
-        ["client", "show"],
-        ["client", "add"],
-        ["client", "remove"],
-        ["client", "enable"],
-        ["client", "disable"],
-        ["fleet", "status"],
-        ["fleet", "inventory"],
-        ["node", "list"],
-        ["relay", "list"],
-    ):
-        return True
-    return positionals[0] == "api"
 
 
 @app.command("studio", rich_help_panel=ADVANCED)
@@ -387,7 +313,7 @@ def help_cmd(
 
 @app.command("plan", rich_help_panel=CHECK_AND_FIX)
 def plan_cmd(
-    json_output: bool = typer.Option(False, "--json", help="Emit plan as JSON for CI consumption"),
+    _json: Json = False,
 ) -> None:
     """Show what apply would change, comparing your topology with live servers
 
@@ -398,17 +324,14 @@ def plan_cmd(
       [yellow]3[/yellow] = required observation evidence unavailable
     """
     from meridian.commands.plan import run
-    from meridian.console import is_json_mode
 
-    if json_output:
-        _enable_json_output()
-    run(json_output=json_output or is_json_mode())
+    run()
 
 
 @app.command("apply", rich_help_panel=CHECK_AND_FIX)
 def apply_cmd(
     yes: Yes = False,
-    json_output: bool = typer.Option(False, "--json", help="Emit final apply result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Apply the reviewed topology in cluster.yml to your servers
 
@@ -420,12 +343,8 @@ def apply_cmd(
       [cyan]meridian apply --yes[/cyan]        Apply without confirmation
     """
     from meridian.commands.apply import run
-    from meridian.console import is_json_mode
 
-    json_enabled = json_output or is_json_mode()
-    if json_enabled:
-        _enable_json_output()
-    run(yes=yes, json_output=json_enabled)
+    run(yes=yes)
 
 
 @app.command("setup", rich_help_panel=GET_STARTED)
@@ -547,11 +466,15 @@ def deploy_cmd(
         "", "--color", help="Page color theme (ocean/sunset/forest/lavender/rose/slate)", rich_help_panel="Branding"
     ),
     yes: Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP, rich_help_panel=AUTOMATION)] = False,
-    json_output: bool = typer.Option(
-        False, "--json", help="Emit final deploy result as JSON", rich_help_panel=AUTOMATION
+    _json: bool = typer.Option(
+        False, "--json", help=JSON_HELP, callback=enable_json_output, rich_help_panel=AUTOMATION
     ),
     events: str = typer.Option(
-        "", "--events", help="Stream progress events as JSONL (use: jsonl)", rich_help_panel=AUTOMATION
+        "",
+        "--events",
+        help="Stream progress events as JSONL (use: jsonl)",
+        callback=enable_json_output,
+        rich_help_panel=AUTOMATION,
     ),
     request_path: str = typer.Option(
         "", "--request", help="Deploy-request JSON file or '-' for stdin", rich_help_panel=AUTOMATION
@@ -583,9 +506,6 @@ def deploy_cmd(
     from meridian.commands.deploy import run
     from meridian.console import is_json_mode
 
-    json_enabled = json_output or is_json_mode() or bool(events)
-    if json_enabled:
-        _enable_json_output()
     run(
         ip,
         domain,
@@ -605,7 +525,7 @@ def deploy_cmd(
         ssh_port=ssh_port,
         fingerprint=fingerprint,
         request_path=request_path,
-        json_output=json_enabled,
+        json_output=is_json_mode(),
         events=events,
         dry_run=dry_run,
         cancel_file=cancel_file,
@@ -615,7 +535,7 @@ def deploy_cmd(
 @client_app.command("add")
 def client_add(
     names: list[str] = typer.Argument(..., metavar="NAME", help="Client name(s) to add"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
 ) -> None:
@@ -629,15 +549,13 @@ def client_add(
     """
     from meridian.commands.client import run_add
 
-    if json_mode:
-        _enable_json_output()
     run_add(names)
 
 
 @client_app.command("show")
 def client_show_cmd(
     name: str = typer.Argument(..., help="Client name"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
     repair_page: bool = typer.Option(False, "--repair-page", help="Republish the client's connection page"),
 ) -> None:
     """Show a client's connection page, subscription link, and status
@@ -647,20 +565,16 @@ def client_show_cmd(
     """
     from meridian.commands.client import run_show
 
-    if json_mode:
-        _enable_json_output()
     run_show(name, repair_page=repair_page)
 
 
 @client_app.command("list")
 def client_list_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """List managed access clients with status and traffic"""
     from meridian.commands.client import run_list
 
-    if json_mode:
-        _enable_json_output()
     run_list()
 
 
@@ -668,39 +582,33 @@ def client_list_cmd(
 def client_remove(
     name: str = typer.Argument(..., help="Client name"),
     yes: Yes = False,
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Remove a client permanently; their links stop working"""
     from meridian.commands.client import run_remove
 
-    if json_mode:
-        _enable_json_output()
     run_remove(name, yes=yes)
 
 
 @client_app.command("enable")
 def client_enable_cmd(
     name: str = typer.Argument(..., help="Client name"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Resume a suspended client"""
     from meridian.commands.client import run_enable
 
-    if json_mode:
-        _enable_json_output()
     run_enable(name)
 
 
 @client_app.command("disable")
 def client_disable_cmd(
     name: str = typer.Argument(..., help="Client name"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Suspend a client until you enable them again"""
     from meridian.commands.client import run_disable
 
-    if json_mode:
-        _enable_json_output()
     run_disable(name)
 
 
@@ -744,7 +652,7 @@ def check_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
     ai: bool = typer.Option(False, "--ai", help="Copy an AI-ready diagnostic prompt to the clipboard"),
-    json_output: bool = typer.Option(False, "--json", help="Output a typed check result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Check server health, or whether a new server can run Meridian
 
@@ -760,8 +668,6 @@ def check_cmd(
     """
     from meridian.commands.health import run
 
-    if json_output:
-        _enable_json_output()
     run(target, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai)
 
 
@@ -794,7 +700,7 @@ def test_cmd(
     basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
     probe: bool = typer.Option(False, "--probe", help="Look at the server the way a censor's scanner would"),
     timeout: Timeout = "5",
-    json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Test real proxy traffic from this device (no SSH needed)
 
@@ -808,8 +714,6 @@ def test_cmd(
       [cyan]meridian test --client alice[/cyan]        Use one client's connection
       [cyan]meridian test --probe[/cyan]               See the server as a censor would
     """
-    if json_output:
-        _enable_json_output()
     if probe:
         from meridian.commands.probe import run as run_probe
         from meridian.console import fail
@@ -828,7 +732,7 @@ def probe_cmd(
     ip: str = typer.Argument("", metavar="TARGET", help="Server IP, domain, or saved name", show_default=False),
     sni: str = typer.Option("", "--sni", "-s", help="SNI to use for generic probes"),
     timeout: Timeout = "5",
-    json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Look at a server the way a censor's scanner would (same as test --probe)
 
@@ -838,8 +742,6 @@ def probe_cmd(
     """
     from meridian.commands.probe import run
 
-    if json_output:
-        _enable_json_output()
     run(ip, sni, timeout)
 
 
@@ -936,13 +838,11 @@ def relay_add_cmd(
 @relay_app.command("list")
 def relay_list_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Filter by exit server IP or name"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """List all relay nodes"""
     from meridian.commands.relay import run_list
 
-    if json_mode:
-        _enable_json_output()
     run_list(exit)
 
 
@@ -976,7 +876,7 @@ def route_add_cmd(
     ),
     via: str = typer.Option(..., "--via", help="warp, direct, or block"),
     name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Send matching destinations through WARP, directly, or nowhere
 
@@ -989,21 +889,17 @@ def route_add_cmd(
     """
     from meridian.commands.route import run_add
 
-    if json_mode:
-        _enable_json_output()
     run_add(exit, values, via, name)
 
 
 @route_app.command("list")
 def route_list_cmd(
     exit: str = typer.Argument("", help="Only this exit (ID, saved name, or IP)"),
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """List every exit's egress overrides in first-match order"""
     from meridian.commands.route import run_list
 
-    if json_mode:
-        _enable_json_output()
     run_list(exit)
 
 
@@ -1012,13 +908,11 @@ def route_remove_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
     route_id: str = typer.Argument(..., metavar="ROUTE", help="Route ID from `meridian route list`"),
     yes: Yes = False,
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Remove one egress override; its destinations follow the exit's default again"""
     from meridian.commands.route import run_remove
 
-    if json_mode:
-        _enable_json_output()
     run_remove(exit, route_id, yes=yes)
 
 
@@ -1056,13 +950,11 @@ def node_add_cmd(
 
 @node_app.command("list")
 def node_list_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """List all nodes with live status"""
     from meridian.commands.node import run_list
 
-    if json_mode:
-        _enable_json_output()
     run_list()
 
 
@@ -1115,13 +1007,11 @@ def node_remove_cmd(
 
 @fleet_app.command("status")
 def fleet_status_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Show fleet health — panel, nodes, relays, clients"""
     from meridian.commands.fleet import run_status
 
-    if json_mode:
-        _enable_json_output()
     exit_code = run_status()
     if exit_code:
         raise typer.Exit(exit_code)
@@ -1129,13 +1019,11 @@ def fleet_status_cmd(
 
 @fleet_app.command("inventory")
 def fleet_inventory_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    _json: Json = False,
 ) -> None:
     """Show configured topology with live status"""
     from meridian.commands.fleet import run_inventory
 
-    if json_mode:
-        _enable_json_output()
     run_inventory()
 
 
@@ -1165,55 +1053,56 @@ def fleet_upgrade_cmd(
 
 @api_app.command("schemas")
 def api_schemas_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output schema catalog as JSON envelope"),
-    include_schemas: bool = typer.Option(False, "--include-schemas", help="Include full JSON schemas in output"),
+    _json: Json = False,
+    include_schemas: bool = typer.Option(
+        False, "--include-schemas", help="Include full JSON schemas (implies --json)", callback=enable_json_output
+    ),
 ) -> None:
     """List meridian-core JSON schemas"""
     from meridian.commands.api import run_schemas
 
-    if json_mode or include_schemas:
-        _enable_json_output()
-    run_schemas(json_output=json_mode or include_schemas, include_schemas=include_schemas)
+    run_schemas(include_schemas=include_schemas)
 
 
 @api_app.command("commands")
 def api_commands_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output command catalog as JSON envelope"),
-    include_schemas: bool = typer.Option(False, "--include-schemas", help="Include envelope and data schemas"),
+    _json: Json = False,
+    include_schemas: bool = typer.Option(
+        False,
+        "--include-schemas",
+        help="Include envelope and data schemas (implies --json)",
+        callback=enable_json_output,
+    ),
 ) -> None:
     """List machine-readable command contracts"""
     from meridian.commands.api import run_commands
 
-    if json_mode or include_schemas:
-        _enable_json_output()
-    run_commands(json_output=json_mode or include_schemas, include_schemas=include_schemas)
+    run_commands(include_schemas=include_schemas)
 
 
 @api_app.command("schema")
 def api_schema_cmd(
     name: str = typer.Argument(..., help="Schema name from 'meridian api schemas'"),
-    envelope_output: bool = typer.Option(False, "--envelope", help="Wrap schema in meridian.output/v1"),
-    json_mode: bool = typer.Option(False, "--json", help="Alias for --envelope"),
+    _envelope: bool = typer.Option(
+        False, "--envelope", help="Wrap schema in meridian.output/v1", callback=enable_json_output
+    ),
+    _json: Json = False,
 ) -> None:
-    """Print one meridian-core JSON schema"""
+    """Print one meridian-core JSON schema (raw JSON Schema unless --envelope or --json)"""
     from meridian.commands.api import run_schema
 
-    if envelope_output or json_mode:
-        _enable_json_output()
-    run_schema(name, envelope_output=envelope_output or json_mode)
+    run_schema(name)
 
 
 @api_app.command("workflow")
 def api_workflow_cmd(
     name: str = typer.Argument(..., help="Workflow name (e.g. deploy)"),
-    json_mode: bool = typer.Option(False, "--json", help="Output workflow plan as JSON envelope"),
+    _json: Json = False,
 ) -> None:
     """Print one meridian-core workflow plan"""
     from meridian.commands.api import run_workflow
 
-    if json_mode:
-        _enable_json_output()
-    run_workflow(name, json_output=json_mode)
+    run_workflow(name)
 
 
 @dev_app.command("preview")

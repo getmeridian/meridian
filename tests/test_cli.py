@@ -535,7 +535,6 @@ class TestCommandLocalJsonQuieting:
     def test_global_json_rejects_unmigrated_command(self, monkeypatch) -> None:
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "--json", "node", "remove"])
 
         result = runner.invoke(app, ["--json", "node", "remove"])
 
@@ -547,14 +546,53 @@ class TestCommandLocalJsonQuieting:
         assert payload["errors"][0]["category"] == "user"
         assert "Meridian v" not in result.output
 
+    def test_global_json_is_accepted_exactly_by_commands_that_declare_json(self, monkeypatch) -> None:
+        from meridian.cli_catalog import public_commands, supports_json
+
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        for path, command in public_commands().items():
+            _reset_output_modes()
+            # --help stops after the root callback has accepted or refused the global --json.
+            result = runner.invoke(app, ["--json", *path.split("."), "--help"])
+            _reset_output_modes()
+
+            assert result.exit_code == (0 if supports_json(command) else 2), path
+
+    def test_global_json_reaches_check_and_route_list(self, monkeypatch) -> None:
+        seen: list[bool] = []
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr("meridian.commands.health.run", lambda *_a, **_k: seen.append(is_json_mode()))
+        monkeypatch.setattr("meridian.commands.route.run_list", lambda *_a, **_k: seen.append(is_json_mode()))
+
+        for argv in (["--json", "check"], ["--json", "route", "list", "exit-1"]):
+            _reset_output_modes()
+            result = runner.invoke(app, argv)
+            _reset_output_modes()
+            assert result.exit_code == 0, argv
+
+        assert seen == [True, True]
+
+    def test_an_option_value_spelled_like_json_is_not_a_machine_flag(self, monkeypatch) -> None:
+        seen: list[bool] = []
+        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+        monkeypatch.setattr("meridian.update.check_for_update", lambda _version: None)
+        monkeypatch.setattr("meridian.commands.diagnostics.run", lambda *_a, **_k: seen.append(is_json_mode()))
+
+        _reset_output_modes()
+        result = runner.invoke(app, ["doctor", "--sni", "--json"])
+        _reset_output_modes()
+
+        assert result.exit_code == 0
+        assert seen == [False]
+        assert "Meridian v" in result.output
+
     def test_plan_command_json_suppresses_banner(self, monkeypatch) -> None:
-        def fake_run(*, json_output: bool) -> None:
-            assert json_output is True
+        def fake_run() -> None:
+            assert is_json_mode()
             print('{"ok": true}')
 
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "plan", "--json"])
         monkeypatch.setattr("meridian.commands.plan.run", fake_run)
 
         result = runner.invoke(app, ["plan", "--json"])
@@ -563,14 +601,13 @@ class TestCommandLocalJsonQuieting:
         assert result.exit_code == 0
         assert _assert_machine_json_without_banner(result.output) == {"ok": True}
 
-    def test_apply_global_json_passes_json_output(self, monkeypatch) -> None:
-        def fake_run(*_args: object, **kwargs: object) -> None:
-            assert kwargs["json_output"] is True
+    def test_apply_global_json_turns_on_json_mode(self, monkeypatch) -> None:
+        def fake_run(*_args: object, **_kwargs: object) -> None:
+            assert is_json_mode()
             print('{"ok": true}')
 
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "--json", "apply", "--yes"])
         monkeypatch.setattr("meridian.commands.apply.run", fake_run)
 
         result = runner.invoke(app, ["--json", "apply", "--yes"])
@@ -585,7 +622,6 @@ class TestCommandLocalJsonQuieting:
 
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "client", "list", "--json"])
         monkeypatch.setattr("meridian.commands.client.run_list", fake_run_list)
 
         result = runner.invoke(app, ["client", "list", "--json"])
@@ -600,7 +636,6 @@ class TestCommandLocalJsonQuieting:
 
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "client", "show", "alice", "--json"])
         monkeypatch.setattr("meridian.commands.client.run_show", fake_run_show)
 
         result = runner.invoke(app, ["client", "show", "alice", "--json"])
@@ -615,7 +650,6 @@ class TestCommandLocalJsonQuieting:
 
         _reset_output_modes()
         monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr(cli.sys, "argv", ["meridian", "fleet", "status", "--json"])
         monkeypatch.setattr("meridian.commands.fleet.run_status", fake_run_status)
 
         result = runner.invoke(app, ["fleet", "status", "--json"])

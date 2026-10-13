@@ -13,12 +13,12 @@ from meridian.core.services.workflows import WorkflowNotFoundError, collect_work
 from meridian.renderers import emit_json
 
 
-def run_schemas(*, json_output: bool = False, include_schemas: bool = False) -> None:
+def run_schemas(*, include_schemas: bool = False) -> None:
     """List meridian-core schemas."""
     operation = OperationContext()
     with error_context("api.schemas", timer=operation.timer):
-        catalog = schema_catalog(include_schemas=include_schemas and (json_output or is_json_mode()))
-        if json_output or is_json_mode():
+        catalog = schema_catalog(include_schemas=include_schemas and is_json_mode())
+        if is_json_mode():
             emit_json(
                 command_envelope(
                     command="api.schemas",
@@ -36,12 +36,12 @@ def run_schemas(*, json_output: bool = False, include_schemas: bool = False) -> 
         err_console.print()
 
 
-def run_commands(*, json_output: bool = False, include_schemas: bool = False) -> None:
+def run_commands(*, include_schemas: bool = False) -> None:
     """List machine-readable command contracts."""
     operation = OperationContext()
     with error_context("api.commands", timer=operation.timer):
-        catalog = command_catalog(include_schemas=include_schemas and (json_output or is_json_mode()))
-        if json_output or is_json_mode():
+        catalog = command_catalog(include_schemas=include_schemas and is_json_mode())
+        if is_json_mode():
             emit_json(
                 command_envelope(
                     command="api.commands",
@@ -63,14 +63,14 @@ def run_commands(*, json_output: bool = False, include_schemas: bool = False) ->
         err_console.print()
 
 
-def run_schema(name: str, *, envelope_output: bool = False) -> None:
+def run_schema(name: str) -> None:
     """Print one meridian-core JSON Schema."""
     operation = OperationContext()
     with error_context("api.schema", timer=operation.timer):
         try:
             schema = schema_for(name)
         except ValueError as exc:
-            if not envelope_output and not is_json_mode():
+            if not is_json_mode():
                 emit_json(
                     command_envelope(
                         command="api.schema",
@@ -93,7 +93,7 @@ def run_schema(name: str, *, envelope_output: bool = False) -> None:
                 raise typer.Exit(code=2) from exc
             fail(str(exc), hint="Run: meridian api schemas", hint_type="user")
 
-        if envelope_output or is_json_mode():
+        if is_json_mode():
             emit_json(
                 command_envelope(
                     command="api.schema",
@@ -107,7 +107,7 @@ def run_schema(name: str, *, envelope_output: bool = False) -> None:
         emit_json(schema)
 
 
-def run_workflow(name: str, *, json_output: bool = False) -> None:
+def run_workflow(name: str) -> None:
     """Print one meridian-core workflow plan."""
     operation = OperationContext()
     with error_context("api.workflow", timer=operation.timer):
@@ -116,7 +116,7 @@ def run_workflow(name: str, *, json_output: bool = False) -> None:
         except WorkflowNotFoundError as exc:
             fail(str(exc), hint="Run: meridian api workflow deploy --json", hint_type="user")
 
-        if json_output or is_json_mode():
+        if is_json_mode():
             emit_json(
                 command_envelope(
                     command="api.workflow",

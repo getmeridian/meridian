@@ -392,7 +392,7 @@ meridian api workflow NAME [--json]
 
 **`api schemas`** — lists schema names such as `output-envelope`, `deploy-request`, `deploy-result`, `deploy-plan`, `plan-envelope`, `apply-envelope`, `client-list-envelope`, `fleet-status-envelope`, and `event`.
 
-**`api commands`** — lists command contracts: argv, envelope and data schemas, possible statuses and outcomes, exit-code meanings, machine flags, and `interrupt_behavior`. Ctrl-C exits `130` without a JSON envelope (`interrupt_behavior: "exit_130_without_envelope"`).
+**`api commands`** — lists command contracts: argv, envelope and data schemas, possible statuses and outcomes, exit-code meanings, every option the command accepts (`machine_flags`), and `interrupt_behavior`. Arguments, options, and descriptions are read from the CLI itself. Ctrl-C exits `130` without a JSON envelope (`interrupt_behavior: "exit_130_without_envelope"`).
 
 **`api schema NAME`** — prints one JSON Schema, e.g. `meridian api schema output-envelope`.
 
@@ -424,7 +424,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--install-completion` | Install shell completion for the current shell |
 | `--show-completion` | Print the completion script for the current shell |
 
-JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by deploy, plan, apply, test, probe, all client commands, fleet status/inventory, node/relay list, and the api commands. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
+JSON output uses the `meridian.output/v1` envelope (`schema`, `command`, `operation_id`, `status`, `summary`, `data`, `warnings`, `errors`). It is supported by every command that lists `--json`: deploy, plan, apply, check, test, probe, all client and route commands, fleet status/inventory, node/relay list, and the api commands. The global `--json` and a command's own `--json` are interchangeable. Secrets are redacted before JSON leaves the process. Run `meridian api commands --json` to discover the contracts.
 
 ## Common server options
 
