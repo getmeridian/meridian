@@ -59,19 +59,41 @@ FORGET_ONLY: Mapping[str, str] = {
 }
 
 
+# Kinds whose remote state lives on one server. When the plan keeps such a
+# resource but places it on another server (`node replace`), the old placement
+# is retired on the server its binding recorded. Panel-side kinds keep their
+# UUID across the move and are updated in place instead.
+SERVER_PLACED: frozenset[str] = frozenset(
+    {"node_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
+)
+
+
 @runtime_checkable
 class RetiringDriver(Protocol):
     def retire(self, binding: ManagedResourceBinding) -> None: ...
 
 
 def retired_bindings(plan: ResourcePlan, cluster: ClusterConfig) -> list[ManagedResourceBinding]:
-    """Active bindings whose logical resource no longer appears in the plan, in retirement order."""
-    desired = {resource.logical_id for resource in plan.resources}
+    """Active bindings that left the plan or moved to another server, in retirement order."""
+    desired = {
+        resource.logical_id: str(getattr(resource.payload, "server_ref", "") or "") for resource in plan.resources
+    }
     vanished = [
-        binding for binding in cluster.managed_bindings.values() if binding.active and binding.logical_id not in desired
+        binding
+        for binding in cluster.managed_bindings.values()
+        if binding.active and (binding.logical_id not in desired or _moved(binding, desired[binding.logical_id]))
     ]
     rank = {kind: index for index, kind in enumerate(RETIREMENT_ORDER)}
     return sorted(vanished, key=lambda item: (rank.get(item.resource_kind, len(rank)), item.logical_id))
+
+
+def _moved(binding: ManagedResourceBinding, server_ref: str) -> bool:
+    return (
+        binding.resource_kind in SERVER_PLACED
+        and bool(binding.server_ref)
+        and bool(server_ref)
+        and binding.server_ref != server_ref
+    )
 
 
 def unretirable(bindings: list[ManagedResourceBinding]) -> list[str]:

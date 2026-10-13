@@ -35,4 +35,5 @@ Checkpointed reconciliation of compiled topology resources.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
 - **Bindings are per generation** — a new generation finds resources by name; when a list endpoint omits content (Templates), GET the record by UUID before comparing or every intent edit rewrites it.
 - **Remnawave deletes Nodes asynchronously** — DELETE only queues the job; `NodeRetirement` polls until the Node is gone so its Profile is not deleted under it.
+- **A server move is a retirement** — `SERVER_PLACED` kinds whose desired `server_ref` changed retire their old placement; the panel Node keeps its UUID and is updated in place, never retired.
 - **Node runtime retirement shares a directory** — every exit uses `/opt/remnanode`; when the plan still runs a node on that server, only forget the old binding.

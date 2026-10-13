@@ -224,3 +224,46 @@ def test_review_hash_covers_the_retirement_set_and_its_ssh_targets() -> None:
     moved = DeploymentTarget(host="198.51.100.31", user="root", port=22)
     assert base != retirement_review_hash("p" * 64, [relay], {"srv-relay": moved})
     assert base != retirement_review_hash("q" * 64, [relay], {"srv-relay": target})
+
+
+def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements() -> None:
+    from meridian.compiler import compile_topology
+    from meridian.setup.editor import add_exit_to_intent
+    from meridian.setup.single_server import single_server_intent
+
+    before = add_exit_to_intent(
+        single_server_intent(None, server_ref="srv-a"),
+        server_ref="srv-b",
+        title="exit-b",
+        reality_sni="www.google.com",
+        tls_hostname="",
+    )
+    moved_id = next(exit_.id for exit_ in before.exits if exit_.server_ref == "srv-b")
+    after = before.model_copy(
+        update={
+            "exits": [
+                exit_.model_copy(update={"server_ref": "srv-c"}) if exit_.id == moved_id else exit_
+                for exit_ in before.exits
+            ]
+        }
+    )
+    deployed = compile_topology(before)
+    bindings = [
+        ManagedResourceBinding(
+            logical_id=resource.logical_id,
+            resource_kind=resource.payload.kind,
+            generation=1,
+            remote_id=f"{resource.logical_id}-remote",
+            active=True,
+            server_ref=str(getattr(resource.payload, "server_ref", "") or ""),
+        )
+        for resource in deployed.resources
+    ]
+
+    retiring = retired_bindings(compile_topology(after), _cluster(*bindings))
+
+    assert {binding.server_ref for binding in retiring} == {"srv-b"}
+    kinds = {binding.resource_kind for binding in retiring}
+    assert "node_runtime" in kinds and "nginx_artifact" in kinds and "firewall_rule" in kinds
+    # The panel Node keeps its UUID and is re-addressed in place, never deleted.
+    assert "node_binding" not in kinds

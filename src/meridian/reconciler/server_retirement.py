@@ -8,11 +8,13 @@ from typing import Any
 
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import NodeRuntimePayload
-from meridian.config import REMNAWAVE_NODE_DIR
+from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import realm_config_path, realm_service_name
+from meridian.remnawave.versions import parse_image
 from meridian.ssh import ServerConnection
 
+_NODE_REPOSITORY = parse_image(REMNAWAVE_NODE_IMAGE).repository
 _FIREWALL_MARKER = re.compile(r"meridian-v4-[0-9a-f]{16}")
 _NGINX_ARTIFACT = re.compile(r"/etc/nginx/(stream\.d|sites-available)/meridian-v4-[0-9a-f]{16}\.conf")
 
@@ -88,11 +90,13 @@ class RealmHopRetirement:
 
 
 class NodeRuntimeRetirement:
-    """Stop and delete the remnawave-node container and its Compose directory.
+    """Stop and delete the remnawave-node container, its Compose directory, and its image.
 
     The control plane lives in a separate Compose project, so it keeps running.
     When the reviewed plan still runs a node on the same server, the directory
     already belongs to that replacement and only the binding is forgotten.
+    Docker itself stays: the baseline installed it and is never reverted, and
+    the operator may run other containers.
     """
 
     context: Any
@@ -111,7 +115,10 @@ class NodeRuntimeRetirement:
             f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
             " if docker inspect remnawave-node >/dev/null 2>&1;"
             " then docker rm -f remnawave-node >/dev/null || exit 1; fi;"
-            f" rm -rf {shlex.quote(REMNAWAVE_NODE_DIR)}",
+            f" rm -rf {shlex.quote(REMNAWAVE_NODE_DIR)};"
+            # Images still used by another container refuse removal; that is fine.
+            f" ids=$(docker images -q {shlex.quote(_NODE_REPOSITORY)} 2>/dev/null | sort -u);"
+            ' if [ -n "$ids" ]; then docker image rm $ids >/dev/null 2>&1; fi; true',
             timeout=120,
         )
         if result.returncode != 0:

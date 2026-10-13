@@ -135,8 +135,11 @@ def test_node_runtime_container_and_compose_dir_are_removed() -> None:
     (command,) = conn.calls
     assert f"docker compose -f {REMNAWAVE_NODE_DIR}/docker-compose.yml down" in command
     assert "docker rm -f remnawave-node" in command
-    assert command.endswith(f"rm -rf {REMNAWAVE_NODE_DIR}")
-    assert "/opt/remnawave " not in command and not command.endswith("/opt/remnawave")
+    assert f"rm -rf {REMNAWAVE_NODE_DIR};" in command
+    assert "/opt/remnawave " not in command and "/opt/remnawave;" not in command
+    # The pulled node image goes too; Docker itself (baseline-installed, maybe operator-used) stays.
+    assert "docker images -q remnawave/node" in command and "docker image rm $ids" in command
+    assert "apt-get" not in command and "purge" not in command
 
 
 def test_node_runtime_replaced_on_the_same_server_is_only_forgotten() -> None:
