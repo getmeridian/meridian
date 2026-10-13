@@ -14,7 +14,6 @@
 - **Server onboarding is UX-shaped** - collect titles, server IPs, SSH user/port, and stable references before mapping into storage or deploy requests.
 - **Topology uses capabilities plus policy** - a server may be both relay and exit; routing rules decide where traffic exits.
 - **Deploy process API is first-class** - `deploy` has a command contract, a typed output envelope, request-file input, dry-run plan output, and JSONL progress events for UI clients.
-- **Remote execution is transport-neutral** - core workflows depend on executor contracts; SSH and future daemon transports live in adapters.
 - **Verification is four-state** - probe and test share typed passed, failed, warning, and skipped checks; skipped evidence is inconclusive, never a pass.
 - **Cancellation is cooperative** - `core/cancellation.py` owns the token protocol, the typed `OperationCancellation` record, and `OperationCancelledError`; workers poll only at safe points.
 - **Panel interfaces are narrow** — services depend on service-specific protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave implementation.

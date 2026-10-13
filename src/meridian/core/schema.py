@@ -41,7 +41,6 @@ from meridian.core.command_inputs import (
 )
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult, DeployWorkflowAnswers
 from meridian.core.events import EVENT_TYPES
-from meridian.core.execution import CommandSpec, PutBytesSpec, PutTextSpec, RemoteCommandResult, RemoteTarget
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
 from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
@@ -567,11 +566,6 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "deploy-workflow-answers": DeployWorkflowAnswers,
     "deploy-plan": DeployPlan,
     "deploy-ports": DeployPorts,
-    "remote-target": RemoteTarget,
-    "command-spec": CommandSpec,
-    "remote-command-result": RemoteCommandResult,
-    "put-bytes-spec": PutBytesSpec,
-    "put-text-spec": PutTextSpec,
     "workflow-plan": WorkflowPlan,
     "workflow-catalog-entry": WorkflowCatalogEntry,
     "input-field": InputField,

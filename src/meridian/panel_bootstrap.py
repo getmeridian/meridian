@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import secrets
 
-from meridian.adapters import RemoteExecutorConnection, SSHRemoteExecutor
 from meridian.cluster import (
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
@@ -22,7 +21,6 @@ from meridian.config import (
 )
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import PanelSetupError, ProvisioningError
-from meridian.core.execution import RemoteExecutor
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.node_deploy import (
@@ -77,7 +75,6 @@ def run_provisioner(
     subscription_page_image: str = "",
     reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
-    remote_executor: RemoteExecutor | None = None,
     renderer: StepRenderer | None = None,
     cancellation: CancellationToken | None = None,
 ) -> None:
@@ -148,13 +145,11 @@ def run_provisioner(
 
     provisioner = Provisioner(steps)
 
-    if remote_executor is None and not isinstance(resolved.conn, ServerConnection):
+    if not isinstance(resolved.conn, ServerConnection):
         raise ProvisioningError("No SSH connection available", category="bug")
-    remote_executor = remote_executor or SSHRemoteExecutor(resolved.conn)
-    conn = RemoteExecutorConnection(remote_executor)
 
     results = provisioner.run(
-        conn,
+        resolved.conn,
         ctx,
         reporter=reporter,
         operation=operation,
