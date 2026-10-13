@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.diagnostics import (
+from meridian.diagnostics.checks import (
     CheckResult,
     check_container_running,
     check_disk_space,

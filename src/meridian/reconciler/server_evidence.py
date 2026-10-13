@@ -6,7 +6,7 @@ from collections.abc import Collection
 from typing import NoReturn, Protocol
 
 from meridian.compiler.models import ResourcePlan, canonical_hash
-from meridian.diagnostics import command_evidence_unavailable
+from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceObservation,

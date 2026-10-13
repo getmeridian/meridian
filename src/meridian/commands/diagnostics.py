@@ -17,7 +17,7 @@ from meridian.core.errors import LocalStateError
 from meridian.core.execution import ServerConnection as ServerConnectionLike
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.redaction import REDACTED, redact_string
-from meridian.diagnostics import command_evidence_unavailable
+from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.facts import ServerFacts
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult, ServerConnection, SSHError

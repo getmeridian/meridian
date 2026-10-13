@@ -19,8 +19,8 @@ import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
-from meridian.adapters import JsonlReporter
 from meridian.adapters.cancellation import FileCancellationToken
+from meridian.adapters.reporters import JsonlReporter
 from meridian.branding import normalize_icon
 from meridian.cluster import BrandingConfig, ClusterConfig
 from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply

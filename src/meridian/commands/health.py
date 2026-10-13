@@ -27,8 +27,13 @@ from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
 from meridian.core.topology import SetupIntent
 from meridian.core.verification import VerificationCheck, VerificationCounts, VerificationVerdict
-from meridian.diagnostics import check_container_running, check_disk_space, check_port_listening, check_tls_certificate
 from meridian.diagnostics.blocking import blocking_jobs
+from meridian.diagnostics.checks import (
+    check_container_running,
+    check_disk_space,
+    check_port_listening,
+    check_tls_certificate,
+)
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
 from meridian.diagnostics.network import resolve_hostname
 from meridian.diagnostics.preflight import collect_preflight
