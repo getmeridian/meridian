@@ -1,7 +1,5 @@
 # reconciler — Declarative plan / apply engine
 
-Checkpointed reconciliation of compiled topology resources.
-
 ## Design decisions
 
 - **Compiled-resource apply is checkpointed** — `resource_executor.py` re-observes every immutable compiler action, persists each transition, and cuts over a generation only after all dependencies and postconditions succeed.
@@ -10,7 +8,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Relay hosts carry neutral names** — `server_render.py` names Realm units `netfwd-<token>` (binary `/usr/local/bin/netfwd`, config `/etc/netfwd/`), UFW comments `fw-<token>`, and baseline attestations `/var/lib/host-baseline/`; `legacy_*` helpers exist only to migrate and retire pre-rename artifacts.
 - **One progress stream** — `execute_resource_plan(reporter=, operation=)` emits `plan.action.started` then exactly one of completed/failed/skipped per action; `SetupRuntime` shares the same reporter and operation with baseline and control-plane provisioner steps, so Rich, JSONL, and Engine clients render one sequenced stream.
 - **Cancellation is cooperative** — the executor polls its token only between actions, before an unknown-outcome retry, and before retirement; the generation stays pending so re-running the same plan resumes from checkpoints.
-- **Applies are fenced on the control server** — `fence.py` decides and `state_fence.py` stores `/var/lib/meridian/fence.json` (fleet ID, last committed generation and plan hash, 30-minute lease) using compare-and-swap; the executor acquires the fence before `_begin_apply`, renews it between actions, commits it after the generation commits, and releases it on every exit.
+- **Applies are fenced on the control server** — `fence.py` decides and `state_fence.py` stores `/var/lib/meridian/fence.json` (fleet ID, last committed generation and plan hash, 30-minute lease) using compare-and-swap; the executor acquires the fence before `_begin_apply`, renews it between actions, commits it after the generation commits, and releases it on every exit. A copy behind the record refuses; one ahead heals a lost commit; only a fresh copy replaces a foreign fleet's fence.
 - **Server preparation is graph-owned** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; compiled rules alone open public ports.
 
 ## What's done well
@@ -30,8 +28,7 @@ Checkpointed reconciliation of compiled topology resources.
 - **Inbounds are Profile-derived resources** — create/update the aggregate Profile, then observe each exact profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **Never share one TLS output path across Hosts** — hostname-derived directories prevent independent SNI endpoints from overwriting each other.
 - **One stream owner per listener** — the V4 port-443 artifact includes the panel/no-SNI route and retires the legacy `stream.d/meridian.conf` with rollback.
-- **Never apply from a copy behind the fence** — a lower generation or a same-generation hash mismatch refuses; a copy that is ahead heals the record (a lost commit), and only a fresh copy may replace a foreign fleet's fence.
-- **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
+- **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, wait for panel node connectivity after every deploy path.
 - **A cancelled checkpoint is a clean boundary** — only `OperationCancelledError` from a provisioning step boundary becomes `cancelled`; never map timeouts or killed processes to it, they stay `unknown`.
 - **Attest server artifacts against their own inputs** — hashing the whole deployment contract makes every fleet edit re-run work on every server; include only the server's own target plus pins and renderer contract.
 - **Do not mark old bindings inactive as a substitute for deletion** — add a driver `retire()` (idempotent, 404 = done) before adding a kind to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.

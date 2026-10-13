@@ -92,6 +92,19 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   SSHing back into the same machine. A copied `~/.meridian` on a laptop keeps
   using SSH.
 
+- **Per-domain routes on an exit** — `meridian route add EXIT --via
+  warp|direct|block VALUES...` sends chosen domains, `geosite:` lists, or
+  `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
+  exit's default egress (for example, AI services that block datacenter IPs).
+  `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **Relays look like nothing in particular** — nothing a hosting provider can
+  list on a relay (service, binary, config path, firewall comment) names
+  Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.
+- **`meridian check` measures each relay leg** — every hop downloads the exit's
+  camouflage page through the next hop with the clients' SNI and reports
+  connect time, first byte, and bytes received; a freeze in the 8–32 KB
+  throttling window suggests moving the relay to another provider.
+
 ### Sharing
 - Connection pages are built from each user's real subscription, so relays and
   every enabled protocol appear.
