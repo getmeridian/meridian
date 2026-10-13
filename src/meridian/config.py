@@ -47,7 +47,6 @@ PREFERENCES_FILE = MERIDIAN_HOME / "preferences.json"
 MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
 
 DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
-DEFAULT_FINGERPRINT = "chrome"
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"
 
 # Remnawave panel + node

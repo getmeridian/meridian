@@ -36,7 +36,7 @@ def test_every_subscription_link_becomes_a_labelled_page_entry() -> None:
 
     assert [link.url for link in links] == _LINKS
     assert [link.label for link in links][:2] == ["Direct Reality", "Via relay"]
-    assert links[2].label  # falls back to the protocol's display label
+    assert links[2].label == "XHTTP"  # unnamed links fall back to the protocol label
     assert all(link.qr_b64 for link in links)
 
 

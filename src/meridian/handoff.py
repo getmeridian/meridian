@@ -16,11 +16,13 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from meridian.cluster import ClusterConfig
 from meridian.core.clients import PanelUserLike
 from meridian.models import ProtocolURL
-from meridian.protocols import get_protocol
 from meridian.remnawave import MeridianPanel, RemnawaveError, User
 from meridian.ssh import ServerConnection
 
 logger = logging.getLogger("meridian.handoff")
+
+# Page labels for subscription links that carry no name of their own.
+_PROTOCOL_LABELS = {"reality": "Primary", "xhttp": "XHTTP", "wss": "CDN Backup", "hysteria2": "UDP fallback"}
 
 
 @dataclass(frozen=True)
@@ -63,8 +65,7 @@ def subscription_protocol_urls(content: str) -> list[ProtocolURL]:
         key = protocol_key(url) if "://" in url else ""
         if not key:
             continue
-        protocol = get_protocol(key)
-        label = unquote(urlsplit(url).fragment) or (protocol.display_label if protocol else key)
+        label = unquote(urlsplit(url).fragment) or _PROTOCOL_LABELS[key]
         links.append(ProtocolURL(key=key, label=label, url=url, qr_b64=generate_qr_base64(url)))
     return links
 

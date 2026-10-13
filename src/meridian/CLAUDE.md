@@ -1,6 +1,6 @@
 # src/meridian — Python CLI package
 ## Design decisions
-**Protocol registry** — `protocols.py` keeps ordered TCP transports in `PROTOCOLS` and the UDP fallback in `ADDITIONAL_PROTOCOLS`; `get_protocol()` spans both.
+**Protocol keys** — `core/topology.py` owns the protocol vocabulary; `handoff.protocol_key()` classifies delivered subscription links and falls back to a fixed page label when a link has no name.
 **Cluster config** — Schema V3 stores workload-scoped topology intent, generation bindings, allocations, and compact action checkpoints in one hidden `cluster.yml`. Client/user runtime state remains in Remnawave PostgreSQL.
 **Remnawave integration** — `remnawave.py` wraps the REST API with `httpx`. Direct HTTPS calls from deployer's machine (no SSH tunneling for API). JWT auth, retry with backoff, Meridian-specific error types.
 **SSH abstraction** — `ServerConnection` unifies local and remote execution. Local mode uses `bash -c`; remote uses SSH. Non-root triggers `sudo -n`. The `SSHUI` callback protocol in `ssh_auth.py` decouples transport from presentation; CLI callers pass `RichSSHUI` from `ssh_ui.py`, Engine/headless callers get logger-only output by default. File transfer methods (`put_bytes`, `put_text`, `get_text`, `get_bytes`) live in `_FileTransferMixin` in `ssh_transfer.py`; `ServerConnection` inherits from it.

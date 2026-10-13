@@ -1,8 +1,4 @@
-"""Shared data models used across meridian modules.
-
-Centralizes dataclasses that would otherwise create circular imports
-between protocols.py and output.py.
-"""
+"""Shared data models used across meridian modules."""
 
 from __future__ import annotations
 
