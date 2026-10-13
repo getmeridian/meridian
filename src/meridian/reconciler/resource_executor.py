@@ -26,7 +26,7 @@ from meridian.core.events import (
 from meridian.core.models import EventLevel, ResourceRef
 from meridian.core.output import OperationContext
 from meridian.core.reporters import Reporter, emit_event
-from meridian.reconciler.fence import ApplyFence, LocalFenceView
+from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.resources import (
     PendingPlanConflictError,
     ResourceAction,
@@ -100,15 +100,7 @@ def execute_resource_plan(
     save = persist or (lambda state: state.save())
     now = clock or (lambda: datetime.now(UTC))
     if fence is not None:
-        fleet_id = fence.acquire(
-            LocalFenceView(
-                fleet_id=cluster.fleet_id,
-                active_generation=cluster.active_generation,
-                active_plan_hash=cluster.active_plan_hash,
-                fresh=cluster.active_generation == 0 and not cluster.managed_bindings,
-            )
-        )
-        cluster.fleet_id = fleet_id
+        cluster.fleet_id = fence.acquire(local_fence_view(cluster))
     try:
         return _execute_fenced(
             plan,

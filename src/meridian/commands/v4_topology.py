@@ -209,6 +209,7 @@ def run_v4_plan(
             summary=summary_text,
             exit_code=3 if observation_errors else exit_code,
             state_changes=state_changes,
+            warnings=[inspection.fence_warning] if inspection.fence_warning else [],
             observation_errors=[
                 CompiledPlanDriftResult(
                     logical_id=item.action.resource.logical_id,
@@ -279,5 +280,7 @@ def run_v4_plan(
             err_console.print(f"  [red]remove[/red] {escape(logical_id)}")
         for change in state_changes:
             err_console.print(f"  [yellow]state[/yellow] {escape(change)}")
+        if inspection.fence_warning:
+            err_console.print(f"\n  [warn]Apply will refuse:[/warn] {escape(inspection.fence_warning)}")
         err_console.print()
     raise typer.Exit(3 if observation_errors else exit_code)

@@ -90,6 +90,23 @@ class SSHApplyFence:
         self._renewed_at = self._now()
         return record.fleet_id
 
+    def check(self, local: LocalFenceView) -> str:
+        try:
+            remote, _digest = self._read()
+            decide_acquire(
+                remote,
+                local,
+                holder=self._holder,
+                now=self._now(),
+                new_fleet_id="",
+                holder_gone=holder_gone,
+            )
+        except FleetFenceError as exc:
+            if exc.category != "user":
+                return ""  # Unreachable evidence is reported by the observations themselves.
+            return f"{exc} {exc.hint}".strip()
+        return ""
+
     def renew(self) -> None:
         if self._record is None or self._renewed_at is None:
             return

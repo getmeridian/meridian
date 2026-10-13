@@ -52,7 +52,7 @@ from meridian.panel_bootstrap import (
     run_provisioner,
 )
 from meridian.provision.ensure import ensure_file_content
-from meridian.reconciler.fence import ApplyFence
+from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.remnawave_drivers import (
     RemnawaveDriverContext,
     build_remnawave_drivers,
@@ -300,7 +300,9 @@ class SetupRuntime:
                 shadow,
                 drivers,
             )
-            return inspection.model_copy(update={"review_hash": review.review_hash})
+            fence = self._fence_factory(control_connection)
+            fence_warning = fence.check(local_fence_view(cluster)) if fence is not None else ""
+            return inspection.model_copy(update={"review_hash": review.review_hash, "fence_warning": fence_warning})
         finally:
             panel.close()
 

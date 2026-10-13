@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Protocol
 
+from meridian.cluster import ClusterConfig
 from meridian.core.errors import MeridianError
 
 LEASE_DURATION = timedelta(minutes=30)
@@ -52,11 +53,23 @@ class LocalFenceView:
     fresh: bool  # nothing applied yet from this copy
 
 
+def local_fence_view(cluster: ClusterConfig) -> LocalFenceView:
+    return LocalFenceView(
+        fleet_id=cluster.fleet_id,
+        active_generation=cluster.active_generation,
+        active_plan_hash=cluster.active_plan_hash,
+        fresh=cluster.active_generation == 0 and not cluster.managed_bindings,
+    )
+
+
 class ApplyFence(Protocol):
     """Taken before the first action, renewed while applying, released on every exit path."""
 
     def acquire(self, local: LocalFenceView) -> str:
         """Take the lease; return the fleet ID this copy must record."""
+
+    def check(self, local: LocalFenceView) -> str:
+        """Read-only: why an apply from this copy would be refused, or ``""``."""
 
     def renew(self) -> None: ...
 

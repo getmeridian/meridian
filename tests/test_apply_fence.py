@@ -242,6 +242,21 @@ def test_second_machine_is_refused_while_the_first_holds_the_lease() -> None:
         _fence(host, holder="desktop:2").acquire(_local(fleet_id=""))
 
 
+def test_check_explains_a_refusal_without_writing() -> None:
+    host = FenceHost()
+    host.files[FENCE_FILE] = json.dumps({"fleet_id": _FLEET, "generation": 5, "plan_hash": "b" * 64})
+    warning = _fence(host).check(_local(generation=4, plan_hash="a" * 64))
+    assert "Another machine changed this fleet" in warning and "Copy ~/.meridian" in warning
+    assert _fence(host).check(_local(generation=5, plan_hash="b" * 64)) == ""
+    assert host.swaps == 0 and list(host.files) == [FENCE_FILE]
+
+
+def test_check_stays_quiet_when_the_fence_is_unreadable() -> None:
+    host = FenceHost()
+    host.files[FENCE_FILE] = "{not json"
+    assert _fence(host).check(_local()) == ""
+
+
 def test_unreadable_fence_is_a_system_error_with_guidance() -> None:
     host = FenceHost()
     host.files[FENCE_FILE] = "{not json"
@@ -302,6 +317,9 @@ class _RecordingFence:
         if self.refuse:
             raise FleetFenceError("Another machine changed this fleet.")
         return local.fleet_id or _FLEET
+
+    def check(self, local: LocalFenceView) -> str:
+        return ""
 
     def renew(self) -> None:
         self.calls.append("renew")

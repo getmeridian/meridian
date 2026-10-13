@@ -135,6 +135,14 @@
     "summary": {
       "title": "Summary",
       "type": "string"
+    },
+    "warnings": {
+      "description": "Conditions that will make apply refuse, such as a stale state copy.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
     }
   },
   "required": [

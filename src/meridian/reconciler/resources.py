@@ -163,6 +163,7 @@ class ResourceInspectionResult(CoreModel):
     inspections: list[ResourceInspection] = Field(default_factory=list)
     retiring: list[str] = Field(default_factory=list)
     review_hash: str = ""  # plan hash bound to the retirement set; set by the setup runtime
+    fence_warning: str = ""  # why apply from this state copy would be refused; set by the setup runtime
 
     @property
     def converged(self) -> bool:

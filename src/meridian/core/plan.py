@@ -37,6 +37,9 @@ class CompiledPlanResult(CoreModel):
         default="", description="Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed."
     )
     state_changes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(
+        default_factory=list, description="Conditions that will make apply refuse, such as a stale state copy."
+    )
     observation_errors: list[CompiledPlanDriftResult] = Field(default_factory=list)
     drifted_resources: list[CompiledPlanDriftResult] = Field(default_factory=list)
     retiring_resources: list[str] = Field(default_factory=list)

@@ -239,6 +239,7 @@ def test_v4_plan_json_uses_typed_compiled_result() -> None:
         plan_hash=_PLAN_HASH,
         review_hash=_PLAN_HASH,
         retiring=[],
+        fence_warning="",
         converged=True,
         drifted=[],
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
@@ -272,12 +273,41 @@ def test_v4_plan_json_uses_typed_compiled_result() -> None:
     ]
 
 
+def test_v4_plan_warns_when_apply_would_refuse_a_stale_copy() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
+        retiring=[],
+        fence_warning="Another machine changed this fleet. Copy ~/.meridian from it.",
+        converged=True,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    cluster.active_plan_hash = _PLAN_HASH
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit),
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert payload["data"]["warnings"] == ["Another machine changed this fleet. Copy ~/.meridian from it."]
+
+
 def test_v4_plan_reports_generation_activation_when_resources_match() -> None:
     resource = _resource()
     inspection = SimpleNamespace(
         plan_hash=_PLAN_HASH,
         review_hash=_PLAN_HASH,
         retiring=[],
+        fence_warning="",
         converged=True,
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
     )
@@ -308,6 +338,7 @@ def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
         plan_hash=_PLAN_HASH,
         review_hash=_PLAN_HASH,
         retiring=[],
+        fence_warning="",
         converged=False,
         inspections=[
             SimpleNamespace(
@@ -383,6 +414,7 @@ def test_v4_plan_shows_resources_to_remove_and_the_hash_that_binds_them(capsys) 
         plan_hash=_PLAN_HASH,
         review_hash=_REVIEW_HASH,
         retiring=["node:exit-b", "realm:relay-a:0"],
+        fence_warning="",
         converged=False,
         inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
     )
