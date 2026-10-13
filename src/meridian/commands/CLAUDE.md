@@ -42,6 +42,6 @@
 - Re-running `relay add` for a declared relay server resumes it; a different exit, port, or SNI is refused with `relay remove` guidance (a second relay entry duplicated its listener).
 - Bare `test` follows the intent, not the saved-server count: removed servers stay saved, so a fleet down to one entry still tests it without asking.
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.
-- A new public command needs an entry in `_HELP_LAYOUT` and a `rich_help_panel`, or it appears in a bare `Commands` list above the sections.
+- A new public command needs an entry in `_HELP_LAYOUT` and a `rich_help_panel`, or it appears in a bare `Commands` list above the sections, plus a `core.command_catalog.COMMAND_OUTPUTS` entry (`None` unless it declares `--json`); `test_cli_catalog.py` fails otherwise.
 - Entry points convert library `MeridianError`s with `fail(exc)`; an uncaught one prints a traceback (`setup --intent MISSING` did).
 - Page palettes live in `core.inputs.PAGE_PALETTES` (must match `app.js`, tested); `deploy` normalizes `--icon` with `branding.normalize_icon()` before any SSH, and a redeploy merges unnamed branding flags from the saved values.

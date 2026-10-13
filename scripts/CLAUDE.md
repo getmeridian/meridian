@@ -2,7 +2,7 @@
 
 ## Design decisions
 
-**Direct imports for contracts** — contract generation imports `meridian.core` schemas/services directly and never shells out to `meridian`.
+**Direct imports for contracts** — contract generation imports `meridian.core` schemas/services and `meridian.cli_catalog` (the in-process Typer tree) directly and never shells out to `meridian`.
 
 **Deterministic output** — scripts that write tracked artifacts must have a `--check` mode for CI drift detection.
 

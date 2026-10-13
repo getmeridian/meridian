@@ -6,8 +6,8 @@
 - **Events are JSONL-ready** - long-running flows should report progress as typed events, not ad hoc log lines.
 - **Event names are a public set** - add event names in `core.events` before emitting them so schemas and Studio timelines stay typed.
 - **Workflows are renderable data** - wizard-style interactions expose typed fields/sections; CLI and UI decide how to render them.
-- **Contract export is direct** - scripts generate public schemas/catalogs from core imports, never by shelling out to the CLI.
-- **Command metadata is schema-neutral** - command outcomes and bindings never import schema registration; schema embedding depends on them in one direction.
+- **Contract export is direct** - scripts generate public schemas/catalogs from core imports (the command catalog also reads the in-process Typer tree via `meridian.cli_catalog`), never by shelling out to the CLI.
+- **Command metadata is schema-neutral** - `command_catalog.COMMAND_OUTPUTS` maps every public command path to its JSON output (data schemas, outcomes, stability) or `None`; argv, flags, and help come from the Typer tree in `meridian.cli_catalog`, exit-code texts and statuses derive from outcomes, and nothing here imports schema registration.
 - **Pydantic at API boundaries** - public request/result/event/error/service contracts validate, serialize, and export JSON Schema from Pydantic v2 models.
 - **Deploy planning is pure** - mode, ports, reusable paths, and request validation are computed before adapters perform SSH or panel I/O.
 - **Input models fail early** - CLI and Engine adapters should validate typed core request models at the boundary, then pass trusted objects inward.

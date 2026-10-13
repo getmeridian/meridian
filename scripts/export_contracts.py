@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from meridian.cli_catalog import command_catalog
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import ErrorModel, Event, OutputEnvelope, OutputStatus, Summary
 from meridian.core.output import EVENT_SCHEMA, OUTPUT_SCHEMA, json_dumps, jsonl_dumps
 from meridian.core.schema import (
-    command_catalog,
     event_type_catalog,
     schema_for,
     schema_names,

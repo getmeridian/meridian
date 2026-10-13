@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from meridian.cli_catalog import command_catalog
 from meridian.core.events import EVENT_TYPES
 from meridian.core.models import Event
-from meridian.core.schema import DeployOutputEnvelope, command_catalog, schema_names
+from meridian.core.schema import DeployOutputEnvelope, schema_names
 from meridian.core.services.workflows import collect_workflow, workflow_catalog
 from scripts.export_contracts import check_contracts, write_contracts
 

@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 
 import click
-from typer.main import get_command
+
+from meridian.cli_catalog import cli_root, long_options, public_commands
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -76,39 +77,9 @@ GLOBAL_SECTIONS = {
 }
 
 
-def public_leaf_commands() -> tuple[click.Command, dict[str, click.Command]]:
-    """Return the root Click command and every non-hidden public leaf."""
-    from meridian.cli import app
-
-    root = get_command(app)
-    leaves: dict[str, click.Command] = {}
-
-    def walk(group: click.Group, prefix: tuple[str, ...] = ()) -> None:
-        for name, command in group.commands.items():
-            if command.hidden:
-                continue
-            path = (*prefix, name)
-            if isinstance(command, click.Group):
-                walk(command, path)
-            else:
-                leaves[" ".join(path)] = command
-
-    if not isinstance(root, click.Group):
-        raise RuntimeError("Meridian CLI root is not a Click group")
-    walk(root)
-    return root, leaves
-
-
 def long_flags(command: click.Command) -> set[str]:
     """Return every visible long-form option exposed by a Click command."""
-    flags: set[str] = set()
-    for parameter in command.params:
-        if not isinstance(parameter, click.Option) or parameter.hidden:
-            continue
-        for option in (*parameter.opts, *parameter.secondary_opts):
-            if option.startswith("--"):
-                flags.add(option)
-    return flags
+    return set(long_options(command, include_hidden=False))
 
 
 def parse_doc_sections(path: Path) -> dict[str, str]:
@@ -138,7 +109,8 @@ def flags_in_section(section_text: str) -> set[str]:
 
 def main() -> int:
     errors: list[str] = []
-    root, discovered = public_leaf_commands()
+    root = cli_root()
+    discovered = {path.replace(".", " "): command for path, command in public_commands(root).items()}
 
     documented_commands = set(COMMAND_SECTIONS)
     discovered_commands = set(discovered)

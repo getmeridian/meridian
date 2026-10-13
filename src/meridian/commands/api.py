@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import typer
 
+from meridian.cli_catalog import command_catalog
 from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.schema import command_catalog, schema_catalog, schema_for
+from meridian.core.schema import schema_catalog, schema_for
 from meridian.core.services.workflows import WorkflowNotFoundError, collect_workflow
 from meridian.renderers import emit_json
 

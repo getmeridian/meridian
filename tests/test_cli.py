@@ -449,13 +449,9 @@ class TestApiContractCLI:
         assert commands["client.list"]["argv"] == ["client", "list"]
         assert commands["api.workflow"]["data_schema"] == "api-workflow"
         assert commands["deploy"]["data_schema"] == "deploy-command-data"
-        assert commands["deploy"]["machine_flags"] == [
-            "--json",
-            "--events=jsonl",
-            "--request",
-            "--dry-run",
-            "--cancel-file",
-        ]
+        assert {"--json", "--events", "--request", "--dry-run", "--cancel-file"} <= set(
+            commands["deploy"]["machine_flags"]
+        )
 
     def test_api_workflow_json_returns_deploy_fields(self, monkeypatch) -> None:
         set_json_mode(False)

@@ -9,13 +9,13 @@ export const commandCatalog = {
       ],
       "command": "api.commands",
       "data_schema": "api-commands",
-      "description": "List machine-readable command contracts; with --include-schemas, embed envelope, data, error, and failure schemas.",
+      "description": "List machine-readable command contracts",
       "envelope_schema": "api-commands-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "command contracts were listed",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
+        "2": "user or configuration error",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -65,7 +65,7 @@ export const commandCatalog = {
       ],
       "command": "api.schema",
       "data_schema": "api-schema",
-      "description": "Return one JSON Schema. Without --envelope/global --json, success remains raw schema JSON.",
+      "description": "Print one meridian-core JSON schema",
       "envelope_schema": "api-schema-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -91,7 +91,7 @@ export const commandCatalog = {
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "schema name is unknown",
           "status": "failed"
         },
         {
@@ -120,13 +120,13 @@ export const commandCatalog = {
       ],
       "command": "api.schemas",
       "data_schema": "api-schemas",
-      "description": "List meridian-core JSON Schema names; with --include-schemas, embed full schemas.",
+      "description": "List meridian-core JSON schemas",
       "envelope_schema": "api-schemas-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "schema catalog was listed",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
+        "2": "user or configuration error",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -176,7 +176,7 @@ export const commandCatalog = {
       ],
       "command": "api.workflow",
       "data_schema": "api-workflow",
-      "description": "Return a UI-renderable workflow plan such as the deploy wizard field layout.",
+      "description": "Print one meridian-core workflow plan",
       "envelope_schema": "api-workflow-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -201,7 +201,7 @@ export const commandCatalog = {
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "workflow name is unknown",
           "status": "failed"
         },
         {
@@ -229,19 +229,20 @@ export const commandCatalog = {
       ],
       "command": "apply",
       "data_schema": "apply-command-data",
-      "description": "Apply the reviewed topology and emit typed per-resource results.",
+      "description": "Apply the reviewed topology in cluster.yml to your servers",
       "envelope_schema": "apply-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "desired state was already converged or changes were applied",
+        "0": "desired state already matches; changes were applied",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
+        "2": "user or configuration error",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "apply-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--yes",
         "--json"
       ],
       "outcomes": [
@@ -286,29 +287,30 @@ export const commandCatalog = {
     {
       "argv": [
         "check",
-        "SERVER"
+        "[SERVER]"
       ],
       "command": "check",
       "data_schema": "check",
-      "description": "Check fleet servers by role (or a new server's readiness) and return one typed report per scope.",
+      "description": "Check server health, or whether a new server can run Meridian",
       "envelope_schema": "check-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "every checked server passed",
+        "0": "check completed and passed",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "system failure, or SSH/panel evidence was unavailable",
+        "2": "user or configuration error",
+        "3": "check failed or was inconclusive",
         "4": "check completed with negative findings",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "check-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
+        "--domain",
+        "--sni",
         "--user",
         "--ssh-port",
-        "--sni",
-        "--domain"
+        "--ai",
+        "--json"
       ],
       "outcomes": [
         {
@@ -356,20 +358,21 @@ export const commandCatalog = {
       ],
       "command": "client.add",
       "data_schema": "client-add",
-      "description": "Add one or more panel clients and return their public identities.",
+      "description": "Add one or more clients (people who connect)",
       "envelope_schema": "client-add-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "all requested clients were added",
         "1": "unexpected Meridian bug",
-        "2": "invalid input or client already exists",
-        "3": "partial batch or incomplete page/local-state follow-up, or system/panel failure",
+        "2": "invalid input or client conflict",
+        "3": "clients were added with failed requests or incomplete page/local-state follow-up; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json"
+        "--json",
+        "--yes"
       ],
       "outcomes": [
         {
@@ -417,13 +420,13 @@ export const commandCatalog = {
       ],
       "command": "client.disable",
       "data_schema": "client-status",
-      "description": "Disable one managed client; V4 suspension remains temporary until the next apply.",
+      "description": "Suspend a client until you enable them again",
       "envelope_schema": "client-disable-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client was disabled",
         "1": "unexpected Meridian bug",
-        "2": "client not found or input/config error",
+        "2": "client not found or input error",
         "3": "system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -442,13 +445,13 @@ export const commandCatalog = {
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "client not found or input error",
           "status": "failed"
         },
         {
           "category": "system",
           "exit_code": 3,
-          "meaning": "system or infrastructure failure",
+          "meaning": "system or panel failure",
           "status": "failed"
         },
         {
@@ -472,13 +475,13 @@ export const commandCatalog = {
       ],
       "command": "client.enable",
       "data_schema": "client-status",
-      "description": "Enable one panel client and return its resulting status.",
+      "description": "Resume a suspended client",
       "envelope_schema": "client-enable-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client was enabled",
         "1": "unexpected Meridian bug",
-        "2": "client not found or input/config error",
+        "2": "client not found or input error",
         "3": "system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -497,13 +500,13 @@ export const commandCatalog = {
         {
           "category": "user",
           "exit_code": 2,
-          "meaning": "user or configuration error",
+          "meaning": "client not found or input error",
           "status": "failed"
         },
         {
           "category": "system",
           "exit_code": 3,
-          "meaning": "system or infrastructure failure",
+          "meaning": "system or panel failure",
           "status": "failed"
         },
         {
@@ -526,13 +529,13 @@ export const commandCatalog = {
       ],
       "command": "client.list",
       "data_schema": "client-list",
-      "description": "List managed access clients as redacted metadata plus aggregate status counts.",
+      "description": "List managed access clients with status and traffic",
       "envelope_schema": "client-list-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client list was collected",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
+        "2": "user or configuration error",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
@@ -581,21 +584,21 @@ export const commandCatalog = {
       ],
       "command": "client.remove",
       "data_schema": "client-remove",
-      "description": "Remove one client from the topology and delete their connection page.",
+      "description": "Remove a client permanently; their links stop working",
       "envelope_schema": "client-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
         "0": "client was removed",
         "1": "unexpected Meridian bug",
-        "2": "client not found or input/config error",
-        "3": "client removed but page cleanup failed, or system/panel failure",
+        "2": "client not found or input error",
+        "3": "client was removed but their connection page could not be deleted; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
-        "--yes"
+        "--yes",
+        "--json"
       ],
       "outcomes": [
         {
@@ -643,14 +646,14 @@ export const commandCatalog = {
       ],
       "command": "client.show",
       "data_schema": "client-show",
-      "description": "Return one managed access client and their connection page and subscription links.",
+      "description": "Show a client's connection page, subscription link, and status",
       "envelope_schema": "client-show-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "client was found",
+        "0": "client and available handoff were returned",
         "1": "unexpected Meridian bug",
-        "2": "client not found or input/config error",
-        "3": "requested page repair or its local evidence save was incomplete, or a system/infrastructure failure",
+        "2": "client not found or input error",
+        "3": "client was returned but page repair or its local evidence save was incomplete; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -699,26 +702,48 @@ export const commandCatalog = {
     },
     {
       "argv": [
-        "deploy"
+        "deploy",
+        "[SERVER]"
       ],
       "command": "deploy",
       "data_schema": "deploy-command-data",
-      "description": "Deploy or validate a Meridian server from a typed deploy request.",
+      "description": "Deploy one server and get a shareable connection link",
       "envelope_schema": "deploy-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "server was deployed or deploy request was validated/planned",
+        "0": "server was deployed; deploy request was validated or planned",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
+        "2": "user or configuration error",
         "3": "system or infrastructure failure",
-        "5": "cancelled at a safe point; re-run the same deploy to resume",
+        "5": "deploy stopped at a safe point after a cancel request; re-run resumes",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
+        "--domain",
+        "--sni",
+        "--client-name",
+        "--hysteria2",
+        "--no-hysteria2",
+        "--fingerprint",
+        "--warp",
+        "--no-warp",
+        "--geo-block",
+        "--no-geo-block",
+        "--user",
+        "--ssh-port",
+        "--harden",
+        "--no-harden",
+        "--client-ips",
+        "--no-client-ips",
+        "--display-name",
+        "--country",
+        "--icon",
+        "--color",
+        "--yes",
         "--json",
-        "--events=jsonl",
+        "--events",
         "--request",
         "--dry-run",
         "--cancel-file"
@@ -765,8 +790,8 @@ export const commandCatalog = {
       "statuses": [
         "changed",
         "ok",
-        "failed",
-        "cancelled"
+        "cancelled",
+        "failed"
       ]
     },
     {
@@ -776,14 +801,14 @@ export const commandCatalog = {
       ],
       "command": "fleet.inventory",
       "data_schema": "fleet-inventory",
-      "description": "Return the configured fleet topology plus live panel observations when available.",
+      "description": "Show configured topology with live status",
       "envelope_schema": "fleet-inventory-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "inventory was collected; plan --json is the drift/apply authority",
+        "0": "inventory and live status were collected",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "live panel evidence unavailable, or a system/infrastructure failure",
+        "2": "configuration error",
+        "3": "configured inventory was returned but live panel status was unavailable; system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -836,15 +861,15 @@ export const commandCatalog = {
       ],
       "command": "fleet.status",
       "data_schema": "fleet-status",
-      "description": "Collect panel, node, relay, and user health observations for the configured fleet.",
+      "description": "Show fleet health — panel, nodes, relays, clients",
       "envelope_schema": "fleet-status-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "fleet status was collected and health is healthy",
+        "0": "fleet health is healthy",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "health is unknown, or a system/infrastructure failure prevented collection",
-        "4": "fleet status was collected and health is degraded",
+        "2": "user or configuration error",
+        "3": "fleet health is unknown; system or infrastructure failure",
+        "4": "fleet health is degraded",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -903,14 +928,14 @@ export const commandCatalog = {
       ],
       "command": "node.list",
       "data_schema": "node-list",
-      "description": "List configured nodes with live panel status when available.",
+      "description": "List all nodes with live status",
       "envelope_schema": "node-list-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "node list was collected",
+        "0": "node list and panel status were collected",
         "1": "unexpected Meridian bug",
-        "2": "user or configuration error",
-        "3": "system or panel failure",
+        "2": "configuration error",
+        "3": "configured nodes were listed but live panel status was unavailable; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
@@ -962,12 +987,12 @@ export const commandCatalog = {
       ],
       "command": "plan",
       "data_schema": "plan-command-data",
-      "description": "Show what apply would change for the reviewed topology, without applying it.",
+      "description": "Show what apply would change, comparing your topology with live servers",
       "envelope_schema": "plan-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "desired state already matches actual state",
-        "1": "user/config error (category=user) or unexpected Meridian bug (category=bug)",
+        "0": "desired state already matches",
+        "1": "user or configuration error; unexpected Meridian bug",
         "2": "changes pending",
         "3": "system or infrastructure failure",
         "130": "process interrupted; no JSON envelope is emitted"
@@ -1019,27 +1044,27 @@ export const commandCatalog = {
     {
       "argv": [
         "probe",
-        "TARGET"
+        "[TARGET]"
       ],
       "command": "probe",
       "data_schema": "probe-result",
-      "description": "Inspect a target and return typed fingerprint, exposure, and policy findings.",
+      "description": "Look at a server the way a censor's scanner would (same as test --probe)",
       "envelope_schema": "probe-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "probe completed and every check passed",
+        "0": "probe completed and passed",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "system or infrastructure failure, or verification was inconclusive",
+        "2": "user or configuration error",
+        "3": "probe failed or was inconclusive",
         "4": "probe completed with negative findings",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "probe-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
         "--sni",
-        "--timeout"
+        "--timeout",
+        "--json"
       ],
       "outcomes": [
         {
@@ -1086,21 +1111,21 @@ export const commandCatalog = {
       ],
       "command": "relay.list",
       "data_schema": "relay-list",
-      "description": "List configured relays with live panel host status when available.",
+      "description": "List all relay nodes",
       "envelope_schema": "relay-list-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "relay list was collected",
+        "0": "relay list and host status were collected",
         "1": "unexpected Meridian bug",
         "2": "exit filter or configuration error",
-        "3": "panel host status was unavailable, or a system/panel failure occurred",
+        "3": "relay topology was listed but panel host status was unavailable; system or panel failure",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
-        "--exit"
+        "--exit",
+        "--json"
       ],
       "outcomes": [
         {
@@ -1149,7 +1174,7 @@ export const commandCatalog = {
       ],
       "command": "route.add",
       "data_schema": "route-mutation",
-      "description": "Add a per-destination egress override (WARP, direct, block) to an exit and apply it.",
+      "description": "Send matching destinations through WARP, directly, or nowhere",
       "envelope_schema": "route-add-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1162,9 +1187,9 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
         "--via",
-        "--name"
+        "--name",
+        "--json"
       ],
       "outcomes": [
         {
@@ -1201,11 +1226,12 @@ export const commandCatalog = {
     {
       "argv": [
         "route",
-        "list"
+        "list",
+        "[EXIT]"
       ],
       "command": "route.list",
       "data_schema": "route-list",
-      "description": "List every exit's default egress and its overrides in first-match order.",
+      "description": "List every exit's egress overrides in first-match order",
       "envelope_schema": "route-list-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1254,7 +1280,7 @@ export const commandCatalog = {
       ],
       "command": "route.remove",
       "data_schema": "route-mutation",
-      "description": "Remove one egress override from an exit and apply it.",
+      "description": "Remove one egress override; its destinations follow the exit's default again",
       "envelope_schema": "route-remove-envelope",
       "error_schema": "error",
       "exit_codes": {
@@ -1267,8 +1293,8 @@ export const commandCatalog = {
       "failure_data_schema": "empty-data",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
-        "--yes"
+        "--yes",
+        "--json"
       ],
       "outcomes": [
         {
@@ -1305,30 +1331,31 @@ export const commandCatalog = {
     {
       "argv": [
         "test",
-        "TARGET"
+        "[TARGET]"
       ],
       "command": "test",
       "data_schema": "test-result",
-      "description": "Verify delivered proxy traffic end to end and return evidence-aware protocol findings.",
+      "description": "Test real proxy traffic from this device (no SSH needed)",
       "envelope_schema": "test-envelope",
       "error_schema": "error",
       "exit_codes": {
-        "0": "test completed and every check passed",
+        "0": "test completed and passed",
         "1": "unexpected Meridian bug",
-        "2": "user/config error",
-        "3": "system or infrastructure failure, or verification was inconclusive",
+        "2": "user or configuration error",
+        "3": "test failed or was inconclusive",
         "4": "test completed with negative findings",
         "130": "process interrupted; no JSON envelope is emitted"
       },
       "failure_data_schema": "test-failure",
       "interrupt_behavior": "exit_130_without_envelope",
       "machine_flags": [
-        "--json",
         "--domain",
         "--sni",
         "--client",
         "--basic",
-        "--timeout"
+        "--probe",
+        "--timeout",
+        "--json"
       ],
       "outcomes": [
         {

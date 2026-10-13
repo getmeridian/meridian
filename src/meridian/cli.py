@@ -614,7 +614,7 @@ def deploy_cmd(
 
 @client_app.command("add")
 def client_add(
-    names: list[str] = typer.Argument(..., help="Client name(s) to add"),
+    names: list[str] = typer.Argument(..., metavar="NAME", help="Client name(s) to add"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
@@ -787,7 +787,7 @@ def scan_cmd(
 
 @app.command("test", rich_help_panel=CHECK_AND_FIX)
 def test_cmd(
-    ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
+    ip: str = typer.Argument("", metavar="TARGET", help="Server IP, domain, or saved name", show_default=False),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to test"),
     client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
@@ -825,7 +825,7 @@ def test_cmd(
 
 @app.command("probe", rich_help_panel=CHECK_AND_FIX)
 def probe_cmd(
-    ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
+    ip: str = typer.Argument("", metavar="TARGET", help="Server IP, domain, or saved name", show_default=False),
     sni: str = typer.Option("", "--sni", "-s", help="SNI to use for generic probes"),
     timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
@@ -971,7 +971,9 @@ def relay_remove_cmd(
 @route_app.command("add")
 def route_add_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
-    values: list[str] = typer.Argument(..., help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"),
+    values: list[str] = typer.Argument(
+        ..., metavar="VALUE", help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"
+    ),
     via: str = typer.Option(..., "--via", help="warp, direct, or block"),
     name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
@@ -1008,7 +1010,7 @@ def route_list_cmd(
 @route_app.command("remove")
 def route_remove_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
-    route_id: str = typer.Argument(..., help="Route ID from `meridian route list`"),
+    route_id: str = typer.Argument(..., metavar="ROUTE", help="Route ID from `meridian route list`"),
     yes: Yes = False,
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:

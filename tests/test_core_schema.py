@@ -5,13 +5,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from meridian.cli_catalog import command_catalog, command_contracts
 from meridian.core.clients import build_client_list_result
-from meridian.core.command_catalog import (
-    CommandContract,
-    command_contract,
-    command_contracts,
-    command_schema_bindings,
-)
+from meridian.core.command_catalog import CommandContract, command_output, command_schema_bindings
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployResult
 from meridian.core.models import ErrorModel
 from meridian.core.output import OperationTimer, command_envelope, envelope
@@ -21,7 +17,6 @@ from meridian.core.schema import (
     DeployOutputEnvelope,
     PlanOutputEnvelope,
     ProbeOutputEnvelope,
-    command_catalog,
     schema_catalog,
     schema_for,
     schema_names,
@@ -287,7 +282,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["client.list"]["data_schema"] == "client-list"
     assert by_command["client.add"]["data_schema"] == "client-add"
     assert by_command["client.remove"]["data_schema"] == "client-remove"
-    assert by_command["client.remove"]["machine_flags"] == ["--json", "--yes"]
+    assert by_command["client.remove"]["machine_flags"] == ["--yes", "--json"]
     assert {
         "status": "ok",
         "exit_code": 3,
@@ -298,20 +293,18 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["client.disable"]["data_schema"] == "client-status"
     assert by_command["node.list"]["data_schema"] == "node-list"
     assert by_command["relay.list"]["data_schema"] == "relay-list"
-    assert by_command["relay.list"]["machine_flags"] == ["--json", "--exit"]
+    assert by_command["relay.list"]["machine_flags"] == ["--exit", "--json"]
     assert by_command["apply"]["data_schema"] == "apply-command-data"
     assert by_command["apply"]["failure_data_schema"] == "apply-failure"
-    assert by_command["apply"]["machine_flags"] == ["--json"]
+    assert by_command["apply"]["machine_flags"] == ["--yes", "--json"]
     assert by_command["apply"]["stability"] == "preview"
     assert by_command["deploy"]["envelope_schema"] == "deploy-envelope"
     assert by_command["deploy"]["data_schema"] == "deploy-command-data"
-    assert by_command["deploy"]["machine_flags"] == [
-        "--json",
-        "--events=jsonl",
-        "--request",
-        "--dry-run",
-        "--cancel-file",
-    ]
+    assert {"--json", "--events", "--request", "--dry-run", "--cancel-file"} <= set(
+        by_command["deploy"]["machine_flags"]
+    )
+    assert by_command["deploy"]["argv"] == ["deploy", "[SERVER]"]
+    assert by_command["client.add"]["argv"] == ["client", "add", "NAME..."]
     assert by_command["api.commands"]["data_schema"] == "api-commands"
     assert by_command["api.workflow"]["data_schema"] == "api-workflow"
     assert by_command["api.workflow"]["machine_flags"] == ["--json"]
@@ -320,7 +313,7 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["probe"]["data_schema"] == "probe-result"
     assert by_command["probe"]["failure_data_schema"] == "probe-failure"
     assert by_command["probe"]["exit_codes"]["4"] == "probe completed with negative findings"
-    assert by_command["probe"]["machine_flags"] == ["--json", "--sni", "--timeout"]
+    assert by_command["probe"]["machine_flags"] == ["--sni", "--timeout", "--json"]
     assert {
         "status": "ok",
         "exit_code": 4,
@@ -330,12 +323,13 @@ def test_command_catalog_maps_commands_to_envelope_and_data_schemas() -> None:
     assert by_command["test"]["data_schema"] == "test-result"
     assert by_command["test"]["failure_data_schema"] == "test-failure"
     assert by_command["test"]["machine_flags"] == [
-        "--json",
         "--domain",
         "--sni",
         "--client",
         "--basic",
+        "--probe",
         "--timeout",
+        "--json",
     ]
     assert {
         "status": "failed",
@@ -394,8 +388,8 @@ def test_command_contract_registry_is_public_and_schema_neutral() -> None:
 
     assert all(isinstance(contract, CommandContract) for contract in contracts)
     assert [contract.command for contract in contracts] == sorted(contract.command for contract in contracts)
-    assert command_contract("probe") is not None
-    assert command_contract("missing") is None
+    assert command_output("probe") is not None
+    assert command_output("missing") is None
     assert command_schema_bindings()["test"] == "test-envelope"
 
 

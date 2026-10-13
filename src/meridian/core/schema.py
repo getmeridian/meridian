@@ -26,9 +26,9 @@ from meridian.core.command_catalog import (
     CommandContract,
     CommandOutcome,
     OutcomeCategory,
-    command_contract,
-    command_contracts,
+    command_output,
     command_schema_bindings,
+    envelope_schema,
 )
 from meridian.core.command_inputs import (
     ClientNameRequest,
@@ -598,18 +598,16 @@ def schema_for(name: str) -> dict[str, Any]:
 
 def validate_command_envelope(payload: OutputEnvelope) -> OutputEnvelope:
     """Validate a produced envelope against its advertised command contract."""
-    contract = command_contract(payload.command)
-    if contract is None:
+    output = command_output(payload.command)
+    if output is None:
         return payload
-    schema_model(contract.envelope_schema).model_validate(payload.model_dump(mode="json", by_alias=True))
+    schema_model(envelope_schema(payload.command)).model_validate(payload.model_dump(mode="json", by_alias=True))
     categories: set[OutcomeCategory] = {error.category for error in payload.errors} if payload.errors else {"none"}
     if not any(
         outcome.status == payload.status and outcome.exit_code == payload.exit_code and outcome.category in categories
-        for outcome in contract.outcomes
+        for outcome in output.outcomes
     ):
-        expected = ", ".join(
-            f"{outcome.status}/{outcome.exit_code}/{outcome.category}" for outcome in contract.outcomes
-        )
+        expected = ", ".join(f"{outcome.status}/{outcome.exit_code}/{outcome.category}" for outcome in output.outcomes)
         raise ValueError(
             f"{payload.command} produced unsupported outcome "
             f"{payload.status}/{payload.exit_code}/{', '.join(sorted(categories))}; expected one of: {expected}"
@@ -629,21 +627,6 @@ def schema_catalog(*, include_schemas: bool = False) -> list[dict[str, Any]]:
             description=(model.__doc__ or "").strip(),
             commands=commands,
             schema=schema_for(name) if include_schemas else None,
-        )
-        catalog.append(entry.model_dump(mode="json", by_alias=True, exclude_none=True))
-    return catalog
-
-
-def command_catalog(*, include_schemas: bool = False) -> list[dict[str, Any]]:
-    """Return command contract metadata, optionally including JSON Schemas."""
-    catalog: list[dict[str, Any]] = []
-    for contract in command_contracts():
-        entry = CommandCatalogEntry(
-            **contract.model_dump(mode="json"),
-            envelope=schema_for(contract.envelope_schema) if include_schemas else None,
-            data=schema_for(contract.data_schema) if include_schemas else None,
-            failure_data=schema_for(contract.failure_data_schema) if include_schemas else None,
-            error=schema_for(contract.error_schema) if include_schemas else None,
         )
         catalog.append(entry.model_dump(mode="json", by_alias=True, exclude_none=True))
     return catalog
