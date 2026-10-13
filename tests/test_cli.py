@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
 import typer
 from typer.testing import CliRunner
 
@@ -25,9 +26,12 @@ def _reset_output_modes() -> None:
     set_quiet_mode(False)
 
 
-def _assert_machine_json_without_banner(output: str) -> dict[str, object]:
-    assert "Meridian v" not in output
-    return json.loads(output)
+@pytest.fixture(autouse=True)
+def _quiet_cli(monkeypatch):
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    _reset_output_modes()
+    yield
+    _reset_output_modes()
 
 
 class TestCLIBasics:
@@ -64,8 +68,7 @@ class TestCLIBasics:
 
         assert started == [True]
 
-    def test_unsupported_lang_is_a_user_error(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_unsupported_lang_is_a_user_error(self) -> None:
         result = runner.invoke(app, ["--lang", "de", "server", "list"])
         assert result.exit_code == 2
         assert "Unsupported language: de" in _strip_ansi(result.output)
@@ -122,8 +125,7 @@ class TestHelpSections:
 
 
 class TestRenamedSpellings:
-    def test_every_old_command_spelling_fails_with_a_pointer_to_the_new_one(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_every_old_command_spelling_fails_with_a_pointer_to_the_new_one(self) -> None:
 
         for old, new in cli.RENAMED.items():
             result = runner.invoke(app, [*old.split(), "198.51.100.10"])
@@ -139,21 +141,17 @@ class TestRenamedSpellings:
                 command = command.commands.get(name) if isinstance(command, typer.core.TyperGroup) else None  # type: ignore[attr-defined]
             assert command is None, old
 
-    def test_server_option_points_at_the_positional_target(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_server_option_points_at_the_positional_target(self) -> None:
 
         result = runner.invoke(app, ["doctor", "--server", "mybox"])
 
         assert result.exit_code == 2
         assert "`--server` is now the first argument: `meridian doctor SERVER`" in _strip_ansi(result.output)
 
-    def test_renamed_command_in_json_mode_is_an_error_envelope(self, monkeypatch) -> None:
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_renamed_command_in_json_mode_is_an_error_envelope(self) -> None:
 
         result = runner.invoke(app, ["relay", "check", "relay-a", "--json"])
 
-        _reset_output_modes()
         assert result.exit_code == 2
         payload = json.loads(result.output)
         assert payload["command"] == "relay.check"
@@ -162,32 +160,71 @@ class TestRenamedSpellings:
         assert "meridian check" in payload["errors"][0]["message"]
 
 
-class TestSubcommandHelp:
-    def test_setup_help(self) -> None:
-        result = runner.invoke(app, ["setup", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "--intent" in output
-        assert "--restart" in output
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        (["setup"], ["--intent", "--restart"]),
+        (["deploy"], ["--domain", "--sni", "--json", "--events", "--request", "--dry-run"]),
+        (["studio"], ["--port", "--assets-dir", "--no-open"]),
+        (["client"], ["add", "list", "remove"]),
+        (["server"], ["add", "list", "remove"]),
+        (["fleet"], ["status", "inventory", "upgrade"]),
+        (["fleet", "status"], ["--json"]),
+        (["api"], ["commands", "schemas", "schema"]),
+        (["doctor"], ["--ai"]),
+        (["update"], []),
+    ],
+    ids=" ".join,
+)
+def test_subcommand_help(argv: list[str], expected: list[str]) -> None:
+    result = runner.invoke(app, [*argv, "--help"])
+    assert result.exit_code == 0
+    output = _strip_ansi(result.output)
+    for needle in expected:
+        assert needle in output
 
-    def test_deploy_help(self) -> None:
-        result = runner.invoke(app, ["deploy", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "--domain" in output
-        assert "--sni" in output
-        assert "--json" in output
-        assert "--events" in output
-        assert "--request" in output
-        assert "--dry-run" in output
 
+@pytest.mark.parametrize("argv", [["studio", "--port", "65536"], ["apply", "--parallel", "0"]], ids=" ".join)
+def test_out_of_range_option_values_are_user_errors(argv: list[str]) -> None:
+    assert runner.invoke(app, argv).exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("argv", "target"),
+    [
+        (["plan", "--json"], "meridian.commands.plan.run"),
+        (["--json", "apply", "--yes"], "meridian.commands.apply.run"),
+        (["client", "list", "--json"], "meridian.commands.client.run_list"),
+        (["client", "show", "alice", "--json"], "meridian.commands.client.run_show"),
+        (["fleet", "status", "--json"], "meridian.commands.fleet.run_status"),
+        (["fleet", "inventory", "--json"], "meridian.commands.fleet.run_inventory"),
+    ],
+    ids=lambda value: " ".join(value) if isinstance(value, list) else "",
+)
+def test_json_turns_on_json_mode_and_suppresses_the_banner(monkeypatch, argv: list[str], target: str) -> None:
+    seen: list[bool] = []
+
+    def fake_run(*_args: object, **_kwargs: object) -> None:
+        seen.append(is_json_mode())
+        print('{"ok": true}')
+
+    monkeypatch.setattr(target, fake_run)
+
+    result = runner.invoke(app, argv)
+
+    assert result.exit_code == 0
+    assert seen == [True]
+    assert "Meridian v" not in result.output
+    assert json.loads(result.output) == {"ok": True}
+
+
+class TestCommandDispatch:
     def test_setup_forwards_resumable_options(self, monkeypatch) -> None:
         called: dict[str, object] = {}
 
         def fake_run(**kwargs: object) -> None:
             called.update(kwargs)
 
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.commands.setup_v4.run", fake_run)
 
         result = runner.invoke(
@@ -208,21 +245,12 @@ class TestSubcommandHelp:
             "yes": True,
         }
 
-    def test_bare_deploy_asks_for_a_server_and_gives_up_without_one(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_bare_deploy_asks_for_a_server_and_gives_up_without_one(self) -> None:
 
         result = runner.invoke(app, ["deploy"], input="\n\n\n")
 
         assert result.exit_code == 2
         assert "No server IP given" in _strip_ansi(result.output)
-
-    def test_studio_help(self) -> None:
-        result = runner.invoke(app, ["studio", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "--port" in output
-        assert "--assets-dir" in output
-        assert "--no-open" in output
 
     def test_studio_command_delegates_to_runner(self, monkeypatch) -> None:
         called: dict[str, object] = {}
@@ -230,111 +258,12 @@ class TestSubcommandHelp:
         def fake_run(*, port: int, assets_dir: str, no_open: bool) -> None:
             called.update({"port": port, "assets_dir": assets_dir, "no_open": no_open})
 
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.commands.studio.run", fake_run)
 
         result = runner.invoke(app, ["studio", "--port", "9876", "--assets-dir", "website/dist", "--no-open"])
 
         assert result.exit_code == 0
         assert called == {"port": 9876, "assets_dir": "website/dist", "no_open": True}
-
-    def test_studio_rejects_out_of_range_port(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-
-        result = runner.invoke(app, ["studio", "--port", "65536"])
-
-        assert result.exit_code == 2
-
-    def test_client_help(self) -> None:
-        result = runner.invoke(app, ["client", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "add" in output
-        assert "list" in output
-        assert "remove" in output
-
-    def test_server_help(self) -> None:
-        result = runner.invoke(app, ["server", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "add" in output
-        assert "list" in output
-        assert "remove" in output
-
-    def test_fleet_help(self) -> None:
-        result = runner.invoke(app, ["fleet", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "status" in output
-        assert "inventory" in output
-        assert "upgrade" in output
-
-    def test_api_help(self) -> None:
-        result = runner.invoke(app, ["api", "--help"])
-        assert result.exit_code == 0
-        output = _strip_ansi(result.output)
-        assert "commands" in output
-        assert "schemas" in output
-        assert "schema" in output
-
-    def test_fleet_status_help_documents_command_json(self) -> None:
-        result = runner.invoke(app, ["fleet", "status", "--help"])
-        assert result.exit_code == 0
-        assert "--json" in _strip_ansi(result.output)
-
-    def test_fleet_inventory_accepts_command_json(self, monkeypatch) -> None:
-        called: dict[str, bool] = {}
-
-        def fake_run_inventory() -> None:
-            called["json"] = is_json_mode()
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.fleet.run_inventory", fake_run_inventory)
-
-        result = runner.invoke(app, ["fleet", "inventory", "--json"])
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        assert result.exit_code == 0
-        assert called["json"] is True
-
-    def test_client_list_accepts_command_json(self, monkeypatch) -> None:
-        called: dict[str, bool] = {}
-
-        def fake_run_list(*_args: object, **_kwargs: object) -> None:
-            called["json"] = is_json_mode()
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.client.run_list", fake_run_list)
-
-        result = runner.invoke(app, ["client", "list", "--json"])
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        assert result.exit_code == 0
-        assert called["json"] is True
-
-    def test_client_show_accepts_command_json(self, monkeypatch) -> None:
-        called: dict[str, bool] = {}
-
-        def fake_run_show(*_args: object, **_kwargs: object) -> None:
-            called["json"] = is_json_mode()
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.client.run_show", fake_run_show)
-
-        result = runner.invoke(app, ["client", "show", "alice", "--json"])
-
-        set_json_mode(False)
-        set_quiet_mode(False)
-        assert result.exit_code == 0
-        assert called["json"] is True
 
     def test_deploy_accepts_command_json_and_events(self, monkeypatch) -> None:
         called: dict[str, object] = {}
@@ -343,9 +272,6 @@ class TestSubcommandHelp:
             called.update(kwargs)
             called["json"] = is_json_mode()
 
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.commands.deploy.run", fake_run)
 
         result = runner.invoke(
@@ -353,7 +279,6 @@ class TestSubcommandHelp:
             ["deploy", "198.51.100.10", "--yes", "--json", "--events=jsonl", "--request", "deploy.json", "--dry-run"],
         )
 
-        _reset_output_modes()
         assert result.exit_code == 0
         assert called["json"] is True
         assert called["json_output"] is True
@@ -368,78 +293,46 @@ class TestSubcommandHelp:
             called.update(kwargs)
             called["json"] = is_json_mode()
 
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.commands.deploy.run", fake_run)
 
         result = runner.invoke(app, ["--json", "deploy", "198.51.100.10", "--yes"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         assert called["json"] is True
         assert called["json_output"] is True
 
-    def test_doctor_help(self) -> None:
-        result = runner.invoke(app, ["doctor", "--help"])
-        assert result.exit_code == 0
-        assert "--ai" in _strip_ansi(result.output)
-
-    def test_update_help(self) -> None:
-        result = runner.invoke(app, ["update", "--help"])
-        assert result.exit_code == 0
-
     def test_update_propagates_system_failure_exit(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.update.run_self_update", lambda major=False: 3)
 
         result = runner.invoke(app, ["update"])
 
         assert result.exit_code == 3
 
-    def test_apply_rejects_unsafe_parallel_count(self, monkeypatch) -> None:
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-
-        result = runner.invoke(app, ["apply", "--parallel", "0"])
-
-        assert result.exit_code == 2
-
 
 class TestApiContractCLI:
-    def test_api_schemas_json_is_parseable_machine_output(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_api_schemas_json_is_parseable_machine_output(self) -> None:
 
         result = runner.invoke(app, ["api", "schemas", "--json"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.schemas"
         assert payload["data"]["schemas"]
         assert "Meridian v" not in result.output
 
-    def test_include_schemas_implies_json_envelope(self, monkeypatch) -> None:
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_include_schemas_implies_json_envelope(self) -> None:
 
         result = runner.invoke(app, ["api", "schemas", "--include-schemas"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.schemas"
         assert payload["data"]["schemas"][0]["schema"]
 
-    def test_api_commands_json_lists_command_contracts(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_api_commands_json_lists_command_contracts(self) -> None:
 
         result = runner.invoke(app, ["api", "commands", "--json"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.commands"
@@ -453,14 +346,10 @@ class TestApiContractCLI:
             commands["deploy"]["machine_flags"]
         )
 
-    def test_api_workflow_json_returns_deploy_fields(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_api_workflow_json_returns_deploy_fields(self) -> None:
 
         result = runner.invoke(app, ["api", "workflow", "deploy", "--json"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.workflow"
@@ -470,28 +359,19 @@ class TestApiContractCLI:
         assert workflow["ready_request_schema"] == "deploy-request"
         assert [field["id"] for field in workflow["fields"]][:2] == ["ip", "user"]
 
-    def test_api_schema_envelope_error_is_command_scoped_json(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-
-        result = runner.invoke(app, ["api", "schema", "missing", "--envelope"])
-
-        _reset_output_modes()
+    @pytest.mark.parametrize("argv", [["api", "schema", "missing", "--envelope"], ["api", "schema", "missing"]])
+    def test_api_schema_error_is_command_scoped_json(self, argv: list[str]) -> None:
+        result = runner.invoke(app, argv)
         assert result.exit_code == 2
         payload = json.loads(result.output)
         assert payload["command"] == "api.schema"
         assert payload["status"] == "failed"
         assert payload["errors"][0]["category"] == "user"
 
-    def test_api_schema_json_alias_wraps_envelope(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_api_schema_json_alias_wraps_envelope(self) -> None:
 
         result = runner.invoke(app, ["api", "schema", "compiled-plan-result", "--json"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["command"] == "api.schema"
@@ -499,14 +379,10 @@ class TestApiContractCLI:
         assert payload["data"]["name"] == "compiled-plan-result"
         assert payload["data"]["schema"]["title"] == "CompiledPlanResult"
 
-    def test_api_schema_raw_schema_preserves_sensitive_property_names(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_api_schema_raw_schema_preserves_sensitive_property_names(self) -> None:
 
         result = runner.invoke(app, ["api", "schema", "client-show"])
 
-        _reset_output_modes()
         assert result.exit_code == 0
         payload = json.loads(result.output)
         client_props = payload["$defs"]["ClientDetail"]["properties"]
@@ -516,29 +392,12 @@ class TestApiContractCLI:
         assert handoff_props["subscription_available"]["type"] == "boolean"
         assert handoff_props["share_available"]["type"] == "boolean"
 
-    def test_api_schema_raw_error_is_machine_readable(self, monkeypatch) -> None:
-        set_json_mode(False)
-        set_quiet_mode(False)
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-
-        result = runner.invoke(app, ["api", "schema", "missing"])
-
-        _reset_output_modes()
-        assert result.exit_code == 2
-        payload = json.loads(result.output)
-        assert payload["command"] == "api.schema"
-        assert payload["status"] == "failed"
-        assert payload["errors"][0]["category"] == "user"
-
 
 class TestCommandLocalJsonQuieting:
-    def test_global_json_rejects_unmigrated_command(self, monkeypatch) -> None:
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    def test_global_json_rejects_unmigrated_command(self) -> None:
 
         result = runner.invoke(app, ["--json", "node", "remove"])
 
-        _reset_output_modes()
         assert result.exit_code == 2
         payload = json.loads(result.output)
         assert payload["command"] == "node.remove"
@@ -546,117 +405,36 @@ class TestCommandLocalJsonQuieting:
         assert payload["errors"][0]["category"] == "user"
         assert "Meridian v" not in result.output
 
-    def test_global_json_is_accepted_exactly_by_commands_that_declare_json(self, monkeypatch) -> None:
+    def test_global_json_is_accepted_exactly_by_commands_that_declare_json(self) -> None:
         from meridian.cli_catalog import public_commands, supports_json
 
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         for path, command in public_commands().items():
-            _reset_output_modes()
             # --help stops after the root callback has accepted or refused the global --json.
             result = runner.invoke(app, ["--json", *path.split("."), "--help"])
-            _reset_output_modes()
 
             assert result.exit_code == (0 if supports_json(command) else 2), path
 
     def test_global_json_reaches_check_and_route_list(self, monkeypatch) -> None:
         seen: list[bool] = []
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.commands.health.run", lambda *_a, **_k: seen.append(is_json_mode()))
         monkeypatch.setattr("meridian.commands.route.run_list", lambda *_a, **_k: seen.append(is_json_mode()))
 
         for argv in (["--json", "check"], ["--json", "route", "list", "exit-1"]):
-            _reset_output_modes()
             result = runner.invoke(app, argv)
-            _reset_output_modes()
             assert result.exit_code == 0, argv
 
         assert seen == [True, True]
 
     def test_an_option_value_spelled_like_json_is_not_a_machine_flag(self, monkeypatch) -> None:
         seen: list[bool] = []
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
         monkeypatch.setattr("meridian.update.check_for_update", lambda _version: None)
         monkeypatch.setattr("meridian.commands.diagnostics.run", lambda *_a, **_k: seen.append(is_json_mode()))
 
-        _reset_output_modes()
         result = runner.invoke(app, ["doctor", "--sni", "--json"])
-        _reset_output_modes()
 
         assert result.exit_code == 0
         assert seen == [False]
         assert "Meridian v" in result.output
-
-    def test_plan_command_json_suppresses_banner(self, monkeypatch) -> None:
-        def fake_run() -> None:
-            assert is_json_mode()
-            print('{"ok": true}')
-
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.plan.run", fake_run)
-
-        result = runner.invoke(app, ["plan", "--json"])
-
-        _reset_output_modes()
-        assert result.exit_code == 0
-        assert _assert_machine_json_without_banner(result.output) == {"ok": True}
-
-    def test_apply_global_json_turns_on_json_mode(self, monkeypatch) -> None:
-        def fake_run(*_args: object, **_kwargs: object) -> None:
-            assert is_json_mode()
-            print('{"ok": true}')
-
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.apply.run", fake_run)
-
-        result = runner.invoke(app, ["--json", "apply", "--yes"])
-
-        _reset_output_modes()
-        assert result.exit_code == 0
-        assert _assert_machine_json_without_banner(result.output) == {"ok": True}
-
-    def test_client_list_command_json_suppresses_banner(self, monkeypatch) -> None:
-        def fake_run_list(*_args: object, **_kwargs: object) -> None:
-            print('{"ok": true}')
-
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.client.run_list", fake_run_list)
-
-        result = runner.invoke(app, ["client", "list", "--json"])
-
-        _reset_output_modes()
-        assert result.exit_code == 0
-        assert _assert_machine_json_without_banner(result.output) == {"ok": True}
-
-    def test_client_show_command_json_suppresses_banner(self, monkeypatch) -> None:
-        def fake_run_show(*_args: object, **_kwargs: object) -> None:
-            print('{"ok": true}')
-
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.client.run_show", fake_run_show)
-
-        result = runner.invoke(app, ["client", "show", "alice", "--json"])
-
-        _reset_output_modes()
-        assert result.exit_code == 0
-        assert _assert_machine_json_without_banner(result.output) == {"ok": True}
-
-    def test_fleet_status_command_json_suppresses_banner(self, monkeypatch) -> None:
-        def fake_run_status() -> None:
-            print('{"ok": true}')
-
-        _reset_output_modes()
-        monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-        monkeypatch.setattr("meridian.commands.fleet.run_status", fake_run_status)
-
-        result = runner.invoke(app, ["fleet", "status", "--json"])
-
-        _reset_output_modes()
-        assert result.exit_code == 0
-        assert _assert_machine_json_without_banner(result.output) == {"ok": True}
 
 
 def test_beta_banner_points_testers_at_the_report_form(capsys) -> None:
