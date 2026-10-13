@@ -9,7 +9,7 @@ from importlib.metadata import PackageNotFoundError, version
 import pytest
 
 import meridian.config as config
-from meridian.config import is_ip
+from meridian.core.inputs import is_ip
 
 
 class TestIsIp:

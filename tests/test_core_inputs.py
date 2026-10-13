@@ -12,7 +12,7 @@ from meridian.core.command_inputs import (
     ServerAddRequest,
 )
 from meridian.core.inputs import (
-    is_ip_deploy_target,
+    is_ip,
     validate_hostname_value,
     validate_optional_transport_path_value,
 )
@@ -28,7 +28,7 @@ from meridian.core.validation import validation_error_hint, wrap_validation_erro
 def test_ip_value_accepts_ipv4_and_ipv6() -> None:
     assert ServerAddRequest(ip="198.51.100.10").ip == "198.51.100.10"
     assert ServerAddRequest(ip="2001:db8::1").ip == "2001:db8::1"
-    assert is_ip_deploy_target("2001:db8::1") is True
+    assert is_ip("2001:db8::1") is True
 
 
 def test_ip_value_rejects_typos_with_readable_hint() -> None:

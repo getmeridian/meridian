@@ -14,7 +14,7 @@ from meridian.core.deploy_validation import (
     validate_deploy_target,
 )
 from meridian.core.errors import EngineError, MeridianError
-from meridian.core.inputs import is_ip_deploy_target, is_local_deploy_target
+from meridian.core.inputs import is_ip, is_local_deploy_target
 from meridian.core.servers import ServerProfile
 from meridian.servers import ServerEntry
 from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_server_deploy
@@ -52,7 +52,7 @@ def resolve_deploy_target(request: DeployRequest, registry: ServerLookup) -> Res
             else:
                 entry = registry.find(request.requested_server)
                 if not entry:
-                    if is_ip_deploy_target(request.requested_server):
+                    if is_ip(request.requested_server):
                         server_ip = request.requested_server
                     else:
                         raise DeployValidationError(

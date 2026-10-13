@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, Self
 from urllib.parse import quote, urlsplit
 
-from meridian.core.inputs import validate_optional_transport_path_value
+from meridian.core.inputs import is_ip, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
 
 logger = logging.getLogger("meridian.cluster")
@@ -278,7 +278,7 @@ class ClusterConfig:
                 errors.append("panel.api_token is empty but cluster is marked as configured")
 
         # Panel server_ip
-        if self.panel.server_ip and not _is_valid_ip(self.panel.server_ip):
+        if self.panel.server_ip and not is_ip(self.panel.server_ip):
             errors.append(f"panel.server_ip is not a valid IP: {self.panel.server_ip}")
 
         # Panel ssh_port
@@ -378,17 +378,6 @@ class ClusterConfig:
     def is_configured(self) -> bool:
         """Whether the cluster has a panel configured."""
         return bool(self.panel.url and self.panel.api_token)
-
-
-def _is_valid_ip(s: str) -> bool:
-    """Check if a string is a valid IPv4 or IPv6 address."""
-    import ipaddress
-
-    try:
-        ipaddress.ip_address(s)
-        return True
-    except ValueError:
-        return False
 
 
 def _is_valid_uuid(s: str) -> bool:

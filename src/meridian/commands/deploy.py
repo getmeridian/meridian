@@ -28,7 +28,7 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.commands.port_check import check_ports
 from meridian.commands.resolve import ensure_server_connection, resolve_server
-from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE, is_ip
+from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import (
     err_console,
     error_context,
@@ -47,6 +47,7 @@ from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import EngineError, MeridianError
 from meridian.core.events import COMMAND_CANCELLED, COMMAND_COMPLETED, COMMAND_STARTED
+from meridian.core.inputs import is_ip
 from meridian.core.models import OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS

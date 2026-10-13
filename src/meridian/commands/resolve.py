@@ -11,9 +11,9 @@ from rich.markup import escape
 
 from meridian import resolve as _resolve_lib
 from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
-from meridian.config import is_ip
 from meridian.console import err_console, fail, info
 from meridian.core.errors import LocalStateError
+from meridian.core.inputs import is_ip
 from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,

@@ -14,10 +14,10 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     ResourcePlan,
     ServerBaselinePayload,
-    is_ip_address,
 )
 from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
+from meridian.core.inputs import is_ip
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.node_deploy import deploy_node_container, render_node_compose, wait_for_node_connected
@@ -316,7 +316,7 @@ class CertificateDriver(retirement.CertificateRetirement):
             timeout=15,
         )
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
-        san = f"IP Address:{payload.hostname}" if is_ip_address(payload.hostname) else f"DNS:{payload.hostname}"
+        san = f"IP Address:{payload.hostname}" if is_ip(payload.hostname) else f"DNS:{payload.hostname}"
         matches = valid and san in result.stdout
         return build_observation(
             action,
@@ -379,7 +379,7 @@ class CertificateDriver(retirement.CertificateRetirement):
             _raise_if_timeout(action, reload_result)
             raise ResourceReconcileError("Could not start the ACME HTTP-01 challenge listener.")
         cert_dir = certificate_directory(payload.hostname)
-        bare_ip = is_ip_address(payload.hostname)
+        bare_ip = is_ip(payload.hostname)
         result = IssueTLSCert(
             payload.hostname,
             # Let's Encrypt's short-lived profile is the only one that certifies an IP address.

@@ -167,14 +167,3 @@ REALITL_SCANNER_ASSETS: dict[str, tuple[str, str]] = {
         "27bdd3e53d4391c66c8df3391d3c3fb5eb2dc356125f2fb33ac58fcaaf8f88b3",
     ),
 }
-
-
-def is_ip(s: str) -> bool:
-    """Check if string is a valid IPv4 or IPv6 address."""
-    import ipaddress
-
-    try:
-        ipaddress.ip_address(s)
-        return True
-    except ValueError:
-        return False

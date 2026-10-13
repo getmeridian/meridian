@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from meridian.core.deploy import DeployRequest
 from meridian.core.inputs import (
-    is_ip_deploy_target,
+    is_ip,
     is_local_deploy_target,
     validate_name_value,
 )
@@ -38,7 +38,7 @@ def validate_deploy_target(target: str) -> None:
             "Deploy target is required",
             hint="Enter a server IP address or use --server with a registered server.",
         )
-    if not is_local_deploy_target(target) and not is_ip_deploy_target(target):
+    if not is_local_deploy_target(target) and not is_ip(target):
         raise DeployValidationError(
             f"Invalid IP address: {target}",
             hint="Enter a valid IP address (e.g. meridian deploy 198.51.100.10).",

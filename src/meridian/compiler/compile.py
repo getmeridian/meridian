@@ -44,7 +44,6 @@ from meridian.compiler.models import (
     SubscriptionSettingsPayload,
     canonical_hash,
     compute_plan_hash,
-    is_ip_address,
     make_resource,
 )
 from meridian.compiler.names import (
@@ -63,6 +62,7 @@ from meridian.compiler.routing import (
     exit_override_routes,
 )
 from meridian.core.defaults import CONTROL_TLS_PORT
+from meridian.core.inputs import is_ip
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent, path_fingerprints
 
 
@@ -503,7 +503,7 @@ def _compile_exit_endpoints(
         # A client dialing a bare IP sends no SNI. The control server already routes no-SNI
         # connections to its panel TLS server (which holds the IP certificate), so its IP paths
         # join that server as included locations instead of competing for the route.
-        bare_ip = is_ip_address(tls_sni)
+        bare_ip = is_ip(tls_sni)
         if bare_ip and exit_.server_ref == control_server_ref and public_port == 443:
             location_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:location"
             builder.add(

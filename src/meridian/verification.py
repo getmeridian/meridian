@@ -17,9 +17,8 @@ from meridian.compiler.models import (
     NginxArtifactPayload,
     RealmHopPayload,
 )
-from meridian.config import is_ip
 from meridian.core.errors import LocalStateError, MeridianError
-from meridian.core.inputs import validate_hostname_value
+from meridian.core.inputs import is_ip, validate_hostname_value
 from meridian.core.topology import ProtocolKind, ServerCapability, SetupIntent
 from meridian.core.verification import (
     VerificationCheck,

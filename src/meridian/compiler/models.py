@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import re
 from typing import Annotated, Any, Literal, Self, TypeAlias
@@ -23,6 +22,7 @@ from meridian.core.inputs import (
     PortValue,
     ServerReferenceValue,
     SshUserValue,
+    is_ip,
 )
 from meridian.core.models import CoreModel
 from meridian.core.resources import ResourceKind as ResourceKind
@@ -360,17 +360,9 @@ class CertificatePayload(CoreModel):
 IP_CERTIFICATE_DIRECTORY = "/etc/ssl/meridian"
 
 
-def is_ip_address(value: str) -> bool:
-    try:
-        ipaddress.ip_address(value)
-    except ValueError:
-        return False
-    return True
-
-
 def certificate_directory(hostname: str) -> str:
     """Return the on-server directory holding the issued certificate for ``hostname``."""
-    if is_ip_address(hostname):
+    if is_ip(hostname):
         return IP_CERTIFICATE_DIRECTORY
     token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
     return f"/etc/ssl/meridian/certs/{token}"

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
-from typing import Annotated, Any
+from typing import Annotated
 
-from pydantic import AfterValidator, Field, IPvAnyAddress, TypeAdapter, ValidationError, WithJsonSchema
+from pydantic import AfterValidator, Field, WithJsonSchema
 
-_IP_ADDRESS: TypeAdapter[Any] = TypeAdapter(IPvAnyAddress)
 _IP_ADDRESS_SCHEMA = {
     "anyOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "ipv6"}],
 }
@@ -60,18 +60,18 @@ def is_local_deploy_target(value: str) -> bool:
     return value.lower() in _LOCAL_TARGETS
 
 
-def is_ip_deploy_target(value: str) -> bool:
-    """Return True when a deploy target is a valid IP address."""
+def is_ip(value: str) -> bool:
+    """Return True for a valid IPv4 or IPv6 address."""
     try:
-        _IP_ADDRESS.validate_python(value)
-        return True
-    except ValidationError:
+        ipaddress.ip_address(value)
+    except ValueError:
         return False
+    return True
 
 
 def validate_ip_address_value(value: str) -> str:
     """Validate a required IPv4/IPv6 address while preserving string output."""
-    if is_ip_deploy_target(value):
+    if is_ip(value):
         return value
     raise ValueError("Enter a valid IP address.")
 
@@ -82,7 +82,7 @@ def validate_deploy_ip_value(value: str) -> str:
         return value
     if is_local_deploy_target(value):
         return value.lower()
-    if is_ip_deploy_target(value):
+    if is_ip(value):
         return value
     raise ValueError("Enter a valid IP address, or use 'local' when running Meridian on the target server.")
 

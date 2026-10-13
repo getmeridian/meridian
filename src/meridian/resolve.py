@@ -12,7 +12,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 
-from meridian.config import is_ip
+from meridian.core.inputs import is_ip
 from meridian.servers import ServerEntry, ServerRegistry, this_machine_id
 from meridian.ssh import SSHUI, ServerConnection
 
