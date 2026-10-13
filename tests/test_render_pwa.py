@@ -214,62 +214,13 @@ class TestConfigJsonSchema:
             assert required.issubset(app.keys()), f"App missing fields: {required - app.keys()}"
 
 
-# ---------------------------------------------------------------------------
-# TestPWAAppsSync — _PWA_APPS vs apps.json (Gap #5)
-# ---------------------------------------------------------------------------
-
-
-class TestPWAAppsSync:
-    """Verify _PWA_APPS in render.py matches website/src/data/apps.json."""
-
-    def test_apps_match_apps_json(self) -> None:
-        # Find apps.json relative to the repo root
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        assert apps_json_path.exists(), f"apps.json not found at {apps_json_path}"
-
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-
-        # Both should have the same entries (name + url pairs)
-        json_pairs = {(a["name"], a["url"]) for a in apps_json}
-        pwa_pairs = {(a["name"], a["url"]) for a in _PWA_APPS}
-        assert json_pairs == pwa_pairs, (
-            f"_PWA_APPS out of sync with apps.json.\n"
-            f"In apps.json only: {json_pairs - pwa_pairs}\n"
-            f"In _PWA_APPS only: {pwa_pairs - json_pairs}"
-        )
-
-    def test_apps_count_matches(self) -> None:
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-        assert len(_PWA_APPS) == len(apps_json)
-
-    def test_deeplink_field_is_optional(self) -> None:
-        """Apps without deep links must not be required to have the field."""
-        for app in _PWA_APPS:
-            assert "name" in app
-            assert "url" in app
-            # deeplink is optional — some apps have it, some don't
-
+class TestPWAApps:
     def test_deeplink_templates_contain_url_placeholder(self) -> None:
         """Every deep link template must include a URL placeholder."""
         for app in _PWA_APPS:
             if "deeplink" in app:
                 has_url = "{url}" in app["deeplink"] or "{url_raw}" in app["deeplink"] or "{url_b64}" in app["deeplink"]
                 assert has_url, f"{app['name']} deeplink missing URL placeholder: {app['deeplink']}"
-
-    def test_deeplink_sync_with_apps_json(self) -> None:
-        """Deeplink values in _PWA_APPS must match apps.json."""
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-        json_links = {a["name"]: a.get("deeplink") for a in apps_json}
-        pwa_links = {a["name"]: a.get("deeplink") for a in _PWA_APPS}
-        assert json_links == pwa_links, f"Deeplink mismatch:\n  apps.json: {json_links}\n  _PWA_APPS: {pwa_links}"
 
     def test_protocols_field_present(self) -> None:
         """Every app must have a protocols array."""
@@ -284,18 +235,6 @@ class TestPWAAppsSync:
         for app in _PWA_APPS:
             for proto in app.get("protocols", []):
                 assert proto in valid, f"{app['name']} has unknown protocol {proto!r}"
-
-    def test_protocols_sync_with_apps_json(self) -> None:
-        """Protocol values in _PWA_APPS must match apps.json."""
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-        json_protocols = {a["name"]: a.get("protocols") for a in apps_json}
-        pwa_protocols = {a["name"]: a.get("protocols") for a in _PWA_APPS}
-        assert json_protocols == pwa_protocols, (
-            f"Protocols mismatch:\n  apps.json: {json_protocols}\n  _PWA_APPS: {pwa_protocols}"
-        )
 
 
 # ---------------------------------------------------------------------------

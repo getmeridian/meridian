@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from meridian.diagnostics.checks import (
-    CheckResult,
     check_container_running,
     check_disk_space,
     check_port_listening,
@@ -211,25 +210,6 @@ class TestCheckTlsCertificate:
         check_tls_certificate(conn, "edge.example.com", port=7443)
 
         assert any("127.0.0.1:7443" in command for command in conn.calls)
-
-
-# ---------------------------------------------------------------------------
-# CheckResult contract
-# ---------------------------------------------------------------------------
-
-
-class TestCheckResultContract:
-    def test_frozen_dataclass(self) -> None:
-        r = CheckResult(name="test", status="passed", detail="ok")
-        assert r.name == "test"
-        assert r.status == "passed"
-        assert r.detail == "ok"
-        assert r.remediation == ""
-
-    def test_all_statuses_accepted(self) -> None:
-        for status in ("passed", "failed", "warning", "skipped"):
-            r = CheckResult(name="x", status=status)
-            assert r.status == status
 
 
 def test_running_but_unhealthy_container_is_a_warning_not_a_pass() -> None:

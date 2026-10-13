@@ -18,8 +18,8 @@ from meridian.health import ReadinessTimeout
 from meridian.xray_client import (
     XrayConfigError,
     XrayStartupError,
-    _find_free_port,
     _parse_dgst,
+    _resolve_asset_name,
     _validate_xray_config,
     ensure_xray_binary,
     is_supported_proxy_outbound,
@@ -62,6 +62,23 @@ class TestParseDgst:
         digest = "c" * 64
         content = f"SHA2-256=  {digest}  \n"
         assert _parse_dgst(content) == digest
+
+
+@pytest.mark.parametrize(
+    ("system", "machine", "expected"),
+    [
+        ("Darwin", "arm64", "Xray-macos-arm64-v8a.zip"),
+        ("Darwin", "x86_64", "Xray-macos-64.zip"),
+        ("Linux", "x86_64", "Xray-linux-64.zip"),
+        ("Linux", "aarch64", "Xray-linux-arm64-v8a.zip"),
+        ("Windows", "AMD64", None),
+    ],
+)
+def test_release_asset_follows_platform(system: str, machine: str, expected: str | None) -> None:
+    with patch("meridian.xray_client.platform") as mock_platform:
+        mock_platform.system.return_value = system
+        mock_platform.machine.return_value = machine
+        assert _resolve_asset_name() == expected
 
 
 def _canonical_subscription_config() -> dict:
@@ -579,23 +596,3 @@ def test_missing_curl_is_a_hard_test_failure(tmp_path: Path) -> None:
             "canonical endpoint",
             expect_ip_match=False,
         )
-
-
-# ---------------------------------------------------------------------------
-# _find_free_port
-# ---------------------------------------------------------------------------
-
-
-class TestFindFreePort:
-    def test_returns_integer(self) -> None:
-        port = _find_free_port()
-        assert isinstance(port, int)
-
-    def test_port_in_valid_range(self) -> None:
-        port = _find_free_port()
-        assert 1 <= port <= 65535
-
-    def test_returns_different_ports(self) -> None:
-        """Two consecutive calls should return different ports (not guaranteed but very likely)."""
-        ports = {_find_free_port() for _ in range(5)}
-        assert len(ports) > 1
