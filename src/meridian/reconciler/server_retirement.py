@@ -24,7 +24,9 @@ from meridian.ssh import ServerConnection
 
 _NODE_REPOSITORY = parse_image(REMNAWAVE_NODE_IMAGE).repository
 _FIREWALL_MARKER = re.compile(r"(?:fw|meridian-v4)-[0-9a-f]{16}")
-_NGINX_ARTIFACT = re.compile(r"/etc/nginx/(stream\.d|sites-available)/meridian-v4-[0-9a-f]{16}\.conf")
+_NGINX_ARTIFACT = re.compile(
+    r"/etc/nginx/(stream\.d|sites-available|meridian-v4-locations)/meridian-v4-[0-9a-f]{16}\.conf"
+)
 
 
 def _connection(context: Any, binding: ManagedResourceBinding) -> ServerConnection:

@@ -698,6 +698,8 @@ class TestNginxFingerprinting:
         )
         https_block = cfg[cfg.index("listen 127.0.0.1:8443 ssl;") :]
         assert "absolute_redirect off;" in https_block
+        # IP-mode XHTTP joins this no-SNI server through V4 location files.
+        assert "include /etc/nginx/meridian-v4-locations/*.conf;" in https_block
 
     def test_no_444_in_https_server_block(self):
         """HTTPS block must never use 444 — silent close after TLS is the highest signal."""

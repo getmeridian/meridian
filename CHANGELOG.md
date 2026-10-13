@@ -43,8 +43,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   changes. Running `meridian` alone in a terminal offers to start it.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
-- **Optional paths** — `--domain` adds XHTTP and WSS (Cloudflare CDN fallback);
-  `--hysteria2` adds Hysteria2 on UDP/443. Blocking Russian destinations stays on
+- **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
+  adds WSS (Cloudflare CDN fallback). Blocking Russian destinations stays on
   by default (`--no-geo-block` to turn it off).
 - **TLS fingerprint is a setting** — every Reality, XHTTP, and WSS link presents
   the `chrome` fingerprint by default (XHTTP and WSS used to send none, which
@@ -122,6 +122,12 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   keeps flowing (the throttling freeze), and the subscription from the
   visitor's own network, then copies a report without links or secrets that
   they can send you.
+- **Every deploy offers every invisible method** — without a domain, XHTTP
+  and Hysteria2 now run on the server's IP address (Let's Encrypt certifies
+  IPs), next to Reality, so a block on one method leaves the others. A domain
+  adds WebSocket through the Cloudflare CDN. Hysteria2 is on by default
+  (`--no-hysteria2` turns it off), and the wizard only asks for an optional
+  domain instead of a list of backup methods.
 - **Hysteria2 is disguised** — its UDP traffic is wrapped in salamander
   obfuscation, so censors see random packets instead of QUIC with a readable
   server name. Every subscription format carries the setting automatically.
@@ -160,7 +166,7 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   server.
 - XHTTP links work. Apps sending the default `chrome` fingerprint speak
   HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
-- A fresh deploy with `--hysteria2` converges. The node started before its
+- A fresh deploy with Hysteria2 converges. The node started before its
   certificate existed, so Xray refused to run and the deploy stopped.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.

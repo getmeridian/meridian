@@ -19,7 +19,7 @@ meridian deploy [SERVER] [flags]
 |------|---------|-------------|
 | `--sni HOST` | (auto) | Camouflage target. Without it, the server tries `www.google.com`, `dl.google.com`, `www.cloudflare.com` and uses the first that carries traffic; a redeploy keeps the saved target. An explicit `--sni` is never swapped |
 | `--domain DOMAIN` | (none) | Your domain for XHTTP and WSS (Cloudflare CDN fallback). The panel and connection pages stay on the IP certificate |
-| `--hysteria2` | off | Also offer Hysteria2 on UDP/443. Needs `--domain`; QUIC is throttled in some regions |
+| `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443, disguised with salamander, as the last fallback. Uses the domain's certificate, or the IP certificate without one |
 | `--fingerprint NAME` | chrome | TLS fingerprint clients present on Reality, XHTTP, and WSS (`chrome`, `firefox`, `safari`, `ios`, `android`, `edge`, `random`, `randomized`). Change it if your region starts flagging the current one; a redeploy keeps the saved value |
 | `--client-name NAME` | default | Name of the first client |
 | `--display-name NAME` | (none) | Label for connection pages |

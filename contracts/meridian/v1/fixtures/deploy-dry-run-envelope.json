@@ -7,13 +7,13 @@
     "ports": {
       "reality_port": 10746,
       "wss_port": 0,
-      "xhttp_port": 0
+      "xhttp_port": 39529
     },
     "relay_count": 0,
     "secret_path": "[redacted]",
     "server_ip": "198.51.100.10",
     "ws_path": "",
-    "xhttp_path": ""
+    "xhttp_path": "0123456789abcdef"
   },
   "duration_ms": 0,
   "errors": [],

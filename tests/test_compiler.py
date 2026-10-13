@@ -947,3 +947,33 @@ def test_fingerprint_copies_cover_direct_tls_paths_only() -> None:
     assert path_fingerprints("xhttp", "firefox") == ["firefox", "chrome"]
     assert path_fingerprints("reality", "safari") == ["safari", "chrome", "firefox"]
     assert path_fingerprints("wss", "chrome") == ["chrome"]
+
+
+def test_bare_ip_paths_join_the_panel_on_the_control_and_own_the_no_sni_route_elsewhere() -> None:
+    from meridian.compiler.models import CertificatePayload, NginxArtifactPayload, certificate_directory
+    from meridian.setup.editor import add_exit_to_intent
+    from meridian.setup.single_server import single_server_intent
+
+    intent = single_server_intent(None, server_ref="srv-a", address="198.51.100.10")
+    intent = add_exit_to_intent(
+        intent, server_ref="srv-b", title="second", reality_sni="www.example.org", address="198.51.100.20"
+    )
+    resources = {resource.logical_id: resource.payload for resource in compile_topology(intent).resources}
+    nginx = [payload for payload in resources.values() if isinstance(payload, NginxArtifactPayload)]
+    certificates = [payload for payload in resources.values() if isinstance(payload, CertificatePayload)]
+
+    # Control server: its no-SNI route already serves the panel, so XHTTP joins that TLS server.
+    control_locations = [item for item in nginx if item.server_ref == "srv-a" and item.layer == "location"]
+    assert [route.protocol for item in control_locations for route in item.routes] == ["xhttp"]
+    assert not [item for item in nginx if item.server_ref == "srv-a" and item.layer == "http"]
+    # Exit-only server: an IP-certified TLS server owns the no-SNI route.
+    exit_http = [item for item in nginx if item.server_ref == "srv-b" and item.layer == "http"]
+    assert [item.tls_hostname for item in exit_http] == ["198.51.100.20"]
+    exit_stream = next(item for item in nginx if item.server_ref == "srv-b" and item.layer == "stream")
+    assert any(route.server_names == [""] for route in exit_stream.routes)
+    # Hysteria2 certificates share the panel's one acme.sh entry per IP.
+    assert {(item.server_ref, item.hostname) for item in certificates} == {
+        ("srv-a", "198.51.100.10"),
+        ("srv-b", "198.51.100.20"),
+    }
+    assert certificate_directory("198.51.100.10") == "/etc/ssl/meridian"

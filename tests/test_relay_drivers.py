@@ -573,3 +573,31 @@ def test_v4_http_artifact_redirects_relatively_and_speaks_http2() -> None:
     assert "absolute_redirect off;" in rendered
     # Xray XHTTP with a browser fingerprint always speaks HTTP/2; HTTP/1.1 replies broke it.
     assert "    http2 on;\n" in rendered
+
+
+def test_v4_location_artifact_proxies_without_upstream_blocks() -> None:
+    from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec
+    from meridian.reconciler.server_render import nginx_artifact_path, render_nginx_artifact
+
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=8443,
+        layer="location",
+        tls_hostname="198.51.100.10",
+        routes=[
+            NginxRouteSpec(
+                match="host_path",
+                server_names=["198.51.100.10"],
+                path="0123456789abcdef",
+                backend_server_ref="srv-exit",
+                backend_port=20443,
+                protocol="xhttp",
+            )
+        ],
+    )
+    rendered = render_nginx_artifact("nginx:main:x:location", payload, ADDRESSES)
+    # Included inside the panel's server block, where upstream and server blocks are invalid.
+    assert "upstream" not in rendered and "server {" not in rendered
+    assert "location = /0123456789abcdef {" in rendered
+    assert "proxy_pass http://127.0.0.1:20443;" in rendered
+    assert nginx_artifact_path("nginx:main:x:location", "location").startswith("/etc/nginx/meridian-v4-locations/")

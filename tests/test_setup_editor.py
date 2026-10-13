@@ -74,7 +74,22 @@ def test_add_exit_compiles_independent_reality_and_domain_paths() -> None:
         "hysteria2",
     ]
     assert added.paths[1].host == "edge.example.com"
-    assert added.paths[1].path == "exit-primary-2-xhttp"
+    # Random, not derived from the exit ID: a guessable path lets a prober confirm the proxy.
+    assert len(added.paths[1].path) == 16 and "exit" not in added.paths[1].path
+
+
+def test_add_exit_without_a_domain_offers_xhttp_and_hysteria2_on_its_ip() -> None:
+    updated = add_exit_to_intent(
+        _intent(),
+        server_ref="srv-second-exit",
+        title="Primary",
+        reality_sni="www.example.org",
+        address="198.51.100.20",
+    )
+
+    added = updated.exits[-1]
+    assert [path.protocol for path in added.paths] == ["reality", "xhttp", "hysteria2"]
+    assert {path.tls_sni for path in added.paths[1:]} == {"198.51.100.20"}
 
 
 def test_add_relay_targets_existing_reality_path() -> None:

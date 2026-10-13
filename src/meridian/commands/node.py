@@ -121,6 +121,7 @@ def run_add(
             title=request.name or f"exit-{len(intent.exits) + 1}",
             reality_sni=request.sni or DEFAULT_SNI,
             tls_hostname=request.domain,
+            address=resolved.ip,
         )
     else:
         # A failed or interrupted add leaves its exit in the intent; re-running resumes it.

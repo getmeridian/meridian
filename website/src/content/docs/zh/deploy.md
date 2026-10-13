@@ -27,7 +27,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，服务器从 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 中尝试，使用第一个可达的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
 | `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名，带 Cloudflare CDN 回退 |
-| `--hysteria2` | 关 | 在 UDP/443 上也提供 Hysteria2。需要 `--domain`；QUIC 在某些地区被限制 |
+| `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2 作为最后的回退 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
 | `--display-name NAME` | (无) | 连接页面的标签 |
 | `--icon EMOJI_OR_URL` | (无) | 页面图标 — 表情符号或图片 URL |
@@ -65,15 +65,15 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 ### 伪装目标 vs 域名
 
 - **伪装目标** (`--sni`) — 你**不**拥有的热门网站。Reality 模仿它。
-- **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。它添加 XHTTP 和通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/docs/zh/domain-mode/)。
+- **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。XHTTP 和 Hysteria2 移到它，它还添加通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/docs/zh/domain-mode/)。
 
 ## Hysteria2
 
 ```
-meridian deploy 198.51.100.10 --domain vpn.example.com --hysteria2
+meridian deploy 198.51.100.10 --no-hysteria2
 ```
 
-在 UDP/443 上使用你域名的证书添加 Hysteria2。它可以在有损或高延迟网络上有帮助，但 QUIC 在某些地区被限制或阻止，所以它是可选的。Hysteria2 不通过中继。
+每次部署都在 UDP/443 上提供 Hysteria2，使用你域名的证书或没有域名时的服务器 IP 证书。其流量用 salamander 混淆包装，所以审查者看到随机 UDP 而不是 QUIC。它可以在有损或高延迟网络上有帮助；当 UDP 被阻止时，应用回退到其前面列出的 TCP 方法。`--no-hysteria2` 关闭它。Hysteria2 不通过中继。
 
 ## 品牌定制
 
@@ -93,7 +93,7 @@ meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color
 
 要重新部署，运行相同的命令。Meridian 保持保存的路径、密钥和用户，所以现有链接继续工作。不指定 `--sni` 的重新部署保持保存的伪装目标。
 
-在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。用不同标志再次运行它改变服务器以匹配：添加或删除 `--domain` 或 `--hysteria2` 添加或删除这些路径。
+在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。用不同标志再次运行它改变服务器以匹配：添加或删除 `--domain` 或 `--no-hysteria2` 添加或删除这些路径。
 
 `meridian deploy` 仅重新部署已经是你舰队中出口的服务器。要添加另一个服务器，使用 `meridian node add NEW_IP`。
 

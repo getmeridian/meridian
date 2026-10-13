@@ -33,9 +33,19 @@ def test_domain_adds_tls_paths_and_opt_in_hysteria2() -> None:
     compile_topology(intent)
 
 
-def test_hysteria2_requires_a_domain() -> None:
-    with pytest.raises(LocalStateError, match="Hysteria2 needs a domain"):
-        single_server_intent(None, server_ref="srv-a", hysteria2=True)
+def test_every_invisible_method_is_on_by_default_even_without_a_domain() -> None:
+    def protocols(**kwargs: object) -> list[str]:
+        intent = single_server_intent(None, server_ref="srv-a", **kwargs)  # type: ignore[arg-type]
+        return [path.protocol for path in intent.exits[0].paths]
+
+    # Without a domain, XHTTP and Hysteria2 use the server's IPv4 address (Let's Encrypt IP certificate).
+    assert protocols(address="198.51.100.10") == ["reality", "xhttp", "hysteria2"]
+    assert protocols(address="198.51.100.10", domain="vpn.example.com") == ["reality", "xhttp", "wss", "hysteria2"]
+    assert protocols(address="198.51.100.10", hysteria2=False) == ["reality", "xhttp"]
+    # No IPv4 literal and no domain: nothing can carry a certificate, so Reality stands alone.
+    assert protocols(address="2001:db8::1") == ["reality"]
+    ip_paths = single_server_intent(None, server_ref="srv-a", address="198.51.100.10").exits[0].paths
+    assert {path.tls_sni for path in ip_paths if path.protocol != "reality"} == {"198.51.100.10"}
 
 
 def test_redeploy_keeps_transport_paths_users_and_other_exits() -> None:

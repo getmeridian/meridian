@@ -19,7 +19,7 @@ meridian deploy [SERVER] [flags]
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，服务器尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
 | `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名（Cloudflare CDN 回退）。面板和连接页面保持在 IP 证书上 |
-| `--hysteria2` | 关 | 在 UDP/443 上也提供 Hysteria2。需要 `--domain`；QUIC 在某些地区被限制 |
+| `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2，用 salamander 伪装，作为最后的回退。使用域名的证书或没有域名的 IP 证书 |
 | `--fingerprint NAME` | chrome | 客户端在 Reality、XHTTP 和 WSS 上呈现的 TLS 指纹（`chrome`、`firefox`、`safari`、`ios`、`android`、`edge`、`random`、`randomized`）。如果你的地区开始标记当前指纹，请更改它；重新部署保留已保存的值 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
 | `--display-name NAME` | (无) | 连接页面的标签 |

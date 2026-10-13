@@ -120,7 +120,7 @@ def test_deploy_fixtures_validate_and_jsonl_is_monotonic() -> None:
     assert dry_run["data"]["server_ip"] == "198.51.100.10"
     assert dry_run["data"]["secret_path"] == "[redacted]"
     # An IP-only first deploy compiles one Reality exit and no TLS transport paths.
-    assert dry_run["data"]["xhttp_path"] == ""
+    assert dry_run["data"]["xhttp_path"] == "0123456789abcdef"  # IP-mode XHTTP, pinned for the fixture
     assert dry_run["data"]["ws_path"] == ""
     assert dry_run["data"]["info_page_path"] == ""
     assert dry_run["data"]["ports"]["reality_port"] > 0

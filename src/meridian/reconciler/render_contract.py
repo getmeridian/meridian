@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "pwa": "connection-page-v3",
     "firewall": "ufw-comment-v2",
-    "nginx": "http2-tls-v6",
+    "nginx": "ip-locations-v7",
     "node-compose": "remnawave-node-v3",
     "panel-compose": "remnawave-panel-v2",
     "realm": "neutral-systemd-v2",

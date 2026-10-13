@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import re
 from typing import Annotated, Any, Literal, Self, TypeAlias
@@ -308,7 +309,8 @@ class NginxArtifactPayload(CoreModel):
     kind: Literal["nginx_artifact"] = "nginx_artifact"
     server_ref: str
     listener_port: int
-    layer: Literal["stream", "http"]
+    # "location" files join the control server's panel TLS server (the no-SNI route).
+    layer: Literal["stream", "http", "location"]
     tls_hostname: str = ""
     fallback_server_name: str = ""
     routes: list[NginxRouteSpec]
@@ -339,8 +341,23 @@ class CertificatePayload(CoreModel):
     hostname: str
 
 
+# One acme.sh entry per IP address, shared with the panel: a second entry for the same IP
+# would double Let's Encrypt's short-lived renewals and overwrite the panel's install target.
+IP_CERTIFICATE_DIRECTORY = "/etc/ssl/meridian"
+
+
+def is_ip_address(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
 def certificate_directory(hostname: str) -> str:
     """Return the on-server directory holding the issued certificate for ``hostname``."""
+    if is_ip_address(hostname):
+        return IP_CERTIFICATE_DIRECTORY
     token = hashlib.sha256(hostname.encode("utf-8")).hexdigest()[:16]
     return f"/etc/ssl/meridian/certs/{token}"
 

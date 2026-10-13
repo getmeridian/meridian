@@ -8,6 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import Event, MeridianError, OutputEnvelope, OutputStatus, Summary
@@ -65,12 +66,14 @@ def _envelope(
 
 
 def _deploy_dry_run_fixture() -> OutputEnvelope:
-    plan = preview_single_server_deploy(
-        None,
-        DeployRequest(ip="198.51.100.10"),
-        server_ref=PENDING_SERVER_REF,
-        server_ip="198.51.100.10",
-    )
+    # A fresh deploy draws random transport paths; fix them so the fixture stays byte-stable.
+    with patch("meridian.setup.default_paths.secrets.token_hex", return_value="0123456789abcdef"):
+        plan = preview_single_server_deploy(
+            None,
+            DeployRequest(ip="198.51.100.10"),
+            server_ref=PENDING_SERVER_REF,
+            server_ip="198.51.100.10",
+        )
     return _envelope(
         command="deploy",
         operation_id="op-fixture-deploy-dry-run",

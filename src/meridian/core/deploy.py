@@ -39,7 +39,7 @@ class DeployRequest(CoreModel):
     color: str = ""
     warp: bool = False
     geo_block: bool = True
-    hysteria2: bool = False
+    hysteria2: bool = True
     ssh_port: int = Field(default=0, ge=0, le=65535)
     fingerprint: TlsFingerprint | None = None
 

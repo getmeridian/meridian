@@ -50,7 +50,9 @@ def test_dry_run_explicit_ip_compiles_a_first_deploy_plan() -> None:
     assert plan.server_ip == _IP_A
     assert plan.secret_path == ""
     assert plan.info_page_path == ""
-    assert plan.xhttp_path == ""
+    # XHTTP rides the IP certificate when there is no domain.
+    assert len(plan.xhttp_path) == 16
+    assert plan.ws_path == ""
     assert plan.ports.reality_port > 0
     assert plan.node_count == 1
     assert plan.relay_count == 0

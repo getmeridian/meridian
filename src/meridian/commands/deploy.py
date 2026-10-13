@@ -82,7 +82,7 @@ def run(
     color: str = "",
     warp: bool = False,
     geo_block: bool = True,
-    hysteria2: bool = False,
+    hysteria2: bool = True,
     ssh_port: int = 0,
     fingerprint: str = "",
     request_path: str = "",
@@ -257,6 +257,7 @@ def _execute(
                 cluster.topology_intent if attempt == 0 else ClusterConfig.load().topology_intent,
                 entry.id,
                 _build_request(**{**request.model_dump(), "sni": sni}),
+                resolved.ip,
             )
             applied = runtime.apply_intent(intent)
             if not applied.all_succeeded:
@@ -436,9 +437,14 @@ def _dry_run(request: DeployRequest) -> DeployPlan:
         fail(exc)
 
 
-def _intent_or_fail(existing: SetupIntent | None, server_ref: str, request: DeployRequest) -> SetupIntent:
+def _intent_or_fail(
+    existing: SetupIntent | None,
+    server_ref: str,
+    request: DeployRequest,
+    address: str,
+) -> SetupIntent:
     try:
-        return request_intent(existing, request, server_ref=server_ref)
+        return request_intent(existing, request, server_ref=server_ref, address=address)
     except MeridianError as exc:
         fail(exc)
 
@@ -522,8 +528,8 @@ def _redeploy_command(server_ip: str, request: DeployRequest) -> str:
         parts.append(f"--sni {shlex.quote(request.sni)}")
     if request.domain:
         parts.append(f"--domain {shlex.quote(request.domain)}")
-    if request.hysteria2:
-        parts.append("--hysteria2")
+    if not request.hysteria2:
+        parts.append("--no-hysteria2")
     if request.client_name and request.client_name != DEFAULT_CLIENT:
         parts.append(f"--client-name {shlex.quote(request.client_name)}")
     if not request.harden:

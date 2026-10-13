@@ -19,7 +19,7 @@ meridian deploy [SERVER] [flags]
 |------|---------|-------------|
 | `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، سرور `www.google.com`، `dl.google.com`، `www.cloudflare.com` را امتحان می‌کند و از اول‌ی آن‌های که ترافیق حمل می‌کنند استفاده می‌کند؛ بازاستقرار هدف ذخیره‌شده را نگه می‌دارد. `--sni` صریح هرگز جابه‌جا نمی‌شود |
 | `--domain DOMAIN` | (هیچ) | دامنه شما برای XHTTP و WSS (CDN Cloudflare fallback). پنل و صفحات اتصال روی گواهینامه IP می‌مانند |
-| `--hysteria2` | خاموش | همچنین Hysteria2 را روی UDP/443 ارائه دهید. `--domain` نیاز دارد؛ QUIC در برخی از مناطق throttled است |
+| `--hysteria2/--no-hysteria2` | فعال | Hysteria2 را روی UDP/443، با تعویض salamander ارائه دهید، به عنوان آخرین fallback. دامنه‌ای را استفاده می‌کند یا بدون دامنه IP گواهینامه |
 | `--fingerprint NAME` | chrome | اثر انگشت TLS که کلاینت‌ها در Reality، XHTTP و WSS نشان می‌دهند (`chrome`، `firefox`، `safari`، `ios`، `android`، `edge`، `random`، `randomized`). اگر منطقه شما شروع به پرچم‌گذاری کردن آن کند تغییر دهید؛ بازاستقرار مقدار ذخیره‌شده را نگه می‌دارد |
 | `--client-name NAME` | default | نام کلاینت اول |
 | `--display-name NAME` | (هیچ) | برچسب برای صفحات اتصال |

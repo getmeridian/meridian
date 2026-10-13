@@ -15,10 +15,10 @@ from meridian.core.topology import (
     EgressOverrideIntent,
     EgressOverrideMatch,
     ExitIntent,
-    ProtocolPathIntent,
     SetupIntent,
     TransparentRelayIntent,
 )
+from meridian.setup.default_paths import default_exit_paths
 
 
 def add_access_users_to_intent(intent: SetupIntent, usernames: list[str]) -> SetupIntent:
@@ -54,8 +54,9 @@ def add_exit_to_intent(
     title: str,
     reality_sni: str,
     tls_hostname: str = "",
+    address: str = "",
 ) -> SetupIntent:
-    """Return validated intent with one independent exit workload."""
+    """Return validated intent with one independent exit workload offering every default method."""
     exit_id = unique_resource_id(
         "exit",
         title,
@@ -67,37 +68,7 @@ def add_exit_to_intent(
             *[route.id for route in intent.routes],
         },
     )
-    paths = [
-        ProtocolPathIntent(
-            id=f"{exit_id}-reality",
-            protocol="reality",
-            reality_sni=reality_sni,
-        )
-    ]
-    if tls_hostname:
-        paths.extend(
-            [
-                ProtocolPathIntent(
-                    id=f"{exit_id}-xhttp",
-                    protocol="xhttp",
-                    tls_sni=tls_hostname,
-                    host=tls_hostname,
-                    path=f"/{exit_id}-xhttp",
-                ),
-                ProtocolPathIntent(
-                    id=f"{exit_id}-wss",
-                    protocol="wss",
-                    tls_sni=tls_hostname,
-                    host=tls_hostname,
-                    path=f"/{exit_id}-ws",
-                ),
-                ProtocolPathIntent(
-                    id=f"{exit_id}-hysteria2",
-                    protocol="hysteria2",
-                    tls_sni=tls_hostname,
-                ),
-            ]
-        )
+    paths = default_exit_paths(exit_id, address=address, reality_sni=reality_sni, domain=tls_hostname)
     payload = intent.model_dump(mode="json")
     payload["exits"] = [
         *payload["exits"],

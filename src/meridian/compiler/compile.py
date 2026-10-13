@@ -41,6 +41,7 @@ from meridian.compiler.models import (
     SubscriptionTemplatePayload,
     canonical_hash,
     compute_plan_hash,
+    is_ip_address,
     make_resource,
 )
 from meridian.compiler.names import (
@@ -59,6 +60,9 @@ from meridian.compiler.routing import (
     exit_override_routes,
 )
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent, path_fingerprints
+
+# The control server's panel TLS server, behind the 443 stream router's no-SNI route.
+CONTROL_TLS_PORT = 8443
 
 
 def compile_topology(
@@ -107,14 +111,14 @@ def compile_topology(
             server_ref=intent.control.server_ref,
             public_port=443,
             server_name=server_name,
-            target=(intent.control.server_ref, 8443),
+            target=(intent.control.server_ref, CONTROL_TLS_PORT),
         )
     stream_routes[control_stream_key].append(
         NginxRouteSpec(
             match="sni",
             server_names=control_names,
             backend_server_ref=intent.control.server_ref,
-            backend_port=8443,
+            backend_port=CONTROL_TLS_PORT,
         )
     )
     stream_dependencies[control_stream_key].add(control_id)
@@ -275,6 +279,7 @@ def compile_topology(
             builder=builder,
             ports=ports,
             exit_=exit_,
+            control_server_ref=intent.control.server_ref,
             # Entry names mention the exit only when the subscription has several.
             place=exit_.id if len(intent.exits) > 1 else "",
             runtime_id=runtime_id,
@@ -435,6 +440,7 @@ def _compile_exit_endpoints(
     builder: PlanBuilder,
     ports: PortAllocator,
     exit_: ExitIntent,
+    control_server_ref: str,
     place: str,
     runtime_id: str,
     inbound_by_path: dict[tuple[str, str], str],
@@ -497,6 +503,39 @@ def _compile_exit_endpoints(
             tls_groups[(path.tls_sni, path.public_port)].append(path)
 
     for (tls_sni, public_port), paths in sorted(tls_groups.items()):
+        http_routes = [
+            NginxRouteSpec(
+                match="host_path",
+                server_names=[path.host],
+                path=path.path,
+                backend_server_ref=exit_.server_ref,
+                backend_port=allocated_path_ports[(exit_.id, path.id)],
+                protocol=path.protocol,
+            )
+            for path in sorted(paths, key=lambda item: item.id)
+        ]
+        inbound_ids = [inbound_by_path[(exit_.id, path.id)] for path in paths]
+        # A client dialing a bare IP sends no SNI. The control server already routes no-SNI
+        # connections to its panel TLS server (which holds the IP certificate), so its IP paths
+        # join that server as included locations instead of competing for the route.
+        bare_ip = is_ip_address(tls_sni)
+        if bare_ip and exit_.server_ref == control_server_ref and public_port == 443:
+            location_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:location"
+            builder.add(
+                location_id,
+                NginxArtifactPayload(
+                    server_ref=exit_.server_ref,
+                    listener_port=CONTROL_TLS_PORT,
+                    layer="location",
+                    tls_hostname=tls_sni,
+                    routes=http_routes,
+                ),
+                dependencies=[runtime_id, *inbound_ids],
+                postconditions=[_exists(location_id)],
+            )
+            for path in paths:
+                direct_dependencies[path.id].append(location_id)
+            continue
         certificate_id = _ensure_certificate(
             builder,
             exit_id=exit_.id,
@@ -511,18 +550,6 @@ def _compile_exit_endpoints(
             size=1000,
         )
         http_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:http"
-        http_routes = [
-            NginxRouteSpec(
-                match="host_path",
-                server_names=[path.host],
-                path=path.path,
-                backend_server_ref=exit_.server_ref,
-                backend_port=allocated_path_ports[(exit_.id, path.id)],
-                protocol=path.protocol,
-            )
-            for path in sorted(paths, key=lambda item: item.id)
-        ]
-        inbound_ids = [inbound_by_path[(exit_.id, path.id)] for path in paths]
         builder.add(
             http_id,
             NginxArtifactPayload(
@@ -539,17 +566,18 @@ def _compile_exit_endpoints(
             ],
         )
         stream_key = (exit_.server_ref, public_port)
+        stream_name = "" if bare_ip else tls_sni
         _reserve_stream_name(
             stream_targets,
             server_ref=exit_.server_ref,
             public_port=public_port,
-            server_name=tls_sni,
+            server_name=stream_name,
             target=(exit_.server_ref, tls_port),
         )
         stream_routes[stream_key].append(
             NginxRouteSpec(
                 match="sni",
-                server_names=[tls_sni],
+                server_names=[stream_name],
                 backend_server_ref=exit_.server_ref,
                 backend_port=tls_port,
             )

@@ -8,7 +8,6 @@ verification stay in ``meridian.setup``.
 from __future__ import annotations
 
 import re
-import secrets
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Literal, cast
@@ -38,10 +37,10 @@ from meridian.core.topology import (
     DeliveryIntent,
     EgressPoolIntent,
     OrderedRouteIntent,
-    ProtocolPathIntent,
     RouteMatchKind,
 )
 from meridian.i18n import t, words
+from meridian.setup.default_paths import default_exit_paths
 from meridian.setup.runtime import SetupReview, SetupRuntime, SetupVerification
 from meridian.setup.service import SetupDraftService
 from meridian.setup.shelf import ServerShelf
@@ -54,7 +53,6 @@ RegisterServer = Callable[[str, str, str, int], None]
 SuggestSni = Callable[[str], str]
 Role = Literal["exit", "relay", "gateway", "control"]
 
-_EXTRA_PATHS = ("xhttp", "wss", "hysteria2")
 _PROTOCOL_LABELS = {"reality": "Reality", "xhttp": "XHTTP", "wss": "WSS", "hysteria2": "Hysteria2"}
 
 
@@ -277,7 +275,7 @@ class SetupWizard:
             raise LocalStateError("Server roles are missing.")
         hosts = {item.server_ref: (item.title, item.host) for item in self.shelf.items(draft.roles)}
         self.prompt.explain(t("paths.sni_explain"))
-        self.prompt.explain(t("paths.extras_explain"))
+        self.prompt.explain(t("paths.methods_explain"))
         selections: list[SetupExitPaths] = []
         for exit_ in draft.roles.exits:
             title, host = hosts.get(exit_.server_ref, (exit_.id, ""))
@@ -289,26 +287,10 @@ class SetupWizard:
                 if not suggested:
                     self.prompt.say(t("paths.sni_unreachable", server=title), style="warn")
             reality_sni = self.prompt.ask(t("paths.sni"), default=suggested or DEFAULT_SNI)
-            paths = [ProtocolPathIntent(id=f"{exit_.id}-reality", protocol="reality", reality_sni=reality_sni)]
-            extras = _extra_paths(self.prompt.ask(t("paths.extras"), default=primary_word("word.none")))
-            domain = self.prompt.ask(t("paths.domain", address=host)) if extras else ""
-            if extras and not domain:
-                raise ValueError(t("error.domain_required"))
-            if "wss" in extras:
+            domain = self.prompt.ask(t("paths.domain", address=host))
+            if domain:
                 self.prompt.explain(t("paths.wss_warning"))
-            for protocol in ("xhttp", "wss"):
-                if protocol in extras:
-                    paths.append(
-                        ProtocolPathIntent(
-                            id=f"{exit_.id}-{protocol}",
-                            protocol=cast(Literal["xhttp", "wss"], protocol),
-                            tls_sni=domain,
-                            host=domain,
-                            path=secrets.token_hex(8),
-                        )
-                    )
-            if "hysteria2" in extras:
-                paths.append(ProtocolPathIntent(id=f"{exit_.id}-hysteria2", protocol="hysteria2", tls_sni=domain))
+            paths = default_exit_paths(exit_.id, address=host, reality_sni=reality_sni, domain=domain)
             selections.append(SetupExitPaths(exit_ref=exit_.id, paths=paths))
         self.service.configure_paths(SetupPathSelection(exits=selections))
 
@@ -452,16 +434,6 @@ class SetupWizard:
             self.prompt.say(t("review.removes", count=len(review.retiring)), style="warn")
             for binding in review.retiring:
                 self.io.write(f"    - {escape(binding.logical_id)}")
-
-
-def _extra_paths(answer: str) -> list[str]:
-    chosen = [item.strip().lower() for item in answer.replace("،", ",").split(",") if item.strip()]
-    if not chosen or (len(chosen) == 1 and chosen[0] in words("word.none")):
-        return []
-    unknown = sorted(set(chosen) - set(_EXTRA_PATHS))
-    if unknown:
-        raise ValueError(t("error.unknown_method", names=", ".join(unknown)))
-    return [protocol for protocol in _EXTRA_PATHS if protocol in chosen]
 
 
 def _previous_stage(stage: SetupStage) -> SetupStage:

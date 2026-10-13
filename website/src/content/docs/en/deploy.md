@@ -27,7 +27,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 |------|---------|-------------|
 | `--sni HOST` | (auto) | Camouflage target. Without it, the server picks the first working target from `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
 | `--domain DOMAIN` | (none) | Your domain for XHTTP and WSS, with Cloudflare CDN fallback |
-| `--hysteria2` | off | Also offer Hysteria2 on UDP/443 (needs `--domain`) |
+| `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443 as the last fallback |
 | `--client-name NAME` | default | Name of the first client |
 | `--display-name NAME` | (none) | Label for connection pages (e.g. "Alice's VPN") |
 | `--icon EMOJI_OR_URL` | (none) | Page icon — emoji or image URL |
@@ -65,15 +65,15 @@ To check one target by hand, run `meridian check 198.51.100.10 --sni HOST`. Avoi
 ### Camouflage target vs. domain
 
 - **Camouflage target** (`--sni`) — a popular website you **don't** own. Reality impersonates it.
-- **Domain** (`--domain`) — a domain you **do** own, pointed at your server. It adds XHTTP and a WSS path through Cloudflare's CDN. See [Domain mode](/docs/en/domain-mode/).
+- **Domain** (`--domain`) — a domain you **do** own, pointed at your server. XHTTP and Hysteria2 move to it, and it adds a WSS path through Cloudflare's CDN. See [Domain mode](/docs/en/domain-mode/).
 
 ## Hysteria2
 
 ```
-meridian deploy 198.51.100.10 --domain vpn.example.com --hysteria2
+meridian deploy 198.51.100.10 --no-hysteria2
 ```
 
-Adds Hysteria2 on UDP/443 using your domain's certificate. It can help on lossy or high-latency networks, but QUIC is throttled or blocked in some regions, so it is opt-in. Hysteria2 doesn't pass through relays.
+Every deploy offers Hysteria2 on UDP/443 with your domain's certificate, or the server's IP certificate without a domain. Its traffic is wrapped in salamander obfuscation, so censors see random UDP rather than QUIC. It helps on lossy or high-latency networks; where UDP is blocked, apps fall back to the TCP methods listed before it. `--no-hysteria2` turns it off. Hysteria2 doesn't pass through relays.
 
 ## Branding
 
@@ -93,7 +93,7 @@ Branding is saved in `cluster.yml` and applies to every client's connection page
 
 To redeploy, run the same command again. Meridian keeps the saved paths, keys, and users, so existing links keep working. A redeploy without `--sni` keeps the saved camouflage target.
 
-At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Running it again with different flags changes the server to match: adding or dropping `--domain` or `--hysteria2` adds or removes those paths.
+At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Running it again with different flags changes the server to match: adding or dropping `--domain` or `--no-hysteria2` adds or removes those paths.
 
 `meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
 

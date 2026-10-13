@@ -27,13 +27,13 @@
 ## Pitfalls
 - **The control bootstrap depends on its public 80/443 rules** — ACME HTTP-01 runs inside it; without the edges a fresh server requests its certificate with port 80 still closed.
 - Never import SSH, HTTP, commands, console, config, Remnawave, or randomness here, and never put generated credentials or private Reality keys in a resource plan.
-- Raise `TopologyCompileError` for unsupported intent so CLI and Engine adapters preserve a typed user failure.
-- Deployment contracts are either empty for pure compiler use or cover every topology server ref exactly.
+- Raise `TopologyCompileError` for unsupported intent so CLI and Engine adapters preserve a typed user failure; deployment contracts are either empty (pure compiler use) or cover every topology server ref exactly.
 - Build every Remnawave-facing name through `names.py`; short resources cap at 30 characters, users at 36, Host remarks at 100 (`host_remark()`: method, then fingerprint or transport; the exit only when there are several).
 - A Host is published only after its listener and node runtime dependencies, and carries a `view_position` in `PROTOCOL_PRIORITY` order (path IDs once put UDP Hysteria2 first, the entry clients pick by default).
 - Xray-JSON-only Hosts (hidden edges, the automatic-fallback virtual Host) exclude every other subscription type, or sing-box and Stash list them as duplicate servers.
 - Certificate resources depend on their reviewed TCP/80 ACME firewall rule and never on the node runtime: a Hysteria2 inbound makes Xray load the certificate at startup, so that runtime waits for the certificate (a fresh `--hysteria2` deploy never converged).
 - One exit workload per server: a Remnawave node runtime can activate only one Profile.
+- Clients dialing a bare IP send no SNI: IP paths route on the no-SNI stream key, and on the control server they join the panel TLS server as `location` artifacts instead of stealing its route.
 - Client geodata must exist in stock dat files (v2fly `geosite`/`geoip`, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole delivered config.
 - Every TCP Host (Reality, XHTTP, WSS) and gateway edge carries its path's `fingerprint`; an empty one makes clients send the Go TLS ClientHello, a known DPI signature. Hysteria2 (QUIC) carries none. Reality and XHTTP also publish a copy per `FINGERPRINT_COPIES`, so one blocked ClientHello leaves another entry.
 - Mihomo IP rules keep `no-resolve`: resolving names locally leaks them and spoofed domestic answers would match `geoip:ru`.

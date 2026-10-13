@@ -56,7 +56,7 @@ _TWO_SERVER_JOURNEY: list[tuple[str, str]] = [
     ("Domain for the control panel", ""),
     ("Name of this VPN", ""),
     ("Camouflage site", ""),
-    ("Backup methods", ""),
+    ("Domain pointed at", ""),
     ("Names of the people", ""),
 ]
 
@@ -279,7 +279,7 @@ def test_first_server_added_as_local_is_selected_and_becomes_control_and_exit(tm
             ("Domain for the control panel", ""),
             ("Name of this VPN", ""),
             ("Camouflage site", ""),
-            ("Backup methods", ""),
+            ("Domain pointed at", ""),
             ("Names of the people", "alice, laptop"),
             ("Set this up now?", ""),
         ]
@@ -312,7 +312,7 @@ def test_relay_forwards_to_the_only_exit_without_asking(tmp_path) -> None:
             ("Domain for the control panel", ""),
             ("Name of this VPN", ""),
             ("Camouflage site", ""),
-            ("Backup methods", ""),
+            ("Domain pointed at", ""),
             ("Names of the people", ""),
             ("Set this up now?", "save"),
         ]
@@ -342,7 +342,7 @@ def test_routing_is_skipped_without_a_gateway_and_asked_with_one(tmp_path) -> No
             ("Domain for the control panel", ""),
             ("Name of this VPN", ""),
             ("Camouflage site", ""),
-            ("Backup methods", ""),
+            ("Domain pointed at", ""),
             ("Where should traffic go by default?", ""),
             ("Add a rule", "yes"),
             ("Match traffic by", "domain"),
@@ -378,13 +378,12 @@ def test_typing_exit_picks_the_role_instead_of_quitting(tmp_path) -> None:
     assert io.answers == []
 
 
-def test_backup_methods_get_random_paths_and_wss_warns_about_cdn_stalls(tmp_path) -> None:
+def test_domain_adds_cdn_websocket_and_every_path_gets_a_random_path(tmp_path) -> None:
     store, shelf, service = _services(tmp_path)
     io = _ScriptedIO(
         [
             *_TWO_SERVER_JOURNEY[:10],
-            ("Backup methods", "wss, xhttp"),
-            ("Domain whose DNS points at 198.51.100.20", "vpn.example.org"),
+            ("Domain pointed at 198.51.100.20", "vpn.example.org"),
             ("Names of the people", "save"),
         ]
     )
@@ -394,25 +393,30 @@ def test_backup_methods_get_random_paths_and_wss_warns_about_cdn_stalls(tmp_path
     draft = store.load()
     assert draft is not None and draft.paths is not None
     paths = {path.protocol: path for path in draft.paths.exits[0].paths}
-    assert list(paths) == ["reality", "xhttp", "wss"]
+    assert list(paths) == ["reality", "xhttp", "wss", "hysteria2"]
     assert paths["xhttp"].path != paths["wss"].path
     assert all(len(paths[name].path) == 16 and "exit" not in paths[name].path for name in ("xhttp", "wss"))
     assert any("stall after about 20 KB" in line for line in io.output)
 
 
-def test_backup_methods_without_a_domain_repeat_the_stage(tmp_path) -> None:
+def test_without_a_domain_every_invisible_method_uses_the_server_ip(tmp_path) -> None:
     store, shelf, service = _services(tmp_path)
     io = _ScriptedIO(
         [
             *_TWO_SERVER_JOURNEY[:10],
-            ("Backup methods", "hysteria2"),
-            ("Domain whose DNS points", ""),
-            ("Camouflage site", "quit"),
+            ("Domain pointed at 198.51.100.20", ""),
+            ("Names of the people", "save"),
         ]
     )
 
     assert _wizard(service, shelf, io).run() == "saved"
-    assert any("need a domain" in line for line in io.output)
+
+    draft = store.load()
+    assert draft is not None and draft.paths is not None
+    paths = draft.paths.exits[0].paths
+    assert [path.protocol for path in paths] == ["reality", "xhttp", "hysteria2"]
+    assert {path.tls_sni for path in paths[1:]} == {"198.51.100.20"}
+    assert not any("stall after about 20 KB" in line for line in io.output)
 
 
 def test_language_step_comes_first_and_switches_the_following_prompts(tmp_path) -> None:

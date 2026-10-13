@@ -393,9 +393,9 @@ def deploy_cmd(
         help="Refuse Russian domains and IPs at the exit; subscriptions already send them directly",
     ),
     hysteria2: bool = typer.Option(
-        False,
-        "--hysteria2",
-        help="Also offer Hysteria2 over UDP/443 (needs --domain; QUIC is throttled in some regions)",
+        True,
+        "--hysteria2/--no-hysteria2",
+        help="Offer Hysteria2 over UDP/443 as a last-resort fallback (salamander-obfuscated)",
     ),
     ssh_port: SshPort = 0,
     fingerprint: str = typer.Option(

@@ -14,6 +14,10 @@ import textwrap
 # ---------------------------------------------------------------------------
 
 
+# V4 location files (IP-mode XHTTP) that join the panel TLS server, the no-SNI route.
+NGINX_LOCATION_DIR = "/etc/nginx/meridian-v4-locations"
+
+
 def render_nginx_stream_config(
     reality_sni: str,
     reality_backend_port: int,
@@ -371,6 +375,7 @@ def render_nginx_server_block(
                        text/css text/plain text/xml application/xml
                        application/xhtml+xml image/svg+xml;
     {extra_locations}
+            include {NGINX_LOCATION_DIR}/*.conf;
 
             # --- Remnawave Panel (management interface on secret path) ---
             location /{panel_web_base_path}/ {{

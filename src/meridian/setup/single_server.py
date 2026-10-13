@@ -7,23 +7,18 @@ the same SNI to both the control plane and an exit.
 
 from __future__ import annotations
 
-import secrets
-from typing import Literal
-
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ConfigProfilePayload
-from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
-    DEFAULT_TLS_FINGERPRINT,
     AccessIntent,
     ControlPlaneIntent,
     ExitIntent,
-    ProtocolPathIntent,
     SetupIntent,
     TlsFingerprint,
 )
+from meridian.setup.default_paths import default_exit_paths
 
 DEFAULT_EXIT_ID = "main"
 DEFAULT_CLIENT = "default"
@@ -40,8 +35,9 @@ def single_server_intent(
     client_name: str = "",
     warp: bool = False,
     geo_block: bool = True,
-    hysteria2: bool = False,
+    hysteria2: bool = True,
     fingerprint: TlsFingerprint | None = None,
+    address: str = "",
 ) -> SetupIntent:
     """Return the intent for deploying (or redeploying) one server.
 
@@ -49,17 +45,18 @@ def single_server_intent(
     existing fleet may only be redeployed on a server that already runs an
     exit; its other exits, relays, gateways, and users are preserved.
     """
-    if hysteria2 and not domain:
-        raise LocalStateError(
-            "Hysteria2 needs a domain for its TLS certificate.",
-            hint="Pass --domain, or drop --hysteria2.",
-            category="user",
-        )
     if existing is None:
         exit_ = ExitIntent(
             id=DEFAULT_EXIT_ID,
             server_ref=server_ref,
-            paths=_paths(DEFAULT_EXIT_ID, None, sni=sni, domain=domain, hysteria2=hysteria2, fingerprint=fingerprint),
+            paths=default_exit_paths(
+                DEFAULT_EXIT_ID,
+                address=address,
+                reality_sni=sni,
+                domain=domain,
+                fingerprint=fingerprint,
+                hysteria2=hysteria2,
+            ),
             warp=warp,
             geo_block=geo_block,
         )
@@ -79,7 +76,15 @@ def single_server_intent(
         )
     updated = current.model_copy(
         update={
-            "paths": _paths(current.id, current, sni=sni, domain=domain, hysteria2=hysteria2, fingerprint=fingerprint),
+            "paths": default_exit_paths(
+                current.id,
+                address=address,
+                reality_sni=sni,
+                domain=domain,
+                fingerprint=fingerprint,
+                hysteria2=hysteria2,
+                previous=current.paths,
+            ),
             "warp": warp,
             "geo_block": geo_block,
         }
@@ -95,11 +100,18 @@ def single_server_intent(
     )
 
 
-def request_intent(existing: SetupIntent | None, request: DeployRequest, *, server_ref: str) -> SetupIntent:
+def request_intent(
+    existing: SetupIntent | None,
+    request: DeployRequest,
+    *,
+    server_ref: str,
+    address: str = "",
+) -> SetupIntent:
     """Return the reviewed intent one deploy request describes."""
     return single_server_intent(
         existing,
         server_ref=server_ref,
+        address=address,
         sni=request.sni,
         domain=request.domain,
         client_name=request.client_name,
@@ -123,7 +135,7 @@ def preview_single_server_deploy(
 
     Raises :class:`LocalStateError` when the request cannot target this fleet.
     """
-    intent = request_intent(existing, request, server_ref=server_ref)
+    intent = request_intent(existing, request, server_ref=server_ref, address=server_ip)
     plan = compile_topology(intent)
     ports = {
         inbound.protocol: inbound.listen_port
@@ -147,45 +159,3 @@ def preview_single_server_deploy(
         node_count=len(intent.exits),
         relay_count=len(intent.transparent_relays),
     )
-
-
-def _paths(
-    exit_id: str,
-    current: ExitIntent | None,
-    *,
-    sni: str,
-    domain: str,
-    hysteria2: bool,
-    fingerprint: TlsFingerprint | None,
-) -> list[ProtocolPathIntent]:
-    previous: dict[str, ProtocolPathIntent] = {path.protocol: path for path in current.paths} if current else {}
-    reality_sni = sni or (previous["reality"].reality_sni if "reality" in previous else DEFAULT_SNI)
-    # Like the SNI, a redeploy keeps the saved fingerprint unless one is passed.
-    tls_fingerprint = fingerprint or (
-        previous["reality"].fingerprint if "reality" in previous else DEFAULT_TLS_FINGERPRINT
-    )
-    paths = [
-        ProtocolPathIntent(
-            id=f"{exit_id}-reality", protocol="reality", reality_sni=reality_sni, fingerprint=tls_fingerprint
-        )
-    ]
-    if not domain:
-        return paths
-    tls_protocols: tuple[Literal["xhttp"], Literal["wss"]] = ("xhttp", "wss")
-    for protocol in tls_protocols:
-        # Keep transport paths stable across redeploys so existing links survive.
-        prior = previous.get(protocol)
-        path = prior.path if prior is not None and prior.host == domain else secrets.token_hex(8)
-        paths.append(
-            ProtocolPathIntent(
-                id=f"{exit_id}-{protocol}",
-                protocol=protocol,
-                tls_sni=domain,
-                host=domain,
-                path=path,
-                fingerprint=tls_fingerprint,
-            )
-        )
-    if hysteria2:
-        paths.append(ProtocolPathIntent(id=f"{exit_id}-hysteria2", protocol="hysteria2", tls_sni=domain))
-    return paths

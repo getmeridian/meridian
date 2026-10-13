@@ -54,13 +54,12 @@
   "roles.panel_domain": "控制面板的域名（可选）",
   "roles.title": "此 VPN 的名称，显示在用户的应用中",
   "paths.sni_explain": "Reality 让你的服务器看起来像一个真实网站：连接开始时发送的网站名称 (SNI) 和证书都属于那个网站。除非你知道在你的地区更合适的网站，否则保持默认。",
-  "paths.extras_explain": "Reality 始终启用。你可以添加备用方法；如果 Reality 被阻止，应用会切换到这些：\n  xhttp — 看起来像你域名上的普通 HTTPS\n  wss — 通过 Cloudflare CDN 的 WebSocket，隐藏服务器地址\n  hysteria2 — 在差网络上很快，但使用 UDP，移动网络经常阻止\n所有三种都需要指向出口的域名。",
+  "paths.methods_explain": "每个出口都提供所有当前方法，保持隐形，因此应用可在一个被阻止时切换：\n  Reality — 看起来像访问伪装网站，提供 Chrome 和 Firefox 指纹\n  XHTTP — 看起来像向你的服务器发起普通 HTTPS\n  Hysteria2 — 伪装 UDP，在连接不佳时速度快，尽管移动网络经常阻止 UDP\n添加域名会通过 Cloudflare CDN 提供 WebSocket，隐藏服务器地址。",
   "paths.exit_header": "{server} ({address})",
   "paths.sni": "伪装网站 (SNI)",
   "paths.sni_probe": "正在检查 {server} 能访问哪些伪装网站...",
   "paths.sni_unreachable": "{server} 无法通过 TLS 1.3 访问常用的伪装网站。请检查服务器的出站 HTTPS，或输入一个确定可用的网站。",
-  "paths.extras": "备用方法 (xhttp、wss、hysteria2，用逗号分隔)，或无",
-  "paths.domain": "DNS 指向 {address} 的域名",
+  "paths.domain": "指向 {address} 的域名（可选，按 Enter 跳过）",
   "paths.wss_warning": "注意：从俄罗斯出发，经过 Cloudflare 的连接常在约 20 KB 后卡住。请把 WSS 当作最后的备选，而不是主要方式。",
   "routing.not_needed": "没有路由网关，所以没有什么要路由的：每个用户的应用在你的出口间选择。",
   "routing.explain": "选择路由网关应该将流量发送到哪里。池在多个出口间分散流量，并跳过任何停止响应的出口。",
@@ -122,7 +121,5 @@
   "error.number_range": "选择 1 到 {count} 的号码。",
   "error.number_twice": "每个号码只选择一次。",
   "error.address_required": "输入服务器地址或 'local' 表示此机器。",
-  "error.need_exit": "至少一台服务器必须是出口。",
-  "error.domain_required": "备用方法需要域名。输入一个或答无。",
-  "error.unknown_method": "未知方法：{names}。选择 xhttp、wss、hysteria2。"
+  "error.need_exit": "至少一台服务器必须是出口。"
 }

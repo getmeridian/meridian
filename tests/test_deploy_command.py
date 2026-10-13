@@ -80,17 +80,6 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
     assert data["connection_page_url"].startswith("https://198.51.100.10/")
 
 
-def test_hysteria2_without_a_domain_is_refused_before_ssh(tmp_home: Path, monkeypatch) -> None:
-    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
-
-    with patch("meridian.commands.deploy.resolve_server") as resolve_server:
-        result = _invoke(["deploy", "198.51.100.10", "--hysteria2", "--dry-run"])
-
-    assert result.exit_code == 2
-    assert "Hysteria2 needs a domain" in click.unstyle(result.output)
-    resolve_server.assert_not_called()
-
-
 def _fake_runtime() -> MagicMock:
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)

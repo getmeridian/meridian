@@ -15,6 +15,7 @@ from meridian.compiler.models import (
 )
 from meridian.config import RELAY_BINARY_PATH
 from meridian.core.errors import MeridianError
+from meridian.provision.nginx_render import NGINX_LOCATION_DIR
 
 
 class ServerArtifactError(MeridianError):
@@ -125,6 +126,8 @@ def nginx_artifact_path(logical_id: str, layer: str) -> str:
     token = artifact_token(logical_id)
     if layer == "stream":
         return f"/etc/nginx/stream.d/meridian-v4-{token}.conf"
+    if layer == "location":
+        return f"{NGINX_LOCATION_DIR}/meridian-v4-{token}.conf"
     return f"/etc/nginx/sites-available/meridian-v4-{token}.conf"
 
 
@@ -135,6 +138,8 @@ def render_nginx_artifact(
 ) -> str:
     if payload.layer == "stream":
         return _render_stream(logical_id, payload, addresses)
+    if payload.layer == "location":
+        return _render_locations(payload, addresses)
     return _render_http(logical_id, payload, addresses)
 
 
@@ -232,6 +237,18 @@ def _render_http(
         + "\n    location / { return 404; }\n"
         "}\n"
     )
+
+
+def _render_locations(payload: NginxArtifactPayload, addresses: Mapping[str, str]) -> str:
+    """Locations included into the control server's panel TLS server; no upstream blocks fit there."""
+    locations = [
+        _render_http_route(
+            route,
+            _endpoint(_backend_address(payload.server_ref, route.backend_server_ref, addresses), route.backend_port),
+        )
+        for route in payload.routes
+    ]
+    return "# Managed by Meridian v4. Manual edits will be replaced.\n" + "\n".join(locations)
 
 
 def _render_http_route(route: NginxRouteSpec, upstream: str) -> str:
