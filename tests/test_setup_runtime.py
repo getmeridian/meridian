@@ -24,6 +24,7 @@ from meridian.core.topology import (
     TransparentRelayIntent,
 )
 from meridian.reconciler.contract_drivers import ContractResourceDriver
+from meridian.reconciler.fence import FleetFenceError
 from meridian.reconciler.resources import ResourceDrivers
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
@@ -674,3 +675,35 @@ def test_control_attestation_ignores_other_servers_but_tracks_runtime_pins(tmp_p
     control = next(item for item in bumped.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
     bumped_attestation = _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), bumped)
     assert bumped_attestation != relay_attestation
+
+
+class _RefusingFence:
+    def ensure(self, local) -> None:
+        raise FleetFenceError("Another machine changed this fleet.")
+
+    def check(self, local) -> str:
+        return "Another machine changed this fleet."
+
+    def acquire(self, local) -> str:
+        raise AssertionError("apply must stop before acquiring")
+
+    def renew(self) -> None: ...
+
+    def commit(self, generation: int, plan_hash: str) -> None: ...
+
+    def release(self) -> None: ...
+
+
+def test_stale_copy_is_refused_before_its_intent_edit_is_saved(tmp_path, monkeypatch) -> None:
+    cluster, _binding = _cluster_with_old_relay()
+    runtime = _retiring_runtime(tmp_path, monkeypatch, cluster, [], {})
+    saved: list[object] = []
+    runtime._persist = lambda state: saved.append(state.topology_intent)
+    runtime._fence_factory = lambda _conn: _RefusingFence()
+    review = runtime.review(SetupDraft.from_intent(_intent()))
+
+    with pytest.raises(FleetFenceError):
+        runtime.apply_intent(_intent(), expected_plan_hash=review.review_hash)
+
+    assert saved == []
+    assert cluster.topology_intent is None

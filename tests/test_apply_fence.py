@@ -251,6 +251,15 @@ def test_check_explains_a_refusal_without_writing() -> None:
     assert host.swaps == 0 and list(host.files) == [FENCE_FILE]
 
 
+def test_ensure_raises_the_same_refusal_acquire_would() -> None:
+    host = FenceHost()
+    host.files[FENCE_FILE] = json.dumps({"fleet_id": _FLEET, "generation": 5, "plan_hash": "b" * 64})
+    with pytest.raises(FleetFenceError, match="Another machine changed this fleet") as exc_info:
+        _fence(host).ensure(_local(generation=4, plan_hash="a" * 64))
+    assert "Copy ~/.meridian" in exc_info.value.hint
+    assert host.swaps == 0
+
+
 def test_check_stays_quiet_when_the_fence_is_unreadable() -> None:
     host = FenceHost()
     host.files[FENCE_FILE] = "{not json"
@@ -317,6 +326,9 @@ class _RecordingFence:
         if self.refuse:
             raise FleetFenceError("Another machine changed this fleet.")
         return local.fleet_id or _FLEET
+
+    def ensure(self, local: LocalFenceView) -> None:
+        return None
 
     def check(self, local: LocalFenceView) -> str:
         return ""

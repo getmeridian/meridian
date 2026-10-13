@@ -68,6 +68,9 @@ class ApplyFence(Protocol):
     def acquire(self, local: LocalFenceView) -> str:
         """Take the lease; return the fleet ID this copy must record."""
 
+    def ensure(self, local: LocalFenceView) -> None:
+        """Read-only: raise ``FleetFenceError`` now if ``acquire`` would refuse."""
+
     def check(self, local: LocalFenceView) -> str:
         """Read-only: why an apply from this copy would be refused, or ``""``."""
 

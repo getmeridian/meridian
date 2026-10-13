@@ -324,10 +324,14 @@ class SetupRuntime:
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
         refuse_legacy_deployments({ref: connections[ref] for ref in targets}, addresses)
+        control = _control_payload(review.plan)
+        fence = self._fence_factory(connections[control.server_ref])
+        if fence is not None:
+            # Refuse a stale copy before its intent edit is saved, not only before the first action.
+            fence.ensure(local_fence_view(cluster))
         cluster.topology_intent = review.intent
         self._persist(cluster)
 
-        control = _control_payload(review.plan)
         control_entry = entries[control.server_ref]
         panel = LazyPanel(self._panel_factory, cluster)
 
@@ -371,7 +375,7 @@ class SetupRuntime:
                 cancellation=self._cancellation,
                 reporter=self._reporter,
                 operation=self._operation,
-                fence=self._fence_factory(connections[control.server_ref]),
+                fence=fence,
             )
         finally:
             panel.close()
