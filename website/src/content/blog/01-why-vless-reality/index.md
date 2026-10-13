@@ -1,123 +1,84 @@
 ---
-title: "Why VLESS+Reality is the last VPN protocol you'll need"
+title: "Why VLESS+Reality: a proxy that answers probes with someone else's website"
 date: 2026-02-24
 author: "Meridian Team"
 category: Technical Deep-Dive
-description: "A technical breakdown of how VLESS+Reality defeats DPI, active probing, and TLS fingerprinting — and why older protocols can't keep up."
+description: "How VLESS+Reality resists protocol fingerprinting and active probing, where it stops helping, and how Meridian deploys it."
 tags:
   - vless
   - reality
-  - protocol
-  - encryption
-  - tls
   - censorship-resistance
-readingTime: 12
+  - tls
+  - active-probing
+readingTime: 5
 ---
 
-![Why VLESS+Reality is the last VPN protocol you'll need](./hero.webp)
+![VLESS+Reality](./hero.webp)
 
-For years, a quiet battle has been waged across the global internet. On one side, state-level censorship systems, armed with sophisticated Deep Packet Inspection (DPI) technology, work to control and restrict the flow of information. On the other, developers and users of circumvention tools constantly innovate to keep access open. This technological arms race has seen protocols rise and fall, each new method of detection met with a new method of evasion. Today, that race has reached a new stage, and the tools that worked yesterday are no longer sufficient.
+Meridian puts VLESS+Reality first on every exit. This post explains why: what censors actually look for, how Reality answers each check, and where it stops helping.
 
-Older protocols, once the standard for secure internet access, now find themselves outmaneuvered. The techniques that made them effective have become liabilities, easily flagged by modern censors. To understand why, we need to look at how detection actually works in 2026. It is not a single method, but a combination of approaches that work together to identify and block unwanted traffic.
+### What censors detect
 
-### How modern DPI identifies your traffic
+Published measurements describe three methods.
 
-At the heart of modern internet censorship is **Deep Packet Inspection**. Unlike older firewalls that only looked at the headers of a data packet (the source, destination, and port), DPI systems examine the entire packet, including its payload. This allows them to identify the specific protocol being used, even if it is encrypted. They employ three primary techniques to do this.
+**Protocol fingerprinting.** A protocol with fixed bytes or packet sizes can be matched on the wire. WireGuard's handshake initiation is always 148 bytes and starts with a fixed message type; its authors state it does not aim for obfuscation. The USENIX Security 2022 paper *OpenVPN is Open to VPN Fingerprinting* identified over 85% of OpenVPN flows at a million-user ISP with negligible false positives, and also flagged 34 of 41 "obfuscated" VPN configurations.
 
-First is **protocol fingerprinting**. Every protocol has a unique structure, a digital signature. OpenVPN, for example, has a distinct handshake process and packet structure that is easily recognizable. Even without seeing the content, a DPI system can identify the "shape" of the traffic as it flows by. It looks for specific byte patterns, header values, or sequences of communication that act as a dead giveaway. Think of it like recognizing a car by its silhouette, even at a distance. You do not need to see the driver to know it is a sports car.
+**Looking like nothing is also a fingerprint.** Protocols that encrypt every byte, such as Shadowsocks and VMess, try to look random. Since November 2021 China's Great Firewall has blocked traffic *because* it looks random: it exempts traffic that resembles known protocols and blocks a share of what remains (USENIX Security 2023, *How the Great Firewall of China Detects and Blocks Fully Encrypted Traffic*).
 
-Second is **statistical traffic analysis**. Censors analyze the patterns of your internet usage. They look at the size of packets, the timing between them, and the overall volume of data being sent and received. A video stream looks different from web browsing, and a file download has a different signature than an interactive chat session. VPN traffic, with its consistent and heavily encrypted data flow, often creates a statistical anomaly that stands out from normal, unencrypted web traffic. This method does not identify the specific protocol, but it flags the connection as suspicious, marking it for further inspection or outright blocking.
+**Active probing.** A suspicious server gets test connections from the censor. The IMC 2020 study *How China Detects and Blocks Shadowsocks* found the GFW picks suspects by the length and entropy of the first packet, then sends seven kinds of probes and blocks the server if it answers like a proxy.
 
-Third, and most aggressive, is **active probing**. If a DPI system suspects a server is hosting a proxy, it will not just passively observe. It will actively test that suspicion by sending its own specially crafted packets to the server's IP address. It behaves like a client trying to connect, speaking the language of various known protocols. If the server responds in the expected way for a known proxy protocol, its cover is blown. The censor has confirmed its suspicion, and the server’s IP address is immediately added to a blocklist. This is the digital equivalent of a police officer knocking on a door and asking if an illegal speakeasy is operating inside.
+A protocol that survives all three must look like a common protocol, use a common client implementation of it, and give a stranger a believable answer.
 
-These three methods, used in combination, have made the internet a hostile environment for older protocols. They were designed for a different era, and their defenses are no longer adequate.
+### How Reality works
 
-### Why older protocols fall short in 2026
+Reality, part of Xray-core, uses TLS 1.3, the most common protocol on port 443, and needs no certificate of its own. The server is configured with a **camouflage target**: a real HTTPS site it impersonates.
 
-The protocols that many people still rely on were not designed with modern DPI in mind. **OpenVPN**, for a long time the gold standard, is now trivial to detect. Its handshake is a fixed, recognizable process that gives it away instantly. While it is a secure and stable protocol, its high visibility makes it an easy target for protocol fingerprinting. Its significant packet overhead also creates a distinct statistical signature.
+1. Each exit has an x25519 keypair. Clients get the public key; the private key stays on the server.
+2. The client sends a TLS Client Hello whose SNI names the target. It derives a shared secret from its ephemeral TLS key share and the server's public key, and hides an encrypted token, including a short ID, in the session ID field.
+3. If the token checks out, the server finishes the handshake itself, presenting a temporary certificate the client verifies with the shared secret rather than a CA chain. VLESS then carries traffic inside the TLS session.
+4. If the token is missing or wrong, or the SNI is not on the server's list, the server relays the whole connection to the real target. The prober completes a handshake with that site and gets its genuine, CA-signed certificate.
 
-**WireGuard**, known for its speed and simplicity, also has a tell-tale signature. Its initial handshake packets have a fixed size and structure. While it is much faster and more efficient than OpenVPN, it was designed for security and performance, not for stealth. Censors have learned to recognize its handshake, and active probes can easily confirm its presence. It was built to be a better VPN, not an invisible one, and that distinction is critical.
+Step 4 is the answer to active probing. A probe has no "wrong" response to trigger: it talks to a real website. Step 2 hides the authentication inside a field every TLS 1.3 Client Hello already contains.
 
-**Shadowsocks**, a protocol that gained popularity for its simplicity, relies on a pre-shared key for encryption. While this makes it lightweight, it also makes it vulnerable. The initial packets have a high degree of entropy (randomness) that, ironically, makes them stand out against normal web traffic. More advanced versions have tried to mitigate this, but the core design is susceptible to statistical analysis and active probing. If a censor sends a malformed Shadowsocks request to a server, the server
-'s specific error response can confirm its existence. Reported detection rates tell the story: OpenVPN and WireGuard are blocked at nearly 100% in restrictive environments, with Shadowsocks not far behind at 95%.
+The client side matters too. A Go program's default TLS stack has its own Client Hello fingerprint, so Xray clients use **uTLS** to copy a browser's Client Hello byte for byte. Meridian defaults to Chrome and adds Firefox copies as backup entries in each subscription. `meridian deploy --fingerprint` switches to `safari`, `ios`, `android`, `edge`, or `random` if a region starts flagging the current one.
 
-This is where **VLESS+Reality** changes the game. It was designed from the ground up to be undetectable, learning from the weaknesses of its predecessors.
+### The target has to fit the server
 
-### VLESS+Reality: a design for undetectability
+A censor sees the SNI next to the server's IP. If the SNI names a large foreign site but the IP belongs to a small VPS provider, the pair is odd even though every byte checks out. The best target is a site hosted in the same network as the server, so its DNS really points there.
 
-The core innovation of VLESS and its companion protocol, Reality, is not just adding another layer of encryption. Instead, it is about making the proxy traffic look identical to the normal, everyday HTTPS traffic that makes up the majority of the modern web. It achieves this through a few key technical design choices.
+On a first deploy without `--sni`, Meridian scans the server's own subnet for about a minute. It keeps sites whose DNS points into that subnet and that pass Reality's TLS 1.3 and HTTP/2 check. If none qualify, it falls back to `www.google.com`, `dl.google.com`, and `www.cloudflare.com`. It keeps the first target that real traffic passes through. A target you pass yourself is never swapped:
 
-The most important is how Reality handles TLS, the encryption that secures websites. Instead of generating its own self-signed certificate, which is an immediate red flag for a censor, Reality uses the identity of a real, high-traffic website as camouflage. When an unauthorized party—such as a censor's active probe—connects to the proxy server, Reality forwards the connection to the real target site (e.g., `microsoft.com`). The prober receives a genuine response from the real site, complete with its valid TLS certificate. There is nothing to distinguish this from a normal connection. Only clients that possess the correct x25519 key can authenticate with the server and establish the actual VLESS tunnel. To any outside observer, like a DPI system, the server appears to be a transparent relay to a legitimate website.
-
-This defeats active probing. If a censor tries to connect to your server's IP address, the connection is proxied to the real target site, and the censor receives an authentic response. There is no tell-tale error message, no protocol-specific response. The server perfectly impersonates an innocent, high-traffic web server. This anti-probing design is one piece of a larger [server hardening strategy](/blog/02-proxy-server-hardening-2026/) that includes firewalls, TLS configuration, and reverse proxy layers.
-
-Here is how that handshake compares to a standard HTTPS connection. They are, by design, nearly identical.
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant DPI as Observer (DPI)
-    participant Proxy as Your Proxy Server
-    participant Target as Target Website (e.g., microsoft.com)
-
-    par Standard TLS Handshake
-        Client->>+Target: ClientHello (SNI: microsoft.com)
-        DPI-->>Client: (Observes SNI)
-        Target-->>-Client: ServerHello, Certificate, etc.
-    and VLESS+Reality Handshake
-        Client->>+Proxy: ClientHello (SNI: microsoft.com)
-        DPI-->>Client: (Observes SNI, looks normal)
-        Proxy-->>-Client: ServerHello, Certificate (borrowed from microsoft.com), etc.
-    end
-
-    Note over Client, Target: To the Observer (DPI), both handshakes appear to be a standard connection to the Target Website. The Proxy is invisible.
+```bash
+meridian deploy 198.51.100.10 --sni dl.google.com
 ```
 
-Furthermore, the VLESS protocol itself is incredibly lightweight. It has no “magic numbers” or fixed byte patterns that can be used for fingerprinting. The protocol header is minimal, adding only a few dozen bytes to each packet. This makes it much harder to distinguish from other encrypted traffic using statistical analysis. It blends in with the noise of the internet.
+`meridian scan` lists candidates on the server's network. Avoid `apple.com` and `icloud.com`: their networks don't match VPS providers. `www.microsoft.com` fails a different way: its certificate chain exceeds Reality's 8192-byte limit, so the deploy converges but no traffic passes.
 
-### The final piece: impersonating Chrome with uTLS
+### How Meridian wires it
 
-Even with a perfect TLS handshake, there is one more detail that can give a proxy away: the **TLS Client Hello fingerprint**. Every web browser (Chrome, Firefox, Safari) has a unique way of constructing its initial `ClientHello` packet. The combination of ciphers it supports, the extensions it uses, and the order in which they are presented creates a unique fingerprint. Censors can and do use these fingerprints to identify traffic from non-browser applications.
-
-This is where **uTLS** comes in. It is a library that allows an application to perfectly mimic the TLS fingerprint of a specific browser. VLESS+Reality uses uTLS to make its `ClientHello` packets bit-for-bit identical to those sent by the latest version of Google Chrome. When your client connects, the first packet it sends is indistinguishable from a Chrome browser connecting to a website. This defeats the last major vector for fingerprinting, leaving the censor with nothing to grab onto.
-
-### Real-world survival rates
-
-The result of this design is a protocol that is exceptionally difficult to detect and block. While older protocols are easily identified, VLESS+Reality has a reported survival rate of over 95% even in the most restrictive network environments. It survives because it does not try to hide its encryption; it hides its identity in plain sight, masquerading as the most common and essential traffic on the internet.
-
-This diagram shows how different protocols stack up against modern detection methods.
+Reality does not listen on the public port itself. nginx owns TCP/443 and routes each connection by SNI without terminating TLS:
 
 ```mermaid
-graph TD
-    subgraph Detection Methods
-        A[Protocol Fingerprinting]
-        B[Statistical Analysis]
-        C[Active Probing]
-    end
-
-    subgraph Protocols
-        O[OpenVPN]
-        W[WireGuard]
-        S[Shadowsocks]
-        V[VLESS+Reality]
-    end
-
-    O -- Fails --> A
-    O -- Fails --> B
-    W -- Fails --> A
-    S -- Fails --> B
-    S -- Fails --> C
-    
-    V -- Survives --> A
-    V -- Survives --> B
-    V -- Survives --> C
-
-    style Fails fill:#f9f,stroke:#333,stroke-width:2px
-    style Survives fill:#9f9,stroke:#333,stroke-width:2px
+flowchart LR
+    C((Client or prober)) -->|TCP 443| N[nginx stream<br>SNI router]
+    N -->|SNI = camouflage target| X[Xray Reality<br>127.0.0.1]
+    X -->|valid token| V[VLESS tunnel]
+    X -->|no or bad token| T[Real target site]
+    N -->|no SNI / server IP| H[nginx http<br>panel, pages, subscriptions]
 ```
 
-The arms race will undoubtedly continue. Censors will develop new techniques, and protocol developers will find new ways to evade them. But for now, the evidence is clear. Protocols that rely on obvious handshakes or statistical anomalies are fighting a losing battle. The future of circumvention lies in plausible deniability, in blending in so perfectly with normal traffic that you cannot be distinguished from it.
+Connections without an SNI reach nginx's own TLS server, which serves the panel, connection pages, and subscriptions with a Let's Encrypt certificate for the server's IP. The Reality port is closed to the internet by UFW.
 
-VLESS+Reality is the current pinnacle of that design philosophy. It is not just another VPN protocol; it is a masterclass in camouflage. For anyone who needs reliable, unrestricted internet access in 2026, it is the only choice that makes sense.
+Two details keep clients working. Meridian renders Reality's `minClientVer` as `1.8.0`: newer Xray versions default to a minimum that silently rejects Mihomo and sing-box clients, which announce 1.8.x. Key material is also treated as atomic. A redeploy keeps the existing keypair and short ID, refuses partial key state instead of rotating it, and `meridian node replace` carries the keys to the new server, so existing links keep working.
 
-If you need to set up a proxy for yourself, your family, or your friends, you need a tool that uses the best protocol available. Meridian was built from the ground up to deploy VLESS+Reality servers in a single command, with security and ease-of-use as its top priorities. If you're the designated tech expert in your circle, our [guide to sharing internet access](/blog/03-tech-friend-guide/) walks through the full workflow. For a comparison with other tools, see our [proxy tools comparison](/blog/05-proxy-tools-comparison/). To learn more about its hardened architecture, check out the [Meridian security documentation](https://getmeridian.org/en/security). If you are ready to get started, you can deploy your own server in minutes. The internet is for everyone, and with the right tools, we can keep it that way.
+### Where Reality stops helping
+
+Reality hides what a connection is. It does not hide where it goes.
+
+- **IP blocking.** A censor can block the server's address regardless of protocol. Meridian's answers are relays (Realm TCP forwarders on a domestic IP that carry Reality end to end to the exit) and domain mode, where XHTTP and WSS travel through Cloudflare's CDN.
+- **UDP-friendly networks.** On lossy links, Hysteria2 on UDP/443, wrapped in salamander obfuscation so it doesn't look like QUIC, is on by default as a last resort.
+- **SNI blocking or allowlists.** If the target's name is blocked, the disguise works against you. Run `meridian test --probe` from inside the censored network: it reports whether the server IP or the camouflage SNI looks blocked.
+
+Every subscription lists all of these paths. Apps that import the Xray JSON, Mihomo, or sing-box format, such as Happ, switch to a working path by themselves; other apps show each path as a separate entry.
+
+Further reading: [Architecture: how Reality works](/en/architecture/#how-reality-works) and [choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).
