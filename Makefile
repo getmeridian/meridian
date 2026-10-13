@@ -87,6 +87,12 @@ real-lab-keep: ## Provision + verify, but DON'T auto-destroy (useful with TIER=i
 	fi
 	PYTHONUNBUFFERED=1 uv run python -m tests.realvm.orchestrator up $${TOPO:-single} --keep
 
+real-lab-up: ## Create a lab that stays up (NODES="ctl:hel1 exit:fsn1:debian-13 ..."); see tests/realvm/README.md
+	@if [ -z "$$HCLOUD_TOKEN" ]; then \
+		echo "  ✗ HCLOUD_TOKEN is not set. See tests/realvm/README.md"; exit 2; \
+	fi
+	PYTHONUNBUFFERED=1 uv run --extra hetzner python -m tests.realvm.lab up $${NODES:-ctl:hel1}
+
 real-lab-orphans: ## List harness-tagged VMs left behind in the Hetzner project
 	@if [ -z "$$HCLOUD_TOKEN" ]; then \
 		echo "  ✗ HCLOUD_TOKEN is not set."; exit 2; \

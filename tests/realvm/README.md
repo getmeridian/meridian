@@ -72,6 +72,36 @@ Tier alpha runs by default with no user involvement.
 Domain/CDN and interactive mobile checks remain planned. Environment variables
 do not enable those tiers until their orchestrator paths and verifiers exist.
 
+## Exploratory labs
+
+The one-shot run above destroys its VM when verification ends. For anything
+longer (a multi-server journey, the wizard, page screenshots) bring up a lab
+that stays until you tear it down:
+
+```bash
+make real-lab-up NODES="ctl:hel1 exit:fsn1:debian-13 relay:nbg1:ubuntu-22.04"
+source ~/.cache/meridian-realvm/lab-<id>/env.sh   # ssh, scp, and meridian now target the lab
+tests/realvm/journey.sh "$VM_CTL" "$VM_EXIT" "$VM_RELAY"
+python -m tests.realvm.lab down <id>
+```
+
+Each lab directory holds a fresh SSH key (Hetzner rejects a public key another
+run already uploaded), the VMs' pinned host keys, an `ssh_config` with
+`ssh`/`scp` wrappers, and its own `MERIDIAN_HOME`. `env.sh` exports one
+`VM_<NAME>` per VM.
+
+- `journey.sh CONTROL [EXIT [RELAY]]` — deploy, `node add`, `relay add`,
+  `client add`, fleet-wide `test`, `check`, a converged `apply`/`plan`,
+  `doctor`, then removals that must leave no relay unit or certificate
+  renewal behind. Exits 1 on any unexpected step result.
+- `drive_wizard.py ADDRESS` / `drive_wizard.py --on-server IP` — answers the
+  setup wizard like a newcomer (Enter everywhere except address and users);
+  the transcript lands in the lab directory.
+- `pwa_shots.py OUT URL [case ...]` — Playwright screenshots of a connection
+  page across phone/desktop, light/dark, and languages.
+
+Labs are labelled like harness runs, so orphan cleanup below finds them too.
+
 ## Orphan cleanup
 
 If a run crashes or you `Ctrl+C` mid-provision, VMs may linger. The harness
