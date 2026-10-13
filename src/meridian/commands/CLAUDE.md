@@ -2,7 +2,7 @@
 
 ## Design decisions
 
-**One file per command** — keeps concerns isolated. Each is a Typer sub-app registered in `cli.py`.
+**One file per command** — keeps concerns isolated. `cli.py` registers top-level commands and the root callback; `cli_groups.py` registers the sub-apps (client, server, node, relay, route, fleet, api, dev). Both only parse flags and defer to the command module.
 **Topology-first pattern** — fleet commands load `cluster.yml` through `load_topology_cluster()`, which refuses pre-topology files with rebuild guidance. Mutations (`node add`, `relay add`, `client add`) edit `topology_intent` and run the reviewed `SetupRuntime` apply; reads use the panel API plus `adapters/cluster.py`.
 **One target vocabulary** — `cli_options.py` owns the shared `SERVER` argument and `--user`/`--ssh-port`/`--timeout`/`--yes` types; `meridian.resolve.parse_target()`/`merge_target()` parse `[user@]host[:port]`, saved names, and `local` like ssh, refusing flag contradictions. Empty user / zero port mean "saved, else root/22".
 **Server resolution cascade** in `resolve.py` — adds CLI-specific Rich output around the shared helpers in `meridian.resolve`: 1. target (`local`, saved name/IP/ID, or literal address) → 2. local-mode detection → 3. single-server auto-select → 4. fail with candidates. Add commands (`node add`, `relay add`) resolve first, then validate their request with the resolved address, user, and port.

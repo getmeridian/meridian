@@ -244,7 +244,6 @@ FILE_SIZE_BUDGET = 800
 
 FILE_SIZE_ALLOWLIST: dict[str, str] = {
     "remnawave.py": "single API client wrapping 10+ REST domains — facade pattern is intentional",
-    "cli.py": "Typer registration for all subcommands — structural, not complex",
 }
 
 
