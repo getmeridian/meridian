@@ -1,11 +1,11 @@
 ---
 title: Getting Started
-description: Install Meridian and deploy your first proxy server in two minutes.
+description: Install Meridian and deploy your first proxy server.
 order: 1
 section: guides
 ---
 
-One command turns a fresh VPS into a hardened, undetectable proxy and gives you a link to share. This guide takes you from zero to a working connection in a few minutes.
+One command turns a fresh VPS into a hardened proxy and gives you a link to share. This guide takes you from zero to a working connection in a few minutes.
 
 ## Prerequisites
 
@@ -37,8 +37,8 @@ Run `meridian deploy` without an IP and it asks for one. If you are logged into 
 
 1. **Hardens the server** — SSH key-only login, fail2ban, a UFW firewall that opens only what the deployment needs, BBR congestion control
 2. **Installs the control plane** — the [Remnawave](https://remna.st/) panel, plus a node running Xray, all in Docker
-3. **Picks a camouflage target** — the server tries `www.google.com`, `dl.google.com`, and `www.cloudflare.com` and uses the first one it can reach (pass `--sni` to choose your own)
-4. **Configures VLESS+Reality** on port 443 behind nginx, with a Let's Encrypt certificate for the server's IP
+3. **Picks a camouflage target** — it looks for a suitable TLS 1.3 site on the server's own network, then falls back to `www.google.com`, `dl.google.com`, and `www.cloudflare.com` (pass `--sni` to choose your own)
+4. **Configures the connection methods** — VLESS+Reality and XHTTP on TCP 443 behind nginx, with a Let's Encrypt certificate for the server's IP, and Hysteria2 on UDP 443
 5. **Verifies real traffic** — Meridian pushes traffic through the delivered subscription before saying "Done", and moves to the next camouflage target if traffic doesn't pass
 6. **Publishes a connection page** for the first client
 

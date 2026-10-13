@@ -202,4 +202,4 @@ The full test rotates independent public IP observers and checks the same observ
 
 The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot certify UDP-only Hysteria traffic.
 
-If all checks pass but the VPN client still can't connect: re-scan the QR code, check device clock is accurate (within 30 seconds), or try a different app (v2rayNG, Hiddify).
+If all checks pass but the VPN client still can't connect: re-scan the QR code, check device clock is accurate (within 30 seconds), or try another recommended app (Happ, FlClashX, Clash Mi, or Throne on desktop).
