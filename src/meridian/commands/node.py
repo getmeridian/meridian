@@ -22,7 +22,7 @@ from meridian.commands._helpers import (
 )
 from meridian.commands._validation import validate_command_input
 from meridian.commands.apply_progress import apply_progress
-from meridian.console import confirm, err_console, fail, ok, warn
+from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.errors import MeridianError as MeridianException
@@ -34,7 +34,7 @@ from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
 
 if TYPE_CHECKING:
-    pass
+    from meridian.resolve import ResolvedServer
 
 # -- Node Add --
 
@@ -119,7 +119,7 @@ def run_add(
             intent,
             server_ref=entry.id,
             title=request.name or f"exit-{len(intent.exits) + 1}",
-            reality_sni=request.sni or DEFAULT_SNI,
+            reality_sni=request.sni or _neighbor_sni(resolved) or DEFAULT_SNI,
             tls_hostname=request.domain,
             address=resolved.ip,
         )
@@ -389,3 +389,14 @@ def _gateway_removal(
         )
     extra_lines = (f"Also drops routing rules scoped to it: {', '.join(scoped)}",) if scoped else ()
     return updated, f"routing gateway {gateway.id} on {label}", extra_lines
+
+
+def _neighbor_sni(resolved: ResolvedServer) -> str:
+    """A camouflage site in the new server's own subnet, or "" to use the default target."""
+    from meridian.diagnostics.camouflage import neighbor_camouflage_targets
+
+    info("Looking for a camouflage site in the server's own network (about a minute)...")
+    found = neighbor_camouflage_targets(resolved.conn, resolved.ip, limit=1)
+    if found:
+        ok(f"Camouflage site next to the server: {found[0]}")
+    return found[0] if found else ""

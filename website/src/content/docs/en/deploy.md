@@ -25,7 +25,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sni HOST` | (auto) | Camouflage target. Without it, the server picks the first working target from `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
+| `--sni HOST` | (auto) | Camouflage target. Without it, deploy prefers a site in the server's own subnet, then `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
 | `--domain DOMAIN` | (none) | Your domain for XHTTP and WSS, with Cloudflare CDN fallback |
 | `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443 as the last fallback |
 | `--client-name NAME` | default | Name of the first client |
@@ -45,11 +45,13 @@ Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are d
 
 ## Choosing a camouflage target
 
-The camouflage target (SNI) is the website your server impersonates. It is **not** a domain you own — it is a popular site with TLS 1.3. Anyone who probes your server sees that site's real certificate.
+The camouflage target (SNI) is the website your server impersonates. It is **not** a domain you own — it is a real site with TLS 1.3. Anyone who probes your server sees that site's real certificate.
 
-Without `--sni`, the server itself tries `www.google.com`, `dl.google.com`, and `www.cloudflare.com` in order and uses the first one it can reach. If real traffic then fails through that target, Meridian moves on to the next one before finishing. A target you pass with `--sni` is never swapped; if traffic fails, deploy stops and tells you.
+The best target lives next to your server. A censor sees the SNI together with your server's IP; when the site's DNS really points into the same network, the pair looks like ordinary traffic, while a famous foreign site on a VPS address stands out.
 
-To find a target on the same network as your server, scan its IPv4 neighborhood:
+Without `--sni`, a first deploy scans the server's own subnet for such sites (about a minute) and keeps those whose DNS points into the subnet and that pass Reality's TLS 1.3 and HTTP/2 check. Then it falls back to `www.google.com`, `dl.google.com`, and `www.cloudflare.com`. It uses the first target that real traffic passes through. `meridian node add` picks a neighbor the same way. A target you pass with `--sni` is never swapped; if traffic fails, deploy stops and tells you. A redeploy keeps the saved target.
+
+To see the candidates yourself, scan the server's IPv4 neighborhood:
 
 ```
 meridian scan 198.51.100.10

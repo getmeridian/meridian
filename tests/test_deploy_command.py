@@ -60,7 +60,7 @@ def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypa
         patch("meridian.commands.deploy.resolve_server", return_value=resolved),
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),
         patch("meridian.commands.deploy.check_ports") as check_ports,
-        patch("meridian.commands.deploy._reachable_reality_targets", return_value=["www.google.com"]),
+        patch("meridian.commands.deploy._camouflage_candidates", return_value=["www.google.com"]),
         patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")),
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
     ):
@@ -93,7 +93,7 @@ def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.goo
         patch("meridian.commands.deploy.resolve_server", return_value=resolved),
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),
         patch("meridian.commands.deploy.check_ports"),
-        patch("meridian.commands.deploy._reachable_reality_targets", return_value=list(targets)),
+        patch("meridian.commands.deploy._camouflage_candidates", return_value=list(targets)),
         patch("meridian.commands.deploy._verify_traffic", side_effect=traffic),
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime) as runtime_cls,
     ):
@@ -137,7 +137,7 @@ def test_egress_mismatch_and_inconclusive_evidence_do_not_fail_a_deploy(tmp_home
 
 
 def test_probe_keeps_candidate_order_and_drops_unreachable_targets() -> None:
-    from meridian.commands.deploy import _reachable_reality_targets
+    from meridian.diagnostics.preflight import reachable_reality_targets
     from tests.support.mock_connection import MockConnection
 
     conn = MockConnection()
@@ -145,7 +145,21 @@ def test_probe_keeps_candidate_order_and_drops_unreachable_targets() -> None:
     conn.when("https://dl.google.com/", stdout="2")
     conn.when("https://www.cloudflare.com/", stdout="1.1")  # no HTTP/2
 
-    assert _reachable_reality_targets(conn) == ["dl.google.com"]
+    assert reachable_reality_targets(conn) == ["dl.google.com"]
+
+
+def test_sites_next_to_the_server_are_tried_before_well_known_targets(monkeypatch) -> None:
+    from meridian.commands import deploy
+
+    monkeypatch.setattr(
+        "meridian.diagnostics.camouflage.neighbor_camouflage_targets", lambda _conn, _ip: ["shop.neighbor.test"]
+    )
+    monkeypatch.setattr(
+        "meridian.diagnostics.preflight.reachable_reality_targets",
+        lambda _conn: ["shop.neighbor.test", "dl.google.com"],
+    )
+
+    assert deploy._camouflage_candidates(MagicMock(), "198.51.100.10") == ["shop.neighbor.test", "dl.google.com"]
 
 
 def test_traffic_check_waits_for_node_warm_up_before_declaring_failure(monkeypatch) -> None:

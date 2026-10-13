@@ -218,12 +218,13 @@ def _execute(
         fail(
             "Could not save the server profile", hint="Check ~/.meridian/servers.json permissions.", hint_type="system"
         )
-    # Without --sni, a fresh deploy tries known-good camouflage targets in order;
-    # redeploys keep the saved target unless --sni changes it.
+    # Without --sni, a fresh deploy tries sites next to the server first, then known-good
+    # camouflage targets, keeping the first that carries traffic; redeploys keep the saved
+    # target unless --sni changes it.
     if request.sni or not first_deploy:
         sni_candidates = [request.sni]
     else:
-        sni_candidates = _reachable_reality_targets(resolved.conn)
+        sni_candidates = _camouflage_candidates(resolved.conn, resolved.ip)
     raise_if_cancelled(cancellation, phase="preflight", message="Deploy was cancelled before changing the server.")
 
     from meridian.setup.runtime import SetupRuntime
@@ -336,21 +337,28 @@ def _execute(
 TrafficOutcome = Literal["ok", "egress_mismatch", "failed", "inconclusive"]
 
 
-def _reachable_reality_targets(conn: ServerConnection) -> list[str]:
-    """Candidate camouflage targets the server itself can reach over TLS 1.3 + HTTP/2."""
+def _camouflage_candidates(conn: ServerConnection, ip: str) -> list[str]:
+    """Same-subnet sites first (their DNS really points next to the server), then known targets."""
+    from meridian.diagnostics.camouflage import neighbor_camouflage_targets
     from meridian.diagnostics.preflight import reachable_reality_targets
 
-    reachable = reachable_reality_targets(conn)
-    if not reachable:
+    info("Looking for a camouflage site in the server's own network (about a minute)...")
+    neighbors = neighbor_camouflage_targets(conn, ip)
+    if neighbors:
+        ok(f"Found camouflage sites next to the server: {', '.join(neighbors)}")
+    else:
+        info("No usable site next to the server; using a well-known camouflage target")
+    candidates = [*neighbors, *(item for item in reachable_reality_targets(conn) if item not in neighbors)]
+    if not candidates:
         fail(
             "The server cannot reach any Reality camouflage target over TLS 1.3",
             hint=(
-                f"Tried {', '.join(REALITY_SNI_CANDIDATES)}. "
+                f"Tried its own subnet and {', '.join(REALITY_SNI_CANDIDATES)}. "
                 "Check outbound HTTPS from the server, or pass --sni (see `meridian scan`)."
             ),
             hint_type="system",
         )
-    return reachable
+    return candidates
 
 
 def _verify_traffic(

@@ -46,6 +46,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
   adds WSS (Cloudflare CDN fallback). Blocking Russian destinations stays on
   by default (`--no-geo-block` to turn it off).
+- **Camouflage next door** — without `--sni`, a first deploy (and `node add`)
+  scans the server's own subnet and prefers a site whose DNS really points
+  there and that passes Reality's TLS 1.3 + HTTP/2 check, so the SNI and the
+  server's IP look like they belong together. Well-known targets remain the
+  fallback, and real traffic still decides.
 - **Client IPs stay private unless you ask** — by default the panel records
   the server's own address for every TCP connection, so it never stores where
   users connect from. `--client-ips` (or `forward_client_ips` in the topology)

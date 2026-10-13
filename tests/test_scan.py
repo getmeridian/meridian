@@ -172,3 +172,31 @@ def test_strict_scanner_reports_an_unknown_output_format_as_unavailable() -> Non
 
     with pytest.raises(ScanUnavailableError):
         scan_for_sni(connection, "198.51.100.8", strict=True)
+
+
+def test_neighbor_targets_need_dns_inside_the_subnet_and_reality_tls() -> None:
+    from meridian.diagnostics.camouflage import neighbor_camouflage_targets
+
+    connection = FakeConnection()
+    connection.csv_output = (
+        "IP,CERT_DOMAIN\n198.51.100.20,shop.near.test\n198.51.100.21,cdn.far.test\n198.51.100.22,old.near.test\n"
+    )
+    answers = {
+        "getent ahostsv4 shop.near.test": "198.51.100.20   STREAM shop.near.test\n",
+        # A CDN-fronted name resolves elsewhere: its SNI would not match the server's network.
+        "getent ahostsv4 cdn.far.test": "203.0.113.50    STREAM cdn.far.test\n",
+        "getent ahostsv4 old.near.test": "198.51.100.22   STREAM old.near.test\n",
+        "https://shop.near.test/": "2",
+        "https://old.near.test/": "1.1",  # no HTTP/2, which Reality needs
+    }
+    scan_run = connection.run
+
+    def run(command: str, **kwargs: object) -> CommandResult:
+        for needle, stdout in answers.items():
+            if needle in command:
+                return CommandResult(args=command, returncode=0, stdout=stdout)
+        return scan_run(command, **kwargs)
+
+    connection.run = run  # type: ignore[method-assign]
+
+    assert neighbor_camouflage_targets(connection, "198.51.100.8") == ["shop.near.test"]  # type: ignore[arg-type]

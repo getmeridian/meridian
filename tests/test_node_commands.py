@@ -180,6 +180,7 @@ class TestNodeAdd:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
                 side_effect=LocalStateError("review state changed"),
@@ -204,6 +205,7 @@ class TestNodeAdd:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
             patch("meridian.setup.runtime.SetupRuntime.apply_intent", applied),
         ):
             run_add(ip="198.51.100.5", name="exit", yes=True)
@@ -222,6 +224,7 @@ class TestNodeAdd:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
             patch("meridian.setup.runtime.SetupRuntime.apply_intent") as applied,
             pytest.raises(typer.Exit) as exc_info,
         ):
@@ -244,6 +247,7 @@ class TestNodeAdd:
             patch("meridian.servers.ServerRegistry", return_value=registry),
             patch("meridian.commands.resolve.resolve_server", return_value=resolved),
             patch("meridian.commands.resolve.ensure_server_connection", return_value=resolved),
+            patch("meridian.commands.node._neighbor_sni", return_value=""),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
                 side_effect=ReviewedApplyPersistenceError(

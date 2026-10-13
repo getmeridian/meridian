@@ -6,7 +6,7 @@
 
 **No CLI rendering** — checks return data; commands own Rich output. This keeps the module reusable from Engine, tests, and future Studio surfaces.
 
-**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect → handshake → bytes until EOF or stall) every blocking/throughput check builds on; `blocking.py` turns flows into the SNI-vs-IP differential and data-stall checks and selects them from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest. `images.py` reads each Remnawave container's configured image and classifies it with the setup version policy.
+**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect → handshake → bytes until EOF or stall) every blocking/throughput check builds on; `blocking.py` turns flows into the SNI-vs-IP differential and data-stall checks and selects them from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest. `images.py` reads each Remnawave container's configured image and classifies it with the setup version policy. `camouflage.py` runs the pinned RealiTLScanner and picks same-subnet Reality targets for deploy and `node add`; `commands/scan.py` only adds the spinner and prompt.
 
 ## What's done well
 
@@ -15,6 +15,7 @@
 
 ## Pitfalls
 
+- **A neighbor target must resolve into the scanned subnet** — a CDN-fronted certificate name points elsewhere, so its SNI would not match the server's network; check `getent ahostsv4` before the TLS 1.3 + HTTP/2 probe.
 - **Do not import console, Rich, or Typer** — enforced by architecture tests as a library module.
 - **Skipped evidence is not success** — aggregate verification must remain inconclusive until every required check completes.
 - **Relay legs run curl on the hop, never Python** — `relay.check_relay_leg` sends the chain's client SNI through `--connect-to` and reuses `blocking.STALL_CLEARANCE_BYTES`/`THROTTLE_WINDOW`; unreachable next hops defer to the TCP check and a small camouflage page stays inconclusive.
