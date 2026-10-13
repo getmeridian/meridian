@@ -193,4 +193,4 @@ Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reve
 
 Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/docs/en/client-management/#web-panel).
 
-Meridian pins the Remnawave versions it has tested. If you upgrade Remnawave yourself, Meridian does not downgrade it.
+Meridian pins the Remnawave versions it has tested. `meridian fleet upgrade` moves your servers to the newest Remnawave release in the same major, without waiting for a Meridian update. If you upgrade Remnawave yourself, Meridian does not downgrade it.

@@ -9,9 +9,16 @@ digest) the operator chose.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Literal, NamedTuple
 
-from meridian.config import REMNAWAVE_MIN_VERSION, REMNAWAVE_TESTED_MAJOR
+from meridian.config import (
+    REMNAWAVE_BACKEND_IMAGE,
+    REMNAWAVE_MIN_VERSION,
+    REMNAWAVE_NODE_IMAGE,
+    REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+    REMNAWAVE_TESTED_MAJOR,
+)
 
 from .runtime import RemnawaveError
 
@@ -93,6 +100,48 @@ def resolve_image(pinned: str, existing: str | None) -> str:
     if pinned_version is None or existing_version > pinned_version:
         return existing
     return pinned
+
+
+# Remnawave images `fleet upgrade` may move to a newer release in the same major
+# without a Meridian release; PostgreSQL and Valkey stay Meridian-owned pins.
+UPGRADABLE_PINS: dict[str, str] = {
+    "remnawave_backend_image": REMNAWAVE_BACKEND_IMAGE,
+    "remnawave_node_image": REMNAWAVE_NODE_IMAGE,
+    "remnawave_subscription_page_image": REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+}
+
+
+def valid_upgrade_pin(name: str, image: str) -> bool:
+    """Whether a saved override names a digest-pinned release of the same repository and major."""
+    default = UPGRADABLE_PINS.get(name)
+    if default is None:
+        return False
+    ref, pin = parse_image(image), parse_image(default)
+    version, pinned = parse_version(ref.tag), parse_version(pin.tag)
+    return (
+        ref.repository == pin.repository
+        and ref.digest.startswith("sha256:")
+        and version is not None
+        and pinned is not None
+        and version[0] == pinned[0]
+    )
+
+
+def effective_pins(overrides: Mapping[str, str]) -> dict[str, str]:
+    """This CLI's Remnawave pins, raised to a newer release `fleet upgrade` saved.
+
+    A saved override older than (or equal to) the CLI's pin yields to it, so
+    updating Meridian never moves a fleet backwards.
+    """
+    pins = dict(UPGRADABLE_PINS)
+    for name, image in overrides.items():
+        if not valid_upgrade_pin(name, image):
+            continue
+        saved = parse_version(parse_image(image).tag)
+        default = parse_version(parse_image(pins[name]).tag)
+        if saved is not None and default is not None and saved > default:
+            pins[name] = image
+    return pins
 
 
 _DATA_TAG_RE = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-.*)?$")

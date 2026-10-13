@@ -17,7 +17,7 @@ meridian deploy [SERVER] [flags]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--sni HOST` | (自动) | 伪装目标。不指定时，服务器尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
+| `--sni HOST` | (自动) | 伪装目标。不指定时，首次部署会先尝试服务器所在子网内的网站，再尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com`，并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永远不会被替换 |
 | `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名（Cloudflare CDN 回退）。面板和连接页面保持在 IP 证书上 |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2，用 salamander 伪装，作为最后的回退。使用域名的证书或没有域名的 IP 证书 |
 | `--fingerprint NAME` | chrome | 客户端在 Reality、XHTTP 和 WSS 上呈现的 TLS 指纹（`chrome`、`firefox`、`safari`、`ios`、`android`、`edge`、`random`、`randomized`）。如果你的地区开始标记当前指纹，请更改它；重新部署保留已保存的值 |
@@ -30,7 +30,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
 | `--geo-block` / `--no-geo-block` | 启 | 在出口拒绝俄罗斯域名和 IP（`geosite:category-ru` + `geoip:ru`）。Xray JSON 和 Mihomo 订阅已经从设备直接发送它们 |
-| `--client-ips / --no-client-ips` | 关 | 将每个客户端的真实 IP 传递给 Xray 和面板，用于 Remnawave 按用户 IP 限制和连接日志。关闭时，每个 TCP 连接看起来来自服务器本身 |
+| `--client-ips / --no-client-ips` | 关 | 把每个客户端的真实 IP 传给 Xray 和面板，供 Remnawave 的按用户 IP 限制和连接日志使用。关闭时，每个 TCP 连接看起来都来自服务器本身 |
 | `--yes` | | 跳过确认提示 |
 | `--json` | | 将最终部署结果作为 `meridian.output/v1` 信封发出 |
 | `--events=jsonl` | | 在 stderr 上以 JSONL 形式流式传输类型化进度事件 |
@@ -229,24 +229,25 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 ### meridian fleet
 
-来自实时面板的舰队范围内的健康和库存，以及 `meridian update` 后的镜像升级。
+来自实时面板的舰队范围内的健康和库存，以及 Remnawave 升级。
 
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
-meridian fleet upgrade [--yes]
+meridian fleet upgrade [--tested] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`） |
+| `--tested` | | `fleet upgrade`：仅使用此 Meridian 版本测试过的 Remnawave 版本，不查询 Docker Hub |
 | `--yes`, `-y` | | `fleet upgrade`：跳过确认 |
 
 **`fleet status`** — 面板健康、节点心跳、中继监听器和客户端计数。缺失声明的客户端降低健康；禁用、限制或过期的客户端被计数但是您的选择，不是错误。可达的中继监听器仅证明 TCP，所以未验证的中继路由保持健康 `unknown`；用 `meridian test` 检查完整路径。退出 `0` 意味着健康，`4` 是降级，`3` 是未知。
 
 **`fleet inventory`** — 你的已配置服务器、角色、节点和中继，可达时带实时面板状态。它永不打印面板 API 令牌或秘密路径。如果实时状态不可用，已配置库存仍显示，带警告，命令退出 `3`。使用 `plan --json` 决定应用是否有工作要做。
 
-**`fleet upgrade`** — 在 `meridian update` 后，卷出每个服务器运行的新 CLI 的固定 Remnawave 镜像。它读取后端、订阅页面、PostgreSQL、Valkey 和节点镜像每个服务器运行（通过 SSH 读取 `docker inspect`）并显示每个为 `current`、`upgrade`、`install` 或保留。版本政策是设置使用的：更新的版本标签或您选择的浮动标签（`latest`、`3`）被保留并报告，永远不降级。PostgreSQL 主版本永远不在原地移动 — 旧主版本保持运行，命令解释需要的 dump-and-restore。在您确认后，它应用已审查的计划并在每个服务器上运行 `meridian check`。一个其镜像无法读取的服务器在任何改变前用退出 `3` 停止命令；如果应用收敛但服务器仍运行旧镜像，它也退出 `3`。
+**`fleet upgrade`** — 无需等待 Meridian 更新，就把 Remnawave 升级到最新版本。它向 Docker Hub 查询此 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每一个，并把选择保存到 `cluster.yml`，让之后的应用保持这一选择；之后 Meridian 的版本若带有更新的固定版本，则以它为准。`--tested` 只使用此版本测试过的版本。PostgreSQL 和 Valkey 始终使用 Meridian 的固定版本。随后它读取每个服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像（通过 SSH 只读执行 `docker inspect`），并把每个显示为 `current`、`upgrade`、`install` 或保留。版本政策是设置使用的：更新的版本标签或您选择的浮动标签（`latest`、`3`）被保留并报告，永远不降级。PostgreSQL 主版本永远不在原地移动 — 旧主版本保持运行，命令解释需要的 dump-and-restore。在您确认后，它应用已审查的计划并在每个服务器上运行 `meridian check`。一个其镜像无法读取的服务器在任何改变前用退出 `3` 停止命令；如果应用收敛但服务器仍运行旧镜像，它也退出 `3`。
 
 ### meridian check
 

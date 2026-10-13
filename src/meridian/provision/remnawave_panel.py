@@ -23,7 +23,6 @@ from meridian.config import (
     REMNAWAVE_PANEL_DIR,
     REMNAWAVE_PANEL_PORT,
     REMNAWAVE_POSTGRES_IMAGE,
-    REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
     REMNAWAVE_VALKEY_IMAGE,
 )
@@ -374,8 +373,8 @@ class DeployRemnawavePanel:
         # Keep operator-upgraded images; pinned tags only replace older ones.
         current_compose = conn.get_text(f"{panel_dir}/docker-compose.yml", timeout=15)
         compose_text = current_compose.stdout if current_compose.returncode == 0 else None
-        image = effective_image(REMNAWAVE_BACKEND_IMAGE, compose_text)
-        sub_page_image = effective_image(REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE, compose_text)
+        image = effective_image(ctx.backend_image, compose_text)
+        sub_page_image = effective_image(ctx.subscription_page_image, compose_text)
         data_images = {
             # A PostgreSQL major needs a dump and restore; never move one in place.
             "postgres_image": resolve_data_image(

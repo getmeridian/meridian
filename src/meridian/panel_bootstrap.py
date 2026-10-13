@@ -72,6 +72,8 @@ def run_provisioner(
     xhttp_path: str = "",
     ws_path: str = "",
     info_page_path: str = "",
+    backend_image: str = "",
+    subscription_page_image: str = "",
     reporter: Reporter = NoopReporter(),
     operation: OperationContext | None = None,
     remote_executor: RemoteExecutor | None = None,
@@ -94,6 +96,10 @@ def run_provisioner(
         harden=harden,
         is_panel_host=is_panel_host,
     )
+    if backend_image:
+        ctx.backend_image = backend_image
+    if subscription_page_image:
+        ctx.subscription_page_image = subscription_page_image
     ctx.xhttp_port = xhttp_port
     ctx.reality_port = reality_port
     ctx.wss_port = wss_port

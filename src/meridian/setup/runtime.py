@@ -32,7 +32,6 @@ from meridian.config import (
     REALM_VERSION,
     REMNAWAVE_BACKEND_IMAGE,
     REMNAWAVE_NODE_API_PORT,
-    REMNAWAVE_NODE_IMAGE,
     REMNAWAVE_PANEL_PORT,
     REMNAWAVE_POSTGRES_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
@@ -92,7 +91,7 @@ from meridian.reconciler.workloads import (
     WorkloadStateManager,
 )
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
-from meridian.remnawave.versions import check_panel_version
+from meridian.remnawave.versions import check_panel_version, effective_pins
 from meridian.resolve import ResolvedServer, connection_for_entry
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.legacy_guard import refuse_legacy_deployments
@@ -207,6 +206,8 @@ class SetupRuntime:
         """Compile the draft and list the saved resources the new plan would remove."""
         intent = _draft_intent(draft)
         entries = self._entries(sorted(deployment_server_refs(intent)))
+        cluster = cluster if cluster is not None else self._cluster_loader()
+        images = effective_pins(cluster.image_pins)
         contract = DeploymentContract(
             server_targets={server_ref: _deployment_target(entry) for server_ref, entry in entries.items()},
             runtime_pins={
@@ -214,12 +215,12 @@ class SetupRuntime:
                 "meridian_version": __version__,
                 "realm_sha256_manifest": canonical_hash(REALM_SHA256),
                 "realm_version": REALM_VERSION,
-                "remnawave_backend_image": REMNAWAVE_BACKEND_IMAGE,
-                "remnawave_node_image": REMNAWAVE_NODE_IMAGE,
+                "remnawave_backend_image": images["remnawave_backend_image"],
+                "remnawave_node_image": images["remnawave_node_image"],
                 "remnawave_node_api_port": str(REMNAWAVE_NODE_API_PORT),
                 "remnawave_panel_port": str(REMNAWAVE_PANEL_PORT),
                 "remnawave_postgres_image": REMNAWAVE_POSTGRES_IMAGE,
-                "remnawave_subscription_page_image": REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
+                "remnawave_subscription_page_image": images["remnawave_subscription_page_image"],
                 "remnawave_subscription_page_port": str(REMNAWAVE_SUBSCRIPTION_PAGE_PORT),
                 "remnawave_valkey_image": REMNAWAVE_VALKEY_IMAGE,
                 "xray_version": XRAY_VERSION,
@@ -227,7 +228,7 @@ class SetupRuntime:
             renderer_contract=RENDERER_CONTRACT,
         )
         plan = compile_topology(intent, deployment_contract=contract)
-        retiring = tuple(retired_bindings(plan, cluster if cluster is not None else self._cluster_loader()))
+        retiring = tuple(retired_bindings(plan, cluster))
         targets = {
             server_ref: contract.server_targets[server_ref]
             for server_ref in retiring_server_refs(retiring)
@@ -702,6 +703,10 @@ def _bootstrap_control_plane(
         reality_port=ports["reality"],
         wss_port=ports["wss"],
         info_page_path=info_page_path,
+        backend_image=plan.deployment_contract.runtime_pins.get("remnawave_backend_image", REMNAWAVE_BACKEND_IMAGE),
+        subscription_page_image=plan.deployment_contract.runtime_pins.get(
+            "remnawave_subscription_page_image", REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
+        ),
         reporter=reporter or NoopReporter(),
         operation=operation,
         cancellation=cancellation,

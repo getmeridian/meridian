@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -30,13 +31,27 @@ class ImageComponent:
     cross_major: bool = True
 
 
-CONTROL_COMPONENTS: tuple[ImageComponent, ...] = (
-    ImageComponent("backend", "remnawave", REMNAWAVE_BACKEND_IMAGE),
-    ImageComponent("subscription_page", "remnawave-subscription-page", REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE),
-    ImageComponent("postgres", "remnawave-db", REMNAWAVE_POSTGRES_IMAGE, data=True, cross_major=False),
-    ImageComponent("valkey", "remnawave-redis", REMNAWAVE_VALKEY_IMAGE, data=True),
-)
-NODE_COMPONENTS: tuple[ImageComponent, ...] = (ImageComponent("node", "remnawave-node", REMNAWAVE_NODE_IMAGE),)
+def control_components(pins: Mapping[str, str] | None = None) -> tuple[ImageComponent, ...]:
+    """The control server's containers against *pins* (``effective_pins()``; this CLI's pins by default)."""
+    images = pins or {}
+    return (
+        ImageComponent("backend", "remnawave", images.get("remnawave_backend_image", REMNAWAVE_BACKEND_IMAGE)),
+        ImageComponent(
+            "subscription_page",
+            "remnawave-subscription-page",
+            images.get("remnawave_subscription_page_image", REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE),
+        ),
+        ImageComponent("postgres", "remnawave-db", REMNAWAVE_POSTGRES_IMAGE, data=True, cross_major=False),
+        ImageComponent("valkey", "remnawave-redis", REMNAWAVE_VALKEY_IMAGE, data=True),
+    )
+
+
+def node_components(pins: Mapping[str, str] | None = None) -> tuple[ImageComponent, ...]:
+    """A node server's container against *pins*."""
+    images = pins or {}
+    return (ImageComponent("node", "remnawave-node", images.get("remnawave_node_image", REMNAWAVE_NODE_IMAGE)),)
+
+
 CHANGES: frozenset[ImageStatus] = frozenset({"upgrade", "absent"})
 
 

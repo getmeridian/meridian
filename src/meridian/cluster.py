@@ -221,6 +221,9 @@ class ClusterConfig:
     allocations: dict[str, ResourceAllocation] = field(default_factory=dict)
     action_checkpoints: dict[str, ActionCheckpoint] = field(default_factory=dict)
     connection_page_markers: list[str] = field(default_factory=list)
+    # Newer Remnawave releases `fleet upgrade` moved past this CLI's pins
+    # (runtime pin name -> tag@sha256 image); see remnawave.versions.effective_pins.
+    image_pins: dict[str, str] = field(default_factory=dict)
     # Random ID shared by every copy of this fleet's state; the control server's
     # apply fence refuses copies with another ID (see state_fence.py).
     fleet_id: str = ""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,13 +15,14 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands import fleet_upgrade
 from meridian.config import REMNAWAVE_BACKEND_IMAGE, REMNAWAVE_NODE_IMAGE, REMNAWAVE_POSTGRES_IMAGE
 from meridian.diagnostics.images import (
-    CONTROL_COMPONENTS,
-    NODE_COMPONENTS,
     ImageObservation,
     ServerImages,
+    control_components,
+    node_components,
     observe_images,
 )
 from meridian.reconciler.resources import ResourceExecutionResult
+from meridian.remnawave.versions import UPGRADABLE_PINS, effective_pins
 from meridian.setup.single_server import single_server_intent
 from tests.support.mock_connection import MockConnection
 
@@ -46,7 +48,7 @@ def test_images_are_read_with_docker_inspect_only() -> None:
         ),
     )
 
-    observed = observe_images(conn, CONTROL_COMPONENTS + NODE_COMPONENTS, server_ref="srv-a", label="control")
+    observed = observe_images(conn, control_components() + node_components(), server_ref="srv-a", label="control")
 
     (command,) = conn.calls
     assert "docker inspect --format '{{.Config.Image}}'" in command
@@ -73,7 +75,7 @@ def test_missing_evidence_is_unavailable_not_a_mismatch(rc: int, stdout: str, er
     conn = MockConnection()
     conn.when("docker inspect", rc=rc, stdout=stdout)
 
-    observed = observe_images(conn, CONTROL_COMPONENTS, server_ref="srv-a", label="control")
+    observed = observe_images(conn, control_components(), server_ref="srv-a", label="control")
 
     assert not observed.available and error in observed.error
     assert observed.images == ()
@@ -86,7 +88,7 @@ def test_inspection_script_reports_absent_containers_in_a_real_shell(tmp_path: P
     )
     fake.chmod(0o755)
     conn = MockConnection()
-    observe_images(conn, CONTROL_COMPONENTS[:1] + NODE_COMPONENTS, server_ref="srv-a", label="a")
+    observe_images(conn, control_components()[:1] + node_components(), server_ref="srv-a", label="a")
     script = conn.calls[0]
 
     result = subprocess.run(
@@ -109,6 +111,8 @@ def _run(observations: list[list[ServerImages]], *, yes: bool = True) -> tuple[i
     cluster = ClusterConfig(topology_intent=single_server_intent(None, server_ref="srv-a"))
     with (
         patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_target_pins", return_value=dict(UPGRADABLE_PINS)),
+        patch.object(fleet_upgrade, "_save_pins"),
         patch.object(fleet_upgrade, "_observe", side_effect=observations),
         patch.object(fleet_upgrade, "_apply") as apply,
         patch("meridian.commands.health.run") as check,
@@ -214,3 +218,78 @@ def test_components_follow_the_compiled_roles(servers_file: Path) -> None:
         fleet_upgrade._observe(registry, single_server_intent(None, server_ref="srv-a"))
 
     assert seen == {"srv-a": ("backend", "subscription_page", "postgres", "valkey", "node")}
+
+
+_NEWER_NODE = "remnawave/node:3.9.1@sha256:" + "a" * 64
+
+
+def test_a_saved_newer_release_raises_the_pin_and_never_lowers_it() -> None:
+    assert effective_pins({"remnawave_node_image": _NEWER_NODE})["remnawave_node_image"] == _NEWER_NODE
+    older = "remnawave/node:3.0.0@sha256:" + "b" * 64
+    assert effective_pins({"remnawave_node_image": older})["remnawave_node_image"] == REMNAWAVE_NODE_IMAGE
+    # Another major, a missing digest, or an unknown component is never trusted from cluster.yml.
+    for name, image in (
+        ("remnawave_node_image", "remnawave/node:4.0.0@sha256:" + "c" * 64),
+        ("remnawave_node_image", "remnawave/node:3.9.9"),
+        ("remnawave_postgres_image", "postgres:18.0-alpine@sha256:" + "d" * 64),
+    ):
+        assert effective_pins({name: image}) == dict(UPGRADABLE_PINS)
+
+
+def test_saved_pins_reach_the_reviewed_runtime_contract(servers_file: Path) -> None:
+    from meridian.core.setup import SetupDraft
+    from meridian.servers import ServerEntry, ServerRegistry
+    from meridian.setup.runtime import SetupRuntime
+
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry(host="198.51.100.10", name="control", id="srv-a"))
+    cluster = ClusterConfig(
+        topology_intent=single_server_intent(None, server_ref="srv-a", address="198.51.100.10"),
+        image_pins={"remnawave_node_image": _NEWER_NODE},
+    )
+
+    review = SetupRuntime(registry, cluster_loader=lambda: cluster).review(
+        SetupDraft.from_intent(cluster.topology_intent)  # type: ignore[arg-type]
+    )
+
+    assert review.plan.deployment_contract.runtime_pins["remnawave_node_image"] == _NEWER_NODE
+
+
+def test_image_pins_survive_a_cluster_round_trip(tmp_home: Path) -> None:
+    cluster = ClusterConfig(image_pins={"remnawave_node_image": _NEWER_NODE})
+    cluster.save()
+
+    assert ClusterConfig.load().image_pins == {"remnawave_node_image": _NEWER_NODE}
+
+
+def test_latest_release_stays_in_the_major_and_skips_prereleases() -> None:
+    from meridian.remnawave import registry
+
+    tags = ["3.4.2", "3.4.10", "3.5.0-rc1", "3", "latest", "4.0.0", "3.10.1"]
+    calls: list[str] = []
+
+    def fake_get(url: str, headers: dict[str, str]) -> tuple[bytes, dict[str, str]]:
+        calls.append(url)
+        return (b'{"token": "t"}' if "auth.docker.io" in url else json.dumps({"tags": tags}).encode()), {}
+
+    with (
+        patch.object(registry, "_get", side_effect=fake_get),
+        patch.object(registry, "resolve_index_digest", return_value=("remnawave/node:3.10.1", "sha256:" + "e" * 64)),
+    ):
+        assert registry.latest_release(REMNAWAVE_NODE_IMAGE) == "remnawave/node:3.10.1@sha256:" + "e" * 64
+
+    with (
+        patch.object(registry, "_get", side_effect=fake_get),
+        patch.object(registry, "resolve_index_digest") as resolve,
+    ):
+        tags[:] = ["3.4.2", "3.4.1"]
+        assert registry.latest_release(REMNAWAVE_NODE_IMAGE) == REMNAWAVE_NODE_IMAGE
+        resolve.assert_not_called()
+
+
+def test_tested_upgrade_skips_docker_hub() -> None:
+    cluster = ClusterConfig(image_pins={"remnawave_node_image": _NEWER_NODE})
+
+    with patch("meridian.remnawave.registry.latest_release") as latest:
+        assert fleet_upgrade._target_pins(cluster, tested=True) == dict(UPGRADABLE_PINS)
+    latest.assert_not_called()

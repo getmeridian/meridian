@@ -17,7 +17,7 @@ meridian deploy [SERVER] [flags]
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، سرور `www.google.com`، `dl.google.com`، `www.cloudflare.com` را امتحان می‌کند و از اول‌ی آن‌های که ترافیق حمل می‌کنند استفاده می‌کند؛ بازاستقرار هدف ذخیره‌شده را نگه می‌دارد. `--sni` صریح هرگز جابه‌جا نمی‌شود |
+| `--sni HOST` | (خودکار) | هدف camouflage. بدون آن، استقرار اول ابتدا سایت‌هایی را در زیرشبکهٔ خود سرور امتحان می‌کند، سپس `www.google.com`، `dl.google.com`، `www.cloudflare.com` را، و از اولین موردی که ترافیک از آن عبور می‌کند استفاده می‌کند؛ بازاستقرار هدف ذخیره‌شده را نگه می‌دارد. `--sni` صریح هرگز جابه‌جا نمی‌شود |
 | `--domain DOMAIN` | (هیچ) | دامنه شما برای XHTTP و WSS (CDN Cloudflare fallback). پنل و صفحات اتصال روی گواهینامه IP می‌مانند |
 | `--hysteria2/--no-hysteria2` | فعال | Hysteria2 را روی UDP/443، با تعویض salamander ارائه دهید، به عنوان آخرین fallback. دامنه‌ای را استفاده می‌کند یا بدون دامنه IP گواهینامه |
 | `--fingerprint NAME` | chrome | اثر انگشت TLS که کلاینت‌ها در Reality، XHTTP و WSS نشان می‌دهند (`chrome`، `firefox`، `safari`، `ios`، `android`، `edge`، `random`، `randomized`). اگر منطقه شما شروع به پرچم‌گذاری کردن آن کند تغییر دهید؛ بازاستقرار مقدار ذخیره‌شده را نگه می‌دارد |
@@ -30,7 +30,7 @@ meridian deploy [SERVER] [flags]
 | `--harden / --no-harden` | فعال | ورود تنهای کلید SSH، fail2ban و firewall UFW. `--no-harden` برای سروری که سرویس‌های دیگری روی آن دارند است |
 | `--warp / --no-warp` | خاموش | ترافیک خروجی را از طریق Cloudflare WARP ارسال کنید |
 | `--geo-block / --no-geo-block` | فعال | دامنه‌های روسی و IP‌های روسی را در exit block کنید (`geosite:category-ru` + `geoip:ru`). اشتراک‌های Xray JSON و Mihomo قبلاً آن‌ها را مستقیم از دستگاه ارسال می‌کنند |
-| `--client-ips / --no-client-ips` | خاموش | IP واقعی هر کلاینت را برای Xray و پنل منتقل کنید، برای محدودیت‌های IP و لاگ‌های اتصال هر کاربر. خاموش، هر اتصال TCP از خود سرور می‌آید |
+| `--client-ips / --no-client-ips` | خاموش | IP واقعی هر کلاینت را به Xray و پنل منتقل می‌کند، برای محدودیت IP و لاگ اتصال هر کاربر. وقتی خاموش است، هر اتصال TCP انگار از خود سرور آمده است |
 | `--yes` | | پرسش تأیید را رد کنید |
 | `--json` | | نتیجه deploy نهایی را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 | `--events=jsonl` | | رویدادهای تعریف‌شده پیشرفت را به عنوان JSONL روی stderr جریان دهید |
@@ -121,7 +121,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — کلاینت‌ها را با وضعیت، ترافیق، زمان ایجاد و آخری دیده‌شده فهرست می‌کند. با `--json`، `data.summary` counts و `data.clients[]` برمی‌گرداند.
 
-**`client enable` / `client disable`** — کلاینت را فوراً ازسرگیری یا تعلیق کنید. تعلیق تا زمانی‌که شما `client enable` را اجرا کنید دوام می‌آورد؛ اعمال (شامل بازاستقرار و `client add`، `node add`، `relay add`) وضعیت کلاینت را بدون تغییر رها می‌کنند.
+**`client enable` / `client disable`** — کلاینت را فوراً فعال یا تعلیق کنید. کلاینت تعلیق‌شده تا وقتی `client enable` را اجرا نکنید غیرفعال می‌ماند؛ apply (از جمله بازاستقرار و `client add`، `node add`، `relay add`) وضعیت کلاینت را تغییر نمی‌دهد.
 
 **`client remove`** — کلاینت را از topology حذف می‌کند، کاربر پنل و صفحه اتصال آن‌ها را حذف می‌کند. تأیید می‌خواهد مگر `--yes`. آخرین کلاینت نمی‌تواند حذف شود. کاربران را در پنل مستقیماً حذف نکنید؛ Meridian هر کلاینتی را که در topology باقی است در بعدی اعمال دوباره ایجاد می‌کند.
 
@@ -229,24 +229,25 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 ### meridian fleet
 
-سلامتی و موجودی fleet از panel زندگی، و ارتقای image بعد از `meridian update`.
+سلامت و موجودی fleet از پنل زنده، و ارتقای Remnawave.
 
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
-meridian fleet upgrade [--yes]
+meridian fleet upgrade [--tested] [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید (`status`, `inventory`) |
+| `--tested` | | `fleet upgrade`: فقط از نسخه‌های Remnawave استفاده کنید که این نسخه Meridian با آن‌ها تست شده، بدون پرسیدن از Docker Hub |
 | `--yes`, `-y` | | `fleet upgrade`: تأیید را رد کنید |
 
 **`fleet status`** — سلامتی panel، heartbeats گره، relay listeners و تعداد کلاینت. کلاینت‌های اعلام‌شده missing سلامتی را کاهش می‌دهند؛ کلاینت‌های غیرفعال، محدود یا منقضی شده شمرده می‌شوند اما انتخاب شما هستند، نه خرابی. relay listener قابل دسترس فقط TCP را ثابت می‌کند، پس مسیر relay غیر‌تأیید‌شده سلامتی را `unknown` نگه می‌دارد؛ از `meridian test` برای بررسی مسیر کامل استفاده کنید. Exit `0` سلامت، `4` کاهش و `3` نامعلوم است.
 
 **`fleet inventory`** — سروری، نقش، گره و relay پیکربندی‌شده شما، با وضعیت panel زندگی زمانی‌که قابل دسترس باشد. هرگز API token یا مسیرهای مخفی panel را چاپ نمی‌کند. اگر وضعیت زندگی دسترس نباشد، موجودی پیکربندی‌شده هنوز نشان داده می‌شود، با هشدار، و دستور exit `3` می‌شود. `plan --json` را برای تصمیم‌گیری‌اینکه آیا اعمال کار دارد استفاده کنید.
 
-**`fleet upgrade`** — بعد از `meridian update`, تصاویر backend، subscription page، PostgreSQL، Valkey و node را که هر سرور اجرا می‌کند می‌خواند (read-only `docker inspect` روی SSH) و هر یک را `current`، `upgrade`، `install` یا نگه‌داشته نشان می‌دهد. سیاست نسخه برابر setup است: نسخهٔ tag جدیدتر یا tag floating (`latest`، `3`) که انتخاب کردید نگه داشته می‌شود و گزارش می‌شود، هرگز downgrade نمی‌شود. یک PostgreSQL major هرگز در جای خود منتقل نمی‌شود — major قدیم اجرا را نگاه می‌دارد و دستور dump-and-restore آن را نیاز دارد توضیح می‌دهد. بعد از تأیید، برنامهٔ بررسی‌شده را اعمال می‌کند و `meridian check` را روی هر سرور اجرا می‌کند. سروری که تصاویر آن نمی‌توانند خوانده شود دستور را با exit `3` متوقف می‌کند قبل از هیچ تغییری؛ اگر اعمال همگرا شود اما سرور هنوز تصویر قدیمی اجرا می‌کند، exit `3` هم می‌شود.
+**`fleet upgrade`** — Remnawave را بدون انتظار برای به‌روزرسانی Meridian به جدیدترین نسخه‌اش می‌برد. از Docker Hub جدیدترین نسخه‌های backend، node و subscription page را در همان major که این نسخه Meridian پشتیبانی می‌کند می‌پرسد (pre-release‌ها و majorهای دیگر نادیده گرفته می‌شوند)، هر کدام را با digest چندمعماری‌اش pin می‌کند و انتخاب را در `cluster.yml` ذخیره می‌کند تا applyهای بعدی آن را نگه دارند. pin جدیدتر در نسخه بعدی Meridian دوباره جایگزین می‌شود. `--tested` روی نسخه‌هایی می‌ماند که این نسخه با آن‌ها تست شده است. PostgreSQL و Valkey همیشه روی pinهای Meridian می‌مانند. سپس image‌های backend، subscription page، PostgreSQL، Valkey و node را که هر سرور اجرا می‌کند می‌خواند (read-only `docker inspect` روی SSH) و هر یک را `current`، `upgrade`، `install` یا نگه‌داشته نشان می‌دهد. سیاست نسخه برابر setup است: نسخهٔ tag جدیدتر یا tag floating (`latest`، `3`) که انتخاب کردید نگه داشته می‌شود و گزارش می‌شود، هرگز downgrade نمی‌شود. یک PostgreSQL major هرگز در جای خود منتقل نمی‌شود — major قدیم اجرا را نگاه می‌دارد و دستور dump-and-restore آن را نیاز دارد توضیح می‌دهد. بعد از تأیید، برنامهٔ بررسی‌شده را اعمال می‌کند و `meridian check` را روی هر سرور اجرا می‌کند. سروری که تصاویر آن نمی‌توانند خوانده شود دستور را با exit `3` متوقف می‌کند قبل از هیچ تغییری؛ اگر اعمال همگرا شود اما سرور هنوز تصویر قدیمی اجرا می‌کند، exit `3` هم می‌شود.
 
 ### meridian check
 

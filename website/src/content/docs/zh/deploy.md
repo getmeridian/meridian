@@ -25,7 +25,7 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--sni HOST` | (自动) | 伪装目标。不指定时，服务器从 `www.google.com`、`dl.google.com`、`www.cloudflare.com` 中尝试，使用第一个可达的；重新部署保持保存的目标。显式 `--sni` 永不被交换 |
+| `--sni HOST` | (自动) | 伪装目标。不指定时，部署会优先选择服务器所在子网内的网站，然后是 `www.google.com`、`dl.google.com`、`www.cloudflare.com` |
 | `--domain DOMAIN` | (无) | 用于 XHTTP 和 WSS 的你的域名，带 Cloudflare CDN 回退 |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2 作为最后的回退 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
@@ -45,11 +45,13 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 
 ## 选择伪装目标
 
-伪装目标（SNI）是你的服务器所模仿的网站。它**不是**你拥有的域名 — 它是具有 TLS 1.3 的热门网站。任何探测你的服务器的人都会看到该网站的真实证书。
+伪装目标（SNI）是你的服务器所模仿的网站。它**不是**你拥有的域名 — 它是一个支持 TLS 1.3 的真实网站。任何探测你的服务器的人都会看到该网站的真实证书。
 
-不指定 `--sni`，服务器本身会按顺序尝试 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`，使用第一个可达的。如果真实流量随后无法通过该目标，Meridian 在完成之前切换到下一个。用 `--sni` 传递的目标永不被交换；如果流量失败，部署停止并告诉你。
+最好的目标就在你的服务器旁边。审查者看到的是 SNI 和你服务器 IP 的组合；当该网站的 DNS 确实指向同一网络时，这个组合看起来就是普通流量，而 VPS 地址上出现一个知名的国外网站则会很显眼。
 
-要找到与服务器同网络的目标，扫描其 IPv4 邻域：
+不指定 `--sni` 时，首次部署会扫描服务器所在子网内的此类网站（约一分钟），保留 DNS 指向该子网、且通过 Reality 的 TLS 1.3 和 HTTP/2 检查的网站，然后回退到 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`，并使用真实流量能通过的第一个目标。`meridian node add` 以同样的方式选择邻近网站。用 `--sni` 指定的目标永远不会被替换；如果流量失败，部署会停止并告诉你。重新部署会保留已保存的目标。
+
+想自己查看候选网站，可以扫描服务器的 IPv4 邻域：
 
 ```
 meridian scan 198.51.100.10
@@ -65,7 +67,7 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 
 ### 伪装目标 vs 域名
 
-- **伪装目标** (`--sni`) — 你**不**拥有的热门网站。Reality 模仿它。
+- **伪装目标** (`--sni`) — 你**不**拥有的真实网站。Reality 模仿它。
 - **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。XHTTP 和 Hysteria2 移到它，它还添加通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/docs/zh/domain-mode/)。
 
 ## Hysteria2
@@ -167,15 +169,15 @@ meridian deploy 198.51.100.10 --no-geo-block
 
 ## 客户端 IP
 
-默认情况下，面板永不了解你的用户从哪里连接：每个 TCP 连接通过服务器上的 nginx 到达 Xray，所以 Remnawave 记录服务器自己的地址。这是隐私选择，关于用户位置的任何信息都不被存储。
+默认情况下，面板不会知道你的用户从哪里连接：每个 TCP 连接都经由服务器上的 nginx 到达 Xray，所以 Remnawave 记录的是服务器自己的地址。这样更保护隐私，不会保存任何关于用户位置的信息。
 
-Remnawave 的按用户 IP 限制和连接日志需要真实地址。用以下启用它们：
+Remnawave 的按用户 IP 限制和连接日志需要真实地址。用下面的命令开启：
 
 ```
 meridian deploy 198.51.100.10 --client-ips
 ```
 
-nginx 随后将每个客户端的地址传递给 Xray 和面板。Hysteria2 是直接 UDP 并始终显示真实地址。通过中继的连接显示中继的地址，通过 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的。设置应用于整个舰队；不带标志重新部署以关闭它。
+nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是直接的 UDP 连接，始终显示真实地址。经由中继的连接显示中继的地址，经由 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的地址。该设置对整个舰队生效；要关闭，不带该标志重新部署即可。
 
 ## 添加中继
 
@@ -191,4 +193,4 @@ Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx
 
 像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。客户端状态、限制、过期和您自己添加的用户是您的；详见 [Web 面板](/docs/zh/client-management/#web-panel)。
 
-Meridian 固定了它已测试的 Remnawave 版本。如果你自己升级 Remnawave，Meridian 不会降级它。
+Meridian 固定了它已测试的 Remnawave 版本。`meridian fleet upgrade` 会把你的服务器升级到同一主版本内最新的 Remnawave，无需等待 Meridian 更新。如果你自己升级 Remnawave，Meridian 不会降级它。

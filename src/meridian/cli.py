@@ -1188,21 +1188,27 @@ def fleet_inventory_cmd(
 
 
 @fleet_app.command("upgrade")
-def fleet_upgrade_cmd(yes: Yes = False) -> None:
-    """Roll this CLI's pinned Remnawave images out to every server
+def fleet_upgrade_cmd(
+    yes: Yes = False,
+    tested: bool = typer.Option(
+        False, "--tested", help="Use only the Remnawave versions this Meridian release was tested with"
+    ),
+) -> None:
+    """Upgrade Remnawave on every server to its newest release in the tested major
 
-    Lists the backend, subscription page, PostgreSQL, Valkey, and node
-    images each server runs against the pins, applies the reviewed plan,
-    then runs `meridian check`. Newer or floating tags you chose are kept;
-    a PostgreSQL major is never moved.
+    Finds the newest backend, node, and subscription page releases on Docker
+    Hub within the major this Meridian release supports (no Meridian update
+    needed), shows what each server runs, applies the reviewed plan, then runs
+    `meridian check`. Newer or floating tags you chose are kept; PostgreSQL
+    and Valkey stay on Meridian's pins, and a PostgreSQL major is never moved.
 
     [dim]Examples:[/dim]
-      [cyan]meridian update && meridian fleet upgrade[/cyan]
-      [cyan]meridian fleet upgrade --yes[/cyan]
+      [cyan]meridian fleet upgrade[/cyan]
+      [cyan]meridian fleet upgrade --tested --yes[/cyan]
     """
     from meridian.commands.fleet_upgrade import run_upgrade
 
-    run_upgrade(yes=yes)
+    run_upgrade(yes=yes, tested=tested)
 
 
 # =============================================================================

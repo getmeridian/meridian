@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 from typing import Protocol as TypingProtocol
 
-from meridian.config import DEFAULT_SNI
+from meridian.config import DEFAULT_SNI, REMNAWAVE_BACKEND_IMAGE, REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
 from meridian.core.cancellation import CancellationToken, raise_if_cancelled
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.provision.progress import NoopStepRenderer, StepRenderer
@@ -52,6 +52,9 @@ class ProvisionContext:
     hosted_page: bool = False  # serve connection pages via HTTPS on server
     harden: bool = True  # enable SSH hardening + firewall (skip for shared servers)
     is_panel_host: bool = True  # deploy Remnawave panel on this server
+    # The reviewed Remnawave images (this CLI's pins, or newer ones `fleet upgrade` saved).
+    backend_image: str = REMNAWAVE_BACKEND_IMAGE
+    subscription_page_image: str = REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE
 
     results: list[StepResult] = field(default_factory=list)
 

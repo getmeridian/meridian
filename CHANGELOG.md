@@ -200,7 +200,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 ### Remnawave versions
 Fresh deploys install the versions below. Meridian requires at least backend
 3.4.0 and never downgrades a Remnawave you upgraded yourself; it warns when the
-running version is newer than the tested one.
+running version is newer than the tested one. `meridian fleet upgrade` moves
+the backend, node, and subscription page to their newest digest-pinned
+release in the same major without a Meridian update (`--tested` keeps the
+versions below), and the choice is saved for later applies.
 
 | Component | Version |
 |---|---|

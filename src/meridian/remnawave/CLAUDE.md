@@ -5,7 +5,7 @@
 - `__init__.py` is the compatibility facade consumed by Meridian; resource behavior stays in `client.py` and `control_plane.py`.
 - Raw REST over one `httpx.Client`, no SDK: the official SDK stalled at 2.8 and Meridian needs only a few dozen endpoints. `_request` owns retry, typed errors, and envelope unwrapping.
 - `models.py` owns stable Meridian shapes and converts REST payloads immediately at the boundary.
-- `runtime.py` holds only the typed error hierarchy; `versions.py` owns the supported floor, tested major, and never-downgrade image resolution.
+- `runtime.py` holds only the typed error hierarchy; `versions.py` owns the supported floor, tested major, never-downgrade image resolution, and the upgradable pins; `registry.py` reads Docker Hub tags and multi-arch index digests on the deployer's machine.
 
 ## What's done well
 
@@ -13,7 +13,7 @@
 - The facade keeps panel details out of commands, provisioning, and reconciliation code.
 
 ## Pitfalls
-
+- A saved `image_pins` entry is trusted only for an upgradable component, the same repository and major, an X.Y.Z tag, and a sha256 digest; anything else in `cluster.yml` falls back to the CLI pin.
 - PostgreSQL and Valkey go through `resolve_data_image`: an older major cannot open a newer data directory, so a newer or unorderable operator tag is kept. PostgreSQL also passes `cross_major=False`: a newer pinned major needs a dump and restore, so the running major stays and `fleet upgrade` reports it as `held_major`.
 - Users are addressed by numeric `id` (string in `User.id`); uuid-era bindings re-resolve by username, never hit `/api/users/{uuid}`.
 - 3.x answers DELETE and bulk host actions with 204 and node restart with 202: `_request` returns None; treat 2xx as success and 404 as already gone, never read `isDeleted`.

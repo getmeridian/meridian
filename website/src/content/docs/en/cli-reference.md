@@ -229,24 +229,25 @@ meridian route remove EXIT ROUTE [--yes] [--json]
 
 ### meridian fleet
 
-Fleet-wide health and inventory from the live panel, and image upgrades after `meridian update`.
+Fleet-wide health and inventory from the live panel, and Remnawave upgrades.
 
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
-meridian fleet upgrade [--yes]
+meridian fleet upgrade [--tested] [--yes]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`) |
+| `--tested` | | `fleet upgrade`: use only the Remnawave versions this Meridian release was tested with, without asking Docker Hub |
 | `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
 
 **`fleet status`** — panel health, node heartbeats, relay listeners, and client counts. Missing declared clients degrade health; disabled, limited, or expired clients are counted but are your choice, not a fault. A reachable relay listener only proves TCP, so unverified relay routes keep health `unknown`; use `meridian test` to check the full path. Exit `0` means healthy, `4` degraded, and `3` unknown.
 
 **`fleet inventory`** — your configured servers, roles, nodes, and relays, with live panel status when reachable. It never prints the panel API token or secret paths. If live status is unavailable, the configured inventory is still shown, with warnings, and the command exits `3`. Use `plan --json` to decide whether apply has work to do.
 
-**`fleet upgrade`** — after `meridian update`, rolls the new CLI's pinned Remnawave images out to your servers. It reads the backend, subscription page, PostgreSQL, Valkey, and node images each server runs (read-only `docker inspect` over SSH) and shows each one as `current`, `upgrade`, `install`, or kept. The version policy is the one setup uses: a newer version tag or a floating tag (`latest`, `3`) you chose is kept and reported, never downgraded. A PostgreSQL major is never moved in place — the old major keeps running and the command explains the dump-and-restore it needs. After you confirm, it applies the reviewed plan and runs `meridian check` on every server. A server whose images cannot be read stops the command with exit `3` before anything changes; if the apply converges but a server still runs an old image, it exits `3` too.
+**`fleet upgrade`** — moves Remnawave to its newest release without waiting for a Meridian update. It asks Docker Hub for the newest backend, node, and subscription page releases within the major this Meridian release supports (pre-releases and other majors are skipped), pins each by its multi-arch digest, and saves the choice in `cluster.yml` so later applies keep it. A newer pin in a later Meridian release takes over again. `--tested` sticks to the versions this release was tested with. PostgreSQL and Valkey always stay on Meridian's pins. It then reads the backend, subscription page, PostgreSQL, Valkey, and node images each server runs (read-only `docker inspect` over SSH) and shows each one as `current`, `upgrade`, `install`, or kept. The version policy is the one setup uses: a newer version tag or a floating tag (`latest`, `3`) you chose is kept and reported, never downgraded. A PostgreSQL major is never moved in place — the old major keeps running and the command explains the dump-and-restore it needs. After you confirm, it applies the reviewed plan and runs `meridian check` on every server. A server whose images cannot be read stops the command with exit `3` before anything changes; if the apply converges but a server still runs an old image, it exits `3` too.
 
 ### meridian check
 

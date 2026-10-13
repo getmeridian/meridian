@@ -131,6 +131,8 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         out["connection_page_markers"] = list(cfg.connection_page_markers)
     if cfg.fleet_id:
         out["fleet_id"] = cfg.fleet_id
+    if cfg.image_pins:
+        out["image_pins"] = dict(sorted(cfg.image_pins.items()))
 
     out.update(serialize_cluster_v3(cfg))
 
@@ -240,6 +242,12 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
     connection_page_markers = _load_string_list(data, "connection_page_markers")
     raw_fleet_id = data.get("fleet_id")
     fleet_id = raw_fleet_id if isinstance(raw_fleet_id, str) else ""
+    raw_pins = data.get("image_pins")
+    image_pins = (
+        {str(name): str(image) for name, image in raw_pins.items() if isinstance(image, str)}
+        if isinstance(raw_pins, dict)
+        else {}
+    )
     v3 = load_cluster_v3(data)
 
     # Extra fields
@@ -258,6 +266,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         action_checkpoints=v3.action_checkpoints,
         connection_page_markers=connection_page_markers,
         fleet_id=fleet_id,
+        image_pins=image_pins,
         active_generation=v3.active_generation,
         active_plan_hash=v3.active_plan_hash,
         pending_generation=v3.pending_generation,
