@@ -54,6 +54,14 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   edit the topology, show every resource they will delete, and clean up the
   panel node, node container, Realm units, firewall rules, and published Hosts.
   `meridian plan` lists removals too, and the review covers them.
+- **Move an exit to another server** — `meridian node replace EXIT SERVER`
+  keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
+  settings, and relays, so clients keep working, then cleans up the old server
+  through the reviewed apply. The control server can't be moved yet.
+- **`meridian fleet upgrade`** — compares the Remnawave images each server runs
+  with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
+  Newer or floating tags you chose are kept, and PostgreSQL never moves to a new
+  major version in place. `meridian update` points to it when a fleet exists.
 - **One health command: `meridian check`** — checks whatever the server is in
   your fleet: pre-flight readiness for a new server; panel connection,
   containers (including Docker health, so a crash-looping service is flagged),
@@ -103,6 +111,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - A copy of `~/.meridian` that is out of date can't undo newer changes. The
   control server records the last change applied, and `apply` refuses to run
   from an older copy or while another machine is applying.
+- Setup no longer opens an untagged `443/udp` firewall rule, and the next apply
+  removes the one earlier v4 builds left. Removing or moving a node also deletes
+  the `remnawave/node` image; Docker itself stays installed.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
