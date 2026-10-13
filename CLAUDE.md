@@ -17,7 +17,15 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 
 ## Architecture (summary)
 
-Python CLI on PyPI with a growing meridian-core contract layer underneath. nginx (stream SNI routing + http TLS + reverse proxy) + acme.sh + Xray (VLESS+Reality, XHTTP, Hysteria2 UDP fallback) + Remnawave (panel + node + PostgreSQL + Valkey + subscription-page, all pinned). Domain mode adds WSS through Cloudflare CDN. Relay nodes are L4 TCP forwarders (Realm); topology intent gives each server one or more roles, so a server can be both relay and exit. Every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan / apply` compile it and reconcile resource drivers. Website/Studio live in Astro, with docs on Starlight (every page also served as Markdown for agents); static Studio consumes generated contracts, and executable Studio starts through a localhost-only Engine for server setup and deploy planning. Optional real-VM harness lives at `tests/realvm/`. **Full detail in [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).**
+- **CLI:** a Python package on PyPI (`meridian-vpn`) over a growing meridian-core contract layer.
+- **Server stack:** nginx (stream SNI routing, HTTP TLS, reverse proxy), acme.sh, Xray (VLESS+Reality, XHTTP, Hysteria2 over UDP), and Remnawave (panel, node, PostgreSQL, Valkey, subscription page), all pinned.
+- **Domain mode:** XHTTP moves onto the domain and WSS is added, both able to ride Cloudflare's CDN.
+- **Roles:** relays are L4 TCP forwarders (Realm); one server can hold several roles, such as relay and exit.
+- **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
+- **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
+- **Real-VM harness:** optional, local-only, in `tests/realvm/`.
+
+Full detail: [website/src/content/docs/en/architecture.md](website/src/content/docs/en/architecture.md).
 
 ## Per-folder CLAUDE.md — the knowledge system
 
@@ -25,64 +33,47 @@ Every folder with distinct architectural concerns has a `CLAUDE.md`. AI assistan
 
 **Format (applies to every file, root excepted):**
 - Section order: **Design decisions → What's done well → Pitfalls → (optional) Links**
-- ≤ 40 lines (leaf files). Root is the spine; longer is acceptable but resist bloat.
+- ≤ 40 lines and roughly 700 words (leaf files). Root is the spine; longer is acceptable but resist bloat.
 - Pitfalls are one-line, concrete, actionable.
 - No duplication across files. Root has the big picture; folders have the details. Cross-reference by path.
 - No line numbers or function signatures (they drift with code).
 
-**Manifest** — every CLAUDE.md in the tree:
+**Manifest** — every CLAUDE.md in the tree (`AGENTS.md` points other tools here):
 
 ```
 CLAUDE.md                               — this file (vision, manifest, conventions)
-AGENTS.md                               — cross-tool agent discovery pointer
 contracts/CLAUDE.md                     — generated meridian-core contract artifacts
-README.md                               — public project landing
-ROADMAP.md                              — thematic direction + follow-up issue links
-SECURITY.md / CONTRIBUTING.md           — public policies
 scripts/CLAUDE.md                       — repository automation and contract export
+.github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
 
 src/meridian/CLAUDE.md                  — Python CLI package overview
-├── panel_bootstrap.py                  — SSH provisioner run + control-plane credential bootstrap
-├── node_deploy.py                      — node container rollout, panel readiness, API tokens
-├── reality_keys.py                     — Reality x25519 keypair generation
-├── resolve.py                          — ResolvedServer, ensure_server_connection
-├── cluster_persistence.py              — cluster.yml serialization/deserialization
-├── ssh_keys.py                         — host key utilities (shared by ssh.py + engine)
-├── registry_country.py                 — best-effort exit country from RIR RDAP records
-├── cli_groups.py                       — Typer sub-apps (client, server, node, relay, route, fleet, api, dev)
-├── cli_catalog.py                      — command catalog read from the live Typer tree
 ├── core/CLAUDE.md                      — transport-neutral API contracts
-│   ├── defaults.py                     — core-owned constants (DEFAULT_SNI)
-│   └── errors.py                       — shared error base types
 ├── commands/CLAUDE.md                  — per-subcommand pattern
 ├── setup/CLAUDE.md                     — resumable setup draft + server shelf
 ├── compiler/CLAUDE.md                  — pure finite topology compiler
-├── diagnostics/CLAUDE.md               — reusable server health checks (CheckResult)
-├── i18n/CLAUDE.md                      — CLI message catalog, language detection
-├── engine/CLAUDE.md                    — local Engine use-case boundary
-│   └── routes.py                       — FastAPI route handlers
-├── remnawave/CLAUDE.md                 — typed control-plane adapter and version tuple
-├── provision/CLAUDE.md                 — step pipeline + idempotency
 ├── reconciler/CLAUDE.md                — checkpointed compiled-resource drivers
+├── provision/CLAUDE.md                 — step pipeline + idempotency
+├── remnawave/CLAUDE.md                 — typed panel adapter and image version policy
+├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
+├── engine/CLAUDE.md                    — local Engine use-case boundary
+├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 
 tests/CLAUDE.md                         — testing philosophy, MockConnection
 ├── provision/CLAUDE.md                 — mock boundary, idempotency dual-path
 ├── systemlab/CLAUDE.md                 — Docker lab topology, CI boundary
-└── realvm/CLAUDE.md                    — real-VM harness, tier α/β/γ, never-in-CI
+└── realvm/CLAUDE.md                    — real-VM harness, never in CI
     └── providers/CLAUDE.md             — CloudProvider abstract + Hetzner impl
 
-website/CLAUDE.md                       — Astro + Starlight docs, agent endpoints, i18n
+website/CLAUDE.md                       — Astro + Starlight docs, agent endpoints
 ├── src/components/CLAUDE.md            — composition pattern
 ├── src/content/docs/CLAUDE.md          — locale parity, frontmatter schema
 ├── src/i18n/CLAUDE.md                  — asymmetric i18n, detection cascade
 ├── src/layouts/CLAUDE.md               — Base/BlogPost shells, early theme + locale
 ├── src/pages/CLAUDE.md                 — docs entry, Markdown twins, machine-readable endpoints
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
-├── src/studio/CLAUDE.md                — generated Studio contracts, future adapters
+├── src/studio/CLAUDE.md                — generated Studio contracts and adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
-
-.github/workflows/CLAUDE.md             — two-stage pipeline, VERSION-driven releases
 ```
 
 ## How to update CLAUDE.md
@@ -113,7 +104,7 @@ Rules enforced by `tests/test_architecture.py` — violations fail CI.
 
 - **800-line budget** — files above 800 lines require an entry in `FILE_SIZE_ALLOWLIST` in `test_architecture.py` with a justification. When a change pushes a file past the budget, split first.
 - **No private cross-module imports** — if `_foo()` is imported outside its own file, it's public. Drop the underscore and move it to the right module, or add it to the allowlist with a justification.
-- **Layer boundaries** — `core/` never imports console, config, commands, or Rich. `engine/` never imports commands, provision, ssh, or remnawave. `adapters/` never imports engine. Enforced by both ruff (`TID251`) and pytest.
+- **Layer boundaries** — `core/` never imports commands, console, config, Typer, or Rich. `engine/` never imports commands, console, provision, remnawave, or ssh. `compiler/` never does I/O or randomness. `adapters/` never imports engine.
 - **One concept, one place** — before adding a new type, helper, or constant, search for an existing one. Duplicate port computations, result types, error hierarchies, and field sets were the top source of drift.
 - **Typed contracts at boundaries** — new result types must reference or compose existing core types. Don't reinvent `returncode, stdout, stderr`; use `CommandResult`. Don't hand-build dicts that match a Pydantic model; construct the model.
 
@@ -138,6 +129,7 @@ make real-lab    # optional real-VM on Hetzner (local-only, ~€0.01)
 - High-level direction → **[ROADMAP.md](ROADMAP.md)**
 - Shipped history → **[CHANGELOG.md](CHANGELOG.md)**
 - Cross-tool agent rules → **[AGENTS.md](AGENTS.md)**
+- Public landing and policies → **[README.md](README.md)**, **[SECURITY.md](SECURITY.md)**, **[CONTRIBUTING.md](CONTRIBUTING.md)**
 
 ## Agent-context imports
 
