@@ -596,6 +596,10 @@ class TestPureCompiler:
             for dependency in hysteria.dependencies
         )
         assert any(dependency.startswith("certificate:exit-b:") for dependency in hysteria.dependencies)
+        # Xray refuses to start without the Hysteria2 certificate, so the node waits for it.
+        hy2_certificate = next(dep for dep in hysteria.dependencies if dep.startswith("certificate:exit-b:"))
+        assert hy2_certificate in resources["node:exit-b"].dependencies
+        assert "node:exit-b" not in resources[hy2_certificate].dependencies
 
         squad = resources["squad:access"].payload
         assert isinstance(squad, InternalSquadPayload)

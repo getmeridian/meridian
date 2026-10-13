@@ -145,6 +145,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   installed.
 - Panel and connection-page links typed or copied without the trailing slash
   now open; they used to redirect to an internal port and fail.
+- A fresh deploy with `--hysteria2` converges. The node started before its
+  certificate existed, so Xray refused to run and the deploy stopped.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and

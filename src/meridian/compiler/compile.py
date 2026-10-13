@@ -454,6 +454,15 @@ def _compile_exit_endpoints(
                 hostname=path.tls_sni,
                 runtime_id=runtime_id,
             )
+            # Xray loads the Hysteria2 certificate at startup and refuses to run without it.
+            runtime = builder.resources[runtime_id]
+            if certificate_id not in runtime.dependencies:
+                builder.resources[runtime_id] = make_resource(
+                    runtime_id,
+                    runtime.payload,
+                    dependencies=[*runtime.dependencies, certificate_id],
+                    postconditions=runtime.postconditions,
+                )
             direct_dependencies[path.id].extend([certificate_id, firewall_id])
         elif path.protocol == "reality":
             stream_key = (exit_.server_ref, path.public_port)
@@ -701,10 +710,12 @@ def _ensure_certificate(
     if logical_id in builder.resources:
         return logical_id
     challenge_firewall_id = add_firewall(builder, server_ref, "tcp", 80)
+    # Issue after what the runtime waits for (its binding, hence the control plane), not after
+    # the runtime itself: a Hysteria2 runtime needs the certificate before Xray can start.
     return builder.add(
         logical_id,
         CertificatePayload(server_ref=server_ref, hostname=hostname),
-        dependencies=[runtime_id, challenge_firewall_id],
+        dependencies=[*builder.resources[runtime_id].dependencies, challenge_firewall_id],
     )
 
 

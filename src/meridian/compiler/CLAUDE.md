@@ -32,7 +32,7 @@
 - Deployment contracts are either empty for pure compiler use or cover every topology server ref exactly.
 - Build every Remnawave-facing name through `names.py`; short resources cap at 30 characters and users at 36.
 - A Host is published only after its listener and node runtime dependencies.
-- Certificate resources depend on their reviewed TCP/80 ACME firewall rule.
+- Certificate resources depend on their reviewed TCP/80 ACME firewall rule and never on the node runtime: a Hysteria2 inbound makes Xray load the certificate at startup, so that runtime waits for the certificate (a fresh `--hysteria2` deploy never converged).
 - One exit workload per server: a Remnawave node runtime can activate only one Profile.
 - Client geodata must exist in stock dat files (v2fly `geosite`/`geoip`, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole delivered config.
 - Every TCP Host (Reality, XHTTP, WSS) and gateway edge carries its path's `fingerprint`; an empty one makes clients send the Go TLS ClientHello, a known DPI signature. Hysteria2 (QUIC) carries none.
