@@ -30,7 +30,9 @@ assert cluster.panel.secret_path not in public_url, public_url
 subscription = httpx.get(public_url, timeout=20)
 assert subscription.status_code == 200, (subscription.status_code, subscription.text[:200])
 links = subscription_protocol_urls(subscription.text)
-assert [link.key for link in links] == ["reality"], [link.url for link in links]
+assert [link.key for link in links] == ["reality", "reality", "xhttp", "xhttp", "hysteria2"], [
+    link.url for link in links
+]
 
 page = httpx.get(page_url(cluster, user) + "config.json", timeout=20)
 assert page.status_code == 200, (page.status_code, page.text[:200])
