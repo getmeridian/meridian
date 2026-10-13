@@ -6,7 +6,7 @@ from collections.abc import Callable
 
 import typer
 
-from meridian.commands._helpers import load_topology_cluster
+from meridian.commands._helpers import load_topology_cluster, require_intent
 from meridian.commands._validation import validate_command_input
 from meridian.commands.check_render import emit_verification_json, render_verification
 from meridian.console import error_context, fail, is_json_mode
@@ -61,9 +61,7 @@ def collect_relay_check(
         user=user,
     )
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     chains, server_ref, _label = select_relay_chains(intent, registry, request.relay_ip, request.exit_arg)
     try:

@@ -65,7 +65,7 @@ def run(
     operation = OperationContext()
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     with error_context("check", timer=operation.timer):
-        cluster = ClusterConfig() if scope == "preflight" else load_cluster(require_configured=False)
+        cluster = ClusterConfig() if scope == "preflight" else load_cluster()
         reports = _collect(cluster, registry, target, user=user, port=ssh_port, sni=sni, domain=domain, scope=scope)
     result = combine_health_reports(reports)
     summary = _summary("Health check" if len(reports) > 1 else _TITLES[reports[0].scope], result.verdict, result.counts)

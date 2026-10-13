@@ -94,7 +94,7 @@ def run(
 
     # Roles change only through the reviewed topology, so teardown refuses a
     # server that still carries one -- unless it is the whole fleet.
-    cluster = load_cluster(require_configured=False)
+    cluster = load_cluster()
     if cluster.is_configured and cluster.topology_intent is None:
         load_topology_cluster()  # refuses with rebuild guidance
     if cluster.topology_intent is not None:

@@ -167,7 +167,7 @@ class TestNodeAdd:
         ):
             persist_reviewed_apply(cluster)
 
-        assert "Remote state may have changed" in str(exc_info.value)
+        assert "remote state may have changed" in str(exc_info.value)
 
     def test_v4_apply_state_error_is_rendered_at_command_boundary(self) -> None:
         cluster = ClusterConfig(topology_intent=_minimal_v4_intent())
@@ -293,10 +293,7 @@ class TestNodeAdd:
             patch("meridian.commands.node._neighbor_sni", return_value=""),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
-                side_effect=ReviewedApplyPersistenceError(
-                    "disk full. Remote state may have changed. Repair local state, then rerun "
-                    "`meridian plan` and `meridian apply` to reconcile."
-                ),
+                side_effect=ReviewedApplyPersistenceError("disk full"),
             ),
             pytest.raises(typer.Exit) as exc_info,
         ):
@@ -304,7 +301,7 @@ class TestNodeAdd:
 
         assert exc_info.value.exit_code == 3
         output = capsys.readouterr().err
-        assert "Remote state may have changed" in output
+        assert "remote state may have changed" in output
         assert "meridian plan" in output
         assert "meridian apply" in output
 

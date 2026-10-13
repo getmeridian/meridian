@@ -94,7 +94,7 @@ def run(
     local_os = platform.platform()
 
     # Check deployed version
-    cluster = load_cluster(require_configured=False)
+    cluster = load_cluster()
     deployed_with = (cluster.panel.deployed_with if cluster.panel.server_ip == resolved.ip else "") or "unknown"
 
     local_info = f"OS: {local_os}\nMeridian: {__version__}\nServer deployed with: {deployed_with}"

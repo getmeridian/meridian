@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
+from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import LOCAL_STATE_SAVE_ERRORS
 from meridian.console import fail
 from meridian.core.models import MeridianError
 from meridian.core.redaction import redact_string
@@ -12,7 +13,7 @@ def persist_client_state(cluster: ClusterConfig) -> str:
     """Persist client state, returning a redacted failure instead of losing remote-mutation evidence."""
     try:
         cluster.save()
-    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+    except LOCAL_STATE_SAVE_ERRORS as exc:
         return _failure_text(exc)
     return ""
 

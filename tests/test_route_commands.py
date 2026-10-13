@@ -29,7 +29,7 @@ class _Runtime:
         self.result = result
         self.applied: list[SetupIntent] = []
 
-    def apply_intent(self, intent: SetupIntent) -> ResourceExecutionResult:
+    def apply_intent(self, intent: SetupIntent, *, expected_plan_hash: str | None = None) -> ResourceExecutionResult:
         self.applied.append(intent)
         return self.result
 

@@ -6,15 +6,13 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import ReviewedApplyPersistenceError, persist_reviewed_apply
+from meridian.commands._helpers import require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
-from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.models import MeridianError, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
-from meridian.core.reporters import Reporter
 from meridian.renderers import emit_json
 
 
@@ -29,18 +27,10 @@ def run_v4_apply(
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.core.setup import SetupDraft
     from meridian.servers import ServerRegistry
-    from meridian.setup.runtime import SetupRuntime
 
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("V4 topology intent is missing")
+    intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
-
-    def runtime(reporter: Reporter | None = None) -> SetupRuntime:
-        return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
-
-    draft = SetupDraft.from_intent(intent)
-    review = runtime().review(draft)
+    review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent))
     if not yes:
         if json_output:
             error = MeridianError(
@@ -81,19 +71,10 @@ def run_v4_apply(
         if not confirm("Apply this reviewed topology?"):
             raise typer.Exit(1)
 
-    try:
-        with apply_progress(machine_output=json_output, registry=registry) as reporter:
-            result = runtime(reporter).apply_intent(
-                intent,
-                expected_plan_hash=review.review_hash,
-            )
-    except ReviewedApplyPersistenceError as exc:
-        raise MeridianException(
-            "V4 apply could not save local convergence state; remote state may have changed.",
-            hint=str(exc),
-            category="system",
-            retryable=True,
-        ) from exc
+    with apply_progress(machine_output=json_output, registry=registry) as reporter:
+        result = reviewed_runtime(registry, cluster, reporter).apply_intent(
+            intent, expected_plan_hash=review.review_hash
+        )
     status: OutputStatus = "failed" if not result.all_succeeded else "changed" if result.changed else "no_changes"
     exit_code = 0 if result.all_succeeded else 3
     summary_text = "V4 topology converged." if result.all_succeeded else "V4 topology apply failed."
@@ -159,13 +140,10 @@ def run_v4_plan(
     from meridian.servers import ServerRegistry
     from meridian.setup.runtime import SetupRuntime
 
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("V4 topology intent is missing")
     inspection = SetupRuntime(
         ServerRegistry(SERVER_PROFILES_FILE),
         cluster_loader=lambda: cluster,
-    ).inspect_intent(intent)
+    ).inspect_intent(require_intent(cluster))
     resources = [item.action.resource for item in inspection.inspections]
     observation_errors = [item for item in inspection.inspections if item.error]
     drifted = [item for item in inspection.inspections if not item.error and not item.converged]

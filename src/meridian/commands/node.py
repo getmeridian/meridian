@@ -14,19 +14,17 @@ from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
 from meridian.commands._helpers import (
+    apply_reviewed_intent,
     format_traffic,
     load_topology_cluster,
     make_panel,
-    persist_reviewed_apply,
-    reviewed_apply_persistence,
+    require_intent,
 )
 from meridian.commands._validation import validate_command_input
-from meridian.commands.apply_progress import apply_progress
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.fleet import build_node_list_result
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -60,7 +58,6 @@ def run_add(
     from meridian.config import DEFAULT_SNI, SERVER_PROFILES_FILE
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_exit_to_intent
-    from meridian.setup.runtime import SetupRuntime
 
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     target = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
@@ -79,9 +76,7 @@ def run_add(
     )
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     if not request.harden:
         fail(
             "Fleet servers always keep OS hardening enabled.",
@@ -152,23 +147,13 @@ def run_add(
                     ],
                 }
             )
-    try:
-        with reviewed_apply_persistence("V4 exit apply"), apply_progress(registry=registry) as reporter:
-            result = SetupRuntime(
-                registry,
-                cluster_loader=lambda: cluster,
-                persist=persist_reviewed_apply,
-                reporter=reporter,
-            ).apply_intent(updated)
-    except MeridianException as exc:
-        fail(exc)
-    if not result.all_succeeded:
-        failures = result.failure_summary
-        fail(
-            "V4 exit did not converge.",
-            hint=failures,
-            hint_type="system",
-        )
+    result = apply_reviewed_intent(
+        cluster,
+        registry,
+        updated,
+        failure=f"Exit {request.name or resolved.ip} did not converge",
+        hint="The exit stays in the topology; fix the cause and rerun this command or `meridian apply`.",
+    )
     ok(f"Exit {request.name or resolved.ip} {'added' if result.changed else 'already converged'}")
 
 
@@ -304,9 +289,7 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     try:
         entry = ServerRegistry(SERVER_PROFILES_FILE).find(request.ip_or_name)
     except LocalStateError as exc:

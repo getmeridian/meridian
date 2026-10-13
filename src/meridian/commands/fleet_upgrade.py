@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
-from meridian.commands._helpers import load_topology_cluster, persist_reviewed_apply, reviewed_apply_persistence
-from meridian.commands.apply_progress import apply_progress
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError, MeridianError
@@ -44,9 +43,7 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
 
     targets = _target_pins(cluster, tested=tested)
@@ -200,15 +197,10 @@ def _explain_held(observed: list[ServerImages]) -> None:
 
 def _apply(cluster: ClusterConfig, registry: ServerRegistry, intent: SetupIntent) -> None:
     """Review the unchanged intent with the new pins and apply exactly that review."""
-    from meridian.core.reporters import Reporter
     from meridian.core.setup import SetupDraft
-    from meridian.setup.runtime import SetupRuntime
-
-    def runtime(reporter: Reporter | None = None) -> SetupRuntime:
-        return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
 
     try:
-        review = runtime().review(SetupDraft.from_intent(intent), cluster=cluster)
+        review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
     except MeridianError as exc:
         fail(exc)
     if review.retiring:
@@ -217,14 +209,11 @@ def _apply(cluster: ClusterConfig, registry: ServerRegistry, intent: SetupIntent
             hint="Review and apply them first with `meridian plan` and `meridian apply`, then rerun the upgrade.",
             hint_type="user",
         )
-    try:
-        with reviewed_apply_persistence("Fleet upgrade"), apply_progress(registry=registry) as reporter:
-            result = runtime(reporter).apply_intent(intent, expected_plan_hash=review.review_hash)
-    except MeridianError as exc:
-        fail(exc)
-    if not result.all_succeeded:
-        fail(
-            "The fleet upgrade did not converge",
-            hint=f"{result.failure_summary}. Fix the cause and rerun `meridian fleet upgrade`.",
-            hint_type="system",
-        )
+    apply_reviewed_intent(
+        cluster,
+        registry,
+        intent,
+        failure="The fleet upgrade did not converge",
+        hint="Fix the cause and rerun `meridian fleet upgrade`.",
+        expected_plan_hash=review.review_hash,
+    )

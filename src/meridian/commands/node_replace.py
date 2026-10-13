@@ -7,13 +7,11 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
-from meridian.commands._helpers import load_topology_cluster, persist_reviewed_apply, reviewed_apply_persistence
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.commands._validation import validate_command_input
-from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok
 from meridian.core.command_inputs import NodeTargetRequest
 from meridian.core.errors import LocalStateError, MeridianError
-from meridian.core.reporters import Reporter
 from meridian.core.topology import ExitIntent, SetupIntent
 
 if TYPE_CHECKING:
@@ -29,12 +27,9 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
     from meridian.core.setup import SetupDraft
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import move_exit_in_intent
-    from meridian.setup.runtime import SetupRuntime
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     exit_ = _exit_to_move(intent, registry, request.ip_or_name)
     old_label = _label(registry, exit_.server_ref)
@@ -59,11 +54,8 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
     except ValueError as exc:
         fail(f"Cannot move exit {exit_.id}: {exc}", hint="Adjust the topology in `meridian setup`.", hint_type="user")
 
-    def runtime(reporter: Reporter | None = None) -> SetupRuntime:
-        return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
-
     try:
-        review = runtime().review(SetupDraft.from_intent(updated), cluster=cluster)
+        review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
     except MeridianError as exc:
         fail(exc)
 
@@ -85,20 +77,14 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
     if not yes and not confirm(f"Move {subject}?"):
         raise typer.Exit(1)
 
-    try:
-        with reviewed_apply_persistence(f"Moving {subject}"), apply_progress(registry=registry) as reporter:
-            result = runtime(reporter).apply_intent(updated, expected_plan_hash=review.review_hash)
-    except MeridianError as exc:
-        fail(exc)
-    if not result.all_succeeded:
-        fail(
-            f"Exit {exit_.id} was not fully moved",
-            hint=(
-                f"{result.failure_summary}. The topology already places it on {new_label}; "
-                "fix the cause and rerun `meridian apply` to finish the move."
-            ),
-            hint_type="system",
-        )
+    result = apply_reviewed_intent(
+        cluster,
+        registry,
+        updated,
+        failure=f"Exit {exit_.id} was not fully moved",
+        hint=f"The topology already places it on {new_label}; rerun `meridian apply` to finish the move.",
+        expected_plan_hash=review.review_hash,
+    )
     ok(f"Moved {subject} ({len(result.retired)} old resources cleaned up). {old_label} stays in your saved servers.")
 
 

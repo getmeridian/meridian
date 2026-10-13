@@ -6,10 +6,9 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import load_topology_cluster, persist_reviewed_apply, reviewed_apply_persistence
-from meridian.commands.apply_progress import apply_progress
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok
-from meridian.core.errors import LocalStateError, MeridianError
+from meridian.core.errors import LocalStateError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.routes import RouteMutationResult, build_route_list_result
@@ -106,10 +105,7 @@ def run_remove(exit_arg: str, override_id: str, yes: bool = False) -> None:
 
 def _load() -> tuple[ClusterConfig, SetupIntent]:
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
-    return cluster, intent
+    return cluster, require_intent(cluster)
 
 
 def _resolve_exit(intent: SetupIntent, query: str) -> ExitIntent:
@@ -131,25 +127,14 @@ def _resolve_exit(intent: SetupIntent, query: str) -> ExitIntent:
 def _apply(cluster: ClusterConfig, updated: SetupIntent, operation: str) -> None:
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
-    from meridian.setup.runtime import SetupRuntime
 
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
-    try:
-        with reviewed_apply_persistence(operation), apply_progress(registry=registry) as reporter:
-            result = SetupRuntime(
-                registry,
-                cluster_loader=lambda: cluster,
-                persist=persist_reviewed_apply,
-                reporter=reporter,
-            ).apply_intent(updated)
-    except MeridianError as exc:
-        fail(exc)
-    if not result.all_succeeded:
-        fail(
-            f"{operation} did not converge",
-            hint=f"{result.failure_summary}. The topology change was saved; fix the cause and rerun `meridian apply`.",
-            hint_type="system",
-        )
+    apply_reviewed_intent(
+        cluster,
+        ServerRegistry(SERVER_PROFILES_FILE),
+        updated,
+        failure=f"{operation} did not converge",
+        hint="The topology change was saved; fix the cause and rerun `meridian apply`.",
+    )
 
 
 def _emit(command: str, result: RouteMutationResult, text: str) -> None:

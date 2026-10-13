@@ -209,9 +209,7 @@ def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error
 
 def test_v4_apply_persistence_failure_is_typed_system_error() -> None:
     runtime = _runtime(_execution())
-    runtime.apply_intent.side_effect = ReviewedApplyPersistenceError(
-        "disk full. Remote state may have changed; rerun plan and apply."
-    )
+    runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full")
     output = io.StringIO()
     set_json_mode(True)
     try:

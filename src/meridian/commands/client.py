@@ -10,7 +10,7 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel
+from meridian.commands._helpers import format_traffic, load_topology_cluster, make_panel, require_intent
 from meridian.commands.client_handoff import (
     format_status as _format_status,
 )
@@ -51,10 +51,7 @@ from meridian.renderers import emit_json
 
 def _access_users(cluster: ClusterConfig) -> list[str]:
     """Return the declared access users; panel-wide service users stay hidden."""
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
-    return list(intent.access.users)
+    return list(require_intent(cluster).access.users)
 
 
 # -- Client Add --

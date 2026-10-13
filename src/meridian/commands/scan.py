@@ -84,7 +84,7 @@ def run(
             selected = domains[idx - 1]
 
             # A saved topology is a reviewed contract: it only changes through setup/apply.
-            cluster = load_cluster(require_configured=False)
+            cluster = load_cluster()
             if cluster.topology_intent is not None:
                 warn("Your topology is review-managed; the selected SNI was not saved")
             err_console.print()

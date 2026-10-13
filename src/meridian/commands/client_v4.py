@@ -9,13 +9,17 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import ReviewedApplyPersistenceError, make_panel, persist_reviewed_apply
-from meridian.commands.apply_progress import apply_progress
+from meridian.commands._helpers import (
+    ReviewedApplyPersistenceError,
+    apply_reviewed_intent,
+    make_panel,
+    persist_reviewed_apply,
+    require_intent,
+)
 from meridian.commands.client_handoff import get_user_or_fail, print_handoff_links
 from meridian.commands.client_state import build_client_persistence_warning
 from meridian.console import err_console, fail, is_json_mode, ok, warn
 from meridian.core.clients import build_client_add_result, build_client_remove_result
-from meridian.core.errors import MeridianError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
@@ -35,11 +39,8 @@ def run_add_v4(
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import add_access_users_to_intent
-    from meridian.setup.runtime import SetupRuntime
 
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("V4 topology intent is missing")
+    intent = require_intent(cluster)
     already_declared = [name for name in names if name in intent.access.users]
     if already_declared:
         fail(
@@ -59,26 +60,14 @@ def run_add_v4(
                 )
 
     updated = add_access_users_to_intent(intent, names)
-    try:
-        registry = ServerRegistry(SERVER_PROFILES_FILE)
-        with apply_progress(registry=registry) as reporter:
-            result = SetupRuntime(
-                registry,
-                cluster_loader=lambda: cluster,
-                persist=persist_reviewed_apply,
-                reporter=reporter,
-            ).apply_intent(updated)
-    except MeridianError as exc:
-        fail(exc)
-    except ReviewedApplyPersistenceError as exc:
-        _report_v4_state_failure(names, cluster, operation, exc)
-    if not result.all_succeeded:
-        failures = result.failure_summary
-        fail(
-            "V4 client access did not converge",
-            hint=failures + ". The updated intent was saved; retry `meridian apply` after fixing the failure.",
-            hint_type="system",
-        )
+    result = apply_reviewed_intent(
+        cluster,
+        ServerRegistry(SERVER_PROFILES_FILE),
+        updated,
+        failure="Client access did not converge",
+        hint="The updated intent was saved; retry `meridian apply` after fixing the failure.",
+        on_unsaved=lambda exc: _report_state_failure(names, cluster, operation, exc),
+    )
 
     succeeded: list[tuple[str, User]] = []
     with make_panel(cluster) as refreshed_panel:
@@ -138,14 +127,14 @@ def run_add_v4(
         raise typer.Exit(3)
 
 
-def _report_v4_state_failure(
+def _report_state_failure(
     names: list[str],
     cluster: ClusterConfig,
     operation: OperationContext,
-    exc: Exception,
+    exc: ReviewedApplyPersistenceError,
 ) -> NoReturn:
-    """Report a local-state failure after V4 execution may have mutated the panel."""
-    reason = redact_string(str(exc)) or type(exc).__name__
+    """Report the clients the panel already has when local state could not be saved after apply."""
+    reason = redact_string(str(exc.__cause__ or exc))
     observed: list[tuple[str, User]] = []
     try:
         with make_panel(cluster) as panel:
@@ -187,11 +176,7 @@ def _report_v4_state_failure(
         warn(warning.message)
         raise typer.Exit(3)
 
-    fail(
-        f"V4 client apply could not save local state; remote state may have changed: {reason}",
-        hint="Repair cluster.yml persistence, inspect current panel state, then run `meridian plan` before retrying.",
-        hint_type="system",
-    )
+    fail(exc)
 
 
 def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext, *, yes: bool) -> None:
@@ -201,13 +186,9 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
     from meridian.handoff import remove_connection_page
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import remove_access_user_from_intent
-    from meridian.setup.runtime import SetupRuntime
 
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
     try:
-        updated = remove_access_user_from_intent(intent, name)
+        updated = remove_access_user_from_intent(require_intent(cluster), name)
     except ValueError as exc:
         fail(str(exc), hint="Check client names with: meridian client list", hint_type="user")
     if not yes and not confirm(f"Remove client '{name}'? Their links stop working immediately."):
@@ -215,25 +196,13 @@ def run_remove_v4(name: str, cluster: ClusterConfig, operation: OperationContext
 
     with make_panel(cluster) as panel:
         user = get_user_or_fail(panel, name, action="load")
-    try:
-        registry = ServerRegistry(SERVER_PROFILES_FILE)
-        with apply_progress(registry=registry) as reporter:
-            result = SetupRuntime(
-                registry,
-                cluster_loader=lambda: cluster,
-                persist=persist_reviewed_apply,
-                reporter=reporter,
-            ).apply_intent(updated)
-    except MeridianError as exc:
-        fail(exc)
-    except ReviewedApplyPersistenceError as exc:
-        fail(f"Client '{name}' may have been removed, but local state was not saved", hint=str(exc), hint_type="system")
-    if not result.all_succeeded:
-        fail(
-            f"Client '{name}' was not fully removed",
-            hint=f"{result.failure_summary}. The client is out of the topology; rerun `meridian apply` to finish.",
-            hint_type="system",
-        )
+    apply_reviewed_intent(
+        cluster,
+        ServerRegistry(SERVER_PROFILES_FILE),
+        updated,
+        failure=f"Client '{name}' was not fully removed",
+        hint="The client is out of the topology; rerun `meridian apply` to finish.",
+    )
 
     page_error = remove_connection_page(cluster, user.vless_uuid) if user and user.vless_uuid else ""
     if page_error:

@@ -13,19 +13,12 @@ import typer
 from rich.markup import escape
 
 from meridian.adapters.cluster import topology_from_local_cluster
-from meridian.commands._helpers import (
-    load_topology_cluster,
-    make_panel,
-    persist_reviewed_apply,
-    reviewed_apply_persistence,
-)
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, make_panel, require_intent
 from meridian.commands._validation import validate_command_input
-from meridian.commands.apply_progress import apply_progress
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.errors import LocalStateError
-from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.fleet import build_relay_list_result
 from meridian.core.models import MeridianError, Summary
 from meridian.core.output import OperationContext, command_envelope
@@ -53,7 +46,6 @@ def run_deploy(
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerEntry, ServerRegistry
     from meridian.setup.editor import add_relay_to_intent
-    from meridian.setup.runtime import SetupRuntime
 
     target = resolve_server(ServerRegistry(SERVER_PROFILES_FILE), explicit_ip=relay_ip, user=user, port=ssh_port)
     request = validate_command_input(
@@ -70,9 +62,7 @@ def run_deploy(
     )
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     exit_ref = ""
     try:
@@ -149,23 +139,13 @@ def run_deploy(
     else:
         # A re-run after a failed or interrupted add resumes the declared relay.
         updated = intent
-    try:
-        with reviewed_apply_persistence("V4 relay apply"), apply_progress(registry=registry) as reporter:
-            result = SetupRuntime(
-                registry,
-                cluster_loader=lambda: cluster,
-                persist=persist_reviewed_apply,
-                reporter=reporter,
-            ).apply_intent(updated)
-    except MeridianException as exc:
-        fail(exc)
-    if not result.all_succeeded:
-        failures = result.failure_summary
-        fail(
-            "V4 relay did not converge.",
-            hint=failures,
-            hint_type="system",
-        )
+    result = apply_reviewed_intent(
+        cluster,
+        registry,
+        updated,
+        failure=f"Relay {request.relay_name or request.relay_ip} did not converge",
+        hint="The relay stays in the topology; fix the cause and rerun this command or `meridian apply`.",
+    )
     ok(f"Relay {request.relay_name or request.relay_ip} {'added' if result.changed else 'already converged'}")
 
 
@@ -362,9 +342,7 @@ def run_remove(
     from meridian.setup.editor import remove_relays_from_intent
 
     cluster = load_topology_cluster()
-    intent = cluster.topology_intent
-    if intent is None:
-        raise RuntimeError("Topology intent is missing")
+    intent = require_intent(cluster)
     chains, _server_ref, label = select_relay_chains(
         intent,
         ServerRegistry(SERVER_PROFILES_FILE),

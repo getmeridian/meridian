@@ -1,29 +1,37 @@
-"""Shared helpers for command modules.
-
-Common patterns used across multiple command files: cluster loading,
-panel client creation, and traffic formatting.
-"""
+"""Shared helpers for command modules: cluster loading, reviewed apply, panel client, traffic formatting."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from typing import NoReturn
+from collections.abc import Callable
+from typing import TYPE_CHECKING, NoReturn
 
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
+from meridian.commands.apply_progress import apply_progress
 from meridian.config import HOME_DISPLAY
 from meridian.console import fail
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, MeridianError
+from meridian.core.topology import SetupIntent
 from meridian.remnawave import MeridianPanel
 
+if TYPE_CHECKING:
+    from meridian.core.reporters import Reporter
+    from meridian.reconciler.resources import ResourceExecutionResult
+    from meridian.servers import ServerRegistry
+    from meridian.setup.runtime import SetupRuntime
 
-class ReviewedApplyPersistenceError(Exception):
-    """A V4 apply checkpoint could not be written to local state."""
+LOCAL_STATE_SAVE_ERRORS = (ClusterConfigExternallyModifiedError, OSError, ValueError)
 
 
-_REVIEWED_APPLY_RECOVERY = (
-    "Remote state may have changed. Repair local state, then rerun `meridian plan` and `meridian apply` to reconcile."
-)
+class ReviewedApplyPersistenceError(MeridianError):
+    """An apply checkpoint could not be written to local state after remote state may have changed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Could not save local state; remote state may have changed: {reason}",
+            hint="Repair local state, then rerun `meridian plan` and `meridian apply` to reconcile.",
+            category="system",
+            retryable=True,
+        )
 
 
 def has_meridian_v3_state() -> bool:
@@ -52,7 +60,7 @@ def fail_meridian_v3_state() -> NoReturn:
 
 def load_topology_cluster() -> ClusterConfig:
     """Load a cluster that has a reviewed topology, or explain how to get one."""
-    cluster = load_cluster(require_configured=False)
+    cluster = load_cluster()
     if cluster.topology_intent is not None:
         return cluster
     if has_meridian_v3_state():
@@ -70,21 +78,19 @@ def load_topology_cluster() -> ClusterConfig:
     )
 
 
-def load_cluster(*, require_configured: bool = True) -> ClusterConfig:
+def require_intent(cluster: ClusterConfig) -> SetupIntent:
+    """Return the intent of a cluster that came from ``load_topology_cluster()``."""
+    if cluster.topology_intent is None:
+        raise RuntimeError("Topology intent is missing")
+    return cluster.topology_intent
+
+
+def load_cluster() -> ClusterConfig:
     """Load local cluster state through the CLI error boundary."""
     try:
-        cluster = ClusterConfig.load()
+        return ClusterConfig.load()
     except LocalStateError as exc:
         fail(exc)
-    if require_configured and not cluster.is_configured:
-        if has_meridian_v3_state():
-            fail_meridian_v3_state()
-        fail(
-            "No cluster configured",
-            hint="Deploy first: meridian deploy",
-            hint_type="user",
-        )
-    return cluster
 
 
 def make_panel(cluster: ClusterConfig) -> MeridianPanel:
@@ -92,25 +98,49 @@ def make_panel(cluster: ClusterConfig) -> MeridianPanel:
     return MeridianPanel(cluster.panel.url, cluster.panel.api_token)
 
 
-@contextmanager
-def reviewed_apply_persistence(operation: str) -> Iterator[None]:
-    """Render ambiguous V4 checkpoint write failures at the CLI boundary."""
-    try:
-        yield
-    except ReviewedApplyPersistenceError as exc:
-        fail(
-            f"{operation} could not save local convergence state",
-            hint=str(exc),
-            hint_type="system",
-        )
-
-
 def persist_reviewed_apply(cluster: ClusterConfig) -> None:
-    """Persist a V4 checkpoint while preserving its failure provenance."""
+    """Persist an apply checkpoint, marking a failure as one that follows remote changes."""
     try:
         cluster.save()
-    except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
-        raise ReviewedApplyPersistenceError(f"{exc} {_REVIEWED_APPLY_RECOVERY}") from exc
+    except LOCAL_STATE_SAVE_ERRORS as exc:
+        raise ReviewedApplyPersistenceError(str(exc)) from exc
+
+
+def reviewed_runtime(
+    registry: ServerRegistry, cluster: ClusterConfig, reporter: Reporter | None = None
+) -> SetupRuntime:
+    """A setup runtime bound to an already-loaded cluster that persists every checkpoint."""
+    from meridian.setup.runtime import SetupRuntime
+
+    return SetupRuntime(registry, cluster_loader=lambda: cluster, persist=persist_reviewed_apply, reporter=reporter)
+
+
+def apply_reviewed_intent(
+    cluster: ClusterConfig,
+    registry: ServerRegistry,
+    intent: SetupIntent,
+    *,
+    failure: str,
+    hint: str,
+    expected_plan_hash: str | None = None,
+    on_unsaved: Callable[[ReviewedApplyPersistenceError], NoReturn] | None = None,
+) -> ResourceExecutionResult:
+    """Apply an edited intent with progress, failing with ``failure`` unless every resource converged.
+
+    ``on_unsaved`` lets a command report partial results when remote state changed but local state was not saved.
+    """
+    try:
+        with apply_progress(registry=registry) as reporter:
+            result = reviewed_runtime(registry, cluster, reporter).apply_intent(
+                intent, expected_plan_hash=expected_plan_hash
+            )
+    except MeridianError as exc:
+        if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):
+            on_unsaved(exc)
+        fail(exc)
+    if not result.all_succeeded:
+        fail(failure, hint=f"{result.failure_summary}. {hint}", hint_type="system")
+    return result
 
 
 def format_traffic(bytes_used: int, bytes_limit: int = 0) -> str:

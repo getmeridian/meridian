@@ -128,7 +128,7 @@ class TestRunAdd:
         panel = _make_panel_mock()
         panel.get_user.side_effect = [None, _make_user("alice")]
         runtime = MagicMock()
-        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full; remote state may have changed")
+        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full")
 
         set_json_mode(True)
         try:
@@ -159,9 +159,7 @@ class TestRunAdd:
         panel = _make_panel_mock()
         panel.get_user.side_effect = [None, None]
         runtime = MagicMock()
-        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError(
-            "state file is read-only; remote state may have changed"
-        )
+        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("state file is read-only")
 
         set_json_mode(True)
         try:

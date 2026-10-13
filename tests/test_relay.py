@@ -180,10 +180,7 @@ class TestRelayCLI:
             ),
             patch(
                 "meridian.setup.runtime.SetupRuntime.apply_intent",
-                side_effect=ReviewedApplyPersistenceError(
-                    "read-only filesystem. Remote state may have changed. Repair local state, then rerun "
-                    "`meridian plan` and `meridian apply` to reconcile."
-                ),
+                side_effect=ReviewedApplyPersistenceError("read-only filesystem"),
             ),
             pytest.raises(typer.Exit) as exc_info,
         ):
@@ -191,7 +188,7 @@ class TestRelayCLI:
 
         assert exc_info.value.exit_code == 3
         output = capsys.readouterr().err
-        assert "Remote state may have changed" in output
+        assert "remote state may have changed" in output
         assert "meridian plan" in output
         assert "meridian apply" in output
 
