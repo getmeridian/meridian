@@ -118,6 +118,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **`meridian test` tests the whole fleet** — with no target and several saved
   servers it tests every exit and relay entry in turn instead of asking which
   one, and exits with the worst result.
+- `meridian test` names each path like its subscription entry ("Reality ·
+  Chrome", "XHTTP · Firefox", "Hysteria2 · UDP") instead of calling every
+  VLESS path "VLESS".
 
 ### Sharing
 - **Connection names show where traffic exits** — entries lead with the exit's

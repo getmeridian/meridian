@@ -345,7 +345,7 @@ def test_full_test_executes_fallback_and_target_hysteria_without_rebuilding(tmp_
     assert selected == "alice"
     assert provider_timeouts == [120]
     assert [check.status for check in checks] == ["passed", "passed", "passed"]
-    assert [call[0] for call in calls] == ["Automatic fallback", f"Hysteria2 {_IP}"]
+    assert [call[0] for call in calls] == ["Automatic fallback", f"Hysteria2 · UDP {_IP}"]
     assert calls[0][3] is False
     assert calls[1][2:] == (_IP, True)
     pinned_hysteria = calls[1][1]["outbounds"][1]
@@ -624,4 +624,4 @@ def test_full_test_reports_each_transport_with_time_to_first_byte(tmp_path: Path
     )
 
     assert [(item.check_id, item.outcome, item.first_byte_ms) for item in run.transports] == [("protocol_1", "ok", 230)]
-    assert run.transports[0].label == f"Hysteria2 {_IP}"
+    assert run.transports[0].label == f"Hysteria2 · UDP {_IP}"

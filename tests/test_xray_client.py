@@ -128,8 +128,21 @@ def test_parses_canonical_vless_and_hysteria_v2_outbounds() -> None:
     assert outbound_address(outbounds[0]) == "198.51.100.10"
     assert outbound_address(outbounds[1]) == "198.51.100.20"
     assert outbound_label(outbounds[0]) == "VLESS 198.51.100.10"
-    assert outbound_label(outbounds[1]) == "Hysteria2 198.51.100.20"
+    assert outbound_label(outbounds[1]) == "Hysteria2 · UDP 198.51.100.20"
     assert "11111111-1111-1111-1111-111111111111" not in outbound_label(outbounds[0])
+
+
+def test_vless_labels_name_the_method_and_fingerprint_like_the_entry() -> None:
+    def vless(stream: dict) -> dict:
+        return {"protocol": "vless", "settings": {"vnext": [{"address": "198.51.100.10"}]}, "streamSettings": stream}
+
+    reality = vless({"network": "tcp", "security": "reality", "realitySettings": {"fingerprint": "chrome"}})
+    xhttp = vless({"network": "xhttp", "security": "tls", "tlsSettings": {"fingerprint": "firefox"}})
+    websocket = vless({"network": "ws", "security": "none"})
+
+    assert outbound_label(reality) == "Reality · Chrome 198.51.100.10"
+    assert outbound_label(xhttp) == "XHTTP · Firefox 198.51.100.10"
+    assert outbound_label(websocket) == "WebSocket · CDN 198.51.100.10"
 
 
 def test_pins_a_canonical_hysteria_outbound_without_rebuilding_it() -> None:

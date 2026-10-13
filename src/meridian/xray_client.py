@@ -312,12 +312,22 @@ def outbound_tcp_endpoint(outbound: dict[str, Any]) -> tuple[str, int] | None:
 
 
 def outbound_label(outbound: dict[str, Any]) -> str:
-    """Derive a credential-free display label for a canonical outbound."""
+    """Derive a credential-free display label for a canonical outbound, named like its entry.
+
+    ``Reality · Chrome 198.51.100.10``, ``XHTTP · Firefox …``, ``Hysteria2 · UDP …``.
+    """
+    from meridian.compiler.names import host_remark
+
     settings = outbound.get("settings")
+    stream = outbound.get("streamSettings")
+    stream = stream if isinstance(stream, dict) else {}
     if outbound.get("protocol") == "vless":
-        protocol = "VLESS"
+        key = _vless_method(stream)
+        security = stream.get("realitySettings") or stream.get("tlsSettings")
+        fingerprint = security.get("fingerprint") if isinstance(security, dict) else ""
+        protocol = host_remark(key, fingerprint=_safe_label_component(fingerprint)) if key else "VLESS"
     elif outbound.get("protocol") == "hysteria" and isinstance(settings, dict) and settings.get("version") == 2:
-        protocol = "Hysteria2"
+        protocol = host_remark("hysteria2")
     else:
         protocol = "Xray"
     address = _safe_label_component(outbound_address(outbound))
@@ -325,6 +335,12 @@ def outbound_label(outbound: dict[str, Any]) -> str:
         return f"{protocol} {address}"
     tag = _safe_label_component(outbound.get("tag"))
     return f"{protocol} {tag or 'endpoint'}"
+
+
+def _vless_method(stream: dict[str, Any]) -> str:
+    if stream.get("security") == "reality":
+        return "reality"
+    return {"xhttp": "xhttp", "ws": "wss"}.get(str(stream.get("network") or ""), "")
 
 
 def _safe_label_component(value: object) -> str:
