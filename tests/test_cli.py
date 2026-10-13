@@ -71,6 +71,56 @@ class TestCLIBasics:
         assert "Unsupported language: de" in _strip_ansi(result.output)
 
 
+class TestHelpSections:
+    def test_top_level_help_groups_commands_into_ordered_sections(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        output = _strip_ansi(result.output)
+
+        titles = ["Get started", "Clients", "Servers", "Check & fix", "Advanced"]
+        positions = [output.index(f"─ {title} ") for title in titles]
+        assert positions == sorted(positions)
+
+        def section(title: str) -> str:
+            start = output.index(f"─ {title} ")
+            nxt = output.find("╭─", start)
+            return output[start : nxt if nxt != -1 else len(output)]
+
+        assert "setup" in section("Get started") and "deploy" in section("Get started")
+        assert "client" in section("Clients")
+        for name in ("node", "relay", "route", "fleet", "server"):
+            assert name in section("Servers")
+        for name in ("check", "test", "doctor", "plan", "apply"):
+            assert name in section("Check & fix")
+        assert "teardown" in section("Advanced")
+
+    def test_every_public_command_has_a_help_section(self) -> None:
+        group = typer.main.get_command(app)
+        public = {name for name, command in group.commands.items() if not command.hidden}  # type: ignore[attr-defined]
+
+        assert public == set(cli._HELP_ORDER)
+
+    def test_hidden_aliases_stay_out_of_top_level_help(self) -> None:
+        output = _strip_ansi(runner.invoke(app, ["--help"]).output)
+
+        for alias in ("preflight", "probe", "rage", "dev"):
+            assert not re.search(rf"│ {alias}\s", output)
+
+    def test_deploy_help_groups_options_into_panels(self) -> None:
+        output = _strip_ansi(runner.invoke(app, ["deploy", "--help"]).output)
+
+        for panel in ("Server access", "Methods", "Branding", "Automation"):
+            assert f"─ {panel} " in output
+        methods = output[output.index("─ Methods ") :]
+        assert "--hysteria2" in methods.split("╰")[0]
+        assert "--dry-run" in output[output.index("─ Automation ") :].split("╰")[0]
+        assert "--cancel-file" not in output
+
+    def test_deploy_display_name_help_has_no_stray_backslash(self) -> None:
+        output = _strip_ansi(runner.invoke(app, ["deploy", "--help"]).output)
+
+        assert "\\'" not in output
+
+
 class TestSubcommandHelp:
     def test_setup_help(self) -> None:
         result = runner.invoke(app, ["setup", "--help"])
@@ -176,7 +226,7 @@ class TestSubcommandHelp:
         output = _strip_ansi(result.output)
         assert "status" in output
         assert "inventory" in output
-        assert "recover" in output
+        assert "upgrade" in output
 
     def test_api_help(self) -> None:
         result = runner.invoke(app, ["api", "--help"])

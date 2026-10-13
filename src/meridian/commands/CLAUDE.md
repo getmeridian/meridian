@@ -13,6 +13,7 @@
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
 **One wizard for everyone** — real terms plus one plain sentence each, all text from `meridian.i18n`; `wizard_prompts.py` owns navigation words, yes/no, numbered choices, and the language step. Smart defaults replace questions (exit IDs from server names, random transport paths, routing only with a gateway, delivery formats).
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
+**Sectioned help** — `cli.py` lists top-level commands in `_HELP_LAYOUT` panels (Get started, Clients, Servers, Check & fix, Advanced); `deploy` groups options into Server access, Methods, Branding, and Automation panels. Hidden aliases stay out of the layout and list last.
 **Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove/replace), `relay` (add/list/remove), `route` (add/list/remove — per-exit egress overrides applied like `client add`), `fleet` (status/inventory/upgrade). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `panel`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply; `node_replace.py` re-places one exit and lets reviewed retirement clean the old server. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
 
 ## What's done well
@@ -38,3 +39,5 @@
 - The wizard needs a terminal: `prompt()` returns the default when `/dev/tty` is missing, so a headless run would loop on required answers; `setup` refuses without one unless `--yes`.
 - `node replace` refuses the control server (subscription URLs would change) and a new server that already has any role; check roles before dialing.
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.
+- A new public command needs an entry in `_HELP_LAYOUT` and a `rich_help_panel`, or it appears in a bare `Commands` list above the sections.
+- Entry points convert library `MeridianError`s with `fail(exc)`; an uncaught one prints a traceback (`setup --intent MISSING` did).

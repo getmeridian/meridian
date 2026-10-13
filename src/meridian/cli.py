@@ -6,36 +6,86 @@ import sys
 from typing import Annotated
 
 import typer
+from typer.core import TyperGroup
 
 from meridian import __version__
-from meridian.cli_options import NewServer, ServerAlias, SshPort, Target, Timeout, User, Yes
+from meridian.cli_options import (
+    SSH_PORT_HELP,
+    USER_HELP,
+    YES_HELP,
+    NewServer,
+    ServerAlias,
+    SshPort,
+    Target,
+    Timeout,
+    User,
+    Yes,
+)
 from meridian.config import DISABLE_UPDATE_CHECK
 from meridian.console import banner
 
+# Top-level `--help` sections, in display order, each with its commands in display order.
+# Typer lists plain commands before sub-apps, so the group class below imposes this order.
+GET_STARTED = "Get started"
+CLIENTS = "Clients"
+SERVERS = "Servers"
+CHECK_AND_FIX = "Check & fix"
+ADVANCED = "Advanced"
+_HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (GET_STARTED, ("setup", "deploy")),
+    (CLIENTS, ("client",)),
+    (SERVERS, ("node", "relay", "route", "fleet", "server")),
+    (CHECK_AND_FIX, ("check", "test", "doctor", "plan", "apply")),
+    (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
+)
+# Option panels inside `deploy --help`.
+SERVER_ACCESS = "Server access"
+METHODS = "Methods"
+AUTOMATION = "Automation"
+_HELP_ORDER = [name for _panel, names in _HELP_LAYOUT for name in names]
+
+
+class _SectionedGroup(TyperGroup):
+    """Lists commands in the `_HELP_LAYOUT` order; anything unlisted (hidden aliases) goes last."""
+
+    def list_commands(self, ctx: typer.Context) -> list[str]:  # type: ignore[override]
+        names = super().list_commands(ctx)
+        return sorted(names, key=lambda name: _HELP_ORDER.index(name) if name in _HELP_ORDER else len(_HELP_ORDER))
+
+
 app = typer.Typer(
     name="meridian",
-    help="Censorship-resistant proxy server management",
-    epilog="[dim]Docs: https://getmeridian.org/docs[/dim]",
+    cls=_SectionedGroup,
+    help=(
+        "Censorship-resistant proxy server management\n\n"
+        "Rent a server, run one command, and share a link or QR code.\n\n"
+        "[dim]Quick start:[/dim]\n"
+        "  [cyan]meridian deploy 198.51.100.10[/cyan]   One server, shareable link at the end\n"
+        "  [cyan]meridian setup[/cyan]                  Guided wizard for several servers, relays, or routing\n"
+        "  [cyan]meridian client add alice[/cyan]       Give another person access\n"
+        "  [cyan]meridian check[/cyan]                  Is everything healthy?"
+    ),
+    epilog="[dim]Docs: https://getmeridian.org/docs  ·  Help for any command: meridian COMMAND --help[/dim]",
     add_completion=True,
     rich_markup_mode="rich",
 )
 
 # Subcommand groups
-client_app = typer.Typer(help="Manage proxy clients (add, remove, enable, disable)", no_args_is_help=True)
-server_app = typer.Typer(help="Manage known servers", no_args_is_help=True)
-node_app = typer.Typer(help="Manage proxy nodes in the fleet", no_args_is_help=True)
-relay_app = typer.Typer(help="Manage relay nodes", no_args_is_help=True)
+client_app = typer.Typer(help="Manage who can connect: add, show, list, enable, disable, remove", no_args_is_help=True)
+server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
+node_app = typer.Typer(help="Add, list, replace, or remove exit servers", no_args_is_help=True)
+relay_app = typer.Typer(help="Add, list, or remove relays that forward traffic to an exit", no_args_is_help=True)
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
-fleet_app = typer.Typer(help="Fleet-wide health, inventory, and recovery", no_args_is_help=True)
-api_app = typer.Typer(help="Machine-readable Meridian API contracts", no_args_is_help=True)
+fleet_app = typer.Typer(help="Fleet status, inventory, and image upgrades", no_args_is_help=True)
+api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
 dev_app = typer.Typer(help="Developer tools for testing and debugging", no_args_is_help=True)
-app.add_typer(client_app, name="client")
-app.add_typer(server_app, name="server")
-app.add_typer(node_app, name="node")
-app.add_typer(relay_app, name="relay")
-app.add_typer(route_app, name="route")
-app.add_typer(fleet_app, name="fleet")
-app.add_typer(api_app, name="api")
+app.add_typer(client_app, name="client", rich_help_panel=CLIENTS)
+app.add_typer(server_app, name="server", rich_help_panel=SERVERS)
+app.add_typer(node_app, name="node", rich_help_panel=SERVERS)
+app.add_typer(relay_app, name="relay", rich_help_panel=SERVERS)
+app.add_typer(route_app, name="route", rich_help_panel=SERVERS)
+app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
+app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
 
 
@@ -44,7 +94,9 @@ def main_callback(
     ctx: typer.Context,
     version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
     verbose: bool = typer.Option(False, "--verbose", help="Enable debug logging"),
-    json_mode: bool = typer.Option(False, "--json", help="JSON output to stdout (for scripting)"),
+    json_mode: bool = typer.Option(
+        False, "--json", help="JSON output to stdout (for scripting; not every command supports it)"
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
     lang: str = typer.Option("", "--lang", help="Language for the setup wizard: en, ru, fa, zh", show_default=False),
 ) -> None:
@@ -239,7 +291,7 @@ def _argv_supports_global_json(args: list[str] | None = None) -> bool:
 # =============================================================================
 
 
-@app.command("studio")
+@app.command("studio", rich_help_panel=ADVANCED)
 def studio_cmd(
     port: int = typer.Option(
         0,
@@ -271,11 +323,11 @@ def studio_cmd(
 # =============================================================================
 
 
-@app.command("plan")
+@app.command("plan", rich_help_panel=CHECK_AND_FIX)
 def plan_cmd(
     json_output: bool = typer.Option(False, "--json", help="Emit plan as JSON for CI consumption"),
 ) -> None:
-    """Show what apply would change, comparing the topology with live servers.
+    """Show what apply would change, comparing your topology with live servers
 
     [dim]Exit codes:[/dim]
       [green]0[/green] = already converged
@@ -291,12 +343,12 @@ def plan_cmd(
     run(json_output=json_output or is_json_mode())
 
 
-@app.command("apply")
+@app.command("apply", rich_help_panel=CHECK_AND_FIX)
 def apply_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     json_output: bool = typer.Option(False, "--json", help="Emit final apply result as JSON"),
 ) -> None:
-    """Apply the reviewed topology in cluster.yml to your servers.
+    """Apply the reviewed topology in cluster.yml to your servers
 
     Shows the compiled changes, asks for confirmation, then applies them
     with checkpoints; an interrupted apply resumes where it stopped.
@@ -319,7 +371,7 @@ def apply_cmd(
 # =============================================================================
 
 
-@app.command("setup")
+@app.command("setup", rich_help_panel=GET_STARTED)
 def setup_cmd(
     intent_path: str = typer.Option(
         "",
@@ -338,7 +390,17 @@ def setup_cmd(
         help="Approve review and apply without confirmation",
     ),
 ) -> None:
-    """Configure the complete topology with a resumable guided wizard."""
+    """Configure one or many servers with a resumable guided wizard
+
+    Asks plain-language questions with safe defaults, shows a review, then
+    applies it. Progress is saved, so running it again resumes.
+    For one server and no questions, use [cyan]meridian deploy[/cyan].
+
+    [dim]Examples:[/dim]
+      [cyan]meridian setup[/cyan]                           Start or resume the wizard
+      [cyan]meridian setup --restart[/cyan]                 Discard saved progress and start over
+      [cyan]meridian setup --intent intent.json --yes[/cyan]  Apply a prepared topology, no questions
+    """
     from meridian.commands.setup_v4 import run
 
     run(
@@ -348,65 +410,91 @@ def setup_cmd(
     )
 
 
-@app.command("deploy")
+@app.command("deploy", rich_help_panel=GET_STARTED)
 def deploy_cmd(
     ip: Target = "",
     domain: str = typer.Option(
         "",
         "--domain",
         "-d",
-        help="Domain for XHTTP/WSS (and Cloudflare CDN fallback)",
+        help="Your domain: adds XHTTP and WSS methods (with Cloudflare CDN fallback)",
     ),
     sni: str = typer.Option(
         "",
         "--sni",
         "-s",
-        help="TLS camouflage target (use 'meridian scan' to find best)",
+        help="Camouflage site the server imitates (default: auto-picked; try 'meridian scan')",
     ),
     client_name: str = typer.Option("", "--client-name", help="Name for the first client"),
-    user: User = "",
-    yes: Yes = False,
+    hysteria2: bool = typer.Option(
+        True,
+        "--hysteria2/--no-hysteria2",
+        help="Offer Hysteria2 over UDP/443 as a last-resort fallback (salamander-obfuscated)",
+        rich_help_panel=METHODS,
+    ),
+    fingerprint: str = typer.Option(
+        "",
+        "--fingerprint",
+        help="TLS fingerprint clients present: chrome (default), firefox, safari, ios, android, edge, random",
+        rich_help_panel=METHODS,
+    ),
+    warp: bool = typer.Option(
+        False,
+        "--warp/--no-warp",
+        help="Route outgoing traffic through Cloudflare WARP",
+        rich_help_panel=METHODS,
+    ),
+    geo_block: bool = typer.Option(
+        True,
+        "--geo-block/--no-geo-block",
+        help="Refuse Russian domains and IPs at the exit; subscriptions already send them directly",
+        rich_help_panel=METHODS,
+    ),
+    user: Annotated[
+        str,
+        typer.Option("--user", "-u", help=USER_HELP, show_default=False, rich_help_panel=SERVER_ACCESS),
+    ] = "",
+    ssh_port: Annotated[
+        int,
+        typer.Option(
+            "--ssh-port",
+            min=0,
+            max=65535,
+            help=SSH_PORT_HELP,
+            show_default=False,
+            rich_help_panel=SERVER_ACCESS,
+        ),
+    ] = 0,
     harden: bool = typer.Option(
         True,
         "--harden/--no-harden",
         help="Harden SSH and firewall (disable if other services share the server)",
+        rich_help_panel=SERVER_ACCESS,
     ),
     server: ServerAlias = "",
     display_name: str = typer.Option(
         "",
         "--display-name",
-        help="Label for connection pages (e.g. 'Alice\\'s VPN')",
+        help="Label for connection pages (e.g. Alice's VPN)",
         rich_help_panel="Branding",
     ),
     icon: str = typer.Option("", "--icon", help="Page icon (emoji or image URL)", rich_help_panel="Branding"),
     color: str = typer.Option(
         "", "--color", help="Page color theme (ocean/sunset/forest/lavender/rose/slate)", rich_help_panel="Branding"
     ),
-    warp: bool = typer.Option(
-        False,
-        "--warp/--no-warp",
-        help="Route outgoing traffic through Cloudflare WARP",
+    yes: Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP, rich_help_panel=AUTOMATION)] = False,
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit final deploy result as JSON", rich_help_panel=AUTOMATION
     ),
-    geo_block: bool = typer.Option(
-        True,
-        "--geo-block/--no-geo-block",
-        help="Refuse Russian domains and IPs at the exit; subscriptions already send them directly",
+    events: str = typer.Option(
+        "", "--events", help="Stream progress events as JSONL (use: jsonl)", rich_help_panel=AUTOMATION
     ),
-    hysteria2: bool = typer.Option(
-        True,
-        "--hysteria2/--no-hysteria2",
-        help="Offer Hysteria2 over UDP/443 as a last-resort fallback (salamander-obfuscated)",
+    request_path: str = typer.Option(
+        "", "--request", help="Deploy-request JSON file or '-' for stdin", rich_help_panel=AUTOMATION
     ),
-    ssh_port: SshPort = 0,
-    fingerprint: str = typer.Option(
-        "",
-        "--fingerprint",
-        help="TLS fingerprint clients present: chrome (default), firefox, safari, ios, android, edge, random",
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Validate and plan without SSH changes", rich_help_panel=AUTOMATION
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit final deploy result as JSON"),
-    events: str = typer.Option("", "--events", help="Stream progress events as JSONL (use: jsonl)"),
-    request_path: str = typer.Option("", "--request", help="Deploy-request JSON file or '-' for stdin"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Validate and plan without SSH changes"),
     cancel_file: str = typer.Option(
         "",
         "--cancel-file",
@@ -471,7 +559,9 @@ def client_add(
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
 ) -> None:
-    """Add one or more clients through the active topology model.
+    """Add one or more clients (people who connect)
+
+    Prints each client's connection page and subscription link.
 
     [dim]Examples:[/dim]
       [cyan]meridian client add alice[/cyan]
@@ -490,7 +580,7 @@ def client_show_cmd(
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
     repair_page: bool = typer.Option(False, "--repair-page", help="Republish the client's connection page"),
 ) -> None:
-    """Show connection info for a managed access client.
+    """Show a client's connection page, subscription link, and status
 
     [dim]Examples:[/dim]
       [cyan]meridian client show alice[/cyan]
@@ -546,7 +636,7 @@ def client_disable_cmd(
     name: str = typer.Argument(..., help="Client name"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Temporarily suspend a client (V4 apply restores declared users)"""
+    """Suspend a client until you enable them again"""
     from meridian.commands.client import run_disable
 
     if json_mode:
@@ -596,7 +686,7 @@ def server_remove_cmd(
 # =============================================================================
 
 
-@app.command("check")
+@app.command("check", rich_help_panel=CHECK_AND_FIX)
 def check_cmd(
     target: Target = "",
     domain: str = typer.Option("", "--domain", "-d", help="Domain to check on a server not deployed yet"),
@@ -607,7 +697,7 @@ def check_cmd(
     server: ServerAlias = "",
     json_output: bool = typer.Option(False, "--json", help="Output a typed check result as JSON"),
 ) -> None:
-    """Check server health, or whether a new server can run Meridian.
+    """Check server health, or whether a new server can run Meridian
 
     A server outside the fleet gets pre-flight checks. Control, exit, and
     gateway servers get panel, container, listener, TLS, and disk checks;
@@ -643,20 +733,28 @@ def preflight_cmd(
     run(ip or server, user=user, ssh_port=ssh_port, sni=sni, domain=domain, ai=ai, scope="preflight")
 
 
-@app.command("scan")
+@app.command("scan", rich_help_panel=ADVANCED)
 def scan_cmd(
     ip: Target = "",
     user: User = "",
     server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
-    """Find optimal SNI targets on an IPv4 server via RealiTLScanner"""
+    """Find camouflage (SNI) sites that suit your server
+
+    Scans the server's own network with RealiTLScanner (IPv4 only), lets you
+    pick a result, and prints the command that uses it.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian scan 198.51.100.10[/cyan]
+      [cyan]meridian scan ubuntu@198.51.100.10:2222[/cyan]
+    """
     from meridian.commands.scan import run
 
     run(ip, user, server, ssh_port=ssh_port)
 
 
-@app.command("test")
+@app.command("test", rich_help_panel=CHECK_AND_FIX)
 def test_cmd(
     ip: str = typer.Argument("", help="Server IP, domain, or saved name", show_default=False),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
@@ -668,10 +766,17 @@ def test_cmd(
     timeout: Timeout = "5",
     json_output: bool = typer.Option(False, "--json", help="Output a typed verification result as JSON"),
 ) -> None:
-    """Test delivered proxy traffic from this device (no SSH required).
+    """Test real proxy traffic from this device (no SSH needed)
 
-    `--basic` skips client traffic and cannot be combined with `--client`.
-    `--probe` checks what an active prober sees instead of sending traffic.
+    Runs one active client's delivered connection end to end. [cyan]--basic[/cyan]
+    only checks reachability and cannot be combined with [cyan]--client[/cyan];
+    [cyan]--probe[/cyan] shows what a censor's active prober would see instead.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian test[/cyan]                       Test the saved server
+      [cyan]meridian test 198.51.100.10 --basic[/cyan]   Reachability only
+      [cyan]meridian test --client alice[/cyan]        Use one client's connection
+      [cyan]meridian test --probe[/cyan]               See the server as a censor would
     """
     if json_output:
         _enable_json_output()
@@ -710,7 +815,7 @@ def probe_cmd(
 # =============================================================================
 
 
-@app.command("doctor")
+@app.command("doctor", rich_help_panel=CHECK_AND_FIX)
 def doctor_cmd(
     ip: Target = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
@@ -719,7 +824,12 @@ def doctor_cmd(
     server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
-    """Collect system info for bug reports"""
+    """Collect a redacted diagnostic report for bug reports
+
+    [dim]Examples:[/dim]
+      [cyan]meridian doctor[/cyan]                     Report on the saved server
+      [cyan]meridian doctor 198.51.100.10 --ai[/cyan]  Copy an AI-ready report to the clipboard
+    """
     from meridian.commands.diagnostics import run
 
     run(ip, sni, user, ai, server, ssh_port=ssh_port)
@@ -741,7 +851,7 @@ def rage_cmd(
     run(ip, sni, user, ai, server, ssh_port=ssh_port)
 
 
-@app.command("panel")
+@app.command("panel", rich_help_panel=ADVANCED)
 def panel_cmd(
     show_password: bool = typer.Option(False, "--show-password", help="Also print the admin password"),
 ) -> None:
@@ -751,7 +861,7 @@ def panel_cmd(
     run(show_password=show_password)
 
 
-@app.command("teardown")
+@app.command("teardown", rich_help_panel=ADVANCED)
 def teardown_cmd(
     ip: Target = "",
     user: User = "",
@@ -759,17 +869,26 @@ def teardown_cmd(
     server: ServerAlias = "",
     ssh_port: SshPort = 0,
 ) -> None:
-    """Remove an unreferenced proxy deployment from a server"""
+    """Remove Meridian from a server
+
+    A single-server deployment is removed completely, including the local
+    configuration. In a multi-server fleet, a server that still has a role is
+    refused; remove it with [cyan]meridian node remove[/cyan] first.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian teardown 198.51.100.10[/cyan]
+      [cyan]meridian teardown ubuntu@198.51.100.10:2222[/cyan]
+    """
     from meridian.commands.uninstall import run
 
     run(ip, user, yes, server, ssh_port=ssh_port)
 
 
-@app.command("update")
+@app.command("update", rich_help_panel=ADVANCED)
 def update_cmd(
     major: bool = typer.Option(False, "--major", help="Also move to a newer major version"),
 ) -> None:
-    """Update meridian to the latest release of its major version"""
+    """Update the meridian CLI to the latest release of its major version"""
     from meridian.update import run_self_update
 
     exit_code = run_self_update(major=major)
@@ -797,7 +916,7 @@ def relay_add_cmd(
     yes: Yes = False,
     ssh_port: SshPort = 0,
 ) -> None:
-    """Add a TCP relay that forwards to an exit node.
+    """Add a TCP relay that forwards to an exit
 
     [dim]Examples:[/dim]
       [cyan]meridian relay add 203.0.113.10 --exit 198.51.100.10[/cyan]
@@ -832,7 +951,7 @@ def relay_remove_cmd(
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:
-    """Remove relay chains through a relay server.
+    """Remove relay chains through a relay server
 
     Drops every chain that uses the server (or one chain by ID), shows what
     will be deleted, and applies the reviewed removal: Realm units, firewall
@@ -885,7 +1004,7 @@ def route_add_cmd(
     name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
     json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
 ) -> None:
-    """Send matching destinations through WARP, directly, or nowhere.
+    """Send matching destinations through WARP, directly, or nowhere
 
     Overrides apply on the exit, ahead of its default egress, in the order
     they were added. Using --via warp sets up WARP on the exit if needed.
@@ -945,7 +1064,7 @@ def node_add_cmd(
     harden: bool = typer.Option(True, help="Apply OS hardening (fleet servers require it)"),
     yes: Yes = False,
 ) -> None:
-    """Add an exit server to the fleet.
+    """Add an exit server to the fleet
 
     Connects via SSH, adds the server as an exit in your topology, and
     applies the reviewed plan (hardening, Docker, Xray, panel registration).
@@ -993,7 +1112,7 @@ def node_replace_cmd(
     ssh_port: SshPort = 0,
     yes: Yes = False,
 ) -> None:
-    """Move an exit to another server.
+    """Move an exit to another server
 
     Keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo
     settings, and every relay pointing at it. Shows the review (deploy on
@@ -1015,7 +1134,7 @@ def node_remove_cmd(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     force: bool = typer.Option(False, "--force", help="Also remove relay chains that route to this exit"),
 ) -> None:
-    """Remove an exit or routing gateway from the fleet.
+    """Remove an exit or routing gateway from the fleet
 
     Edits the topology, shows every resource that will be deleted (panel
     node, profile, node container, firewall rules, Hosts), and applies the
@@ -1050,9 +1169,21 @@ def fleet_status_cmd(
         raise typer.Exit(exit_code)
 
 
+@fleet_app.command("inventory")
+def fleet_inventory_cmd(
+    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
+) -> None:
+    """Show configured topology with live status"""
+    from meridian.commands.fleet import run_inventory
+
+    if json_mode:
+        _enable_json_output()
+    run_inventory()
+
+
 @fleet_app.command("upgrade")
 def fleet_upgrade_cmd(yes: Yes = False) -> None:
-    """Roll this CLI's pinned Remnawave images out to every server.
+    """Roll this CLI's pinned Remnawave images out to every server
 
     Lists the backend, subscription page, PostgreSQL, Valkey, and node
     images each server runs against the pins, applies the reviewed plan,
@@ -1066,18 +1197,6 @@ def fleet_upgrade_cmd(yes: Yes = False) -> None:
     from meridian.commands.fleet_upgrade import run_upgrade
 
     run_upgrade(yes=yes)
-
-
-@fleet_app.command("inventory")
-def fleet_inventory_cmd(
-    json_mode: bool = typer.Option(False, "--json", help="Output result as JSON"),
-) -> None:
-    """Show configured topology with live status"""
-    from meridian.commands.fleet import run_inventory
-
-    if json_mode:
-        _enable_json_output()
-    run_inventory()
 
 
 # =============================================================================

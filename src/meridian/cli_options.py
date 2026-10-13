@@ -12,10 +12,13 @@ Target = Annotated[str, typer.Argument(metavar="SERVER", help=TARGET_HELP, show_
 NewServer = Annotated[
     str, typer.Argument(metavar="SERVER", help="Server IP, user@IP[:port], or local (this machine)", show_default=False)
 ]
-User = Annotated[str, typer.Option("--user", "-u", help="SSH user (default: saved, else root)", show_default=False)]
+USER_HELP = "SSH user (default: saved, else root)"
+SSH_PORT_HELP = "SSH port (default: saved, else 22)"
+YES_HELP = "Skip confirmation"
+User = Annotated[str, typer.Option("--user", "-u", help=USER_HELP, show_default=False)]
 SshPort = Annotated[
     int,
-    typer.Option("--ssh-port", min=0, max=65535, help="SSH port (default: saved, else 22)", show_default=False),
+    typer.Option("--ssh-port", min=0, max=65535, help=SSH_PORT_HELP, show_default=False),
 ]
 # Kept so older scripts keep working; the server now goes first, like ssh.
 ServerAlias = Annotated[str, typer.Option("--server", hidden=True, help=TARGET_HELP)]
@@ -23,4 +26,4 @@ ServerAlias = Annotated[str, typer.Option("--server", hidden=True, help=TARGET_H
 Timeout = Annotated[
     str, typer.Option("--timeout", metavar="SECONDS", help="Per-network-operation timeout, 1-30 seconds")
 ]
-Yes = Annotated[bool, typer.Option("--yes", "-y", help="Skip confirmation")]
+Yes = Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP)]
