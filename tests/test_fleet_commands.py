@@ -148,140 +148,122 @@ def _v4_projected_topology() -> FleetTopology:
     )
 
 
-def _status_patches(topology: FleetTopology, panel: MagicMock):
-    """Return context managers that patch the fleet source, make_panel, and relay health."""
-    return (
-        _fleet_source(topology),
+def _run(
+    command,
+    panel: MagicMock,
+    *,
+    topology: FleetTopology | None = None,
+    json: bool = False,
+    relay=True,
+) -> tuple[int | None, object, MagicMock]:
+    """Run a fleet command; return its exit code, the JSON payload (if any), and the relay probe mock."""
+    probe = {"side_effect": relay} if isinstance(relay, Exception) else {"return_value": relay}
+    with (
+        _fleet_source(topology or _fleet_topology()),
         patch("meridian.commands.fleet.make_panel", return_value=panel),
-        patch("meridian.commands.fleet.tcp_connect", return_value=True),
-        patch("meridian.commands.fleet.is_json_mode", return_value=False),
-    )
+        patch("meridian.commands.fleet.tcp_connect", **probe) as tcp,
+        patch("meridian.commands.fleet.is_json_mode", return_value=json),
+        patch("meridian.commands.fleet.emit_json") as emit,
+    ):
+        exit_code = command()
+    return exit_code, emit.call_args[0][0] if emit.called else None, tcp
+
+
+def _panel(*, ping_ok: bool = True, nodes=(), users=()) -> MagicMock:
+    panel = _make_panel_mock(ping_ok=ping_ok)
+    panel.list_nodes.return_value = list(nodes)
+    panel.list_users.return_value = list(users)
+    return panel
 
 
 class TestFleetStatus:
     def test_status_healthy_panel(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [
-            _api_node(_UUID_A, connected=True),
-            _api_node(_UUID_B, connected=True),
-        ]
-        panel.list_users.return_value = []
+        panel = _panel(nodes=[_api_node(_UUID_A), _api_node(_UUID_B)])
 
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            exit_code = run_status()
-
-        assert exit_code == 3
+        assert _run(run_status, panel)[0] == 3
         panel.ping.assert_called_once()
         panel.list_nodes.assert_called_once()
 
-    def test_status_unreachable_panel(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=False)
+    def test_status_unreachable_panel_skips_node_listing(self) -> None:
+        panel = _panel(ping_ok=False)
 
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            exit_code = run_status()
-
-        assert exit_code == 3
+        assert _run(run_status, panel)[0] == 3
         panel.ping.assert_called_once()
-        # When panel is unreachable, list_nodes should NOT be called
         panel.list_nodes.assert_not_called()
 
     def test_status_auth_error_exits_user_failure(self) -> None:
         """Authentication failures are not reported as partial healthy status."""
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=False)
+        panel = _panel(ping_ok=False)
         panel.ping.side_effect = RemnawaveAuthError(
-            "Panel authentication failed",
-            hint="Check your API token.",
-            category="user",
+            "Panel authentication failed", hint="Check your API token.", category="user"
         )
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-        ):
-            with pytest.raises(typer.Exit) as exc_info:
-                run_status()
+        with pytest.raises(typer.Exit) as exc_info:
+            _run(run_status, panel)
 
         assert exc_info.value.exit_code == 2
 
     def test_status_mixed_node_states(self) -> None:
         topology = _fleet_topology()
-        # Add a third node to the cluster for "disabled"
         topology.nodes.append(_node("198.51.100.4", _UUID_C, "node-3"))
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [
-            _api_node(_UUID_A, connected=True),
-            _api_node(_UUID_B, connected=False, disabled=False),
-            _api_node(_UUID_C, connected=False, disabled=True),
-        ]
-        panel.list_users.return_value = []
+        panel = _panel(
+            nodes=[
+                _api_node(_UUID_A, connected=True),
+                _api_node(_UUID_B, connected=False, disabled=False),
+                _api_node(_UUID_C, connected=False, disabled=True),
+            ]
+        )
 
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            exit_code = run_status()
+        assert _run(run_status, panel, topology=topology)[0] == 4
 
-        assert exit_code == 4
+    @pytest.mark.parametrize(("reachable", "exit_code"), [(True, 3), (False, 4)])
+    def test_status_probes_each_relay(self, reachable: bool, exit_code: int) -> None:
+        code, _, probe = _run(run_status, _panel(), relay=reachable)
 
-    def test_status_relay_healthy(self) -> None:
+        assert code == exit_code
+        probe.assert_called_once_with("198.51.100.3", 443, 3.0)
+
+    @pytest.mark.parametrize(
+        ("empty_topology", "users"),
+        [(True, []), (False, [_api_user("alice"), _api_user("bob"), _api_user("carol", "DISABLED")])],
+        ids=["no-nodes", "with-users"],
+    )
+    def test_status_completes_with_sparse_or_populated_panels(self, empty_topology: bool, users: list[User]) -> None:
         topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = []
-        panel.list_users.return_value = []
+        if empty_topology:
+            topology = topology.model_copy(update={"nodes": [], "relays": []})
+        panel = _panel(users=users)
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True) as mock_health,
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-        ):
-            exit_code = run_status()
+        _run(run_status, panel, topology=topology)
 
-        assert exit_code == 3
-        # Relay health checked once for the single relay
-        mock_health.assert_called_once_with("198.51.100.3", 443, 3.0)
+        panel.list_users.assert_called_once()
 
-    def test_status_relay_unreachable(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = []
-        panel.list_users.return_value = []
+    def test_status_list_nodes_api_error_is_partial_status(self) -> None:
+        panel = _panel()
+        panel.list_nodes.side_effect = RemnawaveError("API error")
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=False) as mock_health,
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-        ):
-            exit_code = run_status()
+        _run(run_status, panel)
 
-        assert exit_code == 4
-        mock_health.assert_called_once_with("198.51.100.3", 443, 3.0)
+    @pytest.mark.parametrize(
+        ("command", "error"),
+        [(run_status, ValueError("bad adapter")), (run_inventory, TypeError("adapter shape changed"))],
+        ids=["status", "inventory"],
+    )
+    def test_unexpected_adapter_error_is_a_bug_not_partial_status(self, command, error: Exception) -> None:
+        panel = _panel()
+        panel.list_nodes.side_effect = error
+
+        with pytest.raises(type(error), match=str(error)):
+            _run(command, panel)
 
     def test_status_json_output_structure(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [
-            _api_node(_UUID_A, connected=True),
-            _api_node(_UUID_B, connected=False),
-        ]
-        panel.list_users.return_value = [_api_user("alice"), _api_user("bob", "DISABLED")]
+        panel = _panel(
+            nodes=[_api_node(_UUID_A, connected=True), _api_node(_UUID_B, connected=False)],
+            users=[_api_user("alice"), _api_user("bob", "DISABLED")],
+        )
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            exit_code = run_status()
+        exit_code, payload, _ = _run(run_status, panel, json=True)
 
-        mock_json.assert_called_once()
-        payload = mock_json.call_args[0][0]
         data = payload.data
         assert payload.schema_version == "meridian.output/v1"
         assert payload.command == "fleet.status"
@@ -305,118 +287,22 @@ class TestFleetStatus:
         assert len(data["nodes"]) == 2
         assert len(data["relays"]) == 1
         assert data["summary"]["users"] == 2
-
-    def test_status_json_node_statuses(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [
-            _api_node(_UUID_A, connected=True),
-            _api_node(_UUID_B, connected=False, disabled=False),
-        ]
-        panel.list_users.return_value = []
-
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_status()
-
-        data = mock_json.call_args[0][0].data
         statuses = {n["uuid"]: n["status"] for n in data["nodes"]}
-        assert statuses[_UUID_A] == "connected"
-        assert statuses[_UUID_B] == "disconnected"
-
-    def test_status_no_nodes(self) -> None:
-        topology = _fleet_topology().model_copy(update={"nodes": [], "relays": []})
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = []
-        panel.list_users.return_value = []
-
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            run_status()
-
-    def test_status_with_users(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = []
-        panel.list_users.return_value = [
-            _api_user("alice", "ACTIVE"),
-            _api_user("bob", "ACTIVE"),
-            _api_user("carol", "DISABLED"),
-        ]
-
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            run_status()
-
-        panel.list_users.assert_called_once()
+        assert statuses == {_UUID_A: "connected", _UUID_B: "disconnected"}
 
     def test_status_node_unknown_when_not_in_api(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        # API returns only one of the two cluster nodes
-        panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
-        panel.list_users.return_value = []
+        _, payload, _ = _run(run_status, _panel(nodes=[_api_node(_UUID_A)]), json=True)
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_status()
-
-        data = mock_json.call_args[0][0].data
-        statuses = {n["uuid"]: n["status"] for n in data["nodes"]}
+        statuses = {n["uuid"]: n["status"] for n in payload.data["nodes"]}
         assert statuses[_UUID_B] == "unknown"
-
-    def test_status_list_nodes_api_error_handled(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.side_effect = RemnawaveError("API error")
-        panel.list_users.return_value = []
-
-        p_load, p_panel, p_relay, p_json = _status_patches(topology, panel)
-        with p_load, p_panel, p_relay, p_json:
-            run_status()  # should not raise
-
-    def test_status_list_nodes_unexpected_error_is_bug(self) -> None:
-        """Unexpected adapter bugs surface instead of being reported as partial status."""
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.side_effect = ValueError("bad adapter")
-        panel.list_users.return_value = []
-
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-            pytest.raises(ValueError, match="bad adapter"),
-        ):
-            run_status()
 
     def test_status_json_preserves_partial_panel_failures(self) -> None:
         """JSON mode reports source availability and warnings for partial API failures."""
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
+        panel = _panel(users=[_api_user("alice")])
         panel.list_nodes.side_effect = RemnawaveError("API error")
-        panel.list_users.return_value = [_api_user("alice")]
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            exit_code = run_status()
+        exit_code, payload, _ = _run(run_status, panel, json=True)
 
-        payload = mock_json.call_args[0][0]
         assert exit_code == 3
         assert payload.exit_code == 3
         assert payload.warnings[0].code == "MERIDIAN_PANEL_NODES_UNAVAILABLE"
@@ -427,24 +313,11 @@ class TestFleetStatus:
         assert payload.data["summary"]["needs_attention"] is True
 
     def test_status_user_source_failure_returns_unknown_exit(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [
-            _api_node(_UUID_A, connected=True),
-            _api_node(_UUID_B, connected=True),
-        ]
+        panel = _panel(nodes=[_api_node(_UUID_A), _api_node(_UUID_B)])
         panel.list_users.side_effect = RemnawaveError("users unavailable")
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=True),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as emit,
-        ):
-            exit_code = run_status()
+        exit_code, payload, _ = _run(run_status, panel, json=True)
 
-        payload = emit.call_args[0][0]
         assert exit_code == 3
         assert payload.exit_code == 3
         assert payload.data["sources"]["users"] == "unavailable"
@@ -452,66 +325,34 @@ class TestFleetStatus:
 
     def test_status_json_preserves_relay_check_failure_as_warning(self) -> None:
         """Relay checker failures degrade relay source without failing panel data."""
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
-        panel.list_users.return_value = [_api_user("alice")]
+        panel = _panel(nodes=[_api_node(_UUID_A)], users=[_api_user("alice")])
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", side_effect=RuntimeError("probe crashed")),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_status()
+        _, payload, _ = _run(run_status, panel, json=True, relay=RuntimeError("probe crashed"))
 
-        payload = mock_json.call_args[0][0]
         assert payload.warnings[0].code == "MERIDIAN_RELAYS_UNAVAILABLE"
         assert payload.data["sources"]["relays"] == "unavailable"
         assert payload.data["relays"][0]["health"] == "unknown"
         assert payload.data["summary"]["health"] == "unknown"
 
     def test_status_json_relay_health(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = []
-        panel.list_users.return_value = []
+        _, payload, _ = _run(run_status, _panel(), json=True, relay=False)
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.tcp_connect", return_value=False),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_status()
-
-        data = mock_json.call_args[0][0].data
-        assert len(data["relays"]) == 1
-        assert data["relays"][0]["healthy"] is False
-        assert data["relays"][0]["health"] == "unhealthy"
-        assert data["relays"][0]["ip"] == "198.51.100.3"
+        relays = payload.data["relays"]
+        assert len(relays) == 1
+        assert relays[0]["healthy"] is False
+        assert relays[0]["health"] == "unhealthy"
+        assert relays[0]["ip"] == "198.51.100.3"
 
     def test_status_uses_v4_topology_projection(self) -> None:
-        topology = _v4_projected_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
-        panel.list_users.return_value = [_api_user("alice"), _api_user("meridian-route-123")]
+        panel = _panel(nodes=[_api_node(_UUID_A)], users=[_api_user("alice"), _api_user("meridian-route-123")])
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch(
-                "meridian.commands.fleet._check_relays_health",
-                return_value={("198.51.100.30", 8443): True},
-            ),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
+        with patch(
+            "meridian.commands.fleet._check_relays_health",
+            return_value={("198.51.100.30", 8443): True},
         ):
-            run_status()
+            _, payload, _ = _run(run_status, panel, topology=_v4_projected_topology(), json=True)
 
-        data = mock_json.call_args[0][0].data
+        data = payload.data
         assert data["summary"]["nodes"] == 1
         assert data["summary"]["relays"] == 1
         assert data["summary"]["users"] == 1
@@ -525,18 +366,9 @@ class TestFleetInventory:
         topology.nodes[0] = topology.nodes[0].model_copy(
             update={"xhttp_path": "xhttp-a", "ws_path": "ws-a", "protocols": ["reality", "xhttp", "hysteria2"]}
         )
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_inventory()
+        _, payload, _ = _run(run_inventory, _panel(nodes=[_api_node(_UUID_A)]), topology=topology, json=True)
 
-        payload = mock_json.call_args[0][0]
         data = payload.data
         assert payload.schema_version == "meridian.output/v1"
         assert payload.command == "fleet.inventory"
@@ -555,19 +387,11 @@ class TestFleetInventory:
         assert data["nodes"][0]["protocols"] == ["reality", "xhttp", "hysteria2"]
 
     def test_inventory_uses_v4_topology_projection(self) -> None:
-        topology = _v4_projected_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.return_value = [_api_node(_UUID_A, connected=True)]
+        panel = _panel(nodes=[_api_node(_UUID_A)])
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
-        ):
-            run_inventory()
+        _, payload, _ = _run(run_inventory, panel, topology=_v4_projected_topology(), json=True)
 
-        data = mock_json.call_args[0][0].data
+        data = payload.data
         assert data["summary"]["nodes"] == 1
         assert data["summary"]["relays"] == 1
         assert data["nodes"][0]["name"] == "exit-v4"
@@ -579,49 +403,28 @@ class TestFleetInventory:
         topology.nodes[1] = topology.nodes[1].model_copy(
             update={"xhttp_path": "xhttp-b", "protocols": ["reality", "xhttp", "hysteria2"]}
         )
-        panel = _make_panel_mock(ping_ok=False)
 
         with (
             _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
+            patch("meridian.commands.fleet.make_panel", return_value=_panel(ping_ok=False)),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
-            patch("meridian.commands.fleet.emit_json") as mock_json,
+            patch("meridian.commands.fleet.emit_json") as emit,
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_inventory()
 
         assert exc_info.value.exit_code == 3
-        data = mock_json.call_args[0][0].data
-        node = next(n for n in data["nodes"] if n["ip"] == "198.51.100.2")
+        node = next(n for n in emit.call_args[0][0].data["nodes"] if n["ip"] == "198.51.100.2")
         assert node["protocols"] == ["reality", "xhttp", "hysteria2"]
 
     def test_inventory_text_handles_panel_api_error(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
+        panel = _panel()
         panel.list_nodes.side_effect = RemnawaveError("API error")
 
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_inventory()
+        with pytest.raises(typer.Exit) as exc_info:
+            _run(run_inventory, panel)
 
         assert exc_info.value.exit_code == 3
-
-    def test_inventory_unexpected_panel_error_is_bug(self) -> None:
-        topology = _fleet_topology()
-        panel = _make_panel_mock(ping_ok=True)
-        panel.list_nodes.side_effect = TypeError("adapter shape changed")
-
-        with (
-            _fleet_source(topology),
-            patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet.is_json_mode", return_value=False),
-            pytest.raises(TypeError, match="adapter shape changed"),
-        ):
-            run_inventory()
 
 
 class TestPanelVersionWarnings:
