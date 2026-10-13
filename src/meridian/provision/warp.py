@@ -10,6 +10,7 @@ nginx, Xray inbound) are completely unaffected.
 
 from __future__ import annotations
 
+from meridian.facts import ServerFacts
 from meridian.provision.apt_keys import verify_apt_key
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
@@ -51,11 +52,14 @@ class InstallWarp:
             if result.returncode != 0:
                 return StepResult(name=self.name, status="failed", detail="Failed to add GPG key")
 
-            result = conn.run(
-                'echo "deb [arch=$(dpkg --print-architecture)'
+            # Minimal Debian images ship without lsb_release; os-release always exists.
+            facts = ServerFacts(conn)
+            result = conn.put_text(
+                "/etc/apt/sources.list.d/cloudflare-client.list",
+                f"deb [arch={facts.dpkg_arch()}"
                 " signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg]"
-                ' https://pkg.cloudflareclient.com/ $(lsb_release -cs) main"'
-                " | tee /etc/apt/sources.list.d/cloudflare-client.list",
+                f" https://pkg.cloudflareclient.com/ {facts.os_release().version_codename} main\n",
+                mode="644",
                 timeout=15,
             )
             if result.returncode != 0:

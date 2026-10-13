@@ -139,3 +139,28 @@ def test_control_plane_bootstrap_leaves_public_ports_to_the_reviewed_plan() -> N
         firewalls = [step for step in steps if isinstance(step, ConfigureFirewall)]
         assert len(firewalls) == int(harden) and not any(step.manage_public_ports for step in firewalls)
         assert not any(isinstance(step, EnsurePort443) for step in steps)
+
+
+def test_firewall_check_reports_missing_ufw_as_drift_in_a_real_shell(tmp_path) -> None:
+    # Stock Debian ships without ufw; the baseline installs it, so absence is drift.
+    import subprocess
+
+    from meridian.reconciler.server_evidence import baseline_check_command
+
+    check = next(
+        check
+        for check in build_server_baseline_checks(
+            ProvisionContext(ip="198.51.100.1", harden=True), install_docker=False, manage_public_ports=False
+        )
+        if check.name == "firewall"
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", baseline_check_command(check.name, check.command)],
+        env={"PATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "not found" not in result.stderr

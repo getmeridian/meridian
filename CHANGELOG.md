@@ -189,6 +189,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
 - A fresh deploy with Hysteria2 converges. The node started before its
   certificate existed, so Xray refused to run and the deploy stopped.
+- Stock Debian 13 servers deploy and join as exits. The baseline treated a
+  missing `ufw` as an unreadable check, waited for a `dnsutils` package Debian
+  no longer ships, and WARP needed `lsb_release`.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and

@@ -54,7 +54,6 @@ class TestInstallWarp:
             "gpg --show-keys",
             stdout="pub:-:255:22:6E2DD2174FA1C3BA:::::::\nfpr:::::::::C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA:\n",
         )
-        conn.when("tee", stdout="")
         conn.when("apt-get update", stdout="")
         conn.when("systemctl enable", stdout="")
         conn.when("registration new", stdout="Success")
@@ -65,6 +64,32 @@ class TestInstallWarp:
         result = InstallWarp().run(conn, ctx)
         assert result.status == "changed"
         assert str(WARP_PROXY_PORT) in result.detail
+
+    def test_repo_codename_comes_from_os_release_not_lsb_release(self):
+        conn = _WarpMockConnection()
+        conn.when("command -v warp-cli", rc=1)
+        conn.when("cat /etc/os-release", stdout="ID=debian\nVERSION_CODENAME=trixie\n")
+        conn.when("dpkg --print-architecture", stdout="arm64")
+        conn.when("curl -fsSL", stdout="")
+        conn.when(
+            "gpg --show-keys",
+            stdout="pub:-:255:22:6E2DD2174FA1C3BA:::::::\nfpr:::::::::C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA:\n",
+        )
+        conn.when("apt-get update", stdout="")
+        conn.when("systemctl enable", stdout="")
+        conn.when("registration new", stdout="Success")
+        conn.when("mode proxy", stdout="")
+        conn.when("proxy port", stdout="")
+
+        result = InstallWarp().run(conn, ProvisionContext(ip="198.51.100.1", warp=True))
+
+        assert result.status == "changed"
+        repo = dict((path, text.decode()) for path, text, _ in conn._writes)[
+            "/etc/apt/sources.list.d/cloudflare-client.list"
+        ]
+        assert repo.startswith("deb [arch=arm64 ")
+        assert repo.endswith(" https://pkg.cloudflareclient.com/ trixie main\n")
+        assert not any("lsb_release" in command for command in conn._calls)
 
     def test_already_installed_but_disconnected(self):
         """warp-cli exists but not connected — register and connect."""

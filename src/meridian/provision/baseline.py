@@ -137,6 +137,8 @@ def build_server_baseline_checks(
                 BaselineCheck("fail2ban", "systemctl is-active --quiet fail2ban"),
                 BaselineCheck(
                     "firewall",
+                    # Absent UFW (stock Debian) is drift to install, not a missing inspection tool.
+                    "command -v ufw >/dev/null 2>&1 || exit 1; "
                     "ufw status | grep -qx 'Status: active' && "
                     "ufw status verbose | grep -q '^Default: deny (incoming), allow (outgoing)' && "
                     "ports=$(sshd -T 2>/dev/null | awk '$1 == \"port\" {print $2}'); "

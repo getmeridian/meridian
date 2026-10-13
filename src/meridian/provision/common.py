@@ -27,7 +27,8 @@ REQUIRED_PACKAGES = [
     "python3-pip",
     "unattended-upgrades",
     "apt-listchanges",
-    "dnsutils",
+    # Debian 13 keeps "dnsutils" only as a virtual name, which dpkg-query never reports installed.
+    "bind9-dnsutils",
 ]
 
 # Auto-upgrades config content
