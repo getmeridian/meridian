@@ -122,7 +122,7 @@ class InboundPayload(CoreModel):
     kind: Literal["inbound"] = "inbound"
     workload_ref: str
     protocol: ProtocolKind
-    purpose: Literal["client", "bridge"] = "client"
+    purpose: Literal["client", "bridge", "relay"] = "client"
     tag: str
     listen_address: str = ""
     listen_port: int

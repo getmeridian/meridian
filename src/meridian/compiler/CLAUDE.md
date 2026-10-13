@@ -20,7 +20,7 @@
 - Deployment review binds every resolved host/user/port and pinned renderer/runtime input without storing credentials.
 - TCP paths terminate through typed nginx artifacts; Hysteria2 stays direct UDP.
 - Realm hops are emitted downstream-first through graph dependencies.
-- Custom relay Reality SNI is added to both the Profile’s accepted server names and the exit stream route before the relay Host.
+- **One camouflage per Reality inbound** — a relay whose SNI differs from its exit path gets a loopback `purpose="relay"` inbound imitating that SNI (shared per exit, path, and name); its ingress falls back to the same site and its Hosts bind to it. Accepting the name on the exit's inbound showed probes the exit's certificate.
 - Routing gateway bridges use dedicated service Users and source-restricted firewall rules.
 - Xray client failover uses a virtual template Host plus hidden tagged edge Hosts; Base64 and Mihomo keep visible alternatives. Health-checked groups never mix fingerprints (TSPU escalates a freeze when one changes): copies carry `ALT_FINGERPRINT_TAG`, get their own Xray balancer and Mihomo `exclude-filter`, and skip sing-box.
 

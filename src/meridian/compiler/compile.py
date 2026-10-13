@@ -55,7 +55,7 @@ from meridian.compiler.names import (
     node_name,
     profile_name,
 )
-from meridian.compiler.relays import compile_relays, register_relay_ingress
+from meridian.compiler.relays import compile_relays, plan_relay_camouflage, register_relay_ingress
 from meridian.compiler.routing import (
     bridge_inbound_id,
     compile_gateway_routing,
@@ -124,7 +124,6 @@ def compile_topology(
     )
     stream_dependencies[control_stream_key].add(control_id)
     direct_host_ids: list[str] = []
-    reality_names_by_path = _reality_names_by_path(intent)
     gateway_plans = {
         gateway.id: compile_gateway_routing(intent, gateway)
         for gateway in sorted(intent.routing_gateways, key=lambda item: item.id)
@@ -177,12 +176,20 @@ def compile_topology(
         )
 
     places = exit_places([(exit_.id, exit_.region) for exit_ in intent.exits])
+    camouflage = plan_relay_camouflage(intent, ports)
     for exit_ in sorted(intent.exits, key=lambda item: item.id):
         profile_id = f"profile:{exit_.id}"
         sorted_paths = sorted(exit_.paths, key=lambda item: item.id)
         client_path_refs = [f"inbound:{exit_.id}:{path.id}" for path in sorted_paths]
         bridge_specs = sorted(bridge_specs_by_exit[exit_.id], key=lambda item: item[0])
-        path_refs = [*client_path_refs, *(item[0] for item in bridge_specs)]
+        camouflage_specs = sorted(
+            {item.inbound_id: item.payload for item in camouflage.values() if item.exit_ref == exit_.id}.items()
+        )
+        path_refs = [
+            *client_path_refs,
+            *(item[0] for item in bridge_specs),
+            *(inbound_id for inbound_id, _ in camouflage_specs),
+        ]
         inbound_specs: list[InboundPayload] = []
         for path in sorted_paths:
             if path.protocol == "hysteria2" and path.listen_port and path.listen_port != path.public_port:
@@ -199,13 +206,14 @@ def compile_topology(
                     listen_port=listen_port,
                     public_port=path.public_port,
                     reality_sni=path.reality_sni,
-                    reality_server_names=reality_names_by_path.get((exit_.id, path.id), []),
+                    reality_server_names=[path.reality_sni] if path.protocol == "reality" else [],
                     tls_sni=path.tls_sni,
                     host=path.host,
                     path=path.path,
                 )
             )
         inbound_specs.extend(item[1] for item in bridge_specs)
+        inbound_specs.extend(payload for _, payload in camouflage_specs)
         builder.add(
             profile_id,
             ConfigProfilePayload(
@@ -236,6 +244,8 @@ def compile_topology(
                 inbound_spec,
                 dependencies=[profile_id, firewall_id],
             )
+        for inbound_id, inbound_spec in camouflage_specs:
+            builder.add(inbound_id, inbound_spec, dependencies=[profile_id])
 
         binding_id = builder.add(
             f"binding:{exit_.id}",
@@ -320,6 +330,7 @@ def compile_topology(
         stream_routes=stream_routes,
         stream_dependencies=stream_dependencies,
         stream_fallbacks=stream_fallbacks,
+        camouflage=camouflage,
     )
     stream_ids = _compile_stream_artifacts(
         builder,
@@ -336,9 +347,10 @@ def compile_topology(
         inbound_by_path=inbound_by_path,
         stream_ids=stream_ids,
         relay_ingress=relay_ingress,
+        camouflage=camouflage,
     )
 
-    all_inbounds = sorted(inbound_by_path.values())
+    all_inbounds = sorted({*inbound_by_path.values(), *(item.inbound_id for item in camouflage.values())})
     squad_id = builder.add(
         "squad:access",
         InternalSquadPayload(
@@ -690,23 +702,6 @@ def _compile_probes(
             dependencies=[gateway_id],
             postconditions=[ResourcePostcondition(kind="probe_succeeds", target_ref=gateway_id)],
         )
-
-
-def _reality_names_by_path(intent: SetupIntent) -> dict[tuple[str, str], list[str]]:
-    names: dict[tuple[str, str], set[str]] = {}
-    for exit_ in intent.exits:
-        for path in exit_.paths:
-            if path.protocol == "reality":
-                names[(exit_.id, path.id)] = {path.reality_sni}
-    for relay in intent.transparent_relays:
-        if relay.reality_sni:
-            names[(relay.exit_ref, relay.protocol_path_ref)].add(relay.reality_sni)
-    result: dict[tuple[str, str], list[str]] = {}
-    for key, accepted in names.items():
-        exit_ = next(item for item in intent.exits if item.id == key[0])
-        path = next(item for item in exit_.paths if item.id == key[1])
-        result[key] = [path.reality_sni, *sorted(accepted - {path.reality_sni})]
-    return result
 
 
 def _ensure_certificate(

@@ -192,6 +192,11 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Removing or moving an exit cleans up its certificate** — the acme.sh
   renewal, the certificate files, and (with the server's last certificate)
   the port-80 challenge listener go, instead of renewing forever.
+- **A relay with its own camouflage site really imitates it** — `relay add
+  --sni` gave clients the new name while the exit answered probes with its own
+  site's certificate (a `www.google.com` certificate for `yandex.ru`), which
+  gives the relay away. Each relay name now gets its own Reality listener on
+  the exit, and anything else sent through the relay reaches that site.
 - **Debian 12 deploys finish** — fail2ban there found no SSH log file and
   stopped right after starting, which failed server preparation; it now reads
   the system journal on every supported release, and a package Debian only

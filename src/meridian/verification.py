@@ -405,8 +405,8 @@ def _v4_context(
                 continue
             allocation = cluster.allocations.get(resource.logical_id)
             listen_port = allocation.port if allocation and allocation.port else payload.listen_port
-            if listen_port and payload.purpose == "bridge":
-                internal_ports[f"bridge/{resource.logical_id}"] = listen_port
+            if listen_port and payload.purpose in ("bridge", "relay"):
+                internal_ports[f"{payload.purpose}/{resource.logical_id}"] = listen_port
             elif listen_port and listen_port != payload.public_port:
                 internal_ports[f"{payload.workload_ref}/{payload.protocol}"] = listen_port
             continue

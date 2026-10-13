@@ -2,14 +2,70 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from meridian.compiler.allocations import PortAllocator
 from meridian.compiler.builder import PlanBuilder
 from meridian.compiler.client_delivery import fingerprint_copy_fields
 from meridian.compiler.errors import TopologyCompileError
-from meridian.compiler.firewalls import add_firewall
-from meridian.compiler.models import HostPayload, NginxRouteSpec, RealmHopPayload, ResourcePostcondition
+from meridian.compiler.firewalls import add_firewall, stable_token
+from meridian.compiler.models import (
+    HostPayload,
+    InboundPayload,
+    NginxRouteSpec,
+    RealmHopPayload,
+    ResourcePostcondition,
+)
 from meridian.compiler.names import exit_places, host_remark
 from meridian.core.topology import SetupIntent, path_fingerprints
+
+
+@dataclass(frozen=True)
+class RelayCamouflage:
+    """A loopback Reality inbound on the exit that imitates one relay's own SNI."""
+
+    exit_ref: str
+    inbound_id: str
+    payload: InboundPayload
+
+
+def plan_relay_camouflage(intent: SetupIntent, ports: PortAllocator) -> dict[str, RelayCamouflage]:
+    """Map each relay whose SNI differs from its exit path to an inbound with that camouflage.
+
+    One Reality inbound forwards probes to exactly one site, so a relay name added to the
+    exit's own inbound answered with the exit's certificate. Relays sharing an exit path
+    and SNI share one inbound.
+    """
+    exits = {exit_.id: exit_ for exit_ in intent.exits}
+    by_name: dict[tuple[str, str, str], RelayCamouflage] = {}
+    result: dict[str, RelayCamouflage] = {}
+    for relay in sorted(intent.transparent_relays, key=lambda item: item.id):
+        exit_ = exits[relay.exit_ref]
+        path = next(path for path in exit_.paths if path.id == relay.protocol_path_ref)
+        if path.protocol != "reality" or not relay.reality_sni or relay.reality_sni == path.reality_sni:
+            continue
+        key = (exit_.id, path.id, relay.reality_sni)
+        if key not in by_name:
+            token = stable_token(relay.reality_sni)
+            port = ports.auxiliary_tcp(
+                exit_.server_ref, f"relay-camouflage:{exit_.id}:{path.id}:{relay.reality_sni}", base=60000, size=4999
+            )
+            by_name[key] = RelayCamouflage(
+                exit_ref=exit_.id,
+                inbound_id=f"inbound:{exit_.id}:{path.id}:camouflage:{token}",
+                payload=InboundPayload(
+                    workload_ref=exit_.id,
+                    protocol="reality",
+                    purpose="relay",
+                    tag=f"meridian-{exit_.id}-reality-{token}",
+                    listen_port=port,
+                    public_port=port,
+                    reality_sni=relay.reality_sni,
+                    reality_server_names=[relay.reality_sni],
+                ),
+            )
+        result[relay.id] = by_name[key]
+    return result
 
 
 def register_relay_ingress(
@@ -23,6 +79,7 @@ def register_relay_ingress(
     stream_routes: dict[tuple[str, int], list[NginxRouteSpec]],
     stream_dependencies: dict[tuple[str, int], set[str]],
     stream_fallbacks: dict[tuple[str, int], str],
+    camouflage: dict[str, RelayCamouflage],
 ) -> dict[str, int]:
     """Give each relay its own SNI listener on the exit, reachable only from its last hop.
 
@@ -40,17 +97,22 @@ def register_relay_ingress(
             continue  # non-Reality relay paths are rejected in _compile_relays
         port = ports.auxiliary_tcp(exit_.server_ref, f"relay-ingress:{relay.id}", base=50000, size=9999)
         key = (exit_.server_ref, port)
+        own = camouflage.get(relay.id)
+        sni = own.payload.reality_sni if own else path.reality_sni
         stream_routes[key].append(
             NginxRouteSpec(
                 match="sni",
-                server_names=[relay.reality_sni or path.reality_sni],
+                server_names=[sni],
                 backend_server_ref=exit_.server_ref,
-                backend_port=allocated_path_ports[(exit_.id, path.id)],
+                backend_port=own.payload.listen_port if own else allocated_path_ports[(exit_.id, path.id)],
                 protocol="reality",
             )
         )
-        stream_fallbacks[key] = path.reality_sni
-        stream_dependencies[key].update({runtime_by_exit[exit_.id], inbound_by_path[(exit_.id, path.id)]})
+        # Anything else through the relay reaches the site its name imitates.
+        stream_fallbacks[key] = sni
+        stream_dependencies[key].update(
+            {runtime_by_exit[exit_.id], own.inbound_id if own else inbound_by_path[(exit_.id, path.id)]}
+        )
         stream_dependencies[key].add(
             add_firewall(builder, exit_.server_ref, "tcp", port, source_server_refs=[relay.hop_server_refs[-1]])
         )
@@ -66,6 +128,7 @@ def compile_relays(
     inbound_by_path: dict[tuple[str, str], str],
     stream_ids: dict[tuple[str, int], str],
     relay_ingress: dict[str, int],
+    camouflage: dict[str, RelayCamouflage],
 ) -> list[str]:
     exits = {exit_.id: exit_ for exit_ in intent.exits}
     places = exit_places([(exit_.id, exit_.region) for exit_ in intent.exits])
@@ -124,7 +187,8 @@ def compile_relays(
             downstream_dependency = hop_id
 
         first_hop_id = hop_ids[0]
-        inbound_id = inbound_by_path[(exit_.id, path.id)]
+        own = camouflage.get(relay.id)
+        inbound_id = own.inbound_id if own else inbound_by_path[(exit_.id, path.id)]
         for index, fingerprint in enumerate(path_fingerprints(path.protocol, path.fingerprint)):
             host_id = f"host:{relay.id}:{path.id}" + ("" if index == 0 else f":{fingerprint}")
             host_ids.append(

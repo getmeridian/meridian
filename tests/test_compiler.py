@@ -575,6 +575,7 @@ class TestPureCompiler:
             ("reality", "client"),
             ("xhttp", "client"),
             ("reality", "bridge"),
+            ("reality", "relay"),
         ]
         assert [(item.protocol, item.purpose) for item in profiles["exit-b"].inbounds] == [
             ("hysteria2", "client"),
@@ -746,16 +747,26 @@ class TestPureCompiler:
         # A relay into a Reality path is published with each fingerprint copy.
         assert sorted(host.fingerprint for host in relay_hosts) == ["chrome", "firefox"]
 
-    def test_custom_relay_sni_is_accepted_before_its_host_is_published(self) -> None:
+    def test_custom_relay_sni_gets_its_own_camouflage_inbound(self) -> None:
+        """One Reality inbound imitates one site; a relay name on the exit's inbound showed the exit's certificate."""
         plan = compile_topology(_intent())
         resources = {resource.logical_id: resource for resource in plan.resources}
         inbound = resources["inbound:exit-a:reality-a"]
         assert isinstance(inbound.payload, InboundPayload)
-        assert inbound.payload.reality_sni == "www.microsoft.com"
-        assert inbound.payload.reality_server_names == [
-            "www.microsoft.com",
-            "relay-a.example.com",
+        assert inbound.payload.reality_server_names == ["www.microsoft.com"]
+
+        [own_id] = [
+            logical_id for logical_id in resources if logical_id.startswith("inbound:exit-a:reality-a:camouflage:")
         ]
+        own = resources[own_id].payload
+        assert isinstance(own, InboundPayload)
+        assert (own.purpose, own.reality_sni, own.reality_server_names) == (
+            "relay",
+            "relay-a.example.com",
+            ["relay-a.example.com"],
+        )
+        assert own_id in resources["profile:exit-a"].payload.inbound_refs
+        assert own_id in resources["squad:access"].payload.inbound_refs
 
         stream = next(
             resource
@@ -766,8 +777,11 @@ class TestPureCompiler:
                 for route in getattr(resource.payload, "routes", [])
             )
         )
+        assert stream.payload.fallback_server_name == "relay-a.example.com"
+        assert [route.backend_port for route in stream.payload.routes] == [own.listen_port]
         relay_host = resources["host:relay-a:reality-a"]
         assert relay_host.payload.sni == "relay-a.example.com"
+        assert relay_host.payload.inbound_ref == own_id
         assert stream.logical_id in resources["realm:relay-a:1"].dependencies
         assert "realm:relay-a:0" in relay_host.dependencies
 
@@ -856,7 +870,7 @@ class TestCompilerFailures:
         )
         names = [name for route in ingress.routes for name in route.server_names]
         assert names == ["relay-a.example.com"]  # no empty-SNI route to the control plane
-        assert ingress.fallback_server_name == "www.microsoft.com"
+        assert ingress.fallback_server_name == "relay-a.example.com"  # the site the relay's name imitates
         firewall = next(
             r.payload
             for r in plan.resources
@@ -959,7 +973,7 @@ def client_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
             profile.inbounds,
             strict=True,
         )
-        if inbound.purpose == "client"
+        if inbound.purpose in ("client", "relay")  # users connect to both; bridges serve gateways
     ]
 
 
