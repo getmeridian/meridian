@@ -117,7 +117,7 @@ def _render(observed: list[ServerImages]) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
-    table = Table(title="Remnawave images", box=ROUNDED, pad_edge=False, padding=(0, 2))
+    table = Table(title="Remnawave images", box=ROUNDED, pad_edge=False, padding=(0, 1))
     table.add_column("Server", style="bold cyan")
     table.add_column("Component")
     table.add_column("Running", style="dim")
@@ -141,12 +141,13 @@ def _render(observed: list[ServerImages]) -> None:
 
 
 def _short(image: str) -> str:
-    """``repo:tag`` plus a short digest, so pins with digests stay readable."""
+    """The tag plus a 7-character digest; the component column already names the repository."""
     if not image:
         return ""
     ref = parse_image(image)
-    digest = f"@{ref.digest[:19]}" if ref.digest else ""
-    return f"{ref.repository}{':' + ref.tag if ref.tag else ''}{digest}"
+    digest = ref.digest.rpartition(":")[2][:7]
+    label = ref.tag or ref.repository
+    return f"{label} @{digest}" if digest else label
 
 
 def _explain_held(observed: list[ServerImages]) -> None:
