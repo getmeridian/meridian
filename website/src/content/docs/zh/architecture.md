@@ -129,7 +129,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 - `/opt/remnanode/` — 节点 compose 文件和 `.env`
 
 ### 在每个中继上
-- `/etc/meridian/realm/` — Realm 配置，由 `meridian-realm-*` systemd 服务运行
+- `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）；下一个 `meridian apply` 重命名在较旧的 `meridian-realm-*` 名字下部署的跳跃
 
 ### 在您的机器上
 - `~/.meridian/cluster.yml` — 拓扑、面板访问、密钥

@@ -83,6 +83,14 @@ meridian client enable alice
 
 ## Web 面板
 
-[Remnawave](https://remna.st/) 管理面板在浏览器中显示流量、用户和节点。其 URL 和管理员登录在 `~/.meridian/cluster.yml` 的 `panel` 部分，并且部署将 URL 打印为 "Remnawave panel (advanced)"。
+[Remnawave](https://remna.st/) 管理面板在浏览器中显示流量、用户和节点，您可以随意使用它。`meridian panel` 打印其 URL 和管理员用户名；`meridian panel --show-password` 也打印密码。
 
-使用面板来查看；使用 Meridian 来改变事物。Meridian 在下次应用时恢复它管理的用户、主机和模板，并且 `meridian plan` 首先显示任何差异。
+Meridian 和面板分工，所以您的编辑不会被覆盖：
+
+| Meridian 管理（下一次应用恢复其版本） | 您的修改（apply 永远不会改变这些） |
+|---|---|
+| 节点、配置文件、入站、发布的主机、小队 | 每个客户端的状态：启用/禁用、流量限制、过期、HWID 限制、描述 |
+| 订阅模板和 Meridian 设置的设置 | 您在面板中自己创建的用户 |
+| 存在哪些客户端、他们的名字和他们的小队 | 通知、插件、IP 控制和其他面板设置 |
+
+`meridian plan` 在任何事情改变之前显示 Meridian 管理内容的任何差异。您在面板中添加的用户从未被 Meridian 列出、改变或删除；要给某人一个 Meridian 管理的链接和连接页面，改为使用 `meridian client add`。

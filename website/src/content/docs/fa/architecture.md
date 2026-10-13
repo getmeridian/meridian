@@ -129,7 +129,7 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 - `/opt/remnanode/` — فایل compose node و `.env`
 
 ### روی هر relay
-- `/etc/meridian/realm/` — پیکربندی Realm، توسط سرویس‌های systemd `meridian-realm-*` اجرا می‌شود
+- `/etc/netfwd/` — پیکربندی Realm، اجرا شده از `/usr/local/bin/netfwd` توسط سرویس‌های systemd `netfwd-*`. میزبان‌های relay هیچ واحد مریدیان‌نام‌شده، مسیر یا نظر firewall (`fw-*`) ندارند؛ `meridian apply` بعدی hopهایی که تحت نام‌های `meridian-realm-*` قدیمی‌تر مستقر شدند را تغییر نام می‌دهد
 
 ### روی ماشین شما
 - `~/.meridian/cluster.yml` — topology، دسترسی پنل، کلیدها

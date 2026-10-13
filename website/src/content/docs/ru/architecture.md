@@ -129,7 +129,7 @@ Backend-порты Xray достигаются через nginx; UFW блоки�
 - `/opt/remnanode/` — файл compose узла и `.env`
 
 ### На каждом ретрансляторе
-- `/etc/meridian/realm/` — конфигурация Realm, запущена через сервисы `meridian-realm-*` systemd
+- `/etc/netfwd/` — конфигурация Realm, запущена из `/usr/local/bin/netfwd` через сервисы `netfwd-*` systemd. На хостах ретрансляторов нет модулей с названиями Meridian, путей или комментариев брандмауэра (`fw-*`); следующее `meridian apply` переименует хопы развёрнутые под старыми названиями `meridian-realm-*`
 
 ### На вашей машине
 - `~/.meridian/cluster.yml` — топология, доступ к панели, ключи

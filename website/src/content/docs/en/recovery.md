@@ -35,6 +35,16 @@ meridian node add 198.51.100.20 --name replacement
 
 Clients keep their accounts. They receive the new exit on their next subscription refresh — ask them to refresh in their app if it doesn't happen on its own.
 
+### Or move the blocked exit to a new server
+
+`node replace` moves an exit to a fresh server, keeping its ID, keys, protocol paths, and relays, then cleans up the old server:
+
+```bash
+meridian node replace exit-1 198.51.100.20
+```
+
+Clients pick up the new address on their next subscription refresh. The control-plane server itself can't be moved this way yet.
+
 ### Add a domain for CDN fallback
 
 If you weren't using a domain, add one to the new exit:
@@ -84,4 +94,4 @@ Don't tear down the blocked server right away — blocks are sometimes lifted af
 meridian test 198.51.100.10
 ```
 
-Retiring a single exit from a multi-server fleet isn't available yet, so a blocked exit stays in the topology for now.
+When you no longer need it, remove it with `meridian node remove`.

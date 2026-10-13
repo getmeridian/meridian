@@ -150,15 +150,15 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-
 meridian node remove NAME_OR_IP [--yes] [--force]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--name NAME` | (自动) | 节点的友好名称 |
 | `--user USER` | 已保存或 root | 节点上的 SSH 用户 |
-| `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`） |
+| `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`、`node replace`） |
 | `--sni HOST` | www.google.com | 此节点的 Reality 伪装目标 |
 | `--domain DOMAIN` | (无) | 节点域；在其上添加 XHTTP、WSS 和 Hysteria2 路径 |
 | `--harden / --no-harden` | 启 | OS、SSH 和防火墙加固。舰队服务器总是保持它；`--no-harden` 被拒绝 |
@@ -172,6 +172,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 
 **`node remove`** — 从拓扑中删除出口或路由网关。它列出将被删除的每个资源（面板节点和配置文件、节点容器、防火墙规则、已发布的主机），请求确认，并准确应用该审查；服务器留在保存的服务器中。对于控制服务器拒绝（使用 `meridian teardown`），而中继仍路由到出口（先删除它们或传递 `--force`），而路由网关通过它进入舰队，以及当结果会破坏拓扑时（例如空出口池或默认出口）。范围限定为已删除网关的路由规则与其一起删除。
 
+**`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（节点容器、镜像和目录；其 nginx 文件、防火墙规则和证书）；Docker 和保存的服务器保留。对于控制服务器拒绝（移动面板会改变每个订阅 URL），以及对于已经有角色的新服务器拒绝。
+
 ### meridian relay
 
 管理中继 — Realm TCP 转发器，给用户一个到国外出口的国内入口点。中继承载 Reality 流量。
@@ -179,7 +181,6 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-
 meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 
@@ -202,7 +203,7 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 ### meridian route
 
-Send chosen destinations from an exit through Cloudflare WARP, directly, or nowhere, ahead of the exit's default egress. (Translation pending; see the English reference.)
+从出口将选定的目标通过 Cloudflare WARP、直接或不通过任何地方发送，领先于出口的默认出站。
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
@@ -210,16 +211,24 @@ meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--via ACTION` | `warp`, `direct`, or `block` |
-| `--name ID` | Route ID |
-| `--yes/-y` | Skip the removal confirmation |
-| `--json` | Emit a `meridian.output/v1` envelope |
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--via ACTION` | （add 需要） | `warp`、`direct` 或 `block` |
+| `--name ID` | 操作，编号 | 路由 ID 显示在 `route list` 并由 `route remove` 使用 |
+| `--yes/-y` | | 跳过删除确认（需要用 `--json`） |
+| `--json` | | 发出 `meridian.output/v1` 信封（`data.override` 用于 add/remove，`data.exits[]` 用于 list） |
+
+`EXIT` 是出口 ID、保存的服务器名称或 IP。每个 `VALUE` 是一个域名（包括子域名）、`geosite:NAME` 或 `geoip:NAME`；一个路由持有一种。
+
+**`route add`** — 将路由添加到拓扑中的出口并应用它。路由按添加它们的顺序匹配。没有 WARP 的出口上的 `warp` 路由仅为该路由设置 WARP；其他流量保持直接。
+
+**`route list`** — 显示每个出口的默认出站及其路由的匹配顺序。
+
+**`route remove`** — 删除一个路由并应用更改；其目标遵循出口的默认出站。WARP 保持安装在服务器上但不承载任何东西，直到路由或 `--warp` 再次使用它。
 
 ### meridian fleet
 
-来自实时面板的舰队范围内的健康和库存。
+来自实时面板的舰队范围内的健康和库存，以及 `meridian update` 后的镜像升级。
 
 ```
 meridian fleet status [--json]
@@ -229,14 +238,14 @@ meridian fleet upgrade [--yes]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--json` | | 将结果作为 `meridian.output/v1` 信封发出 |
-| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+| `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`） |
+| `--yes`, `-y` | | `fleet upgrade`：跳过确认 |
 
-**`fleet upgrade`** — After `meridian update`, compares the Remnawave images each server runs with the CLI's pins, applies the reviewed plan, then runs `meridian check`. Newer or floating tags you chose are kept; a PostgreSQL major is never moved.
-
-**`fleet status`** — 面板健康、节点心跳、中继监听器和客户端计数。缺失或不活跃的声明客户端降低健康。可达的中继监听器仅证明 TCP，所以未验证的中继路由保持健康 `unknown`；用 `meridian test` 检查完整路径。退出 `0` 意味着健康，`4` 是降级，`3` 是未知。
+**`fleet status`** — 面板健康、节点心跳、中继监听器和客户端计数。缺失声明的客户端降低健康；禁用、限制或过期的客户端被计数但是您的选择，不是错误。可达的中继监听器仅证明 TCP，所以未验证的中继路由保持健康 `unknown`；用 `meridian test` 检查完整路径。退出 `0` 意味着健康，`4` 是降级，`3` 是未知。
 
 **`fleet inventory`** — 你的已配置服务器、角色、节点和中继，可达时带实时面板状态。它永不打印面板 API 令牌或秘密路径。如果实时状态不可用，已配置库存仍显示，带警告，命令退出 `3`。使用 `plan --json` 决定应用是否有工作要做。
+
+**`fleet upgrade`** — 在 `meridian update` 后，卷出每个服务器运行的新 CLI 的固定 Remnawave 镜像。它读取后端、订阅页面、PostgreSQL、Valkey 和节点镜像每个服务器运行（通过 SSH 读取 `docker inspect`）并显示每个为 `current`、`upgrade`、`install` 或保留。版本政策是设置使用的：更新的版本标签或您选择的浮动标签（`latest`、`3`）被保留并报告，永远不降级。PostgreSQL 主版本永远不在原地移动 — 旧主版本保持运行，命令解释需要的 dump-and-restore。在您确认后，它应用已审查的计划并在每个服务器上运行 `meridian check`。一个其镜像无法读取的服务器在任何改变前用退出 `3` 停止命令；如果应用收敛但服务器仍运行旧镜像，它也退出 `3`。
 
 ### meridian check
 
@@ -310,15 +319,17 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 ### meridian panel
 
-<!-- TRANSLATE -->Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+显示 Remnawave 管理面板 URL 和管理员用户名，以及 Meridian 管理的内容与您可以改变的内容。
 
 ```
 meridian panel [--show-password]
 ```
 
-| Flag | Default | Description |
+| 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--show-password` | | Also print the admin password |
+| `--show-password` | | 也打印管理员密码 |
+
+对客户端状态、流量限制、过期和描述的编辑，以及您在面板中创建的用户，在每次应用中幸存。对节点、配置文件、主机、小队和 Meridian 创建的模板的编辑由下一次应用恢复；`meridian plan` 首先显示它们。
 
 ### meridian teardown
 

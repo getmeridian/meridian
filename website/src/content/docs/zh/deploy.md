@@ -139,6 +139,19 @@ meridian deploy 198.51.100.10 --warp
 
 Meridian 在代理模式下安装 `cloudflare-warp` 客户端（SOCKS5 在 `127.0.0.1:40000`），使其成为 Xray 的出站。传入连接不受影响。WARP 免费且不需要 Cloudflare 账户。
 
+### 仅对某些网站使用 WARP
+
+要仅发送选定的网站通过 WARP 并保持其他所有内容直接，改为在出口上添加路由而不是为所有流量打开 WARP。Meridian 在第一次路由需要时在出口上设置 WARP：
+
+```
+meridian route add exit-1 --via warp chatgpt.com netflix.com
+meridian route add exit-1 --via block geosite:category-ads-all
+meridian route list
+meridian route remove exit-1 warp
+```
+
+值是域名（包括子域名）、`geosite:NAME` 列表或来自库存 v2fly 数据文件的 `geoip:NAME` 列表；一个路由包含一种。`--via direct` 在 WARP 出口上反向做：这些目标跳过 WARP。路由按您添加它们的顺序应用，在出口的默认出站之前，在地理封锁之前。这些路由位于服务器上；它们与在用户设备上发送俄罗斯网站直接的客户端侧规则分开。
+
 ## 地理封锁
 
 默认情况下，服务器通过代理阻止俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 范围（`geoip:ru`）。这让你的 VPS IP 远离俄罗斯服务日志，降低被发现和阻止的机会。
@@ -161,8 +174,8 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 ## 管理面板
 
-Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx 在随机秘密路径上反向代理，与连接页面路径分开，所以你分享的链接永不显示它。部署打印面板 URL 为"Remnawave 面板（高级）"；URL 和管理员登录在 `~/.meridian/cluster.yml` 的 `panel` 部分。
+Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx 在随机秘密路径上反向代理，与连接页面路径分开，所以你分享的链接永不显示它。`meridian panel` 打印 URL 和管理员登录（`--show-password` 用于密码）。
 
-像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。
+像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。客户端状态、限制、过期和您自己添加的用户是您的；详见 [Web 面板](/docs/zh/client-management/#web-panel)。
 
 Meridian 固定了它已测试的 Remnawave 版本。如果你自己升级 Remnawave，Meridian 不会降级它。

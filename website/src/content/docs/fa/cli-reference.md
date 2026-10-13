@@ -151,13 +151,14 @@ meridian server remove NAME_OR_IP [--yes]
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--name NAME` | (خودکار) | نام دوستانه برای گره |
 | `--user USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی گره |
-| `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی گره (`node add`) |
+| `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی گره (`node add`, `node replace`) |
 | `--sni HOST` | www.google.com | هدف camouflage Reality برای این گره |
 | `--domain DOMAIN` | (هیچ) | دامنه گره؛ XHTTP، WSS و مسیرهای Hysteria2 را روی آن اضافه می‌کند |
 | `--harden / --no-harden` | فعال | تقویت سیستم‌عامل، SSH و firewall. سروری فلیت همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
@@ -170,6 +171,8 @@ meridian node remove NAME_OR_IP [--yes] [--force]
 **`node list`** — گره‌ها را با وضعیت panel زندگی، نسخه Xray و ترافیق فهرست می‌کند. اگر وضعیت panel دسترس نباشد، گره‌های پیکربندی‌شده به عنوان `unknown` نشان داده می‌شوند و دستور exit `3` می‌شود.
 
 **`node remove`** — یک exit یا دروازه مسیریابی را از topology شما حذف می‌کند. هر منابعی را که حذف خواهد شد فهرست می‌کند (پنل node و profile، container node، قوانین firewall، منتشر شده Hosts)، تأیید می‌خواهد، و دقیقاً آن بررسی را اعمال می‌کند؛ سرور در سرورهای ذخیره‌شده باقی می‌ماند. برای سرور کنترل (از `meridian teardown` استفاده کنید) رد می‌شود، درحالی که relays هنوز به exit مسیریابی می‌کنند (ابتدا آنها را بردارید یا `--force` را منتقل کنید)، درحالی که یک دروازه مسیریابی از طریق آن وارد فلیت می‌شود، و وقتی نتیجه topology را می‌شکند (برای مثال یک حوزه egress خالی یا egress پیش‌فرض). قوانین مسیریابی محدود به یک دروازه حذف‌شده با آن حذف می‌شوند.
+
+**`node replace`** — یک exit را به سرور دیگر منتقل می‌کند. `EXIT` ID exit یا نام ذخیره‌شده سرور یا IP است؛ سرور جدید syntax هم‌انندی `node add` (نام ذخیره‌شده یا `local` هم‌چنین کار می‌کند) استفاده می‌کند و مانند `server add` ذخیره می‌شود. exit ID خود را، کلیدهای Reality، مسیرهای پروتکل، SNI، WARP و تنظیمات geo خود را نگاه می‌دارد، و هر relay که به آن اشاره می‌کند، بنابراین relay کاربران کار می‌کند و کاربران مستقیم آدرس جدید را در تازه‌سازی اشتراک بعدی خود دریافت می‌کنند. بررسی آنچه روی سرور جدید مستقر خواهد شد فهرست می‌کند و هر منابع تمیز شدهٔ سرور قدیم (node container، image و directory؛ فایل‌های nginx، قوانین firewall و گواهینامه‌ها)؛ Docker و سرور ذخیره‌شده باقی می‌مانند. برای سرور کنترل (منتقل کردن پنل هر URL اشتراک را تغییر می‌دهد) و برای سرور جدید که قبلاً نقش دارد رد می‌شود.
 
 ### meridian relay
 
@@ -200,7 +203,7 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 
 ### meridian route
 
-Send chosen destinations from an exit through Cloudflare WARP, directly, or nowhere, ahead of the exit's default egress. (Translation pending; see the English reference.)
+مقاصد انتخاب‌شده را از exit از طریق Cloudflare WARP، مستقیم، یا هیچ‌کدام ارسال کنید، پیش از egress پیش‌فرض exit.
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
@@ -208,16 +211,24 @@ meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--via ACTION` | `warp`, `direct`, or `block` |
-| `--name ID` | Route ID |
-| `--yes/-y` | Skip the removal confirmation |
-| `--json` | Emit a `meridian.output/v1` envelope |
+| پرچم | پیش‌فرض | توضیح |
+|------|---------|-------------|
+| `--via ACTION` | (الزامی برای add) | `warp`، `direct` یا `block` |
+| `--name ID` | action، numbered | Route ID نشان داده‌شده توسط `route list` و استفاده شده توسط `route remove` |
+| `--yes/-y` | | تأیید حذف را رد کنید (با `--json` الزامی است) |
+| `--json` | | پاکت `meridian.output/v1` ارسال کنید (`data.override` برای add/remove، `data.exits[]` برای list) |
+
+`EXIT` ID exit، نام سرور ذخیره‌شده یا IP است. هر `VALUE` دامنه (subdomains شامل)، `geosite:NAME` یا `geoip:NAME` است؛ یک route یک نوع را نگاه می‌دارد.
+
+**`route add`** — route را به exit در topology شما اضافه کرده و آن را اعمال می‌کند. Routes به ترتیبی که اضافه شدند match می‌کند. `warp` route روی exit بدون WARP تنظیم WARP برای آن route تنها می‌کند؛ ترافیق دیگر مستقیم می‌ماند.
+
+**`route list`** — هر exit's egress پیش‌فرض و routes آن را به ترتیب match نشان می‌دهد.
+
+**`route remove`** — یک route را حذف کرده و تغییر را اعمال می‌کند؛ مقاصد آن egress پیش‌فرض exit را دنبال می‌کند دوباره. WARP روی سرور نصب شده باقی می‌ماند اما هیچ چیزی را حمل نمی‌کند تا route یا `--warp` آن را استفاده کند.
 
 ### meridian fleet
 
-سلامتی و موجودی fleet از panel زندگی.
+سلامتی و موجودی fleet از panel زندگی، و ارتقای image بعد از `meridian update`.
 
 ```
 meridian fleet status [--json]
@@ -227,14 +238,14 @@ meridian fleet upgrade [--yes]
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید |
-| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+| `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید (`status`, `inventory`) |
+| `--yes`, `-y` | | `fleet upgrade`: تأیید را رد کنید |
 
-**`fleet upgrade`** — After `meridian update`, compares the Remnawave images each server runs with the CLI's pins, applies the reviewed plan, then runs `meridian check`. Newer or floating tags you chose are kept; a PostgreSQL major is never moved.
-
-**`fleet status`** — سلامتی panel، heartbeats گره، relay listeners و تعداد کلاینت. کلاینت‌های اعلام‌شده missing یا inactive سلامتی را کاهش می‌دهند. relay listener قابل دسترس فقط TCP را ثابت می‌کند، پس مسیر relay غیر‌تأیید‌شده سلامتی را `unknown` نگه می‌دارد؛ از `meridian test` برای بررسی مسیر کامل استفاده کنید. Exit `0` سلامت، `4` کاهش و `3` نامعلوم است.
+**`fleet status`** — سلامتی panel، heartbeats گره، relay listeners و تعداد کلاینت. کلاینت‌های اعلام‌شده missing سلامتی را کاهش می‌دهند؛ کلاینت‌های غیرفعال، محدود یا منقضی شده شمرده می‌شوند اما انتخاب شما هستند، نه خرابی. relay listener قابل دسترس فقط TCP را ثابت می‌کند، پس مسیر relay غیر‌تأیید‌شده سلامتی را `unknown` نگه می‌دارد؛ از `meridian test` برای بررسی مسیر کامل استفاده کنید. Exit `0` سلامت، `4` کاهش و `3` نامعلوم است.
 
 **`fleet inventory`** — سروری، نقش، گره و relay پیکربندی‌شده شما، با وضعیت panel زندگی زمانی‌که قابل دسترس باشد. هرگز API token یا مسیرهای مخفی panel را چاپ نمی‌کند. اگر وضعیت زندگی دسترس نباشد، موجودی پیکربندی‌شده هنوز نشان داده می‌شود، با هشدار، و دستور exit `3` می‌شود. `plan --json` را برای تصمیم‌گیری‌اینکه آیا اعمال کار دارد استفاده کنید.
+
+**`fleet upgrade`** — بعد از `meridian update`, تصاویر backend، subscription page، PostgreSQL، Valkey و node را که هر سرور اجرا می‌کند می‌خواند (read-only `docker inspect` روی SSH) و هر یک را `current`، `upgrade`، `install` یا نگه‌داشته نشان می‌دهد. سیاست نسخه برابر setup است: نسخهٔ tag جدیدتر یا tag floating (`latest`، `3`) که انتخاب کردید نگه داشته می‌شود و گزارش می‌شود، هرگز downgrade نمی‌شود. یک PostgreSQL major هرگز در جای خود منتقل نمی‌شود — major قدیم اجرا را نگاه می‌دارد و دستور dump-and-restore آن را نیاز دارد توضیح می‌دهد. بعد از تأیید، برنامهٔ بررسی‌شده را اعمال می‌کند و `meridian check` را روی هر سرور اجرا می‌کند. سروری که تصاویر آن نمی‌توانند خوانده شود دستور را با exit `3` متوقف می‌کند قبل از هیچ تغییری؛ اگر اعمال همگرا شود اما سرور هنوز تصویر قدیمی اجرا می‌کند، exit `3` هم می‌شود.
 
 ### meridian check
 
@@ -308,15 +319,17 @@ Doctor از نقش‌های سرور پیروی می‌کند: سرور relay-on
 
 ### meridian panel
 
-<!-- TRANSLATE -->Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
+URL پنل مدیریت Remnawave و نام کاربری مدیریت را نشان دهید، و آنچه Meridian در آنجا مدیریت می‌کند درمقابل آنچه برای تغییر مال شما است.
 
 ```
 meridian panel [--show-password]
 ```
 
-| Flag | Default | Description |
+| پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--show-password` | | Also print the admin password |
+| `--show-password` | | همچنین رمز عبور مدیریت را چاپ کنید |
+
+ویرایش‌های وضعیت کلاینت، محدودیت‌های ترافیق، انقضا و توضیح و کاربرانی که در پنل ایجاد می‌کنید هر اعمال را survive می‌کنند. ویرایش‌های nodes، profiles، Hosts، squads و templates که Meridian ایجاد کرد توسط بعدی اعمال reverted می‌شوند؛ `meridian plan` ابتدا آن‌ها را نشان می‌دهد.
 
 ### meridian teardown
 
