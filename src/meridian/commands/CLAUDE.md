@@ -38,6 +38,8 @@
 - V4 plan/apply must bind the reviewed hash and emit typed compiled results or exactly one structured terminal error.
 - The wizard needs a terminal: `prompt()` returns the default when `/dev/tty` is missing, so a headless run would loop on required answers; `setup` refuses without one unless `--yes`.
 - `node replace` refuses the control server (subscription URLs would change) and a new server that already has any role; check roles before dialing.
+- Re-running `relay add` for a declared relay server resumes it; a different exit, port, or SNI is refused with `relay remove` guidance (a second relay entry duplicated its listener).
+- Bare `test` follows the intent, not the saved-server count: removed servers stay saved, so a fleet down to one entry still tests it without asking.
 - A failed `node add` leaves its exit in the intent; re-running it must resume that exit (refusing conflicting `--sni`/`--domain`), never add a second exit on the same server.
 - A new public command needs an entry in `_HELP_LAYOUT` and a `rich_help_panel`, or it appears in a bare `Commands` list above the sections.
 - Entry points convert library `MeridianError`s with `fail(exc)`; an uncaught one prints a traceback (`setup --intent MISSING` did).

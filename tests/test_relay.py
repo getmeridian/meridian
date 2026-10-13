@@ -102,6 +102,62 @@ class TestRelayCLI:
         assert exc_info.value.exit_code == 2
         registry.add.assert_called_once()
 
+    def _rerun(self, exit_arg: str, intent: SetupIntent) -> tuple[MagicMock, BaseException | None]:
+        from meridian.commands.relay import run_deploy
+
+        servers = {
+            "srv-exit": SimpleNamespace(id="srv-exit", host="198.51.100.10", name="exit-a"),
+            "srv-exit-b": SimpleNamespace(id="srv-exit-b", host="198.51.100.11", name="exit-b"),
+            "198.51.100.20": SimpleNamespace(id="srv-relay", host="198.51.100.20", name="relay-a"),
+        }
+        registry = MagicMock()
+        registry.find.side_effect = servers.get
+        apply = MagicMock(return_value=SimpleNamespace(all_succeeded=True, changed=True))
+        error: BaseException | None = None
+        with (
+            patch("meridian.commands.relay.load_topology_cluster", return_value=ClusterConfig(topology_intent=intent)),
+            patch("meridian.servers.ServerRegistry", return_value=registry),
+            patch(
+                "meridian.commands.resolve.resolve_server",
+                return_value=SimpleNamespace(ip="198.51.100.20", user="root", port=22, machine_id="", conn=MagicMock()),
+            ),
+            patch("meridian.setup.runtime.SetupRuntime.apply_intent", apply),
+        ):
+            try:
+                run_deploy("198.51.100.20", exit_arg, relay_name="relay-a", yes=True)
+            except typer.Exit as exc:
+                error = exc
+        return apply, error
+
+    def _with_relay(self) -> SetupIntent:
+        from meridian.setup.editor import add_relay_to_intent
+
+        return add_relay_to_intent(
+            self._v4_intent(), server_ref="srv-relay", title="relay-a", exit_ref="exit-a", listen_port=443
+        )
+
+    def test_rerunning_relay_add_resumes_the_declared_relay(self) -> None:
+        intent = self._with_relay()
+
+        apply, error = self._rerun("exit-a", intent)
+
+        assert error is None
+        assert apply.call_args.args[0] == intent
+
+    def test_relay_add_refuses_to_repoint_an_existing_relay(self, capsys: pytest.CaptureFixture[str]) -> None:
+        intent = self._with_relay()
+        payload = intent.model_dump(mode="json")
+        second = {**payload["exits"][0], "id": "exit-b", "server_ref": "srv-exit-b"}
+        second["paths"] = [{**second["paths"][0], "id": "reality-b"}]
+        payload["exits"].append(second)
+        intent = SetupIntent.model_validate(payload)
+
+        apply, error = self._rerun("exit-b", intent)
+
+        assert isinstance(error, typer.Exit) and error.exit_code == 2
+        apply.assert_not_called()
+        assert "relay remove relay-a" in capsys.readouterr().err
+
     def test_v4_deploy_persistence_error_warns_remote_state_may_have_changed(
         self,
         capsys: pytest.CaptureFixture[str],

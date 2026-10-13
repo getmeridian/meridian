@@ -126,14 +126,28 @@ def run_deploy(
         fail(exc)
     if entry is None:
         raise RuntimeError("Validated relay server was not saved")
-    updated = add_relay_to_intent(
-        intent,
-        server_ref=entry.id,
-        title=(request.relay_name or f"relay-{len(intent.transparent_relays) + 1}"),
-        exit_ref=exit_ref,
-        listen_port=request.listen_port,
-        reality_sni=request.sni,
-    )
+    existing = next((relay for relay in intent.transparent_relays if relay.hop_server_refs[0] == entry.id), None)
+    if existing is None:
+        updated = add_relay_to_intent(
+            intent,
+            server_ref=entry.id,
+            title=(request.relay_name or f"relay-{len(intent.transparent_relays) + 1}"),
+            exit_ref=exit_ref,
+            listen_port=request.listen_port,
+            reality_sni=request.sni,
+        )
+    elif (existing.exit_ref, existing.listen_port) != (exit_ref, request.listen_port) or (
+        request.sni and request.sni != existing.reality_sni
+    ):
+        fail(
+            f"{request.relay_name or request.relay_ip} already relays to {existing.exit_ref} "
+            f"on port {existing.listen_port}.",
+            hint=f"Remove it first with `meridian relay remove {existing.id}`, then add it again.",
+            hint_type="user",
+        )
+    else:
+        # A re-run after a failed or interrupted add resumes the declared relay.
+        updated = intent
     try:
         with reviewed_apply_persistence("V4 relay apply"), apply_progress(registry=registry) as reporter:
             result = SetupRuntime(

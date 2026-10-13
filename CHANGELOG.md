@@ -192,6 +192,10 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
 - **Removing or moving an exit cleans up its certificate** — the acme.sh
   renewal, the certificate files, and (with the server's last certificate)
   the port-80 challenge listener go, instead of renewing forever.
+- **Re-running a command resumes it** — `relay add` for a relay that is already
+  declared finishes it instead of failing on a duplicate listener, and a bare
+  `meridian test` after removing servers tests what is left instead of asking
+  which saved server to use.
 - **Page branding is checked before anything changes** — an unknown `--color`
   or an `--icon` that is neither an emoji nor a reachable image stops deploy
   with the valid choices; a redeploy that names only some branding flags keeps
