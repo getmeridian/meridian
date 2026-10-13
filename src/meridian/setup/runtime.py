@@ -87,7 +87,7 @@ from meridian.reconciler.server_drivers import (
 )
 from meridian.reconciler.server_evidence import file_content_or_absent, require_successful_evidence
 from meridian.reconciler.workloads import (
-    SSHRealityKeyFactory,
+    PanelRealityKeyFactory,
     WorkloadStateManager,
 )
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, MeridianPanel
@@ -398,7 +398,7 @@ class SetupRuntime:
         workloads = WorkloadStateManager(
             cluster,
             persist=persist,
-            key_factory=SSHRealityKeyFactory(connections.__getitem__),
+            key_factory=PanelRealityKeyFactory(panel),
         )
         remnawave = RemnawaveDriverContext(
             panel=panel,

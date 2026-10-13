@@ -1,70 +1,40 @@
-"""Reality x25519 keypair generation on a target server."""
+"""Reality x25519 keypair generation through the control panel.
+
+Remnawave's tools controller generates the pair, so no exit server needs Docker,
+Xray, or unzip before its Profile exists. The panel already stores every Reality
+private key inside its Profiles, so this exposes nothing new.
+"""
 
 from __future__ import annotations
 
-import logging
+import base64
+import binascii
+from typing import Protocol
 
 from meridian.core.errors import MeridianError
-from meridian.ssh import ServerConnection
-
-logger = logging.getLogger(__name__)
 
 
-def _parse_reality_key_output(output: str) -> tuple[str, str]:
-    """Extract private/public x25519 values from Xray CLI output."""
-    private_key = ""
-    public_key = ""
-    for raw_line in output.strip().splitlines():
-        line = raw_line.strip()
-        lowered = line.lower()
-        if "private" in lowered and ":" in line:
-            private_key = line.split(":", 1)[1].strip().strip('"')
-        elif ("public" in lowered or "password" in lowered) and ":" in line and "hash" not in lowered:
-            public_key = line.split(":", 1)[1].strip().strip('"')
-    return private_key, public_key
+class X25519Source(Protocol):
+    def generate_x25519_keypairs(self) -> list[tuple[str, str]]: ...
 
 
-def generate_reality_keypair(conn: ServerConnection) -> tuple[str, str]:
-    """Generate x25519 keypair for Reality using tools available on the server.
-
-    Tries the Remnawave node container, then xray on the host.
-    Returns (private_key, public_key) as base64 strings.
-    """
-    # Try various Xray binaries that might be available
-    cmds = [
-        "docker exec remnawave-node rw-core x25519 2>/dev/null",
-        "xray x25519 2>/dev/null",
-    ]
-    for cmd in cmds:
-        result = conn.run(cmd, timeout=15)
-        if result.returncode != 0 or not result.stdout.strip():
-            continue
-        private_key, public_key = _parse_reality_key_output(result.stdout)
-        if private_key and public_key:
+def generate_reality_keypair(panel: X25519Source) -> tuple[str, str]:
+    """Return one validated ``(private_key, public_key)`` pair."""
+    for private_key, public_key in panel.generate_x25519_keypairs():
+        if _is_x25519_key(private_key) and _is_x25519_key(public_key) and private_key != public_key:
             return private_key, public_key
-
-    # Last resort: download a temporary Xray binary
-    logger.info("Downloading Xray binary for key generation...")
-    from meridian.config import XRAY_VERSION
-
-    dl_result = conn.run(
-        "ARCH=$(uname -m); "
-        'case "$ARCH" in '
-        "aarch64|arm64) XRAY_ARCH=arm64-v8a ;; "
-        "*) XRAY_ARCH=64 ;; "
-        "esac; "
-        f'curl -sL "https://github.com/XTLS/Xray-core/releases/download/v{XRAY_VERSION}/Xray-linux-${{XRAY_ARCH}}.zip"'
-        " -o /tmp/xray.zip && cd /tmp && unzip -qo xray.zip xray && chmod +x xray"
-        " && /tmp/xray x25519 && rm -f /tmp/xray /tmp/xray.zip",
-        timeout=60,
-    )
-    if dl_result.returncode == 0:
-        private_key, public_key = _parse_reality_key_output(dl_result.stdout)
-        if private_key and public_key:
-            return private_key, public_key
-
     raise MeridianError(
-        "Could not generate Reality x25519 keypair",
-        hint="Install xray on the server or ensure Docker is running",
+        "Could not generate a Reality x25519 keypair",
+        hint="The panel returned no usable keypair; check that it is healthy and run the same command again.",
         category="system",
     )
+
+
+def _is_x25519_key(value: str) -> bool:
+    """Xray encodes x25519 keys as unpadded base64url of 32 bytes."""
+    if len(value) != 43:
+        return False
+    try:
+        return len(base64.urlsafe_b64decode(value + "=")) == 32
+    except (binascii.Error, ValueError):
+        return False

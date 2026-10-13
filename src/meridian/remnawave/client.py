@@ -535,6 +535,16 @@ class MeridianPanel(ControlPlaneMixin):
         raw = data if isinstance(data, dict) else {}
         return str(raw.get("secretKey") or raw.get("pubKey") or "")
 
+    def generate_x25519_keypairs(self) -> list[tuple[str, str]]:
+        """Return fresh ``(private_key, public_key)`` pairs from the panel's tools controller."""
+        data = self._request("GET", "/api/system/tools/x25519/generate")
+        raw = data.get("keypairs") if isinstance(data, dict) else None
+        return [
+            (str(item.get("privateKey") or ""), str(item.get("publicKey") or ""))
+            for item in raw or []
+            if isinstance(item, dict)
+        ]
+
     # --- Auth (for initial setup — no authenticated client yet) ---
 
     @classmethod

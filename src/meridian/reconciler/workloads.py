@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from meridian.cluster import (
     ClusterConfig,
@@ -14,13 +14,9 @@ from meridian.cluster import (
 )
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.core.errors import LocalStateError
-from meridian.reality_keys import generate_reality_keypair
-
-if TYPE_CHECKING:
-    from meridian.ssh import ServerConnection
+from meridian.reality_keys import X25519Source, generate_reality_keypair
 
 PersistCluster = Callable[[ClusterConfig], None]
-ConnectionFactory = Callable[[str], "ServerConnection"]
 
 
 class RealityKeyFactory(Protocol):
@@ -202,7 +198,7 @@ class WorkloadStateManager:
         if self._key_factory is None:
             raise WorkloadStateError(
                 f"Reality keys have not been allocated for workload {workload.id}.",
-                hint="Connect to the exit server and allocate keys before creating its Profile.",
+                hint="Connect to the control panel and allocate keys before creating the Profile.",
             )
         generated = self._key_factory(server_ref)
         _require_complete_keys(workload.id, generated)
@@ -220,14 +216,14 @@ class WorkloadStateManager:
             )
 
 
-class SSHRealityKeyFactory:
-    """Generate one Reality key triple through the selected exit connection."""
+class PanelRealityKeyFactory:
+    """Generate one Reality key triple through the control panel's x25519 tool."""
 
-    def __init__(self, connection_for: ConnectionFactory) -> None:
-        self._connection_for = connection_for
+    def __init__(self, panel: X25519Source) -> None:
+        self._panel = panel
 
     def __call__(self, server_ref: str) -> RealityKeyBinding:
-        private_key, public_key = generate_reality_keypair(self._connection_for(server_ref))
+        private_key, public_key = generate_reality_keypair(self._panel)
         return RealityKeyBinding(
             public_key=public_key,
             private_key=private_key,

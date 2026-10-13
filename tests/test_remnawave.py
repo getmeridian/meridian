@@ -536,6 +536,12 @@ class TestNodes:
         panel, _ = _wired_panel(_mock_response(200, {"response": {"pubKey": "legacy"}}))
         assert panel.get_node_secret_key() == "legacy"
 
+    def test_x25519_keypairs_come_from_the_tools_controller(self) -> None:
+        keypairs = {"keypairs": [{"privateKey": "priv", "publicKey": "pub"}, "junk"]}
+        panel, client = _wired_panel(_mock_response(200, {"response": keypairs}))
+        assert panel.generate_x25519_keypairs() == [("priv", "pub")]
+        assert _call(client)[:2] == ("GET", "api/system/tools/x25519/generate")
+
     def test_list_nodes_reads_bare_array(self) -> None:
         panel, _ = _wired_panel(_mock_response(200, {"response": [{"uuid": "n-1"}, {"uuid": "n-2"}]}))
         assert [node.uuid for node in panel.list_nodes()] == ["n-1", "n-2"]
