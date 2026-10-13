@@ -163,8 +163,11 @@ def test_node_runtime_container_and_compose_dir_are_removed() -> None:
         ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
     )
 
-    (command,) = conn.calls
+    command, rule_cleanup = conn.calls
     assert f"docker compose -f {REMNAWAVE_NODE_DIR}/docker-compose.yml down" in command
+    # Its Docker-internal API rule goes too, under the neutral and the pre-rename comment.
+    assert "grep -F -e '# fw-node-api' -e '# Meridian node API (Docker internal)'" in rule_cleanup
+    assert "ufw --force delete" in rule_cleanup
     assert "docker rm -f remnawave-node" in command
     assert f"rm -rf {REMNAWAVE_NODE_DIR};" in command
     assert "/opt/remnawave " not in command and "/opt/remnawave;" not in command

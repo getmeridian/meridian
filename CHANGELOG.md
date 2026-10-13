@@ -141,7 +141,8 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   client that speaks Reality.
 - Setup no longer opens an untagged `443/udp` firewall rule, and the next apply
   removes the one earlier v4 builds left. Removing or moving a node also deletes
-  the `remnawave/node` image; Docker itself stays installed.
+  the `remnawave/node` image and its node API firewall rule; Docker itself stays
+  installed.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and

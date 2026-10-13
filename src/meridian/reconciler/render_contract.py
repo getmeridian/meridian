@@ -10,7 +10,7 @@ _RENDERER_MANIFEST = {
     "pwa": "connection-page-v3",
     "firewall": "ufw-comment-v2",
     "nginx": "per-resource-v4",
-    "node-compose": "remnawave-node-v2",
+    "node-compose": "remnawave-node-v3",
     "panel-compose": "remnawave-panel-v2",
     "realm": "neutral-systemd-v2",
     "server-baseline": "neutral-paths-v2",

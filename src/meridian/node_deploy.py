@@ -17,6 +17,10 @@ from meridian.ssh import ServerConnection
 
 logger = logging.getLogger(__name__)
 _API_TOKEN_EXPIRES_IN_DAYS = 100_000
+# Neutral, so a server that later becomes a relay names nothing; retirement also
+# deletes rules carrying the pre-rename comment.
+NODE_API_RULE_COMMENT = "fw-node-api"
+LEGACY_NODE_API_RULE_COMMENT = "Meridian node API (Docker internal)"
 
 
 # Panel API utilities
@@ -234,7 +238,7 @@ def deploy_node_container(
         q_port = shlex.quote(str(effective_port))
         conn.run(
             f"ufw allow from 172.16.0.0/12 to any port {q_port} proto tcp"
-            f" comment 'Meridian node API (Docker internal)' 2>/dev/null; true",
+            f" comment {shlex.quote(NODE_API_RULE_COMMENT)} 2>/dev/null; true",
             timeout=15,
         )
 
