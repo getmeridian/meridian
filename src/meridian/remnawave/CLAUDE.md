@@ -6,6 +6,7 @@
 - Raw REST over one `httpx.Client`, no SDK: the official SDK stalled at 2.8 and Meridian needs only a few dozen endpoints. `_request` owns retry, typed errors, and envelope unwrapping.
 - `models.py` owns stable Meridian shapes and converts REST payloads immediately at the boundary.
 - `runtime.py` holds only the typed error hierarchy; `versions.py` owns the supported floor, tested major, never-downgrade image resolution, and the upgradable pins; `registry.py` reads Docker Hub tags and multi-arch index digests on the deployer's machine.
+- **Version policy** — `config.py` pins backend, node, and subscription-page images as `tag@sha256:<index digest>` (move them together, refresh with `scripts/pin_image_digests.py`, update the CHANGELOG matrix). Pins replace older or same-version tags and keep newer or floating operator tags. `fleet upgrade` saves newer same-major releases in `ClusterConfig.image_pins`, and `effective_pins()` feeds the newer pin into the reviewed `runtime_pins`. Panels below `REMNAWAVE_MIN_VERSION` are refused; an untested newer major warns.
 
 ## What's done well
 
@@ -24,5 +25,7 @@
 - Omit unmanaged subscription settings and response rules from PATCH payloads; `null` can erase panel-owned policy.
 - The public Xray JSON selector is `json` and returns an array of generated configs; `xray-json` is a template name and returns 403 as an unknown client type.
 - Reality Hosts use `securityLayer=DEFAULT`; `REALITY` is an Inbound transport security value, not a Host enum.
+- Hysteria2 is `hysteria2` in Meridian keys and URLs but protocol/network `hysteria` plus version `2` in Remnawave profiles.
+- API token creation requires `name` and `expiresInDays` (the provisioner token uses wildcard scope); tokens are signed with `APP_SECRET`, which upgrades carry over from 2.x `JWT_AUTH_SECRET`.
 - Keep certificate verification enabled for credential-bearing requests; explicit overrides are for caller-supplied trust contexts and isolated tests.
 - Image references may be `repo:tag@sha256:...`: compare versions by tag via `parse_image()` and treat an equal digest as the same image in any spelling; never string-compare or `rfind(':')` a reference.
