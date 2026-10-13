@@ -99,6 +99,16 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   admin panel's address.
 - `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
   the user and their page; links stop working immediately.
+- **Connection pages recommend apps per platform** — Happ first, then
+  FlClashX and Clash Mi (plus Throne on desktop), with a link to the router
+  guide and a note on subscription refresh and app updates. v2rayNG and
+  Streisand import links are fixed, Throne import is added, and the broken
+  v2rayN button is gone. App icons now ship once in a shared cached file, so
+  each page loads about 70 KB less.
+- **"Check my connection"** — the page tests the device clock, whether data
+  keeps flowing (the throttling freeze), and the subscription from the
+  visitor's own network, then copies a report without links or secrets that
+  they can send you.
 - **Russian sites work with the VPN on** — Xray JSON and Mihomo subscriptions
   send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
   traffic directly and refuse foreign QUIC, while the exit's block stays as a
