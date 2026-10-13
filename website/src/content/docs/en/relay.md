@@ -76,6 +76,8 @@ meridian check 203.0.113.10
 meridian test
 ```
 
+The check also measures each leg: from every hop it downloads the exit's camouflage site through the next hop, sending the same SNI clients send, and reports the connect time, the time to first byte, and how many bytes arrived. A transfer that freezes between roughly 8 and 32 KB is the signature of throttling on that leg and is reported as a warning; the usual fix is a relay host at a different provider (another network, or ASN). If the camouflage site's home page is smaller than 32 KB, the leg check is inconclusive rather than passing.
+
 To retire a relay, remove the chains through it. Meridian shows what it will delete, asks for confirmation, and cleans up the Realm service, firewall rules, and published entry points; existing clients lose the relay on their next subscription refresh:
 
 ```bash

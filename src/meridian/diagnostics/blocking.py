@@ -21,7 +21,7 @@ VANTAGE_NOTE = "Measured from this machine; it only reflects censorship when run
 # TSPU-style throttling freezes flagged TLS flows after roughly 14-24 KB; anything
 # past this many bytes has cleared the usual freeze point.
 STALL_CLEARANCE_BYTES = 32 * 1024
-_THROTTLE_WINDOW = (8 * 1024, STALL_CLEARANCE_BYTES)
+THROTTLE_WINDOW = (8 * 1024, STALL_CLEARANCE_BYTES)
 
 FlowProber = Callable[..., TlsFlowResult]
 Resolver = Callable[..., str | None]
@@ -159,7 +159,7 @@ def check_data_stall(
             "Fix reachability first, then retry.",
         )
     if flow.stalled or (flow.stage == "transfer" and flow.error_kind in {"reset", "closed"}):
-        low, high = _THROTTLE_WINDOW
+        low, high = THROTTLE_WINDOW
         throttled = low <= flow.bytes_received <= high
         if via_cdn:
             remediation = (

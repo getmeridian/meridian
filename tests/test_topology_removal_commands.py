@@ -213,8 +213,9 @@ class TestRelayCheck:
         return 0
 
     @staticmethod
-    def _hop(probe_status: int = 0) -> MockConnection:
+    def _hop(probe_status: int = 0, leg_bytes: int = 98304, leg_status: int = 0) -> MockConnection:
         conn = MockConnection().when("systemctl is-active", stdout="active\n")
+        conn.when("curl -sk", stdout=f"leg=0.012|0.140|{leg_bytes}\nleg-status={leg_status}\n")
         return conn.when("/dev/tcp", stdout=f"probe-status={probe_status}\n")
 
     @classmethod
@@ -233,7 +234,20 @@ class TestRelayCheck:
         core = self._healthy()
 
         assert self._check("198.51.100.14", {"198.51.100.14": core}) == 0
-        assert len(core._calls) == 2
+        assert len(core._calls) == 3
+
+    def test_each_hop_pulls_the_chain_camouflage_name_through_its_next_hop(self, registry: ServerRegistry) -> None:
+        edge, core = self._healthy(), self._healthy()
+
+        assert self._check("relay-a", {"198.51.100.13": edge, "198.51.100.14": core}) == 0
+        (edge_leg,) = [command for command in edge._calls if "curl -sk" in command]
+        assert "--connect-to www.example.org:443:198.51.100.14:" in edge_leg
+        assert "https://www.example.org/" in edge_leg
+
+    def test_frozen_relay_leg_is_a_finding(self, registry: ServerRegistry) -> None:
+        frozen = self._hop(leg_bytes=16384, leg_status=28)
+
+        assert self._check("relay-a", {"198.51.100.13": self._healthy(), "198.51.100.14": frozen}) == 4
 
     def test_closed_next_hop_is_negative_evidence(self, registry: ServerRegistry) -> None:
         core = self._hop(probe_status=1)

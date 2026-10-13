@@ -71,6 +71,11 @@
       "additionalProperties": false,
       "description": "One Realm hop of a relay chain, resolved from the compiled topology.",
       "properties": {
+        "camouflage_sni": {
+          "default": "",
+          "title": "Camouflage Sni",
+          "type": "string"
+        },
         "chain_ref": {
           "title": "Chain Ref",
           "type": "string"

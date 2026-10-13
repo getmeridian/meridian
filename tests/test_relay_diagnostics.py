@@ -5,11 +5,13 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from meridian.core.relay_check import RelayHopTarget
-from meridian.diagnostics.relay import check_realm_hop, check_relay_listener
+from meridian.diagnostics.relay import check_realm_hop, check_relay_leg, check_relay_listener
 from tests.support.mock_connection import MockConnection
 
 
-def _hop(*, public: bool = False, legacy_service: str = "") -> RelayHopTarget:
+def _hop(
+    *, public: bool = False, legacy_service: str = "", next_host: str = "198.51.100.12", sni: str = "www.example.org"
+) -> RelayHopTarget:
     return RelayHopTarget(
         logical_id="realm:relay-a:1",
         chain_ref="relay-a",
@@ -20,8 +22,9 @@ def _hop(*, public: bool = False, legacy_service: str = "") -> RelayHopTarget:
         legacy_service=legacy_service,
         listen_port=55603,
         public=public,
-        next_host="198.51.100.12",
+        next_host=next_host,
         next_port=443,
+        camouflage_sni=sni,
     )
 
 
@@ -94,3 +97,70 @@ def test_neither_unit_active_is_negative_evidence() -> None:
     check = check_realm_hop(conn, _hop(legacy_service="meridian-realm-abc123"))
 
     assert check.findings[0].code == "REALM_UNIT_INACTIVE"
+
+
+def _leg(stdout: str, *, rc: int = 0, hop: RelayHopTarget | None = None):
+    conn = MockConnection().when("curl -sk", stdout=stdout, rc=rc)
+    check = check_relay_leg(conn, hop or _hop())
+    return check, conn
+
+
+def test_leg_past_the_freeze_point_passes_with_timings() -> None:
+    check, conn = _leg("leg=0.012000|0.145000|98304\nleg-status=0\n")
+
+    assert check.status == "passed"
+    assert check.id == "relay_leg:relay-a:1"
+    assert "96.0 KB" in check.findings[0].message
+    assert "connect 12 ms, first byte 145 ms" in check.findings[0].message
+    (command,) = conn._calls
+    assert "--connect-to www.example.org:443:198.51.100.12:443" in command
+    assert "https://www.example.org/" in command and "--speed-time 6" in command
+
+
+def test_leg_freezing_inside_the_throttle_window_warns_and_suggests_another_provider() -> None:
+    check, _ = _leg("leg=0.012000|0.145000|16384\nleg-status=28\n")
+
+    assert check.status == "warning"
+    assert check.findings[0].code == "RELAY_LEG_STALLED"
+    assert "signature of throttling" in check.findings[0].message
+    assert "different provider" in check.findings[0].remediation
+
+
+def test_leg_dying_outside_the_window_is_still_a_stall() -> None:
+    check, _ = _leg("leg=0.012000|0.000000|0\nleg-status=35\n")
+
+    assert check.status == "warning"
+    assert "curl exit 35" in check.findings[0].message
+
+
+def test_small_camouflage_page_is_inconclusive() -> None:
+    check, _ = _leg("leg=0.012000|0.145000|2048\nleg-status=0\n")
+
+    assert check.status == "skipped"
+    assert check.findings[0].code == "RELAY_LEG_TOO_SMALL"
+
+
+def test_unreachable_next_hop_defers_to_the_tcp_check() -> None:
+    refused, _ = _leg("leg=0.000000|0.000000|0\nleg-status=7\n")
+    timed_out, _ = _leg("leg=0.000000|0.000000|0\nleg-status=28\n")
+
+    assert refused.status == timed_out.status == "skipped"
+    assert "next-hop check" in refused.findings[0].message
+
+
+def test_leg_ssh_or_missing_curl_is_unavailable_evidence() -> None:
+    assert _leg("", rc=255)[0].status == "skipped"
+    assert _leg("", rc=127)[0].status == "skipped"
+
+
+def test_leg_brackets_an_ipv6_next_hop() -> None:
+    _, conn = _leg("leg=0.012|0.145|98304\nleg-status=0\n", hop=_hop(next_host="2001:db8::12"))
+
+    assert "--connect-to 'www.example.org:443:[2001:db8::12]:443'" in conn._calls[0]
+
+
+def test_leg_without_a_camouflage_name_never_runs() -> None:
+    check, conn = _leg("", hop=_hop(sni=""))
+
+    assert check.status == "skipped"
+    assert conn._calls == []

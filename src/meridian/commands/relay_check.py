@@ -51,7 +51,7 @@ def collect_relay_check(
 ) -> RelayCheckResult:
     from meridian.commands.relay import select_relay_chains
     from meridian.config import SERVER_PROFILES_FILE
-    from meridian.diagnostics.relay import check_realm_hop, check_relay_listener
+    from meridian.diagnostics.relay import check_realm_hop, check_relay_leg, check_relay_listener
 
     request = validate_command_input(
         RelayTargetRequest,
@@ -83,6 +83,7 @@ def collect_relay_check(
                 raise RuntimeError(f"Saved server {hop.server_ref} disappeared during the check")
             connections[hop.server_ref] = connect(entry)
         checks.append(check_realm_hop(connections[hop.server_ref], hop))
+        checks.append(check_relay_leg(connections[hop.server_ref], hop))
     aggregate = aggregate_verification(checks)
     return RelayCheckResult(
         relay=request.relay_ip,
@@ -108,6 +109,7 @@ def relay_hop_targets(
     from meridian.reconciler.server_render import legacy_realm_service_name, realm_service_name
 
     chain_ids = {relay.id for relay in chains}
+    camouflage = {relay.id: _camouflage_sni(intent, relay) for relay in chains}
     targets: list[RelayHopTarget] = []
     for resource in compile_topology(intent).resources:
         payload = resource.payload
@@ -130,9 +132,20 @@ def relay_hop_targets(
                 public=payload.advertised,
                 next_host=next_entry.host,
                 next_port=payload.target_port,
+                camouflage_sni=camouflage[payload.chain_ref],
             )
         )
     return sorted(targets, key=lambda hop: (hop.chain_ref, hop.hop_index))
+
+
+def _camouflage_sni(intent: SetupIntent, relay: TransparentRelayIntent) -> str:
+    """The Reality name clients send through this chain (the compiler's Host SNI)."""
+    for exit_ in intent.exits:
+        if exit_.id == relay.exit_ref:
+            for path in exit_.paths:
+                if path.id == relay.protocol_path_ref and path.protocol == "reality":
+                    return relay.reality_sni or path.reality_sni
+    return ""
 
 
 def _entry(registry: ServerRegistry, server_ref: str) -> ServerEntry:

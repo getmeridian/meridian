@@ -29,6 +29,7 @@ class RelayHopTarget(CoreModel):
     public: bool
     next_host: str
     next_port: int = Field(ge=1, le=65535)
+    camouflage_sni: str = ""
 
 
 class RelayCheckResult(CoreModel):

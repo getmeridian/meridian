@@ -17,6 +17,7 @@
 
 - **Do not import console, Rich, or Typer** — enforced by architecture tests as a library module.
 - **Skipped evidence is not success** — aggregate verification must remain inconclusive until every required check completes.
+- **Relay legs run curl on the hop, never Python** — `relay.check_relay_leg` sends the chain's client SNI through `--connect-to` and reuses `blocking.STALL_CLEARANCE_BYTES`/`THROTTLE_WINDOW`; unreachable next hops defer to the TCP check and a small camouflage page stays inconclusive.
 - **Execution failure is not negative evidence** — command timeout, SSH drop, or a missing inspection tool must return skipped rather than failed.
 - **Protocol shape controls checks** — do not require TCP/443 or HTTPS from a UDP-only Hysteria endpoint; full canonical traffic is the UDP authority.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but pass status requires separate trust, lifetime, and hostname validation.
