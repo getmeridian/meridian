@@ -24,9 +24,20 @@ from meridian.xray_client import ConnectionAttempt
 from tests.support.topology import single_exit_intent
 
 
-def _canonical(*args, **kwargs):
-    run = check_canonical_subscription(*args, **kwargs)
-    return run.checks, run.client
+def _alice(status: str = "ACTIVE", **panel_kwargs) -> FakePanel:
+    return FakePanel([User(username="alice", status=status, short_uuid="short-alice")], **panel_kwargs)
+
+
+def _canonical(panel: FakePanel, **overrides):
+    """check_canonical_subscription for client alice with no local Xray unless overridden."""
+    kwargs = {
+        "requested_client": "alice",
+        "panel_factory": lambda *_args: panel,
+        "xray_provider": lambda **_kwargs: None,
+        "connection_tester": lambda *_args: ConnectionAttempt(True, "unused"),
+        **overrides,
+    }
+    return check_canonical_subscription(_cluster(), _context(), _IP, **kwargs)
 
 
 _IP = "198.51.100.20"
@@ -292,7 +303,6 @@ def test_legacy_default_client_selection_still_uses_panel_users() -> None:
 
 
 def test_full_test_executes_fallback_and_target_hysteria_without_rebuilding(tmp_path: Path) -> None:
-    panel = FakePanel([User(username="alice", status="ACTIVE", short_uuid="short-alice")])
     calls: list[tuple[str, dict, str, bool]] = []
     provider_timeouts: list[float] = []
 
@@ -310,20 +320,16 @@ def test_full_test_executes_fallback_and_target_hysteria_without_rebuilding(tmp_
         calls.append((label, config, server_ip, expect_ip_match))
         return ConnectionAttempt(True, "exit IP 203.0.113.10", 120)
 
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
+    run = _canonical(
+        _alice(),
         timeout=7,
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
         xray_provider=lambda *, timeout: provider_timeouts.append(timeout) or tmp_path / "xray",
         connection_tester=execute,
     )
 
-    assert selected == "alice"
+    assert run.client == "alice"
     assert provider_timeouts == [120]
-    assert [check.status for check in checks] == ["passed", "passed", "passed"]
+    assert [check.status for check in run.checks] == ["passed", "passed", "passed"]
     assert [call[0] for call in calls] == ["Automatic fallback", f"Hysteria2 · UDP {_IP}"]
     assert calls[0][3] is False
     assert calls[1][2:] == (_IP, True)
@@ -333,164 +339,54 @@ def test_full_test_executes_fallback_and_target_hysteria_without_rebuilding(tmp_
 
 
 def test_inactive_requested_client_is_a_real_finding() -> None:
-    panel = FakePanel([User(username="alice", status="DISABLED", short_uuid="short-alice")])
+    run = _canonical(_alice("DISABLED"))
 
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-        xray_provider=lambda **_kwargs: None,
-        connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
-    )
-
-    assert selected == ""
-    assert checks[0].status == "failed"
-    assert checks[0].findings[0].code == "ACTIVE_CLIENT_MISSING"
+    assert run.client == ""
+    assert run.checks[0].status == "failed"
+    assert run.checks[0].findings[0].code == "ACTIVE_CLIENT_MISSING"
 
 
-def test_panel_network_error_is_inconclusive_not_a_dummy_auth_test() -> None:
-    panel = FakePanel(
-        [User(username="alice", status="ACTIVE", short_uuid="short-alice")],
-        error=RemnawaveNetworkError("offline"),
-    )
+@pytest.mark.parametrize(
+    ("error", "status", "code", "exit_code"),
+    [
+        # Panel trouble is unavailable evidence, never a dummy auth or connectivity failure.
+        (RemnawaveNetworkError("offline"), "skipped", "PANEL_UNAVAILABLE", 3),
+        (RemnawaveError("Subscription fetch failed (503)", category="system"), "skipped", "PANEL_UNAVAILABLE", 3),
+        (RemnawaveError("Subscription fetch failed (422)", category="user"), "failed", "PANEL_REQUEST_FAILED", 4),
+    ],
+    ids=["network", "system", "bad-request"],
+)
+def test_panel_errors_classify_the_subscription_check(error, status: str, code: str, exit_code: int) -> None:
+    run = _canonical(_alice(error=error))
 
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-        xray_provider=lambda **_kwargs: None,
-        connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
-    )
-
-    assert selected == "alice"
-    assert checks[0].status == "skipped"
-    assert checks[0].findings[0].code == "PANEL_UNAVAILABLE"
-    assert aggregate_verification(checks).exit_code == 3
-
-
-def test_panel_system_error_is_inconclusive_not_a_connectivity_failure() -> None:
-    panel = FakePanel(
-        [User(username="alice", status="ACTIVE", short_uuid="short-alice")],
-        error=RemnawaveError("Subscription fetch failed (503)", category="system"),
-    )
-
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-        xray_provider=lambda **_kwargs: None,
-        connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
-    )
-
-    assert selected == "alice"
-    assert checks[0].status == "skipped"
-    assert checks[0].findings[0].code == "PANEL_UNAVAILABLE"
-    assert aggregate_verification(checks).exit_code == 3
-
-
-def test_panel_bad_request_is_a_completed_connectivity_finding() -> None:
-    panel = FakePanel(
-        [User(username="alice", status="ACTIVE", short_uuid="short-alice")],
-        error=RemnawaveError("Subscription fetch failed (422)", category="user"),
-    )
-
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-        xray_provider=lambda **_kwargs: None,
-        connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
-    )
-
-    assert selected == "alice"
-    assert checks[0].status == "failed"
-    assert checks[0].findings[0].code == "PANEL_REQUEST_FAILED"
-    assert aggregate_verification(checks).exit_code == 4
+    assert run.client == "alice"
+    assert run.checks[0].status == status
+    assert run.checks[0].findings[0].code == code
+    assert aggregate_verification(run.checks).exit_code == exit_code
 
 
 def test_panel_auth_error_remains_a_typed_user_error() -> None:
-    panel = FakePanel(
-        [User(username="alice", status="ACTIVE", short_uuid="short-alice")],
-        error=RemnawaveAuthError("token expired", category="user"),
-    )
-
     with pytest.raises(RemnawaveAuthError, match="token expired"):
-        check_canonical_subscription(
-            _cluster(),
-            _context(),
-            _IP,
-            requested_client="alice",
-            panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-            xray_provider=lambda **_kwargs: None,
-            connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
-        )
+        _canonical(_alice(error=RemnawaveAuthError("token expired", category="user")))
 
 
-def test_invalid_local_inbound_is_a_failed_protocol_check(tmp_path: Path) -> None:
-    config = _canonical_config()
+def _with_open_inbound(config: dict) -> None:
     config["inbounds"].append({"protocol": "dokodemo-door", "listen": "0.0.0.0", "port": 9999})
-    tester = patch("meridian.connectivity.test_connection")
-
-    with tester as connection:
-        result = execute_xray_config(
-            "protocol",
-            "Reality",
-            config,
-            tmp_path / "xray",
-            _IP,
-            connection,
-            expected_egress_ip=_IP,
-            timeout=5,
-        )
-
-    assert result.check.status == "failed"
-    assert result.check.findings[0].code == "PROTOCOL_CONFIG_INVALID"
-    connection.assert_not_called()
 
 
-def test_unavailable_ip_observers_make_protocol_check_inconclusive(tmp_path: Path) -> None:
-    result = execute_xray_config(
-        "protocol",
-        "Reality",
-        _canonical_config(),
-        tmp_path / "xray",
-        _IP,
-        lambda *_args, **_kwargs: ConnectionAttempt(None, "IP observers unavailable"),
-        expected_egress_ip=_IP,
-        timeout=5,
-    )
-
-    assert result.check.status == "skipped"
-    assert result.check.findings[0].code == "PROTOCOL_TRAFFIC_INCONCLUSIVE"
-
-
-def test_unexpected_egress_is_a_distinct_failed_finding(tmp_path: Path) -> None:
-    result = execute_xray_config(
-        "protocol",
-        "Reality",
-        _canonical_config(),
-        tmp_path / "xray",
-        _IP,
-        lambda *_args, **_kwargs: ConnectionAttempt(False, f"exit IP 203.0.113.9 does not match server {_IP}"),
-        expected_egress_ip=_IP,
-        timeout=5,
-    )
-
-    assert result.check.status == "failed"
-    assert result.check.findings[0].code == "PROTOCOL_EGRESS_MISMATCH"
-
-
-def test_invalid_canonical_routing_is_a_failed_protocol_check(tmp_path: Path) -> None:
-    config = _canonical_config()
+def _without_routing(config: dict) -> None:
     config["routing"] = []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "outbound_tag"),
+    [(_with_open_inbound, None), (_without_routing, "MERIDIAN_PROXY_VLESS")],
+    ids=["open-local-inbound", "invalid-routing"],
+)
+def test_invalid_canonical_config_fails_before_any_traffic(tmp_path: Path, mutate, outbound_tag) -> None:
+    config = _canonical_config()
+    mutate(config)
+    extra = {"outbound_tag": outbound_tag} if outbound_tag else {}
 
     with patch("meridian.connectivity.test_connection") as connection:
         result = execute_xray_config(
@@ -502,7 +398,7 @@ def test_invalid_canonical_routing_is_a_failed_protocol_check(tmp_path: Path) ->
             connection,
             expected_egress_ip=_IP,
             timeout=5,
-            outbound_tag="MERIDIAN_PROXY_VLESS",
+            **extra,
         )
 
     assert result.check.status == "failed"
@@ -510,22 +406,40 @@ def test_invalid_canonical_routing_is_a_failed_protocol_check(tmp_path: Path) ->
     connection.assert_not_called()
 
 
-def test_missing_xray_runtime_is_inconclusive() -> None:
-    panel = FakePanel([User(username="alice", status="ACTIVE", short_uuid="short-alice")])
-
-    checks, selected = _canonical(
-        _cluster(),
-        _context(),
+@pytest.mark.parametrize(
+    ("attempt", "status", "code"),
+    [
+        (ConnectionAttempt(None, "IP observers unavailable"), "skipped", "PROTOCOL_TRAFFIC_INCONCLUSIVE"),
+        (
+            ConnectionAttempt(False, f"exit IP 203.0.113.9 does not match server {_IP}"),
+            "failed",
+            "PROTOCOL_EGRESS_MISMATCH",
+        ),
+    ],
+    ids=["observers-unavailable", "egress-mismatch"],
+)
+def test_traffic_outcome_classifies_the_protocol_check(tmp_path: Path, attempt, status: str, code: str) -> None:
+    result = execute_xray_config(
+        "protocol",
+        "Reality",
+        _canonical_config(),
+        tmp_path / "xray",
         _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
-        xray_provider=lambda **_kwargs: None,
-        connection_tester=lambda *_args: ConnectionAttempt(True, "unused"),
+        lambda *_args, **_kwargs: attempt,
+        expected_egress_ip=_IP,
+        timeout=5,
     )
 
-    assert selected == "alice"
-    assert checks[-1].status == "skipped"
-    assert checks[-1].findings[0].code == "XRAY_UNAVAILABLE"
+    assert result.check.status == status
+    assert result.check.findings[0].code == code
+
+
+def test_missing_xray_runtime_is_inconclusive() -> None:
+    run = _canonical(_alice())
+
+    assert run.client == "alice"
+    assert run.checks[-1].status == "skipped"
+    assert run.checks[-1].findings[0].code == "XRAY_UNAVAILABLE"
 
 
 def _failed_attempt(*_args, **_kwargs) -> ConnectionAttempt:
@@ -590,14 +504,8 @@ def test_udp_transport_failure_stays_a_plain_failure_without_a_tcp_probe(tmp_pat
 
 
 def test_full_test_reports_each_transport_with_time_to_first_byte(tmp_path: Path) -> None:
-    panel = FakePanel([User(username="alice", status="ACTIVE", short_uuid="short-alice")])
-
-    run = check_canonical_subscription(
-        _cluster(),
-        _context(),
-        _IP,
-        requested_client="alice",
-        panel_factory=lambda *_args: panel,  # type: ignore[arg-type]
+    run = _canonical(
+        _alice(),
         xray_provider=lambda **_kwargs: tmp_path / "xray",
         connection_tester=lambda *_args, **_kwargs: ConnectionAttempt(True, "exit IP ok", 230),
     )

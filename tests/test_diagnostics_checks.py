@@ -1,11 +1,12 @@
 """Tests for meridian.diagnostics — reusable server health checks.
 
 These test the diagnostics package (meridian.diagnostics), not the
-commands/diagnostics.py bug-report collector. Uses MockConnection
-for all checks.
+commands/diagnostics.py bug-report collector.
 """
 
 from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -17,187 +18,105 @@ from meridian.diagnostics.checks import (
 )
 from tests.support.mock_connection import MockConnection
 
+# Timeout, missing tool, or a dropped SSH session is unavailable evidence, not a finding.
+_UNAVAILABLE = [124, 127, 255]
 
-class TestCheckDiskSpace:
-    def test_passed_when_enough_space(self) -> None:
-        conn = MockConnection()
-        conn.when("df -BM", stdout="  2048M\n")
-        result = check_disk_space(conn, min_free_mb=1024)
-        assert result.status == "passed"
-        assert "2048" in result.detail
 
-    def test_failed_when_low_space(self) -> None:
-        conn = MockConnection()
-        conn.when("df -BM", stdout="  512M\n")
-        result = check_disk_space(conn, min_free_mb=1024)
-        assert result.status == "failed"
-        assert "512" in result.detail
+def _conn(pattern: str, *, stdout: str = "", rc: int = 0) -> MockConnection:
+    return MockConnection().when(pattern, stdout=stdout, rc=rc)
+
+
+@pytest.mark.parametrize(
+    ("stdout", "rc", "status", "detail"),
+    [
+        ("  2048M\n", 0, "passed", "2048"),
+        ("  1024M\n", 0, "passed", ""),
+        ("  512M\n", 0, "failed", "512"),
+        ("", 1, "skipped", ""),
+        ("  ???\n", 0, "skipped", ""),
+    ],
+    ids=["enough", "exact-threshold", "low", "command-failed", "unparseable"],
+)
+def test_disk_space(stdout: str, rc: int, status: str, detail: str) -> None:
+    result = check_disk_space(_conn("df -BM", stdout=stdout, rc=rc), min_free_mb=1024)
+    assert result.status == status
+    assert detail in result.detail
+    if status == "failed":
         assert result.remediation != ""
 
-    def test_skipped_when_command_fails(self) -> None:
-        conn = MockConnection()
-        conn.when("df -BM", rc=1)
-        result = check_disk_space(conn)
-        assert result.status == "skipped"
 
-    def test_skipped_when_unparseable_output(self) -> None:
-        conn = MockConnection()
-        conn.when("df -BM", stdout="  ???\n")
-        result = check_disk_space(conn)
-        assert result.status == "skipped"
-
-    def test_exact_threshold_passes(self) -> None:
-        conn = MockConnection()
-        conn.when("df -BM", stdout="  1024M\n")
-        result = check_disk_space(conn, min_free_mb=1024)
-        assert result.status == "passed"
-
-
-class TestCheckContainerRunning:
-    def test_passed_when_running(self) -> None:
-        conn = MockConnection()
-        conn.when("docker inspect", stdout="true\n")
-        result = check_container_running(conn, "remnawave-node")
-        assert result.status == "passed"
-        assert result.name == "container:remnawave-node"
-
-    def test_failed_when_not_running(self) -> None:
-        conn = MockConnection()
-        conn.when("docker inspect", stdout="false\n")
-        result = check_container_running(conn, "remnawave-node")
-        assert result.status == "failed"
-        assert "not running" in result.detail
-
-    def test_failed_when_container_not_found(self) -> None:
-        conn = MockConnection()
-        conn.when("docker inspect", rc=1)
-        result = check_container_running(conn, "remnawave-node")
-        assert result.status == "failed"
-        assert "not found" in result.detail
-
-    @pytest.mark.parametrize("returncode", [124, 127, 255])
-    def test_skipped_when_container_evidence_is_unavailable(self, returncode: int) -> None:
-        conn = MockConnection()
-        conn.when("docker inspect", rc=returncode)
-
-        result = check_container_running(conn, "remnawave-node")
-
-        assert result.status == "skipped"
-
-
-class TestCheckPortListening:
-    def test_passed_when_listening(self) -> None:
-        conn = MockConnection()
-        conn.when("ss -tlnp", stdout="1\n")
-        result = check_port_listening(conn, 443)
-        assert result.status == "passed"
-        assert result.name == "port:443"
-
-    def test_failed_when_not_listening(self) -> None:
-        conn = MockConnection()
-        conn.when("ss -tlnp", stdout="0\n")
-        result = check_port_listening(conn, 443)
-        assert result.status == "failed"
-        assert "not listening" in result.detail
-
-    def test_failed_when_command_fails(self) -> None:
-        conn = MockConnection()
-        conn.when("ss -tlnp", rc=1)
-        result = check_port_listening(conn, 8080)
-        assert result.status == "failed"
-        assert result.name == "port:8080"
-
-    @pytest.mark.parametrize("returncode", [124, 127, 255])
-    def test_skipped_when_listener_evidence_is_unavailable(self, returncode: int) -> None:
-        conn = MockConnection()
-        conn.when("ss -tlnp", rc=returncode)
-
-        result = check_port_listening(conn, 8080)
-
-        assert result.status == "skipped"
-
-    def test_udp_listener_uses_udp_socket_evidence(self) -> None:
-        conn = MockConnection()
-        conn.when("ss -ulnp", stdout="1\n")
-
-        result = check_port_listening(conn, 8443, transport="udp")
-
-        assert result.status == "passed"
-        assert any("ss -ulnp" in command for command in conn.calls)
-
-
-class TestCheckTlsCertificate:
-    def test_passed_when_cert_valid(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", stdout="notAfter=Dec 31 23:59:59 2027 GMT\n")
-        result = check_tls_certificate(conn, "198.51.100.1")
-        assert result.status == "passed"
-        assert "2027-12-31" in result.detail
-
-    def test_warning_when_cannot_connect(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", rc=1)
-        result = check_tls_certificate(conn, "198.51.100.1")
-        assert result.status == "warning"
-
-    def test_warning_when_empty_output(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", stdout="")
-        result = check_tls_certificate(conn, "198.51.100.1")
-        assert result.status == "warning"
-
-    @pytest.mark.parametrize("returncode", [124, 127, 255])
-    def test_skipped_when_tls_evidence_is_unavailable(self, returncode: int) -> None:
-        conn = MockConnection()
-        conn.when("openssl", rc=returncode)
-
-        result = check_tls_certificate(conn, "198.51.100.1")
-
-        assert result.status == "skipped"
-
-    def test_failed_when_cert_expired(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", stdout="notAfter=Jan 01 00:00:00 2020 GMT\n")
-        result = check_tls_certificate(conn, "198.51.100.1")
-        assert result.status == "failed"
-        assert "expired" in result.detail.lower()
-
-    def test_warning_when_cert_expires_soon(self) -> None:
-        from datetime import datetime, timedelta, timezone
-
-        soon = datetime.now(timezone.utc) + timedelta(days=3)
-        date_str = soon.strftime("%b %d %H:%M:%S %Y GMT")
-
-        conn = MockConnection()
-        conn.when("openssl", stdout=f"notAfter={date_str}\n")
-        result = check_tls_certificate(conn, "198.51.100.1")
-        assert result.status == "warning"
-        # days_left depends on time-of-day rounding; just verify it's under 7
-        assert "days" in result.detail
-
-    def test_uses_shlex_quote_on_host(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", rc=1)
-        check_tls_certificate(conn, "evil; rm -rf /")
-        # Verify the command was called with a quoted host
-        assert any("'evil; rm -rf /'" in c for c in conn.calls)
-
-    def test_uses_requested_local_tls_port(self) -> None:
-        conn = MockConnection()
-        conn.when("openssl", rc=1)
-
-        check_tls_certificate(conn, "edge.example.com", port=7443)
-
-        assert any("127.0.0.1:7443" in command for command in conn.calls)
+@pytest.mark.parametrize(
+    ("stdout", "rc", "status", "detail"),
+    [
+        ("true\n", 0, "passed", ""),
+        ("false\n", 0, "failed", "not running"),
+        ("", 1, "failed", "not found"),
+        *[("", rc, "skipped", "") for rc in _UNAVAILABLE],
+    ],
+)
+def test_container_running(stdout: str, rc: int, status: str, detail: str) -> None:
+    result = check_container_running(_conn("docker inspect", stdout=stdout, rc=rc), "remnawave-node")
+    assert result.name == "container:remnawave-node"
+    assert result.status == status
+    assert detail in result.detail
 
 
 def test_running_but_unhealthy_container_is_a_warning_not_a_pass() -> None:
-    from tests.support.mock_connection import MockConnection
-
-    conn = MockConnection()
-    conn.when("docker inspect", stdout="true unhealthy\n")
-
-    result = check_container_running(conn, "remnawave-subscription-page")
+    result = check_container_running(_conn("docker inspect", stdout="true unhealthy\n"), "remnawave-subscription-page")
 
     assert result.status == "warning"
     assert "docker logs" in result.remediation
+
+
+@pytest.mark.parametrize(
+    ("stdout", "rc", "status", "detail"),
+    [
+        ("1\n", 0, "passed", ""),
+        ("0\n", 0, "failed", "not listening"),
+        ("", 1, "failed", ""),
+        *[("", rc, "skipped", "") for rc in _UNAVAILABLE],
+    ],
+)
+def test_port_listening(stdout: str, rc: int, status: str, detail: str) -> None:
+    result = check_port_listening(_conn("ss -tlnp", stdout=stdout, rc=rc), 8080)
+    assert result.name == "port:8080"
+    assert result.status == status
+    assert detail in result.detail
+
+
+def test_udp_listener_uses_udp_socket_evidence() -> None:
+    conn = _conn("ss -ulnp", stdout="1\n")
+
+    assert check_port_listening(conn, 8443, transport="udp").status == "passed"
+    assert any("ss -ulnp" in command for command in conn.calls)
+
+
+def _not_after(when: datetime) -> str:
+    return f"notAfter={when.strftime('%b %d %H:%M:%S %Y GMT')}\n"
+
+
+@pytest.mark.parametrize(
+    ("stdout", "rc", "status", "detail"),
+    [
+        ("notAfter=Dec 31 23:59:59 2027 GMT\n", 0, "passed", "2027-12-31"),
+        ("notAfter=Jan 01 00:00:00 2020 GMT\n", 0, "failed", "expired"),
+        # Under seven days left; the exact count depends on time-of-day rounding.
+        (_not_after(datetime.now(timezone.utc) + timedelta(days=3)), 0, "warning", "days"),
+        ("", 1, "warning", ""),
+        ("", 0, "warning", ""),
+        *[("", rc, "skipped", "") for rc in _UNAVAILABLE],
+    ],
+    ids=["valid", "expired", "expires-soon", "cannot-connect", "empty-output", *map(str, _UNAVAILABLE)],
+)
+def test_tls_certificate(stdout: str, rc: int, status: str, detail: str) -> None:
+    result = check_tls_certificate(_conn("openssl", stdout=stdout, rc=rc), "198.51.100.1")
+    assert result.status == status
+    assert detail in result.detail
+
+
+def test_tls_check_quotes_the_host_and_uses_the_requested_local_port() -> None:
+    conn = _conn("openssl", rc=1)
+
+    check_tls_certificate(conn, "evil; rm -rf /", port=7443)
+
+    assert any("'evil; rm -rf /'" in c and "127.0.0.1:7443" in c for c in conn.calls)
