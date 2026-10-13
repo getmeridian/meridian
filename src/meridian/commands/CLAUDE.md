@@ -13,13 +13,14 @@
 **V4 setup is presentation-only** — `setup_v4.py` and `setup_wizard.py` collect resumable choices; compilation, checkpointed apply, and canonical verification stay in `meridian.setup`.
 **One wizard for everyone** — real terms plus one plain sentence each, all text from `meridian.i18n`; `wizard_prompts.py` owns navigation words, yes/no, numbered choices, and the language step. Smart defaults replace questions (exit IDs from server names, random transport paths, routing only with a gateway, delivery formats).
 **Validate at entry** — command functions build core request models first, then render wrapped validation errors with `fail()` before opening SSH or panel connections.
-**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove/replace), `relay` (add/list/remove), `fleet` (status/inventory). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `panel`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply; `node_replace.py` re-places one exit and lets reviewed retirement clean the old server. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
+**Command groups**: `client` (add/show/list/remove/enable/disable), `node` (add/list/remove/replace), `relay` (add/list/remove), `fleet` (status/inventory/upgrade). Top-level: `setup`, `deploy`, `plan`, `apply`, `check`, `test`, `doctor`, `panel`, `teardown`. Hidden one-release aliases: `preflight`, `probe`, `node check`, `relay check`, `relay deploy`. `client remove`, `node remove`, and `relay remove` edit the intent and let reviewed retirement delete what vanished; `topology_removal.py` owns their shared review, confirmation, and apply; `node_replace.py` re-places one exit and lets reviewed retirement clean the old server. `relay_check.py` collects each compiled Realm hop over SSH plus the public entry locally.
 
 ## What's done well
 
 - **`client add` follows topology ownership** — it expands declared access intent and applies the reviewed topology; it never creates panel users directly.
 - **`deploy --dry-run` and Engine share one preview** — `setup/single_server.py::preview_single_server_deploy()` compiles the intent; neither path imports the other.
 - **`fleet inventory`** — prints local topology with live panel status without exposing tokens.
+- **`fleet upgrade` never mutates beside the plan** — it only reads images (`diagnostics/images.py`), then runs the reviewed apply of the unchanged intent (new pins ride the render contract) and the fleet `check`.
 - **Read and health commands** — node, relay, fleet, and doctor consume registry-backed topology plus compiled listener allocations.
 
 ## Pitfalls

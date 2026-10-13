@@ -205,11 +205,15 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
+meridian fleet upgrade [--yes]
 ```
 
 | Флаг | По умолчанию | Описание |
 |------|---------|-------------|
 | `--json` | | Выдать результат как конверт `meridian.output/v1` |
+| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+
+**`fleet upgrade`** — After `meridian update`, compares the Remnawave images each server runs with the CLI's pins, applies the reviewed plan, then runs `meridian check`. Newer or floating tags you chose are kept; a PostgreSQL major is never moved.
 
 **`fleet status`** — здоровье панели, биения сердца узла, слушатели ретранслятора и подсчёты клиентов. Отсутствующие или неактивные объявленные клиенты понижают здоровье. Достижимый слушатель ретранслятора только доказывает TCP, поэтому непроверенные маршруты ретранслятора сохраняют здоровье `unknown`; используйте `meridian test` для проверки полного пути. Выход `0` означает здоровый, `4` понижение и `3` неизвестный.
 

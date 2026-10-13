@@ -6,7 +6,7 @@
 
 **No CLI rendering** — checks return data; commands own Rich output. This keeps the module reusable from Engine, tests, and future Studio surfaces.
 
-**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect → handshake → bytes until EOF or stall) every blocking/throughput check builds on; `blocking.py` turns flows into the SNI-vs-IP differential and data-stall checks and selects them from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest.
+**I/O follows perspective** — server health accepts a `core.execution.ServerConnection`; external checks use bounded sockets and argv-only subprocesses. `network.py` owns low-level TLS I/O and the child-interpreter `run_json_helper()`; `tls_probe.py` is the stage-timed flow primitive (connect → handshake → bytes until EOF or stall) every blocking/throughput check builds on; `blocking.py` turns flows into the SNI-vs-IP differential and data-stall checks and selects them from deployment facts (`blocking_jobs`, shared by `test --probe` and `check`); `probe.py` selects the rest. `images.py` reads each Remnawave container's configured image and classifies it with the setup version policy.
 
 ## What's done well
 
@@ -27,4 +27,5 @@
 - **A TLS alert is an answer, a timeout or reset is not** — classify flows by `TlsFlowResult.server_answered_tls`/`silenced`; macOS reports a pre-handshake reset as EINVAL from `getpeername()`.
 - **Blocking verdicts need a control** — an unreachable real camouflage site makes the differential inconclusive, never "IP blocked"; only Meridian's own ~50 KB `pwa/app.js` on the control server is a size-known stall target, so exit-only servers get no data-flow check.
 - **UFW port matching is line-based** — a rule for port 80 will not match port 8080 only if the line contains the exact port string; callers should be aware of broad ALLOW rules.
+- **Unreadable images are unavailable, not drift** — a missing Docker, SSH failure, or partial `docker inspect` output yields `ServerImages.error`, never `upgrade`.
 - **External checks need an outside vantage** — from the server itself, own-address connections arrive over loopback past UFW; `check_port_surface(local_vantage=True)` skips instead of reporting firewalled ports as public.

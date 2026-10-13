@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from packaging.version import Version
 
 from meridian.update import (
@@ -129,6 +130,23 @@ class TestRunSelfUpdate:
         ):
             assert run_self_update() == 0
         upgrade.assert_called_once_with("4.0.1")
+
+    @pytest.mark.parametrize(("fleet", "hint"), [(True, "meridian fleet upgrade"), (False, "meridian deploy")])
+    def test_a_successful_update_points_an_existing_fleet_to_fleet_upgrade(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str], fleet: bool, hint: str
+    ) -> None:
+        cluster_file = tmp_path / "cluster.yml"
+        if fleet:
+            cluster_file.write_text("version: 3\n")
+        with (
+            patch("meridian.__version__", "4.0.0"),
+            patch("meridian.update.get_pypi_releases", return_value=_v("4.0.1")),
+            patch("meridian.update.do_upgrade", return_value=True),
+            patch("meridian.update.verify_installed_version", return_value=True),
+            patch("meridian.config.CLUSTER_CONFIG", cluster_file),
+        ):
+            assert run_self_update() == 0
+        assert hint in capsys.readouterr().err
 
     def test_current_version_returns_success(self) -> None:
         with (

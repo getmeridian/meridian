@@ -243,7 +243,12 @@ def run_self_update(major: bool = False) -> int:
         upgraded = False
     if upgraded and verify_installed_version(latest):
         ok(f"Updated to v{latest}")
-        info("Run `meridian deploy` to apply changes to your servers")
+        from meridian.config import CLUSTER_CONFIG
+
+        if CLUSTER_CONFIG.exists():
+            info("Run `meridian fleet upgrade` to roll its pinned images out to your servers")
+        else:
+            info("Run `meridian deploy` to set up your first server")
         return 0
     if upgraded:
         warn("An installer completed, but the active `meridian` command did not change to the requested version")

@@ -207,11 +207,15 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
+meridian fleet upgrade [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出 |
+| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+
+**`fleet upgrade`** — After `meridian update`, compares the Remnawave images each server runs with the CLI's pins, applies the reviewed plan, then runs `meridian check`. Newer or floating tags you chose are kept; a PostgreSQL major is never moved.
 
 **`fleet status`** — 面板健康、节点心跳、中继监听器和客户端计数。缺失或不活跃的声明客户端降低健康。可达的中继监听器仅证明 TCP，所以未验证的中继路由保持健康 `unknown`；用 `meridian test` 检查完整路径。退出 `0` 意味着健康，`4` 是降级，`3` 是未知。
 

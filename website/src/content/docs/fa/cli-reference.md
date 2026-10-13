@@ -205,11 +205,15 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 ```
 meridian fleet status [--json]
 meridian fleet inventory [--json]
+meridian fleet upgrade [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--json` | | نتیجه را به عنوان پاکت `meridian.output/v1` ارسال کنید |
+| `--yes`, `-y` | | `fleet upgrade`: skip the confirmation |
+
+**`fleet upgrade`** — After `meridian update`, compares the Remnawave images each server runs with the CLI's pins, applies the reviewed plan, then runs `meridian check`. Newer or floating tags you chose are kept; a PostgreSQL major is never moved.
 
 **`fleet status`** — سلامتی panel، heartbeats گره، relay listeners و تعداد کلاینت. کلاینت‌های اعلام‌شده missing یا inactive سلامتی را کاهش می‌دهند. relay listener قابل دسترس فقط TCP را ثابت می‌کند، پس مسیر relay غیر‌تأیید‌شده سلامتی را `unknown` نگه می‌دارد؛ از `meridian test` برای بررسی مسیر کامل استفاده کنید. Exit `0` سلامت، `4` کاهش و `3` نامعلوم است.
 
