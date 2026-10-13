@@ -161,7 +161,7 @@ def _process_image_url(url: str) -> str:
         return ""
 
     # Try Pillow for smart resize
-    result = _resize_with_pillow(data, content_type)
+    result = _resize_with_pillow(data)
     if result:
         return result
 
@@ -169,7 +169,7 @@ def _process_image_url(url: str) -> str:
     return _fallback_raw(data, content_type)
 
 
-def _resize_with_pillow(data: bytes, content_type: str) -> str:
+def _resize_with_pillow(data: bytes) -> str:
     """Resize image using Pillow. Returns data URI or empty string."""
     try:
         from PIL import Image

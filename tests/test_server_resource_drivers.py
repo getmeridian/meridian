@@ -726,7 +726,7 @@ def _node_runtime_with_compose(image: str) -> tuple[NodeRuntimeDriver, ResourceA
 
     driver, action, panel = _node_runtime_case()
     connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout=render_node_compose(image, action.resource.payload.api_port))
+    connection.get_text.return_value = _result(stdout=render_node_compose(image))
     connection.run.return_value = _result(stdout="true\n")
     driver.context.connection_for = lambda _ref: connection
     panel.get_node.return_value = SimpleNamespace(is_connected=True)

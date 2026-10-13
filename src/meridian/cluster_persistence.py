@@ -432,7 +432,7 @@ def _save_locked(cfg: ClusterConfig, path: Path | None = None) -> None:
         raise
 
 
-def backup_cluster(cfg: ClusterConfig, path: Path | None = None) -> None:
+def backup_cluster(path: Path | None = None) -> None:
     """Copy cluster.yml to cluster.yml.bak before mutations."""
     if path is None:
         from meridian.config import CLUSTER_CONFIG

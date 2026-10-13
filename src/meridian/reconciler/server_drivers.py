@@ -584,7 +584,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         compose_path = f"{REMNAWAVE_NODE_DIR}/docker-compose.yml"
         compose = conn.get_text(compose_path, timeout=15)
         compose_content = file_content_or_absent(action.resource.logical_id, compose, "node compose file")
-        expected_compose = render_node_compose(self._image(compose_content), payload.api_port)
+        expected_compose = render_node_compose(self._image(compose_content))
         running = conn.run(
             "docker inspect remnawave-node --format '{{.State.Running}}' 2>&1",
             timeout=15,

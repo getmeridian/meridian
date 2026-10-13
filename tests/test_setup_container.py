@@ -665,7 +665,7 @@ class TestRenderNodeCompose:
         """
         from meridian.node_deploy import render_node_compose
 
-        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0")
 
         assert "cap_add:" in content, "cap_add key missing — node will not accept elevated capabilities"
         assert "NET_ADMIN" in content, "NET_ADMIN capability missing — panel plugins + IP Control will silently fail"
@@ -676,11 +676,11 @@ class TestRenderNodeCompose:
         proxying."""
         from meridian.node_deploy import render_node_compose
 
-        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0")
         assert "network_mode: host" in content
 
     def test_interpolates_image_tag(self) -> None:
         from meridian.node_deploy import render_node_compose
 
-        content = render_node_compose(image="remnawave/node:2.7.0", node_api_port=3010)
+        content = render_node_compose(image="remnawave/node:2.7.0")
         assert "image: remnawave/node:2.7.0" in content

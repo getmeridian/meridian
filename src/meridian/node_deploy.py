@@ -150,7 +150,7 @@ def wait_for_node_connected(
         return False
 
 
-def render_node_compose(image: str, node_api_port: int) -> str:
+def render_node_compose(image: str) -> str:
     """Render the Remnawave node Compose configuration."""
     return f"""\
 # Remnawave Node - Xray Proxy Node
@@ -214,7 +214,7 @@ def deploy_node_container(
     effective_image = REMNAWAVE_NODE_IMAGE if image is None else image
 
     env_content = render_node_env(effective_port, secret_key)
-    compose_content = render_node_compose(effective_image, effective_port)
+    compose_content = render_node_compose(effective_image)
 
     def _node_running() -> bool:
         check = conn.run(

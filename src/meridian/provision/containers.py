@@ -6,12 +6,9 @@ Used by DeployRemnawavePanel, deploy_node_container, and future container steps.
 
 from __future__ import annotations
 
-import logging
 import shlex
 from dataclasses import dataclass
 from typing import Any, Callable
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -147,7 +144,7 @@ def deploy_compose_stack(
     # -- Bring stack up --
     result = conn.run("docker compose up -d", cwd=work_dir, timeout=120)
     if result.returncode != 0:
-        logs = _collect_logs(conn, work_dir, service_name)
+        logs = _collect_logs(conn, work_dir)
         return ComposeDeployResult(
             changed=False,
             detail=(f"docker compose up failed: {result.stderr.strip()[:200]}\nContainer logs:\n{logs}"),
@@ -166,7 +163,7 @@ def deploy_compose_stack(
                 description=service_name or "stack",
             )
         except ReadinessTimeout:
-            logs = _collect_logs(conn, work_dir, service_name)
+            logs = _collect_logs(conn, work_dir)
             label = service_name or "stack"
             return ComposeDeployResult(
                 changed=False,
@@ -177,7 +174,7 @@ def deploy_compose_stack(
     return ComposeDeployResult(changed=True)
 
 
-def _collect_logs(conn: Any, work_dir: str, service_name: str) -> str:
+def _collect_logs(conn: Any, work_dir: str) -> str:
     """Collect recent container logs for diagnostics."""
     result = conn.run("docker compose logs --tail 50", cwd=work_dir, timeout=15)
     if result.returncode == 0:

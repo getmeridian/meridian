@@ -372,7 +372,7 @@ class ClusterConfig:
         """Copy cluster.yml to cluster.yml.bak before mutations."""
         from meridian.cluster_persistence import backup_cluster
 
-        backup_cluster(self, path)
+        backup_cluster(path)
 
     @property
     def is_configured(self) -> bool:
