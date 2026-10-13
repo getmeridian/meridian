@@ -129,7 +129,7 @@ meridian test
 
 `--sni` on `meridian deploy` and `meridian node add` sets the camouflage target for the exit's direct Reality path. The target must be a site the exit can reach with TLS 1.3, and deploy checks real traffic through it and stops if none passes. Before deploying, check a candidate with `meridian check IP --sni HOST`. On a network that checks names only, an allowed name may let the direct path through, but whether a name works depends on the operator, so test each one.
 
-### What Meridian doesn't do yet
+### What Meridian doesn't do
 
 - It doesn't tell you whether a relay's IP is on any operator's list, or whether restrictions are active.
 - It doesn't set up fronting through a domestic CDN. Domain mode is built and tested for Cloudflare.
@@ -158,5 +158,3 @@ On the relay server, list the forwarder services and read their logs. Relay host
 systemctl list-units 'netfwd-*'
 journalctl -u 'netfwd-*' --no-pager -n 20
 ```
-
-Hops deployed by earlier releases run as `meridian-realm-*` until the next `meridian apply` renames them; `meridian check RELAY` warns until then.

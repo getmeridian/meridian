@@ -10,16 +10,9 @@ commitments; contributions in any theme are welcome.
 
 ## In flight
 
-**Meridian 4.0** (in development on the `v4` branch)
-Remnawave replaces 3x-ui; 4.0 is a fresh deploy, not an in-place upgrade.
-Every command now works on one reviewed topology in `cluster.yml`:
-`meridian deploy IP` builds a single-server topology, `meridian setup` is a
-resumable wizard for exits, Realm relay chains, routing gateways with failover
-pools, and users, and `meridian plan / apply` review and apply it with
-checkpoints. Deploy picks a working camouflage target and verifies real
-traffic before finishing; connection pages are built from each user's real
-subscription. Real-VM testing runs through the Hetzner harness.
-Related roadmap issues:
+**Beyond Meridian 4.** Meridian 4 replaced 3x-ui with Remnawave and put every
+command on one reviewed topology in `cluster.yml` (see the
+[changelog](CHANGELOG.md)). Next on the topology:
 
 - [#32](https://github.com/getmeridian/meridian/issues/32) — multi-hop chain topologies (arbitrary N ≥ 2)
 - [#33](https://github.com/getmeridian/meridian/issues/33) — multi-IP nodes (ingress IP ≠ egress IP)
@@ -28,11 +21,8 @@ Related roadmap issues:
 - [#36](https://github.com/getmeridian/meridian/issues/36) — expand real-VM harness for existing features
 - [#37](https://github.com/getmeridian/meridian/issues/37) — real-VM harness: multi-topology + multi-provider + optional CI smoke
 
-### 4.0 release hardening
+### Hardening
 
-- Safe retirement: `client remove`, `node remove`, `relay remove`, and
-  shrinking the topology (today apply is additive and refuses removals)
-- Per-hop relay health checks (`relay check`)
 - Complete typed process-API envelopes and generated clients across commands
 - Make operation state durable, cancellation real, and diagnostics redacted
 - Scan built artifacts for secrets
@@ -108,7 +98,7 @@ hood; no terminal required.
 
 Rotate Reality keys, JWT secrets, and subscription paths in place.
 
-## Tracked follow-ups (v4 aftermath)
+## Tracked follow-ups
 
 Security / supply chain:
 - [#38](https://github.com/getmeridian/meridian/issues/38) — `install.sh` verify `SHA256SUMS` before exec
@@ -120,4 +110,4 @@ Product:
 
 UX / docs:
 - [#44](https://github.com/getmeridian/meridian/issues/44) — WebRTC leak warning on connection page
-- ~~[#45](https://github.com/getmeridian/meridian/issues/45) — Windows / WSL setup guide~~ — shipped on `main`; carry it into 4.0 docs
+- ~~[#45](https://github.com/getmeridian/meridian/issues/45) — Windows / WSL setup guide~~ — shipped

@@ -129,7 +129,7 @@ meridian test
 
 `meridian deploy` 和 `meridian node add` 上的 `--sni` 为出口的直接 Reality 路径设置伪装目标。目标必须是出口可用 TLS 1.3 到达的网站，部署检查真实流量通过它并在没有通过停止。在部署前用 `meridian check IP --sni HOST` 检查候选者。在仅检查名称的网络上，允许的名称可能让直接路径通过，但是名称是否有效取决于运营商，所以测试每个。
 
-### Meridian 尚未做的
+### Meridian 不做的
 
 - 它不告诉您中继的 IP 是否在任何运营商列表上，或限制是否有效。
 - 它不通过国内 CDN 设置前置。域名模式为 Cloudflare 构建和测试。
@@ -158,5 +158,3 @@ meridian test
 systemctl list-units 'netfwd-*'
 journalctl -u 'netfwd-*' --no-pager -n 20
 ```
-
-由更早版本部署的跳跃作为 `meridian-realm-*` 运行，直到下一个 `meridian apply` 重命名它们；`meridian check RELAY` 警告直到那时。

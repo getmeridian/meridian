@@ -41,7 +41,7 @@ Meridian 会在交互式命令前定期检查 PyPI，并在有新版本时打印
 
 ## 从 3.x 升级
 
-Meridian 4.0 **不是就地升级**。它用 Remnawave 替换 3x-ui 面板，来自 3.x 服务器的链接无法转移：每个用户需要新链接。
+Meridian 4 **不是就地升级**。它用 Remnawave 替换 3x-ui 面板，来自 3.x 服务器的链接无法转移：每个用户需要新链接。
 
 您的 3.x 服务器继续工作。您有两个选择：
 
@@ -50,12 +50,12 @@ Meridian 4.0 **不是就地升级**。它用 Remnawave 替换 3x-ui 面板，来
   uv tool install 'meridian-vpn<4'
   ```
   （或 `pipx install 'meridian-vpn<4'`）。Meridian 3.17.3 及更高版本在您运行 `meridian update` 时保持在 3.x，除非您传递 `--major`。
-- **迁移到 4.0。**
-  1. 用 4.0 部署一个新服务器：`meridian deploy NEW_IP`
+- **迁移到 Meridian 4。**
+  1. 用 Meridian 4 部署一个新服务器：`meridian deploy NEW_IP`
   2. 为您的用户提供他们的新连接页面（为每个人运行 `meridian client add NAME`）
-  3. 一旦每个人都切换了，用 `meridian teardown OLD_IP` 卸载旧服务器 — 4.0 的卸载也会移除 3x-ui
+  3. 一旦每个人都切换了，用 `meridian teardown OLD_IP` 卸载旧服务器 — Meridian 4 的卸载也会移除 3x-ui
 
-Meridian 4.0 把自己的状态保存在 `~/.config/meridian/`，从不读取或改变 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为解释这些选项。
+Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或改变 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为解释这些选项。
 
 ## 需求
 

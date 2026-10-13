@@ -95,7 +95,7 @@ meridian apply [--yes] [--json]
 
 JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.config/meridian` permissions, then run `plan` and `apply` again.
 
-Removing users or protocol paths is applied: the removed resources are deleted after everything still in the plan has converged, and `plan` lists them first. Removing an exit, relay, or routing gateway is refused for now.
+Removals are applied too: whatever left the topology (users, protocol paths, exits, relays, routing gateways) is deleted after everything still in the plan has converged, and `plan` lists it first. The control server leaves only with `meridian teardown`.
 
 ### meridian client
 
@@ -270,8 +270,6 @@ meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
 
 Missing evidence is never treated as success. Exit `0` means every check passed, `4` means problems were found, `3` means required evidence was unavailable, and `2` means invalid input. Each failure prints its fix. Use `meridian test` to push real traffic through the whole route.
 
-The older `preflight`, `node check`, and `relay check` commands still work for one release.
-
 ### meridian scan
 
 Find camouflage targets on the server's own network using a pinned RealiTLScanner release. Meridian verifies its SHA-256 checksum before running it and removes the remote workspace afterwards.
@@ -309,7 +307,7 @@ Exit `0` means every check passed, `4` means the test found problems, and `3` me
 
 Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
 
-`--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes. The older `meridian probe` command still works for one release.
+`--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes.
 
 ### meridian doctor
 
@@ -442,4 +440,4 @@ Client commands use the panel API directly and don't take a server. `test` runs 
 
 ## Server resolution
 
-Name the server first, the way `ssh` does: an IP, a saved name, `user@host:port`, or `local` to run on the current machine without SSH. `--user` and `--ssh-port` fill in what the target leaves out and must not contradict it. An empty user or port means the saved value, else `root` and `22`. With no server, Meridian uses local mode (when running on a deployed server) or the only saved server. Zero or several candidates exit `2` rather than prompting. The older `--server NAME` flag still works.
+Name the server first, the way `ssh` does: an IP, a saved name, `user@host:port`, or `local` to run on the current machine without SSH. `--user` and `--ssh-port` fill in what the target leaves out and must not contradict it. An empty user or port means the saved value, else `root` and `22`. With no server, Meridian uses local mode (when running on a deployed server) or the only saved server. Zero or several candidates exit `2` rather than prompting.

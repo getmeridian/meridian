@@ -23,7 +23,7 @@ This installs the `meridian` command with [uv](https://docs.astral.sh/uv/) (or p
 
 Run Meridian on your own machine rather than on the VPS: it connects over SSH, keeps credentials on your device, and lets `meridian test` check the server from the outside.
 
-> Coming from Meridian 3.x? 4.0 is not an in-place upgrade. Read [Upgrading from 3.x](/en/installation/#upgrading-from-3x) first.
+> Coming from Meridian 3.x? Meridian 4 is not an in-place upgrade. Read [Upgrading from 3.x](/en/installation/#upgrading-from-3x) first.
 
 ## Deploy
 
@@ -53,12 +53,14 @@ When the deploy finishes, it prints:
 
 Recommended apps:
 
-| Platform | App |
-|----------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| All platforms | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+| App | Platforms |
+|-----|-----------|
+| [Happ](https://happ.su/) | iOS, Android, Windows, macOS, Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android, Windows, macOS, Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS, Android, Windows, macOS, Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows, macOS, Linux |
+
+The connection page lists these first and links more apps for each platform.
 
 Check the server from your machine at any time:
 

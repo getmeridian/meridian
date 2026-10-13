@@ -23,7 +23,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 Meridian را روی ماشین خود (نه روی VPS) اجرا کنید: روی SSH متصل می‌شود، اعتبارنامه‌ها را روی دستگاه نگه می‌دارد و `meridian test` سرور را از خارج بررسی می‌کند.
 
-> از Meridian 3.x می‌آیید؟ 4.0 ارتقا درجا **نیست**. ابتدا [Upgrading from 3.x](/fa/installation/#ارتقا-از-3x) را بخوانید.
+> از Meridian 3.x می‌آیید؟ Meridian 4 ارتقا درجا **نیست**. ابتدا [ارتقا از 3.x](/fa/installation/#ارتقا-از-3x) را بخوانید.
 
 ## Deploy
 
@@ -53,12 +53,14 @@ Deploy checkpointed است. اگر قطع شود، دستور یکسان را د
 
 برنامه‌های توصیه‌شده:
 
-| Platform | App |
-|----------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| All platforms | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+| برنامه | پلتفرم‌ها |
+|-----|-----------|
+| [Happ](https://happ.su/) | iOS، Android، Windows، macOS، Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android، Windows، macOS، Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS، Android، Windows، macOS، Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows، macOS، Linux |
+
+صفحه اتصال این برنامه‌ها را اول نشان می‌دهد و برای هر پلتفرم لینک برنامه‌های بیشتری ارائه می‌کند.
 
 سرور را از ماشین خود در هر زمان بررسی کنید:
 

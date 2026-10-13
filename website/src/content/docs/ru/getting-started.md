@@ -23,7 +23,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 Запустите Meridian на вашей собственной машине вместо на VPS: он подключается по SSH, сохраняет учётные данные на вашем устройстве и позволяет `meridian test` проверить сервер снаружи.
 
-> Приходит из Meridian 3.x? 4.0 не является обновлением на месте. Прочитайте [Upgrading from 3.x](/ru/installation/#обновление-с-3x) сначала.
+> Приходит из Meridian 3.x? Meridian 4 не является обновлением на месте. Прочитайте [Обновление с 3.x](/ru/installation/#обновление-с-3x) сначала.
 
 ## Развернуть
 
@@ -53,12 +53,14 @@ meridian deploy 198.51.100.10
 
 Рекомендуемые приложения:
 
-| Платформа | Приложение |
-|----------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| Все платформы | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+| Приложение | Платформы |
+|-----|-----------|
+| [Happ](https://happ.su/) | iOS, Android, Windows, macOS, Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android, Windows, macOS, Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS, Android, Windows, macOS, Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows, macOS, Linux |
+
+Страница подключения показывает эти приложения первыми и даёт ссылки на другие приложения для каждой платформы.
 
 Проверьте сервер с вашей машины в любой момент:
 

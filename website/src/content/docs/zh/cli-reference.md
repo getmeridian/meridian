@@ -95,7 +95,7 @@ meridian apply [--yes] [--json]
 
 JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.config/meridian` 权限，然后再次运行 `plan` 和 `apply`。
 
-删除用户或协议路径被应用：删除的资源在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。删除出口、中继或路由网关目前被拒绝。
+删除同样会被应用：离开拓扑的所有内容（用户、协议路径、出口、中继、路由网关）在计划中剩下的所有内容收敛后被删除，`plan` 首先列出它们。控制服务器只能通过 `meridian teardown` 删除。
 
 ### meridian client
 
@@ -270,8 +270,6 @@ meridian check [SERVER] [--domain NAME] [--sni HOST] [--user USER]
 
 缺失证据永不视为成功。退出 `0` 表示每个检查都通过，`4` 表示发现问题，`3` 表示需要的证据不可用，`2` 表示无效输入。每个失败都打印其修复。使用 `meridian test` 通过整条路由推动真实流量。
 
-较旧的 `preflight`、`node check` 和 `relay check` 命令仍在本版本工作一个发布周期。
-
 ### meridian scan
 
 使用固定 RealiTLScanner 版本在服务器自己的网络上找伪装目标。Meridian 在运行之前验证其 SHA-256 校验和并之后删除远程工作空间。
@@ -309,7 +307,7 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 检查遵循真实部署：公共和内部端口暴露、HTTP/TLS 行为、SNI 一致性和伪装、常见代理和面板路径、WebSocket 升级、反向 DNS、HTTP/2、遗留 TLS 版本和已配置域名。`--sni` 覆盖通用 TLS 探测的 SNI。纯 UDP 监听器报告为需要完整 `meridian test` 而不是被猜测。
 
-`--probe` 还回答「什么被阻止了？」。它使用其伪装 SNI 打开到服务器的 TLS；如果失败，它将重试而不使用 SNI 并直接打开真实的伪装站点，然后报告**服务器 IP** 或**伪装 SNI** 是否看起来被阻止。如果也无法连接到真实站点，结果是不确定的而不是一个发现。在控制服务器上，它还下载连接页面的脚本（约 50 KB）并监视传输在约 16-24 KB 后冻结的情况，这是受限外部 IP 的行为方式。当 WSS 路径通过 CDN 时，相同的下载通过 CDN 运行。这些结果仅在从审查网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 结合使用。退出码与 `test` 相同；跳过的检查从不报告为通过。较旧的 `meridian probe` 命令在一个版本内仍然有效。
+`--probe` 还回答「什么被阻止了？」。它使用其伪装 SNI 打开到服务器的 TLS；如果失败，它将重试而不使用 SNI 并直接打开真实的伪装站点，然后报告**服务器 IP** 或**伪装 SNI** 是否看起来被阻止。如果也无法连接到真实站点，结果是不确定的而不是一个发现。在控制服务器上，它还下载连接页面的脚本（约 50 KB）并监视传输在约 16-24 KB 后冻结的情况，这是受限外部 IP 的行为方式。当 WSS 路径通过 CDN 时，相同的下载通过 CDN 运行。这些结果仅在从审查网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 结合使用。退出码与 `test` 相同；跳过的检查从不报告为通过。
 
 ### meridian doctor
 
@@ -442,4 +440,4 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 
 ## 服务器解析
 
-与 `ssh` 一样，先写服务器：IP、已保存的名称、`user@host:port`，或 `local`（在当前机器上运行，不经 SSH）。`--user` 和 `--ssh-port` 补充目标中未写明的部分，且不能与之冲突。用户或端口留空表示使用已保存的值，没有则为 `root` 和 `22`。未指定服务器时，Meridian 使用本地模式（在已部署的服务器上运行时）或唯一已保存的服务器。没有候选或有多个候选时以退出码 `2` 结束，而不会提示选择。旧的 `--server NAME` 参数仍然可用。
+与 `ssh` 一样，先写服务器：IP、已保存的名称、`user@host:port`，或 `local`（在当前机器上运行，不经 SSH）。`--user` 和 `--ssh-port` 补充目标中未写明的部分，且不能与之冲突。用户或端口留空表示使用已保存的值，没有则为 `root` 和 `22`。未指定服务器时，Meridian 使用本地模式（在已部署的服务器上运行时）或唯一已保存的服务器。没有候选或有多个候选时以退出码 `2` 结束，而不会提示选择。

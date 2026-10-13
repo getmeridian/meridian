@@ -82,7 +82,7 @@ relay ترافیک TCP خام را از IP داخلی به listener Reality exit
 
 Meridian topology را به لیست منابع تبدیل می‌کند: قوانین firewall، مسیرهای nginx، containers، پروفایل‌های Remnawave، میزبان‌ها، کاربران و templates. `meridian plan` هر کدام را روی سرورها و پنل زندگی مشاهده می‌کند و گزارش می‌کند چه نیاز به تعمیر دارد. `meridian apply` دقیقاً plan را اعمال می‌کند که نشان داد، هر مرحله را checkpoint می‌کند تا interrupted apply امن از سر شروع شود. منابعی که نتیجه آن‌ها نامشخص است مجدداً مشاهده می‌شوند پیش از هر تلاش.
 
-کاربران و مسیرهای پروتکل می‌توانند اضافه و حذف شوند؛ بعد از اینکه نقشه جدید همگرا شود، apply حذف می‌کند آن‌های که آن را ترک کردند (کاربران پنل و میزبان‌ها، فایل‌های nginx، قوانین firewall). حذف exit، relay یا routing gateway از fleet در حال اجرا برای اکنون رد می‌شود.
+هر چیزی در topology را می‌توان اضافه و حذف کرد: کاربران، مسیرهای پروتکل، exitها، relayها و routing gatewayها. بعد از اینکه نقشه جدید همگرا شود، apply آن‌هایی را که آن را ترک کرده‌اند حذف می‌کند (کاربران، میزبان‌ها و node‌های پنل، فایل‌های nginx، سرویس‌های Realm، گواهینامه‌ها، قوانین firewall). سرور کنترل استثنا است: نشانی آن بخشی از هر URL اشتراک است، بنابراین فقط با `meridian teardown` حذف می‌شود.
 
 ویرایش‌های پنل برای منابعی که Meridian مالک است در `meridian plan` نشان می‌دهند و توسط apply بعدی بازگردانده می‌شوند. تنظیمات Remnawave که Meridian مدیریت نمی‌کند تنهایشان می‌مانند.
 
@@ -132,7 +132,7 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 - `/opt/remnanode/` — فایل compose node و `.env`
 
 ### روی هر relay
-- `/etc/netfwd/` — پیکربندی Realm، اجرا شده از `/usr/local/bin/netfwd` توسط سرویس‌های systemd `netfwd-*`. میزبان‌های relay هیچ واحد مریدیان‌نام‌شده، مسیر یا نظر firewall (`fw-*`) ندارند؛ `meridian apply` بعدی hopهایی که تحت نام‌های `meridian-realm-*` قدیمی‌تر مستقر شدند را تغییر نام می‌دهد
+- `/etc/netfwd/` — پیکربندی Realm، اجرا شده از `/usr/local/bin/netfwd` توسط سرویس‌های systemd `netfwd-*`. میزبان‌های relay هیچ واحد مریدیان‌نام‌شده، مسیر یا نظر firewall (`fw-*`) ندارند.
 
 ### روی ماشین شما
 - `~/.config/meridian/cluster.yml` — topology، دسترسی پنل، کلیدها
@@ -142,4 +142,4 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 - `~/.config/meridian/ssh/meridian_ed25519` — کلید SSH مدیریت‌شده، وقتی تولید شود
 - `~/.config/meridian/cache/` — update-check cache
 
-این دایرکتوری در صورت تنظیم بودن `$XDG_CONFIG_HOME` از آن پیروی می‌کند و `MERIDIAN_HOME` آن را بازنویسی می‌کند. اگر یک fleet نسخهٔ 4.0 از قبل در `~/.meridian-v4/` یا `~/.meridian/` باشد (با `servers.json` شناخته می‌شود)، تا زمانی که `~/.config/meridian/` وجود نداشته باشد همان‌جا استفاده می‌شود؛ وضعیت 3.x در `~/.meridian/` هرگز دست نمی‌خورد.
+این دایرکتوری در صورت تنظیم بودن `$XDG_CONFIG_HOME` از آن پیروی می‌کند و `MERIDIAN_HOME` آن را بازنویسی می‌کند. تا زمانی که `~/.config/meridian/` وجود ندارد، Meridian اگر `~/.meridian-v4/` یا `~/.meridian/` یک fleet داشته باشد (فایل `servers.json` دارد) از آن‌ها هم استفاده می‌کند. وضعیت Meridian 3.x در `~/.meridian/` هرگز دست نمی‌خورد.

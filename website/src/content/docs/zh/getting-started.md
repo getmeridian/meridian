@@ -23,7 +23,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 在自己的机器上运行 Meridian，而不是在 VPS 上：它通过 SSH 连接，将凭证保存在你的设备上，让 `meridian test` 从外部检查服务器。
 
-> 从 Meridian 3.x 升级？4.0 不是就地升级。先阅读[从 3.x 升级](/zh/installation/#从-3x-升级)。
+> 从 Meridian 3.x 升级？Meridian 4 不是就地升级。先阅读[从 3.x 升级](/zh/installation/#从-3x-升级)。
 
 ## 部署
 
@@ -53,12 +53,14 @@ meridian deploy 198.51.100.10
 
 推荐应用：
 
-| 平台 | 应用 |
-|------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| 所有平台 | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+| 应用 | 平台 |
+|-----|-----|
+| [Happ](https://happ.su/) | iOS、Android、Windows、macOS、Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android、Windows、macOS、Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS、Android、Windows、macOS、Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows、macOS、Linux |
+
+连接页面会优先列出这些应用，并为每个平台提供更多应用的链接。
 
 随时从你的机器检查服务器：
 

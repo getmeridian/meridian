@@ -43,7 +43,7 @@ meridian node add 198.51.100.20 --name replacement
 meridian node replace exit-1 198.51.100.20
 ```
 
-客户端在下次订阅刷新时获取新地址。控制平面服务器本身无法以这种方式移动。
+客户端在下次订阅刷新时获取新地址。控制平面服务器无法以这种方式移动：其地址是每个订阅 URL 的一部分。
 
 ### 添加域名用于 CDN 回退
 
@@ -63,11 +63,11 @@ meridian node add 198.51.100.20 --domain vpn.example.com
 meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
-将现有中继移到不同出口尚不可用；改为针对新出口部署一个新中继。
+要让中继指向不同的出口，请先用 `meridian relay remove` 移除它，再用 `meridian relay add` 重新添加，并将 `--exit` 设为新出口。
 
 ### 如果控制平面服务器丢失
 
-`node add` 和 `relay add` 需要面板。如果托管它的服务器消失且无法恢复，目前没有自动迁移：用 `meridian deploy` 部署新服务器，然后用 `meridian client add` 重新创建每个客户端。每个人获得新链接。
+`node add` 和 `relay add` 需要面板。如果托管它的服务器消失且无法恢复，Meridian 无法迁移其客户端：用 `meridian deploy` 部署新服务器，然后用 `meridian client add` 重新创建每个客户端。每个人获得新链接。
 
 ## 从多台机器管理
 

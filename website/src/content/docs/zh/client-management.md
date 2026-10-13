@@ -68,7 +68,7 @@ meridian client enable alice
 
 `disable` 立即切断客户端；`enable` 用相同链接让他们回来。
 
-禁用是临时的：下次应用将每个声明的客户端转回开启。Apply 运行于 `meridian apply`、重新部署以及当您添加客户端、节点或中继时。如果需要，这之后再禁用。
+禁用会持续到执行 `client enable`：应用、重新部署和集群变更都不会改动它。
 
 ## 删除客户端
 

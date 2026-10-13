@@ -82,7 +82,7 @@ flowchart LR
 
 Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容器、Remnawave 配置文件、主机、用户和模板。`meridian plan` 在实时服务器和面板上观察每一个并报告需要修复的内容。`meridian apply` 应用它显示的确切计划，在每一步设置检查点，以便中断的应用可以安全地恢复。结果不确定的资源在任何重试之前会被重新观察。
 
-用户和协议路径可以添加和删除；在新计划收敛后，应用删除离开它的东西（面板用户和主机、nginx 文件、防火墙规则）。从运行中的集群删除出口、中继或路由网关目前被拒绝。
+拓扑中的任何内容都可以添加和删除：用户、协议路径、出口、中继和路由网关。在新计划收敛后，应用会删除离开拓扑的内容（面板用户、主机和节点、nginx 文件、Realm 服务、证书、防火墙规则）。控制服务器是例外：它的地址是每个订阅 URL 的一部分，因此只能通过 `meridian teardown` 删除。
 
 对面板拥有资源的编辑会在 `meridian plan` 中显示，并由下一次应用恢复。Meridian 不管理的 Remnawave 设置被保留。
 
@@ -132,7 +132,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 - `/opt/remnanode/` — 节点 compose 文件和 `.env`
 
 ### 在每个中继上
-- `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）；下一个 `meridian apply` 重命名在较旧的 `meridian-realm-*` 名字下部署的跳跃
+- `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）。
 
 ### 在您的机器上
 - `~/.config/meridian/cluster.yml` — 拓扑、面板访问、密钥
@@ -142,4 +142,4 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 - `~/.config/meridian/ssh/meridian_ed25519` — 托管 SSH 密钥，生成时
 - `~/.config/meridian/cache/` — 更新检查缓存
 
-该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。已存放在 `~/.meridian-v4/` 或 `~/.meridian/` 中的 4.0 集群（通过 `servers.json` 识别）会继续从原处使用，直到 `~/.config/meridian/` 出现；`~/.meridian/` 中的 3.x 状态不会被触碰。
+该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。在 `~/.config/meridian/` 不存在期间，若 `~/.meridian-v4/` 或 `~/.meridian/` 中存有集群（含有 `servers.json`），Meridian 也会使用它们。`~/.meridian/` 中的 Meridian 3.x 状态不会被触碰。

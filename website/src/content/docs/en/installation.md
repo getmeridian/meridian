@@ -41,7 +41,7 @@ Updating the CLI changes nothing on your servers. If a server works, there is no
 
 ## Upgrading from 3.x
 
-Meridian 4.0 is **not an in-place upgrade**. It replaces the 3x-ui panel with Remnawave, and links from a 3.x server cannot carry over: every user needs a new link.
+Meridian 4 is **not an in-place upgrade**. It replaces the 3x-ui panel with Remnawave, and links from a 3.x server cannot carry over: every user needs a new link.
 
 Your 3.x servers keep working. You have two choices:
 
@@ -50,12 +50,12 @@ Your 3.x servers keep working. You have two choices:
   uv tool install 'meridian-vpn<4'
   ```
   (or `pipx install 'meridian-vpn<4'`). Meridian 3.17.3 and later stay on 3.x when you run `meridian update`, unless you pass `--major`.
-- **Move to 4.0.**
-  1. Deploy a fresh server with 4.0: `meridian deploy NEW_IP`
+- **Move to Meridian 4.**
+  1. Deploy a fresh server with Meridian 4: `meridian deploy NEW_IP`
   2. Give your users their new connection pages (`meridian client add NAME` for each person)
-  3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — 4.0's teardown also removes 3x-ui
+  3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — Meridian 4's teardown also removes 3x-ui
 
-Meridian 4.0 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
+Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
 
 ## Requirements
 

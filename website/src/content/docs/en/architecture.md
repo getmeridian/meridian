@@ -82,7 +82,7 @@ A relay forwards raw TCP from a domestic IP to the exit's Reality listener. Encr
 
 Meridian turns the topology into a list of resources: firewall rules, nginx routes, containers, Remnawave profiles, hosts, users, and templates. `meridian plan` observes each one on the live servers and panel and reports what needs repair. `meridian apply` applies the exact plan it showed, checkpointing every step so an interrupted apply resumes safely. Resources whose outcome is uncertain are re-observed before any retry.
 
-Users and protocol paths can be added and removed; after the new plan converges, apply deletes what left it (panel users and hosts, nginx files, firewall rules). Removing an exit, relay, or routing gateway from a running fleet is refused for now.
+Anything in the topology can be added and removed: users, protocol paths, exits, relays, and routing gateways. After the new plan converges, apply deletes what left it (panel users, hosts, and nodes, nginx files, Realm services, certificates, firewall rules). The control server is the exception: its address is part of every subscription URL, so it leaves only with `meridian teardown`.
 
 Panel edits to resources Meridian owns show up in `meridian plan` and are restored by the next apply. Remnawave settings Meridian doesn't manage are left alone.
 
@@ -132,7 +132,7 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 - `/opt/remnanode/` — node compose file and `.env`
 
 ### On each relay
-- `/etc/netfwd/` — Realm configuration, run from `/usr/local/bin/netfwd` by `netfwd-*` systemd services. Relay hosts carry no Meridian-named units, paths, or firewall comments (`fw-*`); the next `meridian apply` renames hops deployed under the older `meridian-realm-*` names
+- `/etc/netfwd/` — Realm configuration, run from `/usr/local/bin/netfwd` by `netfwd-*` systemd services. Relay hosts carry no Meridian-named units, paths, or firewall comments (`fw-*`)
 
 ### On your machine
 - `~/.config/meridian/cluster.yml` — topology, panel access, keys
@@ -142,4 +142,4 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 - `~/.config/meridian/ssh/meridian_ed25519` — managed SSH key, when generated
 - `~/.config/meridian/cache/` — update-check cache
 
-The directory follows `$XDG_CONFIG_HOME` when it is set, and `MERIDIAN_HOME` overrides it. A 4.0 fleet already kept in `~/.meridian-v4/` or `~/.meridian/` (recognised by its `servers.json`) keeps being used from there until `~/.config/meridian/` exists; 3.x state in `~/.meridian/` is never touched.
+The directory follows `$XDG_CONFIG_HOME` when it is set, and `MERIDIAN_HOME` overrides it. While `~/.config/meridian/` doesn't exist, Meridian also uses `~/.meridian-v4/` or `~/.meridian/` when either holds a fleet (it has a `servers.json`). Meridian 3.x state in `~/.meridian/` is never touched.

@@ -68,7 +68,7 @@ meridian client enable alice
 
 `disable` cuts the client off immediately; `enable` lets them back in with the same links.
 
-A disable is temporary: the next apply turns every declared client back on. Apply runs for `meridian apply`, a redeploy, and when you add clients, nodes, or relays. Disable again after those if needed.
+A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
 
 ## Removing a client
 

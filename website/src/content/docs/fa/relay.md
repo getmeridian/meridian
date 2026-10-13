@@ -129,7 +129,7 @@ meridian test
 
 `--sni` روی `meridian deploy` و `meridian node add` hدف camouflage برای مسیر Reality مستقیم exit را تنظیم می‌کند. هدف باید سایتی باشد که exit می‌تواند با TLS 1.3 به آن دسترسی داشته باشد، و deploy ترافیق واقعی از طریق آن بررسی کرده و متوقف می‌شود اگر هیچ کدام عبور نکند. قبل از deploy، candidate را با `meridian check IP --sni HOST` بررسی کنید. بر روی شبکه‌ای که تنها نام‌ها را بررسی می‌کند، نام مجاز ممکن است مسیر مستقیم را عبور دهد، اما آیا نام کار می‌کند وابسته به operator است، بنابراین هر یک را تست کنید.
 
-### آنچه Meridian هنوز انجام نمی‌دهد
+### آنچه Meridian انجام نمی‌دهد
 
 - آن بگوید آیا IP relay بر روی هر operator's list است یا محدودیت‌ها فعال هستند.
 - Fronting را تنظیم کنید از طریق CDN داخلی. Domain mode برای Cloudflare built و tested است.
@@ -158,5 +158,3 @@ relay باید به درگاه Reality خروجی برسد. `meridian test` را
 systemctl list-units 'netfwd-*'
 journalctl -u 'netfwd-*' --no-pager -n 20
 ```
-
-hopهای deploy شده توسط انتشارات قدیمی‌تر تا `meridian apply` بعدی `meridian-realm-*` نام‌برند؛ `meridian check RELAY` تا آن موقع هشدار می‌دهد.

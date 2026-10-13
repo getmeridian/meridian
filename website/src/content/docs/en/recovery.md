@@ -43,7 +43,7 @@ Clients keep their accounts. They receive the new exit on their next subscriptio
 meridian node replace exit-1 198.51.100.20
 ```
 
-Clients pick up the new address on their next subscription refresh. The control-plane server itself can't be moved this way yet.
+Clients pick up the new address on their next subscription refresh. The control-plane server can't be moved this way: its address is part of every subscription URL.
 
 ### Add a domain for CDN fallback
 
@@ -63,11 +63,11 @@ A relay on a domestic server gives users an entry point that stays reachable whe
 meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
-Moving an existing relay to a different exit isn't available yet; deploy a new relay against the new exit instead.
+To point a relay at a different exit, remove it with `meridian relay remove` and add it again with `--exit` set to the new exit.
 
 ### If the control-plane server is lost
 
-`node add` and `relay add` need the panel. If the server that hosted it is gone and cannot be restored, there is no automatic migration yet: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
+`node add` and `relay add` need the panel. If the server that hosted it is gone and cannot be restored, Meridian can't carry its clients over: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
 
 ## Managing from more than one machine
 

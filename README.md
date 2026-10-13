@@ -54,7 +54,7 @@ uv tool install meridian-vpn    # recommended
 pipx install meridian-vpn       # alternative
 ```
 
-> **Upgrading from 3.x?** Meridian 4.0 is not an in-place upgrade: it replaces 3x-ui with Remnawave, and every user needs a new link. Your 3.x servers keep working. See [Upgrading from 3.x](https://getmeridian.org/en/installation/#upgrading-from-3x).
+> **Upgrading from 3.x?** Meridian 4 is not an in-place upgrade: it replaces 3x-ui with Remnawave, and every user needs a new link. Your 3.x servers keep working. See [Upgrading from 3.x](https://getmeridian.org/en/installation/#upgrading-from-3x).
 
 ## Quick start
 
@@ -147,12 +147,14 @@ Removal commands change the topology and clean up what disappears; `client remov
 
 ## Client apps
 
-| Platform | App |
-|----------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| All platforms | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+| App | Platforms |
+|-----|-----------|
+| [Happ](https://happ.su/) | iOS, Android, Windows, macOS, Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android, Windows, macOS, Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS, Android, Windows, macOS, Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows, macOS, Linux |
+
+The connection page lists these first and links more apps for each platform.
 
 ## Troubleshooting
 
