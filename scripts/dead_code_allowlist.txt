@@ -5,4 +5,3 @@
 # Unused parameters use `qualified.name(param)`. Entries that no longer match
 # a finding are reported as stale-allowlist: delete them.
 
-meridian.infra.*  # consumed by the tests/realvm harness; future `deploy --create-vm` backend (infra/CLAUDE.md)
