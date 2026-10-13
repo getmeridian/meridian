@@ -4,7 +4,6 @@ Public API:
 
     from meridian.diagnostics import (
         CheckResult,
-        CheckStatus,
         check_container_running,
         check_disk_space,
         check_firewall_port,
@@ -18,7 +17,6 @@ from __future__ import annotations
 
 from meridian.diagnostics.checks import (
     CheckResult,
-    CheckStatus,
     check_container_running,
     check_disk_space,
     check_firewall_port,
@@ -29,7 +27,6 @@ from meridian.diagnostics.checks import (
 
 __all__ = [
     "CheckResult",
-    "CheckStatus",
     "check_container_running",
     "check_disk_space",
     "check_firewall_port",

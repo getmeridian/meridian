@@ -11,10 +11,11 @@ import shlex
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+from meridian.core.verification import VerificationStatus
+
 if TYPE_CHECKING:
     from meridian.core.execution import ServerConnection
 
-CheckStatus = Literal["passed", "failed", "warning", "skipped"]
 UNAVAILABLE_COMMAND_RETURN_CODES = frozenset({124, 127, 255})
 
 
@@ -28,7 +29,7 @@ class CheckResult:
     """Outcome of a single server health check."""
 
     name: str
-    status: CheckStatus
+    status: VerificationStatus
     detail: str = ""
     remediation: str = ""
 

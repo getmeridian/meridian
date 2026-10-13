@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, TypeVar, get_args
+from typing import Protocol, TypeVar, get_args
 
 from pydantic import Field, model_validator
 
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import CompiledResource, ResourceKind, ResourcePlan, canonical_hash
+from meridian.core.apply import CompiledApplyActionStatus
 from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
 
-ResourceActionStatus = Literal["converged", "applied", "failed", "unknown", "skipped"]
 PayloadT = TypeVar("PayloadT")
 
 
@@ -102,7 +102,7 @@ class ResourceActionResult(CoreModel):
     """Terminal result for one resource action."""
 
     action: ResourceAction
-    status: ResourceActionStatus
+    status: CompiledApplyActionStatus
     changed: bool = False
     error: str = ""
 
