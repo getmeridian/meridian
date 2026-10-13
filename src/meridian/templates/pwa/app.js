@@ -20,7 +20,6 @@ var T = {
     'import.add': 'Добавить в {name}',
     'import.manual': 'Скопировать URL подписки',
     'install.offline': 'Доступ к подключению офлайн',
-    'relay.via': 'через {name}',
     'apps.more': 'Другие платформы',
     'apps.other': 'Другие приложения',
     'apps.update': 'Обновляйте приложение',
@@ -71,7 +70,6 @@ var T = {
     'import.add': 'افزودن به {name}',
     'import.manual': 'کپی URL اشتراک',
     'install.offline': 'دسترسی آفلاین به اتصال',
-    'relay.via': 'از طریق {name}',
     'apps.more': 'پلتفرم\u200Cهای دیگر',
     'apps.other': 'برنامه‌های دیگر',
     'apps.update': 'برنامه را به‌روز نگه دارید',
@@ -122,7 +120,6 @@ var T = {
     'import.add': '添加到 {name}',
     'import.manual': '复制订阅链接',
     'install.offline': '离线访问连接',
-    'relay.via': '经由 {name}',
     'apps.more': '其他平台',
     'apps.other': '更多应用',
     'apps.update': '保持应用为最新版本',
@@ -368,15 +365,6 @@ var ICON_HELP = svg('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5
 var ICON_ROUTER = svg('<rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 17.5h.01M10 17.5h.01M15 14V9M8.5 8.5a6 6 0 0 1 13 0M11.5 10.5a3 3 0 0 1 7 0"/>', 18);
 var ICON_SHARE = svg('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/>', 15);
 var ICON_CHEVRON = svg('<path d="m9 18 6-6-6-6"/>', 16);
-
-/* -----------------------------------------------------------------------
- * i18n helper for relay "via" label
- * ----------------------------------------------------------------------- */
-function relayViaLabel(name) {
-  var dict = currentLang && T[currentLang];
-  var tpl = (dict && dict['relay.via']) || 'via {name}';
-  return tpl.replace('{name}', name);
-}
 
 /* -----------------------------------------------------------------------
  * Color palettes — curated presets with dark + light mode variants
@@ -662,12 +650,11 @@ var PROTOCOL_HINTS = {
   wss: '<span data-t="proto.wss">Through a CDN — last resort</span>'
 };
 
-function renderConnection(proto, platform, via) {
-  var label = proto.label + (via ? ' ' + relayViaLabel(via) : '');
+function renderConnection(proto, platform) {
   var url = escapeHtml(proto.url);
   var hasQr = isValidBase64(proto.qr_b64);
   var html = '<div class="conn"><div class="conn-main"><div class="conn-text">';
-  html += '<span class="conn-name">' + escapeHtml(label) + '</span>';
+  html += '<span class="conn-name">' + escapeHtml(proto.label) + '</span>';
   html += '<span class="conn-meta">';
   if (proto.recommended) html += '<span class="badge" data-t="primary.rec">Recommended</span>';
   if (PROTOCOL_HINTS.hasOwnProperty(proto.key)) html += PROTOCOL_HINTS[proto.key];
@@ -685,19 +672,10 @@ function renderConnection(proto, platform, via) {
 }
 
 function renderConnections(config, platform, open) {
-  var rows = '', count = 0;
-  var relays = config.relays || [];
-  for (var r = 0; r < relays.length; r++) {
-    for (var u = 0; u < relays[r].urls.length; u++) {
-      rows += renderConnection(relays[r].urls[u], platform, relays[r].name || relays[r].ip);
-      count++;
-    }
-  }
+  var rows = '';
   var protocols = config.protocols || [];
-  for (var i = 0; i < protocols.length; i++) {
-    rows += renderConnection(protocols[i], platform, '');
-    count++;
-  }
+  var count = protocols.length;
+  for (var i = 0; i < count; i++) rows += renderConnection(protocols[i], platform);
   if (!count) return '';
   var html = '<details class="panel"' + (open ? ' open' : '') + '><summary>';
   html += '<span class="panel-icon">' + ICON_LIST + '</span>';
