@@ -225,15 +225,25 @@ def _find_free_port() -> int:
 
 
 def parse_xray_subscription(content: str) -> dict[str, Any]:
-    """Decode one canonical Remnawave Xray subscription document."""
+    """Decode a canonical Remnawave Xray subscription and return its primary config.
+
+    Remnawave answers with one config per virtual Host in view order: the primary
+    "Automatic" config first, then the optional fingerprint-copy config. Every
+    entry must be valid; only the primary is returned.
+    """
     try:
         parsed = json.loads(content)
     except (TypeError, json.JSONDecodeError) as exc:
         raise ValueError(f"Canonical Xray subscription is not JSON: {exc}") from exc
     if isinstance(parsed, list):
-        if len(parsed) != 1:
-            raise ValueError("Canonical Xray subscription must contain exactly one config")
-        parsed = parsed[0]
+        if not parsed:
+            raise ValueError("Canonical Xray subscription contains no configs")
+        configs = [_subscription_config(item) for item in parsed]
+        return configs[0]
+    return _subscription_config(parsed)
+
+
+def _subscription_config(parsed: Any) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("Canonical Xray subscription must be an object")
     if not isinstance(parsed.get("outbounds"), list):

@@ -41,6 +41,7 @@
 - **Xray runtime and config failures differ** — keep the executable/assets atomic and validate canonical configs with `run -test`; malformed delivery fails, while local runtime absence is inconclusive.
 - **Exit-IP observers are single-stack** — pick IPv4-only or IPv6-only observers by the server's address; a dual-stack observer lets a dual-stack exit answer over the other family and fail the egress match.
 - **Failed traffic is classified by a direct TCP connect** — `connectivity.py` reports `no_traffic` (port answers, session carries nothing) vs `unreachable`; UDP (Hysteria2) paths are never TCP-probed and stay plain failures.
+- **The Xray JSON subscription is an array** — one config per virtual Host in view order (primary "Automatic", then the fingerprint copy); `parse_xray_subscription()` validates every entry and returns the first.
 - **Xray downloads are checksum-verified** — a missing, malformed, or mismatched release SHA2-256 sidecar makes connection verification inconclusive; never execute that archive.
 - **Whatever adds a firewall rule retires it** — node retirement deletes the Docker-internal node API rule (`fw-node-api`, plus its pre-rename comment); a leftover once named Meridian on a server reused as a relay.
 - **Fleet role contracts are finite** — do not project routing gateways as exits or source-restricted internal relay hops as public endpoints.

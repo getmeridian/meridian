@@ -172,8 +172,13 @@ def test_parses_only_rendered_canonical_xray_documents() -> None:
         parse_xray_subscription("dmxlc3M6Ly8=")
     with pytest.raises(ValueError, match="no Meridian"):
         parse_xray_subscription('{"outbounds": [{"tag": "DIRECT"}]}')
-    with pytest.raises(ValueError, match="exactly one config"):
-        parse_xray_subscription(json.dumps([_canonical_config(), _canonical_config()]))
+    with pytest.raises(ValueError, match="no configs"):
+        parse_xray_subscription("[]")
+    with pytest.raises(ValueError, match="no Meridian proxy outbounds"):
+        parse_xray_subscription(json.dumps([_canonical_config(), {"outbounds": [{"tag": "DIRECT"}]}]))
+    primary, copy = _canonical_config(), _canonical_config()
+    primary["remarks"], copy["remarks"] = "Automatic", "Automatic · Firefox"
+    assert parse_xray_subscription(json.dumps([primary, copy]))["remarks"] == "Automatic"
 
     assert parse_xray_subscription(json.dumps(_canonical_config()))["routing"]
 
