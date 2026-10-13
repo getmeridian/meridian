@@ -34,15 +34,6 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   no longer mark `fleet status` as degraded.
 
 ### Deploy
-- **Built for AI agents** — `meridian help agents` prints a Markdown guide that
-  explains how Meridian works and how to drive it safely: non-interactive
-  flags, JSON envelopes, plan before apply, exit codes, and which outputs are
-  secrets. `meridian help COMMAND` shows any command's help, git-style.
-- **Docs for people and agents** — getmeridian.org's docs have search, a
-  per-page table of contents, and proper right-to-left Persian. Every page is
-  also served as Markdown (add `.md` to its address), with Copy page and Open
-  in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
-  links redirect.
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
   and proxy, picks a camouflage target the server can actually use, pushes real
   traffic through the delivered subscription, and only then prints "Done" with a
@@ -114,7 +105,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Run Meridian on the server itself** — after `meridian deploy local` (or on
   any saved server whose IP is on this machine), later commands such as
   `client add`, `doctor`, and `node add` run locally with sudo instead of
-  SSHing back into the same machine. A copied `~/.meridian` on a laptop keeps
+  SSHing back into the same machine. The same fleet copied to a laptop keeps
   using SSH.
 
 - **Per-domain routes on an exit** — `meridian route add EXIT --via
@@ -168,12 +159,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   keeps flowing (the throttling freeze), and the subscription from the
   visitor's own network, then copies a report without links or secrets that
   they can send you.
-- **Every deploy offers every invisible method** — without a domain, XHTTP
+- **Every deploy offers every method** — without a domain, XHTTP
   and Hysteria2 now run on the server's IP address (Let's Encrypt certifies
   IPs), next to Reality, so a block on one method leaves the others. A domain
-  adds WebSocket through the Cloudflare CDN. Hysteria2 is on by default
-  (`--no-hysteria2` turns it off), and the wizard only asks for an optional
-  domain instead of a list of backup methods.
+  carries XHTTP and adds WebSocket through the Cloudflare CDN. Hysteria2 is on
+  by default (`--no-hysteria2` turns it off), and the wizard only asks for an
+  optional domain instead of a list of backup methods.
 - **Hysteria2 is disguised** — its UDP traffic is wrapped in salamander
   obfuscation, so censors see random packets instead of QUIC with a readable
   server name. Every subscription format carries the setting automatically.
@@ -197,6 +188,17 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   by hand, and send local-network and `.ru`/`.su`/`.рф` sites directly. Nothing
   is downloaded at startup, so the app starts even when GitHub is blocked.
   sing-box has no XHTTP, so those entries are left out.
+
+### Docs and agents
+- **An agent guide** — `meridian help agents` prints a Markdown guide that
+  explains how Meridian works and how to drive it safely: non-interactive
+  flags, JSON envelopes, plan before apply, exit codes, and which outputs are
+  secrets. `meridian help COMMAND` shows any command's help, git-style.
+- **Docs for people and agents** — getmeridian.org's docs have search, a
+  per-page table of contents, and proper right-to-left Persian. Every page is
+  also served as Markdown (add `.md` to its address), with Copy page and Open
+  in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
+  links redirect.
 
 ### Security and correctness
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
@@ -226,7 +228,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
-- A copy of `~/.meridian` that is out of date can't undo newer changes. The
+- An out-of-date copy of `cluster.yml` can't undo newer changes. The
   control server records the last change applied, and `apply` refuses to run
   from an older copy or while another machine is applying.
 - Mihomo-based apps (FlClash, Clash Verge, ClashMi) and sing-box routers
