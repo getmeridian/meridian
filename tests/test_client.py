@@ -7,6 +7,8 @@ state lives in Remnawave and is read through MeridianPanel.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -24,8 +26,8 @@ from meridian.remnawave import RemnawaveError, User
 from tests.support.topology import panel_mock, single_exit_intent
 
 
-def _make_v4_cluster(tmp_path: Path, *, users: list[str] | None = None) -> ClusterConfig:
-    """Create a configured cluster whose topology declares the given access users."""
+def _make_cluster(tmp_path: Path, *, users: list[str] | None = None) -> ClusterConfig:
+    """Save a configured cluster whose topology declares the given access users (alice and bob by default)."""
     cluster = ClusterConfig(
         panel=PanelConfig(
             url="https://198.51.100.1/panel",
@@ -33,15 +35,10 @@ def _make_v4_cluster(tmp_path: Path, *, users: list[str] | None = None) -> Clust
             server_ip="198.51.100.1",
             sub_path="pages",
         ),
-        topology_intent=single_exit_intent(users=users or ["default"]),
+        topology_intent=single_exit_intent(users=users or ["alice", "bob"]),
     )
     cluster.save(tmp_path / "cluster.yml")
     return cluster
-
-
-def _make_cluster(tmp_path: Path) -> ClusterConfig:
-    """Create a configured cluster whose topology declares alice and bob."""
-    return _make_v4_cluster(tmp_path, users=["alice", "bob"])
 
 
 def _make_user(name: str = "alice", status: str = "ACTIVE") -> User:
@@ -60,19 +57,44 @@ def _make_panel_mock() -> MagicMock:
     return panel_mock(get_user=_make_user(), list_users=[_make_user("alice"), _make_user("bob")], delete_user=True)
 
 
+@contextmanager
+def _cli(
+    cluster: ClusterConfig,
+    panel: MagicMock | None = None,
+    *,
+    json_mode: bool = False,
+    runtime: MagicMock | None = None,
+) -> Iterator[MagicMock]:
+    """Serve the saved cluster and panel to a client command; yields the MeridianPanel class mock."""
+    set_json_mode(json_mode)
+    try:
+        with ExitStack() as stack:
+            stack.enter_context(patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster))
+            panel_cls = stack.enter_context(
+                patch("meridian.commands._helpers.MeridianPanel", return_value=panel or _make_panel_mock())
+            )
+            if runtime is not None:
+                stack.enter_context(patch("meridian.setup.runtime.SetupRuntime", return_value=runtime))
+                stack.enter_context(patch("meridian.servers.ServerRegistry"))
+            yield panel_cls
+    finally:
+        set_json_mode(False)
+
+
+def _json(capsys: pytest.CaptureFixture[str]) -> dict:
+    return json.loads(capsys.readouterr().out)
+
+
 class TestRunAdd:
     def test_v4_add_updates_intent_and_uses_compiled_access_driver(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home)
+        cluster = _make_cluster(tmp_home, users=["default"])
         panel = _make_panel_mock()
         panel.get_user.side_effect = [None, _make_user("alice")]
         runtime = MagicMock()
         runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
 
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-            patch("meridian.servers.ServerRegistry"),
+            _cli(cluster, panel, runtime=runtime),
             patch(
                 "meridian.commands.client.publish_connection_pages",
                 return_value=[HandoffLinks("alice", subscription_url="https://198.51.100.1/pages/sub/abc123")],
@@ -84,90 +106,48 @@ class TestRunAdd:
         assert updated.access.users == ["default", "alice"]
         publish_handoff.assert_called_once_with(cluster, ["alice"])
 
-    def test_v4_add_save_failure_returns_observed_partial_json(
-        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        ("observed", "status"),
+        [(_make_user("alice"), "ok"), (None, "failed")],
+        ids=["observed", "unobserved"],
+    )
+    def test_v4_add_save_failure_reports_remote_state_change(
+        self, observed: User | None, status: str, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """An observed client comes back as partial data; otherwise the error says remote state may have changed."""
         from meridian.commands._helpers import ReviewedApplyPersistenceError
 
-        cluster = _make_v4_cluster(tmp_home)
         panel = _make_panel_mock()
-        panel.get_user.side_effect = [None, _make_user("alice")]
+        panel.get_user.side_effect = [None, observed]
         runtime = MagicMock()
         runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full")
 
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-                patch("meridian.servers.ServerRegistry"),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                run_add(names=["alice"])
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
-        assert exc_info.value.exit_code == 3
-        assert payload["status"] == "ok"
-        assert payload["data"]["clients"][0]["username"] == "alice"
-        assert payload["warnings"][0]["details"]["remote_state_changed"] is True
-        assert "Remote state changed" in payload["warnings"][0]["message"]
-
-    def test_v4_add_save_failure_without_observation_warns_remote_may_have_changed(
-        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        from meridian.commands._helpers import ReviewedApplyPersistenceError
-
-        cluster = _make_v4_cluster(tmp_home)
-        panel = _make_panel_mock()
-        panel.get_user.side_effect = [None, None]
-        runtime = MagicMock()
-        runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("state file is read-only")
-
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-                patch("meridian.servers.ServerRegistry"),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                run_add(names=["alice"])
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
-        assert exc_info.value.exit_code == 3
-        assert payload["status"] == "failed"
-        assert payload["errors"][0]["category"] == "system"
-        assert "remote state may have changed" in payload["errors"][0]["message"]
-
-    def test_add_duplicate_in_batch_fails(self, tmp_home: Path) -> None:
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
+            _cli(_make_cluster(tmp_home, users=["default"]), panel, json_mode=True, runtime=runtime),
+            pytest.raises(typer.Exit) as exc_info,
         ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_add(names=["alice", "alice"])
-
-    def test_add_client_empty_name_fails(self, tmp_home: Path) -> None:
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_add(names=[""])
-
-    def test_add_client_no_cluster_fails(self, tmp_home: Path) -> None:
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = ClusterConfig()  # unconfigured
             run_add(names=["alice"])
+
+        payload = _json(capsys)
+        assert exc_info.value.exit_code == 3
+        assert payload["status"] == status
+        if observed:
+            assert payload["data"]["clients"][0]["username"] == "alice"
+            assert payload["warnings"][0]["details"]["remote_state_changed"] is True
+            assert "Remote state changed" in payload["warnings"][0]["message"]
+        else:
+            assert payload["errors"][0]["category"] == "system"
+            assert "remote state may have changed" in payload["errors"][0]["message"]
+
+    @pytest.mark.parametrize(
+        ("configured", "names"),
+        [(True, ["alice", "alice"]), (True, [""]), (False, ["alice"])],
+        ids=["duplicate-in-batch", "empty-name", "no-cluster"],
+    )
+    def test_invalid_add_fails(self, configured: bool, names: list[str], tmp_home: Path) -> None:
+        cluster = _make_cluster(tmp_home) if configured else ClusterConfig()
+        with _cli(cluster), pytest.raises(typer.Exit):
+            run_add(names=names)
 
 
 class TestRunShow:
@@ -182,81 +162,45 @@ class TestRunShow:
         assert subscription_url in output
         assert page_url in output
 
-    def test_show_existing_client(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_show(name="alice")
-
-        panel.get_user.assert_called_once_with("alice")
-
-    def test_v4_show_does_not_expose_internal_service_user(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice"])
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_show(name="meridian-route-123")
-
-        assert exc_info.value.exit_code == 2
-        panel.get_user.assert_not_called()
-
     def test_show_never_prints_panel_admin_credentials(
-        self,
-        tmp_home: Path,
-        capsys: pytest.CaptureFixture[str],
+        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         panel = _make_panel_mock()
         cluster = _make_cluster(tmp_home)
         cluster.panel.admin_user = "panel-admin"
         cluster.panel.admin_pass = "panel-password"
 
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
+        with _cli(cluster, panel):
             run_show(name="alice")
 
+        panel.get_user.assert_called_once_with("alice")
         output = capsys.readouterr().err
         assert "panel-admin" not in output
         assert "panel-password" not in output
+
+    def test_v4_show_does_not_expose_internal_service_user(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+
+        with _cli(_make_cluster(tmp_home, users=["alice"]), panel), pytest.raises(typer.Exit) as exc_info:
+            run_show(name="meridian-route-123")
+
+        assert exc_info.value.exit_code == 2
+        panel.get_user.assert_not_called()
 
     def test_show_nonexistent_client_fails(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
+        with _cli(_make_cluster(tmp_home), panel), pytest.raises(typer.Exit):
             run_show(name="nonexistent")
 
     def test_show_json_hands_over_the_public_subscription_url(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Legacy JSON renderer must still apply central redaction."""
-        panel = _make_panel_mock()
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_show(name="alice")
-        finally:
-            set_json_mode(False)
+        with _cli(_make_cluster(tmp_home), json_mode=True):
+            run_show(name="alice")
 
-        payload = json.loads(capsys.readouterr().out)
+        payload = _json(capsys)
         assert payload["schema"] == "meridian.output/v1"
         assert payload["command"] == "client.show"
         assert payload["data"]["handoff"]["subscription_available"] is True
@@ -266,6 +210,8 @@ class TestRunShow:
 
 
 class TestShowConnectionPage:
+    _PAGE_URL = "https://198.51.100.1/pages/550e8400-e29b-41d4-a716-446655440099/"
+
     def test_show_advertises_only_a_published_page(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         from meridian.pwa import mark_connection_page_deployed
 
@@ -277,61 +223,42 @@ class TestShowConnectionPage:
         for published in (False, True):
             if published:
                 mark_connection_page_deployed(cluster, user.vless_uuid)
-            set_json_mode(True)
-            try:
-                with (
-                    patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                    patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                ):
-                    run_show(name="alice")
-            finally:
-                set_json_mode(False)
+            with _cli(cluster, panel, json_mode=True):
+                run_show(name="alice")
 
-            payload = json.loads(capsys.readouterr().out)
-            assert payload["data"]["handoff"]["share_available"] is published
+            assert _json(capsys)["data"]["handoff"]["share_available"] is published
 
     def test_show_repair_page_republishes_from_the_subscription(self, tmp_home: Path) -> None:
         cluster = _make_cluster(tmp_home)
-        panel = _make_panel_mock()
-        page_url = "https://198.51.100.1/pages/550e8400-e29b-41d4-a716-446655440099/"
 
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
+            _cli(cluster),
             patch(
                 "meridian.handoff.publish_connection_pages",
-                return_value=[HandoffLinks("alice", page_url=page_url)],
+                return_value=[HandoffLinks("alice", page_url=self._PAGE_URL)],
             ) as publish,
             patch("meridian.commands.client.print_handoff_links") as print_links,
         ):
             run_show(name="alice", repair_page=True)
 
         publish.assert_called_once_with(cluster, ["alice"])
-        assert print_links.call_args.kwargs["page_url"] == page_url
+        assert print_links.call_args.kwargs["page_url"] == self._PAGE_URL
 
     def test_show_failed_explicit_page_repair_returns_partial_json(
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        cluster = _make_cluster(tmp_home)
-        panel = _make_panel_mock()
-
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                patch(
-                    "meridian.handoff.publish_connection_pages",
-                    return_value=[HandoffLinks("alice", error="upload failed")],
-                ),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                run_show(name="alice", repair_page=True)
-        finally:
-            set_json_mode(False)
+        with (
+            _cli(_make_cluster(tmp_home), json_mode=True),
+            patch(
+                "meridian.handoff.publish_connection_pages",
+                return_value=[HandoffLinks("alice", error="upload failed")],
+            ),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_show(name="alice", repair_page=True)
 
         assert exc_info.value.exit_code == 3
-        payload = json.loads(capsys.readouterr().out)
+        payload = _json(capsys)
         assert payload["status"] == "ok"
         assert payload["data"]["handoff"]["share_available"] is False
         assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_PAGE_REPAIR_FAILED"
@@ -340,26 +267,19 @@ class TestShowConnectionPage:
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         cluster = _make_cluster(tmp_home)
-        panel = _make_panel_mock()
-        page_url = "https://198.51.100.1/pages/550e8400-e29b-41d4-a716-446655440099/"
 
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                patch(
-                    "meridian.handoff.publish_connection_pages",
-                    return_value=[HandoffLinks("alice", page_url=page_url)],
-                ),
-                patch.object(cluster, "save", side_effect=OSError("read-only filesystem")),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                run_show(name="alice", repair_page=True)
-        finally:
-            set_json_mode(False)
+        with (
+            _cli(cluster, json_mode=True),
+            patch(
+                "meridian.handoff.publish_connection_pages",
+                return_value=[HandoffLinks("alice", page_url=self._PAGE_URL)],
+            ),
+            patch.object(cluster, "save", side_effect=OSError("read-only filesystem")),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_show(name="alice", repair_page=True)
 
-        payload = json.loads(capsys.readouterr().out)
+        payload = _json(capsys)
         assert exc_info.value.exit_code == 3
         assert payload["summary"]["changed"] is True
         assert payload["data"]["handoff"]["share_available"] is True
@@ -379,73 +299,37 @@ class TestRunList:
             update={"access": AccessIntent.model_construct(users=["[red]visible[/red]"])}
         )
 
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
+        with _cli(cluster, panel):
             run_list()
 
         assert "[red]visible[/red]" in capsys.readouterr().err
 
-    def test_list_clients(self, tmp_home: Path) -> None:
+    @pytest.mark.parametrize("users", [[_make_user("alice"), _make_user("bob")], []], ids=["clients", "empty"])
+    def test_list_reads_panel_users(self, users: list[User], tmp_home: Path) -> None:
         panel = _make_panel_mock()
+        panel.list_users.return_value = users
 
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
+        with _cli(_make_cluster(tmp_home), panel):
             run_list()
 
         panel.list_users.assert_called_once()
 
-    def test_v4_list_hides_internal_service_users(
-        self,
-        tmp_home: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice"])
+    def test_v4_list_hides_internal_service_users(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         panel = _make_panel_mock()
         panel.list_users.return_value = [_make_user("alice"), _make_user("meridian-route-123")]
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            ):
-                run_list()
-        finally:
-            set_json_mode(False)
 
-        payload = json.loads(capsys.readouterr().out)
+        with _cli(_make_cluster(tmp_home, users=["alice"]), panel, json_mode=True):
+            run_list()
+
+        payload = _json(capsys)
         assert payload["data"]["summary"]["clients"] == 1
         assert [client["username"] for client in payload["data"]["clients"]] == ["alice"]
 
-    def test_list_empty_clients(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.list_users.return_value = []
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
+    def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        with _cli(_make_cluster(tmp_home), json_mode=True):
             run_list()
 
-    def test_list_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_list()
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
+        payload = _json(capsys)
         assert payload["schema"] == "meridian.output/v1"
         assert payload["command"] == "client.list"
         assert payload["data"]["summary"]["clients"] == 2
@@ -454,29 +338,21 @@ class TestRunList:
 
 class TestRunRemove:
     def test_last_client_cannot_be_removed(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice"])
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel") as panel,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
+        with _cli(_make_cluster(tmp_home, users=["alice"])) as panel_cls, pytest.raises(typer.Exit) as exc_info:
             run_remove(name="alice", yes=True)
 
         assert exc_info.value.exit_code == 2
-        panel.assert_not_called()
+        panel_cls.assert_not_called()
 
     def test_remove_retires_the_user_through_the_topology_and_deletes_the_page(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice", "bob"])
+        cluster = _make_cluster(tmp_home)
         panel = _make_panel_mock()
         panel.get_user.return_value = _make_user("bob")
         runtime = MagicMock()
         runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
 
         with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-            patch("meridian.servers.ServerRegistry"),
+            _cli(cluster, panel, runtime=runtime),
             patch("meridian.handoff.remove_connection_page", return_value="") as remove_page,
         ):
             run_remove(name="bob", yes=True)
@@ -486,186 +362,22 @@ class TestRunRemove:
         panel.delete_user.assert_not_called()  # retirement owns the delete
 
     def test_unfinished_retirement_is_a_system_error(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice", "bob"])
         runtime = MagicMock()
         runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=False, failure_summary="retire x: down")
 
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=_make_panel_mock()),
-            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
-            patch("meridian.servers.ServerRegistry"),
-            pytest.raises(typer.Exit) as exc_info,
-        ):
+        with _cli(_make_cluster(tmp_home), runtime=runtime), pytest.raises(typer.Exit) as exc_info:
             run_remove(name="bob", yes=True)
 
         assert exc_info.value.exit_code == 3
 
-
-class TestPanelAPIErrors:
-    @pytest.mark.parametrize("command", ["add", "enable", "disable"])
-    def test_lookup_error_emits_typed_json_failure(
-        self,
-        command: str,
-        tmp_home: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.side_effect = RemnawaveError("Panel lookup unavailable")
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load", return_value=_make_cluster(tmp_home)),
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                if command == "add":
-                    run_add(names=["carol"])
-                elif command == "enable":
-                    run_enable(name="alice")
-                else:
-                    run_disable(name="alice")
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
-        assert exc_info.value.exit_code == 3
-        assert payload["command"] == f"client.{command}"
-        assert payload["status"] == "failed"
-        assert payload["errors"][0]["category"] == "system"
-
-
-class TestRunEnable:
-    def test_enable_existing_client(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="DISABLED")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_enable(name="alice")
-
-        panel.get_user.assert_called_once_with("alice")
-        panel.enable_user.assert_called_once_with("101")
-
-    def test_enable_nonexistent_client_fails(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = None
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_enable(name="nonexistent")
-
-        panel.enable_user.assert_not_called()
-
-    def test_enable_api_error_shows_message(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="DISABLED")
-        panel.enable_user.side_effect = RemnawaveError("Panel unreachable")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_enable(name="alice")
-
-
-class TestRunDisable:
-    def test_v4_disable_lasts_until_enabled_not_until_next_apply(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["alice"])
-        panel = _make_panel_mock()
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            patch("meridian.commands.client.warn") as warning,
-        ):
-            run_disable(name="alice")
-
-        panel.disable_user.assert_called_once()
-        # Apply leaves a client's status to the operator, so the old "until the next apply" warning is gone.
-        warning.assert_not_called()
-
-    def test_v4_disable_rejects_unmanaged_panel_user(self, tmp_home: Path) -> None:
-        cluster = _make_v4_cluster(tmp_home, users=["default"])
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster),
-            patch("meridian.commands._helpers.MeridianPanel") as panel,
-            pytest.raises(typer.Exit) as exc_info,
-        ):
-            run_disable(name="alice")
-
-        assert exc_info.value.exit_code == 2
-        panel.assert_not_called()
-
-    def test_disable_existing_client(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="ACTIVE")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_disable(name="alice")
-
-        panel.get_user.assert_called_once_with("alice")
-        panel.disable_user.assert_called_once_with("101")
-
-    def test_disable_nonexistent_client_fails(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = None
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_disable(name="nonexistent")
-
-        panel.disable_user.assert_not_called()
-
-    def test_disable_api_error_shows_message(self, tmp_home: Path) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="ACTIVE")
-        panel.disable_user.side_effect = RemnawaveError("Panel unreachable")
-
-        with (
-            patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-            patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            pytest.raises(typer.Exit),
-        ):
-            mock_load.return_value = _make_cluster(tmp_home)
-            run_disable(name="alice")
-
-
-class TestRunRemoveJson:
     def test_remove_json_refusal_emits_error_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                pytest.raises(typer.Exit),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_remove(name="nonexistent", yes=True)
-        finally:
-            set_json_mode(False)
+        with _cli(_make_cluster(tmp_home), panel, json_mode=True), pytest.raises(typer.Exit):
+            run_remove(name="nonexistent", yes=True)
 
-        payload = json.loads(capsys.readouterr().out)
+        payload = _json(capsys)
         assert payload["status"] == "failed"
         assert payload["command"] == "client.remove"
 
@@ -673,108 +385,115 @@ class TestRunRemoveJson:
         self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         panel = _make_panel_mock()
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                pytest.raises(typer.Exit) as exc_info,
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_remove(name="alice", yes=False)
-        finally:
-            set_json_mode(False)
 
-        payload = json.loads(capsys.readouterr().out)
+        with _cli(_make_cluster(tmp_home), panel, json_mode=True), pytest.raises(typer.Exit) as exc_info:
+            run_remove(name="alice", yes=False)
+
+        payload = _json(capsys)
         assert exc_info.value.exit_code == 2
         assert payload["status"] == "failed"
         assert "--yes" in payload["errors"][0]["hint"]
         panel.delete_user.assert_not_called()
 
 
-class TestRunEnableJson:
-    def test_enable_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+@pytest.mark.parametrize("command", ["add", "enable", "disable"])
+def test_panel_lookup_error_emits_typed_json_failure(
+    command: str, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    panel = _make_panel_mock()
+    panel.get_user.side_effect = RemnawaveError("Panel lookup unavailable")
+
+    with _cli(_make_cluster(tmp_home), panel, json_mode=True), pytest.raises(typer.Exit) as exc_info:
+        if command == "add":
+            run_add(names=["carol"])
+        elif command == "enable":
+            run_enable(name="alice")
+        else:
+            run_disable(name="alice")
+
+    payload = _json(capsys)
+    assert exc_info.value.exit_code == 3
+    assert payload["command"] == f"client.{command}"
+    assert payload["status"] == "failed"
+    assert payload["errors"][0]["category"] == "system"
+
+
+_TOGGLES = [
+    pytest.param("enable", run_enable, "DISABLED", "active", id="enable"),
+    pytest.param("disable", run_disable, "ACTIVE", "disabled", id="disable"),
+]
+
+
+@pytest.mark.parametrize(("action", "run", "before", "after"), _TOGGLES)
+class TestToggleClient:
+    def test_toggles_the_existing_client(self, action, run, before, after, tmp_home: Path) -> None:
         panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="DISABLED")
+        panel.get_user.return_value = _make_user("alice", status=before)
 
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_enable(name="alice")
-        finally:
-            set_json_mode(False)
+        with _cli(_make_cluster(tmp_home), panel):
+            run(name="alice")
 
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["schema"] == "meridian.output/v1"
-        assert payload["command"] == "client.enable"
-        assert payload["summary"]["changed"] is True
-        assert payload["data"]["client"]["username"] == "alice"
-        assert payload["data"]["client"]["status"] == "active"
+        panel.get_user.assert_called_once_with("alice")
+        getattr(panel, f"{action}_user").assert_called_once_with("101")
 
-    def test_enable_json_error_on_not_found(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = None
-
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                pytest.raises(typer.Exit),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_enable(name="nonexistent")
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["status"] == "failed"
-        assert payload["command"] == "client.enable"
-
-
-class TestRunDisableJson:
-    def test_disable_json_outputs_envelope(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        panel = _make_panel_mock()
-        panel.get_user.return_value = _make_user("alice", status="ACTIVE")
-
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_disable(name="alice")
-        finally:
-            set_json_mode(False)
-
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["schema"] == "meridian.output/v1"
-        assert payload["command"] == "client.disable"
-        assert payload["summary"]["changed"] is True
-        assert payload["data"]["client"]["username"] == "alice"
-        assert payload["data"]["client"]["status"] == "disabled"
-
-    def test_disable_json_error_on_not_found(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    @pytest.mark.parametrize("json_mode", [False, True], ids=["text", "json"])
+    def test_nonexistent_client_fails(
+        self, action, run, before, after, json_mode: bool, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
 
-        set_json_mode(True)
-        try:
-            with (
-                patch("meridian.commands._helpers.ClusterConfig.load") as mock_load,
-                patch("meridian.commands._helpers.MeridianPanel", return_value=panel),
-                pytest.raises(typer.Exit),
-            ):
-                mock_load.return_value = _make_cluster(tmp_home)
-                run_disable(name="nonexistent")
-        finally:
-            set_json_mode(False)
+        with _cli(_make_cluster(tmp_home), panel, json_mode=json_mode), pytest.raises(typer.Exit):
+            run(name="nonexistent")
 
-        payload = json.loads(capsys.readouterr().out)
-        assert payload["status"] == "failed"
-        assert payload["command"] == "client.disable"
+        getattr(panel, f"{action}_user").assert_not_called()
+        if json_mode:
+            payload = _json(capsys)
+            assert payload["status"] == "failed"
+            assert payload["command"] == f"client.{action}"
+
+    def test_api_error_fails(self, action, run, before, after, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+        panel.get_user.return_value = _make_user("alice", status=before)
+        getattr(panel, f"{action}_user").side_effect = RemnawaveError("Panel unreachable")
+
+        with _cli(_make_cluster(tmp_home), panel), pytest.raises(typer.Exit):
+            run(name="alice")
+
+    def test_json_outputs_envelope(
+        self, action, run, before, after, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        panel = _make_panel_mock()
+        panel.get_user.return_value = _make_user("alice", status=before)
+
+        with _cli(_make_cluster(tmp_home), panel, json_mode=True):
+            run(name="alice")
+
+        payload = _json(capsys)
+        assert payload["schema"] == "meridian.output/v1"
+        assert payload["command"] == f"client.{action}"
+        assert payload["summary"]["changed"] is True
+        assert payload["data"]["client"]["username"] == "alice"
+        assert payload["data"]["client"]["status"] == after
+
+
+class TestRunDisable:
+    def test_v4_disable_lasts_until_enabled_not_until_next_apply(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+
+        with _cli(_make_cluster(tmp_home, users=["alice"]), panel), patch("meridian.commands.client.warn") as warning:
+            run_disable(name="alice")
+
+        panel.disable_user.assert_called_once()
+        # Apply leaves a client's status to the operator, so the old "until the next apply" warning is gone.
+        warning.assert_not_called()
+
+    def test_v4_disable_rejects_unmanaged_panel_user(self, tmp_home: Path) -> None:
+        with (
+            _cli(_make_cluster(tmp_home, users=["default"])) as panel_cls,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_disable(name="alice")
+
+        assert exc_info.value.exit_code == 2
+        panel_cls.assert_not_called()
