@@ -93,6 +93,47 @@ meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 
 Clients receive every relay in their subscription. For relay chains with more than one hop, use `meridian setup`.
 
+## Mobile whitelists
+
+During some mobile internet restrictions in Russia, operators let through only an approved list of sites and addresses. Reports vary by operator, region, and week, and no operator publishes its list. Meridian does not detect or track whitelists; this section covers what you can set up today and what stays manual.
+
+### What deployers report
+
+- **Networks differ.** Some seem to look only at the server name (SNI) a connection announces. Others also check the destination IP. Where only the name is checked, a direct Reality path with an allowed name can pass. Where the IP is checked too, the first hop has to be an address on the list.
+- **Domestic cloud addresses are the usual first hop.** Not every address from a provider is listed: people describe one subnet of a provider's range being allowed while another from the same provider is not. Providers may also limit private customers, cap how often you can recreate a server, or shape bandwidth.
+- **Foreign CDN addresses are generally not allowed on mobile networks.** Treat [domain mode](/docs/en/domain-mode/) through Cloudflare as a fallback for home connections, not as a whitelist answer.
+- **The relay-to-exit link can be disrupted too.** A relay that reaches users can still lose its connection to a foreign exit.
+
+### A relay on an allowed address
+
+Rent a small server on a domestic provider whose address is allowed on your users' mobile networks. Community-maintained lists of allowed ranges exist, but only a test from a mobile connection while restrictions are active proves it. Then add it as a relay and give it an allowed name:
+
+```bash
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
+```
+
+With `--sni`, only this relay's entry in the subscription announces that name. Meridian adds the name to the exit's Reality listener (same keys) and gives the relay its own listener on the exit. It routes only that name to Reality, sends everything else to the camouflage site, and is reachable only from the relay's last hop. The exit's own camouflage target and its other entries don't change. The name doesn't have to be reachable from the exit, because the exit still presents its own camouflage target. A prober that reaches the relay without a valid key is therefore forwarded to that target instead of getting a proxy answer.
+
+Then check the relay and test from the network that matters:
+
+```bash
+meridian check 203.0.113.10
+meridian test
+```
+
+`meridian test` from your own machine can't tell you what a whitelisted mobile network allows. Try it on a real device on that network.
+
+### Pick an exit SNI
+
+`--sni` on `meridian deploy` and `meridian node add` sets the camouflage target for the exit's direct Reality path. The target must be a site the exit can reach with TLS 1.3, and deploy checks real traffic through it and stops if none passes. Before deploying, check a candidate with `meridian check IP --sni HOST`. On a network that checks names only, an allowed name may let the direct path through, but whether a name works depends on the operator, so test each one.
+
+### What Meridian doesn't do yet
+
+- It doesn't tell you whether a relay's IP is on any operator's list, or whether restrictions are active.
+- It doesn't set up fronting through a domestic CDN. Domain mode is built and tested for Cloudflare.
+- A relay carries Reality only. XHTTP, WSS, and Hysteria2 stay on the exit.
+- It doesn't tunnel through third-party calling or messaging services.
+
 ## Troubleshooting
 
 ### Port conflict
