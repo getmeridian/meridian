@@ -116,7 +116,7 @@ By default the exit refuses traffic to Russian domains and IP ranges (`--geo-blo
 - **Wrong clock.** Many routers boot with the wrong time until NTP answers. TLS certificate checks then fail for the subscription page, XHTTP, WSS, and package downloads. The podkop FAQ tells you to check the router's date first when its installer fails with a certificate error.
 - **DNS leaks.** podkop routes by domain name, so devices must use the router as their DNS server and browsers must not bypass it with their own secure DNS. A device on another DNS server will resolve to the real address and skip the tunnel. Per the podkop docs, this is the most common cause of "works on one device, not another".
 - **VPN apps on the device.** A phone running its own VPN app skips the router's routing.
-- **A disabled client.** `meridian client disable home-router` cuts the router off until the next apply turns it back on.
+- **A disabled client.** `meridian client disable home-router` cuts the router off until you run `meridian client enable home-router`.
 
 ## Verify
 

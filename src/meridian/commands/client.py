@@ -442,7 +442,6 @@ def _run_disable(
             return
 
         ok(f"Client '{name}' disabled")
-        warn("This V4 client is disabled only until the next `meridian apply`")
 
     err_console.print()
     err_console.print("  [dim]Re-enable:         meridian client enable " + escape(name) + "[/dim]")

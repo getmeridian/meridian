@@ -120,7 +120,7 @@ meridian client remove NAME [--yes] [--json]
 
 **`client list`** — lists clients with status, traffic, creation time, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
 
-**`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until the next apply (including redeploys and `client add`, `node add`, `relay add`), which turns every declared client back on.
+**`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
 
 **`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
 

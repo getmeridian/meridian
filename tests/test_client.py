@@ -627,7 +627,7 @@ class TestRunEnable:
 
 
 class TestRunDisable:
-    def test_v4_disable_is_explicitly_temporary(self, tmp_home: Path) -> None:
+    def test_v4_disable_lasts_until_enabled_not_until_next_apply(self, tmp_home: Path) -> None:
         cluster = _make_v4_cluster(tmp_home, users=["alice"])
         panel = _make_panel_mock()
 
@@ -639,7 +639,8 @@ class TestRunDisable:
             run_disable(name="alice")
 
         panel.disable_user.assert_called_once()
-        warning.assert_called_once_with("This V4 client is disabled only until the next `meridian apply`")
+        # Apply leaves a client's status to the operator, so the old "until the next apply" warning is gone.
+        warning.assert_not_called()
 
     def test_v4_disable_rejects_unmanaged_panel_user(self, tmp_home: Path) -> None:
         cluster = _make_v4_cluster(tmp_home, users=["default"])

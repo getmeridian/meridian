@@ -35,6 +35,14 @@ def run(
     yes: bool = False,
 ) -> None:
     """Resume setup, or seed it from a complete typed intent."""
+    try:
+        _run(intent_path=intent_path, restart=restart, yes=yes)
+    except MeridianError as exc:
+        with error_context("setup"):
+            fail(exc)
+
+
+def _run(*, intent_path: str, restart: bool, yes: bool) -> None:
     with error_context("setup"):
         registry = ServerRegistry(SERVER_PROFILES_FILE)
         store = SetupDraftStore(SETUP_DRAFT_FILE)

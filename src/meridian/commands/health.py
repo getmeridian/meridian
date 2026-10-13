@@ -58,7 +58,8 @@ def run(
         sni = validate_hostname_value(sni) if sni else ""
         domain = validate_hostname_value(domain) if domain else ""
     except ValueError as exc:
-        fail(str(exc), hint_type="user")
+        with error_context("check"):
+            fail(str(exc), hint_type="user")
     from meridian.config import SERVER_PROFILES_FILE
 
     operation = OperationContext()
