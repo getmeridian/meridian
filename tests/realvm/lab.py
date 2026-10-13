@@ -157,9 +157,22 @@ def _resolve_lab(prefix: str) -> tuple[Path, str]:
 
 
 def cmd_down(args: argparse.Namespace) -> int:
-    root, fleet_id = _resolve_lab(args.lab)
-    destroy_fleet(make_provider(args.provider), fleet_id)
-    shutil.rmtree(root)
+    provider = make_provider(args.provider)
+    if any(LABS.glob(f"lab-{args.lab[:8]}*/lab.json")):
+        root, fleet_id = _resolve_lab(args.lab)
+    else:
+        # A lab whose local directory is gone still carries its fleet label in the cloud.
+        fleets = {
+            vm.labels.get(FLEET_ID_LABEL, "")
+            for vm in provider.list_vms({HARNESS_LABEL: "1"})
+            if vm.labels.get(FLEET_ID_LABEL, "").startswith(args.lab)
+        }
+        if len(fleets) != 1:
+            raise SystemExit(f"  ✗ No single lab matches {args.lab!r}; see `python -m tests.realvm.lab list`.")
+        root, fleet_id = None, fleets.pop()
+    destroy_fleet(provider, fleet_id)
+    if root is not None:
+        shutil.rmtree(root)
     print(f"  ✓ Lab {fleet_id[:8]} destroyed")
     return 0
 
