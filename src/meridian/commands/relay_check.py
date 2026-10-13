@@ -105,7 +105,7 @@ def relay_hop_targets(
     """Resolve the compiled Realm hops of the chains, limited to one server when given."""
     from meridian.compiler import compile_topology
     from meridian.compiler.models import RealmHopPayload
-    from meridian.reconciler.server_render import realm_service_name
+    from meridian.reconciler.server_render import legacy_realm_service_name, realm_service_name
 
     chain_ids = {relay.id for relay in chains}
     targets: list[RelayHopTarget] = []
@@ -125,6 +125,7 @@ def relay_hop_targets(
                 server_ref=payload.server_ref,
                 host=hop_entry.host,
                 service=realm_service_name(resource.logical_id),
+                legacy_service=legacy_realm_service_name(resource.logical_id),
                 listen_port=payload.listen_port,
                 public=payload.advertised,
                 next_host=next_entry.host,

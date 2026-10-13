@@ -10,7 +10,12 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import NodeRuntimePayload
 from meridian.config import REMNAWAVE_NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
-from meridian.reconciler.server_render import realm_config_path, realm_service_name
+from meridian.reconciler.server_render import (
+    legacy_realm_config_path,
+    legacy_realm_service_name,
+    realm_config_path,
+    realm_service_name,
+)
 from meridian.reconciler.server_retirement import (
     FirewallRetirement,
     NginxArtifactRetirement,
@@ -19,7 +24,7 @@ from meridian.reconciler.server_retirement import (
 )
 from tests.support.mock_connection import MockConnection
 
-_MARKER = "meridian-v4-0123456789abcdef"
+_MARKER = "fw-0123456789abcdef"
 _STREAM = "/etc/nginx/stream.d/meridian-v4-0123456789abcdef.conf"
 _HTTP = "/etc/nginx/sites-available/meridian-v4-fedcba9876543210.conf"
 
@@ -39,8 +44,20 @@ def test_firewall_rules_are_deleted_by_marker_highest_first() -> None:
 
     _driver(FirewallRetirement, conn).retire(_binding(_MARKER))
 
-    (command,) = conn.calls
+    command, legacy = conn.calls
     assert f"# {_MARKER}$" in command and "sort -rn" in command and "ufw --force delete" in command
+    # The binding's logical ID ("x") also owns a rule under its pre-rename comment.
+    assert "# meridian-v4-" in legacy and "ufw --force delete" in legacy
+
+
+def test_legacy_firewall_binding_is_deleted_once() -> None:
+    from meridian.reconciler.server_render import legacy_firewall_marker
+
+    conn = MockConnection()
+
+    _driver(FirewallRetirement, conn).retire(_binding(legacy_firewall_marker("x")))
+
+    assert len(conn.calls) == 1
 
 
 def test_http_artifact_removes_file_and_enabled_link_then_reloads() -> None:
@@ -101,7 +118,21 @@ def test_realm_hop_unit_and_config_are_removed_and_verified_stopped() -> None:
     assert command.index(f"systemctl disable --now {service}") < command.index("rm -f")
     assert f"/etc/systemd/system/{service}.service" in command
     assert realm_config_path("realm:relay-chain:0") in command
-    assert "daemon-reload" in command and command.endswith(f"! systemctl is-active --quiet {service}")
+    assert "daemon-reload" in command and f"! systemctl is-active --quiet {service}" in command
+
+
+def test_pre_rename_realm_hop_binding_removes_both_unit_names() -> None:
+    conn = MockConnection()
+    legacy = legacy_realm_service_name("realm:relay-chain:0")
+
+    _driver(RealmHopRetirement, conn).retire(
+        ManagedResourceBinding(logical_id="realm:relay-chain:0", remote_id=legacy, server_ref="srv-relay")
+    )
+
+    (command,) = conn.calls
+    assert f"/etc/systemd/system/{legacy}.service" in command
+    assert legacy_realm_config_path("realm:relay-chain:0") in command
+    assert command.endswith(f"! systemctl is-active --quiet {legacy}")
 
 
 def test_realm_hop_still_running_after_removal_is_a_failure() -> None:

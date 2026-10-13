@@ -150,9 +150,11 @@ The relay must reach the exit's Reality port. Run `meridian test` to check the r
 
 ### Relay service not running
 
-On the relay server, list Meridian's Realm services and read their logs:
+On the relay server, list the forwarder services and read their logs. Relay hosts use neutral names (`netfwd-*` units, `/etc/netfwd/` configs) so nothing on them names Meridian, Realm, or a relay:
 
 ```bash
-systemctl list-units 'meridian-realm-*'
-journalctl -u 'meridian-realm-*' --no-pager -n 20
+systemctl list-units 'netfwd-*'
+journalctl -u 'netfwd-*' --no-pager -n 20
 ```
+
+Hops deployed by earlier releases run as `meridian-realm-*` until the next `meridian apply` renames them; `meridian check RELAY` warns until then.

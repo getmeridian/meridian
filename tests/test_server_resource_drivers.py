@@ -295,7 +295,7 @@ def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
         resources=[resource],
     )
     action = build_resource_actions(plan, 1)[0]
-    marker = f"meridian-v4-{artifact_token(resource.logical_id)}"
+    marker = f"fw-{artifact_token(resource.logical_id)}"
     connection = MagicMock(spec=ServerConnection)
     connection.run.return_value = SimpleNamespace(
         returncode=0,
@@ -785,3 +785,116 @@ def test_node_runtime_accepts_another_spelling_of_the_pinned_digest() -> None:
     driver, action, _panel = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
 
     assert observation_converges(action, driver.observe(action, None))
+
+
+def _firewall_driver(connection: MagicMock) -> tuple[FirewallRuleDriver, ResourceAction]:
+    plan, action = _single_action(
+        "firewall:srv-exit:tcp:443",
+        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=443),
+    )
+    driver = FirewallRuleDriver(
+        ServerDriverContext(
+            plan=plan,
+            cluster=ClusterConfig(),
+            panel=MagicMock(),
+            connection_for=lambda _ref: connection,
+            server_addresses={"srv-exit": "198.51.100.10"},
+        )
+    )
+    return driver, action
+
+
+def test_firewall_rule_under_its_pre_rename_comment_is_drift() -> None:
+    connection = MagicMock(spec=ServerConnection)
+    driver, action = _firewall_driver(connection)
+    token = artifact_token(action.resource.logical_id)
+    connection.run.return_value = _result(
+        stdout=(f"ufw allow 443/tcp comment 'fw-{token}'\nufw allow 443/tcp comment 'meridian-v4-{token}'\n")
+    )
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+def test_firewall_migration_deletes_the_legacy_comment_then_re_adds_the_renamed_rule() -> None:
+    connection = MagicMock(spec=ServerConnection)
+    driver, action = _firewall_driver(connection)
+    token = artifact_token(action.resource.logical_id)
+    connection.run.side_effect = lambda command, **_kw: _result(
+        stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n" if command.startswith("ufw show added") else ""
+    )
+
+    receipt = driver.apply(action, None)
+
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    assert receipt.remote_id == f"fw-{token}"
+    delete = next(index for index, command in enumerate(commands) if f"# meridian-v4-{token}$" in command)
+    adds = [index for index, command in enumerate(commands) if command == f"ufw allow 443/tcp comment fw-{token}"]
+    assert adds[0] < delete < adds[-1]
+
+
+def test_failed_firewall_migration_restores_the_legacy_rule() -> None:
+    connection = MagicMock(spec=ServerConnection)
+    driver, action = _firewall_driver(connection)
+    token = artifact_token(action.resource.logical_id)
+    adds = 0
+
+    def run(command: str, **_kw: object):
+        nonlocal adds
+        if command.startswith("ufw show added"):
+            return _result(stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n")
+        if command.startswith("ufw allow") and f"fw-{token}" in command and "meridian" not in command:
+            adds += 1
+            return _result(returncode=1 if adds > 1 else 0, stderr="ERROR: rule failed")
+        return _result()
+
+    connection.run.side_effect = run
+
+    with pytest.raises(ResourceReconcileError, match="Could not apply firewall rule"):
+        driver.apply(action, None)
+
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    assert commands[-1] == f"ufw allow 443/tcp comment meridian-v4-{token}"
+
+
+def test_fresh_firewall_rule_never_deletes_by_comment() -> None:
+    connection = MagicMock(spec=ServerConnection)
+    driver, action = _firewall_driver(connection)
+    connection.run.return_value = _result()
+
+    driver.apply(action, None)
+
+    assert not any("ufw --force delete" in call.args[0] for call in connection.run.call_args_list)
+
+
+def test_server_baseline_apply_moves_its_attestation_to_the_neutral_path() -> None:
+    from meridian.reconciler.server_render import baseline_marker_path, legacy_baseline_marker_path
+
+    plan, action = _action(install_docker=False)
+    connection = MagicMock(spec=ServerConnection)
+    connection.user = "root"
+    connection.run.return_value = _result()
+    driver = ServerBaselineDriver(
+        ServerDriverContext(
+            plan=plan,
+            cluster=ClusterConfig(),
+            panel=MagicMock(),
+            connection_for=lambda _ref: connection,
+            server_addresses={"srv-exit": "198.51.100.10"},
+        )
+    )
+    written: list[str] = []
+
+    with (
+        patch("meridian.provision.Provisioner.run", return_value=[]),
+        patch(
+            "meridian.reconciler.server_drivers.ensure_file_content",
+            side_effect=lambda _conn, path, *_a, **_kw: written.append(path) or SimpleNamespace(ok=True),
+        ),
+    ):
+        driver.apply(action, None)
+
+    assert written == [baseline_marker_path(action.resource.logical_id)]
+    assert "meridian" not in written[0]
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    legacy = legacy_baseline_marker_path(action.resource.logical_id)
+    assert any(command.startswith(f"rm -f {legacy}") for command in commands)

@@ -36,15 +36,16 @@ class Uninstall:
             # Meridian 3.x panel (3x-ui), so teardown also clears pre-4.0 deployments
             "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
             "rm -rf /opt/3x-ui",
-            # Realm transparent relay (single relay and per-hop V4 units)
+            # Realm transparent relay (single relay, per-hop units, and their pre-rename names)
             "systemctl stop meridian-relay 2>/dev/null; systemctl disable meridian-relay 2>/dev/null; true",
             "rm -f /etc/systemd/system/meridian-relay.service /usr/local/bin/realm /etc/meridian/realm.toml",
             (
-                "for unit in /etc/systemd/system/meridian-realm-*.service; do"
+                "for unit in /etc/systemd/system/netfwd-*.service /etc/systemd/system/meridian-realm-*.service; do"
                 ' [ -e "$unit" ] || continue; name=$(basename "$unit" .service);'
                 ' systemctl stop "$name" 2>/dev/null; systemctl disable "$name" 2>/dev/null; rm -f "$unit";'
                 " done; true"
             ),
+            "rm -rf /usr/local/bin/netfwd /etc/netfwd",
             # Docker volumes (may remain after compose down)
             "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
             # nginx (+ systemd restart override)
@@ -71,18 +72,19 @@ class Uninstall:
                 " | crontab - 2>/dev/null; true"
             ),
             # Server credentials, scripts, and V4 baseline attestations
-            "rm -rf /etc/meridian /root/meridian /var/lib/meridian",
+            "rm -rf /etc/meridian /root/meridian /var/lib/meridian /var/lib/host-baseline",
             # Systemd daemon-reload after removing units and overrides
             "systemctl daemon-reload 2>/dev/null; true",
             # UFW rules
             "ufw delete allow 443/tcp 2>/dev/null; true",
             "ufw delete allow 80/tcp 2>/dev/null; true",
             "ufw delete allow 443/udp 2>/dev/null; true",
-            # V4 rules carry a meridian-v4-* comment; delete highest number first so
-            # numbering stays valid. SSH rules come from the baseline and are untagged.
+            # V4 rules carry an fw-<token> (earlier: meridian-v4-<token>) comment; delete highest
+            # number first so numbering stays valid. SSH rules come from the baseline and are untagged.
             (
                 "ufw status numbered 2>/dev/null"
-                r" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*# meridian-v4-.*/\1/p'"
+                r" | sed -n -e 's/^\[ *\([0-9][0-9]*\)\].*# fw-[0-9a-f]\{16\}$/\1/p'"
+                r" -e 's/^\[ *\([0-9][0-9]*\)\].*# meridian-v4-[0-9a-f]\{16\}$/\1/p'"
                 ' | sort -rn | while read -r rule; do ufw --force delete "$rule"; done; true'
             ),
             # fail2ban

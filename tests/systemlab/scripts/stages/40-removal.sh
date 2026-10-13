@@ -43,7 +43,7 @@ for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
   require_command \
     "no Realm unit left on $host" \
     ssh root@"$host" \
-    "! systemctl list-units --all --no-legend 'meridian-realm-*.service' | grep -q meridian-realm-"
+    "! systemctl list-units --all --no-legend 'netfwd-*.service' | grep -q netfwd-"
 done
 
 set +e

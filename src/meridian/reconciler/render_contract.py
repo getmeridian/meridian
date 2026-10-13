@@ -12,7 +12,8 @@ _RENDERER_MANIFEST = {
     "nginx": "per-resource-v4",
     "node-compose": "remnawave-node-v2",
     "panel-compose": "remnawave-panel-v2",
-    "realm": "hashed-systemd-v1",
+    "realm": "neutral-systemd-v2",
+    "server-baseline": "neutral-paths-v2",
     "xray-workload": "reality-min-client-v4",
 }
 

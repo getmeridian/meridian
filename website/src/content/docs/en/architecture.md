@@ -129,7 +129,7 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 - `/opt/remnanode/` — node compose file and `.env`
 
 ### On each relay
-- `/etc/meridian/realm/` — Realm configuration, run by `meridian-realm-*` systemd services
+- `/etc/netfwd/` — Realm configuration, run from `/usr/local/bin/netfwd` by `netfwd-*` systemd services. Relay hosts carry no Meridian-named units, paths, or firewall comments (`fw-*`); the next `meridian apply` renames hops deployed under the older `meridian-realm-*` names
 
 ### On your machine
 - `~/.meridian/cluster.yml` — topology, panel access, keys

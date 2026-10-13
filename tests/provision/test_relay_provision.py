@@ -70,7 +70,7 @@ class TestInstallRealm:
     def test_correct_version_already_installed(self):
         conn = MockConnection()
         conn.when(
-            "realm --version",
+            "netfwd --version",
             stdout=f"Realm {REALM_VERSION} [brutal][batched-udp][proxy][balance][transport][multi-thread]",
         )
         result = InstallRealm().run(conn, _make_ctx())
@@ -81,8 +81,8 @@ class TestInstallRealm:
         conn = MockConnection()
         # Initial check includes "2>/dev/null"; verify after install does not.
         # First-match: the specific pattern wins for the initial probe.
-        conn.when("realm --version 2>/dev/null", rc=1, stderr="command not found")
-        conn.when("realm --version", stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]")
+        conn.when("netfwd --version 2>/dev/null", rc=1, stderr="command not found")
+        conn.when("netfwd --version", stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]")
         conn.when("uname -m", stdout="x86_64")
         conn.when("curl", stdout="")
         conn.when("sha256sum", stdout=REALM_SHA256["x86_64-unknown-linux-gnu"])

@@ -23,6 +23,9 @@ def test_removes_v4_server_artifacts() -> None:
     assert "/etc/nginx/stream.d/meridian-v4-*.conf" in script
     assert "/etc/nginx/sites-enabled/meridian-v4-*.conf" in script
     assert "meridian-realm-*.service" in script
+    assert "netfwd-*.service" in script
+    assert "/etc/netfwd" in script
+    assert "/var/lib/host-baseline" in script
     assert "/var/lib/meridian" in script
     assert "ufw delete allow 443/udp" in script
 
@@ -31,7 +34,7 @@ def test_removes_meridian_3x_panel() -> None:
     assert "rm -rf /opt/3x-ui" in _commands()
 
 
-def test_tagged_ufw_rule_numbers_are_extracted_highest_first() -> None:
+def test_tagged_ufw_rule_numbers_under_both_comment_schemes_are_extracted_highest_first() -> None:
     command = next(call for call in _commands() if "ufw status numbered" in call)
     pipeline = command.split(" | while read")[0].replace("ufw status numbered 2>/dev/null | ", "")
     status = (
@@ -41,11 +44,13 @@ def test_tagged_ufw_rule_numbers_are_extracted_highest_first() -> None:
         "[ 1] 22/tcp                     ALLOW IN    Anywhere\n"
         "[ 2] 443/tcp                    ALLOW IN    Anywhere                   # meridian-v4-0123456789abcdef\n"
         "[ 3] 3010/tcp                   ALLOW IN    198.51.100.10              # meridian-v4-fedcba9876543210\n"
+        "[ 4] 8443/tcp                   ALLOW IN    Anywhere                   # my-fw-rule\n"
+        "[ 7] 3011/tcp                   ALLOW IN    198.51.100.11              # fw-0123456789abcdef\n"
         "[10] 443/udp                    ALLOW IN    Anywhere                   # meridian-v4-aaaaaaaaaaaaaaaa\n"
     )
     out = subprocess.run(["sh", "-c", pipeline], input=status, capture_output=True, text=True, check=True).stdout
 
-    assert out.split() == ["10", "3", "2"]
+    assert out.split() == ["10", "7", "3", "2"]
     assert not re.search(r"\b1\b", out)
 
 

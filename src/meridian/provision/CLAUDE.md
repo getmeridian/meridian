@@ -24,7 +24,7 @@
 
 **Executor bridge** — deploy provisioning enters through `RemoteExecutorConnection`; steps can keep `conn.run()` while transports move behind core executor contracts.
 
-**Relay steps are separate** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver, which owns config, firewall, and service state. Panel-agnostic.
+**Relay steps are separate** — `RelayContext` and `InstallRealm` back the reconciler's Realm driver, which owns config, firewall, and service state. Panel-agnostic. Host-visible names stay neutral: the binary installs as `RELAY_BINARY_PATH` and the sshd drop-in is `00-hardening.conf` (older project-named drop-ins are removed).
 ## What's done well
 - **Idempotent containers** — panel/node steps check `docker inspect` before deploying.
 - **Health polling** — panel step waits for `/api/health`, node step waits for port binding.

@@ -15,6 +15,7 @@ from meridian.config import (
     REALM_GITHUB_URL,
     REALM_SHA256,
     REALM_VERSION,
+    RELAY_BINARY_PATH,
 )
 from meridian.provision.steps import StepResult
 from meridian.ssh import ServerConnection
@@ -24,25 +25,6 @@ _REALM_VERSION_RE = re.compile(
     r"^\s*Realm\s+(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?=\s|$)",
     re.IGNORECASE,
 )
-
-# Realm systemd service template
-_SYSTEMD_UNIT = """\
-[Unit]
-Description=Meridian Relay (Realm TCP forwarder)
-After=network.target
-StartLimitIntervalSec=300
-StartLimitBurst=5
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/realm -c {config_path}
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65535
-
-[Install]
-WantedBy=multi-user.target
-"""
 
 
 @dataclass
@@ -85,13 +67,14 @@ def parse_realm_version(output: str) -> str:
 
 
 class InstallRealm:
-    """Download and install Realm binary from GitHub releases."""
+    """Download Realm from GitHub releases and install it under a neutral name (``RELAY_BINARY_PATH``)."""
 
-    name = "Install Realm TCP relay"
+    name = "Install TCP forwarder"
 
     def run(self, conn: ServerConnection, ctx: RelayContext) -> StepResult:
-        # Check if Realm is already installed at the right version
-        check = conn.run("realm --version 2>/dev/null", timeout=15)
+        binary = shlex.quote(RELAY_BINARY_PATH)
+        # Check if the forwarder is already installed at the right version
+        check = conn.run(f"{binary} --version 2>/dev/null", timeout=15)
         if check.returncode == 0:
             installed_version = parse_realm_version(check.stdout)
             if installed_version == ctx.realm_version:
@@ -115,7 +98,7 @@ class InstallRealm:
         q_url = shlex.quote(url)
 
         download = conn.run(
-            f"curl -fsSL {q_url} -o /tmp/realm.tar.gz",
+            f"curl -fsSL {q_url} -o /tmp/fwd.tar.gz",
             timeout=120,
         )
         if download.returncode != 0:
@@ -128,10 +111,10 @@ class InstallRealm:
         # Verify SHA256 checksum (supply chain protection)
         expected_hash = REALM_SHA256.get(target, "")
         if expected_hash:
-            check = conn.run("sha256sum /tmp/realm.tar.gz | cut -d' ' -f1", timeout=15)
+            check = conn.run("sha256sum /tmp/fwd.tar.gz | cut -d' ' -f1", timeout=15)
             actual_hash = check.stdout.strip()
             if actual_hash != expected_hash:
-                conn.run("rm -f /tmp/realm.tar.gz", timeout=15)
+                conn.run("rm -f /tmp/fwd.tar.gz", timeout=15)
                 return StepResult(
                     name=self.name,
                     status="failed",
@@ -139,10 +122,11 @@ class InstallRealm:
                 )
 
         # Extract and install
+        # Extract into a private directory so the upstream file name never lands in a shared path.
         extract = conn.run(
-            "tar xzf /tmp/realm.tar.gz -C /tmp && "
-            "install -m 755 /tmp/realm /usr/local/bin/realm && "
-            "rm -f /tmp/realm.tar.gz /tmp/realm",
+            'd=$(mktemp -d) && tar xzf /tmp/fwd.tar.gz -C "$d" && '
+            f'install -m 755 "$d/realm" {binary} && '
+            'rm -rf "$d" /tmp/fwd.tar.gz',
             timeout=30,
         )
         if extract.returncode != 0:
@@ -153,8 +137,8 @@ class InstallRealm:
             )
 
         # Verify
-        verify = conn.run("realm --version", timeout=15)
+        verify = conn.run(f"{binary} --version", timeout=15)
         if verify.returncode != 0 or parse_realm_version(verify.stdout) != ctx.realm_version:
-            return StepResult(name=self.name, status="failed", detail="realm binary version mismatch after install")
+            return StepResult(name=self.name, status="failed", detail="forwarder version mismatch after install")
 
         return StepResult(name=self.name, status="changed", detail=f"installed v{ctx.realm_version}")

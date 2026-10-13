@@ -112,6 +112,10 @@ REALM_SHA256: dict[str, str] = {
     "aarch64-unknown-linux-gnu": "9937daacdcdfcac9fd78d25819f2de0a5c3357c2c49e686679d812343ab8661e",
 }
 RELAY_CONFIG_PATH = "/etc/meridian/realm.toml"
+# Relay hosts expose bland names: providers scan process lists and unit names
+# for proxy software. The binary is still Realm; only its installed name changes.
+RELAY_BINARY_PATH = "/usr/local/bin/netfwd"
+LEGACY_REALM_BINARY_PATH = "/usr/local/bin/realm"
 
 # Xray client binary (for connection verification)
 XRAY_VERSION = "26.7.28"  # matches xray bundled in remnawave/node:3.4.2

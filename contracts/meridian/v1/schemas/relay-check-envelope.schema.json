@@ -140,6 +140,11 @@
           "title": "Host",
           "type": "string"
         },
+        "legacy_service": {
+          "default": "",
+          "title": "Legacy Service",
+          "type": "string"
+        },
         "listen_port": {
           "maximum": 65535,
           "minimum": 1,

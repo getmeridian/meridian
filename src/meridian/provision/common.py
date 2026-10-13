@@ -43,8 +43,9 @@ _BBR_SETTINGS = {
     "net.ipv4.tcp_congestion_control": "bbr",
 }
 
-_SSH_HARDENING_DROPIN_PATH = "/etc/ssh/sshd_config.d/00-meridian.conf"
-_SSH_HARDENING_DROPIN_OLD_PATH = "/etc/ssh/sshd_config.d/99-meridian.conf"
+_SSH_HARDENING_DROPIN_PATH = "/etc/ssh/sshd_config.d/00-hardening.conf"
+# Earlier releases named the drop-in after the project; a neutral name keeps hosts unremarkable.
+_SSH_HARDENING_DROPIN_OLD_PATHS = ("/etc/ssh/sshd_config.d/99-meridian.conf", "/etc/ssh/sshd_config.d/00-meridian.conf")
 _SSH_HARDENING_DROPIN = """\
 PasswordAuthentication no
 KbdInteractiveAuthentication no
@@ -183,7 +184,7 @@ class HardenSSH:
                 commands=commands,
             )
         if ensure.changed:
-            rm_result = conn.run(f"rm -f {_SSH_HARDENING_DROPIN_OLD_PATH}", timeout=15)
+            rm_result = conn.run(f"rm -f {' '.join(_SSH_HARDENING_DROPIN_OLD_PATHS)}", timeout=15)
             commands.append(rm_result)
             # Neutralize conflicting settings in other drop-ins (e.g., cloud-init)
             # so our values are authoritative regardless of load order.

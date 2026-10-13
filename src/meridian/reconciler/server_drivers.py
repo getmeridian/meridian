@@ -52,6 +52,8 @@ from meridian.reconciler.server_render import (
     baseline_marker_path,
     certificate_directory,
     firewall_marker,
+    legacy_baseline_marker_path,
+    legacy_firewall_marker,
     nginx_artifact_path,
     render_firewall_rules,
     render_nginx_artifact,
@@ -203,6 +205,16 @@ class ServerBaselineDriver:
         if not attestation.ok:
             _raise_if_timeout(action, attestation.result)
             raise ResourceReconcileError(f"Could not attest server baseline {payload.server_ref}: {attestation.detail}")
+        legacy = legacy_baseline_marker_path(action.resource.logical_id)
+        # The control-runtime attestation may still live beside it, so the rmdir may fail harmlessly.
+        removed = conn.run(
+            f"rm -f {shlex.quote(legacy)}"
+            " && { rmdir /var/lib/meridian/baselines /var/lib/meridian 2>/dev/null; true; }",
+            timeout=15,
+        )
+        if removed.returncode != 0:
+            _raise_if_timeout(action, removed)
+            raise ResourceReconcileError(f"Could not remove the legacy baseline attestation {legacy}.")
         return ResourceApplyReceipt(remote_id=payload.server_ref)
 
 
@@ -225,7 +237,8 @@ class FirewallRuleDriver(retirement.FirewallRetirement):
         result = conn.run("ufw show added 2>/dev/null", timeout=15)
         require_successful_evidence(action.resource.logical_id, result, "UFW rule inspection")
         rules = render_firewall_rules(action.resource.logical_id, payload, self.context.server_addresses)
-        matches = all(ufw_rule_present(result.stdout, rule) for rule in rules)
+        present = all(ufw_rule_present(result.stdout, rule) for rule in rules)
+        matches = present and legacy_firewall_marker(action.resource.logical_id) not in result.stdout
         return build_observation(
             action,
             remote_id=firewall_marker(action.resource.logical_id),
@@ -240,16 +253,36 @@ class FirewallRuleDriver(retirement.FirewallRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
+        logical_id = action.resource.logical_id
         payload = _payload(action, FirewallRulePayload)
         conn = self.context.connection(payload.server_ref)
-        for rule in render_firewall_rules(action.resource.logical_id, payload, self.context.server_addresses):
+        rules = render_firewall_rules(logical_id, payload, self.context.server_addresses)
+        self._ensure_rules(action, conn, rules)
+        legacy = legacy_firewall_marker(logical_id)
+        added = conn.run("ufw show added 2>/dev/null", timeout=15)
+        _raise_if_timeout(action, added)
+        if added.returncode == 0 and legacy in added.stdout:
+            # Pre-rename rules: UFW may have skipped the renamed copy as a duplicate,
+            # so delete the old comment, then re-add; restore the old rules on failure.
+            if not retirement.delete_rules_by_comment(conn, legacy):
+                raise ResourceReconcileError(f"Could not remove the legacy firewall rule {logical_id}.")
+            try:
+                self._ensure_rules(action, conn, rules)
+            except ResourceReconcileError:
+                for rule in render_firewall_rules(logical_id, payload, self.context.server_addresses, marker=legacy):
+                    ensure_ufw_rule(conn, rule)
+                raise
+        return ResourceApplyReceipt(remote_id=firewall_marker(logical_id))
+
+    @staticmethod
+    def _ensure_rules(action: ResourceAction, conn: ServerConnection, rules: list[str]) -> None:
+        for rule in rules:
             result = ensure_ufw_rule(conn, rule)
             if not result.ok:
                 _raise_if_timeout(action, result.result)
                 raise ResourceReconcileError(
                     f"Could not apply firewall rule {action.resource.logical_id}: {result.detail}"
                 )
-        return ResourceApplyReceipt(remote_id=firewall_marker(action.resource.logical_id))
 
 
 class CertificateDriver:

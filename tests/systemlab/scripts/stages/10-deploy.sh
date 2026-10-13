@@ -64,7 +64,7 @@ for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
   require_command \
     "Realm active on $host" \
     ssh root@"$host" \
-    "systemctl list-units --state=active --no-legend 'meridian-realm-*.service' | grep -q meridian-realm-"
+    "systemctl list-units --state=active --no-legend 'netfwd-*.service' | grep -q netfwd-"
 done
 
 SECOND_APPLY_OUT=/tmp/meridian-systemlab-second-apply.json

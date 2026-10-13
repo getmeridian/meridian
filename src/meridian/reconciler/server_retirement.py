@@ -10,12 +10,19 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import NodeRuntimePayload
 from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
 from meridian.reconciler.resources import ResourceReconcileError
-from meridian.reconciler.server_render import realm_config_path, realm_service_name
+from meridian.reconciler.server_render import (
+    legacy_firewall_marker,
+    legacy_realm_config_path,
+    legacy_realm_service_name,
+    realm_config_path,
+    realm_service_name,
+    unit_path,
+)
 from meridian.remnawave.versions import parse_image
 from meridian.ssh import ServerConnection
 
 _NODE_REPOSITORY = parse_image(REMNAWAVE_NODE_IMAGE).repository
-_FIREWALL_MARKER = re.compile(r"meridian-v4-[0-9a-f]{16}")
+_FIREWALL_MARKER = re.compile(r"(?:fw|meridian-v4)-[0-9a-f]{16}")
 _NGINX_ARTIFACT = re.compile(r"/etc/nginx/(stream\.d|sites-available)/meridian-v4-[0-9a-f]{16}\.conf")
 
 
@@ -28,8 +35,22 @@ def _connection(context: Any, binding: ManagedResourceBinding) -> ServerConnecti
     return connection
 
 
+def delete_rules_by_comment(conn: ServerConnection, marker: str) -> bool:
+    """Delete every UFW rule whose comment is exactly ``marker``; True when the deletion completed."""
+    if not _FIREWALL_MARKER.fullmatch(marker):
+        raise ResourceReconcileError(f"Refusing to delete firewall rules by unexpected comment {marker!r}.")
+    # Highest number first so the remaining rule numbers stay valid.
+    result = conn.run(
+        "ufw status numbered 2>/dev/null"
+        rf" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*# {marker}$/\1/p'"
+        ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null || exit 1; done',
+        timeout=30,
+    )
+    return result.returncode == 0
+
+
 class FirewallRetirement:
-    """Delete UFW rules carrying this resource's Meridian comment."""
+    """Delete UFW rules carrying this resource's comment, current or pre-rename."""
 
     context: Any
 
@@ -37,14 +58,8 @@ class FirewallRetirement:
         if not _FIREWALL_MARKER.fullmatch(binding.remote_id):
             raise ResourceReconcileError(f"Unexpected firewall marker for {binding.logical_id}: {binding.remote_id!r}")
         conn = _connection(self.context, binding)
-        # Highest number first so the remaining rule numbers stay valid.
-        result = conn.run(
-            "ufw status numbered 2>/dev/null"
-            rf" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*# {binding.remote_id}$/\1/p'"
-            ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null || exit 1; done',
-            timeout=30,
-        )
-        if result.returncode != 0:
+        markers = dict.fromkeys((binding.remote_id, legacy_firewall_marker(binding.logical_id)))
+        if not all(delete_rules_by_comment(conn, marker) for marker in markers):
             raise ResourceReconcileError(f"Could not delete firewall rule {binding.logical_id}.")
 
 
@@ -68,25 +83,32 @@ class NginxArtifactRetirement:
 
 
 class RealmHopRetirement:
-    """Stop and delete one hop's Realm unit and config; the Realm binary stays for other hops."""
+    """Stop and delete one hop's forwarder unit and config under both names; the binary stays for other hops."""
 
     context: Any
 
     def retire(self, binding: ManagedResourceBinding) -> None:
-        service = realm_service_name(binding.logical_id)
-        if binding.remote_id != service:
+        current, legacy = realm_service_name(binding.logical_id), legacy_realm_service_name(binding.logical_id)
+        if binding.remote_id not in {current, legacy}:
             raise ResourceReconcileError(f"Unexpected Realm service for {binding.logical_id}: {binding.remote_id!r}")
-        unit = f"/etc/systemd/system/{service}.service"
         conn = _connection(self.context, binding)
+        services = f"{shlex.quote(current)} {shlex.quote(legacy)}"
+        paths = (
+            unit_path(current),
+            unit_path(legacy),
+            realm_config_path(binding.logical_id),
+            legacy_realm_config_path(binding.logical_id),
+        )
         result = conn.run(
-            f"systemctl disable --now {shlex.quote(service)} >/dev/null 2>&1;"
-            f" rm -f {shlex.quote(unit)} {shlex.quote(realm_config_path(binding.logical_id))}"
-            f" && systemctl daemon-reload && systemctl reset-failed {shlex.quote(service)} >/dev/null 2>&1;"
-            f" ! systemctl is-active --quiet {shlex.quote(service)}",
+            f"systemctl disable --now {services} >/dev/null 2>&1;"
+            f" rm -f {' '.join(shlex.quote(path) for path in paths)}"
+            f" && systemctl daemon-reload && systemctl reset-failed {services} >/dev/null 2>&1;"
+            f" ! systemctl is-active --quiet {shlex.quote(current)}"
+            f" && ! systemctl is-active --quiet {shlex.quote(legacy)}",
             timeout=60,
         )
         if result.returncode != 0:
-            raise ResourceReconcileError(f"Realm service {service} is still running after removal.")
+            raise ResourceReconcileError(f"Realm service {binding.remote_id} is still running after removal.")
 
 
 class NodeRuntimeRetirement:

@@ -59,6 +59,16 @@ def _unit_finding(conn: ServerConnection, hop: RelayHopTarget) -> VerificationFi
             f"Could not inspect Realm unit {hop.service} over SSH",
             "Restore SSH access to the relay and rerun the check.",
         )
+    if hop.legacy_service:
+        # Hops deployed before neutral naming keep running under the old unit until the next apply.
+        legacy = conn.run(f"systemctl is-active {shlex.quote(hop.legacy_service)}", timeout=15)
+        if legacy.returncode == 0 and legacy.stdout.strip() == "active":
+            return finding(
+                "REALM_UNIT_LEGACY_NAME",
+                "warning",
+                f"Realm hop runs under its pre-rename unit {hop.legacy_service}, which names the project",
+                "Run `meridian apply` to move the hop to neutral unit, path, and firewall names.",
+            )
     return finding(
         "REALM_UNIT_INACTIVE",
         "failed",

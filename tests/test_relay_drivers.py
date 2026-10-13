@@ -19,7 +19,7 @@ from meridian.compiler.models import (
     compute_plan_hash,
     make_resource,
 )
-from meridian.config import REALM_VERSION
+from meridian.config import REALM_VERSION, RELAY_BINARY_PATH
 from meridian.provision.steps import StepResult
 from meridian.reconciler.realm_driver import RealmHopDriver
 from meridian.reconciler.resources import (
@@ -31,6 +31,8 @@ from meridian.reconciler.resources import (
 )
 from meridian.reconciler.server_drivers import ServerDriverContext
 from meridian.reconciler.server_render import (
+    legacy_realm_config_path,
+    legacy_realm_service_name,
     realm_config_path,
     realm_service_name,
     render_nginx_artifact,
@@ -82,7 +84,7 @@ class StatefulConnection:
             return _result(stdout="active\n")
         if self.realm_ready and command.startswith("ss -H -lnt"):
             return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
-        if self.realm_ready and command.startswith("realm --version"):
+        if self.realm_ready and command.startswith(f"{RELAY_BINARY_PATH} --version"):
             return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
         return _result()
 
@@ -93,7 +95,7 @@ class StatefulConnection:
         **kwargs: object,
     ) -> subprocess.CompletedProcess[str]:
         if path not in self.files:
-            return _result(returncode=1)
+            return _result(returncode=1, stderr=f"cat: {path}: No such file or directory")
         return _result(stdout=self.files[path])
 
     def put_text(
@@ -256,6 +258,7 @@ def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock
     payload = action.resource.payload
     config_path = realm_config_path(action.resource.logical_id)
     unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    legacy_unit_path = f"/etc/systemd/system/{legacy_realm_service_name(action.resource.logical_id)}.service"
     conn = MagicMock(spec=ServerConnection)
 
     def get_text(path: str, **_kwargs: object):
@@ -263,6 +266,8 @@ def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock
             return _result(stdout=render_realm_config(payload, ADDRESSES))
         if path == unit_path:
             return _result(stdout=render_realm_unit(action.resource.logical_id))
+        if path == legacy_unit_path:
+            return _result(returncode=1, stderr="cat: unit: No such file or directory")
         raise AssertionError(path)
 
     def run(command: str, **_kwargs: object):
@@ -270,7 +275,7 @@ def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock
             return _result(stdout="active\n")
         if command.startswith("ss -H -lnt"):
             return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
-        if command.startswith("realm --version"):
+        if command.startswith(f"{RELAY_BINARY_PATH} --version"):
             return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
         raise AssertionError(command)
 
@@ -291,6 +296,7 @@ def test_realm_missing_configuration_is_confirmed_absent() -> None:
     conn.get_text.side_effect = [
         _result(returncode=1, stderr="cat: config: No such file or directory"),
         _result(stdout=render_realm_unit(action.resource.logical_id)),
+        _result(returncode=1, stderr="cat: unit: No such file or directory"),
     ]
 
     observation = driver.observe(action, None)
@@ -303,6 +309,7 @@ def test_realm_unreadable_configuration_is_unavailable_evidence() -> None:
     conn.get_text.side_effect = [
         _result(returncode=1, stderr="cat: config: Permission denied"),
         _result(stdout=render_realm_unit(action.resource.logical_id)),
+        _result(returncode=1, stderr="cat: unit: No such file or directory"),
     ]
 
     with pytest.raises(ResourceReconcileError, match="Realm configuration evidence is unavailable"):
@@ -400,6 +407,98 @@ def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
     assert conn.files[config_path] != "previous config\n"
     assert conn.files[unit_path] != "previous unit\n"
     assert conn.restart_count == 1
+
+
+def _migration_case(
+    monkeypatch: pytest.MonkeyPatch, *, legacy: bool, fail_first_restart: bool = False
+) -> tuple[RealmHopDriver, ResourceAction, StatefulConnection]:
+    plan, action = _realm_plan_and_action()
+    logical_id = action.resource.logical_id
+    files = {}
+    if legacy:
+        files = {
+            legacy_realm_config_path(logical_id): "legacy config\n",
+            f"/etc/systemd/system/{legacy_realm_service_name(logical_id)}.service": "legacy unit\n",
+        }
+    conn = StatefulConnection(files=files, fail_first_restart=fail_first_restart)
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+    monkeypatch.setattr(
+        "meridian.reconciler.realm_driver.InstallRealm.run",
+        lambda *_args, **_kwargs: StepResult(name="Install TCP forwarder", status="ok"),
+    )
+    return RealmHopDriver(context), action, conn
+
+
+def test_fresh_realm_hop_uses_neutral_names_and_never_touches_legacy_units(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=False)
+    logical_id = action.resource.logical_id
+
+    receipt = driver.apply(action, None)
+
+    service = realm_service_name(logical_id)
+    assert receipt.remote_id == service
+    unit = conn.files[f"/etc/systemd/system/{service}.service"]
+    config = conn.files[realm_config_path(logical_id)]
+    for exposed in (service, realm_config_path(logical_id), unit, config, RELAY_BINARY_PATH):
+        for word in ("meridian", "realm", "relay", "proxy", "vpn"):
+            assert word not in exposed.lower()
+    assert not any(legacy_realm_service_name(logical_id) in call for call in conn.calls)
+
+
+def test_legacy_realm_hop_is_stopped_before_the_renamed_unit_binds_then_removed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=True)
+    logical_id = action.resource.logical_id
+    legacy = legacy_realm_service_name(logical_id)
+
+    receipt = driver.apply(action, None)
+
+    assert receipt.remote_id == realm_service_name(logical_id)
+    stop = conn.calls.index(f"systemctl stop {legacy}")
+    restart = conn.calls.index(f"systemctl restart {realm_service_name(logical_id)}")
+    disable = f"systemctl disable --now {legacy}"
+    cleanup = next(index for index, call in enumerate(conn.calls) if call.startswith(disable))
+    assert stop < restart < cleanup
+    assert legacy_realm_config_path(logical_id) in conn.calls[cleanup]
+    assert "/usr/local/bin/realm" in conn.calls[cleanup]
+
+
+def test_failed_migration_restarts_the_legacy_unit_and_keeps_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=True, fail_first_restart=True)
+    logical_id = action.resource.logical_id
+    legacy = legacy_realm_service_name(logical_id)
+
+    with pytest.raises(ResourceReconcileError, match="previous configuration restored"):
+        driver.apply(action, None)
+
+    assert conn.calls[-1] == f"systemctl start {legacy}"
+    assert f"systemctl disable --now {realm_service_name(logical_id)} >/dev/null 2>&1" in conn.calls
+    assert not any(call.startswith(f"systemctl disable --now {legacy}") for call in conn.calls)
+    assert any(call == f"rm -f {realm_config_path(logical_id)}" for call in conn.calls)
+    assert conn.files[legacy_realm_config_path(logical_id)] == "legacy config\n"
+
+
+def test_converged_hop_beside_a_legacy_unit_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    logical_id = action.resource.logical_id
+    payload = action.resource.payload
+    conn.get_text.side_effect = [
+        _result(stdout=render_realm_config(payload, ADDRESSES)),
+        _result(stdout=render_realm_unit(logical_id)),
+        _result(stdout="legacy unit\n"),
+    ]
+
+    observation = driver.observe(action, None)
+
+    assert observation.exists is True
+    assert not observation_converges(action, observation)
 
 
 def _realm_plan_and_action() -> tuple[ResourcePlan, ResourceAction]:

@@ -78,7 +78,7 @@ def test_systemlab_runtime_uses_canonical_documents_and_waited_pool_failover() -
     assert "only exit B available" in resilience
     assert "only exit A available" in resilience
     assert "after both exits stop" in resilience
-    assert "meridian-realm-*.service" in deploy
+    assert "netfwd-*.service" in deploy
     assert "systemctl is-active meridian-relay" not in deploy
 
 

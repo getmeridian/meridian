@@ -1,4 +1,4 @@
-"""Pure rendering for V4 Realm and nginx server artifacts."""
+"""Pure rendering for V4 relay-hop (Realm) and nginx server artifacts."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from meridian.compiler.models import (
     RealmHopPayload,
     certificate_directory,
 )
+from meridian.config import RELAY_BINARY_PATH
 from meridian.core.errors import MeridianError
 
 
@@ -24,11 +25,22 @@ def artifact_token(logical_id: str) -> str:
     return hashlib.sha256(logical_id.encode("utf-8")).hexdigest()[:16]
 
 
+# Host artifacts use neutral names (no meridian/realm/relay/proxy/vpn) so a
+# provider scanning a relay host's units, paths, or firewall comments finds nothing
+# telling; the legacy_* names are only read to migrate and clean up.
 def baseline_marker_path(logical_id: str) -> str:
+    return f"/var/lib/host-baseline/{artifact_token(logical_id)}.attestation"
+
+
+def legacy_baseline_marker_path(logical_id: str) -> str:
     return f"/var/lib/meridian/baselines/{artifact_token(logical_id)}.attestation"
 
 
 def firewall_marker(logical_id: str) -> str:
+    return f"fw-{artifact_token(logical_id)}"
+
+
+def legacy_firewall_marker(logical_id: str) -> str:
     return f"meridian-v4-{artifact_token(logical_id)}"
 
 
@@ -36,8 +48,10 @@ def render_firewall_rules(
     logical_id: str,
     payload: FirewallRulePayload,
     addresses: Mapping[str, str],
+    *,
+    marker: str | None = None,
 ) -> list[str]:
-    marker = shlex.quote(firewall_marker(logical_id))
+    marker = shlex.quote(marker or firewall_marker(logical_id))
     port = shlex.quote(str(payload.port))
     transport = shlex.quote(payload.transport)
     if not payload.source_server_refs:
@@ -50,11 +64,23 @@ def render_firewall_rules(
 
 
 def realm_config_path(logical_id: str) -> str:
-    return f"/etc/meridian/realm/{artifact_token(logical_id)}.toml"
+    return f"/etc/netfwd/{artifact_token(logical_id)}.toml"
 
 
 def realm_service_name(logical_id: str) -> str:
+    return f"netfwd-{artifact_token(logical_id)}"
+
+
+def legacy_realm_config_path(logical_id: str) -> str:
+    return f"/etc/meridian/realm/{artifact_token(logical_id)}.toml"
+
+
+def legacy_realm_service_name(logical_id: str) -> str:
     return f"meridian-realm-{artifact_token(logical_id)}"
+
+
+def unit_path(service: str) -> str:
+    return f"/etc/systemd/system/{service}.service"
 
 
 def render_realm_config(
@@ -78,14 +104,14 @@ def render_realm_unit(logical_id: str) -> str:
     config_path = realm_config_path(logical_id)
     return (
         "[Unit]\n"
-        f"Description=Meridian Realm hop {logical_id}\n"
+        "Description=TCP port forwarder\n"
         "After=network.target\n"
         "StartLimitIntervalSec=300\n"
         "StartLimitBurst=5\n"
         "\n"
         "[Service]\n"
         "Type=simple\n"
-        f"ExecStart=/usr/local/bin/realm -c {config_path}\n"
+        f"ExecStart={RELAY_BINARY_PATH} -c {config_path}\n"
         "Restart=on-failure\n"
         "RestartSec=5\n"
         "LimitNOFILE=65535\n"

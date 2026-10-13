@@ -24,6 +24,7 @@ class RelayHopTarget(CoreModel):
     server_ref: str
     host: str
     service: str
+    legacy_service: str = ""
     listen_port: int = Field(ge=1, le=65535)
     public: bool
     next_host: str
