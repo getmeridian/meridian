@@ -402,27 +402,27 @@ class TestCheckPortsHappyPath:
         """Empty ss output means port is free."""
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout="")
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
 
     def test_port_held_by_nginx_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("nginx",pid=1234,fd=6))\n')
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
 
     def test_port_held_by_xray_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("xray",pid=5678,fd=7))\n')
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
 
     def test_port_held_by_docker_proxy_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("docker-proxy",pid=999,fd=4))\n')
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
 
     def test_port_held_by_remnawave_node_is_allowed(self) -> None:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:80 *:* users:(("remnawave-node",pid=444,fd=3))\n')
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
 
     def test_caddy_from_an_older_meridian_release_is_allowed(self) -> None:
         conn = MagicMock()
@@ -431,7 +431,7 @@ class TestCheckPortsHappyPath:
             _ok_result(),  # test -e /etc/caddy/conf.d/meridian.caddy
             _ok_result(stdout=""),  # port 80 free
         ]
-        _check_ports(conn, _IP, yes=True)
+        _check_ports(conn, yes=True)
         assert "meridian.caddy" in conn.run.call_args_list[1].args[0]
 
 
@@ -453,7 +453,7 @@ class TestCheckPortsConflict:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:443 *:* users:(("apache2",pid=111,fd=5))\n')
         with pytest.raises(typer.Exit):
-            _check_ports(conn, _IP, yes=True)
+            _check_ports(conn, yes=True)
         mock_fail.assert_called_once()
         assert "apache2" in mock_fail.call_args[0][0]
 
@@ -467,7 +467,7 @@ class TestCheckPortsConflict:
             subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr=""),
         ]
         with pytest.raises(typer.Exit):
-            _check_ports(conn, _IP, yes=True)
+            _check_ports(conn, yes=True)
         assert "caddy" in mock_fail.call_args[0][0]
 
     @patch("meridian.commands.port_check.err_console")
@@ -484,7 +484,7 @@ class TestCheckPortsConflict:
         conn = MagicMock()
         conn.run.return_value = _ok_result(stdout='LISTEN 0 128 *:80 *:* users:(("apache2",pid=222,fd=3))\n')
         with pytest.raises(typer.Exit):
-            _check_ports(conn, _IP, yes=False)
+            _check_ports(conn, yes=False)
         mock_fail.assert_called_once()
 
     @patch("meridian.commands.port_check.err_console")
@@ -502,7 +502,7 @@ class TestCheckPortsConflict:
             _ok_result(stdout=""),  # retry: now free
             _ok_result(stdout=""),  # port 80 free
         ]
-        _check_ports(conn, _IP, yes=False)
+        _check_ports(conn, yes=False)
         mock_choose.assert_called_once()
 
     @patch("meridian.commands.port_check.err_console")
@@ -514,7 +514,7 @@ class TestCheckPortsConflict:
         # Malformed users field — regex won't match
         conn.run.return_value = _ok_result(stdout="LISTEN 0 128 *:443 *:* users:((broken-format))\n")
         with pytest.raises(typer.Exit):
-            _check_ports(conn, _IP, yes=True)
+            _check_ports(conn, yes=True)
         mock_fail.assert_called_once()
 
 

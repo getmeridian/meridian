@@ -21,8 +21,14 @@ Progress = Callable[[str], None]
 
 _FIREWALL_HINT = "Allow inbound TCP 443 in your cloud provider's firewall / security group."
 # Listeners Meridian itself runs on 443; a v4 stream artifact proves the server is ours.
-_MERIDIAN_LISTENERS = frozenset({"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"})
+MERIDIAN_LISTENERS = frozenset({"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"})
 _V4_STREAM_MARKER = 'test -n "$(ls /etc/nginx/stream.d/meridian-v4-*.conf 2>/dev/null)" && echo managed'
+
+
+def listener_process(ss_output: str) -> str:
+    """Name of the first process in ``ss -tlnp`` output, or ``unknown``."""
+    match = re.search(r'users:\(\("([^"]*)"', ss_output)
+    return match.group(1) if match else "unknown"
 
 
 def reachable_reality_targets(
@@ -149,12 +155,11 @@ def _port_443_free(conn: ServerConnection) -> tuple[VerificationCheck, bool, boo
     if not listeners:
         found = finding("port_443", "passed", "Port 443 is available")
         return finish_check("port_443", "Port 443", [found], started), True, True
-    match = re.search(r'users:\(\("([^"]*)"', listeners)
-    owner = match.group(1) if match else "unknown"
+    owner = listener_process(listeners)
     ownership = conn.run(_V4_STREAM_MARKER, timeout=10)
     if command_evidence_unavailable(ownership.returncode):
         found = finding("port_443", "skipped", "Could not verify whether the port 443 listener belongs to Meridian")
-    elif owner in _MERIDIAN_LISTENERS and ownership.stdout.strip() == "managed":
+    elif owner in MERIDIAN_LISTENERS and ownership.stdout.strip() == "managed":
         found = finding("port_443", "passed", f"Port 443 is in use by {owner} (Meridian)")
     else:
         found = finding(

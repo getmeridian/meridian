@@ -91,7 +91,7 @@ def run_deploy(
     try:
         connection.check_ssh(ui=RichSSHUI())
     except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)
     try:
         registry.add(
             ServerEntry(

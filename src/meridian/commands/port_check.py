@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import re
 import shlex
 
 from meridian.console import choose, err_console, fail, is_quiet_mode, warn
+from meridian.diagnostics.preflight import MERIDIAN_LISTENERS, listener_process
 from meridian.ssh import ServerConnection
 
 
-def check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
+def check_ports(conn: ServerConnection, yes: bool) -> None:
     """Check that ports 443 and 80 are available before deploying.
 
     Allows re-deploy over existing Meridian processes.
     Loops with retry prompt if a non-Meridian process holds a port.
     """
-    allowed = {"nginx", "xray", "remnawave", "remnawave-node", "docker-proxy"}
     # HAProxy/Caddy count as ours only when an older Meridian release installed them.
     legacy_markers = {
         "haproxy": "grep -qs '^# HAProxy SNI Router' /etc/haproxy/haproxy.cfg",
@@ -29,9 +28,8 @@ def check_ports(conn: ServerConnection, ip: str, yes: bool) -> None:
             if not result.stdout.strip():
                 break  # port free
 
-            match = re.search(r'users:\(\("([^"]*)"', result.stdout)
-            proc = match.group(1) if match else "unknown"
-            if proc in allowed:
+            proc = listener_process(result.stdout)
+            if proc in MERIDIAN_LISTENERS:
                 break  # Meridian's own process -- OK for re-deploy
             if proc in legacy_markers and conn.run(legacy_markers[proc], timeout=10).returncode == 0:
                 break  # retired by InstallNginx

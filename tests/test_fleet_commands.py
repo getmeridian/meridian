@@ -169,7 +169,7 @@ def _status_patches(topology: FleetTopology, panel: MagicMock):
     return (
         _fleet_source(topology),
         patch("meridian.commands.fleet.make_panel", return_value=panel),
-        patch("meridian.commands.fleet._check_relay_health", return_value=True),
+        patch("meridian.commands.fleet.tcp_connect", return_value=True),
         patch("meridian.commands.fleet.is_json_mode", return_value=False),
     )
 
@@ -261,7 +261,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True) as mock_health,
+            patch("meridian.commands.fleet.tcp_connect", return_value=True) as mock_health,
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
         ):
             exit_code = run_status()
@@ -280,7 +280,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=False) as mock_health,
+            patch("meridian.commands.fleet.tcp_connect", return_value=False) as mock_health,
             patch("meridian.commands.fleet.is_json_mode", return_value=False),
         ):
             exit_code = run_status()
@@ -301,7 +301,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True),
+            patch("meridian.commands.fleet.tcp_connect", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):
@@ -346,7 +346,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True),
+            patch("meridian.commands.fleet.tcp_connect", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):
@@ -396,7 +396,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True),
+            patch("meridian.commands.fleet.tcp_connect", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):
@@ -444,7 +444,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True),
+            patch("meridian.commands.fleet.tcp_connect", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):
@@ -472,7 +472,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=True),
+            patch("meridian.commands.fleet.tcp_connect", return_value=True),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as emit,
         ):
@@ -494,7 +494,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", side_effect=RuntimeError("probe crashed")),
+            patch("meridian.commands.fleet.tcp_connect", side_effect=RuntimeError("probe crashed")),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):
@@ -516,7 +516,7 @@ class TestFleetStatus:
         with (
             _fleet_source(topology),
             patch("meridian.commands.fleet.make_panel", return_value=panel),
-            patch("meridian.commands.fleet._check_relay_health", return_value=False),
+            patch("meridian.commands.fleet.tcp_connect", return_value=False),
             patch("meridian.commands.fleet.is_json_mode", return_value=True),
             patch("meridian.commands.fleet.emit_json") as mock_json,
         ):

@@ -217,4 +217,4 @@ def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
     try:
         return _ensure_server_connection(resolved, ui=RichSSHUI())
     except SSHError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)

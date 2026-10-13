@@ -6,7 +6,6 @@ at a glance: panel connectivity, node status, relay reachability, user count.
 
 from __future__ import annotations
 
-import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Literal
 
@@ -22,18 +21,10 @@ from meridian.core.fleet import FleetStatus, TopologyRelay
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.fleet import collect_fleet_inventory, collect_fleet_status
+from meridian.health import tcp_connect
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
 from meridian.remnawave.versions import check_panel_version
 from meridian.renderers import emit_json
-
-
-def _check_relay_health(ip: str, port: int, timeout: float = 3.0) -> bool:
-    """TCP connect check to verify relay is reachable."""
-    try:
-        with socket.create_connection((ip, port), timeout=timeout):
-            return True
-    except (OSError, socket.timeout):
-        return False
 
 
 def _check_relays_health(
@@ -45,8 +36,7 @@ def _check_relays_health(
     results: dict[tuple[str, int], bool] = {}
     with ThreadPoolExecutor(max_workers=min(max_workers, len(relays))) as executor:
         futures = {
-            executor.submit(_check_relay_health, relay.ip, relay.port, timeout): (relay.ip, relay.port)
-            for relay in relays
+            executor.submit(tcp_connect, relay.ip, relay.port, timeout): (relay.ip, relay.port) for relay in relays
         }
         for future in as_completed(futures):
             results[futures[future]] = future.result()
@@ -112,7 +102,7 @@ def _run_inventory(*, operation: OperationContext) -> None:
             classify_error=_classify_panel_error,
         )
     except RemnawaveAuthError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)
     except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
         fail(f"Could not collect fleet inventory: {exc}", hint_type="bug")
 
@@ -305,7 +295,7 @@ def _run_status(*, operation: OperationContext) -> int:
             classify_error=_classify_panel_error,
         )
     except RemnawaveAuthError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)
     except Exception as exc:  # Top-level command boundary — unexpected errors are bugs
         fail(f"Could not collect fleet status: {exc}", hint_type="bug")
 

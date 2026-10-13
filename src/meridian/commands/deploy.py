@@ -211,7 +211,7 @@ def _execute(
     try:
         target = resolve_deploy_target(request, registry)
     except EngineError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)
     resolved = ensure_server_connection(
         resolve_server(registry, explicit_ip=target.server_ip, user=target.ssh_user, port=target.ssh_port)
     )
@@ -220,7 +220,7 @@ def _execute(
     _refuse_pre_topology_cluster(cluster)
     first_deploy = cluster.topology_intent is None
     if first_deploy:
-        check_ports(resolved.conn, resolved.ip, request.yes)
+        check_ports(resolved.conn, request.yes)
 
     registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=resolved.port, machine_id=resolved.machine_id))
     entry = registry.find(resolved.ip)
@@ -452,7 +452,7 @@ def _dry_run(request: DeployRequest) -> DeployPlan:
     try:
         target = resolve_deploy_target(request, registry)
     except EngineError as exc:
-        fail(str(exc), hint=exc.hint, hint_type=exc.category)
+        fail(exc)
     cluster = ClusterConfig.load()
     _refuse_pre_topology_cluster(cluster)
     entry = registry.find(target.server_ip)
