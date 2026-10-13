@@ -127,6 +127,7 @@ export * as SetupRoutingSelectionSchema from "./setup-routing-selection.schema";
 export * as SummarySchema from "./summary.schema";
 export * as TestEnvelopeSchema from "./test-envelope.schema";
 export * as TestFailureSchema from "./test-failure.schema";
+export * as TestFleetResultSchema from "./test-fleet-result.schema";
 export * as TestResultSchema from "./test-result.schema";
 export * as TopologyBuilderDraftSchema from "./topology-builder-draft.schema";
 export * as TopologyServerCapabilitiesSchema from "./topology-server-capabilities.schema";

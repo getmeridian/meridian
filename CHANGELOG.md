@@ -115,6 +115,9 @@ reviewed topology in `~/.meridian/cluster.yml` describes your whole fleet.
   camouflage page through the next hop with the clients' SNI and reports
   connect time, first byte, and bytes received; a freeze in the 8–32 KB
   throttling window suggests moving the relay to another provider.
+- **`meridian test` tests the whole fleet** — with no target and several saved
+  servers it tests every exit and relay entry in turn instead of asking which
+  one, and exits with the worst result.
 
 ### Sharing
 - **Connection names show where traffic exits** — entries lead with the exit's

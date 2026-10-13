@@ -7,6 +7,49 @@
       "title": "EmptyData",
       "type": "object"
     },
+    "FleetTestResult": {
+      "additionalProperties": false,
+      "description": "One `meridian test` run over every public entry server, with a fail-closed aggregate.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/VerificationCounts"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            3,
+            4
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/TestResult"
+          },
+          "minItems": 2,
+          "title": "Results",
+          "type": "array"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "findings",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "results",
+        "verdict",
+        "exit_code",
+        "counts"
+      ],
+      "title": "FleetTestResult",
+      "type": "object"
+    },
     "MeridianError": {
       "additionalProperties": false,
       "description": "Structured error safe for JSON/API clients.",
@@ -413,7 +456,15 @@
           "type": "string"
         },
         "data": {
-          "$ref": "#/$defs/TestResult"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestResult"
+            },
+            {
+              "$ref": "#/$defs/FleetTestResult"
+            }
+          ],
+          "title": "Data"
         },
         "duration_ms": {
           "title": "Duration Ms",
@@ -495,6 +546,9 @@
               "$ref": "#/$defs/TestResult"
             },
             {
+              "$ref": "#/$defs/FleetTestResult"
+            },
+            {
               "$ref": "#/$defs/EmptyData"
             }
           ],
@@ -567,7 +621,7 @@
       "type": "object"
     }
   },
-  "description": "Envelope schema for test JSON output.",
+  "description": "Envelope schema for test JSON output; a bare run over a multi-server fleet returns FleetTestResult.",
   "discriminator": {
     "mapping": {
       "failed": "#/$defs/_TestTerminalEnvelope",

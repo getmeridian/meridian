@@ -83,6 +83,7 @@ from meridian.core.servers import (
     ServerValidateResult,
 )
 from meridian.core.verification import (
+    FleetTestResult,
     ProbeResult,
     TestResult,
     VerificationAggregate,
@@ -173,7 +174,7 @@ class _ContractEnvelope(CoreModel):
 def _make_command_envelope(
     prefix: str,
     command: str,
-    data_type: type,
+    data_type: Any,
     *,
     success_statuses: Any = None,
     failure_data_type: Any = EmptyData,
@@ -187,7 +188,7 @@ def _make_command_envelope(
     Args:
         prefix: PascalCase prefix for class names (e.g. ``"FleetStatus"``).
         command: Literal command string (e.g. ``"fleet.status"``).
-        data_type: Pydantic model for the success ``data`` field.
+        data_type: Pydantic model (or union of models) for the success ``data`` field.
         success_statuses: Literal type for success status values.
             Defaults to ``Literal["ok"]``.
         failure_data_type: Pydantic model for the terminal ``data`` field.
@@ -264,9 +265,9 @@ _, _, ProbeOutputEnvelope = _make_command_envelope(
 _, _, TestOutputEnvelope = _make_command_envelope(
     "Test",
     "test",
-    TestResult,
-    failure_data_type=TestResult | EmptyData,
-    doc="Envelope schema for test JSON output.",
+    TestResult | FleetTestResult,
+    failure_data_type=TestResult | FleetTestResult | EmptyData,
+    doc="Envelope schema for test JSON output; a bare run over a multi-server fleet returns FleetTestResult.",
 )
 
 
@@ -300,7 +301,7 @@ class ProbeFailureData(RootModel[ProbeResult | EmptyData]):
     """Failure data schema for probe JSON output."""
 
 
-class TestFailureData(RootModel[TestResult | EmptyData]):
+class TestFailureData(RootModel[TestResult | FleetTestResult | EmptyData]):
     """Failure data schema for test JSON output."""
 
 
@@ -516,6 +517,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "test-envelope": TestOutputEnvelope,
     "test-failure": TestFailureData,
     "test-result": TestResult,
+    "test-fleet-result": FleetTestResult,
     "verification-aggregate": VerificationAggregate,
     "verification-check": VerificationCheck,
     "verification-context": VerificationContext,

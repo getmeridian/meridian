@@ -6,10 +6,11 @@
  */
 
 /**
- * Envelope schema for test JSON output.
+ * Envelope schema for test JSON output; a bare run over a multi-server fleet returns FleetTestResult.
  */
 export type TestOutputEnvelope = _TestSuccessEnvelope | _TestTerminalEnvelope;
 export type Command = "test";
+export type Data = TestResult | FleetTestResult;
 export type DurationMs = number;
 export type Code = string;
 export type Message = string;
@@ -42,12 +43,18 @@ export type Label = string;
 export type Outcome = "ok" | "no_traffic" | "unreachable" | "failed" | "egress_mismatch" | "inconclusive" | "invalid";
 export type Transports = TransportResult[];
 export type Verdict = "passed" | "findings" | "inconclusive";
+export type ExitCode1 = 0 | 3 | 4;
+/**
+ * @minItems 2
+ */
+export type Results = [TestResult, TestResult, ...TestResult[]];
+export type Verdict1 = "passed" | "findings" | "inconclusive";
 export type DurationMs1 = number;
 /**
  * @maxItems 0
  */
 export type Errors = [];
-export type ExitCode1 = number;
+export type ExitCode2 = number;
 export type MeridianVersion = string;
 export type OperationId = string;
 export type Schema = "meridian.output/v1";
@@ -57,19 +64,19 @@ export type Changed = boolean;
 export type Text = string;
 export type Category = "user" | "system" | "bug" | "cancelled";
 export type Code1 = string;
-export type ExitCode2 = number;
+export type ExitCode3 = number;
 export type Hint = string;
 export type Message1 = string;
 export type Retryable = boolean;
 export type Warnings1 = MeridianError[];
 export type Command1 = "test";
-export type Data = TestResult | EmptyData;
+export type Data1 = TestResult | FleetTestResult | EmptyData;
 export type DurationMs2 = number;
 /**
  * @minItems 1
  */
 export type Errors1 = [MeridianError, ...MeridianError[]];
-export type ExitCode3 = number;
+export type ExitCode4 = number;
 export type MeridianVersion1 = string;
 export type OperationId1 = string;
 export type Schema1 = "meridian.output/v1";
@@ -79,10 +86,10 @@ export type Warnings2 = MeridianError[];
 
 export interface _TestSuccessEnvelope {
   command: Command;
-  data: TestResult;
+  data: Data;
   duration_ms: DurationMs1;
   errors: Errors;
-  exit_code: ExitCode1;
+  exit_code: ExitCode2;
   meridian_version: MeridianVersion;
   operation_id: OperationId;
   schema: Schema;
@@ -165,6 +172,15 @@ export interface TransportResult {
   outcome: Outcome;
 }
 /**
+ * One `meridian test` run over every public entry server, with a fail-closed aggregate.
+ */
+export interface FleetTestResult {
+  counts: VerificationCounts;
+  exit_code: ExitCode1;
+  results: Results;
+  verdict: Verdict1;
+}
+/**
  * Structured summary shown in JSON envelopes and UI dashboards.
  */
 export interface Summary {
@@ -183,7 +199,7 @@ export interface MeridianError {
   cause?: Cause;
   code: Code1;
   details?: Details;
-  exit_code?: ExitCode2;
+  exit_code?: ExitCode3;
   hint?: Hint;
   message: Message1;
   retryable?: Retryable;
@@ -196,10 +212,10 @@ export interface Details {
 }
 export interface _TestTerminalEnvelope {
   command: Command1;
-  data: Data;
+  data: Data1;
   duration_ms: DurationMs2;
   errors: Errors1;
-  exit_code: ExitCode3;
+  exit_code: ExitCode4;
   meridian_version: MeridianVersion1;
   operation_id: OperationId1;
   schema: Schema1;

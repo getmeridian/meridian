@@ -223,3 +223,27 @@ class TestResult(VerificationResult):
     scope: Literal["basic", "full"] = "full"
     client: str = ""
     transports: list[TransportResult] = Field(default_factory=list)
+
+
+class FleetTestResult(CoreModel):
+    """One `meridian test` run over every public entry server, with a fail-closed aggregate."""
+
+    results: list[TestResult] = Field(min_length=2)
+    verdict: VerificationVerdict
+    exit_code: VerificationCompletedExitCode
+    counts: VerificationCounts
+
+    @classmethod
+    def combine(cls, results: Sequence[TestResult]) -> FleetTestResult:
+        aggregate = aggregate_verification([check for result in results for check in result.checks])
+        return cls(
+            results=list(results),
+            verdict=aggregate.verdict,
+            exit_code=aggregate.exit_code,
+            counts=aggregate.counts,
+        )
+
+    def to_data(self) -> dict[str, Any]:
+        from meridian.core.serde import to_plain
+
+        return to_plain(self)

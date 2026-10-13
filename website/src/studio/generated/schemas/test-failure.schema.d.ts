@@ -8,7 +8,7 @@
 /**
  * Failure data schema for test JSON output.
  */
-export type TestFailureData = TestResult | EmptyData;
+export type TestFailureData = TestResult | FleetTestResult | EmptyData;
 export type DurationMs = number;
 export type Code = string;
 export type Message = string;
@@ -41,6 +41,12 @@ export type Label = string;
 export type Outcome = "ok" | "no_traffic" | "unreachable" | "failed" | "egress_mismatch" | "inconclusive" | "invalid";
 export type Transports = TransportResult[];
 export type Verdict = "passed" | "findings" | "inconclusive";
+export type ExitCode1 = 0 | 3 | 4;
+/**
+ * @minItems 2
+ */
+export type Results = [TestResult, TestResult, ...TestResult[]];
+export type Verdict1 = "passed" | "findings" | "inconclusive";
 
 /**
  * End-to-end proxy connection verification result.
@@ -114,6 +120,15 @@ export interface TransportResult {
   first_byte_ms?: FirstByteMs;
   label: Label;
   outcome: Outcome;
+}
+/**
+ * One `meridian test` run over every public entry server, with a fail-closed aggregate.
+ */
+export interface FleetTestResult {
+  counts: VerificationCounts;
+  exit_code: ExitCode1;
+  results: Results;
+  verdict: Verdict1;
 }
 /**
  * Empty data object used by envelopes without command-specific failure data.

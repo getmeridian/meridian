@@ -5,21 +5,25 @@ from __future__ import annotations
 from dataclasses import replace
 
 import typer
+from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
 from meridian.commands.check_render import emit_verification_json, render_verification
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.connectivity import collect_connectivity_checks
-from meridian.console import error_context, fail, is_json_mode
+from meridian.console import err_console, error_context, fail, is_json_mode
+from meridian.core.errors import LocalStateError
 from meridian.core.errors import MeridianError as MeridianException
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
 from meridian.core.verification import (
+    FleetTestResult,
     TestResult,
     VerificationTarget,
     aggregate_verification,
 )
-from meridian.servers import ServerRegistry
+from meridian.resolve import local_entry
+from meridian.servers import ServerEntry, ServerRegistry
 from meridian.verification import (
     VerificationHttpsRoute,
     VerificationTargetError,
@@ -43,15 +47,26 @@ def run(
     operation = OperationContext()
     with error_context("test", timer=operation.timer):
         try:
-            result = collect_test_result(
-                target_value,
-                domain,
-                sni,
-                requested_server,
-                client=client,
-                basic=basic,
-                timeout=timeout,
-            )
+            fleet = [] if target_value or requested_server or domain or sni else fleet_test_targets()
+            result: TestResult | FleetTestResult
+            if len(fleet) > 1:
+                results = [
+                    collect_test_result(
+                        "", "", "", entry.name or entry.host, client=client, basic=basic, timeout=timeout
+                    )
+                    for entry in fleet
+                ]
+                result = FleetTestResult.combine(results)
+            else:
+                result = collect_test_result(
+                    target_value,
+                    domain,
+                    sni,
+                    requested_server,
+                    client=client,
+                    basic=basic,
+                    timeout=timeout,
+                )
         except MeridianException as exc:
             fail(exc)
         except OSError as exc:
@@ -65,10 +80,47 @@ def run(
 
     if is_json_mode():
         _emit_json_result(result, operation=operation)
+    elif isinstance(result, FleetTestResult):
+        for one in result.results:
+            _render_result(one)
+        err_console.print(f"  [bold]{escape(_summary_text(result))}[/bold]")
+        err_console.print()
     else:
         _render_result(result)
     if result.exit_code:
         raise typer.Exit(result.exit_code)
+
+
+def fleet_test_targets(
+    registry: ServerRegistry | None = None,
+    cluster: ClusterConfig | None = None,
+) -> list[ServerEntry]:
+    """Public entry servers a bare `meridian test` covers: every exit, then each relay's first hop.
+
+    Empty when the command runs on a saved server, only one server is saved, or no
+    topology is saved; those cases keep single-target resolution.
+    """
+    registry = registry or ServerRegistry(SERVER_PROFILES_FILE)
+    if local_entry(registry) is not None or len(registry.list()) < 2:
+        return []
+    try:
+        intent = (cluster or ClusterConfig.load()).topology_intent
+    except LocalStateError:
+        return []
+    if intent is None:
+        return []
+    refs = [exit_.server_ref for exit_ in intent.exits]
+    refs += [relay.hop_server_refs[0] for relay in intent.transparent_relays]
+    entries = []
+    for ref in dict.fromkeys(refs):
+        entry = registry.find(ref)
+        if entry is None:
+            raise VerificationTargetError(
+                f"The fleet uses saved server {ref!r}, which is missing.",
+                hint="Add it back with `meridian server add`, or test one server with --server NAME.",
+            )
+        entries.append(entry)
+    return entries
 
 
 def collect_test_result(
@@ -168,7 +220,16 @@ def collect_test_result(
     )
 
 
-def _summary_text(result: TestResult) -> str:
+def _summary_text(result: TestResult | FleetTestResult) -> str:
+    if isinstance(result, FleetTestResult):
+        total = len(result.results)
+        if result.verdict == "passed":
+            return f"All {total} servers passed."
+        failed = sum(1 for one in result.results if one.verdict == "findings")
+        unknown = sum(1 for one in result.results if one.verdict == "inconclusive")
+        parts = [f"{failed} of {total} servers had failed checks"] if failed else []
+        parts += [f"{unknown} of {total} could not be fully tested"] if unknown else []
+        return "; ".join(parts) + "."
     scope = "Basic reachability" if result.scope == "basic" else "End-to-end connection test"
     if result.verdict == "passed":
         return f"{scope} passed all {result.counts.checks} checks."
@@ -177,7 +238,7 @@ def _summary_text(result: TestResult) -> str:
     return f"{scope} was inconclusive: {result.counts.skipped} check(s) could not complete."
 
 
-def _emit_json_result(result: TestResult, *, operation: OperationContext) -> None:
+def _emit_json_result(result: TestResult | FleetTestResult, *, operation: OperationContext) -> None:
     emit_verification_json(
         command="test",
         data=result.to_data(),

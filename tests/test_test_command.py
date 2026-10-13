@@ -12,7 +12,8 @@ from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
-from meridian.commands.test import collect_test_result
+from meridian.cluster import ClusterConfig
+from meridian.commands.test import collect_test_result, fleet_test_targets
 from meridian.connectivity import ConnectivityChecks
 from meridian.core.verification import (
     TestResult as CoreTestResult,
@@ -25,7 +26,7 @@ from meridian.core.verification import (
     VerificationTarget,
     aggregate_verification,
 )
-from meridian.servers import ServerRegistry
+from meridian.servers import ServerEntry, ServerRegistry
 
 _IP = "198.51.100.20"
 runner = CliRunner()
@@ -268,3 +269,65 @@ def test_invalid_timeout_preserves_json_error_contract(monkeypatch: pytest.Monke
     assert payload["command"] == "test"
     assert payload["status"] == "failed"
     assert payload["errors"][0]["category"] == "user"
+
+
+def _fleet(servers_file: Path) -> tuple[ServerRegistry, ClusterConfig]:
+    """A control+exit server, a second exit, and a relay into the first exit."""
+    from meridian.setup.editor import add_exit_to_intent, add_relay_to_intent
+    from meridian.setup.single_server import single_server_intent
+
+    registry = ServerRegistry(servers_file)
+    for host, name in (("198.51.100.10", "exit-a"), ("198.51.100.11", "exit-b"), ("198.51.100.20", "relay-a")):
+        registry.add(ServerEntry(host=host, name=name))
+    intent = single_server_intent(None, server_ref=registry.find("exit-a").id, sni="www.example.com")
+    intent = add_exit_to_intent(
+        intent, server_ref=registry.find("exit-b").id, title="exit-b", reality_sni="www.example.com"
+    )
+    intent = add_relay_to_intent(
+        intent, server_ref=registry.find("relay-a").id, title="relay-a", exit_ref="main", listen_port=8443
+    )
+    return registry, ClusterConfig(topology_intent=intent)
+
+
+def test_bare_test_covers_every_exit_then_each_relay_entry(servers_file: Path) -> None:
+    registry, cluster = _fleet(servers_file)
+
+    targets = fleet_test_targets(registry, cluster)
+
+    assert [entry.name for entry in targets] == ["exit-a", "exit-b", "relay-a"]
+
+
+def test_bare_test_keeps_single_target_resolution_for_one_server(servers_file: Path) -> None:
+    from meridian.setup.single_server import single_server_intent
+
+    registry = ServerRegistry(servers_file)
+    registry.add(ServerEntry(host="198.51.100.10", name="exit-a"))
+    cluster = ClusterConfig(topology_intent=single_server_intent(None, server_ref=registry.find("exit-a").id))
+
+    assert fleet_test_targets(registry, cluster) == []
+
+
+def test_bare_fleet_test_emits_one_envelope_with_every_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    entries = [ServerEntry(host="198.51.100.10", name="exit-a"), ServerEntry(host="198.51.100.20", name="relay-a")]
+    monkeypatch.setattr("meridian.commands.test.fleet_test_targets", lambda: entries)
+    seen: list[str] = []
+
+    def collect(_target: str, _domain: str, _sni: str, server: str, **_kwargs: object) -> CoreTestResult:
+        seen.append(server)
+        return _result("failed" if server == "relay-a" else "passed")
+
+    monkeypatch.setattr("meridian.commands.test.collect_test_result", collect)
+
+    result = runner.invoke(app, ["test", "--json"])
+
+    from meridian.console import set_json_mode, set_quiet_mode
+
+    set_json_mode(False)
+    set_quiet_mode(False)
+    assert seen == ["exit-a", "relay-a"]
+    assert result.exit_code == 4
+    payload = json.loads(result.stdout)
+    assert [one["verdict"] for one in payload["data"]["results"]] == ["passed", "findings"]
+    assert payload["data"]["verdict"] == "findings"
+    assert payload["summary"]["text"] == "1 of 2 servers had failed checks."

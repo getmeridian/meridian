@@ -297,6 +297,8 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
               [--client NAME] [--basic] [--probe] [--timeout SECONDS] [--json]
 ```
 
+Without a target, `test` tests the saved server it runs on, or your only saved server. With several, it tests every public entry of your fleet in turn (each exit, then each relay's entry) and exits with the worst result; `--json` then returns one result per server in `data.results`.
+
 `--client` tests a specific active client. `--basic` runs only network and TLS checks, without downloading Xray, and cannot verify UDP-only paths; it cannot be combined with `--client` (exit `2`). `--timeout` (default `5`, range `1`–`30`) limits each network operation, separate from the first-run Xray download.
 
 Exit `0` means every check passed, `4` means the test found problems, and `3` means required evidence was unavailable. `--json` emits a `meridian.output/v1` envelope with every check and finding.
