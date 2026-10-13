@@ -13,7 +13,7 @@ from meridian.core.command_catalog import (
     command_schema_bindings,
 )
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployResult
-from meridian.core.models import MeridianError
+from meridian.core.models import ErrorModel
 from meridian.core.output import OperationTimer, command_envelope, envelope
 from meridian.core.schema import (
     ApiCommandsResult,
@@ -436,7 +436,7 @@ def test_command_catalog_can_embed_command_schemas() -> None:
 
 
 def test_command_envelope_schema_validates_failed_output_shape() -> None:
-    error = MeridianError(
+    error = ErrorModel(
         code="MERIDIAN_USER_ERROR",
         category="user",
         message="No desired state defined in cluster.yml",
@@ -482,7 +482,7 @@ def test_command_envelope_producer_rejects_unsupported_success_exit_code() -> No
 
 
 def test_command_envelope_producer_rejects_unsupported_failure_exit_code() -> None:
-    error = MeridianError(
+    error = ErrorModel(
         code="MERIDIAN_USER_ERROR",
         category="user",
         message="User error",
@@ -572,7 +572,7 @@ def test_test_failure_envelope_accepts_partial_typed_result_or_empty_data() -> N
             )
         ],
     )
-    error = MeridianError(
+    error = ErrorModel(
         code="MERIDIAN_TEST_NETWORK_ERROR",
         category="system",
         message="The proxy endpoint could not be reached.",
@@ -601,7 +601,7 @@ def test_test_failure_envelope_accepts_partial_typed_result_or_empty_data() -> N
         status="failed",
         exit_code=2,
         errors=[
-            MeridianError(
+            ErrorModel(
                 code="MERIDIAN_TEST_TARGET_INVALID",
                 category="user",
                 message="The test target is invalid.",

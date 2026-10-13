@@ -26,7 +26,7 @@ from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import NodeAddRequest, NodeTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_node_list_result
-from meridian.core.models import MeridianError, Summary
+from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.topology import ExitIntent, RoutingGatewayIntent, SetupIntent
 from meridian.registry_country import registry_country
@@ -185,13 +185,13 @@ def _run_list(*, operation: OperationContext) -> None:
     except LocalStateError as exc:
         fail(exc)
     api_nodes = []
-    warnings: list[MeridianError] = []
+    warnings: list[ErrorModel] = []
     try:
         with make_panel(cluster) as panel:
             api_nodes = panel.list_nodes()
     except RemnawaveError as exc:
         warnings.append(
-            MeridianError(
+            ErrorModel(
                 code="MERIDIAN_NODE_STATUS_UNAVAILABLE",
                 category="system",
                 message="Configured nodes are available, but live panel status could not be collected.",

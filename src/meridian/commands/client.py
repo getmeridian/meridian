@@ -24,7 +24,7 @@ from meridian.commands.client_v4 import run_add_v4, run_remove_v4
 from meridian.console import err_console, error_context, fail, is_json_mode, ok, warn
 from meridian.core.clients import PanelUserLike, build_client_status_result
 from meridian.core.fleet import public_url
-from meridian.core.models import MeridianError, Summary
+from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.redaction import HANDOFF_LINK_KEYS
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
@@ -99,10 +99,10 @@ def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
         )
 
     detail = result.client.client
-    repair_warnings: list[MeridianError] = []
+    repair_warnings: list[ErrorModel] = []
     if repair_page and not result.share_url:
         repair_warnings.append(
-            MeridianError(
+            ErrorModel(
                 code="MERIDIAN_CLIENT_PAGE_REPAIR_FAILED",
                 category="system",
                 message=f"Client '{detail.username}' is available, but its connection page could not be repaired.",

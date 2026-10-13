@@ -129,9 +129,9 @@ def fail(
         exit_code: Explicit exit code. If None, derived from hint_type
             (user=2, system=3, bug=1).
     """
-    from meridian.core.errors import MeridianError as _MeridianError
+    from meridian.core.errors import MeridianError
 
-    if isinstance(msg, _MeridianError):
+    if isinstance(msg, MeridianError):
         hint = msg.hint
         hint_type = msg.category
         exit_code = msg.exit_code
@@ -141,7 +141,7 @@ def fail(
     if hint_type == "user" and user_override is not None and code == _EXIT_CODES["user"]:
         code = user_override
     if _state.json_mode:
-        from meridian.core.models import ErrorCategory, MeridianError
+        from meridian.core.models import ErrorCategory, ErrorModel
         from meridian.core.output import command_envelope
         from meridian.renderers import emit_json
 
@@ -153,7 +153,7 @@ def fail(
                 status="cancelled" if category == "cancelled" else "failed",
                 exit_code=code,
                 errors=[
-                    MeridianError(
+                    ErrorModel(
                         code=f"MERIDIAN_{category.upper()}_ERROR",
                         category=category,
                         message=message,

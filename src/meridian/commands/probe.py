@@ -10,7 +10,7 @@ from meridian.cluster import ClusterConfig
 from meridian.commands.check_render import emit_verification_json, render_verification
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.console import error_context, fail, is_json_mode
-from meridian.core.errors import MeridianError as MeridianException
+from meridian.core.errors import MeridianError
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
 from meridian.core.verification import (
@@ -45,7 +45,7 @@ def run(
                 sni=sni,
                 timeout=timeout,
             )
-        except MeridianException as exc:
+        except MeridianError as exc:
             fail(exc)
         except OSError as exc:
             fail(

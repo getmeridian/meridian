@@ -11,7 +11,7 @@ from typing import Any
 from unittest.mock import patch
 
 from meridian.core.deploy import DeployRequest, DeployResult
-from meridian.core.models import Event, MeridianError, OutputEnvelope, OutputStatus, Summary
+from meridian.core.models import ErrorModel, Event, OutputEnvelope, OutputStatus, Summary
 from meridian.core.output import EVENT_SCHEMA, OUTPUT_SCHEMA, json_dumps, jsonl_dumps
 from meridian.core.schema import (
     command_catalog,
@@ -46,7 +46,7 @@ def _envelope(
     exit_code: int,
     summary: Summary,
     data: dict[str, Any] | None = None,
-    errors: list[MeridianError] | None = None,
+    errors: list[ErrorModel] | None = None,
 ) -> OutputEnvelope:
     payload = OutputEnvelope(
         schema=OUTPUT_SCHEMA,
@@ -118,7 +118,7 @@ def _deploy_success_fixture(operation_id: str = "op-fixture-deploy-success") -> 
 
 
 def _deploy_user_error_fixture() -> OutputEnvelope:
-    error = MeridianError(
+    error = ErrorModel(
         code="MERIDIAN_DEPLOY_INPUT_REQUIRED",
         category="user",
         message="Deploy request is incomplete",

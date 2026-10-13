@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from meridian.core.models import ErrorCategory
 
 if TYPE_CHECKING:
-    from meridian.core.models import MeridianError as MeridianErrorModel
+    from meridian.core.models import ErrorModel
 
 _EXIT_CODES: dict[str, int] = {"user": 2, "system": 3, "bug": 1, "cancelled": 5}
 
@@ -23,7 +23,7 @@ class MeridianError(Exception):
     Subsystem errors inherit this.  CLI adapters catch it to render
     human-readable output.  Engine/API adapters catch it to build
     typed error responses.  The ``to_error_model()`` method serializes
-    to the JSON-safe ``MeridianError`` Pydantic model.
+    to the JSON-safe ``ErrorModel`` Pydantic model.
     """
 
     def __init__(
@@ -43,10 +43,10 @@ class MeridianError(Exception):
     def exit_code(self) -> int:
         return _EXIT_CODES.get(self.category, 1)
 
-    def to_error_model(self) -> MeridianErrorModel:
-        from meridian.core.models import MeridianError as MeridianErrorModel
+    def to_error_model(self) -> ErrorModel:
+        from meridian.core.models import ErrorModel
 
-        return MeridianErrorModel(
+        return ErrorModel(
             code=type(self).__name__,
             category=self.category,
             message=str(self),

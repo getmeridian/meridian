@@ -46,8 +46,8 @@ from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, Rel
 from meridian.core.health import HealthCheckResult
 from meridian.core.models import (
     CoreModel,
+    ErrorModel,
     Event,
-    MeridianError,
     OutputEnvelope,
     OutputSchema,
     OutputStatus,
@@ -162,8 +162,8 @@ class _ContractEnvelope(CoreModel):
     status: OutputStatus
     exit_code: int
     summary: Summary
-    warnings: list[MeridianError]
-    errors: list[MeridianError]
+    warnings: list[ErrorModel]
+    errors: list[ErrorModel]
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ def _make_command_envelope(
         command=(cmd_literal, ...),
         status=(success_statuses, ...),
         data=(data_type, ...),
-        errors=(list[MeridianError], Field(max_length=0)),
+        errors=(list[ErrorModel], Field(max_length=0)),
     )
 
     terminal_cls = create_model(
@@ -215,7 +215,7 @@ def _make_command_envelope(
         command=(cmd_literal, ...),
         status=(failed_status, ...),
         data=(failure_data_type, ...),
-        errors=(list[MeridianError], Field(min_length=1)),
+        errors=(list[ErrorModel], Field(min_length=1)),
     )
 
     union_type = Annotated[Union[success_cls, terminal_cls], Field(discriminator="status")]  # type: ignore[valid-type]
@@ -319,28 +319,28 @@ class _DeployChangedEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
     status: Literal["changed"]
     data: DeployResult
-    errors: list[MeridianError] = Field(max_length=0)
+    errors: list[ErrorModel] = Field(max_length=0)
 
 
 class _DeployPlanEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
     status: Literal["ok"]
     data: DeployPlan
-    errors: list[MeridianError] = Field(max_length=0)
+    errors: list[ErrorModel] = Field(max_length=0)
 
 
 class _DeployTerminalEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
     status: Literal["failed"]
     data: EmptyData
-    errors: list[MeridianError] = Field(min_length=1)
+    errors: list[ErrorModel] = Field(min_length=1)
 
 
 class _DeployCancelledEnvelope(_ContractEnvelope):
     command: Literal["deploy"]
     status: Literal["cancelled"]
     data: OperationCancellation
-    errors: list[MeridianError] = Field(min_length=1)
+    errors: list[ErrorModel] = Field(min_length=1)
 
 
 class DeployOutputEnvelope(
@@ -528,7 +528,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "fleet-status-envelope": FleetStatusOutputEnvelope,
     "fleet-inventory-envelope": FleetInventoryOutputEnvelope,
     "event": Event,
-    "error": MeridianError,
+    "error": ErrorModel,
     "operation": OperationEnvelope,
     "deploy-operation-result": DeployOperationResult,
     "operation-cancel": OperationCancel,

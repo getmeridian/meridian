@@ -8,7 +8,7 @@ from typing import Any
 from rich.markup import escape
 
 from meridian.console import err_console
-from meridian.core.models import MeridianError, OutputStatus, Summary
+from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationTimer, command_envelope
 from meridian.core.redaction import redact_string
 from meridian.core.verification import VerificationCheck, VerificationCounts, VerificationVerdict
@@ -73,7 +73,7 @@ def emit_verification_json(
     if verdict == "inconclusive":
         status = "failed"
         errors = [
-            MeridianError(
+            ErrorModel(
                 code=inconclusive_code,
                 category="system",
                 message=summary,

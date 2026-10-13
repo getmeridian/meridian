@@ -7,7 +7,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from meridian.core.models import MeridianError, OutputEnvelope, ResourceRef, Summary
+from meridian.core.models import ErrorModel, OutputEnvelope, ResourceRef, Summary
 from meridian.core.output import EventStream, OperationTimer, envelope, json_dumps, jsonl_dumps
 from meridian.core.redaction import REDACTED, redact
 
@@ -36,7 +36,7 @@ def test_output_envelope_has_stable_top_level_contract() -> None:
 
 
 def test_output_envelope_serializes_errors() -> None:
-    err = MeridianError(
+    err = ErrorModel(
         code="MERIDIAN_INPUT_REQUIRED",
         category="user",
         message="Missing server IP",

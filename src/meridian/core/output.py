@@ -11,10 +11,10 @@ from typing import Any
 from meridian import __version__
 from meridian.core.events import CoreEventType
 from meridian.core.models import (
+    ErrorModel,
     Event,
     EventLevel,
     EventSchema,
-    MeridianError,
     OutputEnvelope,
     OutputSchema,
     OutputStatus,
@@ -69,8 +69,8 @@ def envelope(
     summary: Summary | str = "",
     status: OutputStatus = "ok",
     exit_code: int = 0,
-    warnings: list[MeridianError] | None = None,
-    errors: list[MeridianError] | None = None,
+    warnings: list[ErrorModel] | None = None,
+    errors: list[ErrorModel] | None = None,
     timer: OperationTimer | None = None,
 ) -> OutputEnvelope:
     """Build a standard output envelope."""
@@ -99,8 +99,8 @@ def command_envelope(
     summary: Summary | str = "",
     status: OutputStatus = "ok",
     exit_code: int = 0,
-    warnings: list[MeridianError] | None = None,
-    errors: list[MeridianError] | None = None,
+    warnings: list[ErrorModel] | None = None,
+    errors: list[ErrorModel] | None = None,
     timer: OperationTimer | None = None,
 ) -> OutputEnvelope:
     """Build and validate an advertised command-specific output envelope."""

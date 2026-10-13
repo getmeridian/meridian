@@ -20,7 +20,7 @@ from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import RelayDeployRequest, RelayTargetRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import build_relay_list_result
-from meridian.core.models import MeridianError, Summary
+from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.topology import SetupIntent, TransparentRelayIntent
 from meridian.remnawave import RemnawaveError
@@ -199,7 +199,7 @@ def _run_list(
 
     # Optionally check host status from panel
     host_status: dict[tuple[str, int], bool | None] = {}
-    warnings: list[MeridianError] = []
+    warnings: list[ErrorModel] = []
     if relays:
         try:
             with make_panel(cluster) as panel:
@@ -212,7 +212,7 @@ def _run_list(
                             host_status[endpoint] = not h.is_disabled
         except RemnawaveError as exc:
             warnings.append(
-                MeridianError(
+                ErrorModel(
                     code="MERIDIAN_RELAY_HOST_STATUS_UNAVAILABLE",
                     category="system",
                     message="Relay topology is available, but panel host status could not be collected.",

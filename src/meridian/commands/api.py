@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from meridian.console import err_console, error_context, fail, is_json_mode
-from meridian.core.models import MeridianError, Summary
+from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.schema import command_catalog, schema_catalog, schema_for
 from meridian.core.services import WorkflowNotFoundError, collect_workflow
@@ -77,7 +77,7 @@ def run_schema(name: str, *, envelope_output: bool = False) -> None:
                         status="failed",
                         exit_code=2,
                         errors=[
-                            MeridianError(
+                            ErrorModel(
                                 code="MERIDIAN_USER_ERROR",
                                 category="user",
                                 message=str(exc),

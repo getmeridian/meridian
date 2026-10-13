@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "MeridianError": {
+    "ErrorModel": {
       "additionalProperties": false,
       "description": "Structured error safe for JSON/API clients.",
       "properties": {
@@ -102,7 +102,7 @@
     },
     "errors": {
       "items": {
-        "$ref": "#/$defs/MeridianError"
+        "$ref": "#/$defs/ErrorModel"
       },
       "title": "Errors",
       "type": "array"
@@ -145,7 +145,7 @@
     },
     "warnings": {
       "items": {
-        "$ref": "#/$defs/MeridianError"
+        "$ref": "#/$defs/ErrorModel"
       },
       "title": "Warnings",
       "type": "array"

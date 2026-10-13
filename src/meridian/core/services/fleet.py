@@ -16,7 +16,7 @@ from meridian.core.fleet import (
     build_fleet_inventory,
     build_fleet_status,
 )
-from meridian.core.models import CoreModel, MeridianError
+from meridian.core.models import CoreModel, ErrorModel
 
 PanelErrorKind = Literal["auth", "system", "bug"]
 
@@ -43,14 +43,14 @@ class FleetStatusServiceResult(CoreModel):
     """Status result plus non-fatal collection warnings."""
 
     status: FleetStatus
-    warnings: list[MeridianError]
+    warnings: list[ErrorModel]
 
 
 class FleetInventoryServiceResult(CoreModel):
     """Inventory result plus non-fatal collection warnings."""
 
     inventory: FleetInventory
-    warnings: list[MeridianError]
+    warnings: list[ErrorModel]
 
 
 def _system_warning(
@@ -59,9 +59,9 @@ def _system_warning(
     *,
     hint: str = "",
     details: dict[str, object] | None = None,
-) -> MeridianError:
+) -> ErrorModel:
     """Build a retryable system warning for partial fleet data."""
-    return MeridianError(
+    return ErrorModel(
         code=code,
         category="system",
         message=message,
@@ -87,7 +87,7 @@ def collect_fleet_inventory(
     """Collect redacted fleet inventory with live panel node observations."""
     panel_ok = False
     api_nodes: Sequence[ApiNodeLike] = []
-    warnings: list[MeridianError] = []
+    warnings: list[ErrorModel] = []
     sources = FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays="not_requested")
 
     try:
@@ -148,7 +148,7 @@ def collect_fleet_status(
     panel_ok = False
     api_nodes: Sequence[ApiNodeLike] = []
     api_users: Sequence[ApiUserLike] = []
-    warnings: list[MeridianError] = []
+    warnings: list[ErrorModel] = []
     relay_source: Literal["available", "not_requested"] = "available" if topology.relays else "not_requested"
     sources = FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays=relay_source)
 

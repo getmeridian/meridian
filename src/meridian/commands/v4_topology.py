@@ -10,7 +10,7 @@ from meridian.commands._helpers import require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
-from meridian.core.models import MeridianError, OutputStatus, Summary
+from meridian.core.models import ErrorModel, OutputStatus, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.plan import CompiledPlanDriftResult, CompiledPlanResourceResult, CompiledPlanResult
 from meridian.renderers import emit_json
@@ -33,7 +33,7 @@ def run_v4_apply(
     review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent))
     if not yes:
         if json_output:
-            error = MeridianError(
+            error = ErrorModel(
                 code="MERIDIAN_CONFIRMATION_REQUIRED",
                 category="user",
                 message="Apply requires explicit confirmation",
@@ -83,9 +83,9 @@ def run_v4_apply(
         exit_code=exit_code,
         summary=summary_text,
     )
-    apply_error: MeridianError | None = None
+    apply_error: ErrorModel | None = None
     if not result.all_succeeded:
-        apply_error = MeridianError(
+        apply_error = ErrorModel(
             code="MERIDIAN_APPLY_FAILED",
             category="system",
             message=summary_text,
@@ -215,7 +215,7 @@ def run_v4_plan(
             ],
         )
         evidence_error = (
-            MeridianError(
+            ErrorModel(
                 code="MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE",
                 category="system",
                 message=summary_text,

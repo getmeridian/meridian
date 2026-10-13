@@ -5,7 +5,7 @@ from __future__ import annotations
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import LOCAL_STATE_SAVE_ERRORS
 from meridian.console import fail
-from meridian.core.models import MeridianError
+from meridian.core.models import ErrorModel
 from meridian.core.redaction import redact_string
 
 
@@ -24,7 +24,7 @@ def build_client_persistence_warning(
     reason: str,
     client: str = "",
     remote_state_changed: bool = True,
-) -> MeridianError:
+) -> ErrorModel:
     """Build the typed partial warning shared by client mutation commands."""
     target = f" '{client}'" if client else ""
     details: dict[str, object] = {"remote_state_changed": remote_state_changed}
@@ -44,7 +44,7 @@ def build_client_persistence_warning(
             f"evidence: {reason}"
         )
         hint = "Repair cluster.yml persistence, then rerun the command to record the observed evidence."
-    return MeridianError(
+    return ErrorModel(
         code="MERIDIAN_CLIENT_LOCAL_STATE_SAVE_FAILED",
         category="system",
         message=message,

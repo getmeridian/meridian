@@ -7,50 +7,7 @@
       "title": "EmptyData",
       "type": "object"
     },
-    "FleetTestResult": {
-      "additionalProperties": false,
-      "description": "One `meridian test` run over every public entry server, with a fail-closed aggregate.",
-      "properties": {
-        "counts": {
-          "$ref": "#/$defs/VerificationCounts"
-        },
-        "exit_code": {
-          "enum": [
-            0,
-            3,
-            4
-          ],
-          "title": "Exit Code",
-          "type": "integer"
-        },
-        "results": {
-          "items": {
-            "$ref": "#/$defs/TestResult"
-          },
-          "minItems": 2,
-          "title": "Results",
-          "type": "array"
-        },
-        "verdict": {
-          "enum": [
-            "passed",
-            "findings",
-            "inconclusive"
-          ],
-          "title": "Verdict",
-          "type": "string"
-        }
-      },
-      "required": [
-        "results",
-        "verdict",
-        "exit_code",
-        "counts"
-      ],
-      "title": "FleetTestResult",
-      "type": "object"
-    },
-    "MeridianError": {
+    "ErrorModel": {
       "additionalProperties": false,
       "description": "Structured error safe for JSON/API clients.",
       "properties": {
@@ -104,6 +61,49 @@
         "message"
       ],
       "title": "MeridianError",
+      "type": "object"
+    },
+    "FleetTestResult": {
+      "additionalProperties": false,
+      "description": "One `meridian test` run over every public entry server, with a fail-closed aggregate.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/VerificationCounts"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            3,
+            4
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/TestResult"
+          },
+          "minItems": 2,
+          "title": "Results",
+          "type": "array"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "findings",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "results",
+        "verdict",
+        "exit_code",
+        "counts"
+      ],
+      "title": "FleetTestResult",
       "type": "object"
     },
     "Summary": {
@@ -472,7 +472,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "maxItems": 0,
           "title": "Errors",
@@ -509,7 +509,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"
@@ -560,7 +560,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "minItems": 1,
           "title": "Errors",
@@ -597,7 +597,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"

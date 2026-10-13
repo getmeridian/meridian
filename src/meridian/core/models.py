@@ -29,8 +29,11 @@ class Summary(CoreModel):
     counts: dict[str, int] = Field(default_factory=dict)
 
 
-class MeridianError(CoreModel):
+class ErrorModel(CoreModel):
     """Structured error safe for JSON/API clients."""
+
+    # The exception is core.errors.MeridianError; published contracts keep this schema's MeridianError title.
+    model_config = ConfigDict(title="MeridianError")
 
     code: str
     category: ErrorCategory
@@ -55,8 +58,8 @@ class OutputEnvelope(CoreModel):
     exit_code: int
     summary: Summary
     data: dict[str, Any] = Field(default_factory=dict)
-    warnings: list[MeridianError] = Field(default_factory=list)
-    errors: list[MeridianError] = Field(default_factory=list)
+    warnings: list[ErrorModel] = Field(default_factory=list)
+    errors: list[ErrorModel] = Field(default_factory=list)
 
 
 class ResourceRef(CoreModel):

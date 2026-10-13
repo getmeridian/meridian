@@ -19,7 +19,7 @@ from meridian.commands._helpers import format_traffic, load_topology_cluster, ma
 from meridian.console import err_console, error_context, fail, is_json_mode, warn
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import FleetStatus, TopologyRelay
-from meridian.core.models import MeridianError, Summary
+from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.services.fleet import collect_fleet_inventory, collect_fleet_status
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError
@@ -62,7 +62,7 @@ def _classify_panel_error(exc: Exception) -> Literal["auth", "system", "bug"]:
     return "bug"
 
 
-def _render_warnings(warnings: list[MeridianError]) -> None:
+def _render_warnings(warnings: list[ErrorModel]) -> None:
     """Render non-fatal service warnings in human mode."""
     if is_json_mode():
         return
@@ -70,7 +70,7 @@ def _render_warnings(warnings: list[MeridianError]) -> None:
         warn(warning.message)
 
 
-def _panel_version_warnings(cluster: ClusterConfig) -> list[MeridianError]:
+def _panel_version_warnings(cluster: ClusterConfig) -> list[ErrorModel]:
     """Flag a live panel outside Meridian's supported Remnawave range."""
     try:
         with make_panel(cluster) as panel:
@@ -84,8 +84,8 @@ def _panel_version_warnings(cluster: ClusterConfig) -> list[MeridianError]:
     return [_version_warning(message, "")] if message else []
 
 
-def _version_warning(message: str, hint: str) -> MeridianError:
-    return MeridianError(code="MERIDIAN_PANEL_VERSION", category="user", message=message, hint=hint, exit_code=0)
+def _version_warning(message: str, hint: str) -> ErrorModel:
+    return ErrorModel(code="MERIDIAN_PANEL_VERSION", category="user", message=message, hint=hint, exit_code=0)
 
 
 # -- Fleet Inventory --

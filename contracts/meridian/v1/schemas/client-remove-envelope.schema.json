@@ -36,7 +36,7 @@
       "title": "EmptyData",
       "type": "object"
     },
-    "MeridianError": {
+    "ErrorModel": {
       "additionalProperties": false,
       "description": "Structured error safe for JSON/API clients.",
       "properties": {
@@ -136,7 +136,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "maxItems": 0,
           "title": "Errors",
@@ -173,7 +173,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"
@@ -213,7 +213,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "minItems": 1,
           "title": "Errors",
@@ -250,7 +250,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"

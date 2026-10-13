@@ -12,8 +12,7 @@ from meridian.commands.check_render import emit_verification_json, render_verifi
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.connectivity import collect_connectivity_checks
 from meridian.console import err_console, error_context, fail, is_json_mode
-from meridian.core.errors import LocalStateError
-from meridian.core.errors import MeridianError as MeridianException
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
 from meridian.core.verification import (
@@ -69,7 +68,7 @@ def run(
                     basic=basic,
                     timeout=timeout,
                 )
-        except MeridianException as exc:
+        except MeridianError as exc:
             fail(exc)
         except OSError as exc:
             fail(

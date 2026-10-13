@@ -7,6 +7,62 @@
       "title": "EmptyData",
       "type": "object"
     },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
     "FleetStatusNode": {
       "additionalProperties": false,
       "properties": {
@@ -64,62 +120,6 @@
         "traffic_bytes"
       ],
       "title": "FleetStatusNode",
-      "type": "object"
-    },
-    "MeridianError": {
-      "additionalProperties": false,
-      "description": "Structured error safe for JSON/API clients.",
-      "properties": {
-        "category": {
-          "enum": [
-            "user",
-            "system",
-            "bug",
-            "cancelled"
-          ],
-          "title": "Category",
-          "type": "string"
-        },
-        "cause": {
-          "additionalProperties": true,
-          "title": "Cause",
-          "type": "object"
-        },
-        "code": {
-          "title": "Code",
-          "type": "string"
-        },
-        "details": {
-          "additionalProperties": true,
-          "title": "Details",
-          "type": "object"
-        },
-        "exit_code": {
-          "default": 1,
-          "title": "Exit Code",
-          "type": "integer"
-        },
-        "hint": {
-          "default": "",
-          "title": "Hint",
-          "type": "string"
-        },
-        "message": {
-          "title": "Message",
-          "type": "string"
-        },
-        "retryable": {
-          "default": false,
-          "title": "Retryable",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "code",
-        "category",
-        "message"
-      ],
-      "title": "MeridianError",
       "type": "object"
     },
     "NodeListResult": {
@@ -181,7 +181,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "maxItems": 0,
           "title": "Errors",
@@ -218,7 +218,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"
@@ -258,7 +258,7 @@
         },
         "errors": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "minItems": 1,
           "title": "Errors",
@@ -295,7 +295,7 @@
         },
         "warnings": {
           "items": {
-            "$ref": "#/$defs/MeridianError"
+            "$ref": "#/$defs/ErrorModel"
           },
           "title": "Warnings",
           "type": "array"
