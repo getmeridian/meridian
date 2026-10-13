@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Literal, Protocol, Self
 
 from meridian.core.fleet import (
@@ -78,6 +79,88 @@ def _handle_error(exc: Exception, classify_error: PanelErrorClassifier) -> None:
         raise exc
 
 
+@dataclass
+class _PanelObservation:
+    """Live panel data gathered for one fleet read, plus partial-failure warnings."""
+
+    sources: FleetSources
+    healthy: bool = False
+    nodes: list[ApiNodeLike] = field(default_factory=list)
+    users: list[ApiUserLike] = field(default_factory=list)
+    warnings: list[ErrorModel] = field(default_factory=list)
+
+
+def _observe_panel(
+    panel_client: FleetPanelClient,
+    classify_error: PanelErrorClassifier,
+    *,
+    sources: FleetSources,
+    unreachable: str,
+    access_users: list[str] | None = None,
+    with_users: bool,
+) -> _PanelObservation:
+    """Ping the panel and list nodes (and users); auth and bug errors propagate."""
+    observed = _PanelObservation(sources=sources)
+    unavailable = {"panel": "unavailable", "nodes": "unavailable"} | ({"users": "unavailable"} if with_users else {})
+
+    def unreachable_warning(details: dict[str, object] | None = None) -> ErrorModel:
+        return _system_warning(
+            "MERIDIAN_PANEL_UNREACHABLE",
+            unreachable,
+            hint="Verify panel connectivity from the caller environment.",
+            details=details,
+        )
+
+    try:
+        with panel_client as panel:
+            observed.healthy = panel.ping()
+            if not observed.healthy:
+                observed.warnings.append(unreachable_warning())
+                observed.sources = observed.sources.model_copy(update=unavailable)
+                return observed
+            observed.sources = observed.sources.model_copy(update={"panel": "available"})
+            try:
+                observed.nodes = list(panel.list_nodes())
+                observed.sources = observed.sources.model_copy(update={"nodes": "available"})
+            except Exception as exc:  # Protocol adapter — concrete exception type unknown
+                _handle_error(exc, classify_error)
+                observed.sources = observed.sources.model_copy(update={"nodes": "unavailable"})
+                observed.warnings.append(
+                    _system_warning(
+                        "MERIDIAN_PANEL_NODES_UNAVAILABLE",
+                        "Could not fetch node status from panel",
+                        hint="Panel is reachable, but the node list API failed.",
+                        details={"cause": type(exc).__name__},
+                    )
+                )
+            if not with_users:
+                return observed
+            try:
+                users = panel.list_users()
+                if access_users is not None:
+                    allowed_users = set(access_users)
+                    users = [user for user in users if user.username in allowed_users]
+                observed.users = list(users)
+                observed.sources = observed.sources.model_copy(update={"users": "available"})
+            except Exception as exc:  # Protocol adapter — concrete exception type unknown
+                _handle_error(exc, classify_error)
+                observed.sources = observed.sources.model_copy(update={"users": "unavailable"})
+                observed.warnings.append(
+                    _system_warning(
+                        "MERIDIAN_PANEL_USERS_UNAVAILABLE",
+                        "Could not fetch user status from panel",
+                        hint="Panel is reachable, but the user list API failed.",
+                        details={"cause": type(exc).__name__},
+                    )
+                )
+    except Exception as exc:  # Protocol adapter — concrete exception type unknown
+        _handle_error(exc, classify_error)
+        observed.healthy = False
+        observed.sources = observed.sources.model_copy(update=unavailable)
+        observed.warnings.append(unreachable_warning({"cause": type(exc).__name__}))
+    return observed
+
+
 def collect_fleet_inventory(
     topology: FleetTopology,
     panel_client: FleetPanelClient,
@@ -85,55 +168,18 @@ def collect_fleet_inventory(
     classify_error: PanelErrorClassifier,
 ) -> FleetInventoryServiceResult:
     """Collect redacted fleet inventory with live panel node observations."""
-    panel_ok = False
-    api_nodes: Sequence[ApiNodeLike] = []
-    warnings: list[ErrorModel] = []
-    sources = FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays="not_requested")
-
-    try:
-        with panel_client as panel:
-            panel_ok = panel.ping()
-            sources = sources.model_copy(update={"panel": "available" if panel_ok else "unavailable"})
-            if not panel_ok:
-                warnings.append(
-                    _system_warning(
-                        "MERIDIAN_PANEL_UNREACHABLE",
-                        "Cannot reach panel API; live inventory status is unavailable",
-                        hint="Verify panel connectivity from the caller environment.",
-                    )
-                )
-                sources = sources.model_copy(update={"nodes": "unavailable"})
-            else:
-                try:
-                    api_nodes = panel.list_nodes()
-                    sources = sources.model_copy(update={"nodes": "available"})
-                except Exception as exc:  # Protocol adapter — concrete exception type unknown
-                    _handle_error(exc, classify_error)
-                    sources = sources.model_copy(update={"nodes": "unavailable"})
-                    warnings.append(
-                        _system_warning(
-                            "MERIDIAN_PANEL_NODES_UNAVAILABLE",
-                            "Could not fetch node status from panel",
-                            hint="Panel is reachable, but the node list API failed.",
-                            details={"cause": type(exc).__name__},
-                        )
-                    )
-    except Exception as exc:  # Protocol adapter — concrete exception type unknown
-        _handle_error(exc, classify_error)
-        panel_ok = False
-        sources = sources.model_copy(update={"panel": "unavailable", "nodes": "unavailable"})
-        warnings.append(
-            _system_warning(
-                "MERIDIAN_PANEL_UNREACHABLE",
-                "Cannot reach panel API; live inventory status is unavailable",
-                hint="Verify panel connectivity from the caller environment.",
-                details={"cause": type(exc).__name__},
-            )
-        )
-
+    panel = _observe_panel(
+        panel_client,
+        classify_error,
+        sources=FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays="not_requested"),
+        unreachable="Cannot reach panel API; live inventory status is unavailable",
+        with_users=False,
+    )
     return FleetInventoryServiceResult(
-        inventory=build_fleet_inventory(topology, panel_healthy=panel_ok, api_nodes=api_nodes, sources=sources),
-        warnings=warnings,
+        inventory=build_fleet_inventory(
+            topology, panel_healthy=panel.healthy, api_nodes=panel.nodes, sources=panel.sources
+        ),
+        warnings=panel.warnings,
     )
 
 
@@ -145,70 +191,17 @@ def collect_fleet_status(
     classify_error: PanelErrorClassifier,
 ) -> FleetStatusServiceResult:
     """Collect fleet health overview with partial-failure warnings."""
-    panel_ok = False
-    api_nodes: Sequence[ApiNodeLike] = []
-    api_users: Sequence[ApiUserLike] = []
-    warnings: list[ErrorModel] = []
     relay_source: Literal["available", "not_requested"] = "available" if topology.relays else "not_requested"
-    sources = FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays=relay_source)
-
-    try:
-        with panel_client as panel:
-            panel_ok = panel.ping()
-            sources = sources.model_copy(update={"panel": "available" if panel_ok else "unavailable"})
-            if not panel_ok:
-                warnings.append(
-                    _system_warning(
-                        "MERIDIAN_PANEL_UNREACHABLE",
-                        "Cannot reach panel API -- node and user data may be stale",
-                        hint="Verify panel connectivity from the caller environment.",
-                    )
-                )
-                sources = sources.model_copy(update={"nodes": "unavailable", "users": "unavailable"})
-            else:
-                try:
-                    api_nodes = panel.list_nodes()
-                    sources = sources.model_copy(update={"nodes": "available"})
-                except Exception as exc:  # Protocol adapter — concrete exception type unknown
-                    _handle_error(exc, classify_error)
-                    sources = sources.model_copy(update={"nodes": "unavailable"})
-                    warnings.append(
-                        _system_warning(
-                            "MERIDIAN_PANEL_NODES_UNAVAILABLE",
-                            "Could not fetch node status from panel",
-                            hint="Panel is reachable, but the node list API failed.",
-                            details={"cause": type(exc).__name__},
-                        )
-                    )
-                try:
-                    api_users = panel.list_users()
-                    if topology.access_users is not None:
-                        allowed_users = set(topology.access_users)
-                        api_users = [user for user in api_users if user.username in allowed_users]
-                    sources = sources.model_copy(update={"users": "available"})
-                except Exception as exc:  # Protocol adapter — concrete exception type unknown
-                    _handle_error(exc, classify_error)
-                    sources = sources.model_copy(update={"users": "unavailable"})
-                    warnings.append(
-                        _system_warning(
-                            "MERIDIAN_PANEL_USERS_UNAVAILABLE",
-                            "Could not fetch user status from panel",
-                            hint="Panel is reachable, but the user list API failed.",
-                            details={"cause": type(exc).__name__},
-                        )
-                    )
-    except Exception as exc:  # Protocol adapter — concrete exception type unknown
-        _handle_error(exc, classify_error)
-        panel_ok = False
-        sources = sources.model_copy(update={"panel": "unavailable", "nodes": "unavailable", "users": "unavailable"})
-        warnings.append(
-            _system_warning(
-                "MERIDIAN_PANEL_UNREACHABLE",
-                "Cannot reach panel API -- node and user data may be stale",
-                hint="Verify panel connectivity from the caller environment.",
-                details={"cause": type(exc).__name__},
-            )
-        )
+    panel = _observe_panel(
+        panel_client,
+        classify_error,
+        sources=FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays=relay_source),
+        unreachable="Cannot reach panel API -- node and user data may be stale",
+        access_users=topology.access_users,
+        with_users=True,
+    )
+    sources = panel.sources
+    warnings = panel.warnings
 
     try:
         relay_health = check_relays(topology.relays)
@@ -226,9 +219,9 @@ def collect_fleet_status(
     return FleetStatusServiceResult(
         status=build_fleet_status(
             topology,
-            panel_healthy=panel_ok,
-            api_nodes=api_nodes,
-            api_users=api_users,
+            panel_healthy=panel.healthy,
+            api_nodes=panel.nodes,
+            api_users=panel.users,
             relay_health=relay_health,
             sources=sources,
         ),
