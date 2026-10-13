@@ -9,7 +9,7 @@ from typing import Any
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import NodeRuntimePayload
 from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
-from meridian.node_deploy import LEGACY_NODE_API_RULE_COMMENT, NODE_API_RULE_COMMENT
+from meridian.node_deploy import delete_node_api_rules
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_firewall_marker,
@@ -147,15 +147,5 @@ class NodeRuntimeRetirement:
         if result.returncode != 0:
             detail = (result.stderr or result.stdout).strip()[:200]
             raise ResourceReconcileError(f"Could not remove the Remnawave node runtime: {detail}")
-        comments = " ".join(
-            f"-e {shlex.quote('# ' + comment)}" for comment in (NODE_API_RULE_COMMENT, LEGACY_NODE_API_RULE_COMMENT)
-        )
-        rules = conn.run(
-            f"ufw status numbered 2>/dev/null | grep -F {comments}"
-            r" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*/\1/p'"
-            ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null || exit 1; done',
-            timeout=30,
-        )
-        if rules.returncode != 0:
-            detail = (rules.stderr or rules.stdout).strip()[:200]
-            raise ResourceReconcileError(f"Could not remove the node API firewall rule: {detail}")
+        if not delete_node_api_rules(conn):
+            raise ResourceReconcileError("Could not remove the node API firewall rule.")

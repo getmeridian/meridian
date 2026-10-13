@@ -130,6 +130,10 @@ class TestDeployNodeContainerHappyPath:
         ufw_cmds = [c for c in commands if "ufw allow" in c and str(_NODE_API_PORT) in c]
         assert len(ufw_cmds) == 1
         assert "172.16.0.0/12" in ufw_cmds[0]
+        assert "comment fw-node-api" in ufw_cmds[0] and "Meridian" not in ufw_cmds[0]
+        # UFW keeps an identical rule's old comment, so the pre-rename rule is deleted first.
+        legacy = next(i for i, c in enumerate(commands) if "# Meridian node API (Docker internal)" in c)
+        assert legacy < commands.index(ufw_cmds[0])
 
     @patch("meridian.health.time.sleep")
     def test_no_warnings_on_happy_path(self, mock_time: MagicMock, caplog: pytest.LogCaptureFixture) -> None:

@@ -23,6 +23,19 @@ NODE_API_RULE_COMMENT = "fw-node-api"
 LEGACY_NODE_API_RULE_COMMENT = "Meridian node API (Docker internal)"
 
 
+def delete_node_api_rules(conn: ServerConnection, *, legacy_only: bool = False) -> bool:
+    """Delete the Docker-internal node API UFW rules (highest number first); True on success."""
+    comments = (LEGACY_NODE_API_RULE_COMMENT,) if legacy_only else (NODE_API_RULE_COMMENT, LEGACY_NODE_API_RULE_COMMENT)
+    patterns = " ".join(f"-e {shlex.quote('# ' + comment)}" for comment in comments)
+    result = conn.run(
+        f"ufw status numbered 2>/dev/null | grep -F {patterns}"
+        r" | sed -n 's/^\[ *\([0-9][0-9]*\)\].*/\1/p'"
+        ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null || exit 1; done',
+        timeout=30,
+    )
+    return result.returncode == 0
+
+
 # Panel API utilities
 def panel_base_url(ip: str, domain: str, secret_path: str) -> str:
     """Build the panel base URL for API calls.
@@ -236,6 +249,8 @@ def deploy_node_container(
     deploy_reached_containers = deploy_result.changed or "healthy" in deploy_result.detail
     if deploy_reached_containers:
         q_port = shlex.quote(str(effective_port))
+        # UFW keeps an identical rule's old comment, so drop the pre-rename one first.
+        delete_node_api_rules(conn, legacy_only=True)
         conn.run(
             f"ufw allow from 172.16.0.0/12 to any port {q_port} proto tcp"
             f" comment {shlex.quote(NODE_API_RULE_COMMENT)} 2>/dev/null; true",
