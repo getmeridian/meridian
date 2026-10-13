@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import pytest
 
 from meridian.provision import (
-    build_node_steps,
     build_server_baseline_checks,
     build_server_baseline_steps,
     build_setup_steps,
@@ -27,7 +24,6 @@ from meridian.provision.steps import ProvisionContext
                 "Enable automatic security updates",
                 "Set timezone to UTC",
                 "Enable BBR congestion control",
-                "Ensure port 443",
             ],
         ),
         (
@@ -70,34 +66,21 @@ def test_server_baseline_appends_docker_only_when_requested() -> None:
 def test_declarative_baseline_leaves_public_ports_to_compiled_firewall_resources() -> None:
     ctx = ProvisionContext(ip="198.51.100.1", harden=True)
 
-    steps = build_server_baseline_steps(
-        ctx,
-        install_docker=False,
-        manage_public_ports=False,
-    )
+    steps = build_server_baseline_steps(ctx, install_docker=False)
     firewall = next(step for step in steps if step.name == "Configure firewall")
-    checks = build_server_baseline_checks(
-        ctx,
-        install_docker=False,
-        manage_public_ports=False,
-    )
+    checks = build_server_baseline_checks(ctx, install_docker=False)
 
     assert firewall.provides == frozenset({Resource.FIREWALL_CONFIGURED})
-    assert firewall.manage_public_ports is False
     assert "https_firewall" not in {check.name for check in checks}
     assert "hysteria_firewall" not in {check.name for check in checks}
 
 
 @pytest.mark.parametrize("harden", [False, True])
-@pytest.mark.parametrize("builder", [build_setup_steps, build_node_steps])
-def test_deploy_recipes_keep_baseline_as_their_prefix(
-    harden: bool,
-    builder: Callable[[ProvisionContext], list[Operation]],
-) -> None:
+def test_setup_recipe_keeps_baseline_as_its_prefix(harden: bool) -> None:
     ctx = ProvisionContext(ip="198.51.100.1", harden=harden)
-    baseline = build_server_baseline_steps(ctx, install_docker=True, manage_public_ports=False)
+    baseline = build_server_baseline_steps(ctx, install_docker=True)
 
-    steps = builder(ctx)
+    steps = build_setup_steps(ctx)
 
     assert [step.name for step in steps[: len(baseline)]] == [step.name for step in baseline]
 
@@ -112,7 +95,7 @@ def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) 
     check = next(
         check
         for check in build_server_baseline_checks(
-            ProvisionContext(ip="198.51.100.1", harden=False), install_docker=True, manage_public_ports=False
+            ProvisionContext(ip="198.51.100.1", harden=False), install_docker=True
         )
         if check.name == "docker"
     )
@@ -128,19 +111,6 @@ def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) 
     assert "not found" not in result.stderr
 
 
-def test_control_plane_bootstrap_leaves_public_ports_to_the_reviewed_plan() -> None:
-    from meridian.provision import build_setup_steps
-    from meridian.provision.common import ConfigureFirewall, EnsurePort443
-
-    for harden in (False, True):
-        ctx = ProvisionContext(ip="198.51.100.1", hysteria2=True, is_panel_host=True, harden=harden)
-        steps = [operation.step for operation in build_setup_steps(ctx)]
-
-        firewalls = [step for step in steps if isinstance(step, ConfigureFirewall)]
-        assert len(firewalls) == int(harden) and not any(step.manage_public_ports for step in firewalls)
-        assert not any(isinstance(step, EnsurePort443) for step in steps)
-
-
 def test_firewall_check_reports_missing_ufw_as_drift_in_a_real_shell(tmp_path) -> None:
     # Stock Debian ships without ufw; the baseline installs it, so absence is drift.
     import subprocess
@@ -150,7 +120,7 @@ def test_firewall_check_reports_missing_ufw_as_drift_in_a_real_shell(tmp_path) -
     check = next(
         check
         for check in build_server_baseline_checks(
-            ProvisionContext(ip="198.51.100.1", harden=True), install_docker=False, manage_public_ports=False
+            ProvisionContext(ip="198.51.100.1", harden=True), install_docker=False
         )
         if check.name == "firewall"
     )

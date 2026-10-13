@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from meridian.provision import build_node_steps, build_setup_steps
+from meridian.provision import build_setup_steps
 from meridian.provision.recipe import Operation, Recipe, RecipeValidationError, Resource, op
 from meridian.provision.steps import ProvisionContext, StepResult
 
@@ -70,12 +70,3 @@ def test_setup_pipeline_steps_are_operations_with_resources() -> None:
     assert Resource.DOCKER_INSTALLED in by_name["Deploy Remnawave panel"].requires
     assert Resource.NGINX_INSTALLED in by_name["Configure nginx"].requires
     assert Resource.TLS_CERTIFICATE in by_name["Deploy PWA assets"].requires
-
-
-def test_node_pipeline_keeps_panel_out_of_graph() -> None:
-    ctx = ProvisionContext(ip="198.51.100.1", hosted_page=True)
-    steps = build_node_steps(ctx)
-
-    names = [step.name for step in steps]
-    assert "Deploy Remnawave panel" not in names
-    assert "Install nginx" in names

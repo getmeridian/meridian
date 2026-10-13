@@ -697,7 +697,6 @@ def _bootstrap_control_plane(
         domain=payload.public_hostname,
         sni=reality_sni,
         harden=_plan_harden(plan, payload.server_ref),
-        is_panel_host=True,
         secret_path=secret_path,
         xhttp_port=ports["xhttp"],
         reality_port=ports["reality"],

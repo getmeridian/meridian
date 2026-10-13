@@ -17,7 +17,6 @@ from meridian.provision.common import (
     ConfigureFail2ban,
     ConfigureFirewall,
     EnableAutoUpgrades,
-    EnsurePort443,
     HardenSSH,
     InstallPackages,
     SetTimezone,
@@ -29,10 +28,6 @@ from meridian.provision.steps import ProvisionContext
 
 def _harden(ctx: ProvisionContext) -> bool:
     return ctx.harden
-
-
-def _not_harden(ctx: ProvisionContext) -> bool:
-    return not ctx.harden
 
 
 @dataclass(frozen=True)
@@ -47,7 +42,6 @@ def build_server_baseline_steps(
     ctx: ProvisionContext,
     *,
     install_docker: bool,
-    manage_public_ports: bool = True,
 ) -> list[Operation]:
     """Build the shared OS baseline, optionally including Docker."""
     extra_packages = FAIL2BAN_PACKAGES if ctx.harden else []
@@ -68,25 +62,14 @@ def build_server_baseline_steps(
             when=_harden,
         ),
         op(ConfigureBBR(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.BBR_ENABLED]),
+        # Public ports belong to the reviewed plan's tagged firewall rules.
         op(
-            ConfigureFirewall(manage_public_ports=manage_public_ports),
+            ConfigureFirewall(),
             requires=[Resource.SYSTEM_PACKAGES],
-            provides=[
-                Resource.FIREWALL_CONFIGURED,
-                *([Resource.HTTPS_ALLOWED] if manage_public_ports else []),
-            ],
+            provides=[Resource.FIREWALL_CONFIGURED],
             when=_harden,
         ),
     ]
-    if manage_public_ports:
-        operations.append(
-            op(
-                EnsurePort443(),
-                requires=[Resource.SYSTEM_PACKAGES],
-                provides=[Resource.HTTPS_ALLOWED],
-                when=_not_harden,
-            )
-        )
     if install_docker:
         operations.append(
             op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED])
@@ -99,7 +82,6 @@ def build_server_baseline_checks(
     ctx: ProvisionContext,
     *,
     install_docker: bool,
-    manage_public_ports: bool = True,
 ) -> list[BaselineCheck]:
     """Build read-only checks covering every durable baseline effect."""
     packages = [*REQUIRED_PACKAGES, *(FAIL2BAN_PACKAGES if ctx.harden else [])]
@@ -156,15 +138,6 @@ def build_server_baseline_checks(
                 ),
             ]
         )
-    if manage_public_ports:
-        checks.extend(
-            [
-                BaselineCheck("https_firewall", "ufw show added 2>/dev/null | grep -Fq 'allow 443/tcp'"),
-                BaselineCheck("hysteria_firewall", "ufw show added 2>/dev/null | grep -Fq 'allow 443/udp'"),
-            ]
-        )
-        if ctx.needs_web_server:
-            checks.append(BaselineCheck("http_firewall", "ufw show added 2>/dev/null | grep -Fq 'allow 80/tcp'"))
     if install_docker:
         checks.append(
             BaselineCheck(

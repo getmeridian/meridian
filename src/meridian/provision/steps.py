@@ -46,12 +46,8 @@ class ProvisionContext:
     domain: str = ""
     sni: str = DEFAULT_SNI
     xhttp_enabled: bool = True
-    warp: bool = False  # route egress through Cloudflare WARP (SOCKS5 proxy mode)
-    hysteria2: bool = True  # UDP/443 fallback (enabled by default)
-    geo_block: bool = True  # block Russian domains/IPs at Xray routing level
     hosted_page: bool = False  # serve connection pages via HTTPS on server
     harden: bool = True  # enable SSH hardening + firewall (skip for shared servers)
-    is_panel_host: bool = True  # deploy Remnawave panel on this server
     # The reviewed Remnawave images (this CLI's pins, or newer ones `fleet upgrade` saved).
     backend_image: str = REMNAWAVE_BACKEND_IMAGE
     subscription_page_image: str = REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE

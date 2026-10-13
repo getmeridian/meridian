@@ -389,18 +389,6 @@ class TestConfigureFirewall:
         port_index = next(i for i, call in enumerate(mock_conn.calls) if "2222/tcp" in call)
         assert port_index < enable_index
 
-    def test_udp_443_stays_closed_without_hysteria2(self, mock_conn: MockConnection):
-        mock_conn.when("which ufw", rc=0)
-        mock_conn.when("ufw status", stdout="Status: inactive")
-        mock_conn.when("ufw allow", stdout="Rule added")
-        mock_conn.when("ufw delete", rc=0, stdout="Could not")
-        mock_conn.when("ufw default", rc=0)
-        mock_conn.when("ufw enable", stdout="Firewall is active")
-
-        ConfigureFirewall().run(mock_conn, ProvisionContext(ip="198.51.100.1", hysteria2=False))
-
-        assert not any("443/udp" in call for call in mock_conn.calls)
-
     def test_v4_baseline_opens_no_public_port_and_drops_the_untagged_udp_443_rule(self, mock_conn: MockConnection):
         """Earlier 4.0 betas opened an untagged 443/udp from the control-plane bootstrap."""
         mock_conn.when("which ufw", rc=0)
@@ -409,9 +397,7 @@ class TestConfigureFirewall:
         mock_conn.when("ufw allow", stdout="Skipping adding existing rule")
         mock_conn.when("ufw default", rc=0)
 
-        result = ConfigureFirewall(manage_public_ports=False).run(
-            mock_conn, ProvisionContext(ip="198.51.100.1", hysteria2=True)
-        )
+        result = ConfigureFirewall().run(mock_conn, ProvisionContext(ip="198.51.100.1", hosted_page=True))
 
         assert result.status == "changed"
         assert not any("ufw allow 443" in call or "allow 80/tcp" in call for call in mock_conn.calls)
@@ -421,6 +407,7 @@ class TestConfigureFirewall:
     def test_already_active_returns_ok(self, mock_conn: MockConnection, base_ctx):
         """When ufw is active and rules already exist, status is ok."""
         mock_conn.when("which ufw", rc=0)
+        mock_conn.when("ufw status numbered", stdout="")  # no untagged 443/udp rule to drop
         mock_conn.when("ufw status", stdout="Status: active\n22/tcp ALLOW\n443/tcp ALLOW")
         # All ufw allow commands return "Skipping" (rule exists)
         mock_conn.when("ufw allow", stdout="Skipping adding existing rule")
@@ -444,20 +431,6 @@ class TestConfigureFirewall:
         result = ConfigureFirewall().run(mock_conn, base_ctx)
 
         assert result.status == "changed"
-
-    def test_web_server_mode_allows_port_80(self, mock_conn: MockConnection, base_ctx):
-        """When hosted_page is True, port 80 is opened for ACME challenges."""
-        base_ctx.hosted_page = True
-
-        mock_conn.when("which ufw", rc=0)
-        mock_conn.when("ufw status", stdout="Status: active")
-        mock_conn.when("ufw allow", stdout="Skipping adding existing rule")
-        mock_conn.when("ufw default", rc=0)
-        mock_conn.when("ufw reload", rc=0)
-
-        ConfigureFirewall().run(mock_conn, base_ctx)
-
-        mock_conn.assert_called_with_pattern("ufw allow 80/tcp")
 
     def test_allows_detected_custom_ssh_port(self, mock_conn: MockConnection, base_ctx):
         """The firewall must follow the live sshd port instead of hardcoding 22."""

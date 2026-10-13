@@ -138,7 +138,6 @@ class ServerBaselineDriver:
         checks = build_server_baseline_checks(
             context,
             install_docker=payload.install_docker,
-            manage_public_ports=False,
         )
         outcomes = {
             check.name: assertion_matches(
@@ -180,7 +179,6 @@ class ServerBaselineDriver:
             build_server_baseline_steps(
                 context,
                 install_docker=payload.install_docker,
-                manage_public_ports=False,
             )
         ).run(
             conn,
@@ -341,7 +339,6 @@ class CertificateDriver(retirement.CertificateRetirement):
             ProvisionContext(
                 ip=self.context.address(payload.server_ref),
                 domain=payload.hostname,
-                is_panel_host=False,
             ),
         )
         if installed.status == "failed":
@@ -394,7 +391,6 @@ class CertificateDriver(retirement.CertificateRetirement):
             ProvisionContext(
                 ip=self.context.address(payload.server_ref),
                 domain=payload.hostname,
-                is_panel_host=False,
             ),
         )
         if result.status == "failed":
@@ -470,7 +466,7 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
         address = self.context.address(payload.server_ref)
         installed = InstallNginx().run(
             conn,
-            ProvisionContext(ip=address, is_panel_host=False),
+            ProvisionContext(ip=address),
         )
         if installed.status == "failed":
             raise ResourceReconcileError(f"Could not install nginx: {installed.detail}")
@@ -633,11 +629,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         if payload.warp:
             result = InstallWarp().run(
                 conn,
-                ProvisionContext(
-                    ip=self.context.address(payload.server_ref),
-                    is_panel_host=False,
-                    warp=True,
-                ),
+                ProvisionContext(ip=self.context.address(payload.server_ref)),
             )
             if result.status == "failed":
                 raise ResourceReconcileError(f"Could not configure WARP: {result.detail}")
@@ -666,5 +658,4 @@ def _baseline_context(
         ip=address,
         user=conn.user,
         harden=payload.harden,
-        is_panel_host=False,
     )

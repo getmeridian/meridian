@@ -355,46 +355,6 @@ class ConfigureBBR:
         return StepResult(name=self.name, status="changed")
 
 
-class EnsurePort443:
-    """Ensure port 443 is allowed if ufw is already active.
-
-    Used when --no-harden skips full firewall configuration. Without this,
-    a pre-existing firewall blocks the deployment silently.
-    """
-
-    name = "Ensure port 443"
-
-    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        ufw = ServerFacts(conn).ufw_state()
-        if not ufw.installed:
-            return StepResult(name=self.name, status="ok", detail="ufw not installed")
-
-        if not ufw.active:
-            return StepResult(name=self.name, status="ok", detail="ufw not active")
-
-        result = ensure_ufw_rule(conn, "allow 443/tcp")
-        if not result.ok:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to allow HTTPS: {result.detail}",
-            )
-        detail_parts = []
-        if result.changed:
-            detail_parts.append("opened 443/tcp")
-
-        if ctx.hysteria2:
-            udp_result = ensure_ufw_rule(conn, "allow 443/udp")
-            if udp_result.changed:
-                detail_parts.append("opened 443/udp (Hysteria2)")
-
-        return StepResult(
-            name=self.name,
-            status="changed" if detail_parts else "ok",
-            detail=", ".join(detail_parts) if detail_parts else "already allowed",
-        )
-
-
 # Prints and deletes (highest number first) bare `443/udp ALLOW IN Anywhere` rules
 # with no comment; tagged meridian-v4 rules and narrower operator rules stay.
 _DELETE_UNTAGGED_UDP_443 = (
@@ -408,13 +368,6 @@ class ConfigureFirewall:
     """Configure UFW firewall rules."""
 
     name = "Configure firewall"
-
-    def __init__(self, *, manage_public_ports: bool = True) -> None:
-        self._manage_public_ports = manage_public_ports
-
-    @property
-    def manage_public_ports(self) -> bool:
-        return self._manage_public_ports
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         commands: list = []
@@ -458,62 +411,16 @@ class ConfigureFirewall:
             if result.changed:
                 changed = True
 
-        if self._manage_public_ports:
-            # Legacy recipes own their standard public ports. Declarative V4
-            # baselines disable this and leave every public rule to the plan.
-            result = ensure_ufw_rule(conn, "allow 443/tcp")
-            if not result.ok:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to allow HTTPS: {result.detail}",
-                    commands=commands,
-                )
-            if result.changed:
-                changed = True
+        # Earlier 4.0 betas let the control-plane bootstrap open an untagged
+        # 443/udp rule even without Hysteria2; compiled rules always carry a
+        # meridian-v4 comment, so only the untagged one is removed.
+        stale = conn.run(_DELETE_UNTAGGED_UDP_443, timeout=30)
+        commands.append(stale)
+        if stale.returncode == 0 and stale.stdout.strip():
+            changed = True
 
-            if ctx.hysteria2:
-                result = ensure_ufw_rule(conn, "allow 443/udp")
-                if not result.ok:
-                    return StepResult(
-                        name=self.name,
-                        status="failed",
-                        detail=f"failed to allow UDP/443: {result.detail}",
-                        commands=commands,
-                    )
-                if result.changed:
-                    changed = True
-
-            # Domain mode or hosted page: allow port 80 for ACME challenges.
-            if ctx.needs_web_server:
-                result = ensure_ufw_rule(conn, "allow 80/tcp")
-                if not result.ok:
-                    return StepResult(
-                        name=self.name,
-                        status="failed",
-                        detail=f"failed to allow HTTP: {result.detail}",
-                        commands=commands,
-                    )
-                if result.changed:
-                    changed = True
-            else:
-                # Cleanup stale port 80 rule if switching from domain/hosted mode.
-                result = ensure_ufw_rule(conn, "delete allow 80/tcp 2>/dev/null")
-                if result.ok and result.result and "Could not" not in result.result.stdout and result.changed:
-                    changed = True
-
-        else:
-            # Earlier 4.0 betas let the control-plane bootstrap open an untagged
-            # 443/udp rule even without Hysteria2; compiled rules always carry a
-            # meridian-v4 comment, so only the untagged one is removed.
-            stale = conn.run(_DELETE_UNTAGGED_UDP_443, timeout=30)
-            commands.append(stale)
-            if stale.returncode == 0 and stale.stdout.strip():
-                changed = True
-
-        # Do not delete arbitrary user-managed rules. Meridian only owns the
-        # standard public ports it opens itself (22/80/443), so cleanup is
-        # limited to the stale port-80 and untagged 443/udp rules above.
+        # Do not delete arbitrary user-managed rules; the reviewed plan owns
+        # every public port through tagged rules.
 
         # Set default policies and enable
         default_incoming = conn.run("ufw default deny incoming", timeout=15)
