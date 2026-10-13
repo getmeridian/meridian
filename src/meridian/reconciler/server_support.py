@@ -3,38 +3,14 @@
 from __future__ import annotations
 
 import shlex
-from typing import TypeVar
 
 from meridian.compiler.models import (
-    CertificatePayload,
-    FirewallRulePayload,
-    NginxArtifactPayload,
-    NodeRuntimePayload,
-    RealmHopPayload,
     ResourcePlan,
-    ServerBaselinePayload,
 )
 from meridian.provision.ensure import ensure_file_content
 from meridian.provision.steps import StepResult
-from meridian.reconciler.resources import ResourceAction, ResourceReconcileError, UnknownResourceOutcome
+from meridian.reconciler.resources import ResourceAction, UnknownResourceOutcome
 from meridian.ssh import ServerConnection
-
-PayloadT = TypeVar(
-    "PayloadT",
-    FirewallRulePayload,
-    CertificatePayload,
-    NginxArtifactPayload,
-    RealmHopPayload,
-    NodeRuntimePayload,
-    ServerBaselinePayload,
-)
-
-
-def payload_of(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
-    payload = action.resource.payload
-    if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(f"Server driver received {payload.kind}, expected {expected_type.__name__}.")
-    return payload
 
 
 def runtime_pin(plan: ResourcePlan, name: str, fallback: str) -> str:

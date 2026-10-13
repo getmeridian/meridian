@@ -16,6 +16,7 @@ from meridian.reconciler.resources import (
     ResourceApplyReceipt,
     ResourceObservation,
     ResourceReconcileError,
+    payload_of,
 )
 from meridian.reconciler.server_evidence import (
     build_observation,
@@ -35,7 +36,6 @@ from meridian.reconciler.server_render import (
     unit_path,
 )
 from meridian.reconciler.server_support import (
-    payload_of,
     raise_if_step_timeout,
     raise_if_timeout,
     restore_file,

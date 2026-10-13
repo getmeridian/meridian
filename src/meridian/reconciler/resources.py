@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, get_args
+from typing import Literal, Protocol, TypeVar, get_args
 
 from pydantic import Field, model_validator
 
@@ -12,6 +12,7 @@ from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
 
 ResourceActionStatus = Literal["converged", "applied", "failed", "unknown", "skipped"]
+PayloadT = TypeVar("PayloadT")
 
 
 class ResourceReconcileError(MeridianError):
@@ -260,3 +261,11 @@ def observation_converges(action: ResourceAction, observation: ResourceObservati
         and observation.observed_hash == action.expected_hash
         and required.issubset(observation.satisfied_postconditions)
     )
+
+
+def payload_of(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
+    """The action's reviewed payload, refusing a driver/kind mismatch."""
+    payload = action.resource.payload
+    if not isinstance(payload, expected_type):
+        raise ResourceReconcileError(f"Driver received {payload.kind}, expected {expected_type.__name__}.")
+    return payload

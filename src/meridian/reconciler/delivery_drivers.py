@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-from collections.abc import Callable
 from typing import TypeVar, cast
 
 from meridian.cluster import ManagedResourceBinding
@@ -12,25 +11,22 @@ from meridian.compiler.models import (
     ExternalSquadPayload,
     SubscriptionSettingsPayload,
     SubscriptionTemplatePayload,
-    canonical_hash,
 )
 from meridian.reconciler.remnawave_drivers import RemnawaveDriverContext
 from meridian.reconciler.remnawave_retirement import ExternalSquadRetirement
+from meridian.reconciler.remnawave_support import bound_or_named_user, mutation, observed, one_or_none, resolved_ids
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
     ResourceObservation,
     ResourceReconcileError,
-    UnknownResourceOutcome,
-    postcondition_key,
+    payload_of,
 )
 from meridian.remnawave import (
     ExternalSquad,
-    RemnawaveNetworkError,
     SubscriptionTemplate,
     User,
 )
-from meridian.remnawave.models import is_user_id
 
 ValueT = TypeVar("ValueT")
 
@@ -55,11 +51,11 @@ class AccessUserDriver:
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, AccessUserPayload)
-        user = _bound_or_named_user(self.context, payload.username, binding)
+        payload = payload_of(action, AccessUserPayload)
+        user = bound_or_named_user(self.context, payload.username, binding)
         if user is None:
             return ResourceObservation(exists=False)
-        squads = _resolved_ids(self.context, [payload.squad_ref], action.generation)
+        squads = resolved_ids(self.context, [payload.squad_ref], action.generation)
         external = _optional_remote_id(
             self.context,
             payload.external_squad_ref,
@@ -72,23 +68,23 @@ class AccessUserDriver:
             and sorted(user.active_internal_squad_uuids) == sorted(squads)
             and user.external_squad_uuid == external
         )
-        return _observed(action, user.id, matches, _user_projection(user))
+        return observed(action, user.id, matches, _user_projection(user))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, AccessUserPayload)
-        squads = _resolved_ids(self.context, [payload.squad_ref], action.generation)
+        payload = payload_of(action, AccessUserPayload)
+        squads = resolved_ids(self.context, [payload.squad_ref], action.generation)
         external = _optional_remote_id(
             self.context,
             payload.external_squad_ref,
             action.generation,
         )
-        existing = _bound_or_named_user(self.context, payload.username, binding)
+        existing = bound_or_named_user(self.context, payload.username, binding)
         if existing is None:
-            user = _mutation(
+            user = mutation(
                 lambda: self.context.panel.create_access_user(
                     payload.username,
                     squad_uuids=squads,
@@ -108,7 +104,7 @@ class AccessUserDriver:
                     hint="Rename the unmanaged User or explicitly recover its Meridian binding.",
                     category="user",
                 )
-            user = _mutation(
+            user = mutation(
                 lambda: self.context.panel.update_access_user(
                     existing.id,
                     squad_uuids=squads,
@@ -121,7 +117,7 @@ class AccessUserDriver:
     def retire(self, binding: ManagedResourceBinding) -> None:
         """Delete a user removed from the access list; already gone counts as done."""
         if binding.remote_id:
-            _mutation(lambda: self.context.panel.delete_user(binding.remote_id), f"delete User {binding.logical_id}")
+            mutation(lambda: self.context.panel.delete_user(binding.remote_id), f"delete User {binding.logical_id}")
 
 
 class SubscriptionTemplateDriver:
@@ -133,22 +129,22 @@ class SubscriptionTemplateDriver:
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, SubscriptionTemplatePayload)
+        payload = payload_of(action, SubscriptionTemplatePayload)
         template = _bound_or_named_template(self.context, payload, binding)
         if template is None:
             return ResourceObservation(exists=False)
         matches = _template_matches(template, payload)
-        return _observed(action, template.uuid, matches, _template_projection(template))
+        return observed(action, template.uuid, matches, _template_projection(template))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, SubscriptionTemplatePayload)
+        payload = payload_of(action, SubscriptionTemplatePayload)
         existing = _bound_or_named_template(self.context, payload, binding)
         if existing is None:
-            existing = _mutation(
+            existing = mutation(
                 lambda: self.context.panel.create_subscription_template(
                     payload.name,
                     payload.template_type,
@@ -165,7 +161,7 @@ class SubscriptionTemplateDriver:
                 hint="Rename the unmanaged Template or explicitly recover its Meridian binding.",
                 category="user",
             )
-        updated = _mutation(
+        updated = mutation(
             lambda: self.context.panel.update_subscription_template(
                 existing.uuid,
                 name=payload.name,
@@ -186,24 +182,24 @@ class ExternalSquadDriver(ExternalSquadRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, ExternalSquadPayload)
+        payload = payload_of(action, ExternalSquadPayload)
         squad = _bound_or_named_external_squad(self.context, payload, binding)
         if squad is None:
             return ResourceObservation(exists=False)
         templates = _resolved_templates(self.context, payload, action.generation)
         matches = squad.name == payload.name and _normalize_templates(squad.templates) == templates
-        return _observed(action, squad.uuid, matches, _external_squad_projection(squad))
+        return observed(action, squad.uuid, matches, _external_squad_projection(squad))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, ExternalSquadPayload)
+        payload = payload_of(action, ExternalSquadPayload)
         templates = _resolved_templates(self.context, payload, action.generation)
         existing = _bound_or_named_external_squad(self.context, payload, binding)
         if existing is None:
-            existing = _mutation(
+            existing = mutation(
                 lambda: self.context.panel.create_external_squad(
                     payload.name,
                 ),
@@ -221,7 +217,7 @@ class ExternalSquadDriver(ExternalSquadRetirement):
                     hint="Rename the unmanaged Squad or explicitly recover its Meridian binding.",
                     category="user",
                 )
-        squad = _mutation(
+        squad = mutation(
             lambda: self.context.panel.update_external_squad(
                 existing.uuid,
                 name=payload.name,
@@ -241,12 +237,12 @@ class SubscriptionSettingsDriver:
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, SubscriptionSettingsPayload)
+        payload = payload_of(action, SubscriptionSettingsPayload)
         settings = self.context.panel.get_subscription_settings()
         matches = (
             settings.profile_title == payload.profile_title and settings.randomize_hosts == payload.randomize_hosts
         )
-        return _observed(
+        return observed(
             action,
             settings.uuid,
             matches,
@@ -261,9 +257,9 @@ class SubscriptionSettingsDriver:
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, SubscriptionSettingsPayload)
+        payload = payload_of(action, SubscriptionSettingsPayload)
         settings = self.context.panel.get_subscription_settings()
-        updated = _mutation(
+        updated = mutation(
             lambda: self.context.panel.update_subscription_settings(
                 settings.uuid,
                 profile_title=payload.profile_title,
@@ -275,27 +271,6 @@ class SubscriptionSettingsDriver:
             "update managed subscription title",
         )
         return ResourceApplyReceipt(remote_id=updated.uuid)
-
-
-def _payload(
-    action: ResourceAction,
-    expected_type: type[ValueT],
-) -> ValueT:
-    payload = action.resource.payload
-    if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(f"Delivery driver received {payload.kind}, expected {expected_type.__name__}.")
-    return cast(ValueT, payload)
-
-
-def _resolved_ids(
-    context: RemnawaveDriverContext,
-    logical_ids: list[str],
-    generation: int,
-) -> list[str]:
-    remote_ids = [context.remote_id(logical_id, generation) for logical_id in logical_ids]
-    if any(not remote_id for remote_id in remote_ids):
-        raise ResourceReconcileError(f"Remote identities are incomplete for {', '.join(logical_ids)}.")
-    return remote_ids
 
 
 def _optional_remote_id(
@@ -343,17 +318,6 @@ def _plan_payload(
     return cast(ValueT, payload)
 
 
-def _bound_or_named_user(
-    context: RemnawaveDriverContext,
-    username: str,
-    binding: ManagedResourceBinding | None,
-) -> User | None:
-    if binding is not None and is_user_id(binding.remote_id):
-        return context.panel.get_user_by_id(binding.remote_id)
-    # Pre-3.x bindings hold the removed user uuid; re-resolve by username.
-    return context.panel.get_user(username)
-
-
 def _bound_or_named_template(
     context: RemnawaveDriverContext,
     payload: SubscriptionTemplatePayload,
@@ -362,7 +326,7 @@ def _bound_or_named_template(
     if binding is not None and binding.remote_id:
         return context.panel.get_subscription_template(binding.remote_id)
     matches = [template for template in context.panel.list_subscription_templates() if template.name == payload.name]
-    listed = _one_or_none(matches, f"Templates named {payload.name!r}")
+    listed = one_or_none(matches, f"Templates named {payload.name!r}")
     # The list omits template content, so compare against the full record.
     return context.panel.get_subscription_template(listed.uuid) if listed is not None else None
 
@@ -375,7 +339,7 @@ def _bound_or_named_external_squad(
     if binding is not None and binding.remote_id:
         return context.panel.get_external_squad(binding.remote_id)
     matches = [squad for squad in context.panel.list_external_squads() if squad.name == payload.name]
-    return _one_or_none(matches, f"External Squads named {payload.name!r}")
+    return one_or_none(matches, f"External Squads named {payload.name!r}")
 
 
 def _template_matches(
@@ -416,25 +380,6 @@ def _action_was_attempted(
     return checkpoint is not None and checkpoint.attempts > 0
 
 
-def _observed(
-    action: ResourceAction,
-    remote_id: str,
-    matches: bool,
-    projection: object,
-) -> ResourceObservation:
-    satisfied = sorted(
-        postcondition_key(condition.kind, condition.target_ref, condition.detail)
-        for condition in action.resource.postconditions
-        if condition.kind == "exists"
-    )
-    return ResourceObservation(
-        exists=True,
-        observed_hash=action.expected_hash if matches else canonical_hash(projection),
-        remote_id=remote_id,
-        satisfied_postconditions=satisfied,
-    )
-
-
 def _user_projection(user: User) -> dict[str, object]:
     return {
         "username": user.username,
@@ -464,16 +409,3 @@ def _external_squad_projection(squad: ExternalSquad) -> dict[str, object]:
         "name": squad.name,
         "templates": _normalize_templates(squad.templates),
     }
-
-
-def _one_or_none(values: list[ValueT], description: str) -> ValueT | None:
-    if len(values) > 1:
-        raise ResourceReconcileError(f"Remnawave contains duplicate {description}.")
-    return values[0] if values else None
-
-
-def _mutation(call: Callable[[], ValueT], description: str) -> ValueT:
-    try:
-        return call()
-    except RemnawaveNetworkError as exc:
-        raise UnknownResourceOutcome(f"Remnawave may have completed {description}; observation is required.") from exc

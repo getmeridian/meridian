@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, TypeVar, cast
 
@@ -19,7 +19,6 @@ from meridian.compiler.models import (
     RouteRulePayload,
     RoutingGatewayPayload,
     ServiceUserPayload,
-    canonical_hash,
 )
 from meridian.reconciler import remnawave_retirement as retirement
 from meridian.reconciler.remnawave_projections import (
@@ -30,14 +29,14 @@ from meridian.reconciler.remnawave_projections import (
     profile_projection,
     squad_projection,
 )
+from meridian.reconciler.remnawave_support import mutation, observed, one_or_none, resolved_ids
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
     ResourceDrivers,
     ResourceObservation,
     ResourceReconcileError,
-    UnknownResourceOutcome,
-    postcondition_key,
+    payload_of,
 )
 from meridian.reconciler.routing_credentials import resolve_service_credentials
 from meridian.reconciler.workloads import WorkloadStateManager
@@ -47,7 +46,6 @@ from meridian.remnawave import (
     InternalSquad,
     MeridianPanel,
     Node,
-    RemnawaveNetworkError,
 )
 from meridian.xray_workload import render_workload_config
 
@@ -64,7 +62,6 @@ PayloadT = TypeVar(
     RouteRulePayload,
     RoutingGatewayPayload,
 )
-ValueT = TypeVar("ValueT")
 
 
 @dataclass
@@ -155,7 +152,7 @@ class ConfigProfileDriver(retirement.ConfigProfileRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, ConfigProfilePayload)
+        payload = payload_of(action, ConfigProfilePayload)
         profile = _bound_or_named_profile(self.context, payload, binding)
         if profile is None:
             return ResourceObservation(exists=False)
@@ -183,14 +180,14 @@ class ConfigProfileDriver(retirement.ConfigProfileRetirement):
                 action.generation,
                 profile.uuid,
             )
-        return _observed(action, profile.uuid, matches, profile_projection(profile))
+        return observed(action, profile.uuid, matches, profile_projection(profile))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, ConfigProfilePayload)
+        payload = payload_of(action, ConfigProfilePayload)
         server_ref = _profile_server_ref(self.context, payload)
         workload = self.context.workloads.ensure(
             payload,
@@ -209,7 +206,7 @@ class ConfigProfileDriver(retirement.ConfigProfileRetirement):
         )
         existing = _bound_or_named_profile(self.context, payload, binding)
         if existing is None:
-            profile = _mutation(
+            profile = mutation(
                 lambda: self.context.panel.create_config_profile(payload.name, expected_config),
                 f"create Profile {payload.name}",
             )
@@ -220,7 +217,7 @@ class ConfigProfileDriver(retirement.ConfigProfileRetirement):
                     hint="Rename the unmanaged Profile or explicitly recover its Meridian binding.",
                     category="user",
                 )
-            profile = _mutation(
+            profile = mutation(
                 lambda: self.context.panel.update_config_profile(
                     existing.uuid,
                     name=payload.name,
@@ -240,7 +237,7 @@ class InboundDriver:
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, InboundPayload)
+        payload = payload_of(action, InboundPayload)
         profile_ref = _profile_ref_for_workload(self.context, payload.workload_ref)
         profile_uuid = self.context.remote_id(profile_ref, action.generation)
         if not profile_uuid:
@@ -267,14 +264,14 @@ class InboundDriver:
                 action.resource.logical_id,
                 inbound.uuid,
             )
-        return _observed(action, inbound.uuid, converged, inbound_projection(inbound))
+        return observed(action, inbound.uuid, converged, inbound_projection(inbound))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, InboundPayload)
+        payload = payload_of(action, InboundPayload)
         raise ResourceReconcileError(
             f"Profile {payload.workload_ref!r} did not materialize reviewed Inbound {payload.tag!r}.",
             hint="Inspect the Profile response; Inbounds are created atomically with their Profile.",
@@ -290,7 +287,7 @@ class NodeBindingDriver(retirement.NodeRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, NodeBindingPayload)
+        payload = payload_of(action, NodeBindingPayload)
         node = _bound_or_named_node(self.context, payload, binding)
         if node is None:
             return ResourceObservation(exists=False)
@@ -318,14 +315,14 @@ class NodeBindingDriver(retirement.NodeRetirement):
                 payload.server_ref,
                 node.uuid,
             )
-        return _observed(action, node.uuid, matches, node_projection(node))
+        return observed(action, node.uuid, matches, node_projection(node))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, NodeBindingPayload)
+        payload = payload_of(action, NodeBindingPayload)
         profile_uuid, inbound_uuids = _resolved_node_dependencies(
             self.context,
             payload,
@@ -335,7 +332,7 @@ class NodeBindingDriver(retirement.NodeRetirement):
         api_port = _node_api_port(self.context, payload)
         existing = _bound_or_named_node(self.context, payload, binding)
         if existing is None:
-            credentials = _mutation(
+            credentials = mutation(
                 lambda: self.context.panel.create_node(
                     payload.name,
                     address,
@@ -359,11 +356,11 @@ class NodeBindingDriver(retirement.NodeRetirement):
         if existing.address != address or existing.port != api_port:
             # The reviewed intent places this owned Node on its server (`node replace`
             # moves an exit); the new runtime authenticates with the panel-wide secret.
-            _mutation(
+            mutation(
                 lambda: self.context.panel.update_node_address(existing.uuid, address, api_port),
                 f"move Node {payload.name}",
             )
-        _mutation(
+        mutation(
             lambda: self.context.panel.bind_node_profile(
                 existing.uuid,
                 profile_uuid,
@@ -372,17 +369,17 @@ class NodeBindingDriver(retirement.NodeRetirement):
             f"bind Node {payload.name}",
         )
         if existing.name != payload.name:
-            _mutation(
+            mutation(
                 lambda: self.context.panel.update_node_name(existing.uuid, payload.name),
                 f"rename Node {payload.name}",
             )
         if payload.country_code and existing.country_code != payload.country_code:
-            _mutation(
+            mutation(
                 lambda: self.context.panel.update_node_country(existing.uuid, payload.country_code),
                 f"set Node {payload.name} country",
             )
         if existing.is_disabled:
-            _mutation(
+            mutation(
                 lambda: self.context.panel.enable_node(existing.uuid),
                 f"enable Node {payload.name}",
             )
@@ -398,7 +395,7 @@ class HostDriver(retirement.HostRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, HostPayload)
+        payload = payload_of(action, HostPayload)
         host = _bound_or_named_host(self.context, action.resource.logical_id, payload, binding)
         if host is None:
             return ResourceObservation(exists=False)
@@ -423,14 +420,14 @@ class HostDriver(retirement.HostRetirement):
                 action.resource.logical_id,
                 host.uuid,
             )
-        return _observed(action, host.uuid, matches, host_projection(host))
+        return observed(action, host.uuid, matches, host_projection(host))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, HostPayload)
+        payload = payload_of(action, HostPayload)
         profile_uuid, inbound_uuid, _ = _resolved_host_dependencies(
             self.context,
             payload,
@@ -463,7 +460,7 @@ class HostDriver(retirement.HostRetirement):
             "exclude_from_subscription_types": payload.exclude_from_subscription_types,
         }
         if existing is None:
-            host = _mutation(
+            host = mutation(
                 lambda: self.context.panel.create_host(**kwargs),
                 f"create Host {payload.remark}",
             )
@@ -474,12 +471,12 @@ class HostDriver(retirement.HostRetirement):
                     hint="Rename the unmanaged Host or explicitly recover its Meridian binding.",
                     category="user",
                 )
-            host = _mutation(
+            host = mutation(
                 lambda: self.context.panel.update_host(existing.uuid, **kwargs),
                 f"update Host {payload.remark}",
             )
         if host.view_position != payload.view_position:
-            _mutation(
+            mutation(
                 lambda: self.context.panel.set_host_positions({host.uuid: payload.view_position}),
                 f"position Host {payload.remark}",
             )
@@ -495,24 +492,24 @@ class InternalSquadDriver(retirement.InternalSquadRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _payload(action, InternalSquadPayload)
+        payload = payload_of(action, InternalSquadPayload)
         squad = _bound_or_named_squad(self.context, payload, binding)
         if squad is None:
             return ResourceObservation(exists=False)
-        inbound_uuids = _resolved_ids(self.context, payload.inbound_refs, action.generation)
+        inbound_uuids = resolved_ids(self.context, payload.inbound_refs, action.generation)
         matches = squad.name == payload.name and sorted(squad.inbound_uuids) == sorted(inbound_uuids)
-        return _observed(action, squad.uuid, matches, squad_projection(squad))
+        return observed(action, squad.uuid, matches, squad_projection(squad))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _payload(action, InternalSquadPayload)
-        inbound_uuids = _resolved_ids(self.context, payload.inbound_refs, action.generation)
+        payload = payload_of(action, InternalSquadPayload)
+        inbound_uuids = resolved_ids(self.context, payload.inbound_refs, action.generation)
         existing = _bound_or_named_squad(self.context, payload, binding)
         if existing is None:
-            squad = _mutation(
+            squad = mutation(
                 lambda: self.context.panel.create_internal_squad(payload.name, inbound_uuids),
                 f"create Internal Squad {payload.name}",
             )
@@ -523,7 +520,7 @@ class InternalSquadDriver(retirement.InternalSquadRetirement):
                     hint="Rename the unmanaged Squad or explicitly recover its Meridian binding.",
                     category="user",
                 )
-            squad = _mutation(
+            squad = mutation(
                 lambda: self.context.panel.update_internal_squad(
                     existing.uuid,
                     name=payload.name,
@@ -532,13 +529,6 @@ class InternalSquadDriver(retirement.InternalSquadRetirement):
                 f"update Internal Squad {payload.name}",
             )
         return ResourceApplyReceipt(remote_id=squad.uuid)
-
-
-def _payload(action: ResourceAction, expected_type: type[PayloadT]) -> PayloadT:
-    payload = action.resource.payload
-    if not isinstance(payload, expected_type):
-        raise ResourceReconcileError(f"Driver received {payload.kind}, expected {expected_type.__name__}.")
-    return payload
 
 
 def _profile_server_ref(context: RemnawaveDriverContext, profile: ConfigProfilePayload) -> str:
@@ -559,18 +549,6 @@ def _profile_ref_for_workload(context: RemnawaveDriverContext, workload_id: str)
     return logical_id
 
 
-def _resolved_ids(
-    context: RemnawaveDriverContext,
-    logical_ids: list[str],
-    generation: int,
-) -> list[str]:
-    values = [context.remote_id(logical_id, generation) for logical_id in logical_ids]
-    missing = [logical_id for logical_id, remote_id in zip(logical_ids, values, strict=True) if not remote_id]
-    if missing:
-        raise ResourceReconcileError(f"Remote identities are missing for reviewed dependencies: {', '.join(missing)}.")
-    return values
-
-
 def _resolved_node_dependencies(
     context: RemnawaveDriverContext,
     payload: NodeBindingPayload,
@@ -582,7 +560,7 @@ def _resolved_node_dependencies(
         profile_uuid = profile.config_profile_uuid
     if not profile_uuid:
         raise ResourceReconcileError(f"Profile UUID is missing for {payload.workload_ref}.")
-    return profile_uuid, _resolved_ids(context, payload.inbound_refs, generation)
+    return profile_uuid, resolved_ids(context, payload.inbound_refs, generation)
 
 
 def _node_api_port(
@@ -629,7 +607,7 @@ def _bound_or_named_profile(
         if profile is not None:
             return profile
     matches = [profile for profile in context.panel.list_config_profiles() if profile.name == payload.name]
-    return _one_or_none(matches, f"Profiles named {payload.name!r}")
+    return one_or_none(matches, f"Profiles named {payload.name!r}")
 
 
 def _bound_or_named_node(
@@ -650,7 +628,7 @@ def _bound_or_named_node(
             if node is not None:
                 return node
     matches = [node for node in context.panel.list_nodes() if node.name == payload.name]
-    return _one_or_none(matches, f"Nodes named {payload.name!r}")
+    return one_or_none(matches, f"Nodes named {payload.name!r}")
 
 
 def _bound_or_named_host(
@@ -670,7 +648,7 @@ def _bound_or_named_host(
         if host is not None:
             return host
     matches = [host for host in context.panel.list_hosts() if host.remark == payload.remark]
-    return _one_or_none(matches, f"Hosts with remark {payload.remark!r}")
+    return one_or_none(matches, f"Hosts with remark {payload.remark!r}")
 
 
 def _bound_or_named_squad(
@@ -681,37 +659,12 @@ def _bound_or_named_squad(
     if binding is not None and binding.remote_id:
         return context.panel.get_internal_squad(binding.remote_id)
     matches = [squad for squad in context.panel.list_internal_squads() if squad.name == payload.name]
-    return _one_or_none(matches, f"Internal Squads named {payload.name!r}")
+    return one_or_none(matches, f"Internal Squads named {payload.name!r}")
 
 
 def _generation_from_workload(context: RemnawaveDriverContext, workload_id: str) -> int:
     generations = [workload.generation for workload in context.cluster.workloads if workload.id == workload_id]
     return max(generations, default=0)
-
-
-def _one_or_none(values: list[ValueT], description: str) -> ValueT | None:
-    if len(values) > 1:
-        raise ResourceReconcileError(f"Remnawave contains duplicate {description}.")
-    return values[0] if values else None
-
-
-def _observed(
-    action: ResourceAction,
-    remote_id: str,
-    matches: bool,
-    projection: dict[str, Any],
-) -> ResourceObservation:
-    satisfied = sorted(
-        postcondition_key(condition.kind, condition.target_ref, condition.detail)
-        for condition in action.resource.postconditions
-        if condition.kind == "exists"
-    )
-    return ResourceObservation(
-        exists=True,
-        observed_hash=action.expected_hash if matches else canonical_hash(projection),
-        remote_id=remote_id,
-        satisfied_postconditions=satisfied,
-    )
 
 
 def _host_expected(
@@ -749,10 +702,3 @@ def _host_expected(
         "exclude_from_subscription_types": sorted(payload.exclude_from_subscription_types),
         "view_position": payload.view_position,
     }
-
-
-def _mutation(call: Callable[[], ValueT], description: str) -> ValueT:
-    try:
-        return call()
-    except RemnawaveNetworkError as exc:
-        raise UnknownResourceOutcome(f"Network outcome is unknown while attempting to {description}: {exc}") from exc

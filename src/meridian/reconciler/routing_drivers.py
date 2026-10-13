@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TypeVar
-
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     ConfigProfilePayload,
@@ -12,25 +9,21 @@ from meridian.compiler.models import (
     RouteRulePayload,
     RoutingGatewayPayload,
     ServiceUserPayload,
-    canonical_hash,
 )
 from meridian.reconciler.remnawave_drivers import RemnawaveDriverContext
 from meridian.reconciler.remnawave_retirement import ServiceUserRetirement
+from meridian.reconciler.remnawave_support import bound_or_named_user, mutation, observed, resolved_ids
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
     ResourceObservation,
     ResourceReconcileError,
-    UnknownResourceOutcome,
-    postcondition_key,
+    payload_of,
 )
 from meridian.reconciler.routing_credentials import resolve_service_credentials
-from meridian.remnawave import RemnawaveNetworkError, User
+from meridian.remnawave import User
 from meridian.remnawave.control_plane import SERVICE_USER_DESCRIPTION
-from meridian.remnawave.models import is_user_id
 from meridian.xray_workload import render_workload_config
-
-ValueT = TypeVar("ValueT")
 
 
 class ServiceUserDriver(ServiceUserRetirement):
@@ -42,11 +35,11 @@ class ServiceUserDriver(ServiceUserRetirement):
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
-        payload = _service_user_payload(action)
-        user = _bound_or_named_user(self.context, payload, binding)
+        payload = payload_of(action, ServiceUserPayload)
+        user = bound_or_named_user(self.context, payload.username, binding)
         if user is None:
             return ResourceObservation(exists=False)
-        squad_uuids = _resolved_ids(self.context, [payload.squad_ref], action.generation)
+        squad_uuids = resolved_ids(self.context, [payload.squad_ref], action.generation)
         matches = (
             user.username == payload.username
             and user.status == "ACTIVE"
@@ -54,18 +47,18 @@ class ServiceUserDriver(ServiceUserRetirement):
             and user.description == SERVICE_USER_DESCRIPTION
             and bool(user.vless_uuid)
         )
-        return _observed(action, user.id, matches, _user_projection(user))
+        return observed(action, user.id, matches, _user_projection(user))
 
     def apply(
         self,
         action: ResourceAction,
         binding: ManagedResourceBinding | None,
     ) -> ResourceApplyReceipt:
-        payload = _service_user_payload(action)
-        squad_uuids = _resolved_ids(self.context, [payload.squad_ref], action.generation)
-        existing = _bound_or_named_user(self.context, payload, binding)
+        payload = payload_of(action, ServiceUserPayload)
+        squad_uuids = resolved_ids(self.context, [payload.squad_ref], action.generation)
+        existing = bound_or_named_user(self.context, payload.username, binding)
         if existing is None:
-            user = _mutation(
+            user = mutation(
                 lambda: self.context.panel.create_service_user(
                     payload.username,
                     squad_uuids=squad_uuids,
@@ -84,7 +77,7 @@ class ServiceUserDriver(ServiceUserRetirement):
                     hint="Rename the unmanaged User or explicitly recover its Meridian binding.",
                     category="user",
                 )
-            user = _mutation(
+            user = mutation(
                 lambda: self.context.panel.update_service_user(
                     existing.id,
                     squad_uuids=squad_uuids,
@@ -125,7 +118,7 @@ class ProfileProjectionDriver:
             ),
         )
         matches = profile.config == expected
-        return _observed(
+        return observed(
             action,
             profile.uuid,
             matches,
@@ -143,59 +136,11 @@ class ProfileProjectionDriver:
         )
 
 
-def _service_user_payload(action: ResourceAction) -> ServiceUserPayload:
-    payload = action.resource.payload
-    if not isinstance(payload, ServiceUserPayload):
-        raise ResourceReconcileError(f"Service User driver received {payload.kind}.")
-    return payload
-
-
 def _profile_ref(action: ResourceAction) -> str:
     payload = action.resource.payload
     if isinstance(payload, EgressPoolPayload | RouteRulePayload | RoutingGatewayPayload):
         return payload.profile_ref
     raise ResourceReconcileError(f"Routing projection driver cannot observe {payload.kind}.")
-
-
-def _resolved_ids(
-    context: RemnawaveDriverContext,
-    logical_ids: list[str],
-    generation: int,
-) -> list[str]:
-    resolved = [context.remote_id(logical_id, generation) for logical_id in logical_ids]
-    if any(not remote_id for remote_id in resolved):
-        raise ResourceReconcileError(f"Remote identities are incomplete for {', '.join(logical_ids)}.")
-    return resolved
-
-
-def _bound_or_named_user(
-    context: RemnawaveDriverContext,
-    payload: ServiceUserPayload,
-    binding: ManagedResourceBinding | None,
-) -> User | None:
-    if binding is not None and is_user_id(binding.remote_id):
-        return context.panel.get_user_by_id(binding.remote_id)
-    # Pre-3.x bindings hold the removed user uuid; re-resolve by username.
-    return context.panel.get_user(payload.username)
-
-
-def _observed(
-    action: ResourceAction,
-    remote_id: str,
-    matches: bool,
-    projection: object,
-) -> ResourceObservation:
-    satisfied = [
-        postcondition_key(condition.kind, condition.target_ref, condition.detail)
-        for condition in action.resource.postconditions
-        if condition.kind == "exists"
-    ]
-    return ResourceObservation(
-        exists=True,
-        observed_hash=action.expected_hash if matches else canonical_hash(projection),
-        remote_id=remote_id,
-        satisfied_postconditions=sorted(satisfied),
-    )
 
 
 def _user_projection(user: User) -> dict[str, object]:
@@ -206,10 +151,3 @@ def _user_projection(user: User) -> dict[str, object]:
         "description": user.description,
         "has_vless_uuid": bool(user.vless_uuid),
     }
-
-
-def _mutation(call: Callable[[], ValueT], description: str) -> ValueT:
-    try:
-        return call()
-    except RemnawaveNetworkError as exc:
-        raise UnknownResourceOutcome(f"Remnawave may have completed {description}; observation is required.") from exc

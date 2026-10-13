@@ -34,6 +34,7 @@ from meridian.reconciler.resources import (
     ResourceDrivers,
     ResourceObservation,
     ResourceReconcileError,
+    payload_of,
 )
 from meridian.reconciler.server_evidence import (
     assertion_matches,
@@ -60,7 +61,6 @@ from meridian.reconciler.server_render import (
     render_nginx_artifact,
 )
 from meridian.reconciler.server_support import (
-    payload_of,
     raise_if_step_timeout,
     raise_if_timeout,
     restore_file,
