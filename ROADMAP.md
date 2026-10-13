@@ -16,7 +16,6 @@ command on one reviewed topology in `cluster.yml` (see the
 
 - [#32](https://github.com/getmeridian/meridian/issues/32) — multi-hop chain topologies (arbitrary N ≥ 2)
 - [#33](https://github.com/getmeridian/meridian/issues/33) — multi-IP nodes (ingress IP ≠ egress IP)
-- [#34](https://github.com/getmeridian/meridian/issues/34) — split routing (direct for selected domains/IPs)
 - [#35](https://github.com/getmeridian/meridian/issues/35) — end-to-end IPv6 (dual-stack ingress/relay/egress)
 - [#36](https://github.com/getmeridian/meridian/issues/36) — expand real-VM harness for existing features
 - [#37](https://github.com/getmeridian/meridian/issues/37) — real-VM harness: multi-topology + multi-provider + optional CI smoke
@@ -59,8 +58,6 @@ Every trust-adjacent gap matters.
   "Connection Setup"
 - Plain-language recipient troubleshooting — remove CLI jargon from user-
   facing recovery docs
-- Opinionated recommended app per platform, demote the long list under
-  "advanced / other platforms"
 - Usable no-JS / failed-config fallback when the handoff page's JavaScript
   or `config.json` fails
 
@@ -96,13 +93,12 @@ hood; no terminal required.
 
 ### Key/credential rotation without reinstall
 
-Rotate Reality keys, JWT secrets, and subscription paths in place.
+Rotate Reality keys, the Remnawave `APP_SECRET`, and subscription paths in place.
 
 ## Tracked follow-ups
 
 Security / supply chain:
 - [#38](https://github.com/getmeridian/meridian/issues/38) — `install.sh` verify `SHA256SUMS` before exec
-- ~~[#39](https://github.com/getmeridian/meridian/issues/39) — pin + verify `RealiTLScanner` binary~~ — shipped: `meridian scan` runs a pinned, SHA-256-verified release
 
 Product:
 - [#42](https://github.com/getmeridian/meridian/issues/42) — `meridian deploy NEW_IP --from OLD_IP` fleet migration
@@ -110,4 +106,3 @@ Product:
 
 UX / docs:
 - [#44](https://github.com/getmeridian/meridian/issues/44) — WebRTC leak warning on connection page
-- ~~[#45](https://github.com/getmeridian/meridian/issues/45) — Windows / WSL setup guide~~ — shipped
