@@ -196,6 +196,11 @@ class StatefulPanel:
         self.calls["rename_node"] += 1
         self.nodes[uuid].name = name
 
+    def update_node_address(self, uuid: str, address: str, port: int) -> None:
+        self.calls["move_node"] += 1
+        self.nodes[uuid].address = address
+        self.nodes[uuid].port = port
+
     def enable_node(self, uuid: str) -> None:
         self.calls["enable_node"] += 1
         self.nodes[uuid].is_disabled = False
@@ -625,6 +630,37 @@ def test_existing_profile_with_incomplete_reality_keys_is_an_observation_error()
 
     assert key_calls == []
     assert panel.calls == mutation_counts
+
+
+def test_moved_exit_repoints_its_owned_node_instead_of_refusing() -> None:
+    plan = compile_topology(_intent())
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
+    addresses = {"srv-control": "198.51.100.10", "srv-exit-a": "198.51.100.20", "srv-exit-b": "198.51.100.30"}
+
+    def run(server_addresses: dict[str, str]) -> None:
+        context = RemnawaveDriverContext(
+            panel=cast(MeridianPanel, panel),
+            plan=plan,
+            cluster=cluster,
+            workloads=workloads,
+            server_addresses=server_addresses,
+        )
+        fallback = AlreadyConvergedDriver()
+        drivers = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+        drivers.update(build_remnawave_drivers(context))
+        result = execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None)
+        assert result.all_succeeded, result.failure_summary
+
+    run(addresses)
+    node_uuid = next(node.uuid for node in panel.nodes.values() if node.name == "Meridian v4 exit-a")
+    cluster.action_checkpoints = {}  # a later apply re-observes every action
+    run({**addresses, "srv-exit-a": "198.51.100.40"})
+
+    assert panel.calls["move_node"] == 1
+    assert panel.nodes[node_uuid].address == "198.51.100.40"
+    assert len(panel.nodes) == 2
 
 
 def test_two_exits_reconcile_distinct_profiles_nodes_hosts_and_squad() -> None:

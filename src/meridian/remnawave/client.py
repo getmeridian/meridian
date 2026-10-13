@@ -350,6 +350,10 @@ class MeridianPanel(ControlPlaneMixin):
         """Update a node's name in the panel."""
         self._patch("/api/nodes", json={"uuid": uuid, "name": name})
 
+    def update_node_address(self, uuid: str, address: str, port: int) -> None:
+        """Point a node record at another server (a moved exit keeps its Node)."""
+        self._patch("/api/nodes", json={"uuid": uuid, "address": address, "port": port})
+
     # --- Hosts (relays map here) ---
 
     def create_host(

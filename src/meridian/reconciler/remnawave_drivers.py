@@ -341,8 +341,11 @@ class NodeBindingDriver(retirement.NodeRetirement):
                 category="user",
             )
         if existing.address != address or existing.port != api_port:
-            raise ResourceReconcileError(
-                f"Node {payload.name!r} address or API port drift requires explicit replacement."
+            # The reviewed intent places this owned Node on its server (`node replace`
+            # moves an exit); the new runtime authenticates with the panel-wide secret.
+            _mutation(
+                lambda: self.context.panel.update_node_address(existing.uuid, address, api_port),
+                f"move Node {payload.name}",
             )
         _mutation(
             lambda: self.context.panel.bind_node_profile(
