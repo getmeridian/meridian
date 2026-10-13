@@ -44,11 +44,6 @@ class CompiledApplyResult(CoreModel):
     retired_resources: list[str] = Field(default_factory=list)
     retirement_errors: list[str] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class ApplyCommandData(CompiledApplyResult):
     """Success data returned by apply execution."""
@@ -63,11 +58,6 @@ class CompiledApplyPreview(CoreModel):
         default="", description="Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed."
     )
     retiring_resources: list[str] = Field(default_factory=list)
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 def build_compiled_apply_result(

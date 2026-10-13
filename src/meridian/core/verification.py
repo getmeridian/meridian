@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -183,11 +183,6 @@ class VerificationResult(CoreModel):
             checks=check_list,
         )
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 TransportOutcome = Literal[
     "ok",
@@ -242,8 +237,3 @@ class FleetTestResult(CoreModel):
             exit_code=aggregate.exit_code,
             counts=aggregate.counts,
         )
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)

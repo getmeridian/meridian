@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Mapping, Protocol, Sequence
+from typing import Literal, Mapping, Protocol, Sequence
 from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field
@@ -199,11 +199,6 @@ class FleetInventory(CoreModel):
     nodes: list[NodeInventory] = Field(default_factory=list)
     relays: list[RelayInventory] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class PanelStatus(CoreModel):
     url: str
@@ -226,11 +221,6 @@ class NodeListResult(CoreModel):
 
     nodes: list[FleetStatusNode] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class RelayListEntry(CoreModel):
     """Configured relay metadata plus optional live host status."""
@@ -247,11 +237,6 @@ class RelayListResult(CoreModel):
     """Result for listing configured relays."""
 
     relays: list[RelayListEntry] = Field(default_factory=list)
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 class FleetStatusRelay(CoreModel):
@@ -301,11 +286,6 @@ class FleetStatus(CoreModel):
     servers: list[ServerInventory] = Field(default_factory=list)
     nodes: list[FleetStatusNode] = Field(default_factory=list)
     relays: list[FleetStatusRelay] = Field(default_factory=list)
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 def public_url(url: str) -> str:

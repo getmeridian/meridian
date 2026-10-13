@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, Protocol, Sequence
+from typing import Literal, Protocol, Sequence
 
 from pydantic import Field
 
@@ -86,22 +86,12 @@ class ClientListResult(CoreModel):
     summary: ClientListSummary
     clients: list[ClientRecord] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class ClientShowResult(CoreModel):
     """Result for showing one client."""
 
     client: ClientDetail
     handoff: ClientHandoff
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 class ClientCreated(CoreModel):
@@ -119,11 +109,6 @@ class ClientAddResult(CoreModel):
 
     clients: list[ClientCreated] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class ClientReference(CoreModel):
     """Public identity of a client mutation target."""
@@ -135,11 +120,6 @@ class ClientRemoveResult(CoreModel):
     """Result for removing one client."""
 
     client: ClientReference
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 ClientMutationStatus = Literal["active", "disabled"]
@@ -156,11 +136,6 @@ class ClientStatusResult(CoreModel):
     """Result for enabling or disabling one client."""
 
     client: ClientStatus
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 def build_client_record(user: PanelUserLike) -> ClientRecord:

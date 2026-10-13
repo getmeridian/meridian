@@ -20,6 +20,10 @@ class CoreModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True, validate_by_alias=True, validate_by_name=True)
 
+    def to_data(self) -> dict[str, Any]:
+        """JSON-ready data for envelopes and API clients."""
+        return self.model_dump(mode="json", by_alias=True)
+
 
 class Summary(CoreModel):
     """Structured summary shown in JSON envelopes and UI dashboards."""

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import Field
 
 from meridian.core.models import CoreModel
@@ -23,22 +21,12 @@ class RouteListResult(CoreModel):
 
     exits: list[ExitEgressOverrides] = Field(default_factory=list)
 
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
-
 
 class RouteMutationResult(CoreModel):
     """The override a `route add` created or a `route remove` deleted."""
 
     exit: str
     override: EgressOverrideIntent
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 def build_route_list_result(exits: list[ExitIntent]) -> RouteListResult:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 
@@ -18,7 +18,6 @@ from meridian.core.inputs import (
     OptionalSshUserValue,
 )
 from meridian.core.models import CoreModel
-from meridian.core.serde import to_plain
 from meridian.core.topology import TlsFingerprint
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
 
@@ -97,9 +96,6 @@ class DeployResult(CoreModel):
     node_count: int
     relay_count: int
     summary: str
-
-    def to_data(self) -> dict[str, Any]:
-        return to_plain(self)
 
 
 def build_deploy_workflow(request: DeployRequest) -> WorkflowPlan:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import Field
 
 from meridian.core.models import CoreModel
@@ -44,11 +42,6 @@ class CompiledPlanResult(CoreModel):
     drifted_resources: list[CompiledPlanDriftResult] = Field(default_factory=list)
     retiring_resources: list[str] = Field(default_factory=list)
     resources: list[CompiledPlanResourceResult] = Field(default_factory=list)
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 class PlanCommandData(CompiledPlanResult):

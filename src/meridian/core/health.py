@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import Field
 
@@ -40,11 +40,6 @@ class HealthCheckResult(CoreModel):
     verdict: VerificationVerdict
     exit_code: VerificationCompletedExitCode
     counts: VerificationCounts
-
-    def to_data(self) -> dict[str, Any]:
-        from meridian.core.serde import to_plain
-
-        return to_plain(self)
 
 
 def health_report(
