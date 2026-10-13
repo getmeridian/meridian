@@ -42,17 +42,7 @@ from meridian.reconciler.server_render import artifact_token, nginx_artifact_pat
 from meridian.ssh import ServerConnection
 from tests.support.topology import resource_plan
 
-
-def _action(*, install_docker: bool = True):
-    resource = make_resource(
-        "baseline:server",
-        ServerBaselinePayload(
-            server_ref="srv-exit",
-            install_docker=install_docker,
-        ),
-    )
-    plan = resource_plan(resource)
-    return plan, build_resource_actions(plan, 1)[0]
+_LISTENING = "LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n"
 
 
 def _result(*, returncode: int = 0, stdout: str = "", stderr: str = "") -> SimpleNamespace:
@@ -65,8 +55,35 @@ def _single_action(logical_id: str, payload):
     return plan, build_resource_actions(plan, 1)[0]
 
 
-def _baseline_attestation(plan: ResourcePlan, action) -> str:
-    return baseline_attestation(action, plan, "srv-exit")
+def _connection() -> MagicMock:
+    connection = MagicMock(spec=ServerConnection)
+    connection.user = "root"
+    return connection
+
+
+def _context(plan: ResourcePlan, connection: MagicMock, **fields) -> ServerDriverContext:
+    return ServerDriverContext(
+        plan=plan,
+        cluster=fields.pop("cluster", ClusterConfig()),
+        panel=fields.pop("panel", MagicMock()),
+        connection_for=lambda _ref: connection,
+        server_addresses={"srv-exit": "198.51.100.10"},
+        **fields,
+    )
+
+
+def _action(*, install_docker: bool = True):
+    return _single_action(
+        "baseline:server", ServerBaselinePayload(server_ref="srv-exit", install_docker=install_docker)
+    )
+
+
+def _baseline_case(*, install_docker: bool = True) -> tuple[ServerBaselineDriver, ResourceAction, MagicMock, str]:
+    """Baseline driver, its action, the server connection, and the attestation file content that matches."""
+    plan, action = _action(install_docker=install_docker)
+    connection = _connection()
+    attestation = f"{baseline_attestation(action, plan, 'srv-exit')}\n"
+    return ServerBaselineDriver(_context(plan, connection)), action, connection, attestation
 
 
 def test_baseline_attestation_ignores_other_servers_joining_or_leaving() -> None:
@@ -87,23 +104,9 @@ def test_baseline_attestation_ignores_other_servers_joining_or_leaving() -> None
 
 
 def test_server_baseline_observes_every_durable_check_and_attestation() -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-    connection.run.return_value = SimpleNamespace(returncode=0, stdout="")
-    connection.get_text.return_value = SimpleNamespace(
-        returncode=0,
-        stdout=f"{_baseline_attestation(plan, action)}\n",
-    )
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
+    driver, action, connection, attestation = _baseline_case()
+    connection.run.return_value = _result()
+    connection.get_text.return_value = _result(stdout=attestation)
 
     assert observation_converges(action, driver.observe(action, None))
     commands = [call.args[0] for call in connection.run.call_args_list]
@@ -113,125 +116,53 @@ def test_server_baseline_observes_every_durable_check_and_attestation() -> None:
     assert any("docker compose version" in command for command in commands)
 
 
-def test_server_baseline_fails_closed_when_docker_is_missing() -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-    connection.run.side_effect = lambda command, **_kwargs: SimpleNamespace(
-        returncode=1 if "docker info" in command else 0,
-        stdout="",
+@pytest.mark.parametrize(
+    ("failing_check", "returncode"),
+    [("docker info", 1), ("systemctl is-active --quiet fail2ban", 3)],
+    ids=["docker-missing", "fail2ban-inactive"],
+)
+def test_server_baseline_negative_check_is_drift(failing_check: str, returncode: int) -> None:
+    driver, action, connection, attestation = _baseline_case()
+    connection.run.side_effect = lambda command, **_kwargs: _result(
+        returncode=returncode if failing_check in command else 0
     )
-    connection.get_text.return_value = SimpleNamespace(
-        returncode=0,
-        stdout=f"{_baseline_attestation(plan, action)}\n",
-    )
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
+    connection.get_text.return_value = _result(stdout=attestation)
 
     assert not observation_converges(action, driver.observe(action, None))
 
 
-@pytest.mark.parametrize("returncode", [124, 127, 255])
-def test_server_baseline_rejects_unavailable_check_evidence(returncode: int) -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-    connection.run.return_value = _result(returncode=returncode, stderr="inspection unavailable")
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
+@pytest.mark.parametrize(
+    ("returncode", "stderr", "match"),
+    [
+        *[(rc, "inspection unavailable", "evidence is unavailable") for rc in (124, 127, 255)],
+        (1, "permission denied", "inspection was denied"),
+    ],
+    ids=["124", "127", "255", "permission-denied"],
+)
+def test_server_baseline_rejects_unavailable_check_evidence(returncode: int, stderr: str, match: str) -> None:
+    driver, action, connection, _ = _baseline_case()
+    connection.run.return_value = _result(returncode=returncode, stderr=stderr)
 
-    with pytest.raises(ResourceReconcileError, match="evidence is unavailable") as exc_info:
+    with pytest.raises(ResourceReconcileError, match=match) as exc_info:
         driver.observe(action, None)
 
-    assert exc_info.value.retryable is True
-
-
-def test_server_baseline_rejects_permission_failure_instead_of_reporting_drift() -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-    connection.run.return_value = _result(returncode=1, stderr="permission denied")
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-
-    with pytest.raises(ResourceReconcileError, match="inspection was denied"):
-        driver.observe(action, None)
-
-
-def test_server_baseline_accepts_inactive_fail2ban_as_negative_state() -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-
-    def run(command: str, **_kwargs):
-        if "systemctl is-active --quiet fail2ban" in command:
-            return _result(returncode=3)
-        return _result()
-
-    connection.run.side_effect = run
-    connection.get_text.return_value = _result(stdout=f"{_baseline_attestation(plan, action)}\n")
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-
-    assert not observation_converges(action, driver.observe(action, None))
+    if returncode != 1:
+        assert exc_info.value.retryable is True
 
 
 def test_server_baseline_missing_attestation_is_confirmed_absent() -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
+    driver, action, connection, _ = _baseline_case()
     connection.run.return_value = _result()
     connection.get_text.return_value = _result(
         returncode=1,
         stderr="cat: /var/lib/meridian/baselines/missing: No such file or directory",
     )
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
 
-    observation = driver.observe(action, None)
-
-    assert observation.exists is False
+    assert driver.observe(action, None).exists is False
 
 
 def test_server_baseline_preserves_unknown_outcome_on_step_timeout(monkeypatch) -> None:
-    plan, action = _action()
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
+    driver, action, _, _ = _baseline_case()
     monkeypatch.setattr(
         "meridian.provision.Provisioner.run",
         lambda *_args, **_kwargs: [
@@ -242,45 +173,53 @@ def test_server_baseline_preserves_unknown_outcome_on_step_timeout(monkeypatch) 
             )
         ],
     )
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
 
     with pytest.raises(UnknownResourceOutcome, match="observation is required"):
         driver.apply(action, None)
 
 
-def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
-    resource = make_resource(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(
-            server_ref="srv-exit",
-            transport="tcp",
-            port=443,
+def test_server_baseline_apply_moves_its_attestation_to_the_neutral_path() -> None:
+    from meridian.reconciler.server_render import baseline_marker_path, legacy_baseline_marker_path
+
+    driver, action, connection, _ = _baseline_case(install_docker=False)
+    connection.run.return_value = _result()
+    written: list[str] = []
+
+    with (
+        patch("meridian.provision.Provisioner.run", return_value=[]),
+        patch(
+            "meridian.reconciler.server_drivers.ensure_file_content",
+            side_effect=lambda _conn, path, *_a, **_kw: written.append(path) or SimpleNamespace(ok=True),
         ),
+    ):
+        driver.apply(action, None)
+
+    assert written == [baseline_marker_path(action.resource.logical_id)]
+    assert "meridian" not in written[0]
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    legacy = legacy_baseline_marker_path(action.resource.logical_id)
+    assert any(command.startswith(f"rm -f {legacy}") for command in commands)
+
+
+def _firewall_case() -> tuple[FirewallRuleDriver, ResourceAction, MagicMock, str]:
+    """Firewall driver for tcp/443, its action, the connection, and the rule's artifact token."""
+    plan, action = _single_action(
+        "firewall:srv-exit:tcp:443",
+        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=443),
     )
-    plan = resource_plan(resource)
-    action = build_resource_actions(plan, 1)[0]
-    marker = f"fw-{artifact_token(resource.logical_id)}"
-    connection = MagicMock(spec=ServerConnection)
-    connection.run.return_value = SimpleNamespace(
-        returncode=0,
-        stdout=(f"Added user rules (see 'ufw status' for running firewall):\nufw allow 443/tcp comment '{marker}'\n"),
+    connection = _connection()
+    return (
+        FirewallRuleDriver(_context(plan, connection)),
+        action,
+        connection,
+        artifact_token(action.resource.logical_id),
     )
-    driver = FirewallRuleDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
+
+
+def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
+    driver, action, connection, token = _firewall_case()
+    connection.run.return_value = _result(
+        stdout=f"Added user rules (see 'ufw status' for running firewall):\nufw allow 443/tcp comment 'fw-{token}'\n"
     )
 
     assert observation_converges(action, driver.observe(action, None))
@@ -288,46 +227,73 @@ def test_firewall_observation_accepts_ufw_quoted_comment() -> None:
 
 @pytest.mark.parametrize("returncode", [1, 124, 127, 255])
 def test_firewall_observation_rejects_failed_ufw_inspection(returncode: int) -> None:
-    plan, action = _single_action(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=443),
-    )
-    connection = MagicMock(spec=ServerConnection)
+    driver, action, connection, _ = _firewall_case()
     connection.run.return_value = _result(returncode=returncode, stderr="ufw inspection failed")
-    driver = FirewallRuleDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
 
     with pytest.raises(ResourceReconcileError, match="UFW rule inspection evidence is unavailable"):
         driver.observe(action, None)
 
 
 def test_firewall_successfully_observed_missing_rule_is_drift() -> None:
-    plan, action = _single_action(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=443),
-    )
-    connection = MagicMock(spec=ServerConnection)
+    driver, action, connection, _ = _firewall_case()
     connection.run.return_value = _result(stdout="Added user rules:\n")
-    driver = FirewallRuleDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
+
+    assert driver.observe(action, None).exists is False
+
+
+def test_firewall_rule_under_its_pre_rename_comment_is_drift() -> None:
+    driver, action, connection, token = _firewall_case()
+    connection.run.return_value = _result(
+        stdout=f"ufw allow 443/tcp comment 'fw-{token}'\nufw allow 443/tcp comment 'meridian-v4-{token}'\n"
     )
 
-    observation = driver.observe(action, None)
+    assert not observation_converges(action, driver.observe(action, None))
 
-    assert observation.exists is False
+
+def test_firewall_migration_deletes_the_legacy_comment_then_re_adds_the_renamed_rule() -> None:
+    driver, action, connection, token = _firewall_case()
+    connection.run.side_effect = lambda command, **_kw: _result(
+        stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n" if command.startswith("ufw show added") else ""
+    )
+
+    receipt = driver.apply(action, None)
+
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    assert receipt.remote_id == f"fw-{token}"
+    delete = next(index for index, command in enumerate(commands) if f"# meridian-v4-{token}$" in command)
+    adds = [index for index, command in enumerate(commands) if command == f"ufw allow 443/tcp comment fw-{token}"]
+    assert adds[0] < delete < adds[-1]
+
+
+def test_failed_firewall_migration_restores_the_legacy_rule() -> None:
+    driver, action, connection, token = _firewall_case()
+    adds = 0
+
+    def run(command: str, **_kw: object):
+        nonlocal adds
+        if command.startswith("ufw show added"):
+            return _result(stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n")
+        if command.startswith("ufw allow") and f"fw-{token}" in command and "meridian" not in command:
+            adds += 1
+            return _result(returncode=1 if adds > 1 else 0, stderr="ERROR: rule failed")
+        return _result()
+
+    connection.run.side_effect = run
+
+    with pytest.raises(ResourceReconcileError, match="Could not apply firewall rule"):
+        driver.apply(action, None)
+
+    commands = [call.args[0] for call in connection.run.call_args_list]
+    assert commands[-1] == f"ufw allow 443/tcp comment meridian-v4-{token}"
+
+
+def test_fresh_firewall_rule_never_deletes_by_comment() -> None:
+    driver, action, connection, _ = _firewall_case()
+    connection.run.return_value = _result()
+
+    driver.apply(action, None)
+
+    assert not any("ufw --force delete" in call.args[0] for call in connection.run.call_args_list)
 
 
 def _certificate_case() -> tuple[CertificateDriver, ResourceAction, MagicMock]:
@@ -335,29 +301,15 @@ def _certificate_case() -> tuple[CertificateDriver, ResourceAction, MagicMock]:
         "certificate:srv-exit:example",
         CertificatePayload(server_ref="srv-exit", hostname="vpn.example.test"),
     )
-    connection = MagicMock(spec=ServerConnection)
-    driver = CertificateDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-    return driver, action, connection
+    connection = _connection()
+    return CertificateDriver(_context(plan, connection)), action, connection
 
 
 def test_certificate_missing_file_is_confirmed_absent() -> None:
     driver, action, connection = _certificate_case()
-    connection.get_text.return_value = _result(
-        returncode=1,
-        stderr="cat: certificate: No such file or directory",
-    )
+    connection.get_text.return_value = _result(returncode=1, stderr="cat: certificate: No such file or directory")
 
-    observation = driver.observe(action, None)
-
-    assert observation.exists is False
+    assert driver.observe(action, None).exists is False
     connection.run.assert_not_called()
 
 
@@ -405,7 +357,7 @@ def _nginx_observation_case() -> tuple[NginxArtifactDriver, ResourceAction, Magi
         ],
     )
     plan, action = _single_action("nginx:srv-exit:stream:8443", payload)
-    connection = MagicMock(spec=ServerConnection)
+    connection = _connection()
     connection.get_text.return_value = _result(
         stdout=render_nginx_artifact(action.resource.logical_id, payload, {"srv-exit": "198.51.100.10"})
     )
@@ -414,29 +366,18 @@ def _nginx_observation_case() -> tuple[NginxArtifactDriver, ResourceAction, Magi
         if command.startswith("systemctl is-active"):
             return _result(stdout="active\n")
         if command.startswith("ss -H -lnt"):
-            return _result(stdout="LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n")
+            return _result(stdout=_LISTENING)
         raise AssertionError(command)
 
     connection.run.side_effect = run
-    driver = NginxArtifactDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-    return driver, action, connection
+    return NginxArtifactDriver(_context(plan, connection)), action, connection
 
 
 def test_nginx_missing_artifact_is_confirmed_absent() -> None:
     driver, action, connection = _nginx_observation_case()
     connection.get_text.return_value = _result(returncode=1, stderr="cat: artifact: No such file or directory")
 
-    observation = driver.observe(action, None)
-
-    assert observation.exists is False
+    assert driver.observe(action, None).exists is False
 
 
 def test_nginx_unreadable_artifact_is_unavailable_evidence() -> None:
@@ -449,34 +390,74 @@ def test_nginx_unreadable_artifact_is_unavailable_evidence() -> None:
 
 def test_nginx_inactive_service_is_drift() -> None:
     driver, action, connection = _nginx_observation_case()
-    connection.run.side_effect = [
-        _result(returncode=3, stdout="inactive\n"),
-        _result(stdout="LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n"),
-    ]
+    connection.run.side_effect = [_result(returncode=3, stdout="inactive\n"), _result(stdout=_LISTENING)]
 
     assert not observation_converges(action, driver.observe(action, None))
 
 
-def test_nginx_rejects_systemd_daemon_failure() -> None:
+@pytest.mark.parametrize(
+    ("service", "listener", "match"),
+    [
+        (_result(returncode=1, stderr="Failed to connect to bus"), _result(stdout=_LISTENING), "nginx service"),
+        (
+            _result(stdout="active\n"),
+            _result(returncode=127, stderr="ss: command not found"),
+            "TCP listener inspection",
+        ),
+    ],
+    ids=["systemd-daemon", "listener-inspection"],
+)
+def test_nginx_rejects_unavailable_runtime_evidence(service, listener, match: str) -> None:
     driver, action, connection = _nginx_observation_case()
-    connection.run.side_effect = [
-        _result(returncode=1, stderr="Failed to connect to bus"),
-        _result(stdout="LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n"),
-    ]
+    connection.run.side_effect = [service, listener]
 
-    with pytest.raises(ResourceReconcileError, match="nginx service evidence is unavailable"):
+    with pytest.raises(ResourceReconcileError, match=f"{match} evidence is unavailable"):
         driver.observe(action, None)
 
 
-def test_nginx_rejects_failed_listener_inspection() -> None:
-    driver, action, connection = _nginx_observation_case()
-    connection.run.side_effect = [
-        _result(stdout="active\n"),
-        _result(returncode=127, stderr="ss: command not found"),
-    ]
+def test_port_443_stream_apply_retires_the_legacy_artifact(monkeypatch) -> None:
+    plan, action = _single_action(
+        "nginx:shared:443:stream",
+        NginxArtifactPayload(
+            server_ref="srv-exit",
+            listener_port=443,
+            layer="stream",
+            routes=[
+                NginxRouteSpec(
+                    match="sni",
+                    server_names=[""],
+                    backend_server_ref="srv-exit",
+                    backend_port=8443,
+                )
+            ],
+        ),
+    )
+    connection = _connection()
+    artifact_path = nginx_artifact_path(action.resource.logical_id, "stream")
 
-    with pytest.raises(ResourceReconcileError, match="TCP listener inspection evidence is unavailable"):
-        driver.observe(action, None)
+    def get_text(path: str, *, timeout: int):
+        if path == "/etc/nginx/nginx.conf":
+            return _result(stdout="stream { include /etc/nginx/stream.d/*.conf; }\n")
+        if path == artifact_path:
+            return _result(returncode=1)
+        if path == "/etc/nginx/stream.d/meridian.conf":
+            return _result(stdout="legacy\n")
+        raise AssertionError(path)
+
+    connection.get_text.side_effect = get_text
+    connection.run.return_value = _result()
+    monkeypatch.setattr(
+        "meridian.reconciler.server_drivers.InstallNginx.run",
+        lambda *_args, **_kwargs: StepResult(name="Install nginx", status="ok"),
+    )
+    monkeypatch.setattr(
+        "meridian.reconciler.server_drivers.ensure_file_content",
+        lambda *_args, **_kwargs: SimpleNamespace(ok=True, result=None),
+    )
+
+    NginxArtifactDriver(_context(plan, connection)).apply(action, None)
+
+    assert any(call.args[0] == "rm -f /etc/nginx/stream.d/meridian.conf" for call in connection.run.call_args_list)
 
 
 def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
@@ -514,29 +495,31 @@ def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, Resour
     )
     panel = MagicMock()
     driver = NodeRuntimeDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=cluster,
-            panel=panel,
-            connection_for=lambda _ref: MagicMock(spec=ServerConnection),
-            server_addresses={"srv-exit": "198.51.100.10"},
-            node_secrets={"exit-a": "node-secret"},
+        _context(
+            plan, MagicMock(spec=ServerConnection), cluster=cluster, panel=panel, node_secrets={"exit-a": "node-secret"}
         )
     )
     return driver, action, panel
 
 
-def test_node_runtime_missing_container_is_confirmed_drift() -> None:
-    driver, action, panel = _node_runtime_case()
-    connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout="compose\n")
-    connection.run.return_value = _result(returncode=1, stdout="Error: No such object: remnawave-node\n")
+def _observed_node_runtime(
+    *, compose: str = "compose\n", warp: bool = False
+) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
+    """Node runtime driver whose server holds `compose` and whose panel Node is connected."""
+    driver, action, panel = _node_runtime_case(warp=warp)
+    connection = _connection()
+    connection.get_text.return_value = _result(stdout=compose)
+    connection.run.return_value = _result(stdout="true\n")
     driver.context.connection_for = lambda _ref: connection
     panel.get_node.return_value = SimpleNamespace(is_connected=True)
+    return driver, action, connection
 
-    observation = driver.observe(action, None)
 
-    assert not observation_converges(action, observation)
+def test_node_runtime_missing_container_is_confirmed_drift() -> None:
+    driver, action, connection = _observed_node_runtime()
+    connection.run.return_value = _result(returncode=1, stdout="Error: No such object: remnawave-node\n")
+
+    assert not observation_converges(action, driver.observe(action, None))
 
 
 @pytest.mark.parametrize(
@@ -549,185 +532,89 @@ def test_node_runtime_missing_container_is_confirmed_drift() -> None:
     ],
 )
 def test_node_runtime_rejects_unavailable_docker_evidence(returncode: int, output: str) -> None:
-    driver, action, panel = _node_runtime_case()
-    connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout="compose\n")
+    driver, action, connection = _observed_node_runtime()
     connection.run.return_value = _result(returncode=returncode, stderr=output)
-    driver.context.connection_for = lambda _ref: connection
-    panel.get_node.return_value = SimpleNamespace(is_connected=True)
 
     with pytest.raises(ResourceReconcileError, match="Docker container remnawave-node evidence is unavailable"):
         driver.observe(action, None)
 
 
 def test_node_runtime_missing_managed_warp_binary_is_drift() -> None:
-    driver, action, panel = _node_runtime_case(warp=True)
-    connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout="compose\n")
+    driver, action, connection = _observed_node_runtime(warp=True)
     connection.run.side_effect = [
         _result(stdout="true\n"),
         _result(returncode=127, stderr="warp-cli: command not found"),
     ]
-    driver.context.connection_for = lambda _ref: connection
-    panel.get_node.return_value = SimpleNamespace(is_connected=True)
 
-    observation = driver.observe(action, None)
-
-    assert not observation_converges(action, observation)
+    assert not observation_converges(action, driver.observe(action, None))
 
 
 def test_node_runtime_rejects_warp_daemon_failure() -> None:
-    driver, action, panel = _node_runtime_case(warp=True)
-    connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout="compose\n")
-    connection.run.side_effect = [
-        _result(stdout="true\n"),
-        _result(returncode=1, stderr="Cannot connect to daemon"),
-    ]
-    driver.context.connection_for = lambda _ref: connection
-    panel.get_node.return_value = SimpleNamespace(is_connected=True)
+    driver, action, connection = _observed_node_runtime(warp=True)
+    connection.run.side_effect = [_result(stdout="true\n"), _result(returncode=1, stderr="Cannot connect to daemon")]
 
     with pytest.raises(ResourceReconcileError, match="WARP status evidence is unavailable"):
         driver.observe(action, None)
 
 
-def test_node_runtime_waits_for_bound_node_to_connect() -> None:
+@pytest.mark.parametrize("connected", [True, False])
+def test_node_runtime_apply_waits_for_bound_node_to_connect(connected: bool) -> None:
     driver, action, panel = _node_runtime_case()
 
     with (
         patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True),
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True) as wait,
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=connected) as wait,
     ):
-        driver.apply(action, None)
+        if connected:
+            driver.apply(action, None)
+        else:
+            with pytest.raises(ResourceReconcileError, match="did not connect to the panel"):
+                driver.apply(action, None)
 
     wait.assert_called_once_with(panel, "node-uuid")
 
 
-def test_node_runtime_fails_when_bound_node_does_not_connect() -> None:
-    driver, action, _panel = _node_runtime_case()
-
-    with (
-        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True),
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=False),
-        pytest.raises(ResourceReconcileError, match="did not connect to the panel"),
-    ):
-        driver.apply(action, None)
-
-
-def test_port_443_stream_apply_retires_the_legacy_artifact(
-    monkeypatch,
-) -> None:
-    resource = make_resource(
-        "nginx:shared:443:stream",
-        NginxArtifactPayload(
-            server_ref="srv-exit",
-            listener_port=443,
-            layer="stream",
-            routes=[
-                NginxRouteSpec(
-                    match="sni",
-                    server_names=[""],
-                    backend_server_ref="srv-exit",
-                    backend_port=8443,
-                )
-            ],
-        ),
-    )
-    plan = resource_plan(resource)
-    action = build_resource_actions(plan, 1)[0]
-    connection = MagicMock(spec=ServerConnection)
-    artifact_path = nginx_artifact_path(resource.logical_id, "stream")
-
-    def get_text(path: str, *, timeout: int):
-        if path == "/etc/nginx/nginx.conf":
-            return SimpleNamespace(
-                returncode=0,
-                stdout="stream { include /etc/nginx/stream.d/*.conf; }\n",
-            )
-        if path == artifact_path:
-            return SimpleNamespace(returncode=1, stdout="")
-        if path == "/etc/nginx/stream.d/meridian.conf":
-            return SimpleNamespace(returncode=0, stdout="legacy\n")
-        raise AssertionError(path)
-
-    connection.get_text.side_effect = get_text
-    connection.run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
-    monkeypatch.setattr(
-        "meridian.reconciler.server_drivers.InstallNginx.run",
-        lambda *_args, **_kwargs: StepResult(name="Install nginx", status="ok"),
-    )
-    monkeypatch.setattr(
-        "meridian.reconciler.server_drivers.ensure_file_content",
-        lambda *_args, **_kwargs: SimpleNamespace(ok=True, result=None),
-    )
-    driver = NginxArtifactDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-
-    driver.apply(action, None)
-
-    assert any(call.args[0] == "rm -f /etc/nginx/stream.d/meridian.conf" for call in connection.run.call_args_list)
-
-
-def _node_runtime_with_compose(image: str) -> tuple[NodeRuntimeDriver, ResourceAction, MagicMock]:
+def _node_runtime_with_compose(image: str) -> tuple[NodeRuntimeDriver, ResourceAction]:
     from meridian.node_deploy import render_node_compose
 
-    driver, action, panel = _node_runtime_case()
-    connection = MagicMock(spec=ServerConnection)
-    connection.get_text.return_value = _result(stdout=render_node_compose(image))
-    connection.run.return_value = _result(stdout="true\n")
-    driver.context.connection_for = lambda _ref: connection
-    panel.get_node.return_value = SimpleNamespace(is_connected=True)
-    return driver, action, panel
+    driver, action, _ = _observed_node_runtime(compose=render_node_compose(image))
+    return driver, action
 
 
-@pytest.mark.parametrize("image", ["remnawave/node:3.9.1", "remnawave/node:4.0.0", "remnawave/node:latest"])
-def test_node_runtime_accepts_operator_upgraded_image(image: str) -> None:
-    driver, action, _panel = _node_runtime_with_compose(image)
-
-    assert observation_converges(action, driver.observe(action, None))
-
+def _applied_image(driver: NodeRuntimeDriver, action: ResourceAction) -> str:
     with (
         patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True) as deploy,
         patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True),
     ):
         driver.apply(action, None)
+    return deploy.call_args.kwargs["image"]
 
-    assert deploy.call_args.kwargs["image"] == image
+
+@pytest.mark.parametrize("image", ["remnawave/node:3.9.1", "remnawave/node:4.0.0", "remnawave/node:latest"])
+def test_node_runtime_accepts_operator_upgraded_image(image: str) -> None:
+    driver, action = _node_runtime_with_compose(image)
+
+    assert observation_converges(action, driver.observe(action, None))
+    assert _applied_image(driver, action) == image
 
 
 def test_node_runtime_upgrades_image_older_than_the_pin() -> None:
     from meridian.config import REMNAWAVE_NODE_IMAGE
 
-    driver, action, _panel = _node_runtime_with_compose("remnawave/node:2.8.0")
+    driver, action = _node_runtime_with_compose("remnawave/node:2.8.0")
 
     assert not observation_converges(action, driver.observe(action, None))
-
-    with (
-        patch("meridian.reconciler.server_drivers.deploy_node_container", return_value=True) as deploy,
-        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=True),
-    ):
-        driver.apply(action, None)
-
-    assert deploy.call_args.kwargs["image"] == REMNAWAVE_NODE_IMAGE
+    assert _applied_image(driver, action) == REMNAWAVE_NODE_IMAGE
 
 
 def test_node_runtime_adopts_the_pinned_digest_for_a_tag_only_compose_once() -> None:
     from meridian.config import REMNAWAVE_NODE_IMAGE
     from meridian.remnawave.versions import parse_image
 
-    tag_only = f"remnawave/node:{parse_image(REMNAWAVE_NODE_IMAGE).tag}"
-    driver, action, _panel = _node_runtime_with_compose(tag_only)
-
+    driver, action = _node_runtime_with_compose(f"remnawave/node:{parse_image(REMNAWAVE_NODE_IMAGE).tag}")
     assert not observation_converges(action, driver.observe(action, None))
 
-    pinned_driver, pinned_action, _panel = _node_runtime_with_compose(REMNAWAVE_NODE_IMAGE)
+    pinned_driver, pinned_action = _node_runtime_with_compose(REMNAWAVE_NODE_IMAGE)
     assert observation_converges(pinned_action, pinned_driver.observe(pinned_action, None))
 
 
@@ -736,119 +623,6 @@ def test_node_runtime_accepts_another_spelling_of_the_pinned_digest() -> None:
     from meridian.remnawave.versions import parse_image
 
     pin = parse_image(REMNAWAVE_NODE_IMAGE)
-    driver, action, _panel = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
+    driver, action = _node_runtime_with_compose(f"docker.io/{pin.repository}@{pin.digest}")
 
     assert observation_converges(action, driver.observe(action, None))
-
-
-def _firewall_driver(connection: MagicMock) -> tuple[FirewallRuleDriver, ResourceAction]:
-    plan, action = _single_action(
-        "firewall:srv-exit:tcp:443",
-        FirewallRulePayload(server_ref="srv-exit", transport="tcp", port=443),
-    )
-    driver = FirewallRuleDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-    return driver, action
-
-
-def test_firewall_rule_under_its_pre_rename_comment_is_drift() -> None:
-    connection = MagicMock(spec=ServerConnection)
-    driver, action = _firewall_driver(connection)
-    token = artifact_token(action.resource.logical_id)
-    connection.run.return_value = _result(
-        stdout=(f"ufw allow 443/tcp comment 'fw-{token}'\nufw allow 443/tcp comment 'meridian-v4-{token}'\n")
-    )
-
-    assert not observation_converges(action, driver.observe(action, None))
-
-
-def test_firewall_migration_deletes_the_legacy_comment_then_re_adds_the_renamed_rule() -> None:
-    connection = MagicMock(spec=ServerConnection)
-    driver, action = _firewall_driver(connection)
-    token = artifact_token(action.resource.logical_id)
-    connection.run.side_effect = lambda command, **_kw: _result(
-        stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n" if command.startswith("ufw show added") else ""
-    )
-
-    receipt = driver.apply(action, None)
-
-    commands = [call.args[0] for call in connection.run.call_args_list]
-    assert receipt.remote_id == f"fw-{token}"
-    delete = next(index for index, command in enumerate(commands) if f"# meridian-v4-{token}$" in command)
-    adds = [index for index, command in enumerate(commands) if command == f"ufw allow 443/tcp comment fw-{token}"]
-    assert adds[0] < delete < adds[-1]
-
-
-def test_failed_firewall_migration_restores_the_legacy_rule() -> None:
-    connection = MagicMock(spec=ServerConnection)
-    driver, action = _firewall_driver(connection)
-    token = artifact_token(action.resource.logical_id)
-    adds = 0
-
-    def run(command: str, **_kw: object):
-        nonlocal adds
-        if command.startswith("ufw show added"):
-            return _result(stdout=f"ufw allow 443/tcp comment 'meridian-v4-{token}'\n")
-        if command.startswith("ufw allow") and f"fw-{token}" in command and "meridian" not in command:
-            adds += 1
-            return _result(returncode=1 if adds > 1 else 0, stderr="ERROR: rule failed")
-        return _result()
-
-    connection.run.side_effect = run
-
-    with pytest.raises(ResourceReconcileError, match="Could not apply firewall rule"):
-        driver.apply(action, None)
-
-    commands = [call.args[0] for call in connection.run.call_args_list]
-    assert commands[-1] == f"ufw allow 443/tcp comment meridian-v4-{token}"
-
-
-def test_fresh_firewall_rule_never_deletes_by_comment() -> None:
-    connection = MagicMock(spec=ServerConnection)
-    driver, action = _firewall_driver(connection)
-    connection.run.return_value = _result()
-
-    driver.apply(action, None)
-
-    assert not any("ufw --force delete" in call.args[0] for call in connection.run.call_args_list)
-
-
-def test_server_baseline_apply_moves_its_attestation_to_the_neutral_path() -> None:
-    from meridian.reconciler.server_render import baseline_marker_path, legacy_baseline_marker_path
-
-    plan, action = _action(install_docker=False)
-    connection = MagicMock(spec=ServerConnection)
-    connection.user = "root"
-    connection.run.return_value = _result()
-    driver = ServerBaselineDriver(
-        ServerDriverContext(
-            plan=plan,
-            cluster=ClusterConfig(),
-            panel=MagicMock(),
-            connection_for=lambda _ref: connection,
-            server_addresses={"srv-exit": "198.51.100.10"},
-        )
-    )
-    written: list[str] = []
-
-    with (
-        patch("meridian.provision.Provisioner.run", return_value=[]),
-        patch(
-            "meridian.reconciler.server_drivers.ensure_file_content",
-            side_effect=lambda _conn, path, *_a, **_kw: written.append(path) or SimpleNamespace(ok=True),
-        ),
-    ):
-        driver.apply(action, None)
-
-    assert written == [baseline_marker_path(action.resource.logical_id)]
-    assert "meridian" not in written[0]
-    commands = [call.args[0] for call in connection.run.call_args_list]
-    legacy = legacy_baseline_marker_path(action.resource.logical_id)
-    assert any(command.startswith(f"rm -f {legacy}") for command in commands)
