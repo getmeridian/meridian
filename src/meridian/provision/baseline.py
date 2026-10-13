@@ -22,12 +22,7 @@ from meridian.provision.common import (
     SetTimezone,
 )
 from meridian.provision.docker import InstallDocker
-from meridian.provision.recipe import Operation, Recipe, Resource, op
-from meridian.provision.steps import ProvisionContext
-
-
-def _harden(ctx: ProvisionContext) -> bool:
-    return ctx.harden
+from meridian.provision.steps import ProvisionContext, Step
 
 
 @dataclass(frozen=True)
@@ -42,40 +37,23 @@ def build_server_baseline_steps(
     ctx: ProvisionContext,
     *,
     install_docker: bool,
-) -> list[Operation]:
-    """Build the shared OS baseline, optionally including Docker."""
-    extra_packages = FAIL2BAN_PACKAGES if ctx.harden else []
-    operations = [
-        op(CheckDiskSpace(), provides=[Resource.DISK_SPACE_CHECKED]),
-        op(
-            InstallPackages(REQUIRED_PACKAGES + extra_packages),
-            requires=[Resource.DISK_SPACE_CHECKED],
-            provides=[Resource.SYSTEM_PACKAGES],
-        ),
-        op(EnableAutoUpgrades(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.AUTO_UPGRADES]),
-        op(SetTimezone(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.TIMEZONE_UTC]),
-        op(HardenSSH(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.SSH_HARDENED], when=_harden),
-        op(
-            ConfigureFail2ban(),
-            requires=[Resource.SYSTEM_PACKAGES, Resource.SSH_HARDENED],
-            provides=[Resource.FAIL2BAN_RUNNING],
-            when=_harden,
-        ),
-        op(ConfigureBBR(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.BBR_ENABLED]),
-        # Public ports belong to the reviewed plan's tagged firewall rules.
-        op(
-            ConfigureFirewall(),
-            requires=[Resource.SYSTEM_PACKAGES],
-            provides=[Resource.FIREWALL_CONFIGURED],
-            when=_harden,
-        ),
+) -> list[Step]:
+    """Build the shared OS baseline in execution order, optionally including Docker."""
+    steps: list[Step] = [
+        CheckDiskSpace(),
+        InstallPackages(REQUIRED_PACKAGES + (FAIL2BAN_PACKAGES if ctx.harden else [])),
+        EnableAutoUpgrades(),
+        SetTimezone(),
     ]
+    if ctx.harden:
+        steps += [HardenSSH(), ConfigureFail2ban()]
+    steps.append(ConfigureBBR())
+    if ctx.harden:
+        # Public ports belong to the reviewed plan's tagged firewall rules.
+        steps.append(ConfigureFirewall())
     if install_docker:
-        operations.append(
-            op(InstallDocker(), requires=[Resource.SYSTEM_PACKAGES], provides=[Resource.DOCKER_INSTALLED])
-        )
-
-    return Recipe(tuple(operations)).steps(ctx)
+        steps.append(InstallDocker())
+    return steps
 
 
 def build_server_baseline_checks(

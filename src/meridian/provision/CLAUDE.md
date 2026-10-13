@@ -4,7 +4,7 @@
 
 **Composable server baseline** — `build_server_baseline_steps()` owns OS setup, SSH-safe UFW, and optional Docker, paired with read-only `build_server_baseline_checks()`; `build_setup_steps()` adds the control plane, nginx, and TLS. WARP is installed by the reconciler's node-runtime driver.
 
-**Recipe graph** — builders wrap steps in `Operation` objects with explicit `requires`/`provides` resources. Add graph edges before relying on declaration order for new conditional chunks.
+**Recipes are ordered lists** — builders return steps in execution order, gated by plain `if` on the context; keep each step after everything it depends on.
 
 **Typed context** — `ProvisionContext` has explicit typed fields for configuration and inter-step data (`ctx.panel_api`, `ctx.cluster`, generated paths). Do not add dictionary-style escape hatches.
 

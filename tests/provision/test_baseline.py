@@ -9,7 +9,6 @@ from meridian.provision import (
     build_server_baseline_steps,
     build_setup_steps,
 )
-from meridian.provision.recipe import Operation, Resource
 from meridian.provision.steps import ProvisionContext
 
 
@@ -47,7 +46,6 @@ def test_server_baseline_preserves_order(harden: bool, expected_names: list[str]
     steps = build_server_baseline_steps(ctx, install_docker=False)
 
     assert [step.name for step in steps] == expected_names
-    assert all(isinstance(step, Operation) for step in steps)
 
 
 def test_server_baseline_appends_docker_only_when_requested() -> None:
@@ -59,18 +57,13 @@ def test_server_baseline_appends_docker_only_when_requested() -> None:
     assert [step.name for step in with_docker[:-1]] == [step.name for step in without_docker]
     docker = with_docker[-1]
     assert docker.name == "Install Docker"
-    assert docker.requires == frozenset({Resource.SYSTEM_PACKAGES})
-    assert docker.provides == frozenset({Resource.DOCKER_INSTALLED})
 
 
 def test_declarative_baseline_leaves_public_ports_to_compiled_firewall_resources() -> None:
     ctx = ProvisionContext(ip="198.51.100.1", harden=True)
 
-    steps = build_server_baseline_steps(ctx, install_docker=False)
-    firewall = next(step for step in steps if step.name == "Configure firewall")
     checks = build_server_baseline_checks(ctx, install_docker=False)
 
-    assert firewall.provides == frozenset({Resource.FIREWALL_CONFIGURED})
     assert "https_firewall" not in {check.name for check in checks}
     assert "hysteria_firewall" not in {check.name for check in checks}
 

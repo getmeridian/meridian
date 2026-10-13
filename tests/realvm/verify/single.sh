@@ -87,7 +87,7 @@ else
 fi
 
 # VERIFY: fail2ban_active
-echo ">>> Checking fail2ban is active (hard assertion — regression guard for build_node_steps/setup_steps fix)..."
+echo ">>> Checking fail2ban is active (hard assertion — regression guard for the baseline fail2ban fix)..."
 F2B_STATE=$(ssh -o StrictHostKeyChecking=no root@"$TARGET_IP" "systemctl is-active fail2ban 2>/dev/null || echo missing" 2>/dev/null)
 echo "    systemctl is-active fail2ban: $F2B_STATE"
 if [ "$F2B_STATE" = "active" ]; then
