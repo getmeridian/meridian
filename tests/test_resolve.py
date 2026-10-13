@@ -8,7 +8,7 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig
-from meridian.commands.resolve import resolve_server, try_resolve_server
+from meridian.commands.resolve import resolve_server
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
 from meridian.resolve import TargetSpec, is_local_keyword, merge_target, parse_target
 from meridian.servers import ServerEntry, ServerProfileStore, ServerRegistry
@@ -32,10 +32,6 @@ def _topology_cluster(reg: ServerRegistry, *, exits: list[str], relays: list[str
             intent, server_ref=ref(host), title=f"relay-{index}", exit_ref="main", listen_port=8443
         )
     return ClusterConfig(topology_intent=intent)
-
-
-def test_try_resolve_returns_none_for_cli_exit(servers_file: Path) -> None:
-    assert try_resolve_server(ServerRegistry(servers_file)) is None
 
 
 class TestExplicitIP:

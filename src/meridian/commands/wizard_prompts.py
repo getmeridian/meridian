@@ -12,7 +12,7 @@ from typing import Protocol
 
 from rich.markup import escape
 
-from meridian.console import confirm, err_console, prompt
+from meridian.console import err_console, prompt
 from meridian.i18n import LOCALE_NAMES, LOCALES, Locale, system_locale, t, words
 
 
@@ -20,8 +20,6 @@ class WizardIO(Protocol):
     def write(self, message: str = "") -> None: ...
 
     def ask(self, label: str, *, default: str = "") -> str: ...
-
-    def approve(self, label: str) -> bool: ...
 
 
 class RichWizardIO:
@@ -32,9 +30,6 @@ class RichWizardIO:
 
     def ask(self, label: str, *, default: str = "") -> str:
         return prompt(label, default=default)
-
-    def approve(self, label: str) -> bool:
-        return confirm(label)
 
 
 class Navigation(Exception):

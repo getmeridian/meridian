@@ -40,9 +40,6 @@ class _ScriptedIO:
         self.labels.append(label)
         return answer or default
 
-    def approve(self, label: str) -> bool:
-        raise AssertionError(f"Unexpected direct approval prompt: {label}")
-
 
 # control server runs only the panel; the second server is the exit.
 _TWO_SERVER_JOURNEY: list[tuple[str, str]] = [

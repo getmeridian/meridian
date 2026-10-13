@@ -2,7 +2,7 @@
 
 Extracted from ``ssh.py`` to keep the transport module under the 800-line
 budget.  ``ServerConnection`` inherits from ``_FileTransferMixin`` defined
-here; file-oriented helpers (put_bytes, put_text, get_text, get_bytes) live
+here; file-oriented helpers (put_bytes, put_text, get_text) live
 in this module.
 """
 
@@ -303,15 +303,3 @@ class _FileTransferMixin:
     def get_text(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> CommandResult:
         """Read a remote text file through the normal command path."""
         return self.run(f"cat {shlex.quote(remote_path)}", timeout=timeout, sudo=sudo, sensitive=True)
-
-    def get_bytes(self, remote_path: str, *, timeout: int = 30, sudo: bool | None = None) -> bytes:
-        """Read a remote file as bytes.
-
-        This is intentionally small: binary reads are currently needed only for
-        support utilities, while text reads should use ``get_text`` so callers
-        retain return-code and stderr details.
-        """
-        result = self.get_text(remote_path, timeout=timeout, sudo=sudo)
-        if result.returncode != 0:
-            return b""
-        return result.stdout.encode()

@@ -131,9 +131,6 @@ class _IO:
         self.labels.append(label)
         return self.answers.pop(0) or default
 
-    def approve(self, label: str) -> bool:
-        raise AssertionError(label)
-
 
 def test_russian_prompts_accept_russian_and_english_answers() -> None:
     i18n.set_locale("ru")

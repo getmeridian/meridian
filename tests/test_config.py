@@ -79,4 +79,4 @@ class TestEnvOverrides:
     def test_connect_test_url_override(self, monkeypatch) -> None:
         monkeypatch.setenv("MERIDIAN_CONNECT_TEST_URL", "https://echo.test/ip")
         importlib.reload(config)
-        assert config.CONNECT_TEST_URL == "https://echo.test/ip"
+        assert config.CONNECT_TEST_URLS_IPV4 == config.CONNECT_TEST_URLS_IPV6 == ("https://echo.test/ip",)

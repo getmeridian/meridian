@@ -7,7 +7,6 @@ prompts, or ``console.fail()``.
 
 from __future__ import annotations
 
-import typer
 from rich.markup import escape
 
 from meridian import resolve as _resolve_lib
@@ -26,7 +25,6 @@ from meridian.ssh_ui import RichSSHUI
 __all__ = [
     "ensure_server_connection",
     "resolve_server",
-    "try_resolve_server",
 ]
 
 
@@ -190,21 +188,6 @@ def resolve_server(
         )
     except LocalStateError as exc:
         fail(exc)
-
-
-def try_resolve_server(
-    registry: ServerRegistry,
-    requested_server: str = "",
-    explicit_ip: str = "",
-    user: str = "root",
-) -> ResolvedServer | None:
-    """Like resolve_server but returns None instead of exiting on failure."""
-    try:
-        return _resolve_server(registry, requested_server=requested_server, explicit_ip=explicit_ip, user=user)
-    except LocalStateError as exc:
-        fail(exc)
-    except (SystemExit, typer.Exit):
-        return None
 
 
 def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:

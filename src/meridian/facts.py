@@ -43,13 +43,6 @@ class UfwState:
     raw_status: str = ""
 
 
-@dataclass(frozen=True)
-class ContainerState:
-    name: str
-    running: bool = False
-    status: str = ""
-
-
 def parse_ssh_ports(output: str) -> list[int]:
     """Parse one or more SSH ports from command output."""
     ports: list[int] = []
@@ -95,14 +88,6 @@ class ServerFacts:
 
     conn: ServerConnection
     _cache: dict[str, Any] = field(default_factory=dict)
-
-    def invalidate(self, *names: str) -> None:
-        """Clear cached facts by name, or all facts if no names are passed."""
-        if not names:
-            self._cache.clear()
-            return
-        for name in names:
-            self._cache.pop(name, None)
 
     def os_release(self) -> OsRelease:
         if "os_release" not in self._cache:
@@ -181,19 +166,6 @@ class ServerFacts:
                 version=version.stdout.strip() if version.returncode == 0 else "",
             )
         return self._cache["docker_state"]
-
-    def container_state(self, name: str) -> ContainerState:
-        key = f"container_state:{name}"
-        if key not in self._cache:
-            q_name = shlex.quote(name)
-            status = self.conn.run(f"docker inspect -f '{{{{.State.Status}}}}' {q_name} 2>/dev/null", timeout=15)
-            running = self.conn.run(f"docker inspect -f '{{{{.State.Running}}}}' {q_name} 2>/dev/null", timeout=15)
-            self._cache[key] = ContainerState(
-                name=name,
-                running=running.returncode == 0 and running.stdout.strip() == "true",
-                status=status.stdout.strip() if status.returncode == 0 else "",
-            )
-        return self._cache[key]
 
     def ufw_state(self) -> UfwState:
         if "ufw_state" not in self._cache:

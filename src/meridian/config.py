@@ -98,8 +98,6 @@ CONNECT_TEST_URLS_IPV6 = (
         "https://v6.ident.me",
     )
 )
-# Singular alias retained for callers that expose the configured primary observer.
-CONNECT_TEST_URL = CONNECT_TEST_URLS_IPV4[0]
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
     "true",
@@ -135,14 +133,12 @@ ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8
 # Relay (Realm TCP relay)
 REALM_VERSION = "2.9.3"
 REALM_GITHUB_URL = "https://github.com/zhboner/realm/releases/download"
-RELAY_SERVICE_NAME = "meridian-relay"
 
 # SHA256 digests for Realm tarball verification (keyed by target triple)
 REALM_SHA256: dict[str, str] = {
     "x86_64-unknown-linux-gnu": "2eba86f1a1e47c1bfe9d6fd682ef8667bd05e57c3aeb0ec37806aabe2ce74a0c",
     "aarch64-unknown-linux-gnu": "9937daacdcdfcac9fd78d25819f2de0a5c3357c2c49e686679d812343ab8661e",
 }
-RELAY_CONFIG_PATH = "/etc/meridian/realm.toml"
 # Relay hosts expose bland names: providers scan process lists and unit names
 # for proxy software. The binary is still Realm; only its installed name changes.
 RELAY_BINARY_PATH = "/usr/local/bin/netfwd"
