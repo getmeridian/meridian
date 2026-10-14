@@ -8,7 +8,7 @@
 
 **Dead-code report** — `find_dead_code.py` (stdlib `ast`) builds a reference graph over `src/meridian`: imports resolve precisely through re-exports, attributes and production strings match members by name. Liveness spreads from production roots (src top level, `scripts/`, entry points, registration decorators), then from `tests/`; it reports `dead`, `test-only`, and `unused-param` as sorted warnings in `make ci` and CI, failing only under `--strict`.
 
-**Conditional Studio packaging** — `hatch_build.py` bundles, when `website/dist` exists (so clean source installs work), only the Studio page's closure: `studio/` plus every file its HTML, CSS `url()`, and JS imports reach. `verify_package_assets.py` checks the page is there and nothing outside the Engine's served roots rides along.
+**Conditional Studio packaging** — `hatch_build.py` bundles, when `website/dist` exists (so clean source installs work), only the Studio page's closure: `studio/` plus every file its HTML, CSS `url()`, and JS imports reach, and the font licenses whenever a font rides along. `verify_package_assets.py` checks the page is there and nothing outside the Engine's served roots rides along.
 
 ## What's done well
 

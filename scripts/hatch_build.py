@@ -41,6 +41,9 @@ def studio_asset_closure(dist: Path) -> list[str]:
         for target in _references(root, path):
             if target not in seen:
                 pending.append(target)
+    licenses = root / "fonts" / "licenses"
+    if licenses.is_dir() and any(path.is_relative_to(root / "fonts") for path in seen):
+        seen.update(path for path in licenses.iterdir() if path.is_file())  # the OFL travels with its fonts
     return sorted(path.relative_to(root).as_posix() for path in seen)
 
 
