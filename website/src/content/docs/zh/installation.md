@@ -12,10 +12,25 @@ curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
 此脚本：
-1. 如果没有 [uv](https://docs.astral.sh/uv/)，则安装它，pipx 或 pip 作为后备方案
-2. 从 PyPI 安装 `meridian-vpn`
+1. 如果没有 [uv](https://docs.astral.sh/uv/)，则安装它，pipx 或 pip 作为后备方案。uv 安装程序按版本固定，并在运行前用 SHA-256 校验。
+2. 从 PyPI 安装 `meridian-vpn`（设置 `MERIDIAN_VERSION=4.0.0` 可安装某个确切版本）
 3. 必要时将工具目录加入您的 shell PATH
 4. 仅在无密码 sudo 可用时创建 `/usr/local/bin/meridian`
+
+## 验证安装
+
+每个 [GitHub 发布版本](https://github.com/getmeridian/meridian/releases)都附带 `install.sh` 及其 `SHA256SUMS`。要在运行脚本前检查它，请从发布页下载两者并校验：
+
+```
+VERSION=4.0.0
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
+sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
+less install.sh                  # optional: read it
+MERIDIAN_VERSION=$VERSION bash install.sh
+```
+
+要检查 getmeridian.org 上的副本，请把 `curl -sSf https://getmeridian.org/install.sh | sha256sum` 的结果与该发布版本的 `SHA256SUMS` 对比；只要脚本在该发布之后没有变动，两者就会一致。
 
 ## 手动安装
 
@@ -60,7 +75,7 @@ Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或�
 ## 需求
 
 - **Python 3.11+**（uv 为您安装和管理）
-- 对您的服务器的 **SSH 密钥访问**，以 root 身份或拥有无密码 sudo 的用户身份
+- 对您的服务器的 **SSH 访问**，以 root 身份或拥有无密码 sudo 的用户身份。最好使用密钥登录；如果服务器只接受密码，`meridian deploy` 和 `meridian setup` 会提示为 Meridian 创建密钥，并用该密码一次性安装它（见[仅密码登录的服务器](/zh/deploy/#仅密码登录的服务器)）
 
 终端 QR 码由捆绑的 `segno` 包渲染；不需要系统依赖。
 

@@ -21,6 +21,24 @@ meridian deploy 198.51.100.10
 meridian deploy 198.51.100.10 --client-name alice --yes
 ```
 
+## 仅密码登录的服务器
+
+Meridian 使用 SSH 密钥登录。许多 VPS 提供商只给您一个 root 密码，所以当服务器拒绝您的密钥但接受密码时，交互式的 `meridian deploy` 会询问：
+
+```
+→ This server accepts only a password. Create a key for Meridian and install it now? [y/N]
+```
+
+回答 `y` 并输入密码（输入内容不可见）。Meridian 会在 `~/.config/meridian/ssh/meridian_ed25519` 创建自己的密钥，将其加入服务器的 `authorized_keys`，检查它能否登录，把它保存到服务器配置中，然后继续。密码只用于这一条命令，从不保存或记录。主机密钥会先被验证，因此密码只会发送给您已接受其指纹的服务器。`meridian setup` 在您添加服务器时提供同样的功能。
+
+没有终端、使用 `--yes` 或使用 `--json` 时，Meridian 从不提示：它会停止并给出手动命令。先安装一次您自己的密钥，然后重新运行：
+
+```
+ssh-copy-id root@198.51.100.10
+```
+
+加固会在部署后关闭密码登录，所以请保留密钥：之后的命令会自动使用它。
+
 ## 所有标志
 
 | 标志 | 默认值 | 说明 |

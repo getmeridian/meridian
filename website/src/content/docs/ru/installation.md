@@ -12,10 +12,25 @@ curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
 Этот скрипт:
-1. Устанавливает [uv](https://docs.astral.sh/uv/) если его нет, с pipx или pip как возврат
-2. Устанавливает `meridian-vpn` из PyPI
+1. Устанавливает [uv](https://docs.astral.sh/uv/) если его нет, с pipx или pip как возврат. Установщик uv закреплён по версии и проверяется по SHA-256 перед запуском.
+2. Устанавливает `meridian-vpn` из PyPI (задайте `MERIDIAN_VERSION=4.0.0`, чтобы установить точный выпуск)
 3. Добавляет директорий инструмента в ваш shell PATH при необходимости
 4. Создаёт `/usr/local/bin/meridian` только когда доступен passwordless sudo
+
+## Проверенная установка
+
+К каждому [выпуску на GitHub](https://github.com/getmeridian/meridian/releases) приложены `install.sh` и его `SHA256SUMS`. Чтобы проверить скрипт перед запуском, скачайте оба файла из выпуска и сверьте их:
+
+```
+VERSION=4.0.0
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
+sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
+less install.sh                  # optional: read it
+MERIDIAN_VERSION=$VERSION bash install.sh
+```
+
+Чтобы проверить копию с getmeridian.org, сравните `curl -sSf https://getmeridian.org/install.sh | sha256sum` с `SHA256SUMS` выпуска; они совпадают, если скрипт не менялся после этого выпуска.
 
 ## Ручная установка
 
@@ -60,7 +75,7 @@ Meridian 4 хранит своё состояние в `~/.config/meridian/` и 
 ## Требования
 
 - **Python 3.11+** (uv устанавливает и управляет им для вас)
-- **SSH ключевой доступ** к вашему серверу, как root или пользователь с passwordless sudo
+- **SSH доступ** к вашему серверу, как root или пользователь с passwordless sudo. Лучше всего вход по ключу; если сервер принимает только пароль, `meridian deploy` и `meridian setup` предложат создать ключ для Meridian и один раз установить его с помощью этого пароля (см. [Серверы только с паролем](/ru/deploy/#серверы-только-с-паролем))
 
 Терминальные QR коды отрисовываются встроенным пакетом `segno`; нет системной зависимости.
 

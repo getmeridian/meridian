@@ -111,7 +111,7 @@ section: guides
 
 ### SSH 连接错误
 
-手动测试 SSH：`ssh root@SERVER_IP`。确保您有基于密钥的访问。如果不是 root，使用 `--user` 标志。
+手动测试 SSH：`ssh root@SERVER_IP`。确保您有基于密钥的访问。如果不是 root，使用 `--user` 标志。如果服务器只接受密码，请在终端中不带 `--yes` 运行 `meridian deploy` 让它安装密钥（见[仅密码登录的服务器](/zh/deploy/#仅密码登录的服务器)），或者运行一次 `ssh-copy-id root@SERVER_IP`。
 
 ### Xray 无法在节点容器中启动
 

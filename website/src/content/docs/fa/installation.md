@@ -12,10 +12,25 @@ curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
 این اسکریپت:
-1. اگر [uv](https://docs.astral.sh/uv/) موجود نباشد آن را نصب می‌کند، pipx یا pip را به‌عنوان جایگزین استفاده می‌کند
-2. `meridian-vpn` را از PyPI نصب می‌کند
+1. اگر [uv](https://docs.astral.sh/uv/) موجود نباشد آن را نصب می‌کند، pipx یا pip را به‌عنوان جایگزین استفاده می‌کند. نصب‌کنندهٔ uv با نسخه pin شده و پیش از اجرا با SHA-256 بررسی می‌شود.
+2. `meridian-vpn` را از PyPI نصب می‌کند (برای نصب یک نسخهٔ دقیق، `MERIDIAN_VERSION=4.0.0` را تنظیم کنید)
 3. در صورت نیاز پوشه ابزار را به PATH شل اضافه می‌کند
 4. فقط وقتی sudo بدون گذرواژه در دسترس باشد `/usr/local/bin/meridian` را ایجاد می‌کند
+
+## نصب تأییدشده
+
+هر [release در GitHub](https://github.com/getmeridian/meridian/releases) فایل `install.sh` و `SHA256SUMS` آن را پیوست می‌کند. برای بررسی اسکریپت پیش از اجرا، هر دو را از release دانلود کنید و تأیید کنید:
+
+```
+VERSION=4.0.0
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
+sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
+less install.sh                  # optional: read it
+MERIDIAN_VERSION=$VERSION bash install.sh
+```
+
+برای بررسی نسخهٔ موجود در getmeridian.org، خروجی `curl -sSf https://getmeridian.org/install.sh | sha256sum` را با `SHA256SUMS` همان release مقایسه کنید؛ تا وقتی اسکریپت پس از آن release تغییر نکرده باشد یکسان‌اند.
 
 ## نصب دستی
 
@@ -60,7 +75,7 @@ Meridian 4 وضعیت خودش را در `~/.config/meridian/` نگه می‌د�
 ## نیازمندی‌ها
 
 - **Python 3.11+** (uv آن را نصب و مدیریت می‌کند)
-- **دسترسی کلید SSH** به سرور شما، به‌عنوان root یا کاربر با sudo بدون گذرواژه
+- **دسترسی SSH** به سرور شما، به‌عنوان root یا کاربر با sudo بدون گذرواژه. ورود با کلید بهترین است؛ اگر سرور فقط گذرواژه می‌پذیرد، `meridian deploy` و `meridian setup` پیشنهاد می‌کنند برای Meridian کلیدی بسازند و یک بار با همان گذرواژه نصبش کنند (ببینید [سرورهای فقط با گذرواژه](/fa/deploy/#سرورهای-فقط-با-گذرواژه))
 
 کدهای QR ترمینال با بستهٔ موجود `segno` رسم می‌شوند؛ به وابستگی سیستمی نیاز ندارد.
 
