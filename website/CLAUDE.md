@@ -32,4 +32,5 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, studio) are excluded because Starlight can't see them.
 - **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).
 - **Starlight owns Astro i18n** — never add a top-level `i18n` block; Starlight derives it from `locales`.
+- **Prefetch on hover only** — `defaultStrategy: 'viewport'` with `prefetchAll` downloaded every visible sidebar page (~20) on each visit.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

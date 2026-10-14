@@ -126,9 +126,11 @@ export default defineConfig({
   build: {
     format: 'directory',
   },
+  // Prefetch a page only when the reader points at its link; 'viewport' downloaded every
+  // sidebar page on each visit, which costs real money on metered connections.
   prefetch: {
     prefetchAll: true,
-    defaultStrategy: 'viewport',
+    defaultStrategy: 'hover',
   },
   markdown: {
     processor: unified({ remarkPlugins: [remarkMermaid] }),
