@@ -56,6 +56,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   unless you have a gateway, suggests five short server names (astra, boba,
   foxtrot…), and ends with a plain summary before anything
   changes. Running `meridian` alone in a terminal offers to start it.
+- **Camouflage scans work on cloud servers** — VPSes that get a `/32` address
+  (Hetzner Cloud and others) now scan their surrounding `/24`; the scan used to
+  cover only the server itself, so `deploy` and `node add` always fell back to
+  a well-known site.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
 - **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`

@@ -14,8 +14,9 @@ from meridian.ssh import CommandResult
 
 
 class FakeConnection:
-    def __init__(self, *, arch: str = "x86_64", scan_returncode: int = 0) -> None:
+    def __init__(self, *, arch: str = "x86_64", scan_returncode: int = 0, cidr: str = "198.51.100.8/24") -> None:
         self.arch = arch
+        self.cidr = cidr
         self.scan_returncode = scan_returncode
         self.commands: list[str] = []
         # RealiTLScanner 0.2.3 output: certificate details precede CERT_DOMAIN.
@@ -32,7 +33,7 @@ class FakeConnection:
         if command == "uname -m":
             return CommandResult(args=command, returncode=0, stdout=f"{self.arch}\n")
         if command.startswith("ip addr show"):
-            return CommandResult(args=command, returncode=0, stdout="198.51.100.8/24\n")
+            return CommandResult(args=command, returncode=0, stdout=f"{self.cidr}\n")
         return CommandResult(args=command, returncode=self.scan_returncode, stdout=self.csv_output)
 
 
@@ -200,3 +201,20 @@ def test_neighbor_targets_need_dns_inside_the_subnet_and_reality_tls() -> None:
     connection.run = run  # type: ignore[method-assign]
 
     assert neighbor_camouflage_targets(connection, "198.51.100.8") == ["shop.near.test"]  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("cidr", "network"),
+    [
+        ("198.51.100.8/32", "198.51.100.0/24"),
+        ("198.51.100.8/29", "198.51.100.0/24"),
+        ("198.51.100.8/22", "198.51.100.0/22"),
+    ],
+    ids=["cloud-point-to-point", "small-block", "wider-subnet-kept"],
+)
+def test_scan_covers_at_least_the_servers_slash_24(cidr: str, network: str) -> None:
+    from meridian.diagnostics.camouflage import scan_neighbors
+
+    connection = FakeConnection(cidr=cidr)
+
+    assert str(scan_neighbors(connection, "198.51.100.8").network) == network  # type: ignore[arg-type]

@@ -19,6 +19,7 @@
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint; full canonical traffic is the UDP authority.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but a pass needs separate trust, lifetime, and hostname validation.
 - **A neighbor target must resolve into the scanned subnet** — CDN-fronted names point elsewhere; check `getent ahostsv4` before the TLS 1.3 + HTTP/2 probe.
+- **Neighbor scans cover at least a /24** — cloud VPSes get a `/32` point-to-point address; scanning only that found nothing, so every deploy fell back to a well-known site.
 - **Relay legs run curl on the hop, never Python** — `relay.check_relay_leg` sends the chain's client SNI through `--connect-to` with the blocking stall thresholds; unreachable next hops defer to the TCP check, and a small camouflage page stays inconclusive.
 - **Relay next-hop probes use bash `/dev/tcp` under `timeout`** — never `nc` (absent on minimal images); the probe echoes its own status so SSH or tool failures stay skipped.
 - **Probe cancellation is prompt** — daemon workers stop taking jobs on SIGINT so socket timeouts cannot delay exit 130.
