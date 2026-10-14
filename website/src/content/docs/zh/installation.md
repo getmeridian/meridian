@@ -70,6 +70,8 @@ Meridian 4 **不是就地升级**。它用 Remnawave 替换 3x-ui 面板，来�
 
 Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或改变 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为解释这些选项。
 
+本文档介绍的是 Meridian 4。仍在使用 3.x 的服务器可以参阅保留在 GitHub 上的 [Meridian 3.17.3 文档](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/zh)。
+
 ## 需求
 
 - **Python 3.11+**（uv 为您安装和管理）

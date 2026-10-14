@@ -70,6 +70,8 @@ Your 3.x servers keep working. You have two choices:
 
 Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
 
+These docs describe Meridian 4. The [Meridian 3.17.3 docs](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/en) stay on GitHub for servers you keep on 3.x.
+
 ## Requirements
 
 - **Python 3.11+** (uv installs and manages it for you)
