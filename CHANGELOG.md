@@ -288,6 +288,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   Firefox copy slipped into the automatic failover group.
 - `meridian check` and `meridian test` are fail-closed: skipped evidence is never
   reported as a pass.
+- Mihomo and sing-box subscriptions are tested with the real engines, not only
+  parsed: every change runs `mihomo -t` (Mihomo 1.19.32) and `sing-box check`
+  (sing-box 1.14.3) on what a real panel delivers. The client-management docs
+  list the tested apps and engine versions.
 - Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
   every container image is pinned to its tested multi-arch digest (amd64 and
   arm64), so a re-pushed tag cannot change what a fresh server runs.

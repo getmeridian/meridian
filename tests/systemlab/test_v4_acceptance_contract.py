@@ -14,12 +14,15 @@ from meridian.compiler.models import (
     RouteRulePayload,
     SubscriptionTemplatePayload,
 )
+from meridian.config import XRAY_VERSION
 from tests.systemlab.topology import build_systemlab_intent
 
 _COMPOSE_PATH = Path(__file__).parent / "compose.yml"
 _CONTROLLER_DOCKERFILE = Path(__file__).parent / "images/controller/Dockerfile"
 _BOOTSTRAP_PATH = Path(__file__).parent / "scripts/stages/00-bootstrap.sh"
 _RESILIENCE_PATH = Path(__file__).parent / "scripts/stages/30-resilience.sh"
+_SUBSCRIPTIONS_PATH = Path(__file__).parent / "scripts/stages/20-subscriptions.sh"
+_CLIENT_DOCS = Path(__file__).parents[2] / "website/src/content/docs/en/client-management.md"
 _INTERRUPTED_HOST_RESOURCE = "host:exit-a:exit-a-reality:direct"
 
 
@@ -150,3 +153,17 @@ def test_resilience_kills_a_real_apply_after_the_exact_host_mutation() -> None:
     assert re.search(r"cluster\.pending_generation\s*=(?!=)", script) is None
     assert re.search(r"cluster\.pending_plan_hash\s*=(?!=)", script) is None
     assert "cluster.save()" not in script
+
+
+def test_engine_checks_are_pinned_per_architecture_and_documented() -> None:
+    """The docs promise the engine versions the lab checks with; a pin bump must update them."""
+    pins = dict(re.findall(r"^ARG (\w+)=(\S+)$", _CONTROLLER_DOCKERFILE.read_text(encoding="utf-8"), re.MULTILINE))
+    docs = _CLIENT_DOCS.read_text(encoding="utf-8")
+
+    for engine in ("SING_BOX", "MIHOMO"):
+        for arch in ("AMD64", "ARM64"):
+            assert re.fullmatch(r"[0-9a-f]{64}", pins[f"{engine}_SHA256_{arch}"])
+    assert f"sing-box {pins['SING_BOX_VERSION']}" in docs
+    assert f"Mihomo {pins['MIHOMO_VERSION']}" in docs
+    assert f"Xray {XRAY_VERSION}" in docs
+    assert "check-client-engines.py" in _SUBSCRIPTIONS_PATH.read_text(encoding="utf-8")

@@ -32,6 +32,8 @@ import os
 from meridian.cluster import ClusterConfig
 from meridian.remnawave import MeridianPanel, XRAY_JSON_CLIENT_TYPE
 from tests.systemlab.subscription_client import (
+    MIHOMO_CLIENT_TYPE,
+    SINGBOX_CLIENT_TYPE,
     base64_endpoint_addresses,
     base64_vless_user_ids,
     endpoint_addresses,
@@ -39,7 +41,10 @@ from tests.systemlab.subscription_client import (
     mihomo_vless_user_ids,
     parse_base64_subscription,
     parse_mihomo_subscription,
+    parse_singbox_subscription,
     parse_xray_subscription,
+    singbox_endpoint_addresses,
+    singbox_vless_user_ids,
     xray_vless_user_ids,
 )
 
@@ -52,11 +57,13 @@ with MeridianPanel(
     assert user is not None and user.short_uuid
     base64_document = panel.fetch_subscription(user.short_uuid)
     xray_document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
-    mihomo_document = panel.fetch_subscription(user.short_uuid, client_type="mihomo")
+    mihomo_document = panel.fetch_subscription(user.short_uuid, client_type=MIHOMO_CLIENT_TYPE)
+    singbox_document = panel.fetch_subscription(user.short_uuid, client_type=SINGBOX_CLIENT_TYPE)
 
 base64_urls = parse_base64_subscription(base64_document.content)
 xray_config = parse_xray_subscription(xray_document.content)
 mihomo_config = parse_mihomo_subscription(mihomo_document.content)
+singbox_config = parse_singbox_subscription(singbox_document.content)
 
 # The link handed to end users must serve the same subscription without
 # revealing the admin panel's secret path (in the URL or response headers).
@@ -81,6 +88,7 @@ addresses_by_format = {
     "base64": base64_endpoint_addresses(base64_urls),
     "xray-json": endpoint_addresses(xray_config),
     "mihomo": mihomo_endpoint_addresses(mihomo_config),
+    "singbox": singbox_endpoint_addresses(singbox_config),
 }
 expected = {
     os.environ["EXIT_A_IP"],
@@ -95,11 +103,16 @@ vless_ids_by_format = {
     "base64": base64_vless_user_ids(base64_urls),
     "xray-json": xray_vless_user_ids(xray_config),
     "mihomo": mihomo_vless_user_ids(mihomo_config),
+    "singbox": singbox_vless_user_ids(singbox_config),
 }
 assert vless_ids_by_format["xray-json"]
 assert len({frozenset(ids) for ids in vless_ids_by_format.values()}) == 1, vless_ids_by_format
 PYEOF
-pass "Base64, Xray JSON, and Mihomo agree on endpoints and VLESS credentials"
+pass "Base64, Xray JSON, Mihomo, and sing-box agree on endpoints and VLESS credentials"
+
+# Parsing proves shape; the clients' own engines prove they would load it.
+python3 "$SYSTEMLAB_ROOT/scripts/check-client-engines.py"
+pass "sing-box check and mihomo -t accept the delivered documents"
 
 # A relay forwards raw TCP. A probe through it without SNI must land on the
 # camouflage site, never on the exit's own TLS server (its IP certificate).

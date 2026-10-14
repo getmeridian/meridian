@@ -14,7 +14,7 @@ uv run pytest tests/systemlab/ -q
 ## What's done well
 
 - Fresh deploy verifies the Remnawave containers, both exits, the routing gateway, and both Realm hops.
-- Remnawave's delivered Xray config is executed directly; Base64 and Mihomo documents are parsed and endpoint-checked, never treated as opaque strings.
+- Remnawave's delivered Xray config is executed directly; Base64, Mihomo, and sing-box documents are parsed and endpoint-checked, and the last two also pass `mihomo -t` and `sing-box check` at versions pinned (with per-arch checksums) in the controller image.
 - Resilience proves both one-exit-down directions and fail-closed all-down behavior through the `leastPing` pool.
 - Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real Host mutation but before observation.
 - Removal checks both relays, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent.
@@ -36,3 +36,4 @@ uv run pytest tests/systemlab/ -q
 - Client startup failures must never satisfy negative proxy tests; version Xray runtime assets with the binary.
 - Lab exits egress through Docker NAT, so an exit-IP mismatch counts only as traffic evidence, never a passed egress check.
 - Qualify a Reality target only by authenticated Xray traffic, never raw TLS reachability.
+- `sing-box check` resolves no outbound tags and `mihomo -t` downloads missing geodata: keep the graph check in `subscription_client.py`, pin new rule files in the image, and move the client-management docs with any engine pin.
