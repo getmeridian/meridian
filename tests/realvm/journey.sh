@@ -48,7 +48,7 @@ step test 0 "${M[@]}" test
 step check 0 "${M[@]}" check
 step apply-converged 0 "${M[@]}" apply --yes
 step plan-converged 0 "${M[@]}" plan
-step doctor 0 "${M[@]}" doctor
+step doctor 0 "${M[@]}" doctor "$CTL"  # bare doctor asks which server once several are saved
 
 if [ -n "$EXIT" ] && [ -n "$RELAY" ]; then
   step relay-remove 0 "${M[@]}" relay remove boba --yes
