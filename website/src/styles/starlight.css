@@ -1,12 +1,15 @@
 /*
- * Starlight theme for the docs, mapped onto the Meridian palette in tokens.css.
- * Starlight's scale runs from --sl-color-white (strongest text) to --sl-color-black
- * (page background) in both themes, so light mode inverts the values.
+ * Starlight theme for the docs, mapped onto the Meridian palette in tokens.css so
+ * docs, landing, and blog read as one site. Starlight's scale runs from
+ * --sl-color-white (strongest text) to --sl-color-black (page background) in both
+ * themes, so light mode inverts the values. Text steps (gray-2..gray-4, accent)
+ * meet WCAG AA on the page background; keep them equal to tokens.css.
  */
 :root {
-  --sl-font: 'Source Sans 3', system-ui, -apple-system, sans-serif;
-  --sl-font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --sl-font: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --sl-content-width: 46rem;
+  --mx-heading: 'Fraunces', Georgia, 'Times New Roman', serif;
 
   /* Dark */
   --sl-color-accent-low: #3a2f1c;
@@ -15,8 +18,8 @@
   --sl-color-white: #f4f2ee;
   --sl-color-gray-1: #e4e2de;
   --sl-color-gray-2: #c4c3c8;
-  --sl-color-gray-3: #9a9caa;
-  --sl-color-gray-4: #6b6e7e;
+  --sl-color-gray-3: #a6a8b6;
+  --sl-color-gray-4: #9a9dae;
   --sl-color-gray-5: #3a3e52;
   --sl-color-gray-6: #252836;
   --sl-color-black: #1c1e28;
@@ -24,29 +27,68 @@
 
 :root[data-theme='light'] {
   --sl-color-accent-low: #f3e3c3;
-  --sl-color-accent: #9a6a1c;
+  --sl-color-accent: #85601f;
   --sl-color-accent-high: #5c3f0e;
   --sl-color-white: #1a1d2e;
   --sl-color-gray-1: #2a2d3e;
   --sl-color-gray-2: #444859;
-  --sl-color-gray-3: #6b7084;
-  --sl-color-gray-4: #9095a4;
+  --sl-color-gray-3: #555a6e;
+  --sl-color-gray-4: #636879;
   --sl-color-gray-5: #d5cfc3;
   --sl-color-gray-6: #f5f0e8;
   --sl-color-gray-7: #fbf8f3;
   --sl-color-black: #fdfaf6;
 }
 
-.sl-markdown-content :is(h1, h2, h3),
-h1#_top,
-.site-title span {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+/* Scripts the self-hosted families don't cover (see fonts.css). */
+:root:lang(ru) {
+  --mx-heading: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+}
+:root:lang(fa) {
+  --sl-font: 'Vazirmatn', 'Source Sans 3', Tahoma, system-ui, sans-serif;
+  --mx-heading: 'Vazirmatn', 'Source Sans 3', Tahoma, sans-serif;
+}
+:root:lang(zh) {
+  --sl-font: 'Source Sans 3', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --mx-heading: 'Fraunces', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
 }
 
+/* Headings and site title match the landing and blog. */
+.sl-markdown-content :is(h1, h2, h3),
+h1#_top,
 .site-title {
+  font-family: var(--mx-heading);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-optical-sizing: auto;
+}
+.sl-markdown-content h3 {
+  font-weight: 600;
+}
+:root:is(:lang(fa), :lang(zh)) :is(.sl-markdown-content :is(h1, h2, h3), h1#_top, .site-title) {
+  letter-spacing: normal;
+}
+:root:is(:lang(fa), :lang(zh)) .sl-markdown-content :is(em, i) {
+  font-style: normal;
+  font-synthesis: none;
+}
+
+/* Header: same height, logo size, and translucent cream as the site header. */
+.header {
+  background-color: color-mix(in srgb, var(--sl-color-black) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+}
+.site-title {
+  gap: 10px;
+  font-size: 1.2rem;
+  font-weight: 600;
   color: var(--sl-color-white);
+}
+.site-title img {
+  height: 28px;
+  width: auto;
+  border-radius: 6px;
 }
 
 .sl-markdown-content a {
