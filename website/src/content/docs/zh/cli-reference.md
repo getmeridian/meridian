@@ -345,7 +345,7 @@ meridian panel [--show-password]
 meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
-在单服务器部署上，拆除删除所有东西：面板、节点、nginx 配置、证书、中继和服务器上的防火墙规则（Docker 和系统包保留），然后是本地 `cluster.yml` 和保存的服务器配置。它也删除 Meridian 3.x 的 3x-ui。在多服务器舰队中，拆除拒绝仍在拓扑中有角色的服务器。
+在单服务器部署上，拆除会删除 Meridian 创建的所有内容：服务器上的面板、节点、nginx 配置、证书、中继和防火墙规则，然后是本地 `cluster.yml` 和保存的服务器配置。Docker、系统包、SSH 加固和 fail2ban 会保留；如果 nginx 仍在为你自己的站点提供服务，它也会继续运行。它也删除 Meridian 3.x 的 3x-ui。在多服务器舰队中，拆除拒绝仍在拓扑中有角色的服务器。
 
 `--yes` 跳过确认；角色检查仍先运行。拒绝退出 `1`。未知的服务器名称或零个或多个可能目标退出 `2` 而不是提示。
 
