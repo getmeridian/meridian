@@ -25,9 +25,9 @@ from meridian.engine.servers import (
     KeyProvider,
     ServerConnectionFactory,
     ServerProfileStoreLike,
-    ensure_meridian_keypair,
 )
 from meridian.servers import ServerProfileStore
+from meridian.ssh_keys import ensure_meridian_keypair
 
 SAFE_FETCH_SITES = {"same-origin", "none"}
 LOCAL_ENGINE_CSP = (

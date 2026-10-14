@@ -16,8 +16,8 @@ from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.servers import ServerConnectionDraft, profile_from_draft
 from meridian.engine.api import create_engine_app
 from meridian.engine.operations import ActiveDeployOperationError, EngineOperation, OperationManager
-from meridian.engine.servers import KeyMaterial
 from meridian.ssh import CommandResult
+from meridian.ssh_keys import KeyMaterial
 
 
 def _client(app_port: int = 8765, **kwargs: object) -> TestClient:

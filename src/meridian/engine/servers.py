@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 import shlex
-import subprocess
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Protocol
 
-from meridian.config import MERIDIAN_SSH_KEY_FILE
 from meridian.core.errors import EngineError
 from meridian.core.execution import ServerCommandResult, ServerConnection
 from meridian.core.servers import (
@@ -21,7 +17,16 @@ from meridian.core.servers import (
     ServerValidateResult,
     profile_from_draft,
 )
-from meridian.ssh_keys import host_key_known, host_key_lookup
+from meridian.ssh_keys import (
+    KeyMaterial,
+    SSHKeyError,
+    ensure_meridian_keypair,
+    host_key_known,
+    host_key_lookup,
+    install_public_key,
+    key_login_works,
+    normalize_public_key,
+)
 
 
 class ServerProfileStoreLike(Protocol):
@@ -50,14 +55,6 @@ class ServerConnectionFactory(Protocol):
         """Build a connection for a saved server profile."""
 
 
-@dataclass(frozen=True)
-class KeyMaterial:
-    """Public key material plus the local private key path, when Meridian owns it."""
-
-    private_key_path: str
-    public_key: str
-
-
 class KeyProvider(Protocol):
     """Return or create key material for key-bootstrap operations."""
 
@@ -76,60 +73,6 @@ def _missing_server_connection_factory(
         hint="Start through `meridian studio` or pass a ServerConnectionFactory.",
         category="bug",
     )
-
-
-def ensure_meridian_keypair(path: Path = MERIDIAN_SSH_KEY_FILE) -> KeyMaterial:
-    """Create or reuse Meridian's dedicated local SSH key pair."""
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    public_path = path.with_suffix(path.suffix + ".pub")
-
-    if not path.exists():
-        try:
-            subprocess.run(
-                [
-                    "ssh-keygen",
-                    "-t",
-                    "ed25519",
-                    "-N",
-                    "",
-                    "-f",
-                    str(path),
-                    "-C",
-                    "meridian-local-engine",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=15,
-                stdin=subprocess.DEVNULL,
-            )
-            path.chmod(0o600)
-        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            raise EngineError(
-                "Could not create Meridian SSH key",
-                hint="Install OpenSSH client tools, then try server key setup again.",
-                category="system",
-            ) from exc
-
-    if not public_path.exists():
-        try:
-            result = subprocess.run(
-                ["ssh-keygen", "-y", "-f", str(path)],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=15,
-                stdin=subprocess.DEVNULL,
-            )
-            public_path.write_text(result.stdout.strip() + "\n", encoding="utf-8")
-        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            raise EngineError(
-                "Could not read Meridian SSH public key",
-                hint=f"Check the key file permissions: {path}",
-                category="system",
-            ) from exc
-
-    return KeyMaterial(private_key_path=str(path), public_key=public_path.read_text(encoding="utf-8").strip())
 
 
 def save_server_profile(draft: ServerConnectionDraft, store: ServerProfileStoreLike) -> ServerProfile:
@@ -191,13 +134,16 @@ def bootstrap_server_key(
 ) -> ServerBootstrapKeyResult:
     """Install a public SSH key on a saved server using an already-valid SSH session."""
     profile = _require_saved_profile(request.server_ref, store)
-    if request.key_policy == "generate_meridian":
-        key = key_provider()
-        public_key = _normalize_public_key(key.public_key)
-        key_path = key.private_key_path
-    else:
-        public_key = _normalize_public_key(request.public_key)
-        key_path = ""
+    try:
+        if request.key_policy == "generate_meridian":
+            key = key_provider()
+            public_key = normalize_public_key(key.public_key)
+            key_path = key.private_key_path
+        else:
+            public_key = normalize_public_key(request.public_key)
+            key_path = ""
+    except SSHKeyError as exc:
+        raise EngineError(str(exc), hint=exc.hint, category=exc.category) from exc
 
     if password and not host_key_known(profile.host, profile.ssh_port):
         raise EngineError(
@@ -210,7 +156,7 @@ def bootstrap_server_key(
         )
 
     conn = connection_factory(profile, password=password)
-    install = conn.run(_install_public_key_command(public_key), timeout=20, sudo=False, sensitive=True)
+    install = install_public_key(conn, public_key)
     if install.returncode != 0:
         message = _ssh_failure_message(install)
         failed = _with_validation_state(profile, auth_state="failed", last_error=message)
@@ -305,36 +251,7 @@ def _verify_key_login(
 ) -> bool:
     if not key_path:
         return False
-    result = connection_factory(profile, identity_file=key_path).run(
-        "printf 'meridian-key-ok\\n'",
-        timeout=10,
-        sudo=False,
-    )
-    return result.returncode == 0
-
-
-def _install_public_key_command(public_key: str) -> str:
-    quoted_key = shlex.quote(public_key)
-    return (
-        "umask 077; "
-        "mkdir -p ~/.ssh; "
-        "touch ~/.ssh/authorized_keys; "
-        f"grep -qxF {quoted_key} ~/.ssh/authorized_keys || "
-        f"printf '%s\\n' {quoted_key} >> ~/.ssh/authorized_keys; "
-        "chmod 700 ~/.ssh; "
-        "chmod 600 ~/.ssh/authorized_keys"
-    )
-
-
-def _normalize_public_key(public_key: str) -> str:
-    normalized = public_key.strip()
-    if not normalized:
-        raise EngineError("Public SSH key is required", hint="Paste a .pub key, not a private key.", category="user")
-    if "\n" in normalized or "\r" in normalized:
-        raise EngineError("Public SSH key must be one line", hint="Paste one authorized_keys line.", category="user")
-    if "PRIVATE KEY" in normalized:
-        raise EngineError("Do not paste a private key", hint="Paste the matching .pub file instead.", category="user")
-    return normalized
+    return key_login_works(connection_factory(profile, identity_file=key_path))
 
 
 def _ssh_failure_message(result: ServerCommandResult) -> str:
