@@ -8,6 +8,10 @@ from contextlib import ExitStack
 from importlib import resources
 from pathlib import Path
 
+# The only built-site directories the Engine serves; the wheel packages the
+# Studio page's files under exactly these (scripts/hatch_build.py).
+STUDIO_ASSET_ROOTS = ("studio", "_astro", "fonts", "img")
+
 _PACKAGED_ASSETS: Path | None = None
 # A zipped wheel extracts Studio to a temporary directory that lives as long as
 # its `as_file` context, so keep that context open until the process exits.

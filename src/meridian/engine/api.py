@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -19,6 +19,7 @@ from meridian.adapters.server_engine import default_server_connection_factory
 from meridian.cluster import ClusterConfig
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.core.validation import validation_errors_hint
+from meridian.engine.assets import STUDIO_ASSET_ROOTS
 from meridian.engine.operations import OperationManager, OperationRunner
 from meridian.engine.routes import router
 from meridian.engine.servers import (
@@ -191,7 +192,11 @@ def create_engine_app(
     app.include_router(router)
 
     if assets_dir is not None:
-        app.mount("/", StaticFiles(directory=assets_dir, html=True), name="studio")
+        # Serve Studio's directories only, even from a full website build.
+        app.add_api_route("/", _studio_redirect, methods=["GET"], include_in_schema=False)
+        for name in STUDIO_ASSET_ROOTS:
+            if (assets_dir / name).is_dir():
+                app.mount(f"/{name}", StaticFiles(directory=assets_dir / name, html=name == "studio"), name=name)
     else:
         app.add_api_route("/", _missing_assets_page, methods=["GET"], response_class=HTMLResponse)
         app.add_api_route("/studio/", _missing_assets_page, methods=["GET"], response_class=HTMLResponse)
@@ -202,6 +207,10 @@ def create_engine_app(
 def _allowed_hosts(host: str, port: int) -> set[str]:
     hosts = {host, "127.0.0.1", "localhost"}
     return hosts | {f"{candidate}:{port}" for candidate in hosts}
+
+
+def _studio_redirect() -> RedirectResponse:
+    return RedirectResponse("/studio/", status_code=307)
 
 
 def _missing_assets_page() -> HTMLResponse:

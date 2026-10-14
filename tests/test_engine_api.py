@@ -19,7 +19,6 @@ from meridian.engine.operations import ActiveDeployOperationError, EngineOperati
 from meridian.ssh import CommandResult
 from meridian.ssh_keys import KeyMaterial
 
-
 _KEY = {"x-meridian-csrf": "test-csrf"}
 
 
@@ -729,6 +728,30 @@ def test_engine_serves_missing_assets_page_and_static_assets(tmp_path: Path) -> 
 
     assert response.status_code == 200
     assert "studio html" in response.text
+
+
+def test_engine_serves_only_studio_files_from_a_full_site_build(tmp_path: Path) -> None:
+    assets = tmp_path / "dist"
+    for relative, text in {
+        "studio/index.html": "studio html",
+        "_astro/studio.js": "console.log(1)",
+        "fonts/body.woff2": "font",
+        "img/favicon-32.png": "png",
+        "index.html": "landing page",
+        "en/getting-started/index.html": "docs page",
+    }.items():
+        (assets / relative).parent.mkdir(parents=True, exist_ok=True)
+        (assets / relative).write_text(text, encoding="utf-8")
+    app = create_engine_app(assets_dir=assets, host="127.0.0.1", port=8765, session_key="test-csrf")
+    client = TestClient(app, base_url="http://127.0.0.1:8765")
+
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code == 307
+    assert root.headers["location"] == "/studio/"
+    for path in ("/studio/", "/_astro/studio.js", "/fonts/body.woff2", "/img/favicon-32.png"):
+        assert client.get(path).status_code == 200, path
+    assert client.get("/index.html").status_code == 404
+    assert client.get("/en/getting-started/").status_code == 404
 
 
 def _wait_for_operation(client: TestClient, operation_id: str) -> dict[str, Any]:

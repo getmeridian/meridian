@@ -377,6 +377,8 @@ versions below), and the choice is saved for later applies.
   Studio's Engine no longer hands its key to any local program: `meridian studio` prints (and
   opens) an address ending in `#k=…`, and only a tab opened from it can use the Engine.
   Studio now listens on port 7391 by default, so the draft your browser keeps survives a restart.
+  The package ships only Studio's own page, scripts, and fonts (about 0.5 MB) instead of the
+  whole 16 MB website, so installs are smaller.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.

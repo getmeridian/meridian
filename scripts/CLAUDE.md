@@ -8,7 +8,7 @@
 
 **Dead-code report** — `find_dead_code.py` (stdlib `ast`) builds a reference graph over `src/meridian`: imports resolve precisely through re-exports, attributes and production strings match members by name. Liveness spreads from production roots (src top level, `scripts/`, entry points, registration decorators), then from `tests/`; it reports `dead`, `test-only`, and `unused-param` as sorted warnings in `make ci` and CI, failing only under `--strict`.
 
-**Conditional Studio packaging** — `hatch_build.py` bundles `website/dist` when present so clean source installs work; release/CI builds verify the generated Studio marker inside the wheel.
+**Conditional Studio packaging** — `hatch_build.py` bundles, when `website/dist` exists (so clean source installs work), only the Studio page's closure: `studio/` plus every file its HTML, CSS `url()`, and JS imports reach. `verify_package_assets.py` checks the page is there and nothing outside the Engine's served roots rides along.
 
 ## What's done well
 
@@ -17,4 +17,5 @@
 ## Pitfalls
 
 - Pin the index (manifest-list) digest, never a per-platform manifest digest: arm64 servers would fail to pull an amd64-only pin.
+- Studio links to other site pages must be absolute `https://` URLs; a site-relative link fails the build, because the wheel would not contain the page.
 - Allowlist only real false positives in `dead_code_allowlist.txt`, each with a `# reason`; delete genuine dead code (and the tests keeping it alive) instead. Teach the analyzer a recurring reference pattern rather than allowlisting every name it hides.
