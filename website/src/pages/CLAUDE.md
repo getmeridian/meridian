@@ -13,6 +13,7 @@
 ## Pitfalls
 
 - **No browser reachability testers** — a page cannot tell reachable from refused or reset, and its TLS checks warn on healthy servers; point readers to `meridian test --probe` or their connection page.
+- **One language tag per locale** — Chinese is `zh-CN` (Starlight's built-in UI strings key on it) in docs `<html lang>`, sitemap hreflang, and landing hreflang; redirect stubs carry `noindex` and stay out of the sitemap.
 - **Static endpoints keep only the body** — response headers are discarded at build time and the host derives the content type from the extension, so name endpoints `.md`/`.txt`.
 - **Build-time file reading** — the Markdown endpoints read files with `fs`; `agents.md.ts` reads `../src/meridian/data/agents.md`, so the site builds only inside the full repo. Resolve paths from the website folder, never `import.meta.url` (bundling moves it).
 - **JS helpers in Astro frontmatter** — add an explicit boundary type before iterating helper results; otherwise `astro check` reports implicit `any`.

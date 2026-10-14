@@ -9,6 +9,7 @@ import { remarkDiagrams } from './src/lib/diagrams.mjs';
 import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
 const LOCALES = ['en', 'ru', 'fa', 'zh'];
+const SITEMAP_EXCLUDED = ['/docs/', '/studio/', '/demo/'];
 
 // A page missing from the sidebar list would build but stay unreachable from the navigation.
 for (const locale of LOCALES) {
@@ -96,14 +97,16 @@ export default defineConfig({
       plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/studio/'] })],
     }),
     sitemap({
-      filter: (page) => !page.includes('/CLAUDE'),
+      // Redirects and tools are not pages to index; Astro's own redirect stubs are already left out.
+      filter: (page) => !page.includes('/CLAUDE') && !SITEMAP_EXCLUDED.includes(new URL(page).pathname),
+      // Same language tags as Starlight's `lang` above, so hreflang matches each page's <html lang>.
       i18n: {
         defaultLocale: 'en',
         locales: {
-          en: 'en-US',
-          ru: 'ru-RU',
-          fa: 'fa-IR',
-          zh: 'zh-Hans',
+          en: 'en',
+          ru: 'ru',
+          fa: 'fa',
+          zh: 'zh-CN',
         },
       },
     }),
