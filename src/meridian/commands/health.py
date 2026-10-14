@@ -1,7 +1,8 @@
 """`meridian check`: role-aware server health on the shared verification contract.
 
 A server that is not in the fleet yet gets pre-flight checks; a control, exit,
-or gateway server gets container, listener, TLS, and disk checks; a relay
+or gateway server gets container, listener, TLS, and disk checks (plus node-plugin
+readiness where a Remnawave node runs); a relay
 server gets its Realm hops checked. With no target, every fleet server is checked.
 """
 
@@ -36,6 +37,7 @@ from meridian.diagnostics.checks import (
 )
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
 from meridian.diagnostics.network import resolve_hostname
+from meridian.diagnostics.node_plugins import check_node_plugin_host
 from meridian.diagnostics.preflight import collect_preflight
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.resolve import connection_for_entry, local_entry, merge_target
@@ -276,6 +278,8 @@ def _server_report(
             containers.append("remnawave-subscription-page")
     for name in containers:
         checks.append(check_from_result(f"container:{name}", f"Container {name}", check_container_running(conn, name)))
+    if "remnawave-node" in containers:
+        checks.append(check_node_plugin_host(conn))
 
     try:
         deployment = deployment_verification_context(cluster, registry, entry.host)

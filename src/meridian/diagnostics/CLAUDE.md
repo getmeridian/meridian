@@ -26,4 +26,5 @@
 - **A TLS alert is an answer, a timeout or reset is not** — classify flows by `TlsFlowResult.server_answered_tls`/`silenced`; macOS reports a pre-handshake reset as EINVAL from `getpeername()`.
 - **Blocking verdicts need a control** — an unreachable camouflage site makes the differential inconclusive, never "IP blocked"; only the control server's ~50 KB `pwa/app.js` is a size-known stall target, so exit-only servers get no data-flow check.
 - **Unreadable images are unavailable, not drift** — missing Docker, SSH failure, or partial `docker inspect` output yields `ServerImages.error`, never `upgrade`.
+- **Node-plugin readiness checks the kernel only** — `node_plugins.py` warns on a pre-5.7 kernel with a fix prefixed "Only if you use node plugins"; the node container bundles its own nftables library, so never require the host `nft` binary. An unreadable `uname` is skipped.
 - **External checks need an outside vantage** — on the server itself, own-address connections bypass UFW over loopback; `check_port_surface(local_vantage=True)` skips instead of calling firewalled ports public.

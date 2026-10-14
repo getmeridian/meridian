@@ -16,6 +16,7 @@ from meridian.diagnostics.checks import (
     check_port_listening,
     check_tls_certificate,
 )
+from meridian.diagnostics.node_plugins import check_node_plugin_host
 from tests.support.mock_connection import MockConnection
 
 # Timeout, missing tool, or a dropped SSH session is unavailable evidence, not a finding.
@@ -120,3 +121,28 @@ def test_tls_check_quotes_the_host_and_uses_the_requested_local_port() -> None:
     check_tls_certificate(conn, "evil; rm -rf /", port=7443)
 
     assert any("'evil; rm -rf /'" in c and "127.0.0.1:7443" in c for c in conn.calls)
+
+
+def _plugin_host(*, kernel: str = "6.8.0-45-generic\n", kernel_rc: int = 0) -> MockConnection:
+    return MockConnection().when("uname -r", stdout=kernel, rc=kernel_rc)
+
+
+@pytest.mark.parametrize(
+    ("conn", "status", "codes"),
+    [
+        (_plugin_host(), "passed", []),
+        (_plugin_host(kernel="5.7.0\n"), "passed", []),
+        (_plugin_host(kernel="5.4.0-216-generic\n"), "warning", ["NODE_PLUGIN_KERNEL"]),
+        *[(_plugin_host(kernel="", kernel_rc=rc), "skipped", []) for rc in _UNAVAILABLE],
+        (_plugin_host(kernel="unknown\n"), "skipped", []),
+    ],
+    ids=["supported", "minimum", "old-kernel", *map(str, _UNAVAILABLE), "unparseable"],
+)
+def test_node_plugin_host_readiness(conn: MockConnection, status: str, codes: list[str]) -> None:
+    check = check_node_plugin_host(conn)
+
+    assert check.status == status
+    warned = [found for found in check.findings if found.status == "warning"]
+    assert [found.code for found in warned] == codes
+    # Plugins are optional: an unready host warns with a fix and never fails the check.
+    assert all(found.remediation.startswith("Only if you use node plugins") for found in warned)

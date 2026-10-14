@@ -32,6 +32,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `apply`; before, the next apply re-enabled disabled or limited clients, and a
   description edit made every apply fail. Disabled, limited, or expired clients
   no longer mark `fleet status` as degraded.
+- **`meridian check` says whether node plugins can work** — Remnawave's node
+  plugins (Torrent Blocker, ingress and egress filters) need a 5.7+ kernel
+  and otherwise silently do nothing; every exit and
+  gateway now reports "Node plugin readiness" with the fix. The docs explain
+  turning plugins on in the panel.
 
 ### Deploy
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel

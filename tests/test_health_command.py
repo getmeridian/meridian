@@ -13,13 +13,20 @@ import typer
 from meridian.cluster import ClusterConfig, SubscriptionPageConfig
 from meridian.commands import health
 from meridian.core.fleet import TopologyNode
+from meridian.core.verification import build_verification_check
 from meridian.diagnostics.checks import CheckResult
+from meridian.diagnostics.evidence import finding
 from meridian.remnawave import RemnawaveError
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 
 PASSED = CheckResult(name="check", status="passed", detail="healthy")
+PLUGINS_READY = build_verification_check(
+    "node_plugins",
+    "Node plugin readiness",
+    [finding("NODE_PLUGIN_KERNEL", "passed", "Kernel 6.8.0 supports node plugins")],
+)
 
 
 @pytest.fixture
@@ -66,6 +73,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         ports=MagicMock(return_value=PASSED),
         tls=MagicMock(return_value=PASSED),
         blocking=MagicMock(return_value=[]),
+        plugins=MagicMock(return_value=kwargs.pop("plugins", PLUGINS_READY)),
     )
     with (
         patch.object(health, "topology_from_local_cluster", return_value=SimpleNamespace(nodes=[fleet.node])),
@@ -75,6 +83,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         patch.object(health, "check_port_listening", mocks.ports),
         patch.object(health, "check_tls_certificate", mocks.tls),
         patch.object(health, "check_disk_space", return_value=PASSED),
+        patch.object(health, "check_node_plugin_host", mocks.plugins),
         patch.object(health, "deployment_verification_context", return_value=fleet.deployment),
         patch.object(health, "blocking_jobs", mocks.blocking),
         patch("meridian.commands.relay_check.collect_relay_check", return_value=SimpleNamespace(checks=[])) as relay,
@@ -98,6 +107,29 @@ def test_control_and_exit_server_checks_node_panel_and_subscription_page_contain
         )
     ]
     fleet.panel.get_node.assert_called_once_with("node-uuid")
+
+
+def test_node_hosts_report_plugin_readiness(fleet: SimpleNamespace) -> None:
+    plugins = _run(fleet, "exit-a").plugins
+
+    plugins.assert_called_once_with(fleet.conn)
+
+
+def test_unready_plugin_host_is_reported_with_its_fix(
+    fleet: SimpleNamespace, capsys: pytest.CaptureFixture[str]
+) -> None:
+    unready = build_verification_check(
+        "node_plugins",
+        "Node plugin readiness",
+        [finding("NODE_PLUGIN_KERNEL", "warning", "Kernel 5.4.0 is older than 5.7", "move to a 5.7+ kernel")],
+    )
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run(fleet, "exit-a", plugins=unready)
+
+    # A warning is a finding like any other (non-LTS OS, disabled node): exit 4, never 3.
+    assert exc_info.value.exit_code == 4
+    assert "Fix: move to a 5.7+ kernel" in capsys.readouterr().err
 
 
 def test_disconnected_node_is_a_finding(fleet: SimpleNamespace) -> None:

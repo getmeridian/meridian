@@ -3,7 +3,7 @@
 **Cluster config** — one hidden Schema V3 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users live in Remnawave.
 **Panel access** — `remnawave/` speaks HTTPS from the deployer's machine to nginx's secret path on 443 with an API token; no SSH tunnel.
 **SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport.
-**Server facts** — `facts.py` caches OS, Docker, UFW, containers, sshd ports, disk, and sysctl; use it before adding one-off probe parsing.
+**Server facts** — `facts.py` caches OS, kernel, Docker, UFW, containers, sshd ports, disk, sysctl, and command presence (`None` when unknown); use it before adding one-off probe parsing.
 **Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) carrying a `category`; only command entry points call `console.fail()`, whose `hint_type` picks the footer and exit code (tested). Every error must be actionable.
 **Shared logic stays out of commands** — `resolve.py`, `panel_bootstrap.py`, `node_deploy.py`, and `reality_keys.py` serve commands and Engine; library code never imports `commands/`.
 **Protocol keys** — `core/topology.py` owns the protocol vocabulary; `handoff.protocol_key()` classifies delivered links.

@@ -97,3 +97,11 @@ Meridian and the panel split the work so your edits don't get overwritten:
 | Which clients exist, their names, and their squads | Notifications, plugins, IP control, and other panel settings |
 
 `meridian plan` shows any difference in what Meridian manages before anything changes. Users you add in the panel are never listed, changed, or deleted by Meridian; to give someone a Meridian-managed link and connection page, use `meridian client add` instead.
+
+### Node plugins
+
+Remnawave's node plugins (Ingress Filter, Egress Filter, Torrent Blocker, Connection Drop) are optional and live in the panel. To use one, open **Node Plugins** in the admin UI, create a plugin configuration, turn on the plugins you want, and attach it to your nodes. Meridian already runs every node with the `NET_ADMIN` capability the plugins need, and never changes or removes your plugin configurations.
+
+The plugins write nftables rules on the host, so upstream also requires a Linux kernel 5.7 or newer; on an older one they silently do nothing. `meridian check` reports this as **Node plugin readiness** on every exit and gateway, and warns about an old kernel (move to Ubuntu 22.04+ or Debian 11+). If you don't use plugins, you can ignore that warning.
+
+Torrent Blocker also needs traffic sniffing on the inbound to recognize BitTorrent, and Meridian's inbounds leave sniffing off, so it has nothing to act on. The ingress and egress filters work as documented.
