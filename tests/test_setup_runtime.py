@@ -336,6 +336,7 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
     assert verification.subscription_urls == {"default": "https://panel.example/pages/sub/short-default"}
     assert verification.panel_version == "3.4.5"
     assert verification.warnings == ()
+    assert verification.panel_url == "https://panel.example/"
     panel.version = "4.1.0"
     newer = runtime.verify(applied)
     assert len(newer.warnings) == 1 and "newer than the tested 3.x" in newer.warnings[0]

@@ -138,6 +138,8 @@ class SetupVerification:
     subscription_urls: Mapping[str, str]
     panel_version: str = ""
     warnings: tuple[str, ...] = ()
+    panel_url: str = ""
+    admin_user: str = ""  # the saved login; the password stays behind `meridian panel --show-password`
 
 
 class LazyPanel:
@@ -504,6 +506,8 @@ class SetupRuntime:
             subscription_urls=subscription_urls,
             panel_version=panel_version,
             warnings=(version_warning,) if version_warning else (),
+            panel_url=cluster.panel.display_url,
+            admin_user=cluster.panel.admin_user,
         )
 
     def publish_handoff(self, usernames: Sequence[str]) -> list[HandoffLinks]:

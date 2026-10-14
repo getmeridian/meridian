@@ -661,3 +661,33 @@ def test_going_back_to_users_keeps_existing_usernames() -> None:
 
     assert again.users == ["Biba", "user-li", "biba-2"]
     assert again.display_names == {"user-li": "Ли", "biba-2": "Биба"}
+
+
+class _RuntimeWithPanel(_Runtime):
+    def verify(self, draft: SetupDraft) -> SetupVerification:
+        return SetupVerification(
+            plan_hash=draft.applied_plan_hash,
+            node_count=1,
+            subscription_urls={"default": "https://panel.example/pages/sub/default"},
+            panel_url="https://198.51.100.10/secretpanel/",
+            admin_user="admin-a1b2",
+        )
+
+
+def test_handoff_shows_the_admin_panel_and_login_and_points_to_the_password_command(tmp_path) -> None:
+    _store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "yes")])
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _RuntimeWithPanel()),
+        register_server=lambda *_args: None,
+        io=io,
+    )
+
+    assert wizard.run() == "completed"
+
+    handoff = "\n".join(io.output[io.output.index(next(line for line in io.output if "Admin panel" in line)) :])
+    assert "https://198.51.100.10/secretpanel/" in handoff
+    assert "admin-a1b2" in handoff
+    assert "meridian panel --show-password" in handoff
