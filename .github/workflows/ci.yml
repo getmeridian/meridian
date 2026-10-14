@@ -143,10 +143,45 @@ jobs:
       - name: Shellcheck
         run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
 
+  # System Lab costs ~15 minutes of nested Docker, so it runs only when a change can
+  # alter what a real deploy does: runtime code, the lab itself, dependencies, or CI.
+  # Docs, website, contracts, and other tests skip it; a manual dispatch always runs it.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      system-lab: ${{ steps.filter.outputs.system-lab }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether System Lab is needed
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          needed=true
+          if [ "$EVENT" != "workflow_dispatch" ] && [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            needed=false
+            while IFS= read -r changed; do
+              case "$changed" in
+                src/meridian/*.md | src/meridian/i18n/locales/*) ;;
+                src/meridian/* | tests/systemlab/* | pyproject.toml | uv.lock | .github/workflows/ci.yml)
+                  needed=true
+                  echo "System Lab needed: $changed"
+                  break ;;
+              esac
+            done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
+          fi
+          echo "system-lab=$needed" >> "$GITHUB_OUTPUT"
+
   system-lab:
     name: System Lab
     runs-on: ubuntu-latest
-    needs: [python-test, python-lint]
+    needs: [changes, python-test, python-lint]
+    if: needs.changes.outputs.system-lab == 'true'
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5

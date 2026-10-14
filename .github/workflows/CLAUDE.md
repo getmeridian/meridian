@@ -6,6 +6,8 @@
 
 **CI jobs**: Python Tests (3.11–3.14 matrix), Lint (plus the never-failing dead-code report as PR annotations), Type Check, Validate (PWA rendering + app metadata + VERSION + CHANGELOG + public CLI docs), Shell (shellcheck), System Lab (multi-node Docker deploy), Website Build.
 
+**System Lab only where it matters** — the `changes` job diffs the PR (or push) and runs System Lab only when runtime code (`src/meridian` minus Markdown and locale catalogs), `tests/systemlab`, dependencies, or `ci.yml` change; a skipped job still satisfies required checks and Release. `workflow_dispatch` always runs it. Widen the path list when the lab starts depending on something new.
+
 **Website package manager** — website CI uses pnpm with `website/pnpm-lock.yaml`; keep supply-chain guardrails in `website/pnpm-workspace.yaml`.
 
 **VERSION-driven releases** — read VERSION file, check if git tag exists. If missing: detect semver change, extract CHANGELOG section, push tag, create Release. Idempotent — safe to re-run.
