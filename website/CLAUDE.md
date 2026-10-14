@@ -16,7 +16,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
 
-**Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request.
+**Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript (literal absolute-URL loads), and both workflows rerun it after the PWA demo joins `dist`.
 
 **pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a one-week release age, and refuses trust downgrades; allows build scripts only for explicitly trusted packages.
 

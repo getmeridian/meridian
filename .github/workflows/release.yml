@@ -66,6 +66,10 @@ jobs:
       - name: Generate PWA demo page
         run: uv run meridian dev preview --output website/dist/demo
 
+      # The demo joins dist after the build's own check.
+      - name: Check the site and demo for external requests
+        run: node website/scripts/check-runtime-assets.mjs website/dist
+
       - name: Add website artifacts
         run: |
           # Copy the CLI installer into Astro dist

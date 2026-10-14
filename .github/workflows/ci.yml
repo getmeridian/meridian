@@ -212,3 +212,6 @@ jobs:
           grep -q "SW disabled" website/dist/demo/pwa/sw.js
           # Verify client index.html is non-empty (jinja2 rendered correctly)
           find website/dist/demo -mindepth 2 -name 'index.html' -size +0c | grep -q .
+
+      - name: Check the site and demo for external requests
+        run: node website/scripts/check-runtime-assets.mjs website/dist
