@@ -23,10 +23,10 @@ export const fa: LandingStrings = {
   'setup.desc':
     'به یک VPS با Debian یا Ubuntu (مدل ۵ دلار در ماه کافی است) و یک ترمینال روی رایانه‌تان نیاز دارید. بقیه را Meridian انجام می‌دهد.',
   'setup.step1.label': 'مرحلهٔ ۱ — نصب',
-  'setup.step2.label': 'مرحلهٔ ۲ — استقرار',
+  'setup.step2.label': 'مرحلهٔ ۲ — راه‌اندازی',
   'setup.then': 'سپس',
   'setup.hint':
-    'ویزارد IP سرور را می‌پرسد و بقیهٔ کارها را انجام می‌دهد. یا گزینه‌ها را مستقیم بدهید — <a href="{base}/cli-reference/">مرجع CLI</a> را ببینید.',
+    'ویزارد چند سؤال ساده می‌پرسد، یک خلاصه برای بازبینی نشان می‌دهد و سپس سرور شما را راه‌اندازی می‌کند. برای یک سرور بدون هیچ سؤالی، <code>meridian deploy IP</code> را اجرا کنید — <a href="{base}/cli-reference/">مرجع CLI</a> را ببینید.',
   'setup.terminalAlt': 'خروجی meridian deploy در ترمینال',
   'setup.details': 'پشت صحنه چه اتفاقی می‌افتد',
   'setup.idempotent':
@@ -122,7 +122,7 @@ export const fa: LandingStrings = {
   'builder.copy': 'کپی',
   'builder.copied': 'کپی شد',
   'builder.wizard':
-    '<strong>اولین بار است؟</strong> فقط <code>meridian deploy</code> را اجرا کنید — ویزارد هر چیزی را که لازم دارد می‌پرسد.',
+    '<strong>اولین بار است؟</strong> فقط <code>meridian setup</code> را اجرا کنید — ویزارد هر چیزی را که لازم دارد می‌پرسد.',
   'builder.status.invalid': 'یک آدرس IP، نام سرور ذخیره‌شده یا «local» وارد کنید.',
   'builder.status.local': 'روی خود سرور و بدون SSH اجرا می‌شود، با کاربر root یا با sudo بدون رمز عبور.',
   'builder.status.domainMissing': 'یک دامنه وارد کنید، یا تیک آن را بردارید.',

@@ -23,10 +23,10 @@ export const zh: LandingStrings = {
   'setup.desc':
     '你需要一台 Debian 或 Ubuntu 的 VPS（每月 5 美元的就够用）和电脑上的终端。其余由 Meridian 完成。',
   'setup.step1.label': '第 1 步——安装',
-  'setup.step2.label': '第 2 步——部署',
+  'setup.step2.label': '第 2 步——设置',
   'setup.then': '然后',
   'setup.hint':
-    '向导会询问服务器 IP 并处理其余事项。你也可以直接传入参数，详见 <a href="{base}/cli-reference/">CLI 参考</a>。',
+    '向导会问几个简单的问题，展示一份摘要供你确认，然后设置你的服务器。若只有一台服务器且不想回答问题，运行 <code>meridian deploy IP</code> 即可，详见 <a href="{base}/cli-reference/">CLI 参考</a>。',
   'setup.terminalAlt': '终端中的 Meridian 部署输出',
   'setup.details': '幕后发生了什么',
   'setup.idempotent':
@@ -122,7 +122,7 @@ export const zh: LandingStrings = {
   'builder.copy': '复制',
   'builder.copied': '已复制',
   'builder.wizard':
-    '<strong>第一次使用？</strong>直接运行 <code>meridian deploy</code>，向导会询问它需要的一切。',
+    '<strong>第一次使用？</strong>直接运行 <code>meridian setup</code>，向导会询问它需要的一切。',
   'builder.status.invalid': '请填写 IP 地址、已保存的服务器名称，或 "local"。',
   'builder.status.local': '直接在服务器本机上运行，无需 SSH，以 root 身份或使用免密码 sudo。',
   'builder.status.domainMissing': '请填写域名，或取消勾选。',

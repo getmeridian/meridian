@@ -28,10 +28,10 @@ export const en = {
   'setup.desc':
     'You need a Debian or Ubuntu VPS (a $5/month one is enough) and a terminal on your computer. Meridian sets up the rest.',
   'setup.step1.label': 'Step 1 — Install',
-  'setup.step2.label': 'Step 2 — Deploy',
+  'setup.step2.label': 'Step 2 — Set up',
   'setup.then': 'then',
   'setup.hint':
-    'The wizard asks for your server IP and handles the rest. Or pass flags directly — see the <a href="{base}/cli-reference/">CLI reference</a>.',
+    'The wizard asks a few plain questions, shows a review, then sets up your server. For one server with no questions, run <code>meridian deploy IP</code> — see the <a href="{base}/cli-reference/">CLI reference</a>.',
   'setup.terminalAlt': 'Meridian deploy output in a terminal',
   'setup.details': 'What happens behind the scenes',
   'setup.idempotent':
@@ -127,7 +127,7 @@ export const en = {
   'builder.copy': 'Copy',
   'builder.copied': 'Copied',
   'builder.wizard':
-    '<strong>First time?</strong> Just run <code>meridian deploy</code> — the wizard asks for everything it needs.',
+    '<strong>First time?</strong> Just run <code>meridian setup</code> — the wizard asks for everything it needs.',
   'builder.status.invalid': 'Use an IP address, a saved server name, or "local".',
   'builder.status.local': 'Runs on the server itself without SSH, as root or with passwordless sudo.',
   'builder.status.domainMissing': 'Enter a domain, or uncheck it.',

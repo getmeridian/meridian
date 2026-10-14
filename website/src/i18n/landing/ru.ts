@@ -23,10 +23,10 @@ export const ru: LandingStrings = {
   'setup.desc':
     'Вам нужны VPS с Debian или Ubuntu (хватит и за $5 в месяц) и терминал на вашем компьютере. Остальное Meridian настроит сам.',
   'setup.step1.label': 'Шаг 1 — Установка',
-  'setup.step2.label': 'Шаг 2 — Развёртывание',
+  'setup.step2.label': 'Шаг 2 — Настройка',
   'setup.then': 'затем',
   'setup.hint':
-    'Мастер спросит IP сервера и сделает всё остальное. Или передайте флаги напрямую — см. <a href="{base}/cli-reference/">справочник CLI</a>.',
+    'Мастер задаст несколько простых вопросов, покажет сводку и настроит ваш сервер. Для одного сервера без вопросов выполните <code>meridian deploy IP</code> — см. <a href="{base}/cli-reference/">справочник CLI</a>.',
   'setup.terminalAlt': 'Вывод meridian deploy в терминале',
   'setup.details': 'Что происходит за кулисами',
   'setup.idempotent':
@@ -124,7 +124,7 @@ export const ru: LandingStrings = {
   'builder.copy': 'Копировать',
   'builder.copied': 'Скопировано',
   'builder.wizard':
-    '<strong>Впервые?</strong> Просто запустите <code>meridian deploy</code> — мастер спросит всё, что нужно.',
+    '<strong>Впервые?</strong> Просто запустите <code>meridian setup</code> — мастер спросит всё, что нужно.',
   'builder.status.invalid': 'Укажите IP-адрес, имя сохранённого сервера или «local».',
   'builder.status.local': 'Работает на самом сервере без SSH — от root или через sudo без пароля.',
   'builder.status.domainMissing': 'Введите домен или снимите галочку.',
