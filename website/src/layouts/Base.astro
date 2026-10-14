@@ -30,7 +30,7 @@ interface Props {
 const {
   title,
   description = 'One command deploys a hardened VLESS+Reality proxy server and a link to share. Open source.',
-  ogImage = '/img/og.png',
+  ogImage,
   ogImageAlt = 'Meridian: share secure internet with the people you care about',
   ogType = 'website',
   locale = 'en',
@@ -42,7 +42,8 @@ const {
 const localized = Boolean(alternates);
 const info = LOCALE_INFO[locale];
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const ogImageURL = new URL(ogImage, Astro.site);
+// figures/og.html renders one card per locale; pages without a locale version share the English one.
+const ogImageURL = new URL(ogImage ?? (localized && locale !== 'en' ? `/img/og-${locale}.jpg` : '/img/og.jpg'), Astro.site);
 const version = fs.readFileSync(path.resolve('../VERSION'), 'utf8').trim();
 const bodyFont = {
   en: ['/fonts/source-sans-3-latin.woff2'],
@@ -84,7 +85,7 @@ const bodyFont = {
     <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:image" content={ogImageURL} />
-    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={ogImageAlt} />

@@ -8,7 +8,7 @@
 
 **Theme before paint** — the inline head script sets `data-theme` from the saved choice, else the OS (Expressive Code reads the attribute, as on Starlight pages); it never writes storage.
 
-**Social metadata is complete** — og/twitter image with size and alt (`og.png` is 1200×630, ~100 KB for WhatsApp), `theme-color` per scheme, SVG + ICO favicons, the blog's RSS link, and a preload of the locale's body font.
+**Social metadata is complete** — og/twitter image with size and alt (one 1200×630 JPEG per locale, `og.jpg`/`og-<locale>.jpg`, rendered from `figures/og.html`; keep each well under WhatsApp's ~300 KB), `theme-color` per scheme, SVG + ICO favicons, the blog's RSS link, and a preload of the locale's body font.
 
 ## What's done well
 
