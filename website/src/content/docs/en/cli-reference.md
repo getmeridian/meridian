@@ -345,7 +345,7 @@ Remove Meridian from a server.
 meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
 ```
 
-On a single-server deployment, teardown removes everything: the panel, node, nginx configuration, certificates, relays, and firewall rules on the server (Docker and system packages stay), then the local `cluster.yml` and saved server profile. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
+On a single-server deployment, teardown removes everything: the panel, node, nginx configuration, certificates, relays, and firewall rules on the server. Docker, system packages, SSH hardening, and fail2ban stay, and nginx keeps running if it still serves your own sites, then the local `cluster.yml` and saved server profile. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
 
 `--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.
 

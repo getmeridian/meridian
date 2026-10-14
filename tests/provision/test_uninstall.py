@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 import subprocess
 
+import pytest
+
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.uninstall import Uninstall
 from tests.support.mock_connection import MockConnection
@@ -75,3 +77,31 @@ def test_teardown_leaves_the_operators_meridian_cli_in_place(mock_conn) -> None:
     Uninstall().run(mock_conn, ProvisionContext(ip="198.51.100.1"))
 
     mock_conn.assert_not_called_with_pattern("bin/meridian")
+
+
+def test_teardown_leaves_fail2ban_running() -> None:
+    """fail2ban is host hardening, like the SSH settings; it may predate Meridian (#70)."""
+    assert not any("fail2ban" in call for call in _commands())
+
+
+@pytest.mark.parametrize(
+    ("leftover", "expected"),
+    [
+        ([], "stop"),
+        (["conf.d/default.conf"], "stop"),
+        (["sites-enabled/shop"], "reload"),
+        (["conf.d/blog.conf"], "reload"),
+        (["stream.d/other.conf"], "reload"),
+    ],
+)
+def test_nginx_is_stopped_only_when_no_operator_config_remains(tmp_path, leftover, expected) -> None:
+    from meridian.provision.uninstall import NGINX_STOP_UNLESS_SHARED
+
+    for directory in ("sites-enabled", "conf.d", "stream.d"):
+        (tmp_path / directory).mkdir()
+    for name in leftover:
+        (tmp_path / name).write_text("")
+    script = NGINX_STOP_UNLESS_SHARED.replace("/etc/nginx", str(tmp_path)).replace("systemctl", "echo")
+    out = subprocess.run(["sh", "-c", script], capture_output=True, text=True, check=True).stdout
+
+    assert out.split()[0] == expected

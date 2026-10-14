@@ -230,7 +230,8 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   the client.
 - No request logging on Meridian's web server; panel secrets are never rotated
   on restart; the live SSH port is never firewalled; teardown removes everything
-  Meridian created and nothing it didn't (your own HAProxy/Caddy are left alone).
+  Meridian created and nothing it didn't: fail2ban stays on, and nginx keeps
+  running when it serves your own sites, as do your own HAProxy/Caddy.
 - An out-of-date copy of `cluster.yml` can't undo newer changes. The
   control server records the last change applied, and `apply` refuses to run
   from an older copy or while another machine is applying.

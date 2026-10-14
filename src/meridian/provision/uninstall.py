@@ -9,6 +9,16 @@ from meridian.provision.nginx import LEGACY_PROXY_CLEANUP
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
 
+# Meridian deletes Debian's stock default site on install, so any enabled config left after
+# its own files are gone belongs to the operator (nginx.org's stock conf.d/default.conf aside):
+# keep nginx serving it. Only an nginx that served nothing but Meridian is stopped.
+NGINX_STOP_UNLESS_SHARED = (
+    "if ls /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf /etc/nginx/stream.d/*.conf 2>/dev/null"
+    " | grep -qv '^/etc/nginx/conf.d/default.conf$'; then"
+    " systemctl reload nginx 2>/dev/null;"
+    " else systemctl stop nginx 2>/dev/null; systemctl disable nginx 2>/dev/null; fi; true"
+)
+
 
 class Uninstall:
     """Remove all Meridian proxy components from the server.
@@ -20,7 +30,9 @@ class Uninstall:
 
     Also cleans up 3x-ui and HAProxy/Caddy from earlier Meridian deployments.
 
-    Does NOT remove: Docker engine, system packages, SSH settings.
+    Does NOT remove: Docker engine, system packages, or the host hardening
+    (SSH settings, fail2ban and its sshd jail), and keeps nginx running when
+    the operator's own sites remain.
     """
 
     name = "Uninstall Meridian"
@@ -48,8 +60,7 @@ class Uninstall:
             "rm -rf /usr/local/bin/netfwd /etc/netfwd",
             # Docker volumes (may remain after compose down)
             "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
-            # nginx (+ systemd restart override)
-            "systemctl stop nginx 2>/dev/null; systemctl disable nginx 2>/dev/null; true",
+            # nginx: Meridian's files and systemd restart override, then the service (see NGINX_STOP_UNLESS_SHARED)
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",
             "rm -rf /etc/nginx/stream.d/relay-maps",
             (
@@ -57,6 +68,7 @@ class Uninstall:
                 " /etc/nginx/sites-available/meridian-v4-*.conf /etc/nginx/sites-enabled/meridian-v4-*.conf"
             ),
             "rm -rf /etc/systemd/system/nginx.service.d",
+            NGINX_STOP_UNLESS_SHARED,
             # TLS certificates
             "rm -rf /etc/ssl/meridian",
             # HAProxy/Caddy from older Meridian releases (marker-gated)
@@ -87,8 +99,6 @@ class Uninstall:
                 r" -e 's/^\[ *\([0-9][0-9]*\)\].*# meridian-v4-[0-9a-f]\{16\}$/\1/p'"
                 ' | sort -rn | while read -r rule; do ufw --force delete "$rule"; done; true'
             ),
-            # fail2ban
-            "systemctl stop fail2ban 2>/dev/null; systemctl disable fail2ban 2>/dev/null; true",
         ]
 
         errors = []
