@@ -29,7 +29,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 - **Theme and language cross the docs boundary** — landing uses `meridian-theme`/`meridian-lang`, Starlight `starlight-theme`; ThemeToggle writes both and a Starlight head script copies them, or switching sections flips the theme.
 - **Astro builds every `.md` under `src/pages`** — the `drop-contributor-notes` integration deletes the `/CLAUDE/` pages that folder notes produce.
-- **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, ping, studio) are excluded because Starlight can't see them.
+- **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, studio) are excluded because Starlight can't see them.
 - **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).
 - **Starlight owns Astro i18n** — never add a top-level `i18n` block; Starlight derives it from `locales`.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

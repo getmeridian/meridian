@@ -368,6 +368,9 @@ versions below), and the choice is saved for later applies.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
+- The website's ping page: a browser cannot tell a blocked server from one that
+  refuses the connection. Run `meridian test --probe` from the censored network,
+  or open your connection page there.
 - `meridian fleet recover`, `apply --parallel`/`--prune-extras`, and the
   `desired_*` lists in `cluster.yml`.
 

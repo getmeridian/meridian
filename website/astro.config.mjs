@@ -116,7 +116,7 @@ export default defineConfig({
       disable404Route: true,
       credits: false,
       // Blog, demo, and other custom pages live outside Starlight, so the validator cannot see them.
-      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/ping/', '/studio/'] })],
+      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/studio/'] })],
     }),
     sitemap({
       filter: (page) => !page.includes('/CLAUDE'),
