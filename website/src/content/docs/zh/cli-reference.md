@@ -1,8 +1,6 @@
 ---
 title: CLI 参考
 description: Meridian CLI 所有命令和标志的完整参考。
-order: 10
-section: reference
 ---
 
 ## 命令

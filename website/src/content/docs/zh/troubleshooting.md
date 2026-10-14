@@ -1,8 +1,6 @@
 ---
 title: 故障排除
 description: 常见问题、解决方案和诊断工具。
-order: 8
-section: guides
 ---
 
 ## 使用哪种工具

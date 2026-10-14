@@ -1,8 +1,6 @@
 ---
 title: Contributing
 description: Development setup, PR guidelines, and testing approach.
-order: 12
-section: reference
 ---
 
 ## Reporting issues

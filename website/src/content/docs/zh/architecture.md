@@ -1,8 +1,6 @@
 ---
 title: 架构
 description: 系统架构、流量流向和服务拓扑。
-order: 9
-section: reference
 ---
 
 ## 技术栈

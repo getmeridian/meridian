@@ -1,8 +1,6 @@
 ---
 title: 客户端管理
 description: 添加用户、分享连接信息和管理访问密钥。
-order: 5
-section: guides
 ---
 
 ## 添加客户端

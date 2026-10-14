@@ -5,40 +5,32 @@ import { unified } from '@astrojs/markdown-remark';
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
 const LOCALES = ['en', 'ru', 'fa', 'zh'];
-const DOCS_DIR = path.resolve('src/content/docs');
 
-// Sidebar order and sections come from each English page's `order` and `section` frontmatter;
-// Starlight resolves the same slugs in every locale.
-function englishDocs() {
-  return fs
-    .readdirSync(path.join(DOCS_DIR, 'en'))
+// A page missing from the sidebar list would build but stay unreachable from the navigation.
+for (const locale of LOCALES) {
+  const pages = fs
+    .readdirSync(path.resolve('src/content/docs', locale))
     .filter((name) => /^[a-z].*\.md$/.test(name))
-    .map((name) => {
-      const front = fs.readFileSync(path.join(DOCS_DIR, 'en', name), 'utf8').split('---')[1] ?? '';
-      const field = (key) => front.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1].trim();
-      return { slug: name.slice(0, -3), order: Number(field('order') ?? 99), section: field('section') ?? 'guides' };
-    })
-    .sort((a, b) => a.order - b.order);
+    .map((name) => name.slice(0, -3));
+  const missing = pages.filter((slug) => !DOCS_SLUGS.includes(slug));
+  const absent = DOCS_SLUGS.filter((slug) => !pages.includes(slug));
+  if (missing.length || absent.length) {
+    throw new Error(
+      `src/content/docs/${locale}/ does not match src/lib/docs-sidebar.mjs` +
+        (missing.length ? `; not in the sidebar: ${missing.join(', ')}` : '') +
+        (absent.length ? `; no such page: ${absent.join(', ')}` : ''),
+    );
+  }
 }
-
-const SECTIONS = [
-  { key: 'guides', label: 'Guides', translations: { ru: 'Руководства', fa: 'راهنماها', 'zh-CN': '指南' } },
-  { key: 'reference', label: 'Reference', translations: { ru: 'Справочник', fa: 'مرجع', 'zh-CN': '参考' } },
-];
-const docs = englishDocs();
-const sidebar = SECTIONS.map(({ key, label, translations }) => ({
-  label,
-  translations,
-  items: docs.filter((doc) => doc.section === key).map((doc) => doc.slug),
-}));
 
 // Docs used to live under /docs/<locale>/<page>/; every old address keeps working.
 const redirects = Object.fromEntries(
   LOCALES.flatMap((locale) => [
     [`/docs/${locale}`, `/${locale}/getting-started/`],
-    ...docs.map((doc) => [`/docs/${locale}/${doc.slug}`, `/${locale}/${doc.slug}/`]),
+    ...DOCS_SLUGS.map((slug) => [`/docs/${locale}/${slug}`, `/${locale}/${slug}/`]),
   ]),
 );
 
@@ -97,7 +89,7 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/getmeridian/meridian' }],
       editLink: { baseUrl: 'https://github.com/getmeridian/meridian/edit/main/website/' },
       lastUpdated: true,
-      sidebar,
+      sidebar: DOCS_SIDEBAR,
       customCss: ['./src/styles/fonts.css', './src/styles/starlight.css'],
       components: {
         SocialIcons: './src/components/starlight/SocialIcons.astro',

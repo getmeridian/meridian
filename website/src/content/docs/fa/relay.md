@@ -1,8 +1,6 @@
 ---
 title: نودهای Relay
 description: مسیریابی ترافیک از طریق سرور داخلی برای مقاومت در برابر مسدودسازی IP.
-order: 6
-section: guides
 ---
 
 ## آنچه relay حل می‌کند

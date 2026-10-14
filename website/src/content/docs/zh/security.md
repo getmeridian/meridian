@@ -1,8 +1,6 @@
 ---
 title: 安全
 description: 安全设计、漏洞报告和范围。
-order: 11
-section: reference
 ---
 
 ## 报告漏洞

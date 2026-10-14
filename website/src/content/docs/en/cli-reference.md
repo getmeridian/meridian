@@ -1,8 +1,6 @@
 ---
 title: CLI Reference
 description: Complete reference for all Meridian CLI commands and flags.
-order: 10
-section: reference
 ---
 
 ## Commands

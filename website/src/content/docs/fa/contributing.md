@@ -1,8 +1,6 @@
 ---
 title: مشارکت
 description: راه‌اندازی توسعه، دستورالعمل PR و رویکرد تست.
-order: 12
-section: reference
 ---
 
 ## گزارش مسائل

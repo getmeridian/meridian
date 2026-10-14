@@ -1,8 +1,6 @@
 ---
 title: Windows 和 WSL 设置
 description: 使用 Windows Subsystem for Linux 在 Windows 上设置 Meridian。
-order: 2.5
-section: guides
 ---
 
 Meridian 从类 Unix 终端运行。在 Windows 上，请使用 Windows Subsystem for Linux (WSL)，并在 Linux 环境中运行 Meridian。

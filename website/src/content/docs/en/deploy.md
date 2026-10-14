@@ -1,8 +1,6 @@
 ---
 title: Deploy Guide
 description: Full deployment walkthrough with all configuration options.
-order: 3
-section: guides
 ---
 
 This guide covers every option of `meridian deploy`. If this is your first deployment, start with [Getting Started](/en/getting-started/).

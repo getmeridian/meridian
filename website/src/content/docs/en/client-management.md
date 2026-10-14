@@ -1,8 +1,6 @@
 ---
 title: Client Management
 description: Add users, share connection details, and manage access keys.
-order: 5
-section: guides
 ---
 
 ## Add a client

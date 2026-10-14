@@ -1,8 +1,6 @@
 ---
 title: AI 智能体
 description: 让 Claude Code、Codex、Cursor 或其他 AI 智能体安全地替你运行 Meridian。
-order: 10.5
-section: reference
 ---
 
 Meridian 既面向人，也面向 AI 智能体。智能体使用与你相同的命令，就能部署服务器、添加用户、查看健康检查并解释故障。

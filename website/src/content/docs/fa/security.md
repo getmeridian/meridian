@@ -1,8 +1,6 @@
 ---
 title: امنیت
 description: طراحی امنیت، گزارش آسیب‌پذیری و محدوده.
-order: 11
-section: reference
 ---
 
 ## گزارش آسیب‌پذیری‌ها

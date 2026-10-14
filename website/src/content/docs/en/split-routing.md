@@ -1,8 +1,6 @@
 ---
 title: Split Routing (Russia)
 description: Route Russian traffic directly while proxying everything else — keep VPS IP protected and Russian sites working.
-order: 6.5
-section: guides
 ---
 
 ## The problem

@@ -1,8 +1,6 @@
 ---
 title: معماری
 description: معماری سیستم، جریان ترافیک و توپولوژی سرویس.
-order: 9
-section: reference
 ---
 
 ## پشته فناوری

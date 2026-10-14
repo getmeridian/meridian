@@ -1,8 +1,6 @@
 ---
 title: مرجع CLI
 description: مرجع کامل برای تمام دستورات و پرچم‌های CLI مریدیان.
-order: 10
-section: reference
 ---
 
 ## دستورات

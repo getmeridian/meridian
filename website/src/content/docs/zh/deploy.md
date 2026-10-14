@@ -1,8 +1,6 @@
 ---
 title: 部署指南
 description: 完整的部署演练，包括所有配置选项。
-order: 3
-section: guides
 ---
 
 本指南涵盖 `meridian deploy` 的每个选项。如果这是你的第一次部署，从[快速开始](/zh/getting-started/)开始。

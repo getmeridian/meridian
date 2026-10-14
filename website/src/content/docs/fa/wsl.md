@@ -1,8 +1,6 @@
 ---
 title: راه‌اندازی Windows و WSL
 description: راه‌اندازی Meridian در Windows با استفاده از Windows Subsystem for Linux.
-order: 2.5
-section: guides
 ---
 
 Meridian از یک ترمینال شبیه Unix اجرا می‌شود. در Windows از Windows Subsystem for Linux (WSL) استفاده کنید و Meridian را داخل محیط Linux اجرا کنید.

@@ -1,8 +1,6 @@
 ---
 title: 域名模式
 description: 通过 Cloudflare 添加 CDN 回退以增强对 IP 阻止的抗性。
-order: 4
-section: guides
 ---
 
 ## 域名模式添加的内容

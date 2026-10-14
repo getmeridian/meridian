@@ -1,8 +1,6 @@
 ---
 title: IP Blocked Recovery
 description: What to do when your server's IP gets blocked — diagnosis and recovery options.
-order: 7
-section: guides
 ---
 
 ## Diagnose

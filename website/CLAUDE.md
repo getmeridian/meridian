@@ -8,7 +8,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Static Astro** — every page is a flat HTTP request with minimal shipped JS; content collections hold docs and blog.
 
-**Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/` with Starlight's sidebar, search, TOC, RTL, and Expressive Code. `astro.config.mjs` builds the sidebar from English `order`/`section` frontmatter and redirects every old `/docs/{locale}/{page}/` URL; `/docs/` stays the stable entry. Overrides live in `src/components/starlight/`, the route middleware in `src/lib/docs-route.ts`, the theme in `src/styles/starlight.css`.
+**Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/` with Starlight's sidebar, search, TOC, RTL, and Expressive Code. `src/lib/docs-sidebar.mjs` lists the sidebar (sections and page order) for every locale; `astro.config.mjs` refuses a page missing from it and redirects every old `/docs/{locale}/{page}/` URL; `/docs/` stays the stable entry. Overrides live in `src/components/starlight/`, the route middleware in `src/lib/docs-route.ts`, the theme in `src/styles/starlight.css`.
 
 **Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, `/context-hub.md` cover LLM tooling. All of them go through `src/lib/docs-markdown.ts`.
 

@@ -1,8 +1,6 @@
 ---
 title: نصب
 description: نصب Meridian CLI در کامپیوتر محلی خود.
-order: 2
-section: guides
 ---
 
 ## نصب سریع

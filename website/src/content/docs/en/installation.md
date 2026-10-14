@@ -1,8 +1,6 @@
 ---
 title: Installation
 description: Install the Meridian CLI on your local machine.
-order: 2
-section: guides
 ---
 
 ## Quick install

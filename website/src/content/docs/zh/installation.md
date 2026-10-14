@@ -1,8 +1,6 @@
 ---
 title: 安装
 description: 在您的本地计算机上安装 Meridian CLI。
-order: 2
-section: guides
 ---
 
 ## 快速安装

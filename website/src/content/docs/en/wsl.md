@@ -1,8 +1,6 @@
 ---
 title: Windows and WSL Setup
 description: Set up Meridian on Windows using Windows Subsystem for Linux.
-order: 2.5
-section: guides
 ---
 
 Meridian runs from a Unix-like terminal. On Windows, use Windows Subsystem for Linux (WSL) and run Meridian inside the Linux environment.

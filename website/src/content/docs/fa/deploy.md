@@ -1,8 +1,6 @@
 ---
 title: راهنمای Deploy
 description: راهنمای deploy کامل با تمام گزینه‌های پیکربندی.
-order: 3
-section: guides
 ---
 
 این راهنما تمام گزینه‌های `meridian deploy` را پوشش می‌دهد. اگر این استقرار اول شما است، با [Getting Started](/fa/getting-started/) شروع کنید.

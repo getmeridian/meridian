@@ -1,8 +1,6 @@
 ---
 title: IP 封锁恢复
 description: 服务器 IP 被封锁后怎么办 — 诊断和恢复方案。
-order: 7
-section: guides
 ---
 
 ## 诊断

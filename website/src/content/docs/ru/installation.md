@@ -1,8 +1,6 @@
 ---
 title: Установка
 description: Установите Meridian CLI на вашу локальную машину.
-order: 2
-section: guides
 ---
 
 ## Быстрая установка

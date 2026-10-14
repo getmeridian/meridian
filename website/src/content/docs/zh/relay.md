@@ -1,8 +1,6 @@
 ---
 title: 中继节点
 description: 通过国内服务器路由流量，增强 IP 封锁抗性。
-order: 6
-section: guides
 ---
 
 ## 中继节点解决的问题

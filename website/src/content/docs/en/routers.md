@@ -1,8 +1,6 @@
 ---
 title: Use Meridian on a router
 description: Connect a home router to your Meridian server with podkop on OpenWrt or XKeen on Keenetic, so every device is covered without an app.
-order: 6.7
-section: guides
 ---
 
 A router that runs a proxy client covers every device in the house, including TVs and consoles that can't run an app. This guide shows two common setups: **podkop** on OpenWrt and **XKeen** on Keenetic. Both are community projects, so check their pages for the current steps before you start.
