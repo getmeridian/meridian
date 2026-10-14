@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.2",
+    "jsdom": "^29.0.1",
     "json-schema-to-typescript": "^15.0.4",
     "starlight-links-validator": "^0.26.0",
     "typescript": "^5.9.3"
