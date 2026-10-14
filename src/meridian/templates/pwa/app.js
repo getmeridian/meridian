@@ -25,6 +25,7 @@ var T = {
     'apps.update': 'Обновляйте приложение',
     'apps.update.desc': 'В новых версиях исправляют проблемы с подключением и учитывают новые блокировки. Включите автообновление в магазине приложений или время от времени заглядывайте на страницу загрузки.',
     'sub.refresh': 'Приложение само обновляет подписку. Чтобы обновить её сейчас, откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
+    'tip.webrtc': 'Если приложение работает только как прокси, сайты в браузере иногда могут узнать ваш настоящий IP-адрес (утечка WebRTC). Чтобы этого избежать, включите в приложении режим VPN (TUN): тогда весь трафик идёт через подключение. Проверить можно любым сервисом проверки утечек: адрес должен отличаться от вашего обычного.',
     router: 'Роутер',
     'router.desc': 'Подключите всю домашнюю сеть: инструкция по настройке',
     selfcheck: 'Проверить подключение',
@@ -75,6 +76,7 @@ var T = {
     'apps.update': 'برنامه را به‌روز نگه دارید',
     'apps.update.desc': 'نسخه‌های جدید مشکلات اتصال را برطرف می‌کنند و با روش‌های تازهٔ مسدودسازی همگام می‌مانند. به‌روزرسانی خودکار را در فروشگاه برنامه روشن کنید یا هر از گاهی به صفحهٔ دانلود سر بزنید.',
     'sub.refresh': 'برنامه اشتراک را خودش به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
+    'tip.webrtc': 'اگر برنامه فقط به‌صورت پروکسی کار کند، گاهی وب‌سایت‌ها در مرورگر می‌توانند نشانی IP واقعی شما را ببینند (نشت WebRTC). برای جلوگیری از این، حالت VPN (یا TUN) را در برنامه روشن کنید تا همهٔ ترافیک از مسیر اتصال عبور کند. می‌توانید با هر سرویس بررسی نشت، تأیید کنید که نشانی نمایش‌داده‌شده با نشانی همیشگی شما فرق دارد.',
     router: 'روتر',
     'router.desc': 'کل شبکهٔ خانگی را متصل کنید: راهنمای راه‌اندازی',
     selfcheck: 'بررسی اتصال من',
@@ -125,6 +127,7 @@ var T = {
     'apps.update': '保持应用为最新版本',
     'apps.update.desc': '新版本会修复连接问题，并应对新的封锁手段。请在应用商店中开启自动更新，或不时查看下载页面。',
     'sub.refresh': '应用会自动刷新订阅。如需立即刷新，请在应用中打开订阅（或配置）列表并点击"更新"。',
+    'tip.webrtc': '如果应用只以代理模式运行，浏览器中的网站有时可能获知您的真实 IP 地址（WebRTC 泄漏）。要避免这种情况，请在应用中开启 VPN（TUN）模式，让所有流量都经过连接。您可以用任意泄漏检测服务确认：显示的地址应与您平时的地址不同。',
     router: '路由器',
     'router.desc': '让整个家庭网络都能连接：设置指南',
     selfcheck: '检查我的连接',
@@ -696,6 +699,7 @@ function renderTrouble() {
   html += '<ul class="tips">';
   html += '<li data-t="ping.desc">Check automatic time sync on your device, then try another connection option above.</li>';
   html += '<li data-t="sub.refresh">Your app refreshes the subscription on its own. To refresh it now, open the subscription (or profile) list in the app and tap Update.</li>';
+  html += '<li data-t="tip.webrtc">Websites in your browser can sometimes see your real IP address (a WebRTC leak) when your app runs as a proxy only. To avoid it, turn on the app\'s VPN (TUN) mode so all traffic goes through the connection. You can confirm with any leak-check service: the address it shows should differ from your usual one.</li>';
   html += '<li><strong data-t="apps.update">Keep your app updated</strong> ';
   html += '<span data-t="apps.update.desc">New versions fix connection problems and keep up with new blocking. Turn on automatic updates in your app store, or check the download page now and then.</span></li>';
   html += '<li data-t="ping.link">Ask the server owner to run meridian test.</li>';

@@ -309,6 +309,15 @@ class TestPWATemplateSource:
             keys = set(re.findall(r"'?([\w.]+)'?: '", block))
             assert used <= keys, f"{lang} lacks {sorted(used - keys)}"
 
+    def test_webrtc_tip_sits_in_troubleshooting_without_links(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        trouble = app_js.split("function renderTrouble()", 1)[1].split("\n}\n", 1)[0]
+        assert 'data-t="tip.webrtc"' in trouble
+        tips = re.findall(r"'tip\.webrtc': '([^\n]*)',\n", app_js)
+        tips.append(re.search(r'data-t="tip\.webrtc">(.*?)</li>', trouble).group(1))  # type: ignore[union-attr]
+        assert len(tips) == 4
+        assert not any("http" in tip or "://" in tip for tip in tips)
+
     def test_rendered_markup_has_no_inline_styles(self) -> None:
         """The page CSP has no style-src 'unsafe-inline'; style attributes are dropped."""
         for name in ("app.js", "selfcheck.js"):

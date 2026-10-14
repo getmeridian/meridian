@@ -146,6 +146,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   first connection "Основной", and `meridian dev preview` shows a realistic
   page. Without a `--server-name`, the header names the exit countries
   ("🇩🇪 Germany · 🇳🇱 Netherlands") in the page's language.
+- **A WebRTC leak tip on the connection page** — "Not connecting?" now says that
+  an app running as a proxy only can let websites in a browser see the real IP
+  address, and to turn on the app's VPN (TUN) mode. Shown in English, Russian,
+  Persian, and Chinese, with no external links.
 - Connection pages are built from each user's real subscription, so relays and
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the
