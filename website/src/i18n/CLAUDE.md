@@ -10,8 +10,6 @@
 
 **Explicit choice wins** — `meridian-lang` is written only when the reader clicks a language link; `preferredLocale()` falls back to the browser language. `locales.ts` holds the locale list, `lang` (zh is `zh-CN`, as in Starlight), og locale, and hreflang.
 
-**Translations by Sonnet agents** — ru/fa/zh strings are written by Sonnet subagents from the English reference (root `CLAUDE.md`).
-
 ## What's done well
 
 - **RTL is first-class** — Farsi sets `dir="rtl"` on `<html>` (landing) or the swapped scope; components use logical properties (`inset-inline-*`, `border-inline-start`) instead of `[dir=rtl]` flips.
