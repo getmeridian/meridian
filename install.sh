@@ -60,7 +60,7 @@ install_uv() {
     rm -f "$script"
     fail "uv installer checksum mismatch (expected $UV_INSTALLER_SHA256, got $actual)"
   fi
-  sh "$script" </dev/null 2>/dev/null
+  sh "$script" </dev/null >/dev/null 2>&1
   rm -f "$script"
   # Source uv's env to get it on PATH
   # shellcheck disable=SC1091
