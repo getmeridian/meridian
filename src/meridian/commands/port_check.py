@@ -51,7 +51,7 @@ def check_ports(conn: ServerConnection, yes: bool) -> None:
                 needed_for = " (Meridian's nginx needs it on 127.0.0.1)" if port in internal else ""
                 fail(
                     f"Port {port} is occupied by {proc}{needed_for}",
-                    hint=f"Stop {proc} first: sudo systemctl stop {proc}",
+                    hint=f"Stop {proc} or move it off port {port}, then retry.",
                     hint_type="user",
                 )
 
