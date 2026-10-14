@@ -1,153 +1,132 @@
 ---
+/**
+ * BlogPost — a single post: header, prose body (src/styles/prose.css, matched to the
+ * docs), and two more posts to read next.
+ */
 import Base from './Base.astro';
 import Mermaid from '../components/Mermaid.astro';
+import BlogCard from '../components/blog/BlogCard.astro';
+import { categoryHref, formatDate, getPosts, isoDate, type Post } from '../components/blog/posts';
 
 interface Props {
-  title: string;
-  description: string;
-  date: Date;
-  author: string;
-  category: string;
-  readingTime: number;
-  tags: string[];
+  post: Post;
 }
 
-const { title, description, date, author, category, readingTime, tags } = Astro.props;
-
-const formatted = date.toLocaleDateString('en-US', {
-  year: 'numeric',
-  month: 'long',
-  day: 'numeric',
-});
+const { post } = Astro.props;
+const { title, description, date, author, category, readingTime } = post.data;
+const more = (await getPosts()).filter((p) => p.id !== post.id).slice(0, 2);
 
 const articleSchema = {
-  "@context": "https://schema.org",
-  "@type": "Article",
-  "headline": title,
-  "description": description,
-  "datePublished": date.toISOString().slice(0, 10),
-  "author": { "@type": "Organization", "name": author },
-  "publisher": {
-    "@type": "Organization",
-    "name": "Meridian",
-    "logo": { "@type": "ImageObject", "url": "https://getmeridian.org/img/logo-512.png" },
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: title,
+  description,
+  datePublished: isoDate(date),
+  inLanguage: 'en',
+  author: { '@type': 'Organization', name: author },
+  publisher: {
+    '@type': 'Organization',
+    name: 'Meridian',
+    logo: { '@type': 'ImageObject', url: new URL('/img/logo-512.png', Astro.site).href },
   },
 };
 ---
 
-<Base title={`${title} — Meridian Blog`} description={description}>
+<Base title={`${title} — Meridian Blog`} description={description} ogType="article">
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
-  <main id="main" class="blog-post">
-    <article class="blog-article prose" data-pagefind-body>
-      <header class="blog-header">
-        <a href="/blog/" class="blog-back">&larr; All posts</a>
+  <main id="main" class="post">
+    <article class="post__article">
+      <header class="post__header">
+        <a href="/blog/" class="post__back">← All posts</a>
+        <a href={categoryHref(category)} class="pill">{category}</a>
         <h1>{title}</h1>
-        <div class="blog-meta">
-          <time datetime={date.toISOString().slice(0, 10)}>{formatted}</time>
-          <span class="blog-meta__sep">&middot;</span>
+        <p class="post__lead">{description}</p>
+        <p class="post__meta">
+          <time datetime={isoDate(date)}>{formatDate(date, 'long')}</time>
+          <span aria-hidden="true">·</span>
           <span>{author}</span>
-          <span class="blog-meta__sep">&middot;</span>
-          <span class="blog-category">{category}</span>
-          <span class="blog-meta__sep">&middot;</span>
+          <span aria-hidden="true">·</span>
           <span>{readingTime} min read</span>
-        </div>
+        </p>
       </header>
-      <slot />
+      <div class="prose" data-pagefind-body>
+        <slot />
+      </div>
     </article>
-    <footer class="blog-footer">
-      {tags.length > 0 && (
-        <div class="blog-tags">
-          {tags.map((tag) => (
-            <a href={`/blog/tag/${tag}/`} class="blog-tag">#{tag}</a>
-          ))}
+
+    {more.length > 0 && (
+      <aside class="post__more container" aria-labelledby="more-posts">
+        <h2 id="more-posts">More from the blog</h2>
+        <div class="post__more-grid">
+          {more.map((p) => <BlogCard post={p} headingLevel={3} />)}
         </div>
-      )}
-      <a href="/blog/">&larr; Back to all posts</a>
-    </footer>
+        <p><a href="/blog/">← All posts</a> · <a href="/blog/rss.xml">RSS feed</a></p>
+      </aside>
+    )}
   </main>
   <Mermaid />
 </Base>
 
-<style is:global>
-  @import '../styles/prose.css';
-
-  .blog-post {
-    max-width: 680px;
+<style>
+  .post {
+    padding: clamp(32px, 6vw, 64px) 0 24px;
+  }
+  .post__article {
+    max-width: calc(var(--prose-max) + 2 * var(--gutter));
     margin: 0 auto;
-    padding: 48px 24px 80px;
+    padding: 0 var(--gutter);
   }
-
-  .blog-back {
-    display: inline-block;
-    font-size: 0.84rem;
-    color: var(--t3);
-    text-decoration: none;
-    margin-bottom: 24px;
-    transition: color 0.12s;
+  .post__header {
+    margin-bottom: 36px;
   }
-  .blog-back:hover {
-    color: var(--ac);
+  .post__back {
+    display: block;
+    width: fit-content;
+    margin-bottom: 28px;
+    font-size: 0.92rem;
+    color: var(--t2);
   }
-
-  .blog-header {
-    margin-bottom: 40px;
+  .post__back:hover {
+    color: var(--t1);
   }
-  .blog-header h1 {
-    margin-bottom: 12px;
+  .post__header h1 {
+    margin: 14px 0 16px;
+    font-size: clamp(2rem, 4.5vw, 2.8rem);
   }
-  .blog-meta {
+  .post__lead {
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: var(--t2);
+    margin-bottom: 18px;
+  }
+  .post__meta {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 8px;
-    font-size: 0.84rem;
+    font-size: 0.9rem;
     color: var(--t3);
   }
-  .blog-meta__sep {
-    color: var(--b2);
-  }
-  .blog-category {
-    padding: 2px 8px;
-    font-size: 0.76rem;
-    font-weight: 500;
-    background: var(--ac3);
-    color: var(--ac);
-    border-radius: 4px;
-  }
-
-  .blog-footer {
-    margin-top: 48px;
-    padding-top: 24px;
+  .post__more {
+    margin-top: var(--section-y);
+    padding-top: 40px;
     border-top: 1px solid var(--b1);
   }
-  .blog-footer a {
-    font-size: 0.88rem;
-    color: var(--ac);
-    text-decoration: none;
+  .post__more h2 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
   }
-  .blog-footer a:hover {
-    text-decoration: underline;
+  .post__more-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
   }
+  .post__more > p {
+    color: var(--t3);
+    font-size: 0.94rem;
+  }
+</style>
 
-  .blog-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .blog-tag {
-    font-size: 0.78rem;
-    font-weight: 500;
-    padding: 3px 10px;
-    background: var(--s1);
-    color: var(--t2);
-    border: 1px solid var(--b1);
-    border-radius: 4px;
-    text-decoration: none;
-    transition: border-color 0.12s, color 0.12s;
-  }
-  .blog-tag:hover {
-    border-color: var(--ac);
-    color: var(--ac);
-  }
+<style is:global>
+  @import '../styles/prose.css';
 </style>
