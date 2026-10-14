@@ -9,7 +9,6 @@ import textwrap
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import click
 import pytest
 from typer.testing import CliRunner
 
@@ -39,6 +38,7 @@ from meridian.diagnostics.external import (
 from meridian.diagnostics.network import https_get
 from meridian.diagnostics.probe import run_probe_checks
 from meridian.verification import DeploymentVerificationContext, VerificationHttpsRoute
+from tests.support.text import unstyle
 from tests.support.topology import single_exit_intent
 
 _IP = "198.51.100.20"
@@ -651,7 +651,7 @@ def test_probe_json_inconclusive_is_a_typed_system_failure(monkeypatch: pytest.M
 
 def test_probe_help_documents_automation_controls() -> None:
     result = runner.invoke(app, ["probe", "--help"])
-    output = click.unstyle(result.output)
+    output = unstyle(result.output)
 
     assert result.exit_code == 0
     assert "--json" in output

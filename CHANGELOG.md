@@ -251,6 +251,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   links redirect.
 
 ### Security and correctness
+- **Starts with current Typer** — Typer 0.26 stopped installing Click, and a
+  fresh install of an earlier beta failed at launch with `No module named
+  'click'`. Meridian now needs Typer 0.26 or later and uses the Click it ships.
 - **The installer can be verified** — every release attaches `install.sh` and
   its `SHA256SUMS`, the installation guide shows how to check them, and the
   script pins uv's installer by version and SHA-256 instead of piping the

@@ -10,8 +10,7 @@ import re
 import sys
 from pathlib import Path
 
-import click
-
+from meridian import cli_types
 from meridian.cli_catalog import cli_root, long_options, public_commands
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -78,7 +77,7 @@ GLOBAL_SECTIONS = {
 }
 
 
-def long_flags(command: click.Command) -> set[str]:
+def long_flags(command: cli_types.Command) -> set[str]:
     """Return every visible long-form option exposed by a Click command."""
     return set(long_options(command, include_hidden=False))
 

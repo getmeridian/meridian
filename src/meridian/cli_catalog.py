@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import click
 from typer.main import get_command
+
+from meridian import cli_types as click
 
 if TYPE_CHECKING:
     from meridian.core.command_catalog import CommandContract

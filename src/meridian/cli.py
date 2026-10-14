@@ -6,11 +6,11 @@ import sys
 from dataclasses import dataclass
 from typing import Annotated, NoReturn
 
-import click
 import typer
 from typer.core import TyperGroup
 
 from meridian import __version__
+from meridian import cli_types as click
 from meridian.cli_catalog import command_path, requests_machine_output, supports_json
 from meridian.cli_groups import api_app, client_app, dev_app, fleet_app, node_app, relay_app, route_app, server_app
 from meridian.cli_options import (

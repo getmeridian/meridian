@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import click
 from typer.testing import CliRunner
 
 from meridian.cli import app
 from meridian.commands.help import load_agent_guide
+from tests.support.text import unstyle
 
 runner = CliRunner()
 
@@ -20,7 +20,7 @@ def test_help_agents_prints_the_bundled_guide_as_plain_markdown() -> None:
 
 def test_help_command_path_shows_that_commands_help() -> None:
     result = runner.invoke(app, ["help", "node", "add"])
-    output = click.unstyle(result.stdout)  # CI forces color, which splits "--name" with style codes
+    output = unstyle(result.stdout)
 
     assert result.exit_code == 0
     assert "meridian node add" in output

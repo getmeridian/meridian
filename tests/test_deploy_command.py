@@ -7,7 +7,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import click
 import pytest
 from typer.testing import CliRunner
 
@@ -16,6 +15,7 @@ from meridian.cli import app
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.handoff import HandoffLinks
 from meridian.servers import ServerRegistry
+from tests.support.text import unstyle
 
 runner = CliRunner()
 
@@ -126,7 +126,7 @@ def test_explicit_sni_is_never_swapped_and_dead_traffic_fails(tmp_home: Path, mo
     result = _deploy_with(runtime, [("failed", "connection reset")], args=("--sni", "www.example.com"))
 
     assert result.exit_code == 3
-    assert "no traffic passes" in click.unstyle(result.output)
+    assert "no traffic passes" in unstyle(result.output)
     assert runtime.apply_intent.call_count == 1
     runtime.publish_handoff.assert_not_called()
 

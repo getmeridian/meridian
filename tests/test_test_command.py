@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Literal
 
-import click
 import pytest
 from typer.testing import CliRunner
 
@@ -27,6 +26,7 @@ from meridian.core.verification import (
     aggregate_verification,
 )
 from meridian.servers import ServerEntry, ServerRegistry
+from tests.support.text import unstyle
 from tests.support.topology import single_exit_intent
 
 _IP = "198.51.100.20"
@@ -240,7 +240,7 @@ def test_global_json_is_supported_for_test(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_test_help_documents_full_and_basic_controls() -> None:
     result = runner.invoke(app, ["test", "--help"])
-    output = click.unstyle(result.output)
+    output = unstyle(result.output)
 
     assert result.exit_code == 0
     for option in ("--json", "--timeout", "--client", "--basic", "--domain", "--sni"):

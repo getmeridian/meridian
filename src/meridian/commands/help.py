@@ -5,9 +5,9 @@ from __future__ import annotations
 import sys
 from importlib.resources import files as pkg_files
 
-import click
 import typer
 
+from meridian import cli_types as click
 from meridian.console import fail
 
 AGENT_TOPICS = frozenset({"agents", "agent", "ai"})

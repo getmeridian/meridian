@@ -120,6 +120,11 @@ class TestLayerBoundaries:
         violations = _scan_violations(SRC / "compiler", COMPILER_FORBIDDEN)
         assert violations == [], "compiler/ has forbidden imports:\n" + "\n".join(violations)
 
+    def test_click_is_reached_only_through_cli_types(self) -> None:
+        """Typer ≥ 0.26 vendors Click; the ``click`` package isn't installed in production."""
+        violations = [v for v in _scan_violations(SRC, ("click", "typer._click")) if not v.startswith("cli_types.py ")]
+        assert violations == [], "import Click's classes from meridian.cli_types:\n" + "\n".join(violations)
+
     def test_library_modules_never_import_private_from_commands(self) -> None:
         """panel_bootstrap.py and friends must not import _foo from commands/.
 

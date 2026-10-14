@@ -18,6 +18,7 @@
 
 ## Pitfalls
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
+- Reach Click only through `meridian.cli_types` — Typer ≥ 0.26 vendors it and production has no `click` package (architecture-tested).
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
 - Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
 - Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.

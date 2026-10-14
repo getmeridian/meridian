@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import click
 from typer.testing import CliRunner
 
 from meridian.cli import app
+from tests.support.text import unstyle
 
 runner = CliRunner()
 
@@ -16,7 +16,7 @@ def test_client_list_explains_meridian_3_state(tmp_home: Path) -> None:
     (tmp_home / "credentials" / "198.51.100.7").mkdir(parents=True)
 
     result = runner.invoke(app, ["client", "list"])
-    output = click.unstyle(result.output)
+    output = unstyle(result.output)
 
     assert result.exit_code != 0
     assert "Meridian 3.x" in output
@@ -31,14 +31,14 @@ def test_server_list_explains_meridian_3_registry(tmp_home: Path, monkeypatch) -
     result = runner.invoke(app, ["server", "list"])
 
     assert result.exit_code != 0
-    assert "Meridian 3.x" in click.unstyle(result.output)
+    assert "Meridian 3.x" in unstyle(result.output)
 
 
 def test_fresh_install_still_says_deploy_first(tmp_home: Path) -> None:
     result = runner.invoke(app, ["client", "list"])
 
-    assert "No fleet yet" in click.unstyle(result.output)
-    assert "meridian deploy" in click.unstyle(result.output)
+    assert "No fleet yet" in unstyle(result.output)
+    assert "meridian deploy" in unstyle(result.output)
 
 
 def test_v4_home_defaults_to_xdg_and_adopts_an_existing_beta_fleet(tmp_path, monkeypatch) -> None:
