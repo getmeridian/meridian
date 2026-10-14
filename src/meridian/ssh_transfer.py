@@ -89,7 +89,7 @@ class _FileTransferMixin:
         logger.debug("SSH %s@%s: %s", self.user, self.ip, redacted)
 
         if self.local_mode:
-            if sudo or self.needs_sudo or self.user != "root":
+            if self.needs_sudo:
                 cmd = ["sudo", "-n", "tee", path]
                 try:
                     completed = subprocess.run(

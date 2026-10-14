@@ -264,7 +264,9 @@ class ServerConnection(_FileTransferMixin):
             timed_out = False
 
             if self.local_mode:
-                if self.needs_sudo or use_sudo:
+                # On the server, privilege follows the process UID: root never needs sudo,
+                # which minimal images may not even have.
+                if self.needs_sudo:
                     cmd = ["sudo", "-n", "bash", "-c", command]
                 else:
                     cmd = ["bash", "-c", command]

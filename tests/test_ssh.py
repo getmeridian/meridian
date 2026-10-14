@@ -331,6 +331,20 @@ def test_local_sudo_follows_the_process_uid_not_the_saved_user(
     assert conn.needs_sudo is needs_sudo
 
 
+@pytest.mark.parametrize("sudo", [None, True])
+def test_local_root_process_never_wraps_in_sudo_whatever_the_saved_user(
+    monkeypatch: pytest.MonkeyPatch, sudo: bool | None
+) -> None:
+    """A root process on a minimal server may have no sudo at all (#77)."""
+    monkeypatch.setattr("meridian.ssh.os.geteuid", lambda: 0)
+    conn = ServerConnection(ip="198.51.100.1", user="admin", local_mode=True)
+    with patch("meridian.ssh.subprocess.run", return_value=_done()) as run:
+        conn.run("true", sudo=sudo)
+        conn.put_bytes("/tmp/meridian-test", b"x")
+    argv = [call.args[0] for call in run.call_args_list]
+    assert argv and all(cmd[0] != "sudo" for cmd in argv)
+
+
 def _logged_command(command: str, **kwargs: Any) -> str:
     conn = ServerConnection(ip="198.51.100.10", local_mode=True)
     with patch("meridian.ssh.subprocess.run", return_value=_done()):
