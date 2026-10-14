@@ -621,6 +621,7 @@ def _commit_generation(
     current_ids = {resource.logical_id for resource in plan.resources}
     for binding in cluster.managed_bindings.values():
         binding.active = binding.generation == generation and binding.logical_id in current_ids
+    _drop_superseded_bindings(cluster, generation)
     current_workloads = {
         resource.payload.workload_id
         for resource in plan.resources
@@ -633,6 +634,26 @@ def _commit_generation(
     cluster.pending_generation = 0
     cluster.pending_plan_hash = ""
     persist(cluster)
+
+
+def _drop_superseded_bindings(cluster: ClusterConfig, generation: int) -> None:
+    """Forget older copies of a binding once a newer one holds the same remote identity.
+
+    Every generation re-binds each resource, so without this cluster.yml grew with
+    every apply. A (logical ID, remote ID) pair is what ownership checks match
+    (``was_managed``), so keeping its newest binding keeps that evidence.
+    """
+    newest: dict[tuple[str, str], int] = {}
+    for binding in cluster.managed_bindings.values():
+        pair = (binding.logical_id, binding.remote_id)
+        newest[pair] = max(newest.get(pair, 0), binding.generation)
+    cluster.managed_bindings = {
+        key: binding
+        for key, binding in cluster.managed_bindings.items()
+        if binding.active
+        or binding.generation >= generation
+        or newest[(binding.logical_id, binding.remote_id)] == binding.generation
+    }
 
 
 def _timestamp(clock: Clock) -> str:

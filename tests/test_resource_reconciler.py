@@ -463,6 +463,44 @@ class TestCheckpointedExecution:
         assert cluster.active_generation == 0
         assert cluster.pending_generation == 1
 
+    def test_commit_forgets_older_copies_of_the_same_remote_identity(self) -> None:
+        """Every apply re-binds each resource; keeping every copy grew cluster.yml without bound."""
+        plan = _plan()
+        resource = plan.resources[0]
+
+        def binding(generation: int, remote_id: str, *, logical_id: str = resource.logical_id):
+            return ManagedResourceBinding(
+                logical_id=logical_id,
+                resource_kind="firewall_rule",
+                generation=generation,
+                remote_id=remote_id,
+                desired_hash=resource.desired_hash,
+                observed_hash=resource.desired_hash,
+                active=generation == 3,
+            )
+
+        cluster = ClusterConfig(
+            managed_bindings={
+                f"{resource.logical_id}@1": binding(1, "recreated-since"),
+                f"{resource.logical_id}@2": binding(2, "firewall-1"),
+                f"{resource.logical_id}@3": binding(3, "firewall-1"),
+                "host:gone@2": binding(2, "host-9", logical_id="host:gone"),
+            },
+            active_generation=3,
+            active_plan_hash="0" * 64,
+        )
+        action = build_resource_actions(plan, generation=4)[0]
+        driver = ScriptedDriver([_converged(action, remote_id="firewall-1")] * 2)
+
+        result = execute_resource_plan(plan, cluster, {"firewall_rule": driver}, persist=lambda _s: None, clock=_clock)
+
+        assert result.all_succeeded
+        assert sorted(cluster.managed_bindings) == [
+            f"{resource.logical_id}@1",  # a different remote identity stays ownership evidence
+            f"{resource.logical_id}@4",
+            "host:gone@2",
+        ]
+
     def test_old_generation_remains_active_until_resumed_cutover_succeeds(self) -> None:
         old_plan = _plan(public_port=8443)
         new_plan = _plan()

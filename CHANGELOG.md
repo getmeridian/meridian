@@ -104,6 +104,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   how many, and `--component` picks node, panel, nginx, or relay. Every line is
   redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
   path), so the output is safe to share; `doctor` now masks that path too.
+- **`cluster.yml` stops growing with every apply** — each apply kept a full copy
+  of every resource binding, so a small fleet's file passed 300 KB after a few
+  dozen changes. Older copies of the same remote resource are now dropped when a
+  change commits; the next apply shrinks existing files.
 - **`client show` keeps the connection-page link** — `client add` and `deploy`
   printed each client's page link but never recorded that the page was
   published, so `client show` and `--json` later offered only the
