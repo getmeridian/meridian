@@ -71,6 +71,12 @@ jobs:
           # Copy the CLI installer into Astro dist
           cp install.sh website/dist/install.sh
           cp VERSION website/dist/version
+          # While main carries a beta, the site documents it, so its installer installs it.
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          if echo "$VERSION" | grep -qE '(a|b|rc)[0-9]+$'; then
+            sed -i "s/^MERIDIAN_DEFAULT_VERSION=\"\"$/MERIDIAN_DEFAULT_VERSION=\"$VERSION\"/" website/dist/install.sh
+            grep -qx "MERIDIAN_DEFAULT_VERSION=\"$VERSION\"" website/dist/install.sh
+          fi
           # Generate checksums
           cd website/dist
           sha256sum install.sh > SHA256SUMS

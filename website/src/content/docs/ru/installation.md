@@ -30,7 +30,7 @@ less install.sh                  # optional: read it
 MERIDIAN_VERSION=$VERSION bash install.sh
 ```
 
-Чтобы проверить копию с getmeridian.org, сравните `curl -sSf https://getmeridian.org/install.sh | sha256sum` с `SHA256SUMS` выпуска; они совпадают, если скрипт не менялся после этого выпуска.
+Чтобы проверить копию с getmeridian.org, сравните `curl -sSf https://getmeridian.org/install.sh | sha256sum` с `SHA256SUMS` выпуска; они совпадают, если скрипт не менялся после этого выпуска. Если новейший выпуск является бета-версией, копия на сайте по умолчанию устанавливает именно её, и из-за этой одной строки её контрольная сумма отличается от суммы файла из выпуска.
 
 ## Ручная установка
 

@@ -21,7 +21,11 @@ ok()    { printf "  ${G}✓${R} %s\n" "$*"; }
 fail()  { printf "\n  ${RED}✗ %s${R}\n" "$*" >&2; exit 1; }
 
 PYPI_PACKAGE="meridian-vpn"
-if [[ -n "${MERIDIAN_VERSION:-}" ]]; then
+# release.yml fills this in on the website's copy while main carries a beta,
+# so the site's installer matches the docs it publishes.
+MERIDIAN_DEFAULT_VERSION=""
+MERIDIAN_VERSION="${MERIDIAN_VERSION:-$MERIDIAN_DEFAULT_VERSION}"
+if [[ -n "$MERIDIAN_VERSION" ]]; then
   [[ "$MERIDIAN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$ ]] || fail "MERIDIAN_VERSION must look like 4.0.0"
   PYPI_PACKAGE="meridian-vpn==$MERIDIAN_VERSION"
 fi

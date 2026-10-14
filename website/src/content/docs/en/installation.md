@@ -30,7 +30,7 @@ less install.sh                  # optional: read it
 MERIDIAN_VERSION=$VERSION bash install.sh
 ```
 
-To check the copy at getmeridian.org instead, compare `curl -sSf https://getmeridian.org/install.sh | sha256sum` with the release's `SHA256SUMS`; they match unless the script changed after that release.
+To check the copy at getmeridian.org instead, compare `curl -sSf https://getmeridian.org/install.sh | sha256sum` with the release's `SHA256SUMS`; they match unless the script changed after that release. When the newest release is a beta, the website's copy installs that beta by default, and that one line makes its checksum differ from the release asset.
 
 ## Manual install
 

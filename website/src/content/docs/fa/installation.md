@@ -30,7 +30,7 @@ less install.sh                  # optional: read it
 MERIDIAN_VERSION=$VERSION bash install.sh
 ```
 
-برای بررسی نسخهٔ موجود در getmeridian.org، خروجی `curl -sSf https://getmeridian.org/install.sh | sha256sum` را با `SHA256SUMS` همان release مقایسه کنید؛ تا وقتی اسکریپت پس از آن release تغییر نکرده باشد یکسان‌اند.
+برای بررسی نسخهٔ موجود در getmeridian.org، خروجی `curl -sSf https://getmeridian.org/install.sh | sha256sum` را با `SHA256SUMS` همان release مقایسه کنید؛ تا وقتی اسکریپت پس از آن release تغییر نکرده باشد یکسان‌اند. وقتی جدیدترین release یک نسخهٔ بتا باشد، نسخهٔ موجود در وب‌سایت به‌طور پیش‌فرض همان بتا را نصب می‌کند و همان یک خط باعث می‌شود checksum آن با فایل پیوست release فرق کند.
 
 ## نصب دستی
 

@@ -30,7 +30,7 @@ less install.sh                  # optional: read it
 MERIDIAN_VERSION=$VERSION bash install.sh
 ```
 
-要检查 getmeridian.org 上的副本，请把 `curl -sSf https://getmeridian.org/install.sh | sha256sum` 的结果与该发布版本的 `SHA256SUMS` 对比；只要脚本在该发布之后没有变动，两者就会一致。
+要检查 getmeridian.org 上的副本，请把 `curl -sSf https://getmeridian.org/install.sh | sha256sum` 的结果与该发布版本的 `SHA256SUMS` 对比；只要脚本在该发布之后没有变动，两者就会一致。当最新发布版本是测试版时，网站上的副本默认安装的就是该测试版，仅这一行就会使它的校验和与发布附件不同。
 
 ## 手动安装
 
