@@ -1,8 +1,6 @@
 ---
 title: 贡献
 description: 开发设置、PR 指南和测试方法。
-order: 12
-section: reference
 ---
 
 ## 报告问题

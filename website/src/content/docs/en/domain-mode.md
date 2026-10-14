@@ -1,8 +1,6 @@
 ---
 title: Domain Mode
 description: Add CDN fallback via Cloudflare for IP-blocking resilience.
-order: 4
-section: guides
 ---
 
 ## What domain mode adds

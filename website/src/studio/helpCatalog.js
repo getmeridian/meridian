@@ -1,3 +1,4 @@
+// @ts-check
 export const studioJourneySteps = [
   {
     id: "welcome",
@@ -57,11 +58,10 @@ export const studioJourneySteps = [
   },
 ];
 
+// Help for Studio-only controls, plus contract fields whose help_text is empty.
+// Labels and help for workflow fields come from the generated contracts
+// (contractDefaults.js); never restate them here.
 export const studioHelp = {
-  serverTitle: "A friendly name you recognize later, such as Family VPN or London VPS.",
-  serverPublicIp: "Use the public IPv4 or IPv6 address from your VPS provider. Do not use an internal/private IP.",
-  sshUsername: "This is the Linux login user. Many providers use root, ubuntu, debian, or admin.",
-  sshPort: "Use 22 unless your provider explicitly gave you another SSH port.",
   sshCommandPaste:
     "Optional shortcut. Paste the SSH command your provider shows, and Studio will fill username, IP, port, and title.",
   sshPassword:
@@ -69,16 +69,7 @@ export const studioHelp = {
   disablePasswordAuth:
     "Advanced safety setting for deploy hardening. Key setup verifies access first; deploy performs SSH hardening later.",
   savedServer: "Choose a server you already saved and validated. Raw IP and user fields stay behind the scenes.",
-  displayName: "Shown on generated connection pages for clients.",
-  clientName: "The first connection profile Meridian creates for you.",
-  hardening: "Recommended for a new VPS. It may be too strict if the server already hosts other services.",
-  geoBlock: "Blocks RU destinations on this server. Use route policy later when you want RU traffic to exit through a regional server instead.",
-  sni: "A common website name used by Reality during network probes.",
-  domain: "Optional. Use it when you already own a domain pointed at this server.",
   color: "Only affects the connection page appearance.",
-  icon: "Optional emoji or image URL shown on connection pages.",
-  pq: "Experimental. Keep off unless you specifically want to test it.",
-  warp: "Routes outbound server traffic through WARP. Useful for some networks, unnecessary for most first installs.",
   pastedOutput: "Optional advanced tool. Paste one JSON envelope or JSONL events from the CLI to inspect them.",
 };
 
@@ -98,7 +89,3 @@ export const studioFaqs = {
     ["What is the public key?", "The safe half that goes on the server. It lets the server recognize your private key later."],
   ],
 };
-
-export function requiredHelpKeys() {
-  return Object.keys(studioHelp);
-}

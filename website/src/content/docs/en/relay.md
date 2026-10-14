@@ -1,8 +1,6 @@
 ---
 title: Relay Nodes
 description: Route traffic through a domestic server for IP-blocking resilience.
-order: 6
-section: guides
 ---
 
 ## What relays solve

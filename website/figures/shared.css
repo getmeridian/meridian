@@ -1,7 +1,7 @@
 /* Shared look for blog figures: the site's warm light palette and self-hosted fonts. */
-@font-face { font-family: 'Fraunces'; font-weight: 400 600; src: url('../public/fonts/fraunces.woff2') format('woff2'); }
-@font-face { font-family: 'Source Sans 3'; font-weight: 400 600; src: url('../public/fonts/source-sans-3.woff2') format('woff2'); }
-@font-face { font-family: 'JetBrains Mono'; font-weight: 400 500; src: url('../public/fonts/jetbrains-mono.woff2') format('woff2'); }
+@font-face { font-family: 'Fraunces'; font-weight: 400 600; src: url('../public/fonts/fraunces-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Source Sans 3'; font-weight: 400 600; src: url('../public/fonts/source-sans-3-latin.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400 500; src: url('../public/fonts/jetbrains-mono-latin.woff2') format('woff2'); }
 
 :root {
   --bg: #fdfaf6; --s1: #ffffff; --s2: #f5f0e8; --code: #f0ebe1;

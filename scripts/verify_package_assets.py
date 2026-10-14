@@ -1,4 +1,4 @@
-"""Verify that a built Meridian wheel contains the generated Studio site and the agent guide."""
+"""Verify that a built Meridian wheel contains the Studio page, only its files, and the agent guide."""
 
 from __future__ import annotations
 
@@ -10,17 +10,31 @@ _REQUIRED_ASSETS = {
     "meridian/studio_assets/studio/index.html",
     "meridian/data/agents.md",
 }
+_STUDIO_PREFIX = "meridian/studio_assets/"
+# The directories the Engine serves; mirrors meridian.engine.assets.STUDIO_ASSET_ROOTS
+# (this script runs without Meridian installed, and a test keeps the two equal).
+STUDIO_ASSET_ROOTS = ("studio", "_astro", "fonts", "img")
 
 
 def verify_wheel_assets(wheel: Path) -> None:
-    """Raise ValueError when required packaged assets are absent."""
+    """Raise ValueError when required assets are absent or unused website files ride along."""
     if not wheel.is_file():
         raise ValueError(f"Wheel does not exist: {wheel}")
 
     with ZipFile(wheel) as archive:
-        missing = sorted(_REQUIRED_ASSETS - set(archive.namelist()))
+        names = set(archive.namelist())
+    missing = sorted(_REQUIRED_ASSETS - names)
     if missing:
         raise ValueError(f"Wheel is missing packaged assets: {', '.join(missing)}")
+    extra = sorted(
+        name
+        for name in names
+        if name.startswith(_STUDIO_PREFIX)
+        and name.removeprefix(_STUDIO_PREFIX).split("/", 1)[0] not in STUDIO_ASSET_ROOTS
+    )
+    if extra:
+        shown = ", ".join(extra[:5]) + (f" and {len(extra) - 5} more" if len(extra) > 5 else "")
+        raise ValueError(f"Wheel ships website files the Studio Engine never serves: {shown}")
 
 
 def main() -> None:

@@ -1,13 +1,19 @@
+// @ts-check
 // Pure presentation helpers for local Engine operation snapshots.
 // Shapes follow generated/schemas/operation-snapshot, operation-cancel, and
 // operation-cancellation; keep wording here so the page script stays thin.
 
+/** @typedef {import("./generated/schemas/operation-snapshot.schema").OperationSnapshot} OperationSnapshot */
+/** @typedef {import("./generated/schemas/operation-cancellation.schema").OperationCancellation} OperationCancellation */
+
 export const TERMINAL_OPERATION_STATES = new Set(["succeeded", "failed", "cancelled", "completed_after_cancel"]);
 
+/** @param {Partial<OperationSnapshot> | null | undefined} snapshot */
 export function isTerminalOperation(snapshot) {
-  return TERMINAL_OPERATION_STATES.has(snapshot?.state);
+  return TERMINAL_OPERATION_STATES.has(snapshot?.state ?? "");
 }
 
+/** @param {string | undefined} state */
 export function operationStateLabel(state) {
   if (state === "queued") return "Waiting to start";
   if (state === "running") return "Deploy in progress";
@@ -21,6 +27,10 @@ export function operationStateLabel(state) {
 
 // The Cancel control is visible only while an operation can still be stopped.
 // A brand-new operation without a snapshot yet counts as running.
+/**
+ * @param {Partial<OperationSnapshot> | null | undefined} snapshot
+ * @param {boolean} [hasOperation]
+ */
 export function cancelControl(snapshot, hasOperation = Boolean(snapshot)) {
   const state = snapshot?.state || (hasOperation ? "running" : "");
   if (state === "queued" || state === "running") {
@@ -32,6 +42,10 @@ export function cancelControl(snapshot, hasOperation = Boolean(snapshot)) {
   return { hidden: true, disabled: true, label: "Cancel deploy" };
 }
 
+/**
+ * @param {string | undefined} outcome
+ * @returns {{ title: string, detail: string, tone: "ok" | "warning" | "running" }}
+ */
 export function describeCancelOutcome(outcome) {
   if (outcome === "cancelled") {
     return {
@@ -57,6 +71,7 @@ export function describeCancelOutcome(outcome) {
   return { title: "Cancel request sent", detail: "Waiting for the Engine to confirm.", tone: "running" };
 }
 
+/** @param {OperationCancellation | null | undefined} cancellation */
 export function describeCancellation(cancellation) {
   const remoteChanged = Boolean(cancellation?.remote_changed);
   return {

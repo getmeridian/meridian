@@ -1,8 +1,6 @@
 ---
 title: 在路由器上使用 Meridian
 description: 通过 OpenWrt 上的 podkop 或 Keenetic 上的 XKeen 将家庭路由器连接到 Meridian 服务器，这样每台设备都能覆盖，无需安装应用。
-order: 6.7
-section: guides
 ---
 
 运行代理客户端的路由器可以覆盖家中的每台设备，包括无法运行应用的电视和游戏机。本指南展示两种常见的设置：**podkop** 在 OpenWrt 上和 **XKeen** 在 Keenetic 上。两者都是社区项目，所以开始前请查阅他们的页面了解最新步骤。

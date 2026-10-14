@@ -1,84 +1,93 @@
 ---
 /**
- * Footer — warm, understated.
+ * Footer — one footer for every non-docs page. The version comes from the repo's
+ * VERSION file at build time (Base.astro), so no request is made to show it.
  */
+import { Image } from 'astro:assets';
+import logo from '../assets/logo.png';
+import { shellT, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+  version: string;
+}
+
+const { locale, version } = Astro.props;
+const t = shellT(locale);
 ---
 
-<footer class="footer">
+<footer class="footer" data-i18n-scope>
   <div class="footer__inner">
-    <div class="footer__content">
-      <p class="footer__tagline" data-t="footer.tagline">
-        Open source. No tracking. No accounts.
-      </p>
-
-      <div class="footer__links">
-        <a href="https://github.com/getmeridian/meridian" target="_blank" rel="noopener">GitHub</a>
-        <span class="footer__sep">&middot;</span>
-        <a href="https://github.com/getmeridian/meridian/issues" target="_blank" rel="noopener">Issues</a>
-        <span class="footer__sep">&middot;</span>
-        <a href="/docs/" data-astro-prefetch>Docs</a>
-      </div>
-
-      <div class="footer__version" id="footer-version"></div>
+    <div class="footer__brand">
+      <Image src={logo} alt="" width={40} height={40} />
+      <p class="footer__tagline" data-t="footer.tagline">{t('footer.tagline')}</p>
     </div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href={`/${locale}/getting-started/`} data-docs-link data-t="nav.docs">{t('nav.docs')}</a>
+      <a href="/blog/" data-t="nav.blog">{t('nav.blog')}</a>
+      <a href="/demo/" data-t="nav.demo">{t('nav.demo')}</a>
+      <a href="https://github.com/getmeridian/meridian">GitHub</a>
+      <a href="https://github.com/getmeridian/meridian/issues" data-t="footer.issues">{t('footer.issues')}</a>
+      <a href="/blog/rss.xml" data-t="footer.rss">{t('footer.rss')}</a>
+    </nav>
+    <p class="footer__version"><a href="https://github.com/getmeridian/meridian/blob/main/CHANGELOG.md">v{version}</a></p>
   </div>
 </footer>
 
-<script>
-  fetch('/version')
-    .then(r => r.ok ? r.text() : null)
-    .then(v => {
-      if (v) {
-        const el = document.getElementById('footer-version');
-        if (el) el.textContent = `v${v.trim()}`;
-      }
-    })
-    .catch(() => {});
-</script>
-
 <style>
   .footer {
-    padding: 0 24px;
-    margin-top: 32px;
-  }
-  .footer__inner {
-    max-width: 960px;
-    margin: 0 auto;
+    margin-top: 48px;
     border-top: 1px solid var(--b1);
   }
-  .footer__content {
-    padding: 32px 0 40px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
+  .footer__inner {
+    max-width: var(--page-max);
+    margin: 0 auto;
+    padding: 32px var(--gutter) 40px;
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    gap: 8px;
+    gap: 16px 32px;
+  }
+  .footer__brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .footer__brand img {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
   }
   .footer__tagline {
-    font-size: 0.85rem;
-    color: var(--t3);
-    font-style: italic;
-    font-family: var(--heading);
+    font-size: 0.9rem;
+    color: var(--t2);
   }
   .footer__links {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.82rem;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    font-size: 0.9rem;
   }
   .footer__links a {
     color: var(--t2);
-    transition: color 0.12s;
   }
-  .footer__links a:hover { color: var(--ac); }
-  .footer__sep {
-    color: var(--b2);
-    font-size: 0.6rem;
+  .footer__links a:hover {
+    color: var(--t1);
   }
   .footer__version {
+    grid-column: 1 / -1;
     font-family: var(--mono);
-    font-size: 0.68rem;
+    font-size: 0.74rem;
+  }
+  .footer__version a {
     color: var(--t3);
-    letter-spacing: 0.03em;
+  }
+  .footer__version a:hover {
+    color: var(--t1);
+  }
+  @media (max-width: 720px) {
+    .footer__inner {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

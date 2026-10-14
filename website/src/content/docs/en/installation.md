@@ -1,8 +1,6 @@
 ---
 title: Installation
 description: Install the Meridian CLI on your local machine.
-order: 2
-section: guides
 ---
 
 ## Quick install
@@ -71,6 +69,8 @@ Your 3.x servers keep working. You have two choices:
   3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — Meridian 4's teardown also removes 3x-ui
 
 Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
+
+These docs describe Meridian 4. The [Meridian 3.17.3 docs](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/en) stay on GitHub for servers you keep on 3.x.
 
 ## Requirements
 

@@ -1,8 +1,6 @@
 ---
 title: Troubleshooting
 description: Common issues, fixes, and diagnostic tools.
-order: 8
-section: guides
 ---
 
 ## Which tool to use

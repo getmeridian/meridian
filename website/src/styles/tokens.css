@@ -1,137 +1,108 @@
 /*
- * Meridian Design Tokens — Warm Editorial
- * Single source of truth for colors, typography, spacing.
+ * Meridian design tokens — warm editorial, light first.
  *
- * Light-first design with warm cream tones.
- * Dark mode as a considered alternative, not an afterthought.
+ * Every color is written once as light-dark(light, dark). `color-scheme` picks the
+ * side: the OS preference by default, `data-theme="light|dark"` on <html> to override.
+ * Lightning CSS (Vite's minifier) lowers light-dark() for browsers that lack it.
  *
- * Theme override: set data-theme="light" or data-theme="dark" on <html>
- * to override the OS preference. No attribute = follow OS.
+ * Text tokens (--t1..--t3, --ac-text, --ok, --err) meet WCAG AA (4.5:1) on --bg,
+ * --s1, --s2, and --code-bg in both themes. --ac is a fill and decoration color;
+ * text on an --ac fill uses --on-ac.
  */
 
 :root {
-  /* Backgrounds */
-  --bg: #FDFAF6;
-  --s1: #FFFFFF;
-  --s2: #F5F0E8;
+  color-scheme: light dark;
+
+  /* Surfaces */
+  --bg: light-dark(#FDFAF6, #1C1E28);
+  --s1: light-dark(#FFFFFF, #252836);
+  --s2: light-dark(#F5F0E8, #2E3145);
+  --band: light-dark(#F7F2EA, #20222D);
+  --code-bg: light-dark(#F0EBE1, #1E2030);
+  --code-br: light-dark(#DDD7C9, #3A3E52);
 
   /* Borders */
-  --b1: #E5DFD3;
-  --b2: #D5CFC3;
+  --b1: light-dark(#E5DFD3, #3A3E52);
+  --b2: light-dark(#D5CFC3, #4A4F66);
 
   /* Text */
-  --t1: #1A1D2E;
-  --t2: #6B7084;
-  --t3: #9095A4;
+  --t1: light-dark(#1A1D2E, #E4E2DE);
+  --t2: light-dark(#555A6E, #A6A8B6);
+  --t3: light-dark(#636879, #9A9DAE);
+  --t-body: light-dark(#444859, #C4C3C8); /* long-form text; Starlight's gray-2 */
 
   /* Accent (warm gold) */
-  --ac: #C8933A;
-  --ac2: #C8933A14;
-  --ac3: #C8933A08;
-  --ac-hover: #B07E2E;
+  --ac: light-dark(#C8933A, #D4A24E);
+  --ac-hover: light-dark(#BC8833, #E0B060);
+  --ac-text: light-dark(#85601F, #D4A24E);
+  --on-ac: light-dark(#1A1D2E, #1C1E28);
+  --ac2: light-dark(#C8933A1A, #D4A24E1F);
+  --ac3: light-dark(#C8933A0D, #D4A24E0F);
 
   /* Status */
-  --ok: #2D8B5F;
-  --ok2: #2D8B5F10;
-  --err: #C93B3B;
-  --err2: #C93B3B10;
-  --warn: #C8933A;
-  --warn2: #C8933A10;
-
-  /* Code surfaces — distinct from page background */
-  --code-bg: #F0EBE1;
-  --code-br: #DDD7C9;
+  --ok: light-dark(#23744F, #5CE88E);
+  --ok2: light-dark(#23744F12, #5CE88E14);
+  --err: light-dark(#B33A3A, #F06060);
+  --err2: light-dark(#B33A3A10, #F0606014);
+  --warn: var(--ac);
+  --warn2: light-dark(#C8933A14, #D4A24E14);
 
   /* Protocol card colors (connection page) */
-  --blue: #2b7de9;
-  --blue-bg: #2b7de90a;
-  --blue-br: #2b7de925;
-  --amber: #c4882a;
-  --amber-bg: #c4882a0a;
-  --amber-br: #c4882a25;
+  --blue: light-dark(#2b7de9, #5b9cf5);
+  --blue-bg: light-dark(#2b7de90a, #5b9cf512);
+  --blue-br: light-dark(#2b7de925, #5b9cf530);
+  --amber: light-dark(#c4882a, #e5a44e);
+  --amber-bg: light-dark(#c4882a0a, #e5a44e12);
+  --amber-br: light-dark(#c4882a25, #e5a44e30);
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(26, 29, 46, 0.04);
-  --shadow-md: 0 2px 8px rgba(26, 29, 46, 0.06);
-  --shadow-lg: 0 4px 16px rgba(26, 29, 46, 0.08);
+  /* Shadows — ink-tinted in light, deeper black in dark */
+  --shadow-sm: 0 1px 2px light-dark(rgba(26, 29, 46, 0.05), rgba(0, 0, 0, 0.25));
+  --shadow-md: 0 2px 8px light-dark(rgba(26, 29, 46, 0.07), rgba(0, 0, 0, 0.3));
+  --shadow-lg: 0 8px 28px light-dark(rgba(26, 29, 46, 0.1), rgba(0, 0, 0, 0.4));
 
   /* Radii */
   --r: 8px;
   --r2: 12px;
 
+  /* Layout — --nav-h and --prose-max match Starlight's header and content width */
+  --page-max: 1040px;
+  --prose-max: 46rem;
+  --gutter: 24px;
+  --nav-h: 3.5rem;
+  --section-y: clamp(56px, 8vw, 88px);
+
   /* Typography */
   --heading: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --body: 'Source Sans 3', system-ui, -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --body: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --heading-tracking: -0.015em;
+  --label-font: var(--mono); /* small uppercase labels */
 
-  /* Alias used by demo/ping pages */
+  /* Alias used by demo pages */
   --sans: var(--body);
 }
 
-/* Dark tokens — shared by OS preference and explicit override */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1C1E28;
-    --s1: #252836;
-    --s2: #2E3145;
-    --b1: #3A3E52;
-    --b2: #4A4F66;
-    --t1: #E4E2DE;
-    --t2: #9A9CAA;
-    --t3: #6B6E7E;
-    --ac: #D4A24E;
-    --ac2: #D4A24E18;
-    --ac3: #D4A24E0A;
-    --ac-hover: #E0B060;
-    --ok: #5CE88E;
-    --ok2: #5CE88E14;
-    --err: #F06060;
-    --err2: #F0606014;
-    --warn: #D4A24E;
-    --warn2: #D4A24E14;
-    --code-bg: #1E2030;
-    --code-br: #3A3E52;
-    --blue: #5b9cf5;
-    --blue-bg: #5b9cf512;
-    --blue-br: #5b9cf530;
-    --amber: #e5a44e;
-    --amber-bg: #e5a44e12;
-    --amber-br: #e5a44e30;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
-    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3);
-  }
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
-/* Explicit dark override — same tokens, triggered by data-theme="dark" */
-[data-theme="dark"] {
-  --bg: #1C1E28;
-  --s1: #252836;
-  --s2: #2E3145;
-  --b1: #3A3E52;
-  --b2: #4A4F66;
-  --t1: #E4E2DE;
-  --t2: #9A9CAA;
-  --t3: #6B6E7E;
-  --ac: #D4A24E;
-  --ac2: #D4A24E18;
-  --ac3: #D4A24E0A;
-  --ac-hover: #E0B060;
-  --ok: #5CE88E;
-  --ok2: #5CE88E14;
-  --err: #F06060;
-  --err2: #F0606014;
-  --warn: #D4A24E;
-  --warn2: #D4A24E14;
-  --code-bg: #1E2030;
-  --code-br: #3A3E52;
-  --blue: #5b9cf5;
-  --blue-bg: #5b9cf512;
-  --blue-br: #5b9cf530;
-  --amber: #e5a44e;
-  --amber-bg: #e5a44e12;
-  --amber-br: #e5a44e30;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3);
+/* Scripts the three self-hosted families don't cover. Element-level, so a nav or
+   footer swapped to another language (blog, 404) picks up its fonts too. */
+:lang(ru) {
+  --heading: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+}
+:lang(fa) {
+  --heading: 'Vazirmatn', 'Source Sans 3', Tahoma, sans-serif;
+  --body: 'Vazirmatn', 'Source Sans 3', Tahoma, system-ui, sans-serif;
+  --heading-tracking: normal;
+  --label-font: var(--body);
+}
+:lang(zh) {
+  --heading: 'Fraunces', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+  --body: 'Source Sans 3', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --heading-tracking: normal;
+  --label-font: var(--body);
 }

@@ -1,36 +1,46 @@
 ---
+/**
+ * CopyButton — copies `text`. The click handling lives in copy.ts; styles are global
+ * so the command builder's copy button shares them.
+ */
 interface Props {
   text: string;
   label?: string;
+  copiedLabel?: string;
   class?: string;
 }
 
-const { text, label = 'Copy', class: className = '' } = Astro.props;
+const { text, label = 'Copy', copiedLabel = 'Copied', class: className = '' } = Astro.props;
 ---
 
-<button class:list={['copy-btn', className]} data-copy={text} aria-label={`Copy: ${text}`}>
+<button type="button" class:list={['copy-btn', className]} data-copy={text} data-copied-label={copiedLabel} aria-label={`${label}: ${text}`}>
   <span class="copy-btn__label">{label}</span>
-  <svg class="copy-btn__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+  <svg class="copy-btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
   </svg>
-  <svg class="copy-btn__check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+  <svg class="copy-btn__check" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <polyline points="20 6 9 17 4 12"></polyline>
   </svg>
 </button>
 
-<style>
+<script>
+  import { wireCopyButtons } from './copy';
+  wireCopyButtons();
+</script>
+
+<style is:global>
   .copy-btn {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    background: var(--s2);
+    gap: 6px;
+    background: var(--s1);
     border: 1px solid var(--b1);
-    color: var(--t3);
+    color: var(--t2);
     font-family: var(--mono);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     font-weight: 500;
-    padding: 4px 10px;
+    padding: 5px 10px;
     border-radius: 6px;
     cursor: pointer;
     transition: color 0.12s, border-color 0.12s;
@@ -43,9 +53,7 @@ const { text, label = 'Copy', class: className = '' } = Astro.props;
     color: var(--ok);
     border-color: var(--ok);
   }
-  .copy-btn__check {
-    display: none;
-  }
+  .copy-btn__check,
   .copy-btn[data-copied] .copy-btn__icon {
     display: none;
   }
@@ -53,22 +61,3 @@ const { text, label = 'Copy', class: className = '' } = Astro.props;
     display: block;
   }
 </style>
-
-<script>
-  document.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest('.copy-btn') as HTMLButtonElement;
-    if (!btn) return;
-    const text = btn.dataset.copy;
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      const label = btn.querySelector('.copy-btn__label') as HTMLSpanElement;
-      const orig = label.textContent;
-      label.textContent = 'Copied';
-      btn.setAttribute('data-copied', '');
-      setTimeout(() => {
-        label.textContent = orig;
-        btn.removeAttribute('data-copied');
-      }, 1500);
-    });
-  });
-</script>

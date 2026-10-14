@@ -116,17 +116,12 @@ real-lab-down: ## Destroy ALL harness-tagged VMs in the project (orphan cleanup)
 
 ## —— Build & Publish ————————————————————————————————————
 
-ai-docs: ## Generate AI reference from human docs (strip frontmatter)
-	@mkdir -p src/meridian/data
-	@for f in website/src/content/docs/en/cli-reference.md \
-	          website/src/content/docs/en/architecture.md \
-	          website/src/content/docs/en/troubleshooting.md \
-	          website/src/content/docs/en/deploy.md \
-	          website/src/content/docs/en/relay.md \
-	          website/src/content/docs/en/recovery.md; do \
-		awk 'BEGIN{skip=0} /^---$$/{skip++;next} skip<2{next} {print}' "$$f"; \
-		echo ""; \
-	done > src/meridian/data/ai-reference.md
+ai-docs: ## Bundle the docs `doctor --ai` pastes into its prompt (needs Node)
+	@if command -v node >/dev/null 2>&1; then \
+		node website/scripts/ai-docs.mjs reference src/meridian/data/ai-reference.md; \
+	else \
+		echo "  - Node.js not found; skipping the AI reference (doctor --ai works without it)"; \
+	fi
 
 studio-assets: ## Build website assets bundled into `meridian studio`
 	cd website && pnpm run contracts:check && pnpm run build

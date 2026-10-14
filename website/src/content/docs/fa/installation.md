@@ -1,8 +1,6 @@
 ---
 title: نصب
 description: نصب Meridian CLI در کامپیوتر محلی خود.
-order: 2
-section: guides
 ---
 
 ## نصب سریع
@@ -71,6 +69,8 @@ Meridian 4 **نیست نصب درجا**. جای پنل 3x-ui را Remnawave می
   3. بعدما که همه تغییر کردند، سرور قدیمی را پاک کنید با `meridian teardown OLD_IP` — teardown Meridian 4 همچنین 3x-ui را حذف می‌کند
 
 Meridian 4 وضعیت خودش را در `~/.config/meridian/` نگه می‌دارد و وضعیت 3.x در `~/.meridian/` را هرگز نمی‌خواند و تغییر نمی‌دهد، پس هر دو نسخه می‌توانند روی یک ماشین کنار هم باشند؛ دستورهای fleet که فقط وضعیت 3.x را پیدا کنند، این گزینه‌ها را توضیح می‌دهند.
+
+این مستندات Meridian 4 را شرح می‌دهند. [مستندات Meridian 3.17.3](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/fa) برای سرورهایی که روی 3.x نگه می‌دارید در GitHub باقی می‌مانند.
 
 ## نیازمندی‌ها
 

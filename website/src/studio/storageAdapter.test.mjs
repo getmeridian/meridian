@@ -72,15 +72,15 @@ test("sanitizeJourneyDraft restores missing defaults", () => {
   });
 
   assert.equal(draft.currentStep, "welcome");
-  assert.equal(draft.mode, "static");
+  assert.equal("mode" in draft, false);
   assert.equal(draft.server.host, "198.51.100.10");
   assert.equal(draft.server.ssh_user, "root");
   assert.equal(draft.deploy.warp, true);
   assert.equal(draft.deploy.sni, "www.google.com");
-  assert.equal(draft.readiness.dryRunComplete, false);
+  assert.equal("dryRunComplete" in draft.readiness, false);
 });
 
-test("sanitizeJourneyDraft keeps non-secret readiness and dry-run gate state", () => {
+test("sanitizeJourneyDraft keeps non-secret readiness but never a preview without its plan", () => {
   const draft = sanitizeJourneyDraft({
     activeOperationId: "op-resume",
     lastDryRunSignature: '{"ip":"198.51.100.10"}',
@@ -93,13 +93,17 @@ test("sanitizeJourneyDraft keeps non-secret readiness and dry-run gate state", (
   });
 
   assert.equal(draft.activeOperationId, "op-resume");
-  assert.equal(draft.lastDryRunSignature, '{"ip":"198.51.100.10"}');
+  assert.equal("lastDryRunSignature" in draft, false);
   assert.deepEqual(draft.readiness, {
-    dryRunComplete: true,
     keyReady: true,
     serverSaved: true,
     sshValidated: true,
   });
+});
+
+test("a cleared port stays cleared, and older numeric ports still load", () => {
+  assert.equal(sanitizeJourneyDraft({ server: { ssh_port: "" } }).server.ssh_port, "");
+  assert.equal(sanitizeJourneyDraft({ server: { ssh_port: 2222 } }).server.ssh_port, "2222");
 });
 
 test("clearJourneyDraft removes stored state", () => {

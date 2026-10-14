@@ -249,8 +249,24 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   also served as Markdown (add `.md` to its address), with Copy page and Open
   in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
   links redirect.
+- **A page for the people you share with** — the docs' new Connecting page
+  walks a recipient through installing an app, adding the link, turning on
+  VPN (TUN) mode, and what to do when it stops working; send it along with
+  the link.
+- **Lighter docs pages** — diagrams arrive as images that follow the light or
+  dark theme instead of ~3 MB of JavaScript, and docs pages prefetch a link
+  only when you point at it instead of every page in the sidebar.
+- **A lighter, readable website** — the home page is fully translated into
+  Russian, Persian, and Chinese and works without JavaScript (Tor Browser's
+  Safest mode included); choosing English sticks. Fonts download about 70%
+  less, text meets WCAG AA contrast in light and dark themes, link previews
+  load in messengers, and the blog has an RSS feed at `/blog/rss.xml`. The
+  command builder only offers commands and flags the CLI actually has.
 
 ### Security and correctness
+- **A smaller download** — the package carries only Studio's own page, scripts,
+  and fonts instead of the whole website: about 1 MB instead of 7.5 MB, which
+  matters on slow or filtered connections.
 - **Starts with current Typer** — Typer 0.26 stopped installing Click, and a
   fresh install of an earlier beta failed at launch with `No module named
   'click'`. Meridian now needs Typer 0.26 or later and uses the Click it ships.
@@ -364,10 +380,15 @@ versions below), and the choice is saved for later applies.
 
 ### Not yet available
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
-  A running deploy can be cancelled; it stops after its current step and resumes on the next run.
+  It opens an address ending in `#k=…`, and only a tab opened from that address can use the
+  local Engine. A running deploy can be cancelled; it stops after its current step and resumes
+  on the next run. The default port, 7391, keeps your browser's draft across restarts.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
+- The website's ping page: a browser cannot tell a blocked server from one that
+  refuses the connection. Run `meridian test --probe` from the censored network,
+  or open your connection page there.
 - `meridian fleet recover`, `apply --parallel`/`--prune-extras`, and the
   `desired_*` lists in `cluster.yml`.
 

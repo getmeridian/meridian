@@ -1,8 +1,6 @@
 ---
 title: 分流（俄罗斯）
 description: 俄罗斯流量直接路由，其他流量通过代理 — 保持 VPS IP 受保护且俄罗斯网站工作。
-order: 6.5
-section: guides
 ---
 
 ## 问题

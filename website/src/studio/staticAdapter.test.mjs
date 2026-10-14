@@ -3,21 +3,22 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  buildCliCommands,
   buildCommandPack,
-  buildDeployRequest,
+  buildDeployCommand,
+  DEPLOY_FLAGS,
   buildDeployRequestFromJourney,
   buildServerCliCommands,
   buildServerConnectionDraft,
   formatJson,
-  initialFormState,
+  JOURNEY_DEPLOY_FIELDS,
   parseSshCommand,
   parseEnvelope,
   parseEventStream,
-  summarizeEnvelope,
   validateServerConnectionDraft,
   validateDeployRequest,
 } from "./staticAdapter.js";
+import { commandCatalog } from "./generated/index.js";
+import { createDefaultJourneyState } from "./storageAdapter.js";
 
 const repoRoot = new URL("../../../", import.meta.url);
 
@@ -34,39 +35,51 @@ const serverWorkflow = await readJson("contracts/meridian/v1/workflows/server-on
 const deployRequestSchema = await readJson("contracts/meridian/v1/schemas/deploy-request.schema.json");
 const serverConnectionDraftSchema = await readJson("contracts/meridian/v1/schemas/server-connection-draft.schema.json");
 
-test("builds a DeployRequest from generated workflow form state", () => {
-  const state = {
-    ...initialFormState(workflow),
-    client_name: "alice",
-    confirm: true,
-    ip: "198.51.100.10",
-    server_name: "Family VPN",
-    user: "admin",
+function journey(overrides = {}) {
+  const base = createDefaultJourneyState();
+  return {
+    ...base,
+    ...overrides,
+    deploy: { ...base.deploy, ...overrides.deploy },
+    server: { ...base.server, host: "198.51.100.10", ...overrides.server },
   };
+}
 
-  assert.deepEqual(buildDeployRequest(state), {
-    client_name: "alice",
-    color: "ocean",
-    domain: "",
-    geo_block: true,
-    harden: true,
-    icon: "",
-    ip: "198.51.100.10",
-    server_name: "Family VPN",
-    sni: "www.google.com",
-    user: "admin",
-    warp: false,
-    yes: true,
-  });
+test("every key the journey builds is a DeployRequest property", () => {
+  const known = new Set(Object.keys(deployRequestSchema.properties));
+  const byAddress = buildDeployRequestFromJourney(journey(), deployRequestSchema);
+  const bySavedServer = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo" }), deployRequestSchema);
+
+  for (const key of [...JOURNEY_DEPLOY_FIELDS, ...Object.keys(byAddress), ...Object.keys(bySavedServer)]) {
+    assert.ok(known.has(key), `${key} is not in deploy-request.schema.json`);
+  }
+});
+
+test("a fresh journey builds a request the schema accepts", () => {
+  const request = buildDeployRequestFromJourney(journey(), deployRequestSchema);
+
+  assert.deepEqual(validateDeployRequest(request, deployRequestSchema, workflow), []);
+});
+
+test("keys the schema does not declare never reach the request", () => {
+  const request = buildDeployRequestFromJourney(journey({ deploy: { pq: true } }), deployRequestSchema);
+
+  assert.equal("pq" in request, false);
+});
+
+test("validation refuses keys outside a closed schema", () => {
+  const request = { ...buildDeployRequestFromJourney(journey(), deployRequestSchema), pq: false };
+
+  const errors = validateDeployRequest(request, deployRequestSchema, workflow);
+
+  assert.deepEqual(errors.map((error) => error.field), ["pq"]);
 });
 
 test("validates request fields with readable messages", () => {
-  const request = buildDeployRequest({
-    ...initialFormState(workflow),
-    client_name: "bad name!",
-    ip: "198.51.100",
-    user: "bad user",
-  });
+  const request = buildDeployRequestFromJourney(
+    journey({ deploy: { client_name: "bad name!" }, server: { host: "198.51.100", ssh_user: "bad user" } }),
+    deployRequestSchema,
+  );
 
   assert.deepEqual(new Set(validateDeployRequest(request, deployRequestSchema, workflow).map((error) => error.message)), new Set([
     "Enter a valid IP address, or use local when running Meridian on the target server.",
@@ -76,12 +89,7 @@ test("validates request fields with readable messages", () => {
 });
 
 test("allows deploy request validation by saved server reference", () => {
-  const request = buildDeployRequest({
-    ...initialFormState(workflow),
-    ip: "",
-    requested_server: "srv-demo",
-    user: "",
-  });
+  const request = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo", server: { host: "" } }), deployRequestSchema);
 
   const errors = validateDeployRequest(request, deployRequestSchema, workflow);
 
@@ -99,7 +107,6 @@ test("builds deploy requests from the beginner journey state", () => {
       geo_block: true,
       harden: true,
       icon: "",
-      pq: false,
       server_name: "Family VPN",
       sni: "www.google.com",
       warp: false,
@@ -121,7 +128,6 @@ test("builds deploy requests from the beginner journey state", () => {
     harden: true,
     icon: "",
     ip: "198.51.100.10",
-    pq: false,
     server_name: "Family VPN",
     sni: "www.google.com",
     ssh_port: 2222,
@@ -131,29 +137,21 @@ test("builds deploy requests from the beginner journey state", () => {
   });
 });
 
+test("cleared fields take the workflow defaults only when the request is built", () => {
+  const state = journey({ deploy: { client_name: "", server_name: "  ", sni: "" }, server: { ssh_port: "", ssh_user: "" } });
+
+  const request = buildDeployRequestFromJourney(state, deployRequestSchema);
+
+  assert.equal(request.client_name, "default");
+  assert.equal(request.server_name, "My VPN");
+  assert.equal(request.sni, "www.google.com");
+  assert.equal(request.user, "root");
+  assert.equal(request.ssh_port, 22);
+  assert.equal(state.deploy.client_name, "");
+});
+
 test("builds deploy requests by saved server reference and hides raw connection fields", () => {
-  const request = buildDeployRequestFromJourney({
-    confirmDeploy: false,
-    deploy: {
-      client_name: "default",
-      color: "ocean",
-      domain: "",
-      geo_block: true,
-      harden: true,
-      icon: "",
-      pq: false,
-      server_name: "Family VPN",
-      sni: "www.google.com",
-      warp: false,
-    },
-    selectedServerId: "srv-demo",
-    server: {
-      host: "198.51.100.10",
-      ssh_port: 2222,
-      ssh_user: "ubuntu",
-      title: "Family VPN",
-    },
-  });
+  const request = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo", server: { ssh_port: 2222 } }));
 
   assert.equal(request.requested_server, "srv-demo");
   assert.equal("ip" in request, false);
@@ -161,16 +159,46 @@ test("builds deploy requests by saved server reference and hides raw connection 
   assert.equal("ssh_port" in request, false);
 });
 
-test("builds request-file CLI commands", () => {
-  assert.deepEqual(buildCliCommands(), {
-    deploy: "meridian deploy --request deploy.json --json --events=jsonl",
-    dryRun: "meridian deploy --request deploy.json --dry-run --json",
-  });
+test("copied deploy commands are what a person types: no machine flags", () => {
+  const request = buildDeployRequestFromJourney(journey({ server: { ssh_port: "2222", ssh_user: "ubuntu" } }));
+
+  const command = buildDeployCommand(request);
+
+  assert.equal(
+    command,
+    "meridian deploy 198.51.100.10 --user ubuntu --ssh-port 2222 --client-name default --color ocean --display-name 'My VPN' --sni www.google.com",
+  );
+  assert.equal(buildDeployCommand(request, { dryRun: true }), `${command} --dry-run`);
+  assert.doesNotMatch(command, /--json|--events|--yes/);
+});
+
+test("deploy commands switch booleans off only when the request differs from the CLI default", () => {
+  const request = buildDeployRequestFromJourney(
+    journey({ selectedServerId: "family vpn", deploy: { harden: false, geo_block: false, warp: true, domain: "vpn.example.com" } }),
+  );
+
+  const command = buildDeployCommand(request);
+
+  assert.match(command, /^meridian deploy 'family vpn' /);
+  assert.match(command, / --domain vpn\.example\.com/);
+  assert.match(command, / --no-geo-block/);
+  assert.match(command, / --no-harden/);
+  assert.match(command, / --warp/);
+});
+
+test("every journey option maps to a real meridian deploy flag", () => {
+  const deploy = commandCatalog.commands.find((command) => command.command === "deploy");
+  const known = new Set(deploy.machine_flags);
+
+  for (const key of JOURNEY_DEPLOY_FIELDS) {
+    const flags = [DEPLOY_FLAGS[key]].flat();
+    assert.ok(flags.length > 0, `${key} has no deploy flag`);
+    for (const flag of flags) assert.ok(known.has(flag), `${flag} is not a meridian deploy flag`);
+  }
 });
 
 test("builds a server connection draft from onboarding state", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100.10",
     ssh_port: "2222",
     ssh_user: "ubuntu",
@@ -187,7 +215,6 @@ test("builds a server connection draft from onboarding state", () => {
 
 test("validates server onboarding fields with readable messages", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100",
     ssh_port: "70000",
     ssh_user: "bad user",
@@ -217,7 +244,6 @@ test("auto-generates a server title when beginners leave it blank", () => {
 
 test("validation errors include human labels, not only raw field ids", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100",
     ssh_port: "70000",
     ssh_user: "bad user",
@@ -247,7 +273,6 @@ test("validates generated schema maxLength constraints", () => {
         geo_block: true,
         harden: true,
         icon: "",
-        pq: false,
         server_name: "Family VPN",
         sni: "www.google.com",
         warp: false,
@@ -311,7 +336,7 @@ test("builds static server setup commands without storing secrets", () => {
 
 test("builds a beginner static command pack", () => {
   const pack = buildCommandPack({
-    deployRequest: { ip: "198.51.100.10" },
+    deployRequest: buildDeployRequestFromJourney(journey()),
     serverDraft: {
       host: "198.51.100.10",
       ssh_port: 22,
@@ -323,20 +348,8 @@ test("builds a beginner static command pack", () => {
   assert.equal(pack.testSsh, "ssh root@198.51.100.10");
   assert.equal(pack.setupKey, "ssh-copy-id root@198.51.100.10");
   assert.equal(pack.saveServer, "meridian server add 198.51.100.10 --name family-vpn --user root");
-  assert.equal(pack.dryRun, "meridian deploy --request deploy.json --dry-run --json");
-});
-
-test("Studio page renders color options from generated workflow", async () => {
-  const source = await readText("website/src/pages/studio.astro");
-
-  assert.match(source, /workflowOptions\(deployWorkflow, 'color'\)/);
-  assert.doesNotMatch(source, /<option value="lavender">/);
-});
-
-test("Studio page avoids raw HTML sinks for pasted output", async () => {
-  const source = await readText("website/src/pages/studio.astro");
-
-  assert.doesNotMatch(source, /\.innerHTML\s*=/);
+  assert.match(pack.dryRun, /^meridian deploy 198\.51\.100\.10 .* --dry-run$/);
+  assert.equal(pack.requestDryRun, "meridian deploy --request deploy.json --dry-run");
 });
 
 test("parses fixture envelopes and event streams", async () => {
@@ -350,13 +363,4 @@ test("parses fixture envelopes and event streams", async () => {
     ["command.started", "command.completed"],
   );
   assert.match(formatJson(envelope), /Deploy plan: first_deploy/);
-});
-
-test("summarizes failed envelopes with recovery hints", async () => {
-  const envelope = parseEnvelope(await readText("contracts/meridian/v1/fixtures/deploy-user-error-envelope.json"));
-  const summary = summarizeEnvelope(envelope);
-
-  assert.equal(summary.status, "failed");
-  assert.match(summary.text, /Deploy request is incomplete/);
-  assert.match(summary.text, /confirmed deploy request/);
 });

@@ -1,8 +1,6 @@
 ---
 title: AI Agents
 description: Let Claude Code, Codex, Cursor, or another AI agent run Meridian for you, safely.
-order: 10.5
-section: reference
 ---
 
 Meridian is built to be driven by AI agents as well as people. An agent can deploy servers, add people, read health checks, and explain failures, using the same commands you would.

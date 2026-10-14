@@ -1,177 +1,121 @@
 /*
- * Prose — shared markdown content styles for docs and blog.
- * Apply .prose class to any <article> rendering markdown content.
+ * Prose — Markdown typography for blog posts (`.prose`), matched to the docs:
+ * the same text color, heading families and weights, Expressive Code blocks, table,
+ * and quote treatment as starlight.css, at a slightly larger reading size.
  */
 
+.prose {
+  /* Expressive Code reads Starlight's palette; give it the same values on blog pages. */
+  --sl-color-text: var(--t-body);
+  --sl-color-accent: var(--ac-text);
+  --sl-color-black: var(--bg);
+  --sl-color-gray-5: var(--code-br);
+  --sl-color-gray-6: var(--code-bg);
+  --sl-color-gray-7: var(--code-bg);
+  color: var(--t-body);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+.prose > * + * {
+  margin-top: 1.1em;
+}
+.prose :is(h2, h3, h4) {
+  scroll-margin-top: calc(var(--nav-h) + 16px);
+}
 .prose h2 {
-  margin-top: 48px;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--b1);
+  margin-top: 2.2em;
+  font-size: clamp(1.5rem, 3vw, 1.85rem);
 }
 .prose h3 {
-  margin-top: 32px;
-  margin-bottom: 12px;
+  margin-top: 1.9em;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
-.prose p {
-  color: var(--t2);
-  font-size: 0.92rem;
-  line-height: 1.75;
-  margin-bottom: 16px;
-}
-.prose ul, .prose ol {
-  color: var(--t2);
-  font-size: 0.92rem;
-  line-height: 1.75;
-  margin-bottom: 16px;
-  padding-left: 24px;
-}
-.prose li {
-  margin-bottom: 6px;
-}
-.prose strong {
-  color: var(--t1);
-  font-weight: 500;
-}
-.prose em {
-  color: var(--t1);
-  font-style: italic;
-}
-.prose code {
-  font-family: var(--mono);
-  font-size: 0.82rem;
-  background: var(--code-bg);
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid var(--code-br);
+.prose h4 {
+  margin-top: 1.6em;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: var(--t1);
 }
-.prose pre {
-  background: var(--code-bg);
-  border: 1px solid var(--code-br);
-  border-radius: var(--r);
-  padding: 18px 22px;
-  margin: 16px 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  position: relative;
+.prose :is(h2, h3, h4) + * {
+  margin-top: 0.6em;
 }
-.prose pre code {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 0.82rem;
-  line-height: 1.65;
-  color: var(--t1);
+.prose :is(ul, ol) {
+  padding-inline-start: 1.4em;
 }
-
-/*
- * Shiki dual themes (github-light / github-dark).
- * With defaultColor: false, Shiki emits --shiki-light / --shiki-dark
- * CSS variables but applies no inline colors. We select the right set.
- */
-.prose .astro-code,
-.prose .astro-code span {
-  color: var(--shiki-light) !important;
-  background-color: transparent !important;
+.prose li + li {
+  margin-top: 0.4em;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .prose .astro-code span {
-    color: var(--shiki-dark) !important;
-  }
-}
-[data-theme="dark"] .prose .astro-code span {
-  color: var(--shiki-dark) !important;
-}
-
-/* Copy button on code blocks */
-.prose .code-copy {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: var(--s2);
-  border: 1px solid var(--b1);
+.prose li::marker {
   color: var(--t3);
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: color 0.08s, border-color 0.08s;
 }
-.prose .code-copy:hover {
+.prose :is(strong, b) {
   color: var(--t1);
-  border-color: var(--b2);
-}
-.prose .code-copy[data-copied] {
-  color: var(--ok);
-  border-color: var(--ok);
+  font-weight: 600;
 }
 .prose a {
-  color: var(--ac);
+  color: var(--ac-text);
   text-decoration: underline;
-  text-decoration-color: var(--ac2);
-  text-underline-offset: 2px;
-  transition: text-decoration-color 0.1s;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 .prose a:hover {
-  text-decoration-color: var(--ac);
-  color: var(--ac);
+  color: var(--t1);
 }
+
+/* Code blocks render through Expressive Code, the same as the docs; style inline code only. */
+.prose :not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  border: 1px solid var(--code-br);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--t1);
+}
+.prose .expressive-code {
+  margin-block: 1.5em;
+}
+
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.84rem;
-  margin: 16px 0;
+  font-size: 0.94rem;
+  display: block;
+  overflow-x: auto;
 }
 .prose th {
-  text-align: left;
-  color: var(--t3);
-  font-weight: 500;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-align: start;
+  color: var(--t1);
+  font-weight: 600;
   padding: 8px 14px;
   border-bottom: 1px solid var(--b2);
 }
 .prose td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--b1);
-  color: var(--t2);
   vertical-align: top;
-}
-.prose td:first-child {
-  color: var(--t1);
-  font-family: var(--mono);
-  font-size: 0.78rem;
 }
 .prose tr:last-child td {
   border-bottom: none;
 }
 .prose blockquote {
-  border-left: 3px solid var(--ac);
-  padding: 12px 18px;
-  margin: 16px 0;
-  background: var(--ac3);
-  border-radius: 0 var(--r) var(--r) 0;
+  border-inline-start: 3px solid var(--ac);
+  padding: 4px 0 4px 18px;
+  padding-inline: 18px 0;
   color: var(--t2);
-  font-size: 0.9rem;
 }
 .prose hr {
   border: none;
   height: 1px;
   background: var(--b1);
-  margin: 40px 0;
+  margin: 2.5em 0;
 }
 .prose img {
+  display: block;
   max-width: 100%;
   height: auto;
-  border-radius: var(--r);
+  border-radius: var(--r2);
   border: 1px solid var(--b1);
 }

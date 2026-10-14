@@ -1,8 +1,6 @@
 ---
 title: Security
 description: Security design, vulnerability reporting, and scope.
-order: 11
-section: reference
 ---
 
 ## Reporting vulnerabilities

@@ -1,0 +1,50 @@
+Selected logo-based link preview cards
+
+Selected design: compact third variant with matching dark card.
+Reference: the supplied logo-512.png, used directly as the image-generation reference.
+The source logo's diamond, triangular rays, and central negative-space keyhole
+informed the selected design. This is a generated illustration, not a vector
+trace or pixel-exact reproduction of the logo.
+
+The left 55% remains clear for headline placement. No text is composited.
+
+-2400.png: 2400 x 1260 export.
+-1200.png: 1200 x 630 export, downsampled from the 2400 export.
+The generator returned approximately 1730 x 909 pixels; the 2400 versions
+are upscaled exports, not native 2400-pixel generations.
+Built-in imagegen was used to generate the artwork, and ImageMagick Lanczos
+was used only to produce the requested output dimensions. PNGs preserve
+quality before final website compression.
+
+Final generation prompts
+
+logo-light-03-small-emblem
+Style: refined editorial illustration, flat vector with fine hairline strokes, calm and trustworthy.
+Palette only: warm cream background #FDFAF6, paper #F5F0E8, ink navy #1A1D2E, muted slate #555A6E,
+warm gold #C8933A with deep gold #85601F for emphasis. Gold geometric line work echoing an
+art-deco compass rose / diamond lattice (thin radiating lines, a small keyhole motif used sparingly).
+Generous negative space, subtle paper grain, soft even light, no gradients beyond a faint warm vignette.
+No text, no letters, no numbers, no standalone pasted logos, no UI chrome.
+Avoid: neon, glowing globes, padlocks, shields, hooded hackers, matrix code, circuit boards,
+dark cyberpunk, country maps or flags, photorealism, 3D renders, lens flare.
+
+Use case: ads-marketing.
+Input image: logo-512.png is the authoritative design reference for geometry only. It is a gold four-point diamond compass rose with angular triangular rays converging on a small central round-headed keyhole with a long straight stem. Study and reproduce this distinctive pattern accurately in refined thin line work. This is not a generic compass, four-point sparkle, or simple empty diamond. Preserve the logo's real outline, radiating triangular subdivisions, central keyhole shape, and proportions, while adapting the strokes to hairlines. Do not paste its dark square background, create any text, or add another brand mark.
+Create one new wide light-theme link preview card. Target 2400×1260, aspect 1.90476:1, intended for 1200×630. The entire left 55% must be COMPLETELY EMPTY cream #FDFAF6. Every shape and every line must stay strictly beyond x=58% of canvas. Cream paper backdrop with the faintest grain only. 
+On the right, a single elegant gold meridian arc enters at the top edge and leaves at the bottom edge, with a few evenly spaced small nodes. Integrate the compass diamond derived from the supplied source logo naturally with this arc. From one node or junction, exactly three fine paths fan toward three small upright rounded-rectangle phone silhouettes, with plain empty interiors and no interface. The phones belong in the rightmost quarter. Keep all decorative geometry subordinate and airy, all outlines matte flat gold. No shaded metal edges, no 3D phone bevels, no shadows. The small keyhole within the source-derived diamond is the only keyhole. Keep it legible and discreet.
+Do not create a grid of variants; output a single finished card.
+Composition variation 3: the most minimal composition, using a smaller faithful reproduction of the source logo's complete diamond outline, triangular ray lattice, and central keyhole as a delicate compact junction at x=70%, y=50%, about 12% of canvas width with equal actual pixel width and height. The long simple meridian arc sweeps from near x=80% at the top, through this small diamond, back to near x=80% at the bottom; four tiny evenly spaced nodes follow the arc. Three fine curving paths fan from the diamond's right vertex toward three empty phone outlines in a slight stagger near x=89%-94%. Keep the compact motif small and precise. No additional geometry, stars, dotted ornament, or spare diamonds.
+
+logo-dark-03-small-emblem
+Style: refined editorial illustration, flat vector with fine hairline strokes, calm and trustworthy.
+Palette only for this dark variant: warm charcoal background #1C1E28, matte gold linework #D4A24E and soft cream #E4E2DE accents used sparingly.
+Gold geometric line work echoes the supplied source logo's art-deco compass diamond, angular triangular ray lattice, and a single central keyhole.
+Generous negative space, extremely subtle paper grain, soft even light. No gradients, no glow, no bevels.
+No text, no letters, no numbers, no additional standalone logos, no UI chrome.
+Avoid: neon, glowing globes, padlocks, shields, hooded hackers, matrix code, circuit boards,
+dark cyberpunk, country maps or flags, photorealism, 3D renders, lens flare.
+
+Use case: style-transfer.
+Edit target: the attached light wide card, with the small source-derived compass diamond and three phones.
+Create a matching dark card by changing ONLY the palette. Preserve the exact layout, the small compass diamond's outline and all triangular subdivisions, its central negative-space keyhole, the single long meridian arc, the four small nodes, three curved paths and three phone silhouettes. This compact diamond's geometry must remain identical to the attached card and its central keyhole must remain negative space matching the new charcoal background, not a filled gold icon.
+Recolor all cream/paper fields to flat warm charcoal #1C1E28, including all phone interiors and spaces inside the compass diamond. Recolor gold strokes and nodes to matte gold #D4A24E. No extra elements or geometry. Preserve the entire left 55% as completely empty flat charcoal for a later headline. Crisp lines only, no luminance glow, no highlights, no gradients, no shadows, no three-dimensional treatment. Preserve wide 1.90476:1 aspect ratio. Target 2400×1260, intended for 1200×630.

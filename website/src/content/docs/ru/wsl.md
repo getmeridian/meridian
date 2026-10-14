@@ -1,8 +1,6 @@
 ---
 title: Настройка Windows и WSL
 description: Настройте Meridian в Windows через Windows Subsystem for Linux.
-order: 2.5
-section: guides
 ---
 
 Meridian запускается из Unix-подобного терминала. В Windows используйте Windows Subsystem for Linux (WSL) и запускайте Meridian внутри Linux-среды.

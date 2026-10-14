@@ -7,11 +7,14 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+  <meta name="robots" content="noindex" />
   <meta http-equiv="refresh" content="0;url=/en/getting-started/" />
   <link rel="canonical" href="/en/getting-started/" />
   <script is:inline>
     (function() {
-      var lang = localStorage.getItem('meridian-lang');
+      var lang = '';
+      try { lang = localStorage.getItem('meridian-lang') || ''; } catch (e) {}
+      lang = lang || (navigator.language || '').slice(0, 2).toLowerCase();
       if (['ru', 'fa', 'zh'].indexOf(lang) !== -1) location.replace('/' + lang + '/getting-started/');
     })();
   </script>

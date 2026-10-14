@@ -1,0 +1,81 @@
+---
+/**
+ * BlogListing — the shared page for the blog index and each category: heading,
+ * category filter, card grid, and the RSS link.
+ */
+import Base from '../../layouts/Base.astro';
+import SectionHead from '../SectionHead.astro';
+import BlogCard from './BlogCard.astro';
+import { categoryHref, getPosts, type Post } from './posts';
+
+interface Props {
+  title: string;
+  heading: string;
+  description: string;
+  posts: Post[];
+  /** The category being shown; undefined on the index. */
+  category?: string;
+}
+
+const { title, heading, description, posts, category } = Astro.props;
+const categories = [...new Set((await getPosts()).map((p) => p.data.category))].sort();
+---
+
+<Base title={title} description={description}>
+  <main id="main" class="blog-listing">
+    <div class="container">
+      <SectionHead eyebrow="Meridian Blog" title={heading} desc={description} level={1}>
+        <p class="blog-listing__rss"><a href="/blog/rss.xml">RSS feed</a></p>
+      </SectionHead>
+
+      <nav class="blog-listing__filters" aria-label="Categories">
+        <a href="/blog/" class="blog-listing__filter" aria-current={category ? undefined : 'page'}>All posts</a>
+        {categories.map((c) => (
+          <a href={categoryHref(c)} class="blog-listing__filter" aria-current={c === category ? 'page' : undefined}>{c}</a>
+        ))}
+      </nav>
+
+      <div class="blog-listing__grid">
+        {posts.map((post) => <BlogCard post={post} />)}
+      </div>
+    </div>
+  </main>
+</Base>
+
+<style>
+  .blog-listing {
+    padding: clamp(40px, 7vw, 72px) 0 24px;
+  }
+  .blog-listing__rss {
+    margin-top: 10px;
+    font-size: 0.92rem;
+  }
+  .blog-listing__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+  .blog-listing__filter {
+    padding: 5px 14px;
+    border: 1px solid var(--b1);
+    border-radius: 999px;
+    color: var(--t2);
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  .blog-listing__filter:hover {
+    color: var(--t1);
+    border-color: var(--b2);
+  }
+  .blog-listing__filter[aria-current='page'] {
+    background: var(--t1);
+    border-color: var(--t1);
+    color: var(--bg);
+  }
+  .blog-listing__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 24px;
+  }
+</style>

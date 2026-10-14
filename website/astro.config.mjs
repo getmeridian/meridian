@@ -5,58 +5,37 @@ import { unified } from '@astrojs/markdown-remark';
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import { remarkAppList } from './src/lib/apps-list.mjs';
+import { remarkDiagrams } from './src/lib/diagrams.mjs';
+import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
 const LOCALES = ['en', 'ru', 'fa', 'zh'];
-const DOCS_DIR = path.resolve('src/content/docs');
+const SITEMAP_EXCLUDED = ['/docs/', '/studio/', '/demo/'];
 
-// Sidebar order and sections come from each English page's `order` and `section` frontmatter;
-// Starlight resolves the same slugs in every locale.
-function englishDocs() {
-  return fs
-    .readdirSync(path.join(DOCS_DIR, 'en'))
+// A page missing from the sidebar list would build but stay unreachable from the navigation.
+for (const locale of LOCALES) {
+  const pages = fs
+    .readdirSync(path.resolve('src/content/docs', locale))
     .filter((name) => /^[a-z].*\.md$/.test(name))
-    .map((name) => {
-      const front = fs.readFileSync(path.join(DOCS_DIR, 'en', name), 'utf8').split('---')[1] ?? '';
-      const field = (key) => front.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))?.[1].trim();
-      return { slug: name.slice(0, -3), order: Number(field('order') ?? 99), section: field('section') ?? 'guides' };
-    })
-    .sort((a, b) => a.order - b.order);
+    .map((name) => name.slice(0, -3));
+  const missing = pages.filter((slug) => !DOCS_SLUGS.includes(slug));
+  const absent = DOCS_SLUGS.filter((slug) => !pages.includes(slug));
+  if (missing.length || absent.length) {
+    throw new Error(
+      `src/content/docs/${locale}/ does not match src/lib/docs-sidebar.mjs` +
+        (missing.length ? `; not in the sidebar: ${missing.join(', ')}` : '') +
+        (absent.length ? `; no such page: ${absent.join(', ')}` : ''),
+    );
+  }
 }
-
-const SECTIONS = [
-  { key: 'guides', label: 'Guides', translations: { ru: 'Руководства', fa: 'راهنماها', 'zh-CN': '指南' } },
-  { key: 'reference', label: 'Reference', translations: { ru: 'Справочник', fa: 'مرجع', 'zh-CN': '参考' } },
-];
-const docs = englishDocs();
-const sidebar = SECTIONS.map(({ key, label, translations }) => ({
-  label,
-  translations,
-  items: docs.filter((doc) => doc.section === key).map((doc) => doc.slug),
-}));
 
 // Docs used to live under /docs/<locale>/<page>/; every old address keeps working.
 const redirects = Object.fromEntries(
   LOCALES.flatMap((locale) => [
     [`/docs/${locale}`, `/${locale}/getting-started/`],
-    ...docs.map((doc) => [`/docs/${locale}/${doc.slug}`, `/${locale}/${doc.slug}/`]),
+    ...DOCS_SLUGS.map((slug) => [`/docs/${locale}/${slug}`, `/${locale}/${slug}/`]),
   ]),
 );
-
-// Mermaid blocks become plain <pre class="mermaid"> before Expressive Code sees them;
-// the MarkdownContent override renders them in the browser.
-function remarkMermaid() {
-  const escape = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const visit = (node) => {
-    node.children?.forEach((child, index) => {
-      if (child.type === 'code' && child.lang === 'mermaid') {
-        node.children[index] = { type: 'html', value: `<pre class="mermaid">${escape(child.value)}</pre>` };
-      } else {
-        visit(child);
-      }
-    });
-  };
-  return visit;
-}
 
 // Astro builds every Markdown file under src/pages, including the folder notes for contributors.
 const dropContributorNotes = {
@@ -86,7 +65,7 @@ export default defineConfig({
       title: 'Meridian',
       description: 'Deploy censorship-resistant proxy servers with one command, hardened by default.',
       logo: { src: './src/assets/logo.png', alt: '' },
-      favicon: '/img/favicon-32.png',
+      favicon: '/favicon.svg',
       defaultLocale: 'en',
       locales: {
         en: { label: 'English', lang: 'en' },
@@ -97,7 +76,7 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/getmeridian/meridian' }],
       editLink: { baseUrl: 'https://github.com/getmeridian/meridian/edit/main/website/' },
       lastUpdated: true,
-      sidebar,
+      sidebar: DOCS_SIDEBAR,
       customCss: ['./src/styles/fonts.css', './src/styles/starlight.css'],
       components: {
         SocialIcons: './src/components/starlight/SocialIcons.astro',
@@ -107,26 +86,31 @@ export default defineConfig({
       routeMiddleware: './src/lib/docs-route.ts',
       head: [
         {
-          // Landing and docs share one theme and language choice.
+          // Landing and docs share one theme. The language choice is only written when the
+          // reader picks a language (src/i18n/CLAUDE.md); reading a docs page isn't a choice.
           tag: 'script',
           content:
-            "try{var s=localStorage,t=s.getItem('meridian-theme');if(t&&!s.getItem('starlight-theme'))s.setItem('starlight-theme',t);s.setItem('meridian-lang',document.documentElement.lang.slice(0,2))}catch(e){}",
+            "try{var s=localStorage,t=s.getItem('meridian-theme');if(t&&!s.getItem('starlight-theme'))s.setItem('starlight-theme',t)}catch(e){}",
         },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#FDFAF6', media: '(prefers-color-scheme: light)' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#1C1E28', media: '(prefers-color-scheme: dark)' } },
       ],
       disable404Route: true,
       credits: false,
       // Blog, demo, and other custom pages live outside Starlight, so the validator cannot see them.
-      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/ping/', '/studio/'] })],
+      plugins: [starlightLinksValidator({ exclude: ['/blog/**', '/demo/', '/studio/'] })],
     }),
     sitemap({
-      filter: (page) => !page.includes('/CLAUDE'),
+      // Redirects and tools are not pages to index; Astro's own redirect stubs are already left out.
+      filter: (page) => !page.includes('/CLAUDE') && !SITEMAP_EXCLUDED.includes(new URL(page).pathname),
+      // Same language tags as Starlight's `lang` above, so hreflang matches each page's <html lang>.
       i18n: {
         defaultLocale: 'en',
         locales: {
-          en: 'en-US',
-          ru: 'ru-RU',
-          fa: 'fa-IR',
-          zh: 'zh-Hans',
+          en: 'en',
+          ru: 'ru',
+          fa: 'fa',
+          zh: 'zh-CN',
         },
       },
     }),
@@ -134,12 +118,21 @@ export default defineConfig({
   build: {
     format: 'directory',
   },
+  vite: {
+    // tokens.css writes colors as light-dark(); Lightning CSS lowers it (and other
+    // newer syntax) for browsers older than these, e.g. Safari on iOS 16.
+    build: { cssTarget: ['chrome107', 'edge107', 'firefox104', 'safari16'] },
+  },
+  // Prefetch a page only when the reader points at its link; 'viewport' downloaded every
+  // sidebar page on each visit, which costs real money on metered connections.
   prefetch: {
     prefetchAll: true,
-    defaultStrategy: 'viewport',
+    defaultStrategy: 'hover',
   },
   markdown: {
-    processor: unified({ remarkPlugins: [remarkMermaid] }),
+    // Mermaid blocks become their checked-in SVGs before Expressive Code sees them;
+    // `<!-- apps -->` becomes the app list from src/data/apps.json.
+    processor: unified({ remarkPlugins: [remarkDiagrams, remarkAppList] }),
     shikiConfig: {
       themes: {
         light: 'github-light',

@@ -1,8 +1,6 @@
 ---
 title: Режим домена
 description: Добавьте возврат CDN через Cloudflare для устойчивости к блокировке IP.
-order: 4
-section: guides
 ---
 
 ## Что добавляет режим домена

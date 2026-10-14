@@ -6,12 +6,7 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 const docs = defineCollection({
   // [a-z]* excludes the contributor notes (CLAUDE.md) from the docs
   loader: glob({ pattern: '**/[a-z]*.md', base: './src/content/docs' }),
-  schema: docsSchema({
-    extend: z.object({
-      order: z.number().optional(),
-      section: z.enum(['guides', 'reference']).optional(),
-    }),
-  }),
+  schema: docsSchema(),
 });
 
 const i18n = defineCollection({

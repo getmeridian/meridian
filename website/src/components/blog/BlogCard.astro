@@ -1,0 +1,101 @@
+---
+/** BlogCard — one post in a listing: hero thumbnail, category, title, summary, date. */
+import { Image } from 'astro:assets';
+import { categoryHref, formatDate, heroOf, isoDate, type Post } from './posts';
+
+interface Props {
+  post: Post;
+  headingLevel?: 2 | 3;
+}
+
+const { post, headingLevel = 2 } = Astro.props;
+const hero = heroOf(post);
+const Heading = headingLevel === 2 ? 'h2' : 'h3';
+---
+
+<article class="blog-card card card--link">
+  {hero && (
+    <div class="blog-card__media">
+      <Image src={hero} alt="" width={640} widths={[400, 640]} sizes="(min-width: 760px) 360px, 100vw" loading="lazy" />
+    </div>
+  )}
+  <div class="blog-card__body">
+    <div class="blog-card__meta">
+      <a href={categoryHref(post.data.category)} class="pill blog-card__category">{post.data.category}</a>
+      <span>{post.data.readingTime} min read</span>
+    </div>
+    <Heading class="blog-card__title">
+      <a href={`/blog/${post.id}/`}>{post.data.title}</a>
+    </Heading>
+    <p class="blog-card__desc">{post.data.description}</p>
+    <time class="blog-card__date" datetime={isoDate(post.data.date)}>{formatDate(post.data.date)}</time>
+  </div>
+</article>
+
+<style>
+  .blog-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .blog-card__media {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-bottom: 1px solid var(--b1);
+    background: var(--s2);
+  }
+  .blog-card__media img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .blog-card__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 18px 20px 20px;
+  }
+  .blog-card__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 0.84rem;
+    color: var(--t3);
+  }
+  /* Category stays clickable above the stretched title link. */
+  .blog-card__category {
+    position: relative;
+    z-index: 1;
+  }
+  .blog-card__title {
+    font-size: 1.2rem;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+  .blog-card__title a {
+    color: var(--t1);
+  }
+  .blog-card__title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  .blog-card:hover .blog-card__title a {
+    color: var(--ac-text);
+  }
+  .blog-card__desc {
+    flex: 1;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--t2);
+    margin-bottom: 14px;
+  }
+  .blog-card__date {
+    font-size: 0.84rem;
+    color: var(--t3);
+  }
+</style>

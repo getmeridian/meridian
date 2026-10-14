@@ -1,0 +1,28 @@
+{
+  "$comment": "Commands and flags the landing page's CommandBuilder can emit. tests/test_website_command_builder.py checks every command and flag against the live CLI, and the palette list against meridian.core.inputs.PAGE_PALETTES.",
+  "tabs": [
+    { "id": "deploy", "command": "deploy", "server": "optional", "fields": ["user", "sshPort", "domain", "sni", "clientName", "displayName", "icon", "color", "harden", "yes"] },
+    { "id": "relay", "command": "relay add", "server": "required", "fields": ["user", "sshPort", "exit", "relayName", "port", "relaySni", "yes"] },
+    { "id": "check", "command": "check", "server": "optional", "fields": ["user", "sshPort", "domain", "sni", "ai"] },
+    { "id": "scan", "command": "scan", "server": "optional", "fields": ["user", "sshPort"] },
+    { "id": "doctor", "command": "doctor", "server": "optional", "fields": ["user", "sshPort", "sni", "ai"] },
+    { "id": "teardown", "command": "teardown", "server": "optional", "fields": ["user", "sshPort", "yes"] }
+  ],
+  "fields": {
+    "user": { "flag": "--user", "kind": "text", "default": "root", "target": "user", "placeholder": "root", "short": true },
+    "sshPort": { "flag": "--ssh-port", "kind": "text", "default": "22", "target": "port", "placeholder": "22", "short": true },
+    "exit": { "flag": "--exit", "kind": "text", "required": true },
+    "domain": { "flag": "--domain", "kind": "text", "placeholder": "vpn.example.com" },
+    "sni": { "flag": "--sni", "kind": "text" },
+    "relaySni": { "flag": "--sni", "kind": "text" },
+    "clientName": { "flag": "--client-name", "kind": "text", "default": "default", "placeholder": "default", "short": true },
+    "displayName": { "flag": "--display-name", "kind": "text" },
+    "icon": { "flag": "--icon", "kind": "text", "placeholder": "🛡️", "short": true },
+    "color": { "flag": "--color", "kind": "palette", "palettes": ["ocean", "sunset", "forest", "lavender", "rose", "slate"] },
+    "relayName": { "flag": "--name", "kind": "text", "placeholder": "ru-moscow", "short": true },
+    "port": { "flag": "--port", "kind": "text", "default": "443", "placeholder": "443", "short": true },
+    "harden": { "flag": "--no-harden", "kind": "check" },
+    "ai": { "flag": "--ai", "kind": "check" },
+    "yes": { "flag": "--yes", "kind": "check" }
+  }
+}

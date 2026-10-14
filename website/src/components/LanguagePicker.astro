@@ -1,49 +1,61 @@
 ---
 /**
- * LanguagePicker — client-side language switcher.
- * Compact labels (EN/RU/فا/中文) with full names in aria-label.
- * Persists choice in localStorage.
+ * LanguagePicker — plain links to each locale's landing page: crawlable, works
+ * without JavaScript. Clicking one saves the choice (Base.astro), so `/` stops
+ * redirecting a reader who picked English.
  */
+import { LOCALES, LOCALE_INFO, homeOf, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+  label: string;
+}
+
+const { locale, label } = Astro.props;
 ---
 
-<div class="lang-picker" id="lang-picker">
-  <button class="lang-picker__btn lang-picker__btn--active" data-lang="en" aria-label="English">EN</button>
-  <button class="lang-picker__btn" data-lang="ru" aria-label="Русский">RU</button>
-  <button class="lang-picker__btn" data-lang="fa" aria-label="فارسی">فا</button>
-  <button class="lang-picker__btn" data-lang="zh" aria-label="中文">中文</button>
-</div>
+<nav class="lang-picker" aria-label={label} data-t-label="nav.language">
+  {LOCALES.map((l) => (
+    <a
+      href={homeOf(l)}
+      hreflang={LOCALE_INFO[l].hreflang}
+      lang={LOCALE_INFO[l].lang}
+      data-lang-choice={l}
+      aria-current={l === locale ? 'true' : undefined}
+    >
+      <span aria-hidden="true">{LOCALE_INFO[l].short}</span>
+      <span class="sr-only">{LOCALE_INFO[l].label}</span>
+    </a>
+  ))}
+</nav>
 
 <style>
   .lang-picker {
-    display: flex;
+    display: inline-flex;
     gap: 2px;
+    padding: 2px;
     background: var(--s2);
     border: 1px solid var(--b1);
+    border-radius: var(--r);
+  }
+  .lang-picker a {
+    min-width: 32px;
+    padding: 3px 8px;
     border-radius: 6px;
-    padding: 2px;
-  }
-  .lang-picker__btn {
-    background: none;
-    border: none;
-    color: var(--t3);
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-family: var(--body);
-    font-size: 0.7rem;
-    font-weight: 600;
-    transition: all 0.1s;
-  }
-  .lang-picker__btn:hover {
     color: var(--t2);
+    /* System fonts: language names must not pull in other scripts' web fonts. */
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
   }
-  .lang-picker__btn--active {
-    background: var(--ac2);
-    color: var(--ac);
+  .lang-picker a:hover {
+    color: var(--t1);
   }
-  .lang-picker__btn--unavailable {
-    opacity: 0.35;
-    cursor: default;
-    pointer-events: none;
+  .lang-picker a[aria-current] {
+    background: var(--s1);
+    color: var(--t1);
+    box-shadow: var(--shadow-sm);
   }
 </style>

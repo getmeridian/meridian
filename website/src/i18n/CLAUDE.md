@@ -1,21 +1,23 @@
-# i18n — Client-side translation system
+# i18n — Website strings for the landing and the site shell
 
 ## Design decisions
 
-**Asymmetric by design** — English is baked into HTML at build time; other languages swap text client-side via `data-t` attributes, so no English dictionary ships in JS. Components and the PWA follow the same model.
+**Static per locale** — the landing renders at `/`, `/ru/`, `/fa/`, `/zh/` from `landing/<locale>.ts` at build time; nothing about it is translated in the browser, so it is complete without JavaScript and crawlable.
 
-**Detection cascade** — `detectLocale()`: localStorage → browser language → English fallback. URL path locale (`/ru/`, `/fa/`, `/zh/`) is detected by the early `<head>` script in Base layout and persisted to localStorage before this code runs.
+**Typed parity** — `landing/en.ts` and `shell/en.ts` are the references; every other locale is typed `LandingStrings`/`ShellStrings`, so a missing or extra key fails `astro check`. Values may hold trusted inline HTML; `{base}` becomes the locale's docs prefix.
 
-**Build-time helper** — `createT()` in `t.ts` provides a translation function for Astro component frontmatter. Used for locale-specific pages where DOM swapping isn't sufficient (e.g., localized landing pages).
+**Shell swap only where no locale version exists** — blog and 404 load `swap.ts` (shell dictionaries only, a few KB): `data-t` text, `data-t-label` aria-labels, docs links, and `lang`/`dir` on each `data-i18n-scope` element. The document itself stays English and LTR.
+
+**Explicit choice wins** — `meridian-lang` is written only when the reader clicks a language link; `preferredLocale()` falls back to the browser language. `locales.ts` holds the locale list, `lang` (zh is `zh-CN`, as in Starlight), og locale, and hreflang.
+
+**Translations by Sonnet agents** — ru/fa/zh strings are written by Sonnet subagents from the English reference (root `CLAUDE.md`).
 
 ## What's done well
 
-- **`setLang()` handles everything** — text swap, placeholder swap, `dir` attribute, `lang` attribute, picker state, localStorage persistence, and document title. One call, full i18n.
-- **RTL is first-class** — Farsi (`fa`) sets `dir="rtl"` on `<html>`. Components that need directional overrides use `[dir="rtl"]` selectors.
+- **RTL is first-class** — Farsi sets `dir="rtl"` on `<html>` (landing) or the swapped scope; components use logical properties (`inset-inline-*`, `border-inline-start`) instead of `[dir=rtl]` flips.
 
 ## Pitfalls
 
-- **Translation keys must match `data-t` attributes exactly** — `translations.ts` keys are manually maintained. A typo in either side fails silently (English stays visible).
-- **EN reload required** — switching back to English reloads the page because English text is in the build-time HTML, not in a translation dict. Non-EN to non-EN is a seamless client-side swap.
-- **`data-t-placeholder`** — separate attribute for `<input>` placeholders. Easy to forget when adding translatable form elements.
-- **`innerHTML` for translated text** — `setLang()` uses `innerHTML` (not `textContent`) because some translations contain inline HTML (`<em>`, `<a>`, `<strong>`). Translation values must be trusted.
+- **Never ship `landing/*` to the client** — import it only in Astro frontmatter; `swap.ts` must import `shell/` alone.
+- **Adding a locale** touches `locales.ts`, both dictionaries, Starlight's `locales`, and the `/` redirect list in `Landing.astro`.
+- **Keep commands and flags untranslated** — `meridian deploy`, `--domain`, and protocol names stay Latin in every locale.

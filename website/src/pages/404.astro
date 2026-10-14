@@ -1,66 +1,48 @@
 ---
+/**
+ * 404 — one static page for every missing URL, so its text swaps to the reader's
+ * language in the browser (shell strings); the docs link opens /docs/, which picks
+ * the reader's language too.
+ */
 import Base from '../layouts/Base.astro';
+import { shellT } from '../i18n';
+
+const t = shellT('en');
 ---
 
-<Base title="Page not found — Meridian">
-  <meta slot="head" name="robots" content="noindex" />
-  <main id="main">
-    <section class="not-found">
-      <div class="container">
-        <h1>404</h1>
-        <p>This page doesn't exist.</p>
-        <div class="not-found__links">
-          <a href="/" class="not-found__btn">Home</a>
-          <a href="/en/getting-started/" class="not-found__btn not-found__btn--secondary">Docs</a>
-        </div>
+<Base title={`${t('notFound.title')} — Meridian`} titleKey="notFound.title" noindex>
+  <main id="main" class="not-found" data-i18n-scope>
+    <div class="container">
+      <p class="not-found__code" aria-hidden="true">404</p>
+      <h1 data-t="notFound.title">{t('notFound.title')}</h1>
+      <p class="not-found__text" data-t="notFound.text">{t('notFound.text')}</p>
+      <div class="btn-row not-found__actions">
+        <a href="/" class="btn btn--primary" data-t="notFound.home">{t('notFound.home')}</a>
+        <a href="/docs/" class="btn btn--secondary" data-docs-link data-t="notFound.docs">{t('notFound.docs')}</a>
       </div>
-    </section>
+    </div>
   </main>
 </Base>
 
 <style>
   .not-found {
-    padding: calc(56px + 80px) 0 120px;
+    padding: clamp(64px, 12vw, 128px) 0;
     text-align: center;
   }
-  .not-found h1 {
-    font-size: 6rem;
-    color: var(--b2);
-    line-height: 1;
-    margin-bottom: 8px;
-  }
-  .not-found p {
-    color: var(--t3);
-    font-size: 1.1rem;
-    margin-bottom: 32px;
-  }
-  .not-found__links {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-  }
-  .not-found__btn {
-    display: inline-flex;
-    padding: 10px 24px;
-    border-radius: var(--r);
+  .not-found__code {
+    font-family: var(--mono);
+    font-size: 0.9rem;
     font-weight: 600;
-    font-size: 0.88rem;
-    text-decoration: none;
-    background: var(--ac);
-    color: #fff;
-    transition: background 0.15s;
+    letter-spacing: 0.2em;
+    color: var(--ac-text);
+    margin-bottom: 12px;
   }
-  .not-found__btn:hover {
-    background: var(--ac-hover);
-    color: #fff;
+  .not-found__text {
+    color: var(--t2);
+    font-size: 1.1rem;
+    margin: 12px 0 32px;
   }
-  .not-found__btn--secondary {
-    background: var(--s1);
-    color: var(--t1);
-    border: 1px solid var(--b1);
-  }
-  .not-found__btn--secondary:hover {
-    background: var(--s2);
-    color: var(--t1);
+  .not-found__actions {
+    justify-content: center;
   }
 </style>

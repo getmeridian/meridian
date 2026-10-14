@@ -1,8 +1,6 @@
 ---
 title: حالت دامنه
 description: از طریق Cloudflare CDN برای تاب‌آوری مقابل مسدودیت IP اضافه کنید.
-order: 4
-section: guides
 ---
 
 ## حالت دامنه چه می‌افزاید

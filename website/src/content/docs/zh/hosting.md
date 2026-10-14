@@ -1,8 +1,6 @@
 ---
 title: 选择托管
 description: 在提交前如何选择和测试用于出口或中继的 VPS。
-order: 2.8
-section: guides
 ---
 
 Meridian 正确配置服务器，但无法改变服务器所在位置。在用户网络阻止的地址上完美的 Reality 设置仍然无法连接。本页面帮助您在投入大量资金前选择和测试托管。

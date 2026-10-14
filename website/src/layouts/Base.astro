@@ -1,145 +1,134 @@
 ---
+/**
+ * Base — the HTML shell for every non-docs page: head metadata, nav, footer.
+ *
+ * Landing pages exist per locale and pass `locale` plus `alternates`; everything is
+ * static HTML. Pages without a locale version (blog, 404) keep English content and
+ * swap only the shell text (nav, footer, `data-t`) to the reader's language.
+ */
+import fs from 'node:fs';
+import path from 'node:path';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import { LOCALE_INFO, LOCALES, dirOf, type Locale } from '../i18n/locales';
+import type { ShellKey } from '../i18n/shell';
 
 interface Props {
   title: string;
   description?: string;
   ogImage?: string;
+  ogImageAlt?: string;
+  ogType?: 'website' | 'article';
+  locale?: Locale;
+  /** hreflang alternates; set only by pages that exist in every locale. */
+  alternates?: { hreflang: string; href: string }[];
+  noindex?: boolean;
+  /** Shell string that names the page; the client swap retitles the tab with it. */
+  titleKey?: ShellKey;
 }
 
 const {
   title,
   description = 'One command deploys a hardened VLESS+Reality proxy server and a link to share. Open source.',
-  ogImage = '/img/og.png',
+  ogImage,
+  ogImageAlt = 'Meridian: share secure internet with the people you care about',
+  ogType = 'website',
+  locale = 'en',
+  alternates,
+  noindex = false,
+  titleKey,
 } = Astro.props;
 
+const localized = Boolean(alternates);
+const info = LOCALE_INFO[locale];
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const ogImageURL = new URL(ogImage, Astro.site);
-
-const locale = Astro.currentLocale ?? 'en';
-const dir = locale === 'fa' ? 'rtl' : 'ltr';
+// figures/og.html renders one card per locale; pages without a locale version share the English one.
+const ogImageURL = new URL(ogImage ?? (localized && locale !== 'en' ? `/img/og-${locale}.jpg` : '/img/og.jpg'), Astro.site);
+const version = fs.readFileSync(path.resolve('../VERSION'), 'utf8').trim();
+const bodyFont = {
+  en: ['/fonts/source-sans-3-latin.woff2'],
+  ru: ['/fonts/source-sans-3-latin.woff2', '/fonts/source-sans-3-cyrillic.woff2'],
+  fa: ['/fonts/vazirmatn-arabic.woff2'],
+  zh: ['/fonts/source-sans-3-latin.woff2'],
+}[locale];
 ---
 
 <!doctype html>
-<html lang={locale} dir={dir}>
+<html lang={info.lang} dir={dirOf(locale)}>
   <head>
     <meta charset="UTF-8" />
-    <!-- Early locale detection: prevents RTL layout shift for Farsi users -->
-    <!-- Early theme detection: prevents flash of wrong color scheme -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Theme before first paint: the saved choice, else the OS's (Expressive Code reads
+         data-theme, as on Starlight pages). Storage may be unavailable (Tor, private modes). -->
     <script is:inline>
-      (function(){
-        // If the URL has a locale prefix (/ru/, /fa/, /zh/), use it and persist
-        var p=location.pathname.split('/')[1];
-        var urlLocale=({'ru':'ru','fa':'fa','zh':'zh'})[p];
-        if(urlLocale){
-          document.documentElement.lang=urlLocale;
-          if(urlLocale==='fa')document.documentElement.dir='rtl';
-          localStorage.setItem('meridian-lang',urlLocale);
-        } else {
-          var l=localStorage.getItem('meridian-lang');
-          if(l){document.documentElement.lang=l;if(l==='fa')document.documentElement.dir='rtl';}
-        }
-        var t=localStorage.getItem('starlight-theme')||localStorage.getItem('meridian-theme');
-        if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
+      (function () {
+        var t;
+        try {
+          t = localStorage.getItem('starlight-theme') || localStorage.getItem('meridian-theme');
+        } catch (e) {}
+        if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
       })();
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <slot name="early" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#FDFAF6" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1C1E28" media="(prefers-color-scheme: dark)" />
+    {noindex && <meta name="robots" content="noindex" />}
 
+    <meta property="og:site_name" content="Meridian" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:url" content={canonicalURL} />
     <meta property="og:image" content={ogImageURL} />
-    <meta property="og:locale" content={locale === 'zh' ? 'zh_CN' : locale === 'fa' ? 'fa_IR' : locale === 'ru' ? 'ru_RU' : 'en_US'} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta property="og:locale" content={info.og} />
+    {localized && LOCALES.filter((l) => l !== locale).map((l) => <meta property="og:locale:alternate" content={LOCALE_INFO[l].og} />)}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageURL} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
 
     <link rel="canonical" href={canonicalURL} />
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png" />
+    {alternates?.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
+    <link rel="alternate" type="application/rss+xml" title="Meridian Blog" href="/blog/rss.xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/img/logo-180.png" />
+    {bodyFont.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
 
     <meta name="generator" content={Astro.generator} />
     <slot name="head" />
   </head>
-  <body>
-    <a href="#main" class="skip-link">Skip to content</a>
-    <Nav />
+  <body data-title-key={titleKey}>
+    <a href="#main" class="skip-link" data-t="skip">Skip to content</a>
+    <Nav locale={locale} localized={localized} />
     <slot />
-    <Footer />
+    <Footer locale={locale} version={version} />
 
-    <!-- i18n: client-side language switching -->
-    <script>
-      import { detectLocale, setLang } from '../i18n/index';
-      import { translations } from '../i18n/translations';
-
-      function updateDocsLinks(lang: string) {
-        if (lang === 'en') return;
-        // Docs links on English pages point at /en/...; follow the reader's language.
-        document.querySelectorAll<HTMLAnchorElement>('a[href^="/en/"]').forEach((a) => {
-          a.setAttribute('href', a.getAttribute('href')!.replace(/^\/en\//, `/${lang}/`));
-        });
-      }
-
-      // Auto-detect and apply language on load
-      const lang = detectLocale();
-
-      if (lang !== 'en') {
-        setLang(lang, translations);
-        updateDocsLinks(lang);
-      } else {
-        document.querySelectorAll('.lang-picker__btn').forEach((btn) => {
-          btn.classList.toggle('lang-picker__btn--active', (btn as HTMLElement).dataset.lang === 'en');
-        });
-      }
-
-      // Handle language picker clicks
-      document.addEventListener('click', (e) => {
-        const btn = (e.target as HTMLElement).closest('.lang-picker__btn') as HTMLButtonElement;
-        if (!btn || btn.classList.contains('lang-picker__btn--unavailable')) return;
-        const lang = btn.dataset.lang as 'en' | 'ru' | 'fa' | 'zh';
-        if (!lang) return;
-
-        if (lang === 'en') {
-          localStorage.setItem('meridian-lang', 'en');
-          location.reload();
-        } else {
-          setLang(lang, translations);
-          updateDocsLinks(lang);
-        }
-      });
-    </script>
-
-    <!-- Copy buttons on prose code blocks -->
+    {!localized && (
+      <script>
+        import { swapShell } from '../i18n/swap';
+        swapShell();
+      </script>
+    )}
     <script is:inline>
-      (function() {
-        var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-        var check = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-        document.querySelectorAll('.prose pre').forEach(function(pre) {
-          var code = pre.querySelector('code');
-          if (!code) return;
-          var btn = document.createElement('button');
-          btn.className = 'code-copy';
-          btn.setAttribute('aria-label', 'Copy code');
-          btn.innerHTML = icon;
-          btn.addEventListener('click', function() {
-            navigator.clipboard.writeText(code.textContent || '').then(function() {
-              btn.innerHTML = check;
-              btn.setAttribute('data-copied', '');
-              setTimeout(function() {
-                btn.innerHTML = icon;
-                btn.removeAttribute('data-copied');
-              }, 1500);
-            });
-          });
-          pre.appendChild(btn);
-        });
-      })();
+      // An explicit language choice sticks: `/` sends readers to their saved language.
+      document.addEventListener('click', function (e) {
+        var link = e.target instanceof Element && e.target.closest('a[data-lang-choice]');
+        if (!link) return;
+        try {
+          localStorage.setItem('meridian-lang', link.getAttribute('data-lang-choice'));
+        } catch (err) {}
+      });
     </script>
   </body>
 </html>

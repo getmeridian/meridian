@@ -1,5 +1,6 @@
 /*
- * Meridian Global Styles — Warm Editorial
+ * Meridian global styles — reset, base typography, and the shared building blocks
+ * (container, section head, buttons, cards) used by the landing, blog, and 404.
  */
 
 @import './fonts.css';
@@ -12,14 +13,19 @@
   box-sizing: border-box;
 }
 
-/* Base */
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--nav-h) + 16px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -33,57 +39,56 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+[lang] {
+  font-family: var(--body);
+}
+
+img, svg {
+  max-width: 100%;
+}
+
 ::selection {
   background: var(--ac);
-  color: #fff;
+  color: var(--on-ac);
 }
 
 /* Focus states */
-button:focus-visible,
-input:focus-visible,
-a:focus-visible,
-details summary:focus-visible {
+:is(button, input, select, a, summary):focus-visible {
   outline: 2px solid var(--ac);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Skip link */
 .skip-link {
   position: absolute;
   top: -100%;
-  left: 16px;
+  inset-inline-start: 16px;
   background: var(--ac);
-  color: #fff;
+  color: var(--on-ac);
   padding: 8px 16px;
   border-radius: var(--r);
   font-size: 0.88rem;
   font-weight: 600;
   text-decoration: none;
   z-index: 200;
-  transition: top 0.15s;
 }
 .skip-link:focus {
-  top: 16px;
+  top: 12px;
 }
 
-/* RTL support */
-[dir="rtl"] pre,
-[dir="rtl"] code {
+/* Code always reads left to right */
+[dir='rtl'] :is(pre, code) {
   direction: ltr;
   text-align: left;
   unicode-bidi: embed;
 }
 
-/* Container */
+/* Layout */
 .container {
-  max-width: 960px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 0 24px;
-}
-
-/* Section */
-section {
-  padding: 72px 0;
+  padding: 0 var(--gutter);
 }
 
 /* Headings */
@@ -91,68 +96,171 @@ h1, h2, h3 {
   font-family: var(--heading);
   color: var(--t1);
   line-height: 1.2;
-}
-
-h1 {
-  font-size: clamp(2.2rem, 5vw, 3.2rem);
   font-weight: 500;
+  letter-spacing: var(--heading-tracking);
   font-optical-sizing: auto;
-  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
-
+h1 {
+  font-size: clamp(2.2rem, 5vw, 3.3rem);
+  line-height: 1.1;
+}
 h2 {
-  font-size: clamp(1.5rem, 3.5vw, 2rem);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  margin-bottom: 12px;
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
 }
-
 h3 {
   font-size: clamp(1.1rem, 2vw, 1.3rem);
-  font-weight: 500;
+}
+
+/* Scripts without italics or with their own spacing: no faux italics, no tracking */
+:is(:lang(fa), :lang(zh)) :is(h1, h2, h3, em, i, .eyebrow) {
+  font-synthesis: none;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:is(:lang(fa), :lang(zh)) .eyebrow {
+  font-size: 0.84rem;
 }
 
 /* Links */
 a {
-  color: var(--ac);
+  color: var(--ac-text);
   text-decoration: none;
   transition: color 0.12s;
 }
 a:hover {
-  color: var(--ac-hover);
+  color: var(--t1);
 }
 
-/* Section label */
-.section-label {
-  font-family: var(--mono);
-  font-size: 0.68rem;
+/* Section head: eyebrow label, title, description */
+.section {
+  padding: var(--section-y) 0;
+}
+.section + .section {
+  border-top: 1px solid var(--b1);
+}
+.eyebrow {
+  font-family: var(--label-font);
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ac);
-  margin-bottom: 10px;
+  color: var(--ac-text);
+  margin-bottom: 12px;
 }
-
-/* Section description */
-.section-desc {
-  color: var(--t2);
-  font-size: 1rem;
-  max-width: 560px;
+.section-head {
+  max-width: 600px;
   margin-bottom: 36px;
+}
+.section-head :is(h1, h2) {
+  margin-bottom: 12px;
+}
+.section-head__desc {
+  color: var(--t2);
+  font-size: 1.04rem;
   line-height: 1.7;
 }
-
-/* Divider */
-.hr {
-  border: none;
-  height: 1px;
-  background: var(--b1);
-  margin: 0;
-  max-width: 960px;
-  margin-left: auto;
-  margin-right: auto;
+.section-head--center {
+  margin-inline: auto;
+  text-align: center;
 }
 
-[dir="rtl"] .section-label {
-  text-align: right;
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 24px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  font-family: var(--body);
+  font-size: 0.94rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+}
+.btn--primary {
+  background: var(--ac);
+  color: var(--on-ac);
+  box-shadow: var(--shadow-sm);
+}
+.btn--primary:hover {
+  background: var(--ac-hover);
+  color: var(--on-ac);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.btn--secondary {
+  background: var(--s1);
+  color: var(--t1);
+  border-color: var(--b1);
+}
+.btn--secondary:hover {
+  background: var(--s2);
+  border-color: var(--b2);
+  color: var(--t1);
+}
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Cards */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r2);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+a.card:hover,
+.card--link:hover {
+  border-color: var(--b2);
+  box-shadow: var(--shadow-md);
+}
+
+/* Small pill, e.g. a blog category */
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--ac2);
+  color: var(--ac-text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.6;
+  text-decoration: none;
+}
+a.pill:hover {
+  color: var(--t1);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Inline code outside prose */
+:not(pre) > code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--s2);
+  border: 1px solid var(--b1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--t1);
 }

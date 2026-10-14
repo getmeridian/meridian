@@ -22,12 +22,12 @@
 - **System lab waits for lint and tests** — no Docker minutes spent on obvious failures.
 - **PWA demo validation** — the website job builds `meridian dev preview` output and checks its files, a disabled SW, and rendered client HTML.
 - **Contract drift checks** — the website build also runs `pnpm run contracts:check`.
-- **Package asset check** — website CI builds a wheel after Astro and verifies the generated Studio entry point is bundled.
+- **Package asset check** — website CI builds a wheel after Astro and verifies the Studio page is bundled and the rest of the website is not.
 
 ## Pitfalls
 
 - **Release notes depend on CHANGELOG discipline** — if human forgets to update CHANGELOG before bumping VERSION, release notes fall back to git log (less useful).
-- **The AI-docs file list lives in three places** — `make ai-docs` and the deploy-pages and publish-pypi jobs in `release.yml`; change all three together.
+- **Never bundle docs inline in a workflow** — `website/scripts/ai-docs.mjs` owns the AI bundles; the site build serves `/ai/reference.md`, and publish-pypi runs the script for the packaged copy.
 - **`workflow_run` needs `branches: [main]`** — without it every PR's CI completion queues a skipped Release run.
 - **Cancel superseded PR runs only** — CI's concurrency group cancels in progress for pull requests; a cancelled main run would never reach Release.
 - **`workflow_run` uses main's copy of `release.yml`** — a branch whose packaging differs (e.g., a beta line) must release through its tag trigger, never by waiting for main's workflow.

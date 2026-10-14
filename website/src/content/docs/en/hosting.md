@@ -1,8 +1,6 @@
 ---
 title: Choosing hosting
 description: How to pick and test a VPS for an exit or a relay before you commit to it.
-order: 2.8
-section: guides
 ---
 
 Meridian configures the server correctly, but it can't change where the server lives. A perfect Reality setup on an address that your users' network blocks still doesn't connect. This page helps you pick and test hosting before you spend much on it.

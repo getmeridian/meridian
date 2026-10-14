@@ -1,92 +1,170 @@
+// @ts-check
+// Pure request builders, validators, CLI commands, and pasted-output parsers.
+// Browser-safe and Node-tested; no DOM.
+
+import { workflowDefaults, workflowLabels } from "./contractDefaults.js";
+import {
+  deployRequestSchema,
+  deployWorkflow,
+  serverConnectionDraftSchema,
+  serverOnboardingWorkflow,
+} from "./generated/index.js";
+
+/** @typedef {import("./generated/schemas/deploy-request.schema").DeployRequest} DeployRequest */
+/** @typedef {import("./generated/schemas/server-connection-draft.schema").ServerConnectionDraft} ServerConnectionDraft */
+/** @typedef {import("./storageAdapter.js").JourneyState} JourneyState */
+/** @typedef {import("./contractDefaults.js").Workflow} Workflow */
+/**
+ * @typedef {object} JsonSchema
+ * @property {Record<string, any>} [properties]
+ * @property {boolean} [additionalProperties]
+ */
+/** @typedef {{ field: string, label: string, message: string }} FieldError */
+/** @typedef {Pick<JourneyState, "deploy" | "server" | "selectedServerId"> & { confirmDeploy?: boolean }} RequestSource */
+
 const IPV4_RE = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
 const FIELD_LABELS = {
-  client_name: "First client",
-  geo_block: "Block RU traffic",
-  host: "Server IP address",
-  ip: "Server IP address",
   requested_server: "Saved server",
-  server_name: "Connection page name",
-  sni: "Camouflage target",
-  ssh_port: "SSH port",
-  ssh_user: "SSH user",
-  title: "Server title",
-  user: "SSH user",
+  ...workflowLabels(deployWorkflow, serverOnboardingWorkflow),
 };
 
-export function initialFormState(workflow) {
-  const state = {};
-  for (const field of workflow.fields) {
-    state[field.id] = field.default ?? (field.kind === "boolean" || field.kind === "confirmation" ? false : "");
-  }
-  return state;
-}
+const DEPLOY_DEFAULTS = workflowDefaults(deployWorkflow);
+const SERVER_DEFAULTS = workflowDefaults(serverOnboardingWorkflow);
 
-export function buildDeployRequest(formState) {
+// Deploy options the journey edits. Each must be a DeployRequest property: the
+// Engine model forbids extra keys, so a stale field turns every request into a 422.
+/** @type {ReadonlyArray<keyof JourneyState["deploy"]>} */
+export const JOURNEY_DEPLOY_FIELDS = [
+  "client_name",
+  "color",
+  "domain",
+  "geo_block",
+  "harden",
+  "icon",
+  "server_name",
+  "sni",
+  "warp",
+];
+
+// `meridian deploy` flag for each journey option: a string flag takes the value,
+// a [on, off] pair is a boolean switch.
+/** @type {Record<string, string | [string, string]>} */
+export const DEPLOY_FLAGS = {
+  client_name: "--client-name",
+  color: "--color",
+  domain: "--domain",
+  geo_block: ["--geo-block", "--no-geo-block"],
+  harden: ["--harden", "--no-harden"],
+  icon: "--icon",
+  server_name: "--display-name",
+  sni: "--sni",
+  warp: ["--warp", "--no-warp"],
+};
+
+// The one DeployRequest builder: Engine dry-run/deploy, the downloaded
+// deploy.json, and the copied commands all come from here. Empty fields take
+// the workflow contract's defaults at build time, so a cleared input stays
+// cleared in the draft.
+/**
+ * @param {RequestSource} journey
+ * @param {JsonSchema} [schema]
+ * @returns {DeployRequest}
+ */
+export function buildDeployRequestFromJourney(journey, schema = deployRequestSchema) {
+  /** @type {Record<string, unknown>} */
+  const deploy = journey.deploy ?? {};
+  /** @type {Record<string, unknown>} */
   const request = {};
-  for (const [key, rawValue] of Object.entries(formState)) {
-    if (key === "confirm") {
-      request.yes = Boolean(rawValue);
-      continue;
-    }
-    if (typeof rawValue === "string") {
-      request[key] = rawValue.trim();
+  for (const key of JOURNEY_DEPLOY_FIELDS) {
+    const fallback = DEPLOY_DEFAULTS[key];
+    const raw = deploy[key];
+    if (typeof fallback === "boolean") {
+      request[key] = typeof raw === "boolean" ? raw : fallback;
     } else {
-      request[key] = rawValue;
+      request[key] = String(raw ?? "").trim() || String(fallback ?? "");
     }
   }
-  if (!("yes" in request)) {
-    request.yes = false;
-  }
-  return request;
-}
-
-export function buildDeployRequestFromJourney(journey) {
-  const request = {
-    client_name: String(journey.deploy?.client_name ?? "default").trim() || "default",
-    color: String(journey.deploy?.color ?? "ocean").trim() || "ocean",
-    domain: String(journey.deploy?.domain ?? "").trim(),
-    geo_block: Boolean(journey.deploy?.geo_block ?? true),
-    harden: Boolean(journey.deploy?.harden ?? true),
-    icon: String(journey.deploy?.icon ?? "").trim(),
-    pq: Boolean(journey.deploy?.pq ?? false),
-    server_name: String(journey.deploy?.server_name ?? "My VPN").trim() || "My VPN",
-    sni: String(journey.deploy?.sni ?? "www.google.com").trim() || "www.google.com",
-    warp: Boolean(journey.deploy?.warp ?? false),
-    yes: Boolean(journey.confirmDeploy),
-  };
+  request.yes = Boolean(journey.confirmDeploy);
   if (journey.selectedServerId) {
     request.requested_server = String(journey.selectedServerId);
   } else {
     request.ip = String(journey.server?.host ?? "").trim();
-    request.user = String(journey.server?.ssh_user ?? "root").trim() || "root";
-    request.ssh_port = Number(journey.server?.ssh_port ?? 22);
+    request.user = String(journey.server?.ssh_user ?? "").trim() || String(SERVER_DEFAULTS.ssh_user ?? "root");
+    request.ssh_port = sshPortValue(journey.server?.ssh_port);
   }
-  return request;
+  return pickSchemaProperties(request, schema);
 }
 
+// Keep only what the generated schema declares, so no request carries a key
+// the Engine would reject.
+/**
+ * @param {Record<string, unknown>} request
+ * @param {JsonSchema} schema
+ */
+export function pickSchemaProperties(request, schema) {
+  const allowed = schema.properties ?? {};
+  return Object.fromEntries(Object.entries(request).filter(([key]) => key in allowed));
+}
+
+/**
+ * Server draft with contract defaults applied (port, user) and an automatic
+ * title when the field is empty.
+ * @param {Partial<Record<keyof JourneyState["server"], unknown>>} formState
+ * @returns {ServerConnectionDraft}
+ */
 export function buildServerConnectionDraft(formState) {
-  const rawPort = String(formState.ssh_port ?? "").trim();
-  const parsedPort = Number.parseInt(rawPort, 10);
   const host = String(formState.host ?? "").trim();
   const title = String(formState.title ?? "").trim() || autoServerTitle(host);
   return {
     title,
     host,
-    ssh_user: String(formState.ssh_user ?? "root").trim(),
-    ssh_port: Number.isNaN(parsedPort) ? rawPort : parsedPort,
+    ssh_user: String(formState.ssh_user ?? "").trim() || String(SERVER_DEFAULTS.ssh_user ?? "root"),
+    ssh_port: sshPortValue(formState.ssh_port),
   };
 }
 
-export function validateDeployRequest(request, schema, workflow) {
+/** @param {unknown} value */
+function sshPortValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return Number.parseInt(String(SERVER_DEFAULTS.ssh_port ?? "22"), 10);
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
+/**
+ * @param {object} request
+ * @param {JsonSchema} [schema]
+ * @param {Workflow} [workflow]
+ */
+export function validateDeployRequest(request, schema = deployRequestSchema, workflow = deployWorkflow) {
   return validateRequest(request, schema, workflow);
 }
 
-export function validateServerConnectionDraft(request, schema, workflow) {
+/**
+ * @param {object} request
+ * @param {JsonSchema} [schema]
+ * @param {Workflow} [workflow]
+ */
+export function validateServerConnectionDraft(
+  request,
+  schema = serverConnectionDraftSchema,
+  workflow = serverOnboardingWorkflow,
+) {
   return validateRequest(request, schema, workflow);
 }
 
-function validateRequest(request, schema, workflow) {
+/**
+ * @param {object} input
+ * @param {JsonSchema} schema
+ * @param {Workflow} workflow
+ * @returns {FieldError[]}
+ */
+function validateRequest(input, schema, workflow) {
+  const request = /** @type {Record<string, unknown>} */ (input);
+  /** @type {FieldError[]} */
   const errors = [];
   const requiredFields = workflow.fields.filter((field) => field.required && field.id !== "confirm");
   const requestHasServerReference = typeof request.requested_server === "string" && request.requested_server.trim() !== "";
@@ -98,6 +176,15 @@ function validateRequest(request, schema, workflow) {
     const value = request[field.id];
     if (value === undefined || value === null || String(value).trim() === "") {
       errors.push({ field: field.id, label: field.label, message: `${field.label} is required.` });
+    }
+  }
+
+  if (schema.additionalProperties === false) {
+    const known = schema.properties ?? {};
+    for (const field of Object.keys(request)) {
+      if (!(field in known)) {
+        errors.push({ field, label: labelFor(field), message: `${labelFor(field)} is not an option this Meridian version accepts.` });
+      }
     }
   }
 
@@ -115,6 +202,10 @@ function validateRequest(request, schema, workflow) {
   return dedupeErrors(errors);
 }
 
+/**
+ * @param {string} command
+ * @returns {{ host: string, ssh_port: number, ssh_user: string, title: string }}
+ */
 export function parseSshCommand(command) {
   const tokens = shellWords(String(command ?? "").trim());
   if (tokens[0] !== "ssh") {
@@ -182,25 +273,56 @@ export function parseSshCommand(command) {
   };
 }
 
-export function buildCliCommands() {
-  return {
-    deploy: "meridian deploy --request deploy.json --json --events=jsonl",
-    dryRun: "meridian deploy --request deploy.json --dry-run --json",
-  };
+/**
+ * The `meridian deploy` command a person would type for this request. Flags
+ * appear only where the request differs from what the CLI does on its own, so
+ * running it deploys exactly what Studio would.
+ * @param {DeployRequest} request
+ * @param {{ dryRun?: boolean, schema?: JsonSchema }} [options]
+ */
+export function buildDeployCommand(request, options = {}) {
+  const properties = (options.schema ?? deployRequestSchema).properties ?? {};
+  const words = ["meridian", "deploy"];
+  if (request.requested_server) {
+    words.push(shellQuote(request.requested_server));
+  } else {
+    words.push(shellQuote(request.ip ?? ""));
+    if (request.user && request.user !== "root") words.push("--user", shellQuote(request.user));
+    if (request.ssh_port && request.ssh_port !== 22) words.push("--ssh-port", String(request.ssh_port));
+  }
+  const values = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (request));
+  for (const key of JOURNEY_DEPLOY_FIELDS) {
+    const value = values[key];
+    if (value === undefined || value === properties[key]?.default) continue;
+    const flag = DEPLOY_FLAGS[key];
+    if (Array.isArray(flag)) {
+      words.push(value ? flag[0] : flag[1]);
+    } else if (value !== "") {
+      words.push(flag, shellQuote(String(value)));
+    }
+  }
+  if (options.dryRun) words.push("--dry-run");
+  return words.join(" ");
 }
 
+/**
+ * @param {{ deployRequest: DeployRequest, serverDraft: ServerConnectionDraft }} input
+ */
 export function buildCommandPack({ deployRequest, serverDraft }) {
   const serverCommands = buildServerCliCommands(serverDraft);
-  const deployCommands = buildCliCommands();
   return {
-    deploy: deployCommands.deploy,
-    dryRun: deployCommands.dryRun,
+    deploy: buildDeployCommand(deployRequest),
+    dryRun: buildDeployCommand(deployRequest, { dryRun: true }),
+    requestDryRun: "meridian deploy --request deploy.json --dry-run",
     saveServer: serverCommands.save,
     setupKey: serverCommands.copyKey,
     testSsh: serverCommands.connect,
   };
 }
 
+/**
+ * @param {ServerConnectionDraft} draft
+ */
 export function buildServerCliCommands(draft) {
   const target = `${draft.ssh_user}@${draft.host}`;
   const port = Number(draft.ssh_port);
@@ -211,10 +333,14 @@ export function buildServerCliCommands(draft) {
   return {
     connect: `ssh${sshPort} ${shellQuote(target)}`,
     copyKey: `ssh-copy-id${sshPort} ${shellQuote(target)}`,
-    save: `meridian server add ${shellQuote(draft.host)} --name ${shellQuote(cliName)} --user ${shellQuote(draft.ssh_user)}${addPort}`,
+    save: `meridian server add ${shellQuote(draft.host)} --name ${shellQuote(cliName)} --user ${shellQuote(draft.ssh_user ?? "root")}${addPort}`,
   };
 }
 
+/**
+ * @param {string} text
+ * @returns {any}
+ */
 export function parseEnvelope(text) {
   const payload = JSON.parse(text.trim());
   if (!payload || typeof payload !== "object" || payload.schema !== "meridian.output/v1") {
@@ -223,6 +349,10 @@ export function parseEnvelope(text) {
   return payload;
 }
 
+/**
+ * @param {string} text
+ * @returns {any[]}
+ */
 export function parseEventStream(text) {
   const lines = text
     .split("\n")
@@ -237,34 +367,16 @@ export function parseEventStream(text) {
   return events;
 }
 
+/** @param {unknown} value */
 export function formatJson(value) {
   return JSON.stringify(value, null, 2);
 }
 
-export function summarizeEnvelope(envelope) {
-  const firstError = Array.isArray(envelope.errors) ? envelope.errors[0] : null;
-  const text =
-    (firstError && [firstError.message, firstError.hint].filter(Boolean).join(" ")) ||
-    envelope.summary?.text ||
-    `${envelope.command || "Command"} ${envelope.status || "finished"}`;
-  return {
-    changed: Boolean(envelope.summary?.changed),
-    status: envelope.status || "unknown",
-    text,
-  };
-}
-
-export function timelineFromEvents(events) {
-  return events.map((event) => ({
-    data: event.data ?? {},
-    level: event.level ?? "info",
-    message: event.message ?? event.type,
-    phase: event.phase ?? "",
-    seq: event.seq ?? 0,
-    type: event.type ?? "event",
-  }));
-}
-
+/**
+ * @param {unknown} value
+ * @param {Record<string, any>} schema
+ * @param {string} field
+ */
 function validateSchemaProperty(value, schema, field) {
   if (schema.type === "integer") {
     return validateIntegerProperty(value, schema, field);
@@ -283,12 +395,17 @@ function validateSchemaProperty(value, schema, field) {
   if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
     return `${labelFor(field)} has an invalid option.`;
   }
-  if (Array.isArray(schema.anyOf) && !schema.anyOf.some((candidate) => matchesSchemaCandidate(text, candidate))) {
+  if (Array.isArray(schema.anyOf) && !schema.anyOf.some((/** @type {Record<string, any>} */ candidate) => matchesSchemaCandidate(text, candidate))) {
     return patternMessage(field);
   }
   return "";
 }
 
+/**
+ * @param {unknown} value
+ * @param {Record<string, any>} schema
+ * @param {string} field
+ */
 function validateIntegerProperty(value, schema, field) {
   const number = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(number)) {
@@ -303,6 +420,10 @@ function validateIntegerProperty(value, schema, field) {
   return "";
 }
 
+/**
+ * @param {string} value
+ * @param {Record<string, any>} schema
+ */
 function matchesSchemaCandidate(value, schema) {
   if (schema.format === "ipv4") {
     return IPV4_RE.test(value);
@@ -316,6 +437,7 @@ function matchesSchemaCandidate(value, schema) {
   return true;
 }
 
+/** @param {string} value */
 function isLikelyIpv6(value) {
   if (!value.includes(":") || !/^[0-9a-fA-F:]+$/.test(value)) {
     return false;
@@ -327,6 +449,7 @@ function isLikelyIpv6(value) {
   return groups.length >= 3 && groups.length <= 8 && groups.every((group) => group.length > 0 && group.length <= 4);
 }
 
+/** @param {string} field */
 function patternMessage(field) {
   if (field === "host") {
     return "Enter a valid IP address.";
@@ -343,6 +466,7 @@ function patternMessage(field) {
   return `${labelFor(field)} has an invalid format.`;
 }
 
+/** @param {string} value */
 function shellQuote(value) {
   const text = String(value);
   if (/^[a-zA-Z0-9_./:@%+=,-]+$/.test(text)) {
@@ -351,7 +475,9 @@ function shellQuote(value) {
   return `'${text.replaceAll("'", "'\"'\"'")}'`;
 }
 
+/** @param {string} command */
 function shellWords(command) {
+  /** @type {string[]} */
   const tokens = [];
   let current = "";
   let quote = "";
@@ -384,6 +510,7 @@ function shellWords(command) {
   return tokens;
 }
 
+/** @param {string} title */
 function slugifyTitle(title) {
   const slug = String(title)
     .trim()
@@ -393,14 +520,17 @@ function slugifyTitle(title) {
   return slug || "server";
 }
 
+/** @param {string} host */
 function autoServerTitle(host) {
   return host ? `Server ${host}` : "New server";
 }
 
-function labelFor(field) {
-  return FIELD_LABELS[field] ?? field.replaceAll("_", " ");
+/** @param {string} field */
+export function labelFor(field) {
+  return /** @type {Record<string, string>} */ (FIELD_LABELS)[field] ?? field.replaceAll("_", " ");
 }
 
+/** @param {FieldError[]} errors */
 function dedupeErrors(errors) {
   const seen = new Set();
   return errors.filter((error) => {

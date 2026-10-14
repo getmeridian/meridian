@@ -1,8 +1,6 @@
 ---
 title: IP Blocked Recovery
 description: What to do when your server's IP gets blocked — diagnosis and recovery options.
-order: 7
-section: guides
 ---
 
 ## Diagnose
@@ -13,7 +11,9 @@ Run from your own machine (no SSH needed):
 meridian test 198.51.100.10
 ```
 
-If the TCP check on port 443 fails from your network but works from elsewhere (another network, a VPN, the [ping tool](https://getmeridian.org/ping)), the IP is most likely blocked. A TCP failure everywhere usually means a cloud firewall or a server that is down.
+If the TCP check on port 443 fails from your network but works from elsewhere (another network or a VPN), the IP is most likely blocked. A TCP failure everywhere usually means a cloud firewall or a server that is down.
+
+To see what exactly is blocked, run [`meridian test 198.51.100.10 --probe`](/en/cli-reference/#censors-view-meridian-test---probe) from inside the censored network: it reports whether the server IP or the camouflage SNI looks blocked. People without the CLI can open their connection page; if it loads on their network, the control server is reachable from there.
 
 ## Immediate relief
 

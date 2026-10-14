@@ -1,11 +1,13 @@
 /**
- * Markdown versions of the docs for agents and LLM tools. Every endpoint that serves
- * docs as Markdown (`/<locale>/<page>.md`, `/md/...`, `/llms-full.txt`, `/context-hub.md`)
- * goes through here, so links and front matter are handled one way.
+ * Markdown versions of the docs for agents and LLM tools. The per-page twins
+ * (`/<locale>/<page>.md`) and `/llms.txt` render here; the bundles (`/llms-full.txt`,
+ * `/ai/reference.md`) come from `scripts/ai-docs.mjs`, which owns link and front matter handling.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { markdownBody } from '../../scripts/ai-docs.mjs';
+import { DOCS_SLUGS } from './docs-sidebar.mjs';
 
 export type DocEntry = CollectionEntry<'docs'>;
 
@@ -14,16 +16,13 @@ export const SITE = 'https://getmeridian.org';
 /** Docs pages of one locale in sidebar order. */
 export async function docsInOrder(locale = 'en'): Promise<DocEntry[]> {
   const docs = await getCollection('docs', (doc) => doc.id.startsWith(`${locale}/`));
-  return docs.sort((a, b) => (a.data.order ?? 99) - (b.data.order ?? 99));
+  const rank = (doc: DocEntry) => DOCS_SLUGS.indexOf(doc.id.slice(locale.length + 1));
+  return docs.sort((a, b) => rank(a) - rank(b));
 }
 
 /** The page body without front matter; links to other docs point at their Markdown twins. */
 export function docBody(entry: DocEntry): string {
-  const raw = fs.readFileSync(path.resolve(`src/content/docs/${entry.id}.md`), 'utf-8');
-  return raw
-    .replace(/^---[\s\S]*?---\n/, '')
-    .replace(/\]\(\/(en|ru|fa|zh)\/([a-z0-9-]+)\/?(#[^)]*)?\)/g, (_m, locale, slug, hash = '') => `](/${locale}/${slug}.md${hash})`)
-    .trim();
+  return markdownBody(fs.readFileSync(path.resolve(`src/content/docs/${entry.id}.md`), 'utf-8'));
 }
 
 /** One page as a standalone Markdown document. */
@@ -32,6 +31,7 @@ export function docMarkdown(entry: DocEntry): string {
   return `# ${entry.data.title}\n\n${summary}${docBody(entry)}\n`;
 }
 
-export function markdownResponse(body: string, contentType = 'text/markdown'): Response {
-  return new Response(body, { headers: { 'Content-Type': `${contentType}; charset=utf-8` } });
+/** Static builds keep only the body; the host picks the content type from the file extension. */
+export function markdownResponse(body: string): Response {
+  return new Response(body);
 }

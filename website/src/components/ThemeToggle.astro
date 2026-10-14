@@ -1,73 +1,91 @@
 ---
 /**
- * ThemeToggle — two-state theme switcher (light ↔ dark).
- * Defaults to OS preference. Click toggles to the opposite mode.
- * Persists override in localStorage. Works with data-theme attribute on <html>.
- * Self-contained — no dependency on parent container styling.
+ * ThemeToggle — a "dark theme" switch (aria-pressed). Follows the OS until clicked;
+ * only a click saves the choice, in both `meridian-theme` and Starlight's
+ * `starlight-theme`, so landing, blog, and docs agree. Hidden without JavaScript.
  */
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
 ---
 
-<button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">
-  <svg class="theme-toggle__icon theme-toggle__icon--sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="5"></circle>
-    <line x1="12" y1="1" x2="12" y2="3"></line>
-    <line x1="12" y1="21" x2="12" y2="23"></line>
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-    <line x1="1" y1="12" x2="3" y2="12"></line>
-    <line x1="21" y1="12" x2="23" y2="12"></line>
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-  </svg>
-  <svg class="theme-toggle__icon theme-toggle__icon--moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<button class="theme-toggle" type="button" aria-label={label} title={label} aria-pressed="false" data-t-label="nav.theme" hidden>
+  <svg class="theme-toggle__moon" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+  </svg>
+  <svg class="theme-toggle__sun" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4.5"></circle>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
   </svg>
 </button>
 
 <script is:inline>
-  (function() {
-    var btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-
+  (function () {
+    var root = document.documentElement;
+    var media = window.matchMedia('(prefers-color-scheme: dark)');
+    var buttons = document.querySelectorAll('.theme-toggle');
     function isDark() {
-      var saved = localStorage.getItem('starlight-theme') || localStorage.getItem('meridian-theme');
-      if (saved === 'dark' || saved === 'light') return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var forced = root.dataset.theme;
+      return forced ? forced === 'dark' : media.matches;
     }
-
-    function apply(dark) {
-      btn.dataset.state = dark ? 'dark' : 'light';
-      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      localStorage.setItem('meridian-theme', dark ? 'dark' : 'light');
-      localStorage.setItem('starlight-theme', dark ? 'dark' : 'light');
+    function sync() {
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(isDark()));
+      });
     }
-
-    apply(isDark());
-
-    btn.addEventListener('click', function() {
-      apply(btn.dataset.state !== 'dark');
+    buttons.forEach(function (b) {
+      b.hidden = false;
+      b.addEventListener('click', function () {
+        var theme = isDark() ? 'light' : 'dark';
+        root.dataset.theme = theme;
+        try {
+          localStorage.setItem('meridian-theme', theme);
+          localStorage.setItem('starlight-theme', theme);
+        } catch (e) {}
+        sync();
+      });
     });
+    // Without a saved choice, keep following the OS.
+    media.addEventListener('change', function () {
+      var saved;
+      try {
+        saved = localStorage.getItem('starlight-theme') || localStorage.getItem('meridian-theme');
+      } catch (e) {}
+      if (saved !== 'dark' && saved !== 'light') root.dataset.theme = media.matches ? 'dark' : 'light';
+      sync();
+    });
+    sync();
   })();
 </script>
 
 <style>
   .theme-toggle {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 36px;
+    height: 36px;
     background: none;
     border: none;
-    padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--r);
+    color: var(--t2);
     cursor: pointer;
-    color: var(--t3);
-    transition: color 0.12s;
+  }
+  .theme-toggle[hidden] {
+    display: none;
   }
   .theme-toggle:hover {
     color: var(--t1);
+    background: var(--s2);
   }
-  /* In dark mode: show sun (click to go light). In light mode: show moon (click to go dark). */
-  .theme-toggle__icon { display: none; }
-  .theme-toggle[data-state="dark"] .theme-toggle__icon--sun { display: block; }
-  .theme-toggle[data-state="light"] .theme-toggle__icon--moon { display: block; }
+  /* Show the theme a click switches to. */
+  .theme-toggle__sun,
+  .theme-toggle[aria-pressed='true'] .theme-toggle__moon {
+    display: none;
+  }
+  .theme-toggle[aria-pressed='true'] .theme-toggle__sun {
+    display: block;
+  }
 </style>

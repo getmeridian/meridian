@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -73,11 +73,6 @@ class EngineBootstrapKeyRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _require_csrf(header: str, request: Request) -> None:
-    if header != request.app.state.csrf_token:
-        raise HTTPException(status_code=403, detail="Missing or invalid CSRF token.")
-
-
 def _raise_engine_error(exc: EngineError) -> NoReturn:
     raise HTTPException(
         status_code=400,
@@ -125,7 +120,7 @@ def _manager(request: Request) -> OperationManager:
 
 
 # ---------------------------------------------------------------------------
-# Read-only routes (no CSRF needed)
+# Read-only routes (the security middleware requires the session key on all but health)
 # ---------------------------------------------------------------------------
 
 
@@ -135,7 +130,6 @@ def health(request: Request) -> dict[str, Any]:
     return {
         "schema": "meridian.engine-health/v1",
         "status": "ok",
-        "csrf_token": state.csrf_token,
         "assets": {"available": bool(state.assets_dir)},
     }
 
@@ -225,15 +219,12 @@ def operation_diagnostics(operation_id: str, request: Request) -> dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
-# Mutation routes (CSRF required)
+# Mutation routes
 # ---------------------------------------------------------------------------
 
 
 @router.post("/servers")
-def add_server(
-    draft: ServerConnectionDraft, request: Request, x_meridian_csrf: str = Header(default="")
-) -> dict[str, Any]:
-    _require_csrf(x_meridian_csrf, request)
+def add_server(draft: ServerConnectionDraft, request: Request) -> dict[str, Any]:
     profile = save_server_profile(draft, _server_store(request))
     return {"schema": "meridian.server-profile/v1", "server": _dump_profile(profile)}
 
@@ -242,9 +233,7 @@ def add_server(
 def validate_server(
     body: ServerValidateRequest,
     request: Request,
-    x_meridian_csrf: str = Header(default=""),
 ) -> dict[str, Any]:
-    _require_csrf(x_meridian_csrf, request)
     try:
         result = validate_server_connection(
             body,
@@ -260,9 +249,7 @@ def validate_server(
 def bootstrap_key(
     body: EngineBootstrapKeyRequest,
     request: Request,
-    x_meridian_csrf: str = Header(default=""),
 ) -> dict[str, Any]:
-    _require_csrf(x_meridian_csrf, request)
     try:
         contract = body.contract()
     except ValidationError as exc:
@@ -283,8 +270,7 @@ def bootstrap_key(
 
 
 @router.post("/deploy/dry-run")
-def deploy_dry_run(body: DeployRequest, request: Request, x_meridian_csrf: str = Header(default="")) -> dict[str, Any]:
-    _require_csrf(x_meridian_csrf, request)
+def deploy_dry_run(body: DeployRequest, request: Request) -> dict[str, Any]:
     try:
         plan = dry_run_deploy_request(
             body,
@@ -297,8 +283,7 @@ def deploy_dry_run(body: DeployRequest, request: Request, x_meridian_csrf: str =
 
 
 @router.post("/deploy/start")
-def deploy_start(body: DeployRequest, request: Request, x_meridian_csrf: str = Header(default="")) -> Any:
-    _require_csrf(x_meridian_csrf, request)
+def deploy_start(body: DeployRequest, request: Request) -> Any:
     if not body.yes:
         _raise_engine_error(
             EngineError(
@@ -326,9 +311,8 @@ def deploy_start(body: DeployRequest, request: Request, x_meridian_csrf: str = H
 
 
 @router.post("/operations/{operation_id}/cancel")
-def operation_cancel(operation_id: str, request: Request, x_meridian_csrf: str = Header(default="")) -> dict[str, Any]:
+def operation_cancel(operation_id: str, request: Request) -> dict[str, Any]:
     """Request cooperative cancellation; finished operations answer ``already_finished``."""
-    _require_csrf(x_meridian_csrf, request)
     manager = _manager(request)
     outcome = manager.cancel(operation_id)
     if outcome is None:

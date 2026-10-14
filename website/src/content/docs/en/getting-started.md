@@ -1,11 +1,11 @@
 ---
 title: Getting Started
 description: Install Meridian and deploy your first proxy server.
-order: 1
-section: guides
 ---
 
 One command turns a fresh VPS into a hardened proxy and gives you a link to share. This guide takes you from zero to a working connection in a few minutes.
+
+Someone sent you a link? You don't need any of this: see [Connecting](/en/connecting/).
 
 ## Prerequisites
 

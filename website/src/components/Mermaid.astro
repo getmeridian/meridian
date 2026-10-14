@@ -1,56 +1,18 @@
 ---
 /**
- * Client-side Mermaid diagram renderer for docs pages.
- * The remark plugin in astro.config.mjs turns ```mermaid blocks into <pre class="mermaid">,
- * so they skip code highlighting. This script renders them as SVG.
- *
- * The dynamic import ensures the mermaid bundle is only fetched
- * on pages that actually contain diagrams.
+ * Layout for diagrams rendered at authoring time (src/lib/diagrams.mjs). The SVGs carry their
+ * own theme colors; this only places them. No script: nothing renders in the browser.
  */
 ---
 
-<script>
-  const nodes = document.querySelectorAll<HTMLElement>('pre.mermaid');
-  if (nodes.length > 0) {
-    const isDark = document.documentElement.dataset.theme === 'dark';
-
-    // Meridian design tokens mapped to mermaid theme variables
-    const theme = isDark ? {
-      primaryColor: '#2E3145', primaryTextColor: '#E4E2DE', primaryBorderColor: '#4A4F66',
-      lineColor: '#D4A24E', secondaryColor: '#1C1E28', tertiaryColor: '#373B50',
-      noteBkgColor: '#2E3145', noteBorderColor: '#3A3E52',
-      actorBkg: '#252836', actorBorder: '#4A4F66',
-    } : {
-      primaryColor: '#F5F0E8', primaryTextColor: '#1A1D2E', primaryBorderColor: '#D5CFC3',
-      lineColor: '#C8933A', secondaryColor: '#FDFAF6', tertiaryColor: '#EDE7DB',
-      noteBkgColor: '#F5F0E8', noteBorderColor: '#E5DFD3',
-      actorBkg: '#FFFFFF', actorBorder: '#D5CFC3',
-    };
-
-
-    const { default: mermaid } = await import('mermaid');
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'base',
-      themeVariables: theme,
-      securityLevel: 'loose',
-      fontFamily: "'Source Sans 3', system-ui, sans-serif",
-      flowchart: { curve: 'monotoneX', padding: 16 },
-      sequence: { mirrorActors: false, messageMargin: 40 },
-    });
-    await mermaid.run({ nodes });
-  }
-</script>
-
 <style is:global>
-  pre.mermaid {
-    background: transparent !important;
-    border: none !important;
-    padding: 24px 0 !important;
+  figure.diagram {
+    margin: 1.5rem 0;
+    overflow-x: auto;
     text-align: center;
   }
-  pre.mermaid svg {
-    max-width: 100%;
+  figure.diagram svg {
+    display: inline-block;
     height: auto;
   }
 </style>

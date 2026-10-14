@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import secrets
+import hmac
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -19,6 +19,7 @@ from meridian.adapters.server_engine import default_server_connection_factory
 from meridian.cluster import ClusterConfig
 from meridian.config import SERVER_PROFILES_FILE
 from meridian.core.validation import validation_errors_hint
+from meridian.engine.assets import STUDIO_ASSET_ROOTS
 from meridian.engine.operations import OperationManager, OperationRunner
 from meridian.engine.routes import router
 from meridian.engine.servers import (
@@ -30,6 +31,14 @@ from meridian.servers import ServerProfileStore
 from meridian.ssh_keys import ensure_meridian_keypair
 
 SAFE_FETCH_SITES = {"same-origin", "none"}
+HEALTH_PATH = "/api/v1/health"
+# Studio sends the per-launch key in its pre-existing CSRF header.
+SESSION_KEY_HEADER = "x-meridian-csrf"
+SESSION_KEY_DETAIL = {
+    "message": "This Studio tab has no valid key for the running Engine.",
+    "hint": "Open the address `meridian studio` printed in Terminal; it ends with #k=.",
+    "category": "user",
+}
 LOCAL_ENGINE_CSP = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -44,7 +53,13 @@ LOCAL_ENGINE_CSP = (
 
 
 class LocalEngineSecurity:
-    """Reject browser requests that do not look same-origin to this Engine."""
+    """Reject requests that are not same-origin or do not carry this launch's Studio key.
+
+    Any local user can reach 127.0.0.1, so the Host/Origin checks alone only stop
+    browsers. Every API call except the health probe must also present the
+    per-launch key that `meridian studio` hands the browser in the URL fragment;
+    the Engine never serves it.
+    """
 
     def __init__(
         self,
@@ -52,12 +67,12 @@ class LocalEngineSecurity:
         *,
         allowed_hosts: set[str],
         allowed_origins: set[str],
-        csrf_token: str,
+        session_key: str,
     ) -> None:
         self.app = app
         self.allowed_hosts = allowed_hosts
         self.allowed_origins = allowed_origins
-        self.csrf_token = csrf_token
+        self.session_key = session_key
 
     async def __call__(self, scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
         if scope["type"] != "http":
@@ -65,7 +80,6 @@ class LocalEngineSecurity:
             return
 
         headers = {key.decode("latin1").lower(): value.decode("latin1") for key, value in scope["headers"]}
-        method = str(scope["method"]).upper()
         host = headers.get("host", "")
         origin = headers.get("origin", "")
         sec_fetch_site = headers.get("sec-fetch-site", "")
@@ -79,11 +93,16 @@ class LocalEngineSecurity:
         if sec_fetch_site and sec_fetch_site not in SAFE_FETCH_SITES:
             await self._reject(scope, receive, send, 403, "Cross-site browser requests are not allowed.")
             return
-        if method in {"POST", "PUT", "PATCH", "DELETE"} and headers.get("x-meridian-csrf") != self.csrf_token:
-            await self._reject(scope, receive, send, 403, "Missing or invalid CSRF token.")
+        path = str(scope.get("path", ""))
+        if path.startswith("/api/") and path != HEALTH_PATH and not self._has_session_key(headers):
+            await self._reject(scope, receive, send, 401, SESSION_KEY_DETAIL)
             return
 
         await self.app(scope, receive, send)
+
+    def _has_session_key(self, headers: dict[str, str]) -> bool:
+        presented = headers.get(SESSION_KEY_HEADER, "")
+        return hmac.compare_digest(presented.encode("utf-8"), self.session_key.encode("utf-8"))
 
     @staticmethod
     async def _reject(
@@ -91,7 +110,7 @@ class LocalEngineSecurity:
         receive: Callable[..., Any],
         send: Callable[..., Any],
         status_code: int,
-        detail: str,
+        detail: str | dict[str, str],
     ) -> None:
         response = JSONResponse({"detail": detail}, status_code=status_code)
         await response(scope, receive, send)
@@ -102,7 +121,7 @@ def create_engine_app(
     assets_dir: Path | None,
     host: str = "127.0.0.1",
     port: int = 0,
-    csrf_token: str | None = None,
+    session_key: str,
     cluster_loader: Callable[[], ClusterConfig] = ClusterConfig.load,
     server_store_factory: Callable[[], ServerProfileStoreLike] | None = None,
     server_connection_factory: ServerConnectionFactory = default_server_connection_factory,
@@ -110,8 +129,12 @@ def create_engine_app(
     operation_manager: OperationManager | None = None,
     deploy_runner: OperationRunner = run_deploy_process,
 ) -> FastAPI:
-    """Create the localhost Engine app without starting a network listener."""
-    token = csrf_token or secrets.token_urlsafe(32)
+    """Create the localhost Engine app without starting a network listener.
+
+    *session_key* is the per-launch secret every API call except health must send.
+    """
+    if not session_key:
+        raise ValueError("The Engine needs a non-empty session key.")
     allowed_hosts = _allowed_hosts(host, port)
     allowed_origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
     manager = operation_manager or OperationManager()
@@ -125,7 +148,6 @@ def create_engine_app(
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
     # Store all injectable services on app.state for route handlers
-    app.state.csrf_token = token
     app.state.assets_dir = str(assets_dir) if assets_dir else ""
     app.state.operation_manager = manager
     app.state.cluster_loader = cluster_loader
@@ -142,7 +164,7 @@ def create_engine_app(
         LocalEngineSecurity,
         allowed_hosts=allowed_hosts,
         allowed_origins=allowed_origins,
-        csrf_token=token,
+        session_key=session_key,
     )
 
     @app.exception_handler(RequestValidationError)
@@ -170,7 +192,11 @@ def create_engine_app(
     app.include_router(router)
 
     if assets_dir is not None:
-        app.mount("/", StaticFiles(directory=assets_dir, html=True), name="studio")
+        # Serve Studio's directories only, even from a full website build.
+        app.add_api_route("/", _studio_redirect, methods=["GET"], include_in_schema=False)
+        for name in STUDIO_ASSET_ROOTS:
+            if (assets_dir / name).is_dir():
+                app.mount(f"/{name}", StaticFiles(directory=assets_dir / name, html=name == "studio"), name=name)
     else:
         app.add_api_route("/", _missing_assets_page, methods=["GET"], response_class=HTMLResponse)
         app.add_api_route("/studio/", _missing_assets_page, methods=["GET"], response_class=HTMLResponse)
@@ -181,6 +207,10 @@ def create_engine_app(
 def _allowed_hosts(host: str, port: int) -> set[str]:
     hosts = {host, "127.0.0.1", "localhost"}
     return hosts | {f"{candidate}:{port}" for candidate in hosts}
+
+
+def _studio_redirect() -> RedirectResponse:
+    return RedirectResponse("/studio/", status_code=307)
 
 
 def _missing_assets_page() -> HTMLResponse:

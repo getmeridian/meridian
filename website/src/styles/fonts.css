@@ -1,11 +1,16 @@
 /*
- * Self-hosted fonts — no external requests to Google.
- * Critical for users in censored regions where fonts.googleapis.com is blocked.
+ * Self-hosted fonts — no external requests (fonts.googleapis.com is blocked where
+ * Meridian matters most). Files are subsets of the upstream variable fonts, split by
+ * script with unicode-range so a page downloads only the scripts it shows.
+ * Sources, axes, and ranges: scripts/subset-fonts.py; licenses: /fonts/licenses/.
  *
- * Variable woff2 files cover all needed weights in a single file each.
- * Fraunces: 400/500/600 normal + 400/500 italic
- * Source Sans 3: 400/500/600
- * JetBrains Mono: 400/500
+ * Fraunces           headings (Latin; opsz 9–144, wght 400–600)
+ * Fraunces italic    the hero's accent words only (static, hard-subset to ASCII)
+ * Source Serif 4     headings in Russian (Latin + Cyrillic; Fraunces has no Cyrillic)
+ * Source Sans 3      body (Latin + Cyrillic, wght 400–700)
+ * JetBrains Mono     code (Latin + Cyrillic, wght 400–600)
+ * Vazirmatn          Farsi text (Arabic script, wght 400–700)
+ * Chinese uses the system's CJK fonts (see global.css).
  */
 
 @font-face {
@@ -13,29 +18,78 @@
   font-style: normal;
   font-weight: 400 600;
   font-display: swap;
-  src: url('/fonts/fraunces.woff2') format('woff2');
+  src: url('/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2195, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
   font-family: 'Fraunces';
   font-style: italic;
-  font-weight: 400 500;
+  font-weight: 500;
   font-display: swap;
-  src: url('/fonts/fraunces-italic.woff2') format('woff2');
+  src: url('/fonts/fraunces-italic-hero.woff2') format('woff2');
+  unicode-range: U+0020-007E, U+00A0, U+2019;
+}
+
+@font-face {
+  font-family: 'Source Serif 4';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/source-serif-4-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Source Serif 4';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/source-serif-4-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2195, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
   font-family: 'Source Sans 3';
   font-style: normal;
-  font-weight: 400 600;
+  font-weight: 400 700;
   font-display: swap;
-  src: url('/fonts/source-sans-3.woff2') format('woff2');
+  src: url('/fonts/source-sans-3-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/source-sans-3-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2195, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400 500;
+  font-weight: 400 600;
   font-display: swap;
-  src: url('/fonts/jetbrains-mono.woff2') format('woff2');
+  src: url('/fonts/jetbrains-mono-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2195, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/vazirmatn-arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FEFF;
 }

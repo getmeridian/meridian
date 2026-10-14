@@ -17,8 +17,8 @@ _CSRF = {"x-meridian-csrf": "test-csrf"}
 
 
 def _client(**kwargs: object) -> TestClient:
-    app = create_engine_app(assets_dir=None, host="127.0.0.1", port=8765, csrf_token="test-csrf", **kwargs)
-    return TestClient(app, base_url="http://127.0.0.1:8765")
+    app = create_engine_app(assets_dir=None, host="127.0.0.1", port=8765, session_key="test-csrf", **kwargs)
+    return TestClient(app, base_url="http://127.0.0.1:8765", headers=_CSRF)
 
 
 def _start(client: TestClient, ip: str = "198.51.100.10") -> str:
@@ -68,14 +68,14 @@ def _result(request: DeployRequest) -> dict[str, Any]:
     return {"schema": "meridian.deploy-operation-result/v1", "result": result.model_dump(mode="json")}
 
 
-def test_cancel_unknown_operation_is_404_and_requires_csrf() -> None:
+def test_cancel_unknown_operation_is_404_and_requires_the_session_key() -> None:
     client = _client(deploy_runner=lambda _request, _operation: {})
 
-    missing = client.post("/api/v1/operations/op-missing/cancel", json={}, headers=_CSRF)
-    no_csrf = client.post("/api/v1/operations/op-missing/cancel", json={})
+    missing = client.post("/api/v1/operations/op-missing/cancel", json={})
+    no_key = client.post("/api/v1/operations/op-missing/cancel", json={}, headers={"x-meridian-csrf": ""})
 
     assert missing.status_code == 404
-    assert no_csrf.status_code == 403
+    assert no_key.status_code == 401
 
 
 def test_cancel_between_steps_stops_the_runner_with_a_typed_cancelled_state() -> None:
@@ -216,11 +216,12 @@ def test_engine_shutdown_cancels_running_deploys_and_waits_for_a_safe_point() ->
             assets_dir=None,
             host="127.0.0.1",
             port=8765,
-            csrf_token="test-csrf",
+            session_key="test-csrf",
             operation_manager=manager,
             deploy_runner=runner,
         ),
         base_url="http://127.0.0.1:8765",
+        headers=_CSRF,
     ) as client:
         operation_id = _start(client)
         assert started.wait(5)
