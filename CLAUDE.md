@@ -74,6 +74,8 @@ website/CLAUDE.md                       — Astro + Starlight docs, agent endpoi
 ├── src/pages/blog/CLAUDE.md            — blog index, post route
 ├── src/studio/CLAUDE.md                — generated Studio contracts and adapters
 └── src/styles/CLAUDE.md                — token system, warm light-first palette
+
+video/CLAUDE.md                         — Remotion setup walkthrough from recorded, sanitized footage
 ```
 
 ## How to update CLAUDE.md

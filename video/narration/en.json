@@ -1,0 +1,58 @@
+{
+  "voice": "cjVigY5qzO86Huf0OWal",
+  "model": "eleven_v4",
+  "scenes": [
+    {
+      "id": "intro",
+      "text": "Your own VPN, on a server you rent, in about ten minutes. No VPN company in the middle, and nothing to configure by hand. This is Meridian: a free, open-source tool that sets everything up correctly, then gives you links to share with the people you care about."
+    },
+    {
+      "id": "needs",
+      "text": "You need two things. A small rented server, often called a VPS, running Debian or Ubuntu. The cheapest plan, around five dollars a month, is plenty; pick the country whose internet you want to use. And a computer with a terminal, where you can log in to that server over SSH."
+    },
+    {
+      "id": "install",
+      "text": "Install Meridian on your computer with one line from getmeridian.org. If you already use uv, it's just: uv tool install meridian-vpn."
+    },
+    {
+      "id": "server",
+      "text": "Now run meridian setup. The wizard speaks English, Russian, Persian and Chinese. Use the arrow keys and Enter; a question mark explains any step, and Escape goes back. Paste your server's IP address. Meridian connects over SSH and suggests a short name for it."
+    },
+    {
+      "id": "roles",
+      "text": "With one server, it does everything: it runs the control panel and carries your traffic. The defaults are sensible, so you can mostly press Enter. Then give your VPN a name; that's what people will see in their apps."
+    },
+    {
+      "id": "camouflage",
+      "text": "Now the clever part. Your server will pose as an ordinary website. Meridian scans the server's own network for real sites next door, because a neighbour is the most believable disguise, and puts them at the top of the list. A domain is optional; without one, everything works on the IP address."
+    },
+    {
+      "id": "users",
+      "text": "Type the names of the people who will connect, in any language. Each person gets their own link. Then review the plan, and confirm."
+    },
+    {
+      "id": "apply",
+      "text": "Meridian does the rest. It hardens the server, sets up the firewall and certificates, installs the panel and the VPN engine, and keeps every port it doesn't need closed. This takes five to ten minutes, and it's safe to interrupt: run setup again, and it picks up where it stopped. Finally, it checks that the panel, the server, and every link actually work."
+    },
+    {
+      "id": "handoff",
+      "text": "And that's it. For each person, you get a connection page and a subscription link. If you're curious, the admin panel's address is there too."
+    },
+    {
+      "id": "phone",
+      "text": "Send Mom her page. On her phone, it shows a QR code and suggests an app, like Happ. One tap imports the connection, and the app keeps it up to date by itself, so when you change something later, nobody needs a new link."
+    },
+    {
+      "id": "later",
+      "text": "Later on, add a person with meridian client add, or remove one with client remove. meridian check looks over your server, and meridian test sends real traffic through every connection, just like an app would."
+    },
+    {
+      "id": "why",
+      "text": "Why is this hard to block? To anyone watching, the connection looks like a visit to that ordinary website. And every server offers three methods: Reality, XHTTP, and Hysteria2. If one gets blocked, the app quietly switches to another."
+    },
+    {
+      "id": "outro",
+      "text": "Meridian is free and open source. Get started at getmeridian.org."
+    }
+  ]
+}

@@ -16,10 +16,10 @@ venv/
 .DS_Store
 .claude/
 
-# Node (website deps live in website/, not root)
+# Node (website/ and video/ hold their own packages; none at the root)
 node_modules/
-package.json
-package-lock.json
+/package.json
+/package-lock.json
 
 # Environment
 .env
@@ -49,3 +49,7 @@ references/
 
 # pnpm content store (created when pnpm cannot use its global store)
 .pnpm-store/
+
+# Video: rendered output and Remotion caches (narration audio and sanitized terminal JSON are tracked)
+video/out/
+video/.remotion/

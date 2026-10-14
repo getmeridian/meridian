@@ -1,0 +1,13 @@
+packages:
+  - .
+
+# Same supply-chain guardrails as website/pnpm-workspace.yaml.
+minimumReleaseAge: 10080
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+# semver 6.3.1 is a 2023 backport published after provenance-signed 7.x releases (Babel needs it).
+trustPolicyExclude:
+  - semver@6.3.1
+
+allowBuilds:
+  esbuild: true

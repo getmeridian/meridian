@@ -1,0 +1,25 @@
+{
+  "name": "meridian-video",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "studio": "remotion studio",
+    "tts": "node scripts/tts.mjs",
+    "still": "remotion still src/index.ts Setup out/still.png",
+    "render": "remotion render src/index.ts Setup out/meridian-setup.mp4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "@remotion/fonts": "4.0.534",
+    "@remotion/media": "4.0.534",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}
