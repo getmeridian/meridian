@@ -256,6 +256,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Lighter docs pages** — diagrams arrive as images that follow the light or
   dark theme instead of ~3 MB of JavaScript, and docs pages prefetch a link
   only when you point at it instead of every page in the sidebar.
+- **A lighter, readable website** — the home page is fully translated into
+  Russian, Persian, and Chinese and works without JavaScript (Tor Browser's
+  Safest mode included); choosing English sticks. Fonts download about 70%
+  less, text meets WCAG AA contrast in light and dark themes, link previews
+  load in messengers, and the blog has an RSS feed at `/blog/rss.xml`. The
+  command builder only offers commands and flags the CLI actually has.
 
 ### Security and correctness
 - **Starts with current Typer** — Typer 0.26 stopped installing Click, and a

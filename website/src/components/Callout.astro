@@ -2,74 +2,56 @@
 interface Props {
   variant?: 'note' | 'warning' | 'tip' | 'danger';
   icon?: string;
-  'data-t'?: string;
 }
 
-const { variant = 'note', icon, 'data-t': dataT } = Astro.props;
+const { variant = 'note', icon } = Astro.props;
 
 const icons: Record<string, string> = {
   note: '→',
-  warning: '⚠',
+  warning: '!',
   tip: '✓',
   danger: '✕',
 };
-
-const displayIcon = icon ?? icons[variant];
 ---
 
 <div class:list={['callout', `callout--${variant}`]}>
-  <span class="callout__icon" aria-hidden="true">{displayIcon}</span>
-  <div class="callout__content" {...(dataT ? { 'data-t': dataT } : {})}>
-    <slot />
-  </div>
+  <span class="callout__icon" aria-hidden="true">{icon ?? icons[variant]}</span>
+  <div class="callout__content"><slot /></div>
 </div>
 
 <style>
   .callout {
-    border-radius: var(--r);
-    padding: 14px 18px;
-    margin: 20px 0;
-    font-size: 0.88rem;
+    --tone: var(--ac);
+    --tone-bg: var(--ac3);
     display: flex;
-    gap: 10px;
-    line-height: 1.65;
-    border-left: 3px solid;
-  }
-  .callout--note {
-    background: var(--ac2);
-    border-left-color: var(--ac);
+    gap: 12px;
+    margin: 20px 0;
+    padding: 14px 18px;
+    border-radius: var(--r);
+    border-inline-start: 3px solid var(--tone);
+    background: var(--tone-bg);
     color: var(--t1);
+    font-size: 0.94rem;
+    line-height: 1.65;
   }
   .callout--warning {
-    background: var(--warn2);
-    border-left-color: var(--warn);
-    color: var(--t1);
+    --tone: var(--warn);
+    --tone-bg: var(--warn2);
   }
   .callout--tip {
-    background: var(--ok2);
-    border-left-color: var(--ok);
-    color: var(--t1);
+    --tone: var(--ok);
+    --tone-bg: var(--ok2);
   }
   .callout--danger {
-    background: var(--err2);
-    border-left-color: var(--err);
-    color: var(--t1);
+    --tone: var(--err);
+    --tone-bg: var(--err2);
   }
   .callout__icon {
-    font-weight: 600;
     flex-shrink: 0;
-    color: var(--t3);
+    font-weight: 700;
+    color: var(--t2);
   }
-  .callout__content { flex: 1; }
-  .callout__content :global(strong) { font-weight: 600; }
-
-  [dir="rtl"] .callout {
-    flex-direction: row-reverse;
-    border-left: none;
-    border-right: 3px solid;
+  .callout__content {
+    flex: 1;
   }
-  [dir="rtl"] .callout--note { border-right-color: var(--ac); }
-  [dir="rtl"] .callout--warning { border-right-color: var(--warn); }
-  [dir="rtl"] .callout--tip { border-right-color: var(--ok); }
-  [dir="rtl"] .callout--danger { border-right-color: var(--err); }
 </style>

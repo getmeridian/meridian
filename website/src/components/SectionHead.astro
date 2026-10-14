@@ -1,0 +1,24 @@
+---
+/**
+ * SectionHead — eyebrow label, heading, and description; the shared opening of
+ * landing sections, the blog index, and the 404 page. `desc` may hold trusted HTML.
+ */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  desc?: string;
+  level?: 1 | 2;
+  center?: boolean;
+  id?: string;
+}
+
+const { eyebrow, title, desc, level = 2, center = false, id } = Astro.props;
+const Heading = level === 1 ? 'h1' : 'h2';
+---
+
+<header class:list={['section-head', { 'section-head--center': center }]}>
+  {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+  <Heading id={id}>{title}</Heading>
+  {desc && <p class="section-head__desc" set:html={desc} />}
+  <slot />
+</header>

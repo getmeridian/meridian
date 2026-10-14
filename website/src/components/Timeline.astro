@@ -1,9 +1,8 @@
 ---
 interface Step {
   title: string;
+  /** Trusted HTML that continues the sentence after the bold title. */
   text: string;
-  titleKey?: string;
-  textKey?: string;
 }
 
 interface Props {
@@ -13,67 +12,61 @@ interface Props {
 const { steps } = Astro.props;
 ---
 
-<div class="timeline">
+<ol class="timeline">
   {steps.map((step, i) => (
-    <div class="timeline__item">
-      <div class="timeline__marker">
-        <div class="timeline__number">{i + 1}</div>
-        {i < steps.length - 1 && <div class="timeline__line"></div>}
-      </div>
-      <div class="timeline__content">
-        <strong {...(step.titleKey ? { 'data-t': step.titleKey } : {})}>{step.title}</strong>
-        <span {...(step.textKey ? { 'data-t': step.textKey } : {})} set:html={step.text} />
-      </div>
-    </div>
+    <li class="timeline__item">
+      <span class="timeline__number" aria-hidden="true">{i + 1}</span>
+      <p class="timeline__content">
+        <strong>{step.title}</strong><span set:html={step.text} />
+      </p>
+    </li>
   ))}
-</div>
+</ol>
 
 <style>
   .timeline {
-    margin: 24px 0;
+    list-style: none;
+    margin: 20px 0;
   }
   .timeline__item {
+    position: relative;
     display: flex;
     gap: 16px;
-    font-size: 0.92rem;
+    padding-bottom: 18px;
+    font-size: 0.97rem;
     line-height: 1.6;
   }
-  .timeline__marker {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex-shrink: 0;
+  /* The connecting line runs from one number to the next. */
+  .timeline__item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 13px;
+    top: 30px;
+    bottom: 2px;
+    width: 1px;
+    background: var(--b1);
   }
   .timeline__number {
-    width: 28px;
-    height: 28px;
+    flex-shrink: 0;
+    width: 27px;
+    height: 27px;
     border-radius: 50%;
-    background: var(--ac);
-    color: #fff;
+    background: var(--ac2);
+    border: 1px solid var(--ac);
+    color: var(--ac-text);
     font-family: var(--mono);
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
   }
-  .timeline__line {
-    width: 1px;
-    flex: 1;
-    background: var(--b1);
-    min-height: 16px;
-  }
   .timeline__content {
     color: var(--t2);
-    padding-bottom: 20px;
-    padding-top: 3px;
+    padding-top: 2px;
   }
   .timeline__content strong {
     color: var(--t1);
     font-weight: 600;
-  }
-
-  [dir="rtl"] .timeline__item {
-    flex-direction: row-reverse;
   }
 </style>

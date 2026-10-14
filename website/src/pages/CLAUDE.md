@@ -4,6 +4,8 @@
 
 **Docs are Starlight routes** — Starlight injects `/{locale}/{page}/`; this folder only holds `/docs/` (the stable entry that opens Getting Started in the reader's language) and the Markdown twins.
 
+**Landing and 404** — `index.astro` and `[locale]/index.astro` render `components/Landing.astro` per locale; `404.astro` is one English page whose shell text swaps to the reader's language (`src/i18n/CLAUDE.md`) and links `/docs/`, never a fixed locale.
+
 **Machine-readable endpoints** — `[...slug].md.ts` (`/{locale}/{page}.md`), `llms.txt.ts`, `llms-full.txt.ts`, `ai/reference.md.ts`, and `agents.md.ts` (the CLI's agent guide). The bundles come from `scripts/ai-docs.mjs`, the rest from `src/lib/docs-markdown.ts`.
 
 ## What's done well

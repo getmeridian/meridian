@@ -1,0 +1,233 @@
+---
+/**
+ * Landing — the home page, rendered once per locale to static HTML (`/`, `/ru/`,
+ * `/fa/`, `/zh/`). Every string comes from src/i18n/landing/<locale>.ts; no
+ * translation happens in the browser. Works fully without JavaScript.
+ */
+import Base from '../layouts/Base.astro';
+import Hero from './Hero.astro';
+import SectionHead from './SectionHead.astro';
+import CodeBlock from './CodeBlock.astro';
+import Timeline from './Timeline.astro';
+import AppGrid from './AppGrid.astro';
+import Accordion from './Accordion.astro';
+import Callout from './Callout.astro';
+import CommandBuilder from './CommandBuilder.astro';
+import ArchitectureDiagram from './ArchitectureDiagram.astro';
+import { LOCALES, LOCALE_INFO, homeOf, landingT, type LandingKey, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = landingT(locale);
+const site = Astro.site!;
+
+const steps = ([1, 2, 3, 4, 5, 6] as const).map((n) => ({
+  title: t(`step.${n}.title`),
+  text: t(`step.${n}.text`),
+}));
+const accordion = (key: string) => ({ title: t(key as LandingKey), body: t(`${key}.body` as LandingKey) });
+const tech = ['tech.dpi', 'tech.probe', 'tech.fp'].map(accordion);
+const arch = ['arch.standalone', 'arch.domain', 'arch.relay'].map(accordion);
+
+const alternates = [
+  ...LOCALES.map((l) => ({ hreflang: LOCALE_INFO[l].hreflang, href: new URL(homeOf(l), site).href })),
+  { hreflang: 'x-default', href: new URL('/', site).href },
+];
+const plain = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
+const faq = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  inLanguage: LOCALE_INFO[locale].lang,
+  mainEntity: tech.map((item) => ({
+    '@type': 'Question',
+    name: item.title,
+    acceptedAnswer: { '@type': 'Answer', text: plain(item.body.replace(/<\/p><p>/g, ' ')) },
+  })),
+};
+const organization = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Meridian',
+  url: site.href.replace(/\/$/, ''),
+  logo: new URL('/img/logo-512.png', site).href,
+  sameAs: ['https://github.com/getmeridian/meridian'],
+};
+---
+
+<Base
+  title={t('page.title')}
+  description={t('page.description')}
+  ogImageAlt={t('page.ogAlt')}
+  locale={locale}
+  alternates={alternates}
+>
+  {locale === 'en' && (
+    <script slot="early" is:inline>
+      // `/` opens the saved language, else the browser's, unless the reader chose English.
+      try {
+        var saved = localStorage.getItem('meridian-lang');
+        var lang = saved || (navigator.language || '').slice(0, 2).toLowerCase();
+        if (['ru', 'fa', 'zh'].indexOf(lang) !== -1) location.replace('/' + lang + '/' + location.hash);
+      } catch (e) {}
+    </script>
+  )}
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(organization)} />
+    <script type="application/ld+json" set:html={JSON.stringify(faq)} />
+  </Fragment>
+
+  <main id="main">
+    <Hero locale={locale} />
+
+    <section id="setup" class="section">
+      <div class="container">
+        <SectionHead eyebrow={t('setup.label')} title={t('setup.title')} desc={t('setup.desc')} />
+        <div class="setup-grid">
+          <div>
+            <CodeBlock code="curl -sSf https://getmeridian.org/install.sh | bash" label={t('setup.step1.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
+            <div class="step-separator"><span>{t('setup.then')}</span></div>
+            <CodeBlock code="meridian deploy" label={t('setup.step2.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
+            <p class="setup-hint" set:html={t('setup.hint')} />
+            <img src="/img/deploy-terminal.svg" alt={t('setup.terminalAlt')} class="deploy-terminal" loading="lazy" width="720" height="780" />
+          </div>
+          <div>
+            <h3 class="setup-details">{t('setup.details')}</h3>
+            <Timeline steps={steps} />
+            <Callout variant="tip" icon="↻">{t('setup.idempotent')}</Callout>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="builder-section" class="section section--band">
+      <div class="container">
+        <SectionHead eyebrow={t('builder.label')} title={t('builder.title')} desc={t('builder.desc')} />
+        <CommandBuilder locale={locale} />
+      </div>
+    </section>
+
+    <section id="technology" class="section">
+      <div class="container two-col">
+        <SectionHead eyebrow={t('tech.label')} title={t('tech.title')} desc={t('tech.desc')} />
+        <div>
+          {tech.map((item, i) => (
+            <Accordion title={item.title} open={i === 0}><Fragment set:html={item.body} /></Accordion>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section id="connect" class="section">
+      <div class="container">
+        <SectionHead eyebrow={t('connect.label')} title={t('connect.title')} desc={t('connect.desc')} />
+        <AppGrid note={t('connect.apps.more')} />
+        <Callout variant="warning">{t('connect.clock')}</Callout>
+      </div>
+    </section>
+
+    <section id="architecture" class="section">
+      <div class="container">
+        <SectionHead eyebrow={t('arch.label')} title={t('arch.title')} />
+        <div class="arch-grid">
+          <div class="arch-img card"><ArchitectureDiagram label={t('arch.alt')} /></div>
+          <div>
+            {arch.map((item, i) => (
+              <Accordion title={item.title} open={i === 0}><Fragment set:html={item.body} /></Accordion>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cta" class="section section--band">
+      <div class="container">
+        <SectionHead title={t('cta.title')} desc={t('cta.desc')} center>
+          <div class="btn-row cta-actions">
+            <a href="#setup" class="btn btn--primary">{t('cta.install')}</a>
+            <a href={`/${locale}/getting-started/`} class="btn btn--secondary">{t('hero.docs')}</a>
+          </div>
+        </SectionHead>
+      </div>
+    </section>
+  </main>
+</Base>
+
+<style>
+  .section--band {
+    background: var(--band);
+  }
+  .setup-grid {
+    display: grid;
+    gap: 40px;
+  }
+  .two-col,
+  .arch-grid {
+    display: grid;
+    gap: 24px 56px;
+  }
+  @media (min-width: 860px) {
+    .setup-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 56px;
+    }
+    .two-col {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      align-items: start;
+    }
+    .arch-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+
+  .step-separator {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 4px 0;
+    color: var(--t3);
+    font-family: var(--label-font);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .step-separator::before,
+  .step-separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--b1);
+  }
+  .setup-hint {
+    margin: 16px 0 28px;
+    font-size: 0.94rem;
+    color: var(--t2);
+  }
+  .deploy-terminal {
+    display: block;
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-md);
+  }
+  .setup-details {
+    font-family: var(--body);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    color: var(--t1);
+  }
+
+  .arch-img {
+    padding: 12px;
+  }
+
+  .cta-actions {
+    justify-content: center;
+    margin-top: 28px;
+  }
+</style>

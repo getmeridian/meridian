@@ -14,7 +14,9 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Diagrams render before the build** — ```mermaid blocks stay in the Markdown as source; `src/lib/diagrams.mjs` swaps each for a checked-in `src/assets/diagrams/<hash>.svg` that `node scripts/diagrams.mjs render` draws with pinned Mermaid in Chromium (`figures/render_diagrams.py`). The SVGs color themselves with `--sl-color-*` (docs) or `tokens.css` (blog) variables, so one file fits both themes; no diagram JavaScript reaches readers.
 
-**i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
+**i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; the landing is static HTML per locale and the blog and 404 swap only the shell (`src/i18n/CLAUDE.md`).
+
+**One look** — landing, blog, and docs share tokens, type, header, and buttons; `src/styles/CLAUDE.md` owns the system and `starlight.css` carries it into the docs.
 
 **Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript (literal absolute-URL loads), and both workflows rerun it after the PWA demo joins `dist`.
 
@@ -29,7 +31,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 ## Pitfalls
 
-- **Theme and language cross the docs boundary** — landing uses `meridian-theme`/`meridian-lang`, Starlight `starlight-theme`; ThemeToggle writes both and a Starlight head script copies them, or switching sections flips the theme.
+- **Theme and language cross the docs boundary** — landing uses `meridian-theme`/`meridian-lang`, Starlight `starlight-theme`; ThemeToggle writes both (on click only) and a Starlight head script copies them, or switching sections flips the theme.
 - **Astro builds every `.md` under `src/pages`** — the `drop-contributor-notes` integration deletes the `/CLAUDE/` pages that folder notes produce.
 - **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, studio) are excluded because Starlight can't see them.
 - **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).

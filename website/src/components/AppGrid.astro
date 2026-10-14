@@ -5,10 +5,10 @@
  * CI validates these links match the PWA app metadata in render.py.
  */
 import appsData from '../data/apps.json';
-import { createT } from '../i18n/t';
 
 interface Props {
-  locale?: string;
+  /** Trusted HTML shown under the grid. */
+  note: string;
 }
 
 interface App {
@@ -18,66 +18,56 @@ interface App {
   recommended?: string[];
 }
 
-const { locale = 'en' } = Astro.props;
-const t = createT(locale);
+const { note } = Astro.props;
 const apps: App[] = (appsData as App[]).filter((app) => (app.recommended ?? []).length > 0);
 ---
 
 <div class="app-grid">
   {apps.map((app) => (
-    <a class="app-grid__item" href={app.url} target="_blank" rel="noopener">
+    <a class="app-grid__item card" href={app.url} rel="noopener">
       <span class="app-grid__name">{app.name}</span>
       <span class="app-grid__platform">{app.platform}</span>
     </a>
   ))}
 </div>
-<p class="app-grid__note" data-t="connect.apps.more" set:html={t('connect.apps.more', 'Connection pages list these apps first and link others for each platform. <a href="/demo/" data-astro-prefetch>See the demo</a>.')} />
+<p class="app-grid__note" set:html={note} />
 
 <style>
   .app-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 16px 0;
+    gap: 12px;
+    margin: 0 0 14px;
   }
   .app-grid__item {
-    background: var(--s1);
-    border: 1px solid var(--b1);
-    border-radius: var(--r);
-    padding: 16px 12px;
+    padding: 18px 12px;
     text-align: center;
-    text-decoration: none;
     color: var(--t1);
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s, border-color 0.15s;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+    border-radius: var(--r);
   }
   .app-grid__item:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--b2);
     color: var(--t1);
   }
   .app-grid__name {
-    font-size: 0.88rem;
+    font-size: 0.97rem;
     font-weight: 600;
   }
   .app-grid__platform {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     color: var(--t3);
     font-family: var(--mono);
   }
   .app-grid__note {
-    font-size: 0.85rem;
-    color: var(--t3);
-    margin: 0 0 16px;
-  }
-  .app-grid__note a {
-    color: var(--ac);
+    font-size: 0.92rem;
+    color: var(--t2);
   }
 
-  @media (max-width: 540px) {
-    .app-grid { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 560px) {
+    .app-grid {
+      grid-template-columns: 1fr 1fr;
+    }
   }
 </style>

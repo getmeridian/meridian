@@ -1,0 +1,105 @@
+---
+/**
+ * The standalone-server diagram, inline so it takes the page's tokens and follows
+ * the theme (light, dark, or the reader's override) without a second image.
+ */
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
+---
+
+<svg class="arch" viewBox="0 0 800 470" role="img" aria-label={label} xmlns="http://www.w3.org/2000/svg">
+  <title>{label}</title>
+  <defs>
+    <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" class="arch__head" />
+    </marker>
+  </defs>
+
+  <circle cx="400" cy="45" r="36" class="arch__node" />
+  <text x="400" y="50" text-anchor="middle" class="arch__label">Internet</text>
+
+  <rect x="275" y="120" width="250" height="40" rx="8" class="arch__node arch__node--accent" />
+  <text x="400" y="145" text-anchor="middle" class="arch__label">nginx stream — SNI router</text>
+  <line x1="400" y1="81" x2="400" y2="120" class="arch__edge" />
+  <text x="410" y="105" class="arch__edge-label">TCP 443</text>
+
+  <rect x="565" y="120" width="190" height="40" rx="8" class="arch__node" />
+  <text x="660" y="145" text-anchor="middle" class="arch__label">Xray Hysteria2</text>
+  <path d="M 432 60 L 590 120" class="arch__edge arch__edge--dashed" />
+  <text x="520" y="78" class="arch__edge-label">UDP 443 (salamander)</text>
+
+  <rect x="80" y="230" width="200" height="40" rx="8" class="arch__node" />
+  <text x="180" y="255" text-anchor="middle" class="arch__label">Xray Reality</text>
+
+  <rect x="520" y="230" width="200" height="40" rx="8" class="arch__node arch__node--accent" />
+  <text x="620" y="255" text-anchor="middle" class="arch__label">nginx http :8443</text>
+
+  <path d="M 330 160 L 180 230" class="arch__edge" />
+  <text x="212" y="190" class="arch__edge-label">SNI = camouflage</text>
+  <path d="M 470 160 L 620 230" class="arch__edge" />
+  <text x="568" y="190" class="arch__edge-label">no SNI / server IP</text>
+
+  <rect x="420" y="330" width="170" height="36" rx="8" class="arch__node" />
+  <text x="505" y="353" text-anchor="middle" class="arch__label">Connection pages</text>
+  <rect x="610" y="330" width="140" height="36" rx="8" class="arch__node" />
+  <text x="680" y="353" text-anchor="middle" class="arch__label">Remnawave panel</text>
+  <rect x="420" y="400" width="170" height="36" rx="8" class="arch__node" />
+  <text x="505" y="423" text-anchor="middle" class="arch__label">Xray XHTTP</text>
+  <rect x="610" y="400" width="140" height="36" rx="8" class="arch__node" />
+  <text x="680" y="423" text-anchor="middle" class="arch__label">Xray WSS</text>
+
+  <line x1="580" y1="270" x2="505" y2="330" class="arch__edge" />
+  <line x1="660" y1="270" x2="680" y2="330" class="arch__edge" />
+  <path d="M 530 270 L 400 300 L 400 418 L 420 418" class="arch__edge" />
+  <path d="M 715 270 L 775 300 L 775 418 L 750 418" class="arch__edge arch__edge--dashed" />
+  <text x="784" y="318" class="arch__edge-label" transform="rotate(90 784 318)">domain mode</text>
+
+  <rect x="80" y="330" width="200" height="36" rx="8" class="arch__node" />
+  <text x="180" y="353" text-anchor="middle" class="arch__label">nginx ACME</text>
+  <path d="M 368 65 Q 60 65 60 340 L 80 348" class="arch__edge" />
+  <text x="42" y="200" class="arch__edge-label" transform="rotate(-90 42 200)">TCP 80</text>
+</svg>
+
+<style>
+  .arch {
+    display: block;
+    width: 100%;
+    height: auto;
+    direction: ltr;
+    font-family: var(--body);
+  }
+  .arch__node {
+    fill: var(--s1);
+    stroke: var(--b2);
+    stroke-width: 1.5;
+  }
+  .arch__node--accent {
+    fill: var(--ac3);
+    stroke: var(--ac);
+  }
+  .arch__label {
+    fill: var(--t1);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .arch__edge-label {
+    fill: var(--t2);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .arch__edge {
+    fill: none;
+    stroke: var(--t3);
+    stroke-width: 1.5;
+    marker-end: url(#arch-arrow);
+  }
+  .arch__edge--dashed {
+    stroke-dasharray: 6 4;
+  }
+  .arch__head {
+    fill: var(--t3);
+  }
+</style>

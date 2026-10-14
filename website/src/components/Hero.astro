@@ -1,167 +1,94 @@
 ---
 /**
- * Hero — warm editorial. Benefits-first messaging.
- * "Share secure internet with your family" > "Deploy VLESS+Reality"
+ * Hero — benefits first: "share secure internet" before "deploy VLESS+Reality".
  */
-import { createT } from '../i18n/t';
+import { landingT, type Locale } from '../i18n';
 
 interface Props {
-  locale?: string;
+  locale: Locale;
 }
 
-const { locale = 'en' } = Astro.props;
-const t = createT(locale);
+const { locale } = Astro.props;
+const t = landingT(locale);
 ---
 
 <section class="hero">
-  <div class="container hero__content">
-    <p class="hero__kicker" data-t="hero.kicker">{t('hero.kicker', 'Open-source internet freedom tool')}</p>
-
-    <h1 class="hero__title" data-t="hero.title" set:html={t('hero.title', 'Share <em>secure internet</em> with the people you&nbsp;care&nbsp;about')} />
-
-    <p class="hero__sub" data-t="hero.sub">{t('hero.sub', 'One command sets up a proxy server that is hard to tell apart from ordinary HTTPS, with the firewall, TLS, and routing configured for you. Share access with a link or QR\u00a0code.')}</p>
-
-    <div class="hero__actions">
-      <a href="#setup" class="hero__btn hero__btn--primary" data-t="hero.cta">{t('hero.cta', 'Get started')}</a>
-      <a href={`/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
-        {t('hero.docs', 'Read the docs')}
-      </a>
-    </div>
-  </div>
-
   <div class="container">
-    <div class="hero__preview-wrap">
-      <a href="/demo/" class="hero__preview" data-astro-prefetch>
-        <img
-          src="/img/connection-page.png"
-          alt="Connection page — what your friends receive"
-          loading="eager"
-          width="1200"
-          height="855"
-        />
-      </a>
-      <p class="hero__caption" data-t="hero.caption" set:html={t('hero.caption', 'What your friends receive — <a href="/demo/" data-astro-prefetch>see the demo</a>')} />
+    <div class="hero__content">
+      <p class="eyebrow">{t('hero.kicker')}</p>
+      <h1 class="hero__title" set:html={t('hero.title')} />
+      <p class="hero__sub">{t('hero.sub')}</p>
+      <div class="btn-row">
+        <a href="#setup" class="btn btn--primary">{t('hero.cta')}</a>
+        <a href={`/${locale}/getting-started/`} class="btn btn--secondary">{t('hero.docs')}</a>
+      </div>
     </div>
+
+    <figure class="hero__preview">
+      <a href="/demo/" class="hero__frame">
+        <img src="/img/connection-page.png" alt={t('hero.previewAlt')} width="1200" height="855" fetchpriority="high" />
+      </a>
+      <figcaption set:html={t('hero.caption')} />
+    </figure>
   </div>
 </section>
 
 <style>
   .hero {
-    padding: calc(56px + 48px) 0 40px;
+    padding: clamp(40px, 7vw, 80px) 0 var(--section-y);
+    background:
+      radial-gradient(60% 50% at 50% 100%, var(--ac3), transparent 70%),
+      linear-gradient(var(--bg), var(--band));
+    border-bottom: 1px solid var(--b1);
   }
-
   .hero__content {
-    max-width: 640px;
-    margin-bottom: 48px;
+    max-width: 680px;
+    margin-bottom: clamp(36px, 6vw, 56px);
   }
-
-  .hero__kicker {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ac);
-    margin-bottom: 20px;
-  }
-
   .hero__title {
     margin-bottom: 20px;
   }
-
-  .hero__title em {
+  .hero__title :global(em) {
     font-style: italic;
-    color: var(--ac);
+    font-weight: 500;
+    color: var(--ac-text);
   }
-
+  /* The italic face covers Latin only; other scripts keep upright accent words. */
+  :global(:is(:lang(ru), :lang(fa), :lang(zh))) .hero__title :global(em) {
+    font-style: normal;
+  }
   .hero__sub {
-    font-size: 1.1rem;
+    font-size: clamp(1.06rem, 1.6vw, 1.18rem);
     color: var(--t2);
-    max-width: 520px;
+    max-width: 580px;
     margin-bottom: 32px;
     line-height: 1.7;
   }
-
-  .hero__actions {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-
-  .hero__btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 28px;
-    border-radius: var(--r);
-    font-family: var(--body);
-    font-size: 0.92rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.15s;
-  }
-
-  .hero__btn--primary {
-    background: var(--ac);
-    color: #fff;
-  }
-  .hero__btn--primary:hover {
-    background: var(--ac-hover);
-    color: #fff;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .hero__btn--secondary {
-    background: var(--s1);
-    color: var(--t1);
-    border: 1px solid var(--b1);
-  }
-  .hero__btn--secondary:hover {
-    border-color: var(--b2);
-    background: var(--s2);
-    color: var(--t1);
-  }
-
-  .hero__preview-wrap {
-    max-width: 720px;
+  .hero__preview {
+    max-width: 820px;
     margin: 0 auto;
   }
-
-  .hero__preview {
+  .hero__frame {
     display: block;
     border-radius: var(--r2);
     overflow: hidden;
     border: 1px solid var(--b1);
     box-shadow: var(--shadow-lg);
-    transition: box-shadow 0.2s, border-color 0.2s;
+    transition: border-color 0.2s, transform 0.2s;
   }
-  .hero__preview:hover {
+  .hero__frame:hover {
     border-color: var(--b2);
-    box-shadow: 0 8px 32px rgba(26, 29, 46, 0.1);
+    transform: translateY(-2px);
   }
-  .hero__preview img {
+  .hero__frame img {
     display: block;
     width: 100%;
     height: auto;
   }
-
-  .hero__caption {
+  .hero__preview figcaption {
     text-align: center;
-    font-size: 0.8rem;
-    color: var(--t3);
-    margin-top: 12px;
-  }
-  .hero__caption a {
-    color: var(--ac);
-  }
-
-  @media (max-width: 640px) {
-    .hero {
-      padding-top: calc(56px + 32px);
-    }
-    .hero__content {
-      margin-bottom: 36px;
-    }
+    font-size: 0.88rem;
+    color: var(--t2);
+    margin-top: 14px;
   }
 </style>

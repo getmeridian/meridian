@@ -65,7 +65,7 @@ export default defineConfig({
       title: 'Meridian',
       description: 'Deploy censorship-resistant proxy servers with one command, hardened by default.',
       logo: { src: './src/assets/logo.png', alt: '' },
-      favicon: '/img/favicon-32.png',
+      favicon: '/favicon.svg',
       defaultLocale: 'en',
       locales: {
         en: { label: 'English', lang: 'en' },
@@ -114,6 +114,11 @@ export default defineConfig({
   ],
   build: {
     format: 'directory',
+  },
+  vite: {
+    // tokens.css writes colors as light-dark(); Lightning CSS lowers it (and other
+    // newer syntax) for browsers older than these, e.g. Safari on iOS 16.
+    build: { cssTarget: ['chrome107', 'edge107', 'firefox104', 'safari16'] },
   },
   // Prefetch a page only when the reader points at its link; 'viewport' downloaded every
   // sidebar page on each visit, which costs real money on metered connections.

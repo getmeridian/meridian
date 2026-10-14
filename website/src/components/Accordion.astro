@@ -1,17 +1,16 @@
 ---
 interface Props {
   title: string;
-  titleKey?: string;
   open?: boolean;
 }
 
-const { title, titleKey, open = false } = Astro.props;
+const { title, open = false } = Astro.props;
 ---
 
-<details class="accordion" open={open || undefined}>
+<details class="accordion card" open={open || undefined}>
   <summary class="accordion__trigger">
-    <span class="accordion__title" {...(titleKey ? { 'data-t': titleKey } : {})}>{title}</span>
-    <svg class="accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <span>{title}</span>
+    <svg class="accordion__chevron" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 9 12 15 18 9"></polyline>
     </svg>
   </summary>
@@ -22,21 +21,16 @@ const { title, titleKey, open = false } = Astro.props;
 
 <style>
   .accordion {
-    background: var(--s1);
-    border: 1px solid var(--b1);
     border-radius: var(--r);
-    margin: 10px 0;
     overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s;
   }
-  .accordion:hover {
-    box-shadow: var(--shadow-md);
+  .accordion + .accordion {
+    margin-top: 10px;
   }
   .accordion__trigger {
     padding: 16px 20px;
     cursor: pointer;
-    font-size: 0.92rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--t1);
     list-style: none;
@@ -44,35 +38,33 @@ const { title, titleKey, open = false } = Astro.props;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    transition: background 0.1s;
     user-select: none;
   }
-  .accordion__trigger::-webkit-details-marker { display: none; }
-  .accordion__trigger:hover { background: var(--s2); }
+  .accordion__trigger::-webkit-details-marker {
+    display: none;
+  }
+  .accordion__trigger:hover {
+    background: var(--s2);
+  }
   .accordion__chevron {
     color: var(--t3);
     flex-shrink: 0;
     transition: transform 0.2s ease;
   }
-  .accordion[open] .accordion__chevron { transform: rotate(180deg); }
+  .accordion[open] .accordion__chevron {
+    transform: rotate(180deg);
+  }
   .accordion__content {
     padding: 0 20px 20px;
-    font-size: 0.92rem;
+    font-size: 0.97rem;
     color: var(--t2);
     line-height: 1.75;
   }
-  .accordion__content :global(p) { margin-bottom: 12px; }
-  .accordion__content :global(p:last-child) { margin-bottom: 0; }
-  .accordion__content :global(strong) { color: var(--t1); font-weight: 600; }
-  .accordion__content :global(code) {
-    font-family: var(--mono);
-    font-size: 0.84rem;
-    background: var(--s2);
-    padding: 2px 6px;
-    border-radius: 4px;
+  .accordion__content :global(p + p) {
+    margin-top: 12px;
   }
-  .accordion__content :global(a) { color: var(--ac); }
-  .accordion__content :global(em) { font-style: italic; color: var(--t1); }
-
-  [dir="rtl"] .accordion__trigger { flex-direction: row-reverse; }
+  .accordion__content :global(strong) {
+    color: var(--t1);
+    font-weight: 600;
+  }
 </style>

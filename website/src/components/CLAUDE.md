@@ -2,22 +2,25 @@
 
 ## Design decisions
 
-**Stateless + presentational** — most components take props and render HTML. Interactivity is minimal vanilla JS (`is:inline`). No framework state.
+**Stateless + presentational** — components take props (strings already translated by the page) and render HTML; interactivity is small vanilla scripts, and everything reads without JavaScript.
 
-**Translatable text carries `data-t`** — see `src/i18n/CLAUDE.md`.
+**One landing** — `Landing.astro` renders the home page for any `locale`; `pages/index.astro` and `pages/[locale]/index.astro` only pass it.
 
-**Copy-to-clipboard pattern** — `CopyButton.astro` (used by `CodeBlock`) tries the Clipboard API, falls back to `execCommand`, and signals state with a `[data-copied]` attribute.
+**Shared pieces** — `Nav` mirrors Starlight's header (height, logo, link style) and uses a `<details>` mobile menu; `LanguagePicker` is plain links; `SectionHead`, `.btn`, `.card`, `.pill` (global.css) open and style every section; `Footer` is the one footer; `blog/` holds `BlogCard`, `BlogListing`, and the post helpers.
 
-**Fast animations, always visible** — transitions feel instant (most under 100ms; decorative transforms may run longer); never hide interactive elements behind hover, which is for feedback only.
+**Copy-to-clipboard** — `copy.ts` is the one implementation (Clipboard API, `execCommand` fallback, `[data-copied]`), used by `CopyButton` and the command builder; Markdown code blocks get Expressive Code's button.
 
-**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`, the layout for build-rendered diagrams; it ships no script). Wrap Starlight's default component instead of copying it.
+**Theme-following figures** — `ArchitectureDiagram` is inline SVG drawn with tokens, so it follows light, dark, and the reader's override.
+
+**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`, the layout for build-rendered diagrams; it ships no script). Wrap Starlight's default component instead of copying it; visual alignment with the site lives in `src/styles/starlight.css`.
 
 ## What's done well
 
-- **RTL-aware** — Callout border flips, Timeline reverses, code blocks force LTR via `unicode-bidi: embed`.
-- **CommandBuilder** — one config object per tab drives both the UI and the command string; choices persist in localStorage.
+- **CommandBuilder can't drift** — tabs, commands, and flags live in `src/data/command-builder.json`; `tests/test_website_command_builder.py` checks them against the live CLI and the palettes against `PAGE_PALETTES`. Its script gets only the current locale's strings; values are shell-quoted.
+- **Fast animations, always visible** — no scroll-reveal or hover-only controls; the theme toggle stays hidden until its script runs.
 
 ## Pitfalls
 
-- **CommandBuilder localStorage has no schema versioning** — field renames break saved state silently.
-- **BEM naming** — components use `block__element` classes (`nav__inner`, `accordion__trigger`); new ones follow suit.
+- **Bump the builder's storage key** (`meridian-builder-v2`) when field ids change; it writes only after the reader edits something.
+- **BEM naming** — `block__element` classes (`nav__inner`, `builder__tab`); new components follow suit.
+- **Use logical properties for direction** — a `row-reverse` under `dir="rtl"` flips the layout back to LTR.

@@ -1,54 +1,82 @@
 ---
+/**
+ * Site header — mirrors Starlight's docs header (height, logo, link style) so moving
+ * between landing, blog, and docs feels like one site. Works without JavaScript:
+ * language links are plain links and the mobile menu is a <details> element.
+ */
+import { Image } from 'astro:assets';
+import logo from '../assets/logo.png';
 import LanguagePicker from './LanguagePicker.astro';
 import ThemeToggle from './ThemeToggle.astro';
+import { homeOf, shellT, type Locale } from '../i18n';
+
+interface Props {
+  locale: Locale;
+  /** The page exists in every locale, so links can point at this locale directly. */
+  localized: boolean;
+}
+
+const { locale, localized } = Astro.props;
+const t = shellT(locale);
+const docsHref = localized ? `/${locale}/getting-started/` : '/docs/';
+const current = Astro.url.pathname;
+const links = [
+  { href: docsHref, key: 'nav.docs' as const, docs: true, active: false },
+  { href: '/blog/', key: 'nav.blog' as const, docs: false, active: current.startsWith('/blog/') },
+  { href: '/demo/', key: 'nav.demo' as const, docs: false, active: false },
+];
+const github = 'https://github.com/getmeridian/meridian';
 ---
 
-<nav class="nav" aria-label="Main navigation">
+<header class="nav" data-i18n-scope>
   <div class="nav__inner">
-    <a href="/" class="nav__logo" aria-label="Meridian home">
-      <img src="/img/favicon-32.png" alt="" width="22" height="22" />
+    <a href={homeOf(locale)} class="nav__logo" aria-label={t('nav.home')} data-t-label="nav.home">
+      <Image src={logo} alt="" width={56} height={56} loading="eager" />
       <span>Meridian</span>
     </a>
 
-    <div class="nav__links" id="nav-links">
-      <a href="/docs/" data-astro-prefetch data-t="nav.docs">Docs</a>
-      <a href="/blog/" data-astro-prefetch data-t="nav.blog">Blog</a>
-      <a href="/demo/" data-astro-prefetch data-t="nav.demo">Demo</a>
-      <a href="/ping/" data-astro-prefetch data-t="nav.ping">Ping</a>
-      <LanguagePicker />
-      <ThemeToggle />
-      <a href="https://github.com/getmeridian/meridian" target="_blank" rel="noopener" class="nav__gh" aria-label="GitHub">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <nav class="nav__links" aria-label={t('nav.main')} data-t-label="nav.main">
+      {links.map((link) => (
+        <a href={link.href} data-t={link.key} data-docs-link={link.docs ? '' : undefined} aria-current={link.active ? 'page' : undefined}>
+          {t(link.key)}
+        </a>
+      ))}
+    </nav>
+
+    <div class="nav__tools">
+      <div class="nav__lang"><LanguagePicker locale={locale} label={t('nav.language')} /></div>
+      <ThemeToggle label={t('nav.theme')} />
+      <a href={github} class="nav__icon nav__gh" aria-label="GitHub">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
         </svg>
       </a>
-    </div>
 
-    <button class="nav__burger" id="nav-burger" aria-label="Toggle menu" aria-expanded="false">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <line class="nav__burger-top" x1="3" y1="6" x2="21" y2="6" />
-        <line class="nav__burger-mid" x1="3" y1="12" x2="21" y2="12" />
-        <line class="nav__burger-bot" x1="3" y1="18" x2="21" y2="18" />
-      </svg>
-    </button>
+      <details class="nav__menu">
+        <summary class="nav__icon" aria-label={t('nav.menu')} data-t-label="nav.menu">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </summary>
+        <div class="nav__panel">
+          {links.map((link) => (
+            <a href={link.href} data-t={link.key} data-docs-link={link.docs ? '' : undefined}>{t(link.key)}</a>
+          ))}
+          <a href={github}>GitHub</a>
+          <LanguagePicker locale={locale} label={t('nav.language')} />
+        </div>
+      </details>
+    </div>
   </div>
-</nav>
+</header>
 
 <script is:inline>
-  (function() {
-    var burger = document.getElementById('nav-burger');
-    var links = document.getElementById('nav-links');
-    if (!burger || !links) return;
-    burger.addEventListener('click', function() {
-      var open = links.classList.toggle('nav__links--open');
-      burger.setAttribute('aria-expanded', String(open));
-    });
-    // Close on link click
-    links.querySelectorAll('a').forEach(function(a) {
-      a.addEventListener('click', function() {
-        links.classList.remove('nav__links--open');
-        burger.setAttribute('aria-expanded', 'false');
-      });
+  // Close the mobile menu after choosing a link or tapping elsewhere.
+  (function () {
+    var menu = document.querySelector('.nav__menu');
+    if (!menu) return;
+    document.addEventListener('click', function (e) {
+      if (menu.open && (!menu.contains(e.target) || (e.target instanceof Element && e.target.closest('.nav__panel a')))) menu.open = false;
     });
   })();
 </script>
@@ -58,99 +86,131 @@ import ThemeToggle from './ThemeToggle.astro';
     position: sticky;
     top: 0;
     z-index: 100;
-    padding: 0 24px;
-    background: var(--bg);
+    height: var(--nav-h);
+    padding: 0 var(--gutter);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
     border-bottom: 1px solid var(--b1);
   }
+  @supports not (background: color-mix(in srgb, red 50%, transparent)) {
+    .nav {
+      background: var(--bg);
+    }
+  }
   .nav__inner {
-    max-width: 960px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 56px;
-  }
-  .nav__logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-family: var(--heading);
-    font-size: 1.15rem;
-    font-weight: 500;
-    color: var(--t1);
-    text-decoration: none;
-  }
-  .nav__logo:hover {
-    color: var(--ac);
-  }
-  .nav__logo img {
-    border-radius: 4px;
-  }
-  .nav__links {
+    height: 100%;
     display: flex;
     align-items: center;
     gap: 28px;
   }
-  .nav__links a {
-    font-size: 0.88rem;
-    font-weight: 500;
-    color: var(--t2);
-    text-decoration: none;
-    transition: color 0.12s;
-  }
-  .nav__links a:hover {
+  .nav__logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--heading);
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: var(--heading-tracking);
     color: var(--t1);
   }
-  .nav__gh {
+  .nav__logo:hover {
+    color: var(--t1);
+  }
+  .nav__logo img {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
+  .nav__links {
     display: flex;
     align-items: center;
-    color: var(--t3);
-    transition: color 0.12s;
+    gap: 22px;
+    margin-inline-start: auto;
   }
-  .nav__gh:hover {
+  .nav__links a {
+    font-size: 0.94rem;
+    font-weight: 500;
+    color: var(--t2);
+  }
+  .nav__links a:hover,
+  .nav__links a[aria-current='page'] {
     color: var(--t1);
   }
-
-  /* Hamburger — hidden on desktop */
-  .nav__burger {
-    display: none;
-    background: none;
-    border: none;
+  .nav__tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-inline-start: 20px;
+    border-inline-start: 1px solid var(--b1);
+  }
+  .nav__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r);
     color: var(--t2);
     cursor: pointer;
-    padding: 4px;
+  }
+  .nav__icon:hover {
+    color: var(--t1);
+    background: var(--s2);
   }
 
-  @media (max-width: 640px) {
-    .nav__burger { display: flex; }
-    .nav__links {
+  .nav__menu {
+    display: none;
+    position: relative;
+  }
+  .nav__menu summary {
+    list-style: none;
+  }
+  .nav__menu summary::-webkit-details-marker {
+    display: none;
+  }
+  .nav__panel {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 10px);
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+    background: var(--s1);
+    border: 1px solid var(--b1);
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-lg);
+  }
+  .nav__panel > a {
+    padding: 10px 12px;
+    border-radius: var(--r);
+    color: var(--t1);
+    font-weight: 500;
+  }
+  .nav__panel > a:hover {
+    background: var(--s2);
+  }
+  .nav__panel :global(.lang-picker) {
+    margin: 8px 4px 4px;
+    align-self: flex-start;
+  }
+
+  @media (max-width: 720px) {
+    .nav__links,
+    .nav__lang,
+    .nav__gh {
       display: none;
-      position: absolute;
-      top: 56px;
-      left: 0;
-      right: 0;
-      background: var(--bg);
-      border-bottom: 1px solid var(--b1);
-      flex-direction: column;
-      align-items: stretch;
-      padding: 12px 24px 16px;
-      gap: 0;
-      box-shadow: var(--shadow-md);
     }
-    .nav__links--open { display: flex; }
-    .nav__links a {
-      padding: 10px 0;
-      font-size: 0.92rem;
-      border-bottom: 1px solid var(--b1);
+    .nav__tools {
+      margin-inline-start: auto;
+      padding: 0;
+      border: none;
+      gap: 4px;
     }
-    .nav__links a:last-child { border-bottom: none; }
-    .nav__links .lang-picker {
-      align-self: center;
-      margin-top: 8px;
-    }
-    .nav__links .nav__gh {
-      padding: 10px 0;
-      border-bottom: none;
+    .nav__menu {
+      display: block;
     }
   }
 </style>
