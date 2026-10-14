@@ -130,12 +130,13 @@ class Prompter:
         if hint:
             self.explain(hint)
         yes, no = primary_word("word.yes"), primary_word("word.no")
-        answer = self.ask(f"{label} [{yes}/{no}]", default=yes if default else no).lower()
-        if answer in words("word.yes"):
-            return True
-        if answer in words("word.no"):
-            return False
-        raise ValueError(t("error.yes_no", yes=yes, no=no))
+        while True:
+            answer = self.ask(f"{label} [{yes}/{no}]", default=yes if default else no).lower()
+            if answer in words("word.yes"):
+                return True
+            if answer in words("word.no"):
+                return False
+            self.say(t("error.yes_no", yes=yes, no=no), style="error")
 
     def numbers(self, label: str, count: int, *, default: str = "", allow_all: bool = False) -> list[int]:
         answer = self.ask(label, default=default)

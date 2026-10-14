@@ -10,6 +10,11 @@
   "picker.other": "Something else (type it)",
   "picker.none_checked": "Check at least one with Space.",
   "wizard.saved": "Progress saved. Run `meridian setup` to continue.",
+  "wizard.error_next": "This step can't continue. What next?",
+  "wizard.error_back": "Go back to {stage} and change it",
+  "wizard.error_retry": "Try this step again",
+  "wizard.error_save": "Save and quit",
+  "wizard.error_hint": "Fix the setup answers with `meridian setup` (without --yes), or correct the intent file.",
   "stage.servers": "Servers",
   "stage.roles": "What each server does",
   "stage.paths": "Connection methods",
@@ -134,5 +139,6 @@
   "error.number_twice": "Choose each number only once.",
   "error.address_required": "Enter the server's address, or 'local' for this machine.",
   "error.users_required": "Enter at least one name.",
+  "error.users_twice": "Each name must be different, even ignoring capital letters.",
   "error.need_exit": "At least one server must be an exit."
 }

@@ -10,6 +10,11 @@
   "picker.other": "مورد دیگر (تایپ کنید)",
   "picker.none_checked": "دست‌کم یک مورد را با Space علامت بزنید.",
   "wizard.saved": "پیشرفت ذخیره شد. برای ادامه `meridian setup` را اجرا کنید.",
+  "wizard.error_next": "این مرحله نمی‌تواند ادامه پیدا کند. حالا چه کنیم؟",
+  "wizard.error_back": "بازگشت به «{stage}» و تغییر آن",
+  "wizard.error_retry": "تلاش دوباره برای این مرحله",
+  "wizard.error_save": "ذخیره و خروج",
+  "wizard.error_hint": "پاسخ‌های راه‌اندازی را با `meridian setup` (بدون --yes) اصلاح کنید یا فایل intent را درست کنید.",
   "stage.servers": "سرورها",
   "stage.roles": "وظیفه هر سرور",
   "stage.paths": "روش‌های اتصال",
@@ -134,5 +139,6 @@
   "error.number_twice": "هر شماره را فقط یک بار انتخاب کنید.",
   "error.address_required": "آدرس سرور یا 'local' برای این دستگاه را وارد کنید.",
   "error.users_required": "دست‌کم یک نام وارد کنید.",
+  "error.users_twice": "هر نام باید متفاوت باشد، حتی اگر فقط در بزرگی و کوچکی حروف فرق داشته باشند.",
   "error.need_exit": "حداقل یک سرور باید خروجی باشد."
 }

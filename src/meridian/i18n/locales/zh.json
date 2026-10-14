@@ -10,6 +10,11 @@
   "picker.other": "其他（手动输入）",
   "picker.none_checked": "请用 Space 至少勾选一项。",
   "wizard.saved": "进度已保存。运行 `meridian setup` 继续。",
+  "wizard.error_next": "这一步无法继续。接下来怎么做？",
+  "wizard.error_back": "返回“{stage}”并修改",
+  "wizard.error_retry": "重试这一步",
+  "wizard.error_save": "保存并退出",
+  "wizard.error_hint": "请用 `meridian setup`（不带 --yes）修正设置答案，或修改 intent 文件。",
   "stage.servers": "服务器",
   "stage.roles": "每台服务器的作用",
   "stage.paths": "连接方法",
@@ -134,5 +139,6 @@
   "error.number_twice": "每个号码只选择一次。",
   "error.address_required": "输入服务器地址或 'local' 表示此机器。",
   "error.users_required": "请至少输入一个名称。",
+  "error.users_twice": "名称不能重复（大小写不同也算重复）。",
   "error.need_exit": "至少一台服务器必须是出口。"
 }

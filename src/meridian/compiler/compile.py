@@ -373,7 +373,7 @@ def compile_topology(
     user_dependencies = [squad_id, *([external_squad_id] if external_squad_id else [])]
     user_ids = [
         builder.add(
-            f"user:{username}",
+            f"user:{username.lower()}",  # logical IDs are lowercase; AccessIntent refuses case-only twins
             AccessUserPayload(
                 username=username,
                 squad_ref=squad_id,

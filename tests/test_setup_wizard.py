@@ -23,6 +23,7 @@ from meridian.setup.runtime import (
 )
 from meridian.setup.service import SetupDraftService
 from meridian.setup.shelf import ServerShelf
+from tests.support.topology import single_exit_intent
 
 
 class _ScriptedIO:
@@ -574,3 +575,60 @@ def test_terminal_pickers_check_servers_and_offer_probed_and_typed_camouflage_si
     draft = store.load()
     assert draft is not None and draft.paths is not None
     assert draft.paths.exits[0].paths[0].reality_sni == "www.example.org"
+
+
+class _FailingReview(_Runtime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reviews = 0
+
+    def review(self, draft: SetupDraft) -> SetupReview:
+        self.reviews += 1
+        raise ValueError("Compiled resource logical IDs must be lowercase stable identifiers.")
+
+
+def test_a_failing_automatic_stage_asks_what_next_instead_of_looping(tmp_path) -> None:
+    _store, shelf, service = _services(tmp_path)
+    runtime = _FailingReview()
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY, ("What next?", "1"), ("Names of the people", "save")]  # 1 = back to users
+    )
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, runtime),
+        register_server=lambda *_args: None,
+        io=io,
+    )
+
+    assert wizard.run() == "saved"
+    assert runtime.reviews == 1
+    assert sum("lowercase stable identifiers" in line for line in io.output) == 1
+
+
+def test_auto_approve_stops_on_a_failing_stage(tmp_path) -> None:
+    from meridian.core.errors import LocalStateError
+
+    store, shelf, service = _services(tmp_path)
+    store.save(SetupDraft.from_intent(single_exit_intent()))
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _FailingReview()),
+        register_server=lambda *_args: None,
+        io=_ScriptedIO([]),
+        auto_approve=True,
+    )
+
+    with pytest.raises(LocalStateError, match="lowercase stable identifiers"):
+        wizard.run()
+
+
+def test_names_that_differ_only_by_case_are_reasked(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY[:-1], ("Names of the people", "Biba, biba"), ("Names of the people", "save")]
+    )
+
+    assert _wizard(service, shelf, io, lambda *_args: None).run() == "saved"
+    assert any("even ignoring capital letters" in line for line in io.output)

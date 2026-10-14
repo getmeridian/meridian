@@ -263,8 +263,8 @@ class AccessIntent(CoreModel):
     @field_validator("users")
     @classmethod
     def reject_duplicate_users(cls, users: list[str]) -> list[str]:
-        if len(users) != len(set(users)):
-            raise ValueError("Access usernames must be unique.")
+        if len(users) != len({user.lower() for user in users}):
+            raise ValueError("Access usernames must be unique, ignoring case.")
         return users
 
 

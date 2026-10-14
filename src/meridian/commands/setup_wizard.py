@@ -118,18 +118,39 @@ class SetupWizard:
             draft = self.service.load_or_create()
             stage = draft.current_stage
             try:
-                outcome = self._run_stage(stage, draft)
+                try:
+                    outcome = self._run_stage(stage, draft)
+                except (ValidationError, ValueError) as exc:
+                    message = _validation_message(exc)
+                    if self.auto_approve:
+                        raise LocalStateError(message, hint=t("wizard.error_hint")) from exc
+                    self.prompt.say(message, style="error")
+                    if stage not in _QUESTION_STAGES:
+                        self._after_error(stage)  # an automatic stage would fail the same way again
+                    continue
             except Navigation as navigation:
                 if navigation.command in {"save", "quit"}:
                     self.prompt.say(t("wizard.saved"), style="ok")
                     return "saved"
                 self.service.back_to(_previous_stage(stage))
                 continue
-            except (ValidationError, ValueError) as exc:
-                self.prompt.say(_validation_message(exc), style="error")
-                continue
             if outcome == "completed":
                 return outcome
+
+    def _after_error(self, stage: SetupStage) -> None:
+        """Let the reader fix an earlier answer, retry, or stop; returns only to retry."""
+        previous = _previous_stage(stage)
+        choice = self.prompt.choose(
+            t("wizard.error_next"),
+            [
+                Choice("back", t("wizard.error_back", stage=t(f"stage.{previous}"))),
+                Choice("retry", t("wizard.error_retry")),
+                Choice("save", t("wizard.error_save")),
+            ],
+            default="back",
+        )
+        if choice != "retry":
+            raise Navigation(choice)
 
     def _run_stage(self, stage: SetupStage, draft: SetupDraft) -> WizardOutcome | None:
         number = SETUP_STAGE_ORDER.index(stage) + 1
@@ -486,6 +507,10 @@ class SetupWizard:
                 self.io.write(f"    - {escape(binding.logical_id)}")
 
 
+# Stages that ask questions: an error there re-asks them. The rest run on their own.
+_QUESTION_STAGES: frozenset[SetupStage] = frozenset({"servers", "roles", "paths", "routing", "access"})
+
+
 def _previous_stage(stage: SetupStage) -> SetupStage:
     index = SETUP_STAGE_ORDER.index(stage)
     return SETUP_STAGE_ORDER[max(0, index - 1)]
@@ -532,3 +557,5 @@ def _check_users(value: str) -> None:
         raise ValueError(t("error.users_required"))
     for name in names:
         validate_access_username_value(name)
+    if len({name.lower() for name in names}) != len(names):
+        raise ValueError(t("error.users_twice"))

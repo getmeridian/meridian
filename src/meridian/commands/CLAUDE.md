@@ -29,6 +29,7 @@
 - A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
 - `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
 - The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
+- An error in a setup stage that asks nothing (review, apply, verify) offers back/retry/save, and `--yes` raises it; re-running the stage looped forever on the same error.
 - Pickers open the terminal's real device (`os.ttyname`), never the `/dev/tty` alias (macOS kqueue refuses it with EOFError), and accept Ctrl+J as Enter (pexpect and some terminals send a bare line feed); validate through `Prompter.ask(validate=)` so both modes re-ask.
 - Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
 - `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing.

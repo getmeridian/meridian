@@ -27,3 +27,4 @@
 - Every TCP Host and gateway edge carries its path's `fingerprint` (empty means Go's ClientHello, a DPI signature); Reality and XHTTP publish a copy per `FINGERPRINT_COPIES`. Hysteria2 carries none.
 - Mihomo IP rules keep `no-resolve`: local resolution leaks names, and spoofed domestic answers would match `geoip:ru`.
 - Xray server pools use `leastPing` balancers; never claim strict-priority failover.
+- Access usernames keep their case in the panel, but `user:` logical IDs lowercase them (`AccessIntent` refuses case-only twins); a raw `user:Biba` failed every review.

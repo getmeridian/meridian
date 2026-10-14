@@ -1030,3 +1030,19 @@ def test_hosts_follow_exit_order_within_each_protocol() -> None:
     reality_owners = [host.owner_ref for host in visible if host.protocol == "reality"]
     assert reality_owners[0] == "main"
     assert reality_owners == sorted(reality_owners, key=["main", "exit-2"].index)
+
+
+def test_mixed_case_usernames_compile_to_lowercase_logical_ids() -> None:
+    plan = compile_topology(single_exit_intent(users=("Biba", "boba")))
+
+    users = {
+        resource.logical_id: resource.payload.username
+        for resource in plan.resources
+        if isinstance(resource.payload, AccessUserPayload)
+    }
+    assert users == {"user:biba": "Biba", "user:boba": "boba"}
+
+
+def test_usernames_that_differ_only_by_case_are_refused() -> None:
+    with pytest.raises(ValidationError, match="ignoring case"):
+        AccessIntent(users=["biba", "Biba"])
