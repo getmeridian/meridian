@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from meridian.cluster import ClusterConfig
+from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.core.clients import PanelUserLike
 from meridian.models import ProtocolURL
 from meridian.remnawave import MeridianPanel, RemnawaveError, User
@@ -181,4 +181,10 @@ def publish_connection_pages(cluster: ClusterConfig, usernames: Iterable[str]) -
                 results.append(HandoffLinks(name, error="the user does not exist in Remnawave"))
                 continue
             results.append(publish_connection_page(cluster, panel, conn, user))
-        return results
+    if any(links.page_url for links in results):
+        # Later reads show a page link only with this evidence; unsaved, `client show` hid it.
+        try:
+            cluster.save()
+        except (ClusterConfigExternallyModifiedError, OSError, ValueError) as exc:
+            logger.warning("Could not record published connection pages: %s", exc)
+    return results

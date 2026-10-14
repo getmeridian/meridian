@@ -99,3 +99,27 @@ def test_page_without_known_countries_omits_them() -> None:
     publish_connection_page(cluster, panel, conn, _user())  # type: ignore[arg-type]
 
     assert "exit_countries" not in json.loads(conn.write_map["/var/www/private/vless-1/config.json"])
+
+
+def test_published_pages_are_recorded_so_later_reads_show_the_link(tmp_home, monkeypatch) -> None:
+    """client add and deploy printed the page link, but the evidence was never saved: client show hid it."""
+    from contextlib import nullcontext
+
+    from meridian import handoff
+    from meridian.pwa import connection_page_deployed
+
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.1/adminsecret", server_ip="198.51.100.1", sub_path="pages")
+    )
+    cluster.save()
+    panel = SimpleNamespace(
+        get_user=lambda _name: _user(),
+        fetch_subscription=lambda _short: SimpleNamespace(content=_subscription()),
+    )
+    monkeypatch.setattr(handoff, "MeridianPanel", lambda *_args: nullcontext(panel))
+    monkeypatch.setattr(handoff, "control_connection", lambda _cluster: nullcontext(MockConnection()))
+
+    links = handoff.publish_connection_pages(cluster, ["alice"])
+
+    assert links[0].page_url
+    assert connection_page_deployed(ClusterConfig.load(), "vless-1")

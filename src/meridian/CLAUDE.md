@@ -34,4 +34,5 @@
 - **Failed traffic is classified by a direct TCP connect** — `connectivity.py` separates `no_traffic` from `unreachable`; UDP (Hysteria2) paths are never TCP-probed.
 - **Whatever adds a firewall rule retires it** — node retirement deletes the Docker-internal node API rule (`fw-node-api`, plus its pre-rename comment).
 - **Readiness checks name their transient errors** — pass `poll_until_ready(transient=...)`; anything else propagates instead of timing out silently.
+- **Page evidence must be saved** — `client show` offers a page link only with a saved `connection_page_markers` entry; `publish_connection_pages()` saves after marking (it once only marked, so every new client's link vanished after `client add`).
 - **A missing PWA template raises** — never upload a blank page.

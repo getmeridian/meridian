@@ -104,6 +104,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   how many, and `--component` picks node, panel, nginx, or relay. Every line is
   redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
   path), so the output is safe to share; `doctor` now masks that path too.
+- **`client show` keeps the connection-page link** — `client add` and `deploy`
+  printed each client's page link but never recorded that the page was
+  published, so `client show` and `--json` later offered only the
+  subscription URL.
 - **`meridian plan` no longer calls pending changes unavailable** — after any
   topology edit (even one new client) it listed clients, hosts, and squads as
   "observation failed" and exited 3, because their dependencies only get
