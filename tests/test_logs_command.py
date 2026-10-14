@@ -15,6 +15,7 @@ from meridian.cli import app
 from meridian.cluster import ClusterConfig, PanelConfig, SubscriptionPageConfig
 from meridian.commands import logs
 from meridian.diagnostics.logs import NGINX_ERROR_LOG, LogSource, collect_log, tail_command
+from meridian.host_runtime import NODE, SUBSCRIPTION_PAGE
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
@@ -66,8 +67,8 @@ def test_control_and_exit_server_reads_node_panel_and_nginx_logs(
 
     headers = _headers(capsys.readouterr().out)
     assert {header.split(":")[0] for header in headers} == {"==> node", "==> panel", "==> nginx"}
-    assert any("remnawave-subscription-page" in header for header in headers)
-    assert any(f"docker logs --tail 100 {shlex.quote('remnawave-node')}" in call for call in fleet.conn._calls)
+    assert any(SUBSCRIPTION_PAGE.name in header for header in headers)
+    assert any(f"docker logs --tail 100 {shlex.quote(NODE.name)}" in call for call in fleet.conn._calls)
     assert f"tail -n 100 {NGINX_ERROR_LOG}" in fleet.conn._calls[-1]
 
 
@@ -107,7 +108,7 @@ def test_refusals_happen_before_dialing(fleet: SimpleNamespace, target: str, kwa
 
 def test_grep_pattern_is_one_quoted_fixed_string() -> None:
     pattern = "it's; rm -rf / #"
-    source = LogSource("node", "container", "remnawave-node")
+    source = LogSource("node", "container", NODE.name)
 
     command = tail_command(source, lines=50, pattern=pattern)
 
@@ -145,7 +146,7 @@ def test_log_lines_are_redacted_and_printed_without_markup(
 
 
 def test_unreadable_log_is_shown_and_exits_3(fleet: SimpleNamespace, capsys: pytest.CaptureFixture[str]) -> None:
-    fleet.conn.when("docker inspect --type container remnawave-node", rc=10)
+    fleet.conn.when(f"docker inspect --type container {NODE.name}", rc=10)
 
     with pytest.raises(typer.Exit) as exc_info:
         _run(fleet, "exit-a")
