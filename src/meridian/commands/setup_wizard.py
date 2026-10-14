@@ -489,7 +489,7 @@ class SetupWizard:
             return f"{item.title} ({item.host})" if item else ref
 
         def row(label: str, value: str) -> None:
-            self.io.write(f"  [bold]{escape(label):<18}[/bold] {escape(value)}")
+            self.io.write(f"  [bold]{escape(label):<20}[/bold] {escape(value)}")
 
         self.prompt.say(t("review.title"))
         control = server(intent.control.server_ref)

@@ -10,6 +10,8 @@
 
 **Durable prose** — write as the current release: no beta notes, no "still works for one release", no version-dated caveats.
 
+**Russian glossary** (docs, landing, CLI) — relay is «промежуточный сервер», firewall «файрвол», no «флот» (say «ваши серверы»); the product is a «VPN» in prose, «прокси» only where technically exact (protocols, Xray, app proxy modes).
+
 **App list from the catalog** — a line holding only `<!-- apps -->` becomes the featured apps of `src/data/apps.json` (`src/lib/apps-list.mjs`) in the page and its Markdown twin; never hand-write an app list.
 
 **Links** — link other pages as `/{locale}/{page}/` (with `#anchor` from that locale's own heading); the build validates every link.
