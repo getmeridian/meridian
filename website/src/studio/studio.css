@@ -8,7 +8,7 @@
   line-height: 1.45;
   margin: 0 auto;
   padding: 10px 0 44px;
-  width: min(1180px, calc(100% - 32px));
+  width: min(1070px, calc(100% - 32px)); /* journey + gap + task, so header and cockpit share edges */
 }
 
 .studio-site {
@@ -16,7 +16,7 @@
   gap: 18px;
   margin: 0 auto;
   padding: 14px 0 0;
-  width: min(1180px, calc(100% - 32px));
+  width: min(1070px, calc(100% - 32px));
 }
 
 .studio-site a {
@@ -156,8 +156,7 @@
   align-items: start;
   display: grid;
   gap: 14px;
-  grid-template-columns: 196px minmax(0, 860px);
-  justify-content: center;
+  grid-template-columns: 196px minmax(0, 1fr);
 }
 
 .studio__journey {
