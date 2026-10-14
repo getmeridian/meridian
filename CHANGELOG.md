@@ -264,6 +264,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   command builder only offers commands and flags the CLI actually has.
 
 ### Security and correctness
+- **A smaller download** — the package carries only Studio's own page, scripts,
+  and fonts instead of the whole website: about 1 MB instead of 7.5 MB, which
+  matters on slow or filtered connections.
 - **Starts with current Typer** — Typer 0.26 stopped installing Click, and a
   fresh install of an earlier beta failed at launch with `No module named
   'click'`. Meridian now needs Typer 0.26 or later and uses the Click it ships.
@@ -377,14 +380,9 @@ versions below), and the choice is saved for later applies.
 
 ### Not yet available
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
-  A running deploy can be cancelled; it stops after its current step and resumes on the next run.
-  Preview and deploy from Studio work again; the betas refused every request because Studio
-  still sent a removed post-quantum option.
-  Studio's Engine no longer hands its key to any local program: `meridian studio` prints (and
-  opens) an address ending in `#k=…`, and only a tab opened from it can use the Engine.
-  Studio now listens on port 7391 by default, so the draft your browser keeps survives a restart.
-  The package ships only Studio's own page, scripts, and fonts (about 0.5 MB) instead of the
-  whole 16 MB website, so installs are smaller.
+  It opens an address ending in `#k=…`, and only a tab opened from that address can use the
+  local Engine. A running deploy can be cancelled; it stops after its current step and resumes
+  on the next run. The default port, 7391, keeps your browser's draft across restarts.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
