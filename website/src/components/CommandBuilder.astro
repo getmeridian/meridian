@@ -1,597 +1,478 @@
 ---
 /**
- * CommandBuilder — 6-tab interactive CLI command builder.
- * Pure vanilla JS, no framework.
+ * CommandBuilder — pick options, copy a meridian command.
+ *
+ * Commands and flags come from src/data/command-builder.json, which
+ * tests/test_website_command_builder.py checks against the live CLI. Text is rendered
+ * per locale at build time; the script receives only the current locale's strings.
  */
+import config from '../data/command-builder.json';
+import { landingT, type LandingKey, type Locale } from '../i18n';
 
-const tabs = [
-  { key: 'install', label: 'Deploy', i18n: 'builder.tab.deploy' },
-  { key: 'relay', label: 'Relay', i18n: 'builder.tab.relay' },
-  { key: 'check', label: 'Check', i18n: 'builder.tab.preflight' },
-  { key: 'scan', label: 'SNI Scan', i18n: 'builder.tab.scan' },
-  { key: 'diag', label: 'Doctor', i18n: 'builder.tab.doctor' },
-  { key: 'uninstall', label: 'Teardown', i18n: 'builder.tab.teardown' },
-];
+interface Props {
+  locale: Locale;
+}
+
+type FieldId = keyof typeof config.fields;
+interface FieldText {
+  label: LandingKey;
+  hint: LandingKey;
+  placeholder?: LandingKey;
+}
+
+const { locale } = Astro.props;
+const t = landingT(locale);
+
+const TAB_TEXT: Record<string, { label: LandingKey; desc: LandingKey }> = {
+  deploy: { label: 'builder.tab.deploy', desc: 'builder.desc.deploy' },
+  relay: { label: 'builder.tab.relay', desc: 'builder.desc.relay' },
+  check: { label: 'builder.tab.check', desc: 'builder.desc.check' },
+  scan: { label: 'builder.tab.scan', desc: 'builder.desc.scan' },
+  doctor: { label: 'builder.tab.doctor', desc: 'builder.desc.doctor' },
+  teardown: { label: 'builder.tab.teardown', desc: 'builder.desc.teardown' },
+};
+const FIELD_TEXT: Record<FieldId, FieldText> = {
+  user: { label: 'builder.field.user', hint: 'builder.field.user.hint' },
+  sshPort: { label: 'builder.field.sshPort', hint: 'builder.field.sshPort.hint' },
+  exit: { label: 'builder.field.exit', hint: 'builder.field.exit.hint', placeholder: 'builder.field.exit.placeholder' },
+  domain: { label: 'builder.field.domain', hint: 'builder.field.domain.hint' },
+  sni: { label: 'builder.field.sni', hint: 'builder.field.sni.hint', placeholder: 'builder.field.sni.placeholder' },
+  relaySni: { label: 'builder.field.sni', hint: 'builder.field.relaySni.hint', placeholder: 'builder.field.sni.placeholder' },
+  clientName: { label: 'builder.field.clientName', hint: 'builder.field.clientName.hint' },
+  displayName: { label: 'builder.field.displayName', hint: 'builder.field.displayName.hint', placeholder: 'builder.field.displayName.placeholder' },
+  icon: { label: 'builder.field.icon', hint: 'builder.field.icon.hint' },
+  color: { label: 'builder.field.color', hint: 'builder.field.color.hint' },
+  relayName: { label: 'builder.field.relayName', hint: 'builder.field.relayName.hint' },
+  port: { label: 'builder.field.port', hint: 'builder.field.port.hint' },
+  harden: { label: 'builder.field.harden', hint: 'builder.field.harden.hint' },
+  ai: { label: 'builder.field.ai', hint: 'builder.field.ai.hint' },
+  yes: { label: 'builder.field.yes', hint: 'builder.field.yes.hint' },
+};
+const PALETTE_TEXT: Record<string, LandingKey> = {
+  ocean: 'builder.palette.ocean',
+  sunset: 'builder.palette.sunset',
+  forest: 'builder.palette.forest',
+  lavender: 'builder.palette.lavender',
+  rose: 'builder.palette.rose',
+  slate: 'builder.palette.slate',
+};
+const STATUS_KEYS = [
+  'invalid', 'local', 'domainMissing', 'deploy', 'deployDomain', 'relayNeed', 'relayOk', 'checkNeed', 'checkOk',
+  'scanNeed', 'scanOk', 'doctorNeed', 'doctorOk', 'doctorAi', 'teardownNeed', 'teardownOk',
+] as const;
+
+const first = config.tabs[0];
+const fieldIds = Object.keys(config.fields) as FieldId[];
+const textFields = fieldIds.filter((id) => config.fields[id].kind !== 'check');
+const checkFields = fieldIds.filter((id) => config.fields[id].kind === 'check');
+const clientConfig = {
+  tabs: config.tabs,
+  fields: config.fields,
+  strings: {
+    ...Object.fromEntries(STATUS_KEYS.map((k) => [k, t(`builder.status.${k}` as LandingKey)])),
+    copy: t('builder.copy'),
+    copied: t('builder.copied'),
+    server: t('builder.field.server'),
+    serverHint: t('builder.field.server.hint'),
+    relayServer: t('builder.field.relayServer'),
+    relayServerHint: t('builder.field.relayServer.hint'),
+    desc: Object.fromEntries(config.tabs.map((tab) => [tab.id, t(TAB_TEXT[tab.id].desc)])),
+  },
+};
+const fieldText = (id: FieldId) => FIELD_TEXT[id];
+const shown = (id: FieldId) => first.fields.includes(id);
 ---
 
-<div class="builder" id="builder">
-  <!-- Tabs -->
-  <div class="builder__tabs" role="tablist">
-    {tabs.map((tab, i) => (
+<div class="builder card" id="builder">
+  <div class="builder__tabs" role="tablist" aria-label={t('builder.title')}>
+    {config.tabs.map((tab, i) => (
       <button
-        class={`builder__tab ${i === 0 ? 'builder__tab--active' : ''}`}
-        data-tab={tab.key}
-        data-t={tab.i18n}
+        type="button"
+        class="builder__tab"
         role="tab"
+        id={`builder-tab-${tab.id}`}
+        aria-controls="builder-panel"
         aria-selected={i === 0 ? 'true' : 'false'}
+        tabindex={i === 0 ? 0 : -1}
+        data-tab={tab.id}
       >
-        {tab.label}
+        {t(TAB_TEXT[tab.id].label)}
       </button>
     ))}
   </div>
 
-  <div class="builder__body">
-    <!-- Tab description -->
-    <p class="builder__desc" id="builder-desc" data-t="builder.desc.deploy">
-      Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.
-    </p>
+  <div class="builder__body" role="tabpanel" id="builder-panel" aria-labelledby={`builder-tab-${first.id}`}>
+    <p class="builder__desc" id="builder-desc">{t(TAB_TEXT[first.id].desc)}</p>
 
-    <!-- Fields -->
     <div class="builder__fields">
-      <div class="builder__field" id="row-ip">
-        <label class="builder__label" for="f-ip" data-t="builder.field.ip">Server IP</label>
-        <input id="f-ip" type="text" placeholder="198.51.100.10 or local" class="builder__input" />
-        <span class="builder__hint" data-t="builder.field.ip.hint">Your VPS public IPv4 address, or "local" to deploy on this server. Leave empty for interactive mode.</span>
+      <div class="builder__field builder__field--wide">
+        <label class="builder__label" for="builder-server" id="builder-server-label">{t('builder.field.server')}</label>
+        <input id="builder-server" class="builder__input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder={t('builder.field.server.placeholder')} aria-describedby="builder-server-hint" />
+        <span class="builder__hint" id="builder-server-hint">{t('builder.field.server.hint')}</span>
       </div>
 
-      <div class="builder__field" id="row-user">
-        <label class="builder__label" for="f-user" data-t="builder.field.user">SSH user</label>
-        <input id="f-user" type="text" value="root" placeholder="root" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.user.hint">Default: root. Non-root users get sudo automatically.</span>
-      </div>
+      {textFields.map((id) => {
+        const field = config.fields[id] as { kind: string; placeholder?: string; short?: boolean; palettes?: string[] };
+        const text = fieldText(id);
+        const placeholder = text.placeholder ? t(text.placeholder) : (field.placeholder ?? '');
+        return (
+          <div class:list={['builder__field', { 'builder__field--short': field.short }]} data-field-row={id} hidden={!shown(id)}>
+            <label class="builder__label" for={`builder-${id}`}>{t(text.label)}</label>
+            {field.kind === 'palette' ? (
+              <select id={`builder-${id}`} class="builder__input" data-field={id} aria-describedby={`builder-${id}-hint`}>
+                <option value="">{t('builder.field.color.default')}</option>
+                {(field.palettes ?? []).filter((p) => p !== 'ocean').map((p) => <option value={p}>{t(PALETTE_TEXT[p])}</option>)}
+              </select>
+            ) : (
+              <input id={`builder-${id}`} class="builder__input" type="text" autocomplete="off" spellcheck="false" data-field={id} placeholder={placeholder} aria-describedby={`builder-${id}-hint`} />
+            )}
+            <span class="builder__hint" id={`builder-${id}-hint`}>{t(text.hint)}</span>
+          </div>
+        );
+      })}
 
-      <div class="builder__field" id="row-exit">
-        <label class="builder__label" for="f-exit" data-t="builder.field.exit">Exit server</label>
-        <input id="f-exit" type="text" placeholder="198.51.100.10 or server-name" class="builder__input" />
-        <span class="builder__hint" data-t="builder.field.exit.hint">IP or name of the exit server this relay forwards to. Must be deployed first.</span>
-      </div>
-
-      <div class="builder__field" id="row-domain">
-        <label class="builder__label builder__label--check">
-          <input id="f-domain-on" type="checkbox" class="builder__checkbox" />
-          <span data-t="builder.field.domain">Domain</span>
-        </label>
-        <input id="f-domain" type="text" placeholder="example.com" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.domain.hint">Optional. Moves XHTTP to your domain and adds WSS; both can run through the Cloudflare CDN.</span>
-      </div>
-
-      <div class="builder__field" id="row-sni">
-        <label class="builder__label builder__label--check">
-          <input id="f-sni-on" type="checkbox" class="builder__checkbox" />
-          <span data-t="builder.field.sni">Custom SNI</span>
-        </label>
-        <input id="f-sni" type="text" placeholder="auto" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.sni.hint">Site that Reality impersonates. Leave empty and deploy picks one that works from your server. Use <code>meridian scan</code> to find a same-network target.</span>
-      </div>
-
-      <div class="builder__field" id="row-name">
-        <label class="builder__label" for="f-name" data-t="builder.field.name">Client name</label>
-        <input id="f-name" type="text" placeholder="default" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.name.hint">Name for the first client. Default: "default".</span>
-      </div>
-
-      <div class="builder__field" id="row-display-name">
-        <label class="builder__label" for="f-display-name" data-t="builder.field.display-name">Display name</label>
-        <input id="f-display-name" type="text" placeholder="My VPN" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.display-name.hint">Label shown on connection pages.</span>
-      </div>
-
-      <div class="builder__field" id="row-icon">
-        <label class="builder__label" for="f-icon" data-t="builder.field.icon">Icon</label>
-        <input id="f-icon" type="text" placeholder="🚀" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.icon.hint">Emoji or image URL for the connection page.</span>
-      </div>
-
-      <div class="builder__field" id="row-color">
-        <label class="builder__label" for="f-color" data-t="builder.field.color">Color</label>
-        <select id="f-color" class="builder__input builder__input--short">
-          <option value="">Default (ocean)</option>
-          <option value="sunset">Sunset</option>
-          <option value="forest">Forest</option>
-          <option value="lavender">Lavender</option>
-          <option value="rose">Rose</option>
-          <option value="slate">Slate</option>
-        </select>
-        <span class="builder__hint" data-t="builder.field.color.hint">Color palette for the connection page.</span>
-      </div>
-
-      <div class="builder__field" id="row-relay-name">
-        <label class="builder__label" for="f-relay-name" data-t="builder.field.relay-name">Relay name</label>
-        <input id="f-relay-name" type="text" placeholder="ru-moscow" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.relay-name.hint">Optional friendly name for the relay (e.g. "ru-moscow").</span>
-      </div>
-
-      <div class="builder__field" id="row-port">
-        <label class="builder__label" for="f-port" data-t="builder.field.port">Listen port</label>
-        <input id="f-port" type="text" value="443" placeholder="443" class="builder__input builder__input--short" />
-        <span class="builder__hint" data-t="builder.field.port.hint">Port on the relay server. Default: 443.</span>
-      </div>
-
-      <div class="builder__field" id="row-ai">
-        <label class="builder__label builder__label--check">
-          <input id="f-ai" type="checkbox" class="builder__checkbox" />
-          <span data-t="builder.field.ai">AI-ready output</span>
-        </label>
-        <span class="builder__hint" data-t="builder.field.ai.hint">Copies an AI-ready prompt to clipboard for ChatGPT/Claude troubleshooting.</span>
-      </div>
-
-      <div class="builder__field" id="row-yes">
-        <label class="builder__label builder__label--check">
-          <input id="f-yes" type="checkbox" class="builder__checkbox" />
-          <span data-t="builder.field.yes">Skip prompts</span>
-        </label>
-        <span class="builder__hint" data-t="builder.field.yes.hint">Add --yes flag. For CI/automation or non-interactive SSH sessions.</span>
+      <div class="builder__checks">
+        {checkFields.map((id) => (
+          <label class="builder__check" data-field-row={id} hidden={!shown(id)}>
+            <input type="checkbox" data-field={id} />
+            <span>
+              <span class="builder__check-label">{t(fieldText(id).label)}</span>
+              <span class="builder__hint">{t(fieldText(id).hint)}</span>
+            </span>
+          </label>
+        ))}
       </div>
     </div>
 
-    <!-- Command output -->
     <div class="builder__output">
-      <button class="builder__copy" id="builder-copy" aria-label="Copy command">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        <span>Copy</span>
+      <span class="sr-only" id="builder-cmd-label">{t('builder.command')}</span>
+      <pre aria-labelledby="builder-cmd-label" aria-live="polite"><code id="builder-cmd">meridian {first.command}</code></pre>
+      <button type="button" class="copy-btn builder__copy" id="builder-copy">
+        <span class="copy-btn__label">{t('builder.copy')}</span>
       </button>
-      <pre id="builder-cmd">meridian deploy</pre>
     </div>
-    <p class="builder__status" id="builder-status"></p>
-    <div class="builder__wizard" id="builder-wizard" data-t="builder.wizard">
-      <strong>First time?</strong> Just run <code>meridian deploy</code> — the interactive wizard guides you through everything.
-    </div>
+    <p class="builder__status" id="builder-status" aria-live="polite"></p>
+    <p class="builder__wizard" id="builder-wizard" set:html={t('builder.wizard')} />
   </div>
 </div>
 
+<script type="application/json" id="builder-config" set:html={JSON.stringify(clientConfig)} />
+
 <script>
-  const TAB_CONFIG: Record<string, { desc: string; show: string[]; cmd: string; descKey: string }> = {
-    install: {
-      desc: 'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.',
-      show: ['ip', 'user', 'domain', 'sni', 'name', 'display-name', 'icon', 'color', 'yes'],
-      cmd: 'deploy',
-      descKey: 'builder.desc.deploy',
-    },
-    relay: {
-      desc: 'Deploy a TCP relay — forwards traffic through a domestic server to your exit server abroad.',
-      show: ['ip', 'user', 'exit', 'relay-name', 'port', 'yes'],
-      cmd: 'relay add',
-      descKey: 'builder.desc.relay',
-    },
-    check: {
-      desc: 'Check a new server is compatible (SNI, ports, DNS, OS, disk), or a deployed one is healthy.',
-      show: ['ip', 'user', 'domain', 'sni', 'ai'],
-      cmd: 'check',
-      descKey: 'builder.desc.preflight',
-    },
-    scan: {
-      desc: "Find optimal SNI targets on your server's network using RealiTLScanner.",
-      show: ['ip', 'user'],
-      cmd: 'scan',
-      descKey: 'builder.desc.scan',
-    },
-    diag: {
-      desc: 'Collect system diagnostics for bug reports. Secrets are auto-redacted.',
-      show: ['ip', 'user', 'sni', 'ai'],
-      cmd: 'doctor',
-      descKey: 'builder.desc.doctor',
-    },
-    uninstall: {
-      desc: 'Remove the panel and node containers, nginx files, certificates, and firewall rules. Docker and system packages stay.',
-      show: ['ip', 'user', 'yes'],
-      cmd: 'teardown',
-      descKey: 'builder.desc.teardown',
-    },
+  import { copyText, flashCopied } from './copy';
+
+  interface Field { flag: string; kind: string; default?: string; target?: string; required?: boolean }
+  interface Tab { id: string; command: string; server: string; fields: string[] }
+  interface Config { tabs: Tab[]; fields: Record<string, Field>; strings: Record<string, string> & { desc: Record<string, string> } }
+
+  const STORAGE_KEY = 'meridian-builder-v2';
+  const config: Config = JSON.parse(document.getElementById('builder-config')!.textContent!);
+  const root = document.getElementById('builder')!;
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const server = $<HTMLInputElement>('builder-server');
+  const inputs = new Map<string, HTMLInputElement | HTMLSelectElement>();
+  root.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-field]').forEach((el) => inputs.set(el.dataset.field!, el));
+  const S = config.strings;
+  let tab = config.tabs[0];
+  let restored = false; // write storage only after the reader changes something
+
+  const quote = (v: string) => (/^[\w.:/@%+=,-]+$/.test(v) ? v : `'${v.replace(/'/g, `'\\''`)}'`);
+  const value = (id: string) => {
+    const el = inputs.get(id);
+    if (!el) return '';
+    return el instanceof HTMLInputElement && el.type === 'checkbox' ? (el.checked ? 'on' : '') : el.value.trim();
   };
 
-  const ALL_FIELDS = ['ip', 'user', 'exit', 'domain', 'sni', 'name', 'display-name', 'icon', 'color', 'relay-name', 'port', 'ai', 'yes'];
-  let curTab = 'install';
-
-  function $(id: string) {
-    return document.getElementById(id);
+  function setStatus(text: string, tone: '' | 'ok' | 'error' = '') {
+    const el = $('builder-status');
+    el.textContent = text;
+    el.dataset.tone = tone;
   }
 
-  function setTab(t: string) {
-    curTab = t;
-    document.querySelectorAll('.builder__tab').forEach((btn) => {
-      const active = (btn as HTMLElement).dataset.tab === t;
-      btn.classList.toggle('builder__tab--active', active);
-      btn.setAttribute('aria-selected', String(active));
+  function build() {
+    const target = server.value.trim();
+    const local = /^local$/i.test(target);
+    const invalid = target !== '' && !/^[\w.:[\]@-]+$/.test(target);
+
+    $('builder-server-label').textContent = tab.server === 'required' ? S.relayServer : S.server;
+    $('builder-server-hint').textContent = tab.server === 'required' ? S.relayServerHint : S.serverHint;
+    $('builder-desc').textContent = S.desc[tab.id];
+    root.querySelectorAll<HTMLElement>('[data-field-row]').forEach((row) => {
+      const id = row.dataset.fieldRow!;
+      row.hidden = !tab.fields.includes(id) || (local && Boolean(config.fields[id].target));
     });
-
-    const cfg = TAB_CONFIG[t];
-    const descEl = $('builder-desc');
-    if (descEl) {
-      descEl.textContent = cfg.desc;
-      descEl.dataset.t = cfg.descKey;
-    }
-
-    ALL_FIELDS.forEach((f) => {
-      const row = $('row-' + f);
-      if (row) row.style.display = cfg.show.includes(f) ? '' : 'none';
-    });
-
-    buildCmd();
-  }
-
-  function buildCmd() {
-    const ip = ($('f-ip') as HTMLInputElement).value.trim();
-    const user = ($('f-user') as HTMLInputElement).value.trim() || 'root';
-    const domOn = ($('f-domain-on') as HTMLInputElement).checked;
-    const dom = ($('f-domain') as HTMLInputElement).value.trim();
-    const sniOn = ($('f-sni-on') as HTMLInputElement).checked;
-    const sni = ($('f-sni') as HTMLInputElement).value.trim();
-    const clientName = ($('f-name') as HTMLInputElement).value.trim();
-    const displayNameVal = ($('f-display-name') as HTMLInputElement).value.trim();
-    const iconVal = ($('f-icon') as HTMLInputElement).value.trim();
-    const colorVal = ($('f-color') as HTMLSelectElement).value;
-    const exitServer = ($('f-exit') as HTMLInputElement).value.trim();
-    const relayName = ($('f-relay-name') as HTMLInputElement).value.trim();
-    const port = ($('f-port') as HTMLInputElement).value.trim();
-    const ai = ($('f-ai') as HTMLInputElement).checked;
-    const yes = ($('f-yes') as HTMLInputElement).checked;
-    const status = $('builder-status')!;
-    const cfg = TAB_CONFIG[curTab];
-
-    // Toggle conditional inputs
-    ($('f-domain') as HTMLElement).style.display = domOn ? 'block' : 'none';
-    ($('f-sni') as HTMLElement).style.display = sniOn ? 'block' : 'none';
-
-    // Hide SSH user when deploying locally
-    const isLocal = /^locally?$/i.test(ip);
-    const userRow = $('row-user');
-    if (userRow && cfg.show.includes('user')) {
-      userRow.style.display = isLocal ? 'none' : '';
-    }
 
     const args: string[] = [];
-    const wizard = $('builder-wizard')!;
-
-    if (ip) {
-      if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) && !/^locally?$/i.test(ip)) {
-        status.textContent = 'Enter a valid IPv4 address or "local"';
-        status.className = 'builder__status builder__status--error';
-        ($('builder-cmd') as HTMLElement).textContent = 'meridian ' + cfg.cmd;
-        persist();
-        return;
+    let host = invalid ? '' : target;
+    for (const id of tab.fields) {
+      const field = config.fields[id];
+      const v = value(id);
+      if (!v || v === field.default) continue;
+      if (field.target) {
+        if (local) continue;
+        if (host && field.target === 'user' && !host.includes('@')) host = `${v}@${host}`;
+        else if (host && field.target === 'port' && !/:\d+$/.test(host)) host = `${host}:${v}`;
+        else if (!host) args.push(`${field.flag} ${quote(v)}`);
+        continue;
       }
-      args.push(ip);
+      args.push(field.kind === 'check' ? field.flag : `${field.flag} ${quote(v)}`);
     }
+    if (host) args.unshift(quote(host));
+    $('builder-cmd').textContent = ['meridian', tab.command, ...args].join(' ');
+    $('builder-wizard').hidden = !(tab.id === 'deploy' && !target);
 
-    if (user && user !== 'root') args.push('--user ' + user);
-    if (cfg.show.includes('exit') && exitServer) args.push('--exit ' + exitServer);
-    if (cfg.show.includes('domain') && domOn && dom) args.push('--domain ' + dom);
-    if (cfg.show.includes('sni') && sniOn && sni) args.push('--sni ' + sni);
-    if (cfg.show.includes('name') && clientName && clientName !== 'default') args.push('--client-name ' + clientName);
-    if (cfg.show.includes('display-name') && displayNameVal) args.push('--display-name "' + displayNameVal + '"');
-    if (cfg.show.includes('icon') && iconVal) args.push('--icon "' + iconVal + '"');
-    if (cfg.show.includes('color') && colorVal) args.push('--color ' + colorVal);
-    if (cfg.show.includes('relay-name') && relayName) args.push('--name ' + relayName);
-    if (cfg.show.includes('port') && port && port !== '443') args.push('--port ' + port);
-    if (cfg.show.includes('ai') && ai) args.push('--ai');
-    if (cfg.show.includes('yes') && yes) args.push('--yes');
-
-    let cmd = 'meridian ' + cfg.cmd;
-    if (args.length) cmd += ' ' + args.join(' ');
-    ($('builder-cmd') as HTMLElement).textContent = cmd;
-
-    // Status hints
-    if (curTab === 'install') {
-      if (!ip) {
-        status.textContent = '';
-        status.className = 'builder__status';
-        wizard.style.display = '';
-      } else {
-        wizard.style.display = 'none';
-        if (/^locally?$/i.test(ip)) {
-          status.textContent = 'Deploys on this server without SSH. Run it on the VPS as root or with passwordless sudo.';
-          status.className = 'builder__status builder__status--ok';
-        } else if (domOn && !dom) {
-          status.textContent = 'Enter a domain or uncheck to skip.';
-          status.className = 'builder__status';
-        } else {
-          status.textContent = domOn
-            ? 'Deploys Reality, XHTTP, and Hysteria2, plus WSS on your domain.'
-            : 'Deploys Reality, XHTTP, and Hysteria2.';
-          status.className = 'builder__status builder__status--ok';
-        }
-      }
-    } else {
-      wizard.style.display = 'none';
-      if (curTab === 'relay') {
-        if (!ip || !exitServer) {
-          status.textContent = 'Enter the relay IP and exit server. The exit server must be deployed first.';
-          status.className = 'builder__status';
-        } else {
-          status.textContent = 'Adds Reality entries that enter through the relay; other methods still connect to the exit.';
-          status.className = 'builder__status builder__status--ok';
-        }
-      } else if (curTab === 'check') {
-        status.textContent = ip ? 'Runs checks without installing anything.' : 'Enter your server IP to check it.';
-        status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
-      } else if (curTab === 'scan') {
-        status.textContent = ip ? "Scans server's /24 subnet for same-network TLS targets." : 'Enter your server IP to find optimal SNI targets.';
-        status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
-      } else if (curTab === 'diag') {
-        status.textContent = ip
-          ? (ai ? 'Collects diagnostics and copies AI-ready prompt to clipboard.' : 'Collects diagnostics. Enable AI-ready output for instant help.')
-          : 'Enter your server IP to collect diagnostics.';
-        status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
-      } else {
-        status.textContent = ip ? 'Removes Meridian. Docker and system packages stay.' : 'Uses your saved server when you have only one.';
-        status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
-      }
-    }
-
-    persist();
+    const has = target !== '' && !invalid;
+    if (invalid) setStatus(S.invalid, 'error');
+    else if (tab.id === 'deploy') {
+      if (!has) setStatus('');
+      else if (local) setStatus(S.local, 'ok');
+      else setStatus(value('domain') ? S.deployDomain : S.deploy, 'ok');
+    } else if (tab.id === 'relay') setStatus(has && value('exit') ? S.relayOk : S.relayNeed, has && value('exit') ? 'ok' : '');
+    else if (tab.id === 'doctor') setStatus(has ? (value('ai') ? S.doctorAi : S.doctorOk) : S.doctorNeed, has ? 'ok' : '');
+    else setStatus(S[`${tab.id}${has ? 'Ok' : 'Need'}`], has ? 'ok' : '');
+    save();
   }
 
-  function persist() {
+  function selectTab(id: string, focus = false) {
+    tab = config.tabs.find((t) => t.id === id) ?? config.tabs[0];
+    root.querySelectorAll<HTMLButtonElement>('[role="tab"]').forEach((b) => {
+      const active = b.dataset.tab === tab.id;
+      b.setAttribute('aria-selected', String(active));
+      b.tabIndex = active ? 0 : -1;
+      if (active && focus) b.focus();
+    });
+    $('builder-panel').setAttribute('aria-labelledby', `builder-tab-${tab.id}`);
+    build();
+  }
+
+  function save() {
+    if (!restored) return;
     try {
-      localStorage.setItem(
-        'meridian-builder',
-        JSON.stringify({
-          ip: ($('f-ip') as HTMLInputElement).value.trim(),
-          user: ($('f-user') as HTMLInputElement).value.trim(),
-          exit: ($('f-exit') as HTMLInputElement).value.trim(),
-          domOn: ($('f-domain-on') as HTMLInputElement).checked,
-          dom: ($('f-domain') as HTMLInputElement).value.trim(),
-          sniOn: ($('f-sni-on') as HTMLInputElement).checked,
-          sni: ($('f-sni') as HTMLInputElement).value.trim(),
-          name: ($('f-name') as HTMLInputElement).value.trim(),
-          displayName: ($('f-display-name') as HTMLInputElement).value.trim(),
-          icon: ($('f-icon') as HTMLInputElement).value.trim(),
-          color: ($('f-color') as HTMLSelectElement).value,
-          relayName: ($('f-relay-name') as HTMLInputElement).value.trim(),
-          port: ($('f-port') as HTMLInputElement).value.trim(),
-          ai: ($('f-ai') as HTMLInputElement).checked,
-          yes: ($('f-yes') as HTMLInputElement).checked,
-          tab: curTab,
-        }),
-      );
-    } catch {}
+      const values: Record<string, string> = { server: server.value };
+      inputs.forEach((_, id) => (values[id] = value(id)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab: tab.id, values }));
+    } catch {
+      // Storage unavailable: the builder still works for this visit.
+    }
   }
 
   function restore() {
     try {
-      const saved = JSON.parse(localStorage.getItem('meridian-builder') || '{}');
-      if (saved.ip) ($('f-ip') as HTMLInputElement).value = saved.ip;
-      if (saved.user) ($('f-user') as HTMLInputElement).value = saved.user;
-      if (saved.exit) ($('f-exit') as HTMLInputElement).value = saved.exit;
-      if (saved.domOn) ($('f-domain-on') as HTMLInputElement).checked = true;
-      if (saved.dom) ($('f-domain') as HTMLInputElement).value = saved.dom;
-      if (saved.sniOn) ($('f-sni-on') as HTMLInputElement).checked = true;
-      if (saved.sni) ($('f-sni') as HTMLInputElement).value = saved.sni;
-      if (saved.name) ($('f-name') as HTMLInputElement).value = saved.name;
-      if (saved.displayName) ($('f-display-name') as HTMLInputElement).value = saved.displayName;
-      if (saved.icon) ($('f-icon') as HTMLInputElement).value = saved.icon;
-      if (saved.color) ($('f-color') as HTMLSelectElement).value = saved.color;
-      if (saved.relayName) ($('f-relay-name') as HTMLInputElement).value = saved.relayName;
-      if (saved.port && saved.port !== '443') ($('f-port') as HTMLInputElement).value = saved.port;
-      if (saved.ai) ($('f-ai') as HTMLInputElement).checked = true;
-      if (saved.yes) ($('f-yes') as HTMLInputElement).checked = true;
-      if (saved.tab && TAB_CONFIG[saved.tab]) setTab(saved.tab);
-      else buildCmd();
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      const values: Record<string, string> = saved.values ?? {};
+      server.value = values.server ?? '';
+      inputs.forEach((el, id) => {
+        if (el instanceof HTMLInputElement && el.type === 'checkbox') el.checked = values[id] === 'on';
+        else el.value = values[id] ?? '';
+      });
+      return typeof saved.tab === 'string' ? saved.tab : config.tabs[0].id;
     } catch {
-      buildCmd();
+      return config.tabs[0].id;
     }
   }
 
-  // Wire up events
-  document.querySelectorAll('.builder__tab').forEach((btn) => {
-    btn.addEventListener('click', () => setTab((btn as HTMLElement).dataset.tab!));
-  });
-
-  document.querySelectorAll('#builder input, #builder select').forEach((input) => {
-    input.addEventListener('input', buildCmd);
-    input.addEventListener('change', buildCmd);
-  });
-
-  // Copy button
-  $('builder-copy')?.addEventListener('click', () => {
-    const text = ($('builder-cmd') as HTMLElement).textContent || '';
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = $('builder-copy')!;
-      const span = btn.querySelector('span')!;
-      span.textContent = 'Copied!';
-      btn.classList.add('builder__copy--done');
-      setTimeout(() => {
-        span.textContent = 'Copy';
-        btn.classList.remove('builder__copy--done');
-      }, 1500);
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  tabs.forEach((b, i) => {
+    b.addEventListener('click', () => selectTab(b.dataset.tab!));
+    b.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (!step) return;
+      const rtl = getComputedStyle(root).direction === 'rtl' ? -1 : 1;
+      selectTab(tabs[(i + step * rtl + tabs.length) % tabs.length].dataset.tab!, true);
     });
   });
+  root.addEventListener('input', build);
+  root.addEventListener('change', build);
 
-  // Restore saved state
-  restore();
+  $('builder-copy').addEventListener('click', async () => {
+    const button = $('builder-copy');
+    if (await copyText($('builder-cmd').textContent ?? '')) flashCopied(button, button.querySelector('span'), S.copied);
+  });
+
+  selectTab(restore());
+  restored = true;
 </script>
 
 <style>
   .builder {
-    background: var(--s1);
-    border: 1px solid var(--b1);
-    border-radius: var(--r2);
     overflow: hidden;
-    box-shadow: var(--shadow-md);
   }
 
   .builder__tabs {
     display: flex;
+    gap: 4px;
+    padding: 6px;
+    background: var(--s2);
     border-bottom: 1px solid var(--b1);
-    flex-wrap: wrap;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-
   .builder__tab {
-    flex: 1;
-    padding: 11px 8px;
+    flex: 1 0 auto;
+    padding: 8px 14px;
     background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--t3);
+    border: 1px solid transparent;
+    border-radius: var(--r);
+    color: var(--t2);
     font-family: var(--body);
-    font-size: 0.78rem;
-    font-weight: 500;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
     white-space: nowrap;
   }
-  .builder__tab:hover { color: var(--t2); }
-  .builder__tab--active {
-    color: var(--ac);
-    border-bottom-color: var(--ac);
+  .builder__tab:hover {
+    color: var(--t1);
+  }
+  .builder__tab[aria-selected='true'] {
+    background: var(--s1);
+    border-color: var(--b1);
+    color: var(--t1);
+    box-shadow: var(--shadow-sm);
   }
 
   .builder__body {
-    padding: 20px 24px 24px;
+    padding: 24px;
   }
-
   .builder__desc {
-    font-size: 0.78rem;
-    color: var(--t3);
-    margin-bottom: 16px;
-    line-height: 1.5;
+    color: var(--t2);
+    font-size: 0.97rem;
+    margin-bottom: 20px;
+    max-width: 640px;
   }
 
+  .builder__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+    gap: 18px 20px;
+  }
   .builder__field {
-    margin-bottom: 12px;
-  }
-
-  .builder__label {
     display: flex;
-    align-items: center;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--t1);
-    margin-bottom: 5px;
-    user-select: none;
-  }
-  .builder__label--check {
-    cursor: pointer;
+    flex-direction: column;
     gap: 6px;
   }
-
-  .builder__checkbox {
-    accent-color: var(--ac);
+  .builder__field--wide,
+  .builder__checks {
+    grid-column: 1 / -1;
   }
-
+  .builder__field[hidden],
+  .builder__check[hidden] {
+    display: none;
+  }
+  .builder__label,
+  .builder__check-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--t1);
+  }
   .builder__input {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
     background: var(--bg);
-    border: 1px solid var(--b1);
+    border: 1px solid var(--b2);
+    border-radius: var(--r);
     color: var(--t1);
     font-family: var(--mono);
-    font-size: 0.82rem;
-    padding: 9px 12px;
-    border-radius: var(--r);
-    outline: none;
-    transition: border-color 0.1s;
-    width: 100%;
+    font-size: 0.88rem;
   }
-  .builder__input:focus { border-color: var(--b2); }
-  .builder__input--short { width: 120px; }
-  .builder__input--toggle { display: none; }
-
+  .builder__input::placeholder {
+    color: var(--t3);
+    opacity: 1;
+  }
+  .builder__input:focus {
+    outline: 2px solid var(--ac);
+    outline-offset: 0;
+    border-color: transparent;
+  }
+  .builder__field--wide .builder__input {
+    max-width: 420px;
+  }
   .builder__hint {
     display: block;
-    font-size: 0.72rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
     color: var(--t3);
-    margin-top: 3px;
-    line-height: 1.4;
   }
-  .builder__hint :global(code) {
-    font-family: var(--mono);
-    font-size: 0.7rem;
-    background: var(--s2);
-    color: var(--t2);
-    padding: 1px 4px;
-    border-radius: 3px;
+
+  .builder__checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+  }
+  .builder__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 320px;
+    cursor: pointer;
+  }
+  .builder__check input {
+    margin-top: 4px;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ac);
+    flex-shrink: 0;
   }
 
   .builder__output {
-    position: relative;
-    margin-top: 16px;
+    direction: ltr;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 14px 12px 14px 18px;
     background: var(--code-bg);
     border: 1px solid var(--code-br);
     border-radius: var(--r);
-    padding: 16px 20px;
-    padding-right: 80px;
   }
   .builder__output pre {
+    flex: 1;
+    min-width: 0;
     font-family: var(--mono);
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     color: var(--t1);
     white-space: pre-wrap;
-    word-break: break-all;
+    overflow-wrap: anywhere;
   }
-
-  .builder__copy {
-    position: absolute;
-    top: 50%;
-    right: 12px;
-    transform: translateY(-50%);
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    background: var(--s1);
-    border: 1px solid var(--b1);
-    border-radius: var(--r);
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    color: var(--t3);
-    cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
-  }
-  .builder__copy:hover { color: var(--t1); border-color: var(--b2); }
-  .builder__copy--done { color: var(--ok); border-color: var(--ok); }
-
-  .builder__status {
-    font-size: 0.78rem;
-    color: var(--t3);
-    margin-top: 8px;
-    line-height: 1.5;
-  }
-  .builder__status--ok { color: var(--ok); }
-  .builder__status--error { color: var(--err); }
-
-  .builder__wizard {
-    margin-top: 12px;
-    padding: 12px 16px;
-    font-size: 0.8rem;
-    line-height: 1.55;
-    color: var(--t2);
-    background: var(--ok2);
-    border-left: 3px solid var(--ok);
-    border-radius: 0 var(--r) var(--r) 0;
-  }
-  .builder__wizard strong {
-    color: var(--t1);
-    font-weight: 600;
-  }
-  .builder__wizard code {
-    font-family: var(--mono);
-    font-size: 0.76rem;
-    background: var(--s1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--b1);
-    color: var(--t1);
-  }
-
   .builder__output pre::before {
     content: '$ ';
     color: var(--t3);
   }
+  .builder__copy {
+    flex-shrink: 0;
+  }
 
-  @media (max-width: 480px) {
-    .builder__tab { font-size: 0.72rem; padding: 9px 6px; }
-    .builder__body { padding: 16px; }
+  .builder__status {
+    min-height: 1.5em;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: var(--t2);
+  }
+  .builder__status[data-tone='ok'] {
+    color: var(--ok);
+  }
+  .builder__status[data-tone='error'] {
+    color: var(--err);
+  }
+  .builder__wizard {
+    margin-top: 8px;
+    padding: 12px 16px;
+    font-size: 0.92rem;
+    color: var(--t2);
+    background: var(--ac3);
+    border-inline-start: 3px solid var(--ac);
+    border-radius: var(--r);
+  }
+  .builder__wizard[hidden] {
+    display: none;
+  }
+  .builder__wizard :global(strong) {
+    color: var(--t1);
+  }
+
+  @media (max-width: 560px) {
+    .builder__body {
+      padding: 18px;
+    }
   }
 </style>
