@@ -11,6 +11,7 @@ from meridian.reconciler.resources import (
     ResourceAction,
     ResourceObservation,
     ResourceReconcileError,
+    UnboundDependencyError,
     UnknownResourceOutcome,
     postcondition_key,
 )
@@ -32,7 +33,9 @@ def resolved_ids(
     values = [context.remote_id(logical_id, generation) for logical_id in logical_ids]
     missing = [logical_id for logical_id, remote_id in zip(logical_ids, values, strict=True) if not remote_id]
     if missing:
-        raise ResourceReconcileError(f"Remote identities are missing for reviewed dependencies: {', '.join(missing)}.")
+        raise UnboundDependencyError(
+            f"Remote identities are missing for reviewed dependencies: {', '.join(missing)}.", missing
+        )
     return values
 
 

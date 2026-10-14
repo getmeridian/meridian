@@ -19,6 +19,18 @@ class ResourceReconcileError(MeridianError):
     """A reviewed resource plan cannot be reconciled safely."""
 
 
+class UnboundDependencyError(ResourceReconcileError):
+    """A reviewed dependency has no remote identity in this generation yet.
+
+    A new generation binds each resource as it applies, so read-only inspection
+    reports its dependents as waiting on those dependencies, not as lost evidence.
+    """
+
+    def __init__(self, message: str, logical_ids: list[str]) -> None:
+        super().__init__(message)
+        self.logical_ids = logical_ids
+
+
 class PendingPlanConflictError(ResourceReconcileError):
     """A different plan cannot replace a remotely ambiguous pending plan."""
 
@@ -150,10 +162,17 @@ class ResourceInspection(CoreModel):
     action: ResourceAction
     observation: ResourceObservation | None = None
     error: str = ""
+    # Unconverged dependencies that must apply before this resource can be observed.
+    waiting_on: list[str] = Field(default_factory=list)
 
     @property
     def converged(self) -> bool:
-        return not self.error and self.observation is not None and observation_converges(self.action, self.observation)
+        return (
+            not self.error
+            and not self.waiting_on
+            and self.observation is not None
+            and observation_converges(self.action, self.observation)
+        )
 
 
 class ResourceInspectionResult(CoreModel):

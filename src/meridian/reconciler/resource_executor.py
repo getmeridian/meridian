@@ -39,6 +39,7 @@ from meridian.reconciler.resources import (
     ResourceInspectionResult,
     ResourceObservation,
     ResourceReconcileError,
+    UnboundDependencyError,
     UnknownResourceOutcome,
     UnsupportedResourceRetirementError,
     build_resource_actions,
@@ -302,20 +303,14 @@ def inspect_resource_plan(
                 action,
                 _binding(action, cluster),
             )
-        except Exception as exc:
-            inspections.append(
-                ResourceInspection(
-                    action=action,
-                    error=f"observation failed: {exc}",
-                )
-            )
+        except UnboundDependencyError as exc:
+            # Apply binds these dependencies first; until then this resource is a pending change.
+            inspections.append(ResourceInspection(action=action, waiting_on=sorted(exc.logical_ids)))
             continue
-        inspections.append(
-            ResourceInspection(
-                action=action,
-                observation=observation,
-            )
-        )
+        except Exception as exc:
+            inspections.append(ResourceInspection(action=action, error=f"observation failed: {exc}"))
+            continue
+        inspections.append(ResourceInspection(action=action, observation=observation))
     return ResourceInspectionResult(
         plan_hash=plan.plan_hash,
         generation=generation,

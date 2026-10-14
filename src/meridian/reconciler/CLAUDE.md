@@ -31,6 +31,7 @@
 - **Only a step-boundary `OperationCancelledError` is `cancelled`** — timeouts and killed processes stay `unknown`.
 - **Attest server artifacts against their own inputs** (target, pins, renderer contract) — hashing the whole deployment re-runs every server on any fleet edit.
 - **Delete, never mark inactive** — give a kind an idempotent driver `retire()` (404 = done) before adding it to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.
+- **Unbound dependencies are pending, not lost evidence** — a new generation binds identities as it applies, so raise `UnboundDependencyError` for a missing dependency identity; `plan` shows those dependents as `recheck` (exit 2), and every other observation failure stays unavailable (exit 3).
 - **Bindings are per generation** — new generations find resources by name; GET Templates by UUID before comparing (the list omits content).
 - **A renamed Host keeps its UUID** — remarks change with fleet shape, so adopt the committed binding's Host before looking up by remark; name-only lookup created twins.
 - **A moved exit keeps its Node** — `SERVER_PLACED` kinds retire their old placement, but the panel Node is PATCHed to the new address, never recreated.

@@ -248,8 +248,13 @@ def run_v4_plan(
         for kind_name, count in sorted(counts.items()):
             err_console.print(f"  {kind_name}: {count}")
         for item in drifted:
-            detail = f" — {item.error}" if item.error else ""
-            err_console.print(f"  [yellow]repair[/yellow] {escape(item.action.resource.logical_id)}{escape(detail)}")
+            logical_id = escape(item.action.resource.logical_id)
+            if not item.waiting_on:
+                err_console.print(f"  [yellow]repair[/yellow] {logical_id}")
+                continue
+            # Unobservable until its dependencies apply; apply re-checks it then.
+            waits = item.waiting_on[:2] + ([f"{len(item.waiting_on) - 2} more"] if len(item.waiting_on) > 2 else [])
+            err_console.print(f"  [dim]recheck[/dim] {logical_id} — after {escape(', '.join(waits))}")
         for item in observation_errors:
             err_console.print(
                 f"  [yellow]unavailable[/yellow] {escape(item.action.resource.logical_id)} — {escape(item.error)}"

@@ -25,6 +25,7 @@ from meridian.reconciler.resources import (
     ResourceApplyReceipt,
     ResourceObservation,
     ResourceReconcileError,
+    UnboundDependencyError,
     UnknownResourceOutcome,
     UnsupportedResourceRetirementError,
     build_resource_actions,
@@ -178,27 +179,31 @@ class TestResourceInspection:
         assert driver.apply_calls == []
         assert {key: value for key, value in vars(cluster).items() if key != "_lock"} == before
 
-    def test_reports_missing_and_failed_observations_as_drift(self) -> None:
+    def test_a_dependent_without_a_bound_identity_waits_instead_of_reporting_lost_evidence(self) -> None:
+        plan = _plan(with_probe=True)
+        firewall = ScriptedDriver([_missing()])
+        unbound = UnboundDependencyError("Remote identity is missing.", ["firewall:srv-exit:tcp:443"])
+        probe = ScriptedDriver([unbound])
+
+        result = inspect_resource_plan(plan, ClusterConfig(), {"firewall_rule": firewall, "probe": probe})
+
+        assert not result.converged
+        missing, waiting = result.inspections
+        assert missing.observation == _missing()
+        assert waiting.error == ""
+        assert waiting.waiting_on == ["firewall:srv-exit:tcp:443"]
+        assert firewall.apply_calls == [] and probe.apply_calls == []
+
+    def test_any_other_failed_observation_is_lost_evidence_even_behind_pending_work(self) -> None:
         plan = _plan(with_probe=True)
         firewall = ScriptedDriver([_missing()])
         probe = ScriptedDriver([OSError("probe unavailable")])
 
-        result = inspect_resource_plan(
-            plan,
-            ClusterConfig(),
-            {
-                "firewall_rule": firewall,
-                "probe": probe,
-            },
-        )
+        result = inspect_resource_plan(plan, ClusterConfig(), {"firewall_rule": firewall, "probe": probe})
 
-        assert not result.converged
-        drifted = [inspection for inspection in result.inspections if not inspection.converged]
-        assert len(drifted) == 2
-        assert drifted[0].observation == _missing()
-        assert drifted[1].error == ("observation failed: probe unavailable")
-        assert firewall.apply_calls == []
-        assert probe.apply_calls == []
+        _missing_firewall, failed = result.inspections
+        assert failed.error == "observation failed: probe unavailable"
+        assert failed.waiting_on == []
 
 
 class TestCheckpointedExecution:

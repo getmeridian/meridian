@@ -36,6 +36,7 @@ from meridian.reconciler.resources import (
     ResourceDrivers,
     ResourceObservation,
     ResourceReconcileError,
+    UnboundDependencyError,
     payload_of,
 )
 from meridian.reconciler.routing_credentials import resolve_service_credentials
@@ -682,7 +683,9 @@ def _host_expected(
             generation,
         )
         if not template_uuid:
-            raise ResourceReconcileError(f"Template identity is missing for Host {payload.remark!r}.")
+            raise UnboundDependencyError(
+                f"Template identity is missing for Host {payload.remark!r}.", [payload.xray_json_template_ref]
+            )
     return {
         "remark": payload.remark,
         "address": payload.address or context.address(payload.address_server_ref),

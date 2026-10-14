@@ -20,6 +20,7 @@ from meridian.reconciler.resources import (
     ResourceApplyReceipt,
     ResourceObservation,
     ResourceReconcileError,
+    UnboundDependencyError,
     payload_of,
 )
 from meridian.remnawave import (
@@ -286,7 +287,7 @@ def _optional_remote_id(
         return ""
     remote_id = context.remote_id(logical_id, generation)
     if not remote_id:
-        raise ResourceReconcileError(f"Remote identity is missing for {logical_id}.")
+        raise UnboundDependencyError(f"Remote identity is missing for {logical_id}.", [logical_id])
     return remote_id
 
 

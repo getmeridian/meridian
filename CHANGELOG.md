@@ -104,6 +104,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   how many, and `--component` picks node, panel, nginx, or relay. Every line is
   redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
   path), so the output is safe to share; `doctor` now masks that path too.
+- **`meridian plan` no longer calls pending changes unavailable** — after any
+  topology edit (even one new client) it listed clients, hosts, and squads as
+  "observation failed" and exited 3, because their dependencies only get
+  their new identities during apply. It now shows them as `recheck … after`
+  those dependencies and exits 2, as for any pending change.
 - **`meridian doctor` reads the node again** — its node log section said
   "container not running" and its Xray process check failed on every exit
   (the node's logs aren't plain text and its image has no `pgrep`), so every
