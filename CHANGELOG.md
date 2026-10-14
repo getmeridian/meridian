@@ -232,6 +232,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   on restart; the live SSH port is never firewalled; teardown removes everything
   Meridian created and nothing it didn't: fail2ban stays on, and nginx keeps
   running when it serves your own sites, as do your own HAProxy/Caddy.
+- Deploy checks the loopback ports its nginx serves the panel on (8443 and
+  8444) before changing anything, and names the process holding one, instead
+  of failing halfway through on `nginx -t`.
 - An out-of-date copy of `cluster.yml` can't undo newer changes. The
   control server records the last change applied, and `apply` refuses to run
   from an older copy or while another machine is applying.

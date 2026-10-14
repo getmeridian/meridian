@@ -1,4 +1,4 @@
-"""Port 80/443 preflight: Meridian's own listeners pass, anything else conflicts."""
+"""Port preflight (443, 80, nginx's internal 8443/8444): Meridian's own listeners pass, anything else conflicts."""
 
 from __future__ import annotations
 
@@ -43,6 +43,8 @@ def test_caddy_from_an_older_meridian_release_is_allowed() -> None:
         _listener("caddy"),
         _ss(),  # test -e /etc/caddy/conf.d/meridian.caddy
         _ss(),  # port 80 free
+        _ss(),  # 8443 free
+        _ss(),  # 8444 free
     ]
     check_ports(conn, yes=True)
     assert "meridian.caddy" in conn.run.call_args_list[1].args[0]
@@ -73,6 +75,16 @@ def test_foreign_listener_fails_in_yes_mode(fail: MagicMock, ss_output: SimpleNa
     assert named in fail.call_args[0][0]
 
 
+@pytest.mark.parametrize("port", [8443, 8444])
+def test_a_foreign_listener_on_an_internal_nginx_port_fails_before_deploy(fail: MagicMock, port: int) -> None:
+    conn = MagicMock()
+    conn.run.side_effect = lambda command, **_: _listener("python3", port) if f":{port}" in command else _ss()
+    with pytest.raises(typer.Exit):
+        check_ports(conn, yes=True)
+    message = fail.call_args[0][0]
+    assert f"Port {port}" in message and "python3" in message and "127.0.0.1" in message
+
+
 def test_operators_own_caddy_is_a_conflict(fail: MagicMock) -> None:
     conn = MagicMock()
     conn.run.side_effect = [
@@ -97,6 +109,6 @@ def test_interactive_abort_on_a_conflict_fails(_choose: MagicMock, fail: MagicMo
 @patch("meridian.commands.port_check.choose", return_value=1)
 def test_interactive_retry_passes_once_the_port_is_free(choose: MagicMock, _console: MagicMock) -> None:
     conn = MagicMock()
-    conn.run.side_effect = [_listener("apache2"), _ss(), _ss()]
+    conn.run.side_effect = [_listener("apache2"), _ss(), _ss(), _ss(), _ss()]
     check_ports(conn, yes=False)
     choose.assert_called_once()
