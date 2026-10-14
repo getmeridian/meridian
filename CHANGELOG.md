@@ -104,6 +104,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   how many, and `--component` picks node, panel, nginx, or relay. Every line is
   redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
   path), so the output is safe to share; `doctor` now masks that path too.
+- **`meridian doctor` reads the node again** — its node log section said
+  "container not running" and its Xray process check failed on every exit
+  (the node's logs aren't plain text and its image has no `pgrep`), so every
+  report came out partial with exit 3.
 - **"What is blocked?"** — `meridian test --probe` now tells a blocked server
   IP from a blocked camouflage SNI by comparing the server with and without the
   SNI against the real camouflage site, and inconclusive stays inconclusive.

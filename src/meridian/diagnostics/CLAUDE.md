@@ -28,5 +28,6 @@
 - **Blocking verdicts need a control** — an unreachable camouflage site makes the differential inconclusive, never "IP blocked"; only the control server's ~50 KB `pwa/app.js` is a size-known stall target, so exit-only servers get no data-flow check.
 - **Unreadable images are unavailable, not drift** — missing Docker, SSH failure, or partial `docker inspect` output yields `ServerImages.error`, never `upgrade`.
 - **Node-plugin readiness checks the kernel only** — `node_plugins.py` warns on a pre-5.7 kernel with a fix prefixed "Only if you use node plugins"; the node container bundles its own nftables library, so never require the host `nft` binary. An unreadable `uname` is skipped.
+- **Node logs are not plain text, and the node image has no `pgrep`** — `grep -a` every log pipe (grep prints nothing for a "binary" stream) and find Xray (`rw-core`) with host-side `docker top`, not `docker exec`.
 - **Log lines are attacker-influenced** — a prober's request line lands in nginx's error log; strip control characters, search with `grep -F` on a quoted pattern, and print plain text.
 - **External checks need an outside vantage** — on the server itself, own-address connections bypass UFW over loopback; `check_port_surface(local_vantage=True)` skips instead of calling firewalled ports public.

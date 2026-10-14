@@ -112,15 +112,15 @@ def test_grep_pattern_is_one_quoted_fixed_string() -> None:
 
     command = tail_command(source, lines=50, pattern=pattern)
 
-    assert f"grep -F -i -e {shlex.quote(pattern)} | tail -n 50" in command
-    assert shlex.split(command.split("grep -F -i -e ", 1)[1])[0] == pattern
+    assert f"grep -a -F -i -e {shlex.quote(pattern)} | tail -n 50" in command
+    assert shlex.split(command.split("grep -a -F -i -e ", 1)[1])[0] == pattern
 
 
 def test_pattern_reaches_every_source(fleet: SimpleNamespace) -> None:
     _run(fleet, "exit-a", pattern="-handshake failed")
 
     assert fleet.conn._calls
-    assert all(f"grep -F -i -e {shlex.quote('-handshake failed')}" in call for call in fleet.conn._calls)
+    assert all(f"grep -a -F -i -e {shlex.quote('-handshake failed')}" in call for call in fleet.conn._calls)
 
 
 def test_log_lines_are_redacted_and_printed_without_markup(

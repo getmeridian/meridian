@@ -29,6 +29,13 @@ _NODE_CONTAINER = (
     "\"$(docker inspect --type container --format '{{.Name}}' "
     f'{shlex.quote(NODE.name)} {shlex.quote(NODE.legacy)} 2>/dev/null | head -1 | tr -d /)"'
 )
+# The node image ships no pgrep, so ask Docker for the container's processes from the host.
+# Xray runs as rw-core; match the binary, not the s6 supervisor that keeps running without it.
+XRAY_PID_COMMAND = (
+    f"docker top {_NODE_CONTAINER} -o pid,args 2>/dev/null | awk '$2 ~ /(^|\\/)(rw-core|xray)$/ {{print $1; exit}}'"
+)
+# Node logs carry raw bytes; without -a grep calls them binary and prints nothing.
+NODE_LOG_COMMAND = f"docker logs {_NODE_CONTAINER} --tail 50 2>&1 | grep -a -v '^\\s*$' | sort -u | tail -20"
 
 
 def container_roles(names: str) -> str:
@@ -243,10 +250,7 @@ def run(
     if not xray_expected:
         xray_status = "not expected for this server's configured roles"
     else:
-        xray_pid_raw = evidence_conn.run(
-            f"docker exec {_NODE_CONTAINER} pgrep -f xray 2>/dev/null",
-            timeout=10,
-        ).stdout.strip()
+        xray_pid_raw = evidence_conn.run(XRAY_PID_COMMAND, timeout=10).stdout.strip()
         if xray_pid_raw:
             xray_status = f"running (PID {xray_pid_raw.splitlines()[0]})"
         else:
@@ -259,10 +263,9 @@ def run(
         )
 
     if xray_expected:
-        log_cmd = f"docker logs {_NODE_CONTAINER} --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
-        xray_logs = evidence_conn.run(log_cmd, timeout=15).stdout.strip() or "container not running"
+        xray_logs = evidence_conn.run(NODE_LOG_COMMAND, timeout=15).stdout.strip() or "container not running"
         xray_logs = redact_diagnostic_text(xray_logs, known_secrets)
-        sections.append((f"{NODE.role} Logs", f"$ {log_cmd}\n{xray_logs}"))
+        sections.append((f"{NODE.role} Logs", f"$ {NODE_LOG_COMMAND}\n{xray_logs}"))
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:

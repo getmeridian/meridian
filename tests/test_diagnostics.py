@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -197,7 +200,7 @@ def test_doctor_uses_v4_roles_and_redacts_the_final_report() -> None:
     assert "not expected for this server's configured roles" in rendered
     assert "diagnostic-secret" not in rendered
     assert "[REDACTED]" in rendered
-    assert not any("pgrep -f xray" in command for command in connection.commands)
+    assert not any("docker top" in command for command in connection.commands)
     assert not any("docker logs" in command for command in connection.commands)
     listener_command = next(command for command in connection.commands if command.startswith("ss -tulnp"))
     assert all(f"sport = :{port}" in listener_command for port in (7443, 9443, 18443, 39001))
@@ -312,7 +315,7 @@ def test_doctor_keeps_relay_only_diagnostics_role_specific() -> None:
     assert "TLS Certificate" not in rendered
     assert "Geo-blocking" not in rendered
     assert any("ss -tlnp sport = :7443" in command for command in commands)
-    assert not any("pgrep -f xray" in command for command in commands)
+    assert not any("docker top" in command for command in commands)
 
 
 def test_doctor_names_the_role_behind_each_neutral_container_name() -> None:
@@ -327,3 +330,35 @@ def test_doctor_names_the_role_behind_each_neutral_container_name() -> None:
         "remnawave-db: Panel database, pre-rename (meridian apply renames it)",
     ]
     assert container_roles("my-app\n") == ""
+
+
+def _run_with_fake_docker(tmp_path: Path, command: str, script: str) -> str:
+    """Run a doctor command in bash with ``docker`` replaced by *script*."""
+    docker = tmp_path / "docker"
+    docker.write_text("#!/bin/sh\n" + script)
+    docker.chmod(0o755)
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"}
+    return subprocess.run(["bash", "-c", command], capture_output=True, text=True, env=env, check=False).stdout
+
+
+def test_node_logs_with_raw_bytes_are_still_shown(tmp_path: Path) -> None:
+    from meridian.commands.diagnostics import NODE_LOG_COMMAND
+
+    raw = 'printf "xray started\\033[0m\\000\\nconnection accepted\\n"'
+    script = f'case "$1" in inspect) echo /netagent ;; logs) {raw} ;; esac\n'
+    output = _run_with_fake_docker(tmp_path, NODE_LOG_COMMAND, script)
+
+    assert "xray started" in output and "connection accepted" in output
+
+
+def test_xray_pid_comes_from_docker_top_because_the_node_image_has_no_pgrep(tmp_path: Path) -> None:
+    from meridian.commands.diagnostics import XRAY_PID_COMMAND
+
+    supervised = 'printf "PID COMMAND\\n4100 s6-supervise xray\\n4200 rw-node\\n'
+    core = '4242 /usr/local/bin/rw-core -config @x\\n"'
+    script = 'case "$1" in inspect) echo /netagent ;; top) ' + supervised + core + " ;; esac\n"
+    assert "pgrep" not in XRAY_PID_COMMAND
+    assert _run_with_fake_docker(tmp_path, XRAY_PID_COMMAND, script).strip() == "4242"
+    # The s6 supervisor alone does not mean Xray runs.
+    stopped = 'case "$1" in inspect) echo /netagent ;; top) ' + supervised + '" ;; esac\n'
+    assert _run_with_fake_docker(tmp_path, XRAY_PID_COMMAND, stopped).strip() == ""

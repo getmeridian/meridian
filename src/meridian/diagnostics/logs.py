@@ -77,12 +77,13 @@ def log_sources(
 def tail_command(source: LogSource, *, lines: int, pattern: str = "") -> str:
     """The shell command printing the last *lines* of *source*, only those containing *pattern* when set.
 
-    The pattern is a case-insensitive fixed string (``grep -F -i``), so a user's
+    The pattern is a case-insensitive fixed string (``grep -a -F -i``), so a user's
     search text never becomes a regular expression or a shell word.
     """
     count = shlex.quote(str(lines))
     name = shlex.quote(source.name)
-    grep = f"grep -F -i -e {shlex.quote(pattern)}"
+    # -a: container logs carry raw bytes, and grep prints nothing for a "binary" stream.
+    grep = f"grep -a -F -i -e {shlex.quote(pattern)}"
     if source.kind == "container":
         guard = f"docker inspect --type container {name} >/dev/null 2>&1 || exit {_ABSENT}"
         read = (
