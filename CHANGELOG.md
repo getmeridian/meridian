@@ -36,7 +36,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   plugins (Torrent Blocker, ingress and egress filters) need a 5.7+ kernel
   and otherwise silently do nothing; every exit and
   gateway now reports "Node plugin readiness" with the fix. The docs explain
-  turning plugins on in the panel.
+  turning plugins on in the panel. Server inbounds now sniff traffic
+  (route-only, destinations untouched), so Torrent Blocker can recognize
+  BitTorrent once you enable it.
 - **Connect a bot safely** — the client guide shows how to give a community bot
   its own scoped, expiring panel token and which endpoints a read-only bot
   needs, instead of sharing Meridian's full-access token.

@@ -145,6 +145,14 @@ def test_geo_block_refuses_russian_destinations_only_when_reviewed() -> None:
     assert all(rule in blocked["routing"]["rules"] for rule in geo_rules)
 
 
+def test_every_inbound_sniffs_route_only_so_torrent_blocker_can_see_bittorrent() -> None:
+    config = render_workload_config(_profile(), reality_keys=_keys())
+
+    assert config["inbounds"]
+    for inbound in config["inbounds"]:
+        assert inbound["sniffing"] == {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True}
+
+
 def test_access_logging_is_disabled() -> None:
     config = render_workload_config(_profile(), reality_keys=_keys())
 

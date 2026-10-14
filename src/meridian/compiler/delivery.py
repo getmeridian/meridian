@@ -40,7 +40,7 @@ DEFAULT_CLIENT_ROUTES: tuple[ClientRoute, ...] = (
 )
 
 # Route by the sniffed name (IP-only clients and QUIC) without rewriting the destination.
-_SNIFFING: dict[str, Any] = {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True}
+ROUTE_ONLY_SNIFFING: dict[str, Any] = {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True}
 
 _XRAY_OUTBOUND: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "BLOCK"}
 _MIHOMO_TARGET: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "REJECT"}
@@ -169,14 +169,14 @@ def xray_json_template(edge_tag: str = "MERIDIAN_V4_XRAY_EDGE") -> dict[str, Any
                 "port": 10808,
                 "protocol": "socks",
                 "settings": {"udp": True},
-                "sniffing": _SNIFFING,
+                "sniffing": ROUTE_ONLY_SNIFFING,
             },
             {
                 "tag": "HTTP",
                 "listen": "127.0.0.1",
                 "port": 10809,
                 "protocol": "http",
-                "sniffing": _SNIFFING,
+                "sniffing": ROUTE_ONLY_SNIFFING,
             },
         ],
         "outbounds": [

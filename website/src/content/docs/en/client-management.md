@@ -117,7 +117,7 @@ Remnawave's node plugins (Ingress Filter, Egress Filter, Torrent Blocker, Connec
 
 The plugins write nftables rules on the host, so upstream also requires a Linux kernel 5.7 or newer; on an older one they silently do nothing. `meridian check` reports this as **Node plugin readiness** on every exit and gateway, and warns about an old kernel (move to Ubuntu 22.04+ or Debian 11+). If you don't use plugins, you can ignore that warning.
 
-Torrent Blocker also needs traffic sniffing on the inbound to recognize BitTorrent, and Meridian's inbounds leave sniffing off, so it has nothing to act on. The ingress and egress filters work as documented.
+Torrent Blocker recognizes BitTorrent through traffic sniffing, which Meridian turns on (route-only, so destinations are never rewritten) on every inbound it renders. Turn the plugin on in the panel and it works on every exit.
 
 ### Connect a bot to the panel
 

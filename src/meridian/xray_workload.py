@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from meridian.cluster import RealityKeyBinding
+from meridian.compiler.delivery import ROUTE_ONLY_SNIFFING
 from meridian.compiler.models import (
     ConfigProfilePayload,
     InboundPayload,
@@ -143,6 +144,9 @@ def _render_inbound(
     reality_keys: RealityKeyBinding | None,
 ) -> dict[str, Any]:
     rendered = _render_inbound_body(inbound, reality_keys=reality_keys)
+    # Server-side sniffing feeds the geo-block domain rules for IP-only requests and
+    # lets the panel's Torrent Blocker plugin see BitTorrent; it never rewrites targets.
+    rendered["sniffing"] = {**ROUTE_ONLY_SNIFFING, "destOverride": list(ROUTE_ONLY_SNIFFING["destOverride"])}
     if inbound.trust_forwarded_ip:
         # Reality sits behind the 443 stream (PROXY protocol); XHTTP/WS behind an nginx TLS server.
         sockopt: dict[str, Any] = (
