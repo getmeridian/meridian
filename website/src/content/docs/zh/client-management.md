@@ -97,3 +97,26 @@ Meridian 和面板分工，所以您的编辑不会被覆盖：
 | 存在哪些客户端、他们的名字和他们的小队 | 通知、插件、IP 控制和其他面板设置 |
 
 `meridian plan` 在任何事情改变之前显示 Meridian 管理内容的任何差异。您在面板中添加的用户从未被 Meridian 列出、改变或删除；要给某人一个 Meridian 管理的链接和连接页面，改为使用 `meridian client add`。
+
+### 将机器人连接到面板
+
+社区机器人，例如告知用户剩余流量的 Telegram 机器人，直接与 Remnawave API 通信。请为每个机器人单独创建令牌，只授予它所需的权限：
+
+1. 打开面板（`meridian panel` 会打印 URL），进入 **Remnawave Settings → API tokens**（Remnawave 设置 → API 令牌），选择 **Create API token**。
+2. 以机器人名称为令牌命名，并将 **Expires in (days)** 设为您确实会轮换的期限，例如 30 或 90 天。
+3. 从 **Read only** 预设开始，或选择单个端点，只授予机器人用到的权限。面板只显示一次令牌；请将其与机器人的密钥一起保存。
+4. 将机器人指向 `meridian panel` 给出的面板 URL，并以 `Authorization: Bearer <token>` 发送令牌。API 路径位于该 URL 之下，例如 `https://198.51.100.10/<secret-path>/api/users/by-username/alice`。该 URL 包含面板的秘密路径，因此要像令牌一样严格保密。
+
+权限范围命名为 `resource:endpoint`；`resource:read` 授予某资源的所有读取端点，`resource:write` 授予所有写入端点。典型的只读机器人需要：
+
+| 范围 | 端点 | 返回 |
+|---|---|---|
+| `users:by-username` | `GET /api/users/by-username/{username}` | 单个用户的状态、已用流量和限额、过期时间 |
+| `users:by-short-uuid` | `GET /api/users/by-short-uuid/{shortUuid}` | 同上，通过用户订阅链接中的 ID 查找 |
+| `users:list` | `GET /api/users` | 所有用户，分页 |
+| `system:stats` | `GET /api/system/stats` | 面板范围内的用户和流量总计 |
+| `nodes:list` | `GET /api/nodes` | 每个节点的状态和流量 |
+
+仅当机器人需要修改账户时才添加写入范围，例如用于续期的支付机器人的 `users:extend`（`POST /api/users/{id}/actions/extend`）。状态、限额和过期时间由您自行修改（见上表），因此下一次应用会保留机器人的修改。机器人不得重命名或删除 Meridian 的客户端：下一次应用会重新创建它们。
+
+不要把 Meridian 自己的令牌（令牌列表中的 `meridian-provisioner`）交给机器人。它拥有面板的完全访问权限，而且几乎不会过期，机器人所在主机一旦泄露，所有节点、密钥和用户都会暴露。单独的令牌把损失限制在机器人能做的范围内，会自行过期，并且删除它不影响 Meridian。请不要动 `meridian-provisioner`；所有客户端命令和应用命令都使用它。

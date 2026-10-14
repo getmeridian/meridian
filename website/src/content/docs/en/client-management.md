@@ -118,3 +118,26 @@ Remnawave's node plugins (Ingress Filter, Egress Filter, Torrent Blocker, Connec
 The plugins write nftables rules on the host, so upstream also requires a Linux kernel 5.7 or newer; on an older one they silently do nothing. `meridian check` reports this as **Node plugin readiness** on every exit and gateway, and warns about an old kernel (move to Ubuntu 22.04+ or Debian 11+). If you don't use plugins, you can ignore that warning.
 
 Torrent Blocker also needs traffic sniffing on the inbound to recognize BitTorrent, and Meridian's inbounds leave sniffing off, so it has nothing to act on. The ingress and egress filters work as documented.
+
+### Connect a bot to the panel
+
+Community bots, such as a Telegram bot that tells people how much traffic they have left, talk to the Remnawave API directly. Give each bot its own token with only the access it needs:
+
+1. Open the panel (`meridian panel` prints the URL), go to **Remnawave Settings → API tokens**, and choose **Create API token**.
+2. Name the token after the bot and set **Expires in (days)** to a period you will actually rotate, such as 30 or 90 days.
+3. Start from the **Read only** preset, or pick single endpoints, and grant only what the bot uses. The panel shows the token once; store it with the bot's secrets.
+4. Point the bot at the panel URL from `meridian panel` and send the token as `Authorization: Bearer <token>`. API paths go below that URL, for example `https://198.51.100.10/<secret-path>/api/users/by-username/alice`. The URL contains the panel's secret path, so keep it as private as the token.
+
+Scopes are named `resource:endpoint`; `resource:read` grants every read endpoint of a resource and `resource:write` every write. A typical read-only bot needs:
+
+| Scope | Endpoint | Returns |
+|---|---|---|
+| `users:by-username` | `GET /api/users/by-username/{username}` | One user's status, traffic used and limit, and expiry |
+| `users:by-short-uuid` | `GET /api/users/by-short-uuid/{shortUuid}` | The same, found from the ID in the user's subscription link |
+| `users:list` | `GET /api/users` | Every user, paginated |
+| `system:stats` | `GET /api/system/stats` | Panel-wide user and traffic totals |
+| `nodes:list` | `GET /api/nodes` | Each node's status and traffic |
+
+Add a write scope only when the bot changes accounts, for example `users:extend` (`POST /api/users/{id}/actions/extend`) for a payment bot that extends expiry. Status, limits, and expiry are yours to change (see the table above), so the next apply keeps a bot's edits. A bot must not rename or delete Meridian's clients: the next apply recreates them.
+
+Don't hand a bot Meridian's own token (`meridian-provisioner` in the token list). It has full access to the panel and practically never expires, so a leak from the bot's host would expose every node, key, and user. A separate token limits the damage to what the bot can do, expires on its own, and can be deleted without affecting Meridian. Leave `meridian-provisioner` alone; every client and apply command uses it.

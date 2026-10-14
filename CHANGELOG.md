@@ -37,6 +37,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   and otherwise silently do nothing; every exit and
   gateway now reports "Node plugin readiness" with the fix. The docs explain
   turning plugins on in the panel.
+- **Connect a bot safely** — the client guide shows how to give a community bot
+  its own scoped, expiring panel token and which endpoints a read-only bot
+  needs, instead of sharing Meridian's full-access token.
 
 ### Deploy
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
