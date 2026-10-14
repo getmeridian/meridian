@@ -14,7 +14,6 @@ from meridian.console import err_console, fail, info, ok, warn
 from meridian.engine.api import create_engine_app
 from meridian.engine.assets import resolve_studio_assets
 
-
 # Browsers keep Studio's draft per origin, so the same port across launches keeps it.
 DEFAULT_PORT = 7391
 _FALLBACK_PORTS = 9

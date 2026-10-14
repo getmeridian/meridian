@@ -2,31 +2,31 @@
 
 ## Design decisions
 
-**Generated contracts first** — `generated/` is built from `contracts/meridian/v1` with `pnpm run contracts:generate`.
+**Generated contracts first** — `generated/` is built from `contracts/meridian/v1` with `pnpm run contracts:generate`; field labels, help, and defaults come from the workflow contracts through `contractDefaults.js`.
 
 **Schema barrel namespaces** — export each generated schema under its filename-derived namespace; flat wildcard exports collide on shared `$defs` types.
 
-**Static plus local Engine** — Static Studio remains the safe fallback; executable Studio talks to `meridian studio` for localhost-only SSH, files, secrets, operations, and dry-runs.
+**Static plus local Engine** — Static Studio is the safe fallback (copy human CLI commands, download `deploy.json`, paste output); executable Studio talks to `meridian studio` for SSH, secrets, operations, and dry-runs.
 
-**Adapters over contracts** — `staticAdapter.js`, `engineSession.js`, and `storageAdapter.js` consume generated contracts, never command modules.
+**One job per module** — `journey.js` (pure state and step gates), `engineSession.js` (handshake, key, polling), `staticAdapter.js` (requests, validation, commands), `payloadPresenters.js` (one presenter per response schema), `views/` (one per screen, DOM only), `app.js` (the controller), `studio.css`. `studio.astro` is markup plus one module script.
 
-**Guided cockpit UX** — Keep beginner-facing Studio screens focused on one task. Use the journey rail, contextual help, and command sheet instead of always-visible JSON/CLI panels.
+**Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
 
-- Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
-- Static adapter logic is pure browser-safe JavaScript with Node tests; it may persist non-secret wizard progress in versioned localStorage.
-- `engineSession.js` probes health (static vs Engine), takes the Engine key from the `#k=` fragment into sessionStorage (stripped with `history.replaceState`), sends it on every call, and locks on a 401 instead of guessing.
-- Operation state copy and the Cancel control's visibility live in pure `operationState.js`; the page only renders what it returns.
-- Help copy and journey structure live in `helpCatalog.js`; reusable Studio UI fragments live under `components/`.
+- Every module is `// @ts-check` with JSDoc types from `generated/`, so `astro check` catches undefined names and wire-type drift.
+- `engineSession.js` takes the Engine key from the `#k=` fragment into sessionStorage (stripped with `history.replaceState`), re-handshakes after a restart, and locks on a 401 instead of guessing.
+- Pure modules have Node tests (`pnpm run studio:test`, run by `pnpm run build`; fetch mocked, views under jsdom) — no Playwright needed.
 
 ## Pitfalls
 
 - Do not hand-edit `generated/`; change Python contracts, export contracts, then regenerate.
-- Do not let Astro concerns leak into `meridian.core`.
 - Build every DeployRequest (Engine calls and `deploy.json`) with `buildDeployRequestFromJourney()`; it keeps only generated-schema keys, because `DeployRequest` forbids extras and a removed option (`pq`) once made every Studio request a 422.
-- Keep Engine assumptions behind adapters; static Studio still uses generated fixtures, exported requests, copied CLI, or pasted output.
-- Persist only non-secret Studio draft progress in browser storage. Never persist pasted machine output by default.
-- Never include SSH passwords in draft JSON, copied commands, generated contracts, storage, or URLs.
+- Apply defaults when building the request, never into the draft: a field the user cleared stays cleared.
+- Typing updates state only; validation shows on blur or submit, and the timeline only appends (re-rendering closed every open Details).
+- Presenters branch on the error `category`, never on message wording.
+- A preview lives in memory with the signature of the request it planned; never persist it, and never enable Start deploy unless it matches the current request.
+- Text reaches the DOM only through `textContent` (`dom.js`); a test rejects HTML sinks.
+- Persist only non-secret draft progress; never persist pasted output, and never put SSH passwords in drafts, commands, storage, or URLs.
 - The Engine key lives only in this tab's sessionStorage, never localStorage, drafts, logs, or a URL left in history.
 - Cancel means "stop at the next safe point": keep the control disabled (not hidden) while `cancel_requested`, and render `cancelled` from `snapshot.cancellation`, including whether the server changed.

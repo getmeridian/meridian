@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  buildCliCommands,
   buildCommandPack,
+  buildDeployCommand,
+  DEPLOY_FLAGS,
   buildDeployRequestFromJourney,
   buildServerCliCommands,
   buildServerConnectionDraft,
@@ -13,10 +14,10 @@ import {
   parseSshCommand,
   parseEnvelope,
   parseEventStream,
-  summarizeEnvelope,
   validateServerConnectionDraft,
   validateDeployRequest,
 } from "./staticAdapter.js";
+import { commandCatalog } from "./generated/index.js";
 import { createDefaultJourneyState } from "./storageAdapter.js";
 
 const repoRoot = new URL("../../../", import.meta.url);
@@ -158,11 +159,42 @@ test("builds deploy requests by saved server reference and hides raw connection 
   assert.equal("ssh_port" in request, false);
 });
 
-test("builds request-file CLI commands", () => {
-  assert.deepEqual(buildCliCommands(), {
-    deploy: "meridian deploy --request deploy.json --json --events=jsonl",
-    dryRun: "meridian deploy --request deploy.json --dry-run --json",
-  });
+test("copied deploy commands are what a person types: no machine flags", () => {
+  const request = buildDeployRequestFromJourney(journey({ server: { ssh_port: "2222", ssh_user: "ubuntu" } }));
+
+  const command = buildDeployCommand(request);
+
+  assert.equal(
+    command,
+    "meridian deploy 198.51.100.10 --user ubuntu --ssh-port 2222 --client-name default --color ocean --display-name 'My VPN' --sni www.google.com",
+  );
+  assert.equal(buildDeployCommand(request, { dryRun: true }), `${command} --dry-run`);
+  assert.doesNotMatch(command, /--json|--events|--yes/);
+});
+
+test("deploy commands switch booleans off only when the request differs from the CLI default", () => {
+  const request = buildDeployRequestFromJourney(
+    journey({ selectedServerId: "family vpn", deploy: { harden: false, geo_block: false, warp: true, domain: "vpn.example.com" } }),
+  );
+
+  const command = buildDeployCommand(request);
+
+  assert.match(command, /^meridian deploy 'family vpn' /);
+  assert.match(command, / --domain vpn\.example\.com/);
+  assert.match(command, / --no-geo-block/);
+  assert.match(command, / --no-harden/);
+  assert.match(command, / --warp/);
+});
+
+test("every journey option maps to a real meridian deploy flag", () => {
+  const deploy = commandCatalog.commands.find((command) => command.command === "deploy");
+  const known = new Set(deploy.machine_flags);
+
+  for (const key of JOURNEY_DEPLOY_FIELDS) {
+    const flags = [DEPLOY_FLAGS[key]].flat();
+    assert.ok(flags.length > 0, `${key} has no deploy flag`);
+    for (const flag of flags) assert.ok(known.has(flag), `${flag} is not a meridian deploy flag`);
+  }
 });
 
 test("builds a server connection draft from onboarding state", () => {
@@ -304,7 +336,7 @@ test("builds static server setup commands without storing secrets", () => {
 
 test("builds a beginner static command pack", () => {
   const pack = buildCommandPack({
-    deployRequest: { ip: "198.51.100.10" },
+    deployRequest: buildDeployRequestFromJourney(journey()),
     serverDraft: {
       host: "198.51.100.10",
       ssh_port: 22,
@@ -316,20 +348,8 @@ test("builds a beginner static command pack", () => {
   assert.equal(pack.testSsh, "ssh root@198.51.100.10");
   assert.equal(pack.setupKey, "ssh-copy-id root@198.51.100.10");
   assert.equal(pack.saveServer, "meridian server add 198.51.100.10 --name family-vpn --user root");
-  assert.equal(pack.dryRun, "meridian deploy --request deploy.json --dry-run --json");
-});
-
-test("Studio page renders color options from generated workflow", async () => {
-  const source = await readText("website/src/pages/studio.astro");
-
-  assert.match(source, /workflowOptions\(deployWorkflow, 'color'\)/);
-  assert.doesNotMatch(source, /<option value="lavender">/);
-});
-
-test("Studio page avoids raw HTML sinks for pasted output", async () => {
-  const source = await readText("website/src/pages/studio.astro");
-
-  assert.doesNotMatch(source, /\.innerHTML\s*=/);
+  assert.match(pack.dryRun, /^meridian deploy 198\.51\.100\.10 .* --dry-run$/);
+  assert.equal(pack.requestDryRun, "meridian deploy --request deploy.json --dry-run");
 });
 
 test("parses fixture envelopes and event streams", async () => {
@@ -343,13 +363,4 @@ test("parses fixture envelopes and event streams", async () => {
     ["command.started", "command.completed"],
   );
   assert.match(formatJson(envelope), /Deploy plan: first_deploy/);
-});
-
-test("summarizes failed envelopes with recovery hints", async () => {
-  const envelope = parseEnvelope(await readText("contracts/meridian/v1/fixtures/deploy-user-error-envelope.json"));
-  const summary = summarizeEnvelope(envelope);
-
-  assert.equal(summary.status, "failed");
-  assert.match(summary.text, /Deploy request is incomplete/);
-  assert.match(summary.text, /confirmed deploy request/);
 });
