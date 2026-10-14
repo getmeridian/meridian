@@ -6,7 +6,7 @@
 
 **Frontmatter schema** — Starlight's `docsSchema` plus `order` (sidebar position) and `section` (`guides` or `reference`). English values drive the sidebar for every locale.
 
-**Machine-readable consumption** — these markdown files are read at build time by the Markdown twins (`/{locale}/{page}.md`, `/md/...`), `/llms-full.txt`, and `make ai-docs` (bundled `ai-reference.md`).
+**Machine-readable consumption** — these markdown files are read at build time by the Markdown twins (`/{locale}/{page}.md`), `/llms-full.txt`, and `make ai-docs` (bundled `ai-reference.md`).
 
 **Durable prose** — write as the current release: no beta notes, no "still works for one release", no version-dated caveats.
 

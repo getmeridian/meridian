@@ -1,6 +1,6 @@
 /**
  * Markdown versions of the docs for agents and LLM tools. Every endpoint that serves
- * docs as Markdown (`/<locale>/<page>.md`, `/md/...`, `/llms-full.txt`, `/context-hub.md`)
+ * docs as Markdown (`/<locale>/<page>.md`, `/llms-full.txt`, `/context-hub.md`)
  * goes through here, so links and front matter are handled one way.
  */
 import fs from 'node:fs';
@@ -32,6 +32,7 @@ export function docMarkdown(entry: DocEntry): string {
   return `# ${entry.data.title}\n\n${summary}${docBody(entry)}\n`;
 }
 
-export function markdownResponse(body: string, contentType = 'text/markdown'): Response {
-  return new Response(body, { headers: { 'Content-Type': `${contentType}; charset=utf-8` } });
+/** Static builds keep only the body; the host picks the content type from the file extension. */
+export function markdownResponse(body: string): Response {
+  return new Response(body);
 }

@@ -10,7 +10,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/` with Starlight's sidebar, search, TOC, RTL, and Expressive Code. `astro.config.mjs` builds the sidebar from English `order`/`section` frontmatter and redirects every old `/docs/{locale}/{page}/` URL; `/docs/` stays the stable entry. Overrides live in `src/components/starlight/`, the route middleware in `src/lib/docs-route.ts`, the theme in `src/styles/starlight.css`.
 
-**Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, `/md/...`, `/context-hub.md` cover LLM tooling. All of them go through `src/lib/docs-markdown.ts`.
+**Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, `/context-hub.md` cover LLM tooling. All of them go through `src/lib/docs-markdown.ts`.
 
 **i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
 

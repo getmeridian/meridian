@@ -24,5 +24,5 @@ export const GET: APIRoute = async () => {
     '- [Source code](https://github.com/getmeridian/meridian)',
     '',
   ];
-  return markdownResponse(lines.join('\n'), 'text/plain');
+  return markdownResponse(lines.join('\n'));
 };

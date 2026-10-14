@@ -15,5 +15,5 @@ export const GET: APIRoute = async () => {
     '',
     ...docs.map((doc) => `---\n\n# ${doc.data.title}\n\n${docBody(doc)}\n`),
   ];
-  return markdownResponse(sections.join('\n'), 'text/plain');
+  return markdownResponse(sections.join('\n'));
 };
