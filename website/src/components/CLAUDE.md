@@ -10,7 +10,7 @@
 
 **Fast animations, always visible** — transitions feel instant (most under 100ms; decorative transforms may run longer); never hide interactive elements behind hover, which is for feedback only.
 
-**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`). Wrap Starlight's default component instead of copying it.
+**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`, the layout for build-rendered diagrams; it ships no script). Wrap Starlight's default component instead of copying it.
 
 ## What's done well
 

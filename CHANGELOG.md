@@ -249,6 +249,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   also served as Markdown (add `.md` to its address), with Copy page and Open
   in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
   links redirect.
+- **Lighter docs pages** — diagrams arrive as images that follow the light or
+  dark theme instead of ~3 MB of JavaScript, and docs pages prefetch a link
+  only when you point at it instead of every page in the sidebar.
 
 ### Security and correctness
 - **Starts with current Typer** — Typer 0.26 stopped installing Click, and a

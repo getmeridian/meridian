@@ -52,10 +52,3 @@ h1#_top,
 .sl-markdown-content a {
   text-underline-offset: 0.2em;
 }
-
-pre.mermaid {
-  display: flex;
-  justify-content: center;
-  background: transparent;
-  border: none;
-}

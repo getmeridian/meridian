@@ -17,6 +17,6 @@
 ## Pitfalls
 
 - **Hero images are co-located** — images live alongside `index.md` in each post folder. Glob loader resolves relative paths from `src/content/blog/`.
-- **Mermaid rendering** — the remark plugin in `astro.config.mjs` turns ```mermaid blocks into `<pre class="mermaid">`; `Mermaid.astro` lazy-loads mermaid.js only on pages with diagrams. `scripts/validate-mermaid.mjs` checks every diagram at build time.
+- **Mermaid blocks need a rendered SVG** — after editing one, run `node scripts/diagrams.mjs render` (see `website/CLAUDE.md`); the build refuses a block without its SVG.
 - **A figure repeats claims** — when a post's facts change, update its figure HTML too, or the image contradicts the text.
 - **Date coercion** — `z.coerce.date()` in schema handles both `2026-03-25` and `'2026-03-25'` YAML formats.

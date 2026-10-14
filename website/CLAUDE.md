@@ -12,6 +12,8 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, and `/ai/reference.md` cover LLM tooling. Twins go through `src/lib/docs-markdown.ts`; bundles through `scripts/ai-docs.mjs`.
 
+**Diagrams render before the build** — ```mermaid blocks stay in the Markdown as source; `src/lib/diagrams.mjs` swaps each for a checked-in `src/assets/diagrams/<hash>.svg` that `node scripts/diagrams.mjs render` draws with pinned Mermaid in Chromium (`figures/render_diagrams.py`). The SVGs color themselves with `--sl-color-*` (docs) or `tokens.css` (blog) variables, so one file fits both themes; no diagram JavaScript reaches readers.
+
 **i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
 
 **Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request.
@@ -33,4 +35,6 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).
 - **Starlight owns Astro i18n** — never add a top-level `i18n` block; Starlight derives it from `locales`.
 - **Prefetch on hover only** — `defaultStrategy: 'viewport'` with `prefetchAll` downloaded every visible sidebar page (~20) on each visit.
+- **The build only checks diagrams** — CI has no Chromium or network for Mermaid; a changed block fails `node scripts/diagrams.mjs` until its SVG is rendered and committed. Bump `RENDER_VERSION` when the renderer's output changes.
+- **Diagram figures are always LTR** — an RTL page reorders the punctuation in labels like `(Realm)`.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

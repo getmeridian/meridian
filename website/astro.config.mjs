@@ -5,6 +5,7 @@ import { unified } from '@astrojs/markdown-remark';
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import { remarkDiagrams } from './src/lib/diagrams.mjs';
 import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
 const LOCALES = ['en', 'ru', 'fa', 'zh'];
@@ -33,22 +34,6 @@ const redirects = Object.fromEntries(
     ...DOCS_SLUGS.map((slug) => [`/docs/${locale}/${slug}`, `/${locale}/${slug}/`]),
   ]),
 );
-
-// Mermaid blocks become plain <pre class="mermaid"> before Expressive Code sees them;
-// the MarkdownContent override renders them in the browser.
-function remarkMermaid() {
-  const escape = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const visit = (node) => {
-    node.children?.forEach((child, index) => {
-      if (child.type === 'code' && child.lang === 'mermaid') {
-        node.children[index] = { type: 'html', value: `<pre class="mermaid">${escape(child.value)}</pre>` };
-      } else {
-        visit(child);
-      }
-    });
-  };
-  return visit;
-}
 
 // Astro builds every Markdown file under src/pages, including the folder notes for contributors.
 const dropContributorNotes = {
@@ -133,7 +118,8 @@ export default defineConfig({
     defaultStrategy: 'hover',
   },
   markdown: {
-    processor: unified({ remarkPlugins: [remarkMermaid] }),
+    // Mermaid blocks become their checked-in SVGs before Expressive Code sees them.
+    processor: unified({ remarkPlugins: [remarkDiagrams] }),
     shikiConfig: {
       themes: {
         light: 'github-light',
