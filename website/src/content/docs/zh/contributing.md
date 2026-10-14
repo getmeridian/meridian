@@ -7,15 +7,15 @@ section: reference
 
 ## 报告问题
 
-- **有 Bug？** 使用 [Bug 报告模板](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
-- **连接问题？** 使用 [连接问题模板](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian preflight`
-- **有功能想法？** 使用 [功能请求模板](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
-- **安全漏洞？** 见 [安全](/docs/zh/security/)——不要开放公开问题
+- **有 Bug？** 使用 [Bug 报告模板](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
+- **连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian check`
+- **有功能想法？** 使用 [功能请求模板](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
+- **安全漏洞？** 见 [安全](/zh/security/)——不要开放公开问题
 
 ## 开发设置
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # 在可编辑模式下安装 CLI 和开发依赖
 make install
@@ -39,11 +39,14 @@ make templates         # Jinja2 模板验证
 CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-vpn`。
 
 关键模块：
-- `cli.py`——Typer 应用、子命令注册
-- `commands/`——每个子命令一个模块
-- `credentials.py`——`ServerCredentials` 数据类
-- `servers.py`——`ServerRegistry` 用于已知服务器
-- `provision/`——幂等步骤管道
+- `cli.py` — Typer 应用、子命令注册
+- `commands/` — 每个子命令一个模块
+- `cluster.py` + `cluster_persistence.py` — 类型化的 `cluster.yml` 状态和持久化
+- `servers.py` — `ServerRegistry` 用于已知服务器
+- `setup/` — `meridian setup` 向导状态和部署、设置和应用背后的共享运行时
+- `compiler/` — 将拓扑变成已审核、哈希标识的资源列表（无 I/O）
+- `reconciler/` — 带检查点观察和应用这些资源
+- `provision/` — 服务器准备步骤（包、加固、Docker、Realm）
 
 ## Pull Requests
 
@@ -55,9 +58,9 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 
 ## 关键约定
 
-- **Shell 值使用 `shlex.quote()`**——不要插入未清理的值
-- **Connection-info 模板必须保持同步**（CSS/JS/应用链接）
-- **nginx 配置**放在 `/etc/nginx/conf.d/meridian-*.conf`，不是主 nginx.conf
+- **Shell 值使用 `shlex.quote()`** — 永不插入未消毒的值
+- **PWA 资产必须保持同步**（`templates/pwa/` 和应用目录）
+- **nginx 配置**作为每个资源的 `meridian-v4-*.conf` 文件写在 `/etc/nginx/stream.d/` 和 `/etc/nginx/sites-available/` 下
 - **配置程序步骤**返回 `StepResult`（ok/changed/skipped/failed）
 
 ## 测试

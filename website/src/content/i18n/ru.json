@@ -1,0 +1,9 @@
+{
+  "meridian.nav.blog": "Блог",
+  "meridian.nav.demo": "Демо",
+  "meridian.page.copy": "Скопировать страницу",
+  "meridian.page.copied": "Скопировано",
+  "meridian.page.view": "Открыть как Markdown",
+  "meridian.page.open": "Открыть в {{assistant}}",
+  "meridian.page.prompt": "Прочитай {{url}} и помоги мне с Meridian."
+}

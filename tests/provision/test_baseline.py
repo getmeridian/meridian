@@ -1,0 +1,129 @@
+"""Tests for the shared server-baseline recipe."""
+
+from __future__ import annotations
+
+import pytest
+
+from meridian.provision import (
+    build_server_baseline_checks,
+    build_server_baseline_steps,
+    build_setup_steps,
+)
+from meridian.provision.steps import ProvisionContext
+
+
+@pytest.mark.parametrize(
+    ("harden", "expected_names"),
+    [
+        (
+            False,
+            [
+                "Check disk space",
+                "Install system packages",
+                "Enable automatic security updates",
+                "Set timezone to UTC",
+                "Enable BBR congestion control",
+            ],
+        ),
+        (
+            True,
+            [
+                "Check disk space",
+                "Install system packages",
+                "Enable automatic security updates",
+                "Set timezone to UTC",
+                "Harden SSH configuration",
+                "Configure fail2ban",
+                "Enable BBR congestion control",
+                "Configure firewall",
+            ],
+        ),
+    ],
+)
+def test_server_baseline_preserves_order(harden: bool, expected_names: list[str]) -> None:
+    ctx = ProvisionContext(ip="198.51.100.1", harden=harden)
+
+    steps = build_server_baseline_steps(ctx, install_docker=False)
+
+    assert [step.name for step in steps] == expected_names
+
+
+def test_server_baseline_appends_docker_only_when_requested() -> None:
+    ctx = ProvisionContext(ip="198.51.100.1")
+
+    without_docker = build_server_baseline_steps(ctx, install_docker=False)
+    with_docker = build_server_baseline_steps(ctx, install_docker=True)
+
+    assert [step.name for step in with_docker[:-1]] == [step.name for step in without_docker]
+    docker = with_docker[-1]
+    assert docker.name == "Install Docker"
+
+
+def test_declarative_baseline_leaves_public_ports_to_compiled_firewall_resources() -> None:
+    ctx = ProvisionContext(ip="198.51.100.1", harden=True)
+
+    checks = build_server_baseline_checks(ctx, install_docker=False)
+
+    assert "https_firewall" not in {check.name for check in checks}
+    assert "hysteria_firewall" not in {check.name for check in checks}
+
+
+@pytest.mark.parametrize("harden", [False, True])
+def test_setup_recipe_keeps_baseline_as_its_prefix(harden: bool) -> None:
+    ctx = ProvisionContext(ip="198.51.100.1", harden=harden)
+    baseline = build_server_baseline_steps(ctx, install_docker=True)
+
+    steps = build_setup_steps(ctx)
+
+    assert [step.name for step in steps[: len(baseline)]] == [step.name for step in baseline]
+
+
+def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) -> None:
+    # A relay's baseline has no Docker; when the server gains an exit role the
+    # check must say "not installed" (exit 1), not "inspection tool missing" (127).
+    import subprocess
+
+    from meridian.reconciler.server_evidence import baseline_check_command
+
+    check = next(
+        check
+        for check in build_server_baseline_checks(
+            ProvisionContext(ip="198.51.100.1", harden=False), install_docker=True
+        )
+        if check.name == "docker"
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", baseline_check_command(check.name, check.command)],
+        env={"PATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "not found" not in result.stderr
+
+
+def test_firewall_check_reports_missing_ufw_as_drift_in_a_real_shell(tmp_path) -> None:
+    # Stock Debian ships without ufw; the baseline installs it, so absence is drift.
+    import subprocess
+
+    from meridian.reconciler.server_evidence import baseline_check_command
+
+    check = next(
+        check
+        for check in build_server_baseline_checks(
+            ProvisionContext(ip="198.51.100.1", harden=True), install_docker=False
+        )
+        if check.name == "firewall"
+    )
+    result = subprocess.run(
+        ["/bin/bash", "-c", baseline_check_command(check.name, check.command)],
+        env={"PATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "not found" not in result.stderr

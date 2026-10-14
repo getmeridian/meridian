@@ -1,0 +1,27 @@
+---
+/** Header links back to the rest of the site, before Starlight's social icons. */
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+
+const { t } = Astro.locals;
+---
+
+<a href="/blog/" class="site-link">{t('meridian.nav.blog')}</a>
+<a href="/demo/" class="site-link">{t('meridian.nav.demo')}</a>
+<Default />
+
+<style>
+  .site-link {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .site-link:hover {
+    color: var(--sl-color-white);
+  }
+  @media (max-width: 50rem) {
+    .site-link {
+      display: none;
+    }
+  }
+</style>

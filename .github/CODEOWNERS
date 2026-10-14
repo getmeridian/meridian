@@ -2,11 +2,12 @@
 * @uburuntu
 
 # High-risk files — extra scrutiny
-# Connection info templates (must stay in sync)
+# Connection page templates
 src/meridian/templates/ @uburuntu
 
-# Credential handling (security-sensitive)
-src/meridian/credentials.py @uburuntu
+# Cluster state and secret handling (security-sensitive)
+src/meridian/cluster.py @uburuntu
+src/meridian/cluster_persistence.py @uburuntu
 src/meridian/ssh.py @uburuntu
 
 # Provisioner (server deployment logic)

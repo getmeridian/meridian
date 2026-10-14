@@ -1,32 +1,27 @@
-"""Tests for PWA rendering functions (config.json, subscription, shell, manifest)."""
+"""Tests for PWA rendering functions (config.json, shell, manifest)."""
 
 from __future__ import annotations
 
-import base64
 import json
+import re
 from pathlib import Path
 
 import pytest
 
-from meridian.models import ProtocolURL, RelayURLSet
+from meridian.models import ProtocolURL
 from meridian.render import (
     _PWA_APPS,
+    render_apps_catalog,
     render_config_json,
     render_manifest,
     render_pwa_shell,
-    render_subscription,
 )
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 REALITY_URL = (
     "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=reality&sni=www.example.com#Test-Reality"
 )
 XHTTP_URL = "vless://550e8400-e29b-41d4-a716-446655440000@198.51.100.1:443?security=tls&type=xhttp#Test-XHTTP"
 WSS_URL = "vless://660e8400-e29b-41d4-a716-446655440000@example.com:443?security=tls&type=ws#Test-WSS"
-RELAY_URL = "vless://550e8400-e29b-41d4-a716-446655440000@10.0.0.1:443?security=reality&sni=www.example.com#Test-Relay"
 
 
 @pytest.fixture()
@@ -35,22 +30,6 @@ def protocol_urls() -> list[ProtocolURL]:
         ProtocolURL(key="reality", label="Primary", url=REALITY_URL, qr_b64="dGVzdA=="),
         ProtocolURL(key="xhttp", label="XHTTP", url=XHTTP_URL, qr_b64="eGh0dHA="),
     ]
-
-
-@pytest.fixture()
-def relay_entries() -> list[RelayURLSet]:
-    return [
-        RelayURLSet(
-            relay_ip="10.0.0.1",
-            relay_name="ru-moscow",
-            urls=[ProtocolURL(key="reality", label="Primary (via relay)", url=RELAY_URL, qr_b64="cmVsYXk=")],
-        ),
-    ]
-
-
-# ---------------------------------------------------------------------------
-# TestRenderConfigJson
-# ---------------------------------------------------------------------------
 
 
 class TestRenderConfigJson:
@@ -64,7 +43,6 @@ class TestRenderConfigJson:
         assert result["version"] == 1
         assert result["server_ip"] == "198.51.100.1"
         assert "protocols" in result
-        assert "relays" in result
         assert "apps" in result
         assert "generated_at" in result
 
@@ -78,16 +56,6 @@ class TestRenderConfigJson:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
         assert result["protocols"][0]["recommended"] is True
         assert result["protocols"][1]["recommended"] is False
-
-    def test_relay_entries_included(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        assert len(result["relays"]) == 1
-        assert result["relays"][0]["name"] == "ru-moscow"
-        assert result["relays"][0]["ip"] == "10.0.0.1"
 
     def test_client_name(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1", client_name="alice"))
@@ -122,67 +90,6 @@ class TestRenderConfigJson:
         )
         assert result["subscription_url"] == "https://example.com/custom/subscription.txt"
         assert result["subscription_qr_b64"]
-
-
-# ---------------------------------------------------------------------------
-# TestRenderSubscription
-# ---------------------------------------------------------------------------
-
-
-class TestRenderSubscription:
-    def test_base64_encoded(self, protocol_urls: list[ProtocolURL]) -> None:
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result)
-        assert isinstance(decoded, bytes)
-
-    def test_decodes_to_urls(self, protocol_urls: list[ProtocolURL]) -> None:
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert len(lines) == 2
-        assert lines[0].startswith("vless://")
-        assert lines[1].startswith("vless://")
-
-    def test_includes_relay_urls(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = render_subscription(protocol_urls, relay_entries=relay_entries)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        # 1 relay + 2 direct = 3
-        assert len(lines) == 3
-        assert "10.0.0.1" in lines[0]  # relay URL comes first
-
-    def test_relay_urls_first(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = render_subscription(protocol_urls, relay_entries=relay_entries)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert "10.0.0.1" in lines[0]
-
-    def test_empty_urls(self) -> None:
-        result = render_subscription([])
-        assert result == ""
-
-    def test_excludes_empty_urls(self) -> None:
-        urls = [
-            ProtocolURL(key="reality", label="Primary", url=REALITY_URL),
-            ProtocolURL(key="wss", label="WSS", url=""),
-        ]
-        result = render_subscription(urls)
-        decoded = base64.b64decode(result).decode()
-        lines = decoded.strip().split("\n")
-        assert len(lines) == 1
-
-
-# ---------------------------------------------------------------------------
-# TestRenderPWAShell
-# ---------------------------------------------------------------------------
 
 
 class TestRenderPWAShell:
@@ -220,11 +127,6 @@ class TestRenderPWAShell:
         html = render_pwa_shell(asset_path="/custom/path")
         assert "/custom/path/app.js" in html
         assert "/custom/path/styles.css" in html
-
-
-# ---------------------------------------------------------------------------
-# TestRenderManifest
-# ---------------------------------------------------------------------------
 
 
 class TestRenderManifest:
@@ -267,14 +169,7 @@ class TestRenderManifest:
         assert 'My "Server"' == parsed["name"]
 
 
-# ---------------------------------------------------------------------------
-# TestConfigJsonSchema — protocol entry field validation (Gap #4)
-# ---------------------------------------------------------------------------
-
-
 class TestConfigJsonSchema:
-    """Verify config.json protocol and relay entries have all required fields."""
-
     def test_protocol_entry_required_fields(self, protocol_urls: list[ProtocolURL]) -> None:
         result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
         required = {"key", "label", "url", "qr_b64", "recommended"}
@@ -292,97 +187,80 @@ class TestConfigJsonSchema:
         for app in result["apps"]:
             assert required.issubset(app.keys()), f"App missing fields: {required - app.keys()}"
 
-    def test_relay_entry_structure(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        for relay in result["relays"]:
-            assert "name" in relay
-            assert "ip" in relay
-            assert "urls" in relay
-            assert isinstance(relay["urls"], list)
-            assert len(relay["urls"]) >= 1
 
-    def test_relay_url_entry_fields(
-        self,
-        protocol_urls: list[ProtocolURL],
-        relay_entries: list[RelayURLSet],
-    ) -> None:
-        result = json.loads(render_config_json(protocol_urls, "198.51.100.1", relay_entries=relay_entries))
-        required = {"key", "label", "url", "qr_b64"}
-        for relay in result["relays"]:
-            for url_entry in relay["urls"]:
-                assert required.issubset(url_entry.keys()), f"Relay URL missing fields: {required - url_entry.keys()}"
-
-
-# ---------------------------------------------------------------------------
-# TestPWAAppsSync — _PWA_APPS vs apps.json (Gap #5)
-# ---------------------------------------------------------------------------
-
-
-class TestPWAAppsSync:
-    """Verify _PWA_APPS in render.py matches website/src/data/apps.json."""
-
-    def test_apps_match_apps_json(self) -> None:
-        # Find apps.json relative to the repo root
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        assert apps_json_path.exists(), f"apps.json not found at {apps_json_path}"
-
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-
-        # Both should have the same entries (name + url pairs)
-        json_pairs = {(a["name"], a["url"]) for a in apps_json}
-        pwa_pairs = {(a["name"], a["url"]) for a in _PWA_APPS}
-        assert json_pairs == pwa_pairs, (
-            f"_PWA_APPS out of sync with apps.json.\n"
-            f"In apps.json only: {json_pairs - pwa_pairs}\n"
-            f"In _PWA_APPS only: {pwa_pairs - json_pairs}"
-        )
-
-    def test_apps_count_matches(self) -> None:
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-        assert len(_PWA_APPS) == len(apps_json)
-
-    def test_deeplink_field_is_optional(self) -> None:
-        """Apps without deep links must not be required to have the field."""
-        for app in _PWA_APPS:
-            assert "name" in app
-            assert "url" in app
-            # deeplink is optional — some apps have it, some don't
-
+class TestPWAApps:
     def test_deeplink_templates_contain_url_placeholder(self) -> None:
-        """Every deep link template must include a URL placeholder."""
         for app in _PWA_APPS:
             if "deeplink" in app:
                 has_url = "{url}" in app["deeplink"] or "{url_raw}" in app["deeplink"] or "{url_b64}" in app["deeplink"]
                 assert has_url, f"{app['name']} deeplink missing URL placeholder: {app['deeplink']}"
 
-    def test_deeplink_sync_with_apps_json(self) -> None:
-        """Deeplink values in _PWA_APPS must match apps.json."""
-        repo_root = Path(__file__).resolve().parent.parent
-        apps_json_path = repo_root / "website" / "src" / "data" / "apps.json"
-        with open(apps_json_path) as f:
-            apps_json = json.load(f)
-        json_links = {a["name"]: a.get("deeplink") for a in apps_json}
-        pwa_links = {a["name"]: a.get("deeplink") for a in _PWA_APPS}
-        assert json_links == pwa_links, f"Deeplink mismatch:\n  apps.json: {json_links}\n  _PWA_APPS: {pwa_links}"
+    def test_protocols_field_present(self) -> None:
+        for app in _PWA_APPS:
+            assert "protocols" in app, f"{app['name']} missing protocols field"
+            assert isinstance(app["protocols"], list), f"{app['name']} protocols must be a list"
+            assert len(app["protocols"]) >= 1, f"{app['name']} protocols must not be empty"
+
+    def test_protocols_values_valid(self) -> None:
+        valid = {"reality", "xhttp", "wss"}
+        for app in _PWA_APPS:
+            for proto in app.get("protocols", []):
+                assert proto in valid, f"{app['name']} has unknown protocol {proto!r}"
 
 
-# ---------------------------------------------------------------------------
-# TestUnicodeClientNames — non-ASCII names (Gap #6)
-# ---------------------------------------------------------------------------
+PLATFORMS = ("iOS", "Android", "Windows", "macOS", "Linux")
+
+
+def _recommended(platform: str) -> list[str]:
+    return [app["name"] for app in _PWA_APPS if platform in app.get("recommended", [])]
+
+
+class TestAppCatalog:
+    def test_every_platform_has_recommended_apps(self) -> None:
+        for platform in PLATFORMS:
+            assert _recommended(platform), f"no recommended app for {platform}"
+
+    def test_happ_leads_every_platform(self) -> None:
+        for platform in PLATFORMS:
+            assert _recommended(platform)[0] == "Happ"
+
+    def test_mihomo_alternatives_and_throne_on_desktop(self) -> None:
+        assert _recommended("iOS") == ["Happ", "Clash Mi"]
+        assert _recommended("Android") == ["Happ", "FlClashX", "Clash Mi"]
+        for platform in ("Windows", "macOS", "Linux"):
+            assert _recommended(platform) == ["Happ", "FlClashX", "Clash Mi", "Throne"]
+
+    def test_recommended_platforms_are_supported(self) -> None:
+        for app in _PWA_APPS:
+            assert set(app["platforms"]) <= set(PLATFORMS), app["name"]
+            assert set(app.get("recommended", [])) <= set(app["platforms"]), app["name"]
+
+    def test_abandoned_nekoray_is_not_listed(self) -> None:
+        assert not any("nekoray" in app["name"].lower() for app in _PWA_APPS)
+
+    def test_deeplinks_use_only_known_placeholders(self) -> None:
+        for app in _PWA_APPS:
+            if "deeplink" in app:
+                assert set(re.findall(r"\{(\w+)\}", app["deeplink"])) <= {"url_raw", "url_b64", "url", "name"}
+
+    def test_download_links_are_https(self) -> None:
+        for app in _PWA_APPS:
+            for url in [app["url"], *app.get("urls", {}).values()]:
+                assert url.startswith("https://"), f"{app['name']}: {url}"
+
+    def test_config_json_apps_carry_no_icons(self, protocol_urls: list[ProtocolURL]) -> None:
+        """Icons ship once in the shared pwa/apps.json, not in every client's config."""
+        result = json.loads(render_config_json(protocol_urls, "198.51.100.1"))
+        assert [app["name"] for app in result["apps"]] == [app["name"] for app in _PWA_APPS]
+        assert not any("icon" in app for app in result["apps"])
+
+    def test_shared_catalog_has_an_icon_for_every_app(self) -> None:
+        catalog = json.loads(render_apps_catalog())
+        assert [app["name"] for app in catalog["apps"]] == [app["name"] for app in _PWA_APPS]
+        assert all("icon" in app for app in catalog["apps"])
 
 
 class TestUnicodeClientNames:
-    """Verify rendering works correctly with non-ASCII client names."""
-
     def test_config_json_cyrillic(self, protocol_urls: list[ProtocolURL]) -> None:
         result = render_config_json(protocol_urls, "198.51.100.1", client_name="\u0410\u043b\u0438\u0441\u0430")
         parsed = json.loads(result)
@@ -400,17 +278,10 @@ class TestUnicodeClientNames:
         assert "\u5c0f\u660e" in result
 
     def test_config_json_emoji_name(self, protocol_urls: list[ProtocolURL]) -> None:
-        """Non-Latin characters should not corrupt JSON."""
         name = "\u0645\u0631\u06cc\u0645"  # Farsi: Maryam
         result = render_config_json(protocol_urls, "198.51.100.1", client_name=name)
         parsed = json.loads(result)
         assert parsed["client_name"] == name
-
-    def test_subscription_unaffected_by_unicode_name(self, protocol_urls: list[ProtocolURL]) -> None:
-        """Subscription rendering doesn't use client_name, but verify no crash."""
-        result = render_subscription(protocol_urls)
-        decoded = base64.b64decode(result).decode()
-        assert "vless://" in decoded
 
 
 class TestPWATemplateSource:
@@ -421,3 +292,92 @@ class TestPWATemplateSource:
     def test_app_js_has_no_external_ping_dependency(self) -> None:
         app_js = Path("src/meridian/templates/pwa/app.js").read_text()
         assert "getmeridian.org/ping" not in app_js
+
+    def test_app_js_links_the_localized_router_guide(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        assert "'https://getmeridian.org/{lang}/routers/'" in app_js
+
+    def test_app_js_prefers_the_shared_catalog(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        assert "fetch('../pwa/apps.json')" in app_js
+
+    def test_every_data_t_key_is_translated(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        used = set(re.findall(r'data-t="([^"]+)"', app_js))
+        for lang in ("ru", "fa", "zh"):
+            block = app_js.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0]
+            keys = set(re.findall(r"'?([\w.]+)'?: '", block))
+            assert used <= keys, f"{lang} lacks {sorted(used - keys)}"
+
+    def test_webrtc_tip_sits_in_troubleshooting_without_links(self) -> None:
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        trouble = app_js.split("function renderTrouble()", 1)[1].split("\n}\n", 1)[0]
+        assert 'data-t="tip.webrtc"' in trouble
+        tips = re.findall(r"'tip\.webrtc': '([^\n]*)',\n", app_js)
+        tips.append(re.search(r'data-t="tip\.webrtc">(.*?)</li>', trouble).group(1))  # type: ignore[union-attr]
+        assert len(tips) == 4
+        assert not any("http" in tip or "://" in tip for tip in tips)
+
+    def test_rendered_markup_has_no_inline_styles(self) -> None:
+        """The page CSP has no style-src 'unsafe-inline'; style attributes are dropped."""
+        for name in ("app.js", "selfcheck.js"):
+            assert "style=" not in (PWA_DIR / name).read_text(), name
+
+
+PWA_DIR = Path("src/meridian/templates/pwa")
+
+
+def _js_bytes(source: str, name: str) -> int:
+    match = re.search(rf"var {name} = (\d+)(?: \* (\d+))?;", source)
+    assert match, f"{name} not found"
+    return int(match.group(1)) * int(match.group(2) or 1)
+
+
+class TestSelfCheck:
+    def test_thresholds_mirror_cli_blocking_diagnostics(self) -> None:
+        from meridian.diagnostics import blocking
+
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        assert _js_bytes(source, "STALL_CLEARANCE_BYTES") == blocking.STALL_CLEARANCE_BYTES
+        assert _js_bytes(source, "THROTTLE_LOW_BYTES") == blocking.THROTTLE_WINDOW[0]
+        assert _js_bytes(source, "STALL_TIMEOUT_MS") == 5000
+
+    def test_clock_threshold_matches_the_cli_in_both_scripts(self) -> None:
+        from meridian.core.defaults import CLOCK_DRIFT_WARN_SECONDS
+
+        for name in ("selfcheck.js", "app.js"):
+            source = (PWA_DIR / name).read_text()
+            assert _js_bytes(source, "CLOCK_WARN_MS") == CLOCK_DRIFT_WARN_SECONDS * 1000, name
+
+    def test_app_renders_the_section_and_loads_the_script(self) -> None:
+        app_js = (PWA_DIR / "app.js").read_text()
+        assert 'data-action="selfcheck-run"' in app_js
+        assert 'id="selfcheck-results"' in app_js
+        assert "s.src = '../pwa/selfcheck.js';" in app_js
+
+    def test_probe_and_subscription_bypass_the_service_worker(self) -> None:
+        sw = (PWA_DIR / "sw.js").read_text()
+        assert "path.indexOf('/sub/') !== -1" in sw
+        assert "path.endsWith('/probe.bin')" in sw
+        assert "event.request.method !== 'GET'" in sw
+        assert "'../pwa/selfcheck.js'" in sw
+
+    def test_requests_skip_the_http_cache(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        assert source.count("cache: 'no-store'") == 3
+        assert "PROBE_PATH + '?t=' + Date.now()" in source
+
+    def test_report_never_carries_links_or_identifiers(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        report = source.split("function buildReport(results) {", 1)[1].split("\n}\n", 1)[0]
+        for forbidden in ("url", "href", "location", "subscription", "_meridianConfig", "client_name"):
+            assert forbidden not in report.lower(), forbidden
+
+    def test_every_language_has_every_string(self) -> None:
+        source = (PWA_DIR / "selfcheck.js").read_text()
+        blocks = {
+            lang: source.split(f"\n  {lang}: {{\n", 1)[1].split("\n  },\n", 1)[0] for lang in ("en", "ru", "fa", "zh")
+        }
+        keys = {lang: set(re.findall(r"'?([\w.]+)'?: '", block)) for lang, block in blocks.items()}
+        for lang in ("ru", "fa", "zh"):
+            assert keys[lang] == keys["en"], f"{lang}: {sorted(keys['en'] ^ keys[lang])}"

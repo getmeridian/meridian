@@ -1,0 +1,31 @@
+{
+  "$defs": {
+    "ClientReference": {
+      "additionalProperties": false,
+      "description": "Public identity of a client mutation target.",
+      "properties": {
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username"
+      ],
+      "title": "ClientReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for removing one client.",
+  "properties": {
+    "client": {
+      "$ref": "#/$defs/ClientReference"
+    }
+  },
+  "required": [
+    "client"
+  ],
+  "title": "ClientRemoveResult",
+  "type": "object"
+}

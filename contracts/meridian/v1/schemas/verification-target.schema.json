@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "Requested and resolved identity of one verification target.",
+  "properties": {
+    "requested": {
+      "title": "Requested",
+      "type": "string"
+    },
+    "resolved_ip": {
+      "default": "",
+      "title": "Resolved Ip",
+      "type": "string"
+    },
+    "server_ref": {
+      "default": "",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requested"
+  ],
+  "title": "VerificationTarget",
+  "type": "object"
+}

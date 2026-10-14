@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "EgressOverrideIntent": {
+      "additionalProperties": false,
+      "description": "Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.",
+      "properties": {
+        "action": {
+          "enum": [
+            "warp",
+            "direct",
+            "block"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match": {
+          "enum": [
+            "domain",
+            "geosite",
+            "geoip"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "match",
+        "values",
+        "action"
+      ],
+      "title": "EgressOverrideIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The override a `route add` created or a `route remove` deleted.",
+  "properties": {
+    "exit": {
+      "title": "Exit",
+      "type": "string"
+    },
+    "override": {
+      "$ref": "#/$defs/EgressOverrideIntent"
+    }
+  },
+  "required": [
+    "exit",
+    "override"
+  ],
+  "title": "RouteMutationResult",
+  "type": "object"
+}

@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "HealthCheckResult": {
+      "additionalProperties": false,
+      "description": "Every report `meridian check` produced, with one fail-closed aggregate.",
+      "properties": {
+        "counts": {
+          "$ref": "#/$defs/VerificationCounts"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            3,
+            4
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "reports": {
+          "items": {
+            "$ref": "#/$defs/HealthReport"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "findings",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verdict",
+        "exit_code",
+        "counts"
+      ],
+      "title": "HealthCheckResult",
+      "type": "object"
+    },
+    "HealthReport": {
+      "additionalProperties": false,
+      "description": "Checks for one server in one scope.",
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/VerificationCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "counts": {
+          "$ref": "#/$defs/VerificationCounts"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            3,
+            4
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "scope": {
+          "enum": [
+            "preflight",
+            "server",
+            "relay"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "server_ref": {
+          "default": "",
+          "title": "Server Ref",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "findings",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "scope",
+        "verdict",
+        "exit_code",
+        "counts"
+      ],
+      "title": "HealthReport",
+      "type": "object"
+    },
+    "VerificationCheck": {
+      "additionalProperties": false,
+      "description": "One independently reportable verification check.",
+      "properties": {
+        "duration_ms": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/VerificationFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status"
+      ],
+      "title": "VerificationCheck",
+      "type": "object"
+    },
+    "VerificationCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate check counts by terminal status.",
+      "properties": {
+        "checks": {
+          "minimum": 0,
+          "title": "Checks",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "skipped": {
+          "minimum": 0,
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "warnings": {
+          "minimum": 0,
+          "title": "Warnings",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checks",
+        "passed",
+        "failed",
+        "warnings",
+        "skipped"
+      ],
+      "title": "VerificationCounts",
+      "type": "object"
+    },
+    "VerificationFinding": {
+      "additionalProperties": false,
+      "description": "One structured observation produced by a verification check.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "remediation": {
+          "default": "",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "status",
+        "message"
+      ],
+      "title": "VerificationFinding",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/HealthCheckResult"
+    },
+    {
+      "$ref": "#/$defs/EmptyData"
+    }
+  ],
+  "description": "Failure data schema for `meridian check --json`.",
+  "title": "CheckFailureData"
+}

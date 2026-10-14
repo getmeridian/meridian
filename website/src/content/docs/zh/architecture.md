@@ -7,197 +7,143 @@ section: reference
 
 ## 技术栈
 
-- **VLESS+Reality**（Xray-core）— 伪装成合法 TLS 网站的代理协议。审查者探测服务器时会看到真实证书（例如来自 microsoft.com）。只有拥有正确私钥的客户端才能连接。
-- **3x-ui** — 管理 Xray 的 Web 面板，以 Docker 容器部署。Meridian 完全通过 REST API 控制它。
-- **nginx** — 单进程 Web 服务器，同时处理 SNI 路由和 TLS。stream 模块监听端口 443，根据 SNI 主机名路由流量，不终止 TLS。http 模块在端口 8443 终止 TLS，提供连接页面、反向代理面板以及 XHTTP/WSS 流量到 Xray。证书由 acme.sh 管理（独立模式下通过 ACME `shortlived` 配置文件获取 Let's Encrypt IP 证书，域名模式下获取域名证书）。
-- **Docker** — 运行 3x-ui（包含 Xray）。所有代理流量通过容器传输。
-- **纯 Python 配置器** — `src/meridian/provision/` 通过 SSH 执行部署步骤。每个步骤接收 `(conn, ctx)` 并返回 `StepResult`。
-- **uTLS** — 模拟 Chrome 的 TLS Client Hello 指纹，使连接与真实浏览器流量无法区分。
+- **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（最好是与你的服务器托管在同一网络的网站）。只有拥有正确密钥的客户端才能到达代理。
+- **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
+- **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被阻止也仍然可用。
+- **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
+- **Remnawave** — 面板堆栈：`remnawave/backend`（API 和管理 UI，带 PostgreSQL 和 Valkey）在控制平面服务器上，`remnawave/node`（运行 Xray）在每个出口上，以及 `remnawave/subscription-page`。Meridian 固定测试版本并通过 REST API 与面板通信。
+- **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为面板、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
+- **Realm** — 中继服务器上的 TCP 转发器。
+- **uTLS** — 客户端连接复制浏览器的 TLS Client Hello（以 Chrome 为主，另有 Firefox 副本作为备用条目），所以看起来像普通浏览器流量。
 
 ## 服务拓扑
 
-### 独立模式（无域名）
+### 单服务器（`meridian deploy IP`）
 
 ```mermaid
 flowchart TD
-    Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
-    Nginx -->|"SNI = server IP"| NginxHTTP["nginx http<br>:8443"]
-    NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
-    NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
-    Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
+    Internet((Internet)) -->|TCP 443| Nginx[nginx stream<br>SNI router]
+    Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality<br>(Remnawave node)"]
+    Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http<br>:8443"]
+    NginxHTTP -->|/page-path/| Page[Connection pages]
+    NginxHTTP -->|/page-path/sub/| Sub[Subscriptions]
+    NginxHTTP -->|/secret-path/| Panel[Remnawave admin UI]
+    Internet -->|TCP 80| NginxACME["nginx<br>ACME challenges"]
 ```
 
-nginx stream **不**终止 TLS。它从 TLS Client Hello 中读取 SNI 主机名，并将原始 TCP 流转发到相应的后端。
+nginx stream **不**终止 TLS。它从 Client Hello 中读取 SNI 并转发原始 TCP 流。面板、连接页面和订阅使用服务器 IP 的 Let's Encrypt 证书提供（短期有效，自动续期）。
 
-acme.sh 通过 ACME `shortlived` 配置文件从 Let's Encrypt 请求 IP 证书（有效期 6 天，自动续期）。如果不支持 IP 证书颁发，将回退到自签证书。
-
-XHTTP 运行在仅限本地的端口上，由 nginx 反向代理——无需暴露额外的外部端口。
+共享链接位于连接页面路径下：页面在 `/<page-path>/<id>/`，订阅在 `/<page-path>/sub/<id>`。管理面板位于共享链接永远不会暴露的单独密钥路径上。
 
 ### 域名模式
 
 ```mermaid
 flowchart TD
-    Internet((Internet)) -->|Port 443| Nginx[nginx stream<br>SNI Router]
-    Nginx -->|"SNI = reality_sni"| Xray["Xray Reality<br>:10443"]
-    Nginx -->|"SNI = domain"| NginxHTTP["nginx http<br>:8443"]
-    NginxHTTP -->|/info-path| Page[Connection Page]
-    NginxHTTP -->|/panel-path| Panel[3x-ui Panel]
-    NginxHTTP -->|/xhttp-path| XrayXHTTP["Xray XHTTP<br>localhost"]
-    NginxHTTP -->|/ws-path| XrayWSS["Xray WSS<br>localhost"]
-    Internet -->|Port 80| NginxACME["nginx<br>ACME challenges"]
-    Internet -.->|"CDN (Cloudflare)"| NginxHTTP
+    Internet((Internet)) -->|TCP 443| Nginx[nginx stream<br>SNI router]
+    CDN["Cloudflare CDN"] -->|TCP 443| Nginx
+    Nginx -->|"SNI = camouflage target"| XrayReal["Xray Reality"]
+    Nginx -->|"SNI = your domain"| NginxDomain["nginx http<br>(domain certificate)"]
+    Nginx -->|"no SNI / server IP"| NginxHTTP["nginx http :8443<br>panel, pages, subscriptions"]
+    NginxHTTP -->|"/xhttp-path (no domain)"| XrayXHTTP
+    NginxDomain -->|/xhttp-path| XrayXHTTP["Xray XHTTP"]
+    NginxDomain -->|/ws-path| XrayWSS["Xray WSS"]
+    Internet -.->|"UDP 443 (salamander)"| XrayHy2["Xray Hysteria2"]
 ```
 
-域名模式添加 VLESS+WSS 作为 CDN 回退路径。流量通过 Cloudflare 的 CDN 经由 WebSocket 流动，即使服务器 IP 被阻断也能工作。
+域名只承载代理路径；面板和页面留在 IP 证书上。
 
-### 中继拓扑
+### 中继
 
 ```mermaid
 flowchart LR
-    Client([Client]) -->|Port 443| Relay["Relay<br>(Realm TCP)"]
-    Relay -->|Port 443| Exit["Exit Server<br>(abroad)"]
+    Client([Client]) -->|TCP 443| Relay["Relay<br>(Realm)"]
+    Relay -->|TCP| Exit["Exit server<br>(abroad)"]
     Exit --> Internet((Internet))
 ```
 
-中继节点是一个轻量级 TCP 转发器，运行 [Realm](https://github.com/zhboner/realm)。客户端连接到中继的国内 IP，中继将原始 TCP 转发到国外的出口服务器。所有加密都是端到端的，在客户端和出口之间——中继永远看不到明文。
+中继从国内 IP 转发原始 TCP 到出口的 Reality 监听器。端到端加密在客户端和出口之间；中继永远看不到明文。中继仅承载 Reality。`meridian setup` 还可以构建多跳中继链和路由网关，按规则选择出口（或健康检查的出口池）。
 
 ## Reality 协议如何工作
 
-1. 服务器生成一个 **x25519 密钥对**。公钥与客户端共享，私钥保留在服务器上。
-2. 客户端在端口 443 上连接，发送包含伪装域名（例如 `www.cloudflare.com`）作为 SNI 的 TLS Client Hello。
-3. 对于任何观察者来说，这看起来像一个到 microsoft.com 的正常 HTTPS 连接。
-4. 如果一个**探针**发送自己的 Client Hello，服务器会将连接代理到真实的 microsoft.com——探针看到一个有效的证书。
-5. 如果客户端包含有效的身份验证（从 x25519 密钥派生），服务器建立 VLESS 隧道。
-6. **uTLS** 使 Client Hello 逐字节与 Chrome 相同，击败 TLS 指纹识别。
+1. 每个出口有一个 **x25519 密钥对**。客户端获得公钥；私钥留在服务器上。
+2. 客户端在端口 443 上连接，发送命名伪装目标（例如 `www.google.com`）的 TLS Client Hello。
+3. 对观察者来说，这是对该网站的普通 HTTPS 连接。
+4. 没有密钥的**探针**被传递到真实网站并看到其有效证书。
+5. 拥有有效认证的客户端获得 VLESS 隧道。
+6. **uTLS** 使 Client Hello 与 Chrome 的相匹配，击败 TLS 指纹识别。
 
-## Docker 容器结构
+## 状态模型
 
-`3x-ui` Docker 容器包含：
-- **3x-ui Web 面板** — 端口 2053 上的 REST API（内部）
-- **Xray 二进制文件** 位于 `/app/bin/xray-linux-*`（依赖架构的路径）
-- **数据库** 位于 `/etc/x-ui/x-ui.db`（SQLite，存储入站配置和客户端）
-- **Xray 配置** 由 3x-ui 管理（非静态文件）
+- **拓扑** — `~/.config/meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
+- **客户端** — 账户、密钥、状态和流量位于控制平面服务器上的 Remnawave 数据库中。
+- **保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接详情。
 
-Meridian 完全通过 REST API 管理 3x-ui：
-- `POST /login` — 认证（form-urlencoded，返回 session cookie）
-- `POST /panel/api/inbounds/add` — 创建 VLESS 入站
-- `GET /panel/api/inbounds/list` — 列出入站（创建前检查）
-- `POST /panel/setting/update` — 配置面板设置
-- `POST /panel/setting/updateUser` — 更改面板凭据
+## 计划和应用
 
-## 管理面板 (3x-ui)
+Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容器、Remnawave 配置文件、主机、用户和模板。`meridian plan` 在实时服务器和面板上观察每一个并报告需要修复的内容。`meridian apply` 应用它显示的确切计划，在每一步设置检查点，以便中断的应用可以安全地恢复。结果不确定的资源在任何重试之前会被重新观察。
 
-Meridian 使用 [3x-ui](https://github.com/MHSanaei/3x-ui) 作为 Xray 的 Web 管理面板。CLI 会自动处理一切，但您也可以直接访问 Web 面板进行监控和高级配置。
+拓扑中的任何内容都可以添加和删除：用户、协议路径、出口、中继和路由网关。在新计划收敛后，应用会删除离开拓扑的内容（面板用户、主机和节点、nginx 文件、Realm 服务、证书、防火墙规则）。控制服务器是例外：它的地址是每个订阅 URL 的一部分，因此只能通过 `meridian teardown` 删除。
 
-### 如何访问
-
-面板通过 nginx 反向代理在随机的 HTTPS 秘密路径上提供服务——无需 SSH 隧道。URL 和凭据存储在本地凭据文件中：
-
-```
-cat ~/.meridian/credentials/<IP>/proxy.yml
-```
-
-查找 `panel` 部分：
-
-```yaml
-panel:
-  username: a1b2c3d4e5f6
-  password: Xk9mP2qR7vW4nL8jF3hT6yBs
-  web_base_path: n7kx2m9qp4wj8vh3rf6tby5e
-  port: 2053
-```
-
-面板 URL：
-
-```
-https://<您的服务器IP>/n7kx2m9qp4wj8vh3rf6tby5e/
-```
-
-### 功能
-
-- **流量监控** — 按客户端查看上传/下载统计
-- **查看入站配置** — 所有已配置的 VLESS 协议（Reality、XHTTP、WSS）
-- **Xray 状态** — 验证代理引擎是否正在运行
-- **高级配置** — 直接修改 Xray 设置（适合高级用户）
-
-### 注意事项
-
-- `web_base_path` 是随机字符串——这是面板的安全保障。请勿分享给他人。
-- 所有 `meridian` CLI 命令底层使用相同的面板 API。
-- 如果您直接在面板中修改设置，下次运行 `meridian deploy` 时可能会被覆盖。
-
-## nginx 配置模式
-
-Meridian 写入 `/etc/nginx/conf.d/meridian-stream.conf` 和 `/etc/nginx/conf.d/meridian-http.conf`（从不修改主 nginx.conf）。这允许 Meridian 与用户自己的 nginx 配置共存。
-
-nginx 处理：
-- 端口 443 上的 SNI 路由（stream 模块，不终止 TLS）
-- 端口 8443 上的 TLS 终止（http 模块，证书由 acme.sh 管理）
-- 3x-ui 面板的反向代理（在随机路径上）
-- 连接页面服务（带有可分享 URL 的托管页面）
-- XHTTP 流量到 Xray 的反向代理（基于路径的路由，启用 XHTTP 时在所有模式下生效）
-- WSS 流量到 Xray 的反向代理（仅域名模式）
+对面板拥有资源的编辑会在 `meridian plan` 中显示，并由下一次应用恢复。Meridian 不管理的 Remnawave 设置被保留。
 
 ## 端口分配
 
-| 端口 | 服务 | 模式 |
-|------|---------|------|
-| 443 | nginx stream (SNI 路由器) | 全部 |
-| 80 | nginx (ACME 挑战) | 全部 |
-| 10443 | Xray Reality (内部) | 全部 |
-| 8443 | nginx http (内部) | 全部 |
-| localhost | Xray XHTTP | 启用 XHTTP 时 |
-| localhost | Xray WSS | 域名模式 |
-| 2053 | 3x-ui panel (内部) | 全部 |
+| 端口 | 服务 | 范围 |
+|------|---------|-------|
+| 443/TCP | nginx stream（SNI 路由器） | 公开 |
+| 443/UDP | Xray Hysteria2（默认开启） | 公开 |
+| 80/TCP | nginx（ACME 挑战） | 公开 |
+| 8443 | nginx http（面板、页面、订阅） | 内部 |
+| 8444 | nginx http，PROXY 协议监听器（与 `--client-ips` 配合使用） | 内部 |
+| 3000 | Remnawave 后端（管理 UI + API） | localhost |
+| 3010 | Remnawave 节点 API | host network |
+| 3020 | Remnawave 订阅页面 | localhost |
+| 10000+ | Xray Reality（每个出口） | host network，被防火墙阻止 |
+| 20000+ | Xray WSS（域名模式，每个出口） | host network，被防火墙阻止 |
+| 30000+ | Xray XHTTP（每个出口） | host network，被防火墙阻止 |
 
-XHTTP 和 WSS 端口仅限本地——nginx 在端口 443 上将它们反向代理。
+后端 Xray 端口通过 nginx 到达；UFW 从互联网阻止它们。中继服务器仅打开 SSH 和其监听端口。
 
-## 配置管道
+## Docker 容器
 
-Meridian 通过一系列独立步骤配置服务器，每个步骤检查状态并只在必要时采取行动（幂等）。
+容器和目录的名称是中性的，因此主机上查看 `docker ps` 或 `/opt` 的人看不到任何点明代理软件的名字（镜像保留其上游标签）。`meridian check` 和 `meridian doctor` 会显示每个名称背后的角色。
 
-| # | 步骤 | 模块 | 目的 |
-|---|------|------|---------|
-| 1 | InstallPackages | common | OS 包 |
-| 2 | EnableAutoUpgrades | common | 无人值守升级 |
-| 3 | SetTimezone | common | UTC |
-| 4 | HardenSSH | common | 仅密钥认证 |
-| 5 | ConfigureBBR | common | TCP 拥塞控制 |
-| 6 | ConfigureFirewall | common | UFW: 22 + 80 + 443 |
-| 7 | InstallDocker | docker | Docker CE |
-| 8 | Deploy3xui | docker | 3x-ui 容器 |
-| 9 | ConfigurePanel | panel | Panel 凭证 |
-| 10 | LoginToPanel | panel | API 认证 |
-| 11 | CreateRealityInbound | inbounds | VLESS+Reality |
-| 12 | CreateXHTTPInbound | inbounds | VLESS+XHTTP |
-| 13 | CreateWSSInbound | inbounds | VLESS+WSS (域名) |
-| 14 | VerifyXray | inbounds | 健康检查 |
-| 15 | InstallNginx | services | SNI 路由 + TLS + 反向代理 |
-| 16 | DeployConnectionPage | services | 二维码 + 页面 |
+**在控制平面服务器上：**
+- `ctlsvc-api` — Remnawave 后端 API 和管理 UI 在 `127.0.0.1:3000`
+- `ctlsvc-db` — PostgreSQL（用户、主机、配置文件）
+- `ctlsvc-cache` — Valkey 缓存
+- `ctlsvc-web` — Remnawave 订阅前端在 `127.0.0.1:3020`
+- `netagent` — Remnawave 节点（Xray），在 host network 中，带 `NET_ADMIN`
 
-## 凭证生命周期
+**在其他每个出口上：**
+- 仅 `netagent`，通过每个节点的密钥在面板注册
 
-1. **生成**：随机凭证（panel 密码、x25519 密钥、客户端 UUID）
-2. **本地保存**：`~/.meridian/credentials/<IP>/proxy.yml`——应用到服务器之前保存
-3. **应用**：panel 密码更改、入站创建
-4. **同步**：凭证复制到服务器上的 `/etc/meridian/proxy.yml`
-5. **重新运行**：从缓存加载，不会重新生成（幂等）
-6. **跨机器**：`meridian server add IP` 通过 SSH 从服务器获取
-7. **卸载**：从服务器和本地机器中删除
+由 4.0 测试版部署的服务器以 `remnawave*` 的名称从 `/opt/remnawave` 和 `/opt/remnanode` 运行这些容器。下一次 `meridian apply` 会停止它们，通过一次重命名把面板目录（其 PostgreSQL `data/` 和 `.env` 密钥）移到 `/opt/ctlsvc`，然后启动重命名后的容器。用户、客户端链接和 API 令牌保持不变。
+
+## 卸载
+
+`meridian teardown IP` 移除面板和节点容器及卷、Meridian 的 nginx 文件、证书、Realm 服务和防火墙规则（加上 Meridian 3.x 的 3x-ui）。Docker 和系统包保留。在单服务器部署中它也移除本地 `cluster.yml`。在多服务器集群中它拒绝仍有角色的服务器。
 
 ## 文件位置
 
-### 服务器上
-- `/etc/meridian/proxy.yml` — 凭据和客户端列表
-- `/etc/nginx/conf.d/meridian-stream.conf` — nginx stream 配置（SNI 路由）
-- `/etc/nginx/conf.d/meridian-http.conf` — nginx http 配置（TLS、反向代理）
-- `/etc/ssl/meridian/` — TLS 证书（由 acme.sh 管理）
-- Docker 容器 `3x-ui` — Xray + 面板
+### 在控制平面服务器上
+- `/opt/ctlsvc/` — 面板 compose 文件、`.env` 和 PostgreSQL `data/`
+- `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI 路由
+- `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS 网站和反向代理
+- `/etc/ssl/meridian/` — 证书
 
-### 本地机器上
-- `~/.meridian/credentials/<IP>/` — 每个服务器的缓存凭据
-- `~/.meridian/servers` — 服务器注册表
-- `~/.meridian/cache/` — 更新检查缓存
-- `~/.local/bin/meridian` — CLI 入口点（通过 uv/pipx 安装）
+### 在每个出口上
+- `/opt/netagent/` — 节点 compose 文件和 `.env`
+
+### 在每个中继上
+- `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）。
+
+### 在您的机器上
+- `~/.config/meridian/cluster.yml` — 拓扑、面板访问、密钥
+- `~/.config/meridian/cluster.yml.bak` — 破坏性操作前的备份
+- `~/.config/meridian/servers.json` — 保存的 SSH 服务器
+- `~/.config/meridian/setup.json` — `meridian setup` 进度（无秘密）
+- `~/.config/meridian/ssh/meridian_ed25519` — 托管 SSH 密钥，生成时
+- `~/.config/meridian/cache/` — 更新检查缓存
+
+该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。在 `~/.config/meridian/` 不存在期间，若 `~/.meridian-v4/` 或 `~/.meridian/` 中存有集群（含有 `servers.json`），Meridian 也会使用它们。`~/.meridian/` 中的 Meridian 3.x 状态不会被触碰。

@@ -1,0 +1,91 @@
+# cluster.example.yml — annotated reference for ~/.meridian/cluster.yml
+#
+# Meridian writes this file; you generally do NOT edit it by hand. Change the
+# fleet with `meridian deploy`, `meridian setup`, `meridian node add`,
+# `meridian relay deploy`, and `meridian client add`, which review and apply
+# `topology_intent` for you.
+#
+# Two parts:
+#   1. Panel access and presentation (panel, branding, subscription_page,
+#      telegram) — written during deploy.
+#   2. topology_intent — the reviewed description of your fleet. Servers are
+#      referenced by the stable IDs saved in ~/.meridian/servers.json, never
+#      by address. Compiled-resource bookkeeping (workloads, managed_bindings,
+#      allocations, action_checkpoints, generations) is appended after apply.
+#
+# All IPs in this example use RFC 5737 documentation ranges (198.51.100.x).
+
+version: 3
+
+# ---------------------------------------------------------------------------
+# Panel — populated by `meridian deploy`. Edit api_token only when rotating.
+# ---------------------------------------------------------------------------
+panel:
+  url: https://198.51.100.1/panel-secret-path
+  api_token: example-jwt-token-from-remnawave-panel
+  admin_user: admin
+  admin_pass: example-admin-password
+  server_ip: 198.51.100.1
+  ssh_user: root
+  ssh_port: 22
+  secret_path: panel-secret-path             # nginx reverse proxy path
+  sub_path: subscription-secret-path         # connection-page and subscription path
+  deployed_with: 4.0.0
+
+# ---------------------------------------------------------------------------
+# Branding — shown on connection pages.
+# ---------------------------------------------------------------------------
+branding:
+  server_name: "Example VPN"
+  icon: "🌍"
+  color: ocean                               # ocean | sunset | forest | lavender | rose | slate
+
+# ---------------------------------------------------------------------------
+# Subscription page — Remnawave subscription frontend container.
+# `path` is the random nginx route generated on first deploy; persisted.
+# ---------------------------------------------------------------------------
+subscription_page:
+  enabled: true
+  path: ""                                   # auto-generated; do not pre-fill
+
+# ---------------------------------------------------------------------------
+# Telegram notifications — passed through to Remnawave backend.
+# Omit entirely to disable. When bot_token is set, notifications are
+# enabled on next deploy/redeploy. Chat IDs use "chat_id" or
+# "chat_id:thread_id" format (thread_id for topics in group chats).
+# ---------------------------------------------------------------------------
+# telegram:
+#   bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+#   notify_users: "-100123456789"             # user events (create, expire, etc.)
+#   notify_nodes: "-100123456789:80"          # node events (online/offline)
+#   notify_crm: "-100123456789"              # CRM / billing events
+#   notify_service: "-100123456789"          # service events (login, restart)
+#   notify_tblocker: "-100123456789"         # torrent blocker events
+
+# ---------------------------------------------------------------------------
+# Topology intent — one control plane, one exit, and a relay in front of it.
+# `meridian deploy 198.51.100.1` writes the control + exit part;
+# `meridian relay deploy 198.51.100.10 --exit main --name relay-moscow`
+# adds the relay. Omitted fields take their defaults.
+# ---------------------------------------------------------------------------
+topology_intent:
+  control:
+    server_ref: srv-0a1b2c3d4e5f             # 198.51.100.1 in servers.json
+  exits:
+    - id: main
+      server_ref: srv-0a1b2c3d4e5f
+      paths:
+        - id: main-reality
+          protocol: reality
+          reality_sni: www.google.com
+      geo_block: true
+  transparent_relays:
+    - id: relay-moscow
+      hop_server_refs:
+        - srv-6a7b8c9d0e1f                   # 198.51.100.10 in servers.json
+      exit_ref: main
+      protocol_path_ref: main-reality
+  default_egress_ref: main
+  access:
+    users:
+      - alice

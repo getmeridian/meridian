@@ -115,7 +115,7 @@ meridian deploy
 meridian deploy 198.51.100.10
 ```
 
-Meridian اطلاعات ورود را زیر `~/.meridian/` داخل WSL ذخیره می‌کند. دستورهای بعدی را از همان توزیع WSL اجرا کنید تا بتواند اطلاعات ذخیره‌شده سرور را پیدا کند:
+Meridian اطلاعات ورود را زیر `~/.config/meridian/` داخل WSL ذخیره می‌کند. دستورهای بعدی را از همان توزیع WSL اجرا کنید تا بتواند اطلاعات ذخیره‌شده سرور را پیدا کند:
 
 ```bash
 meridian client add alice
@@ -143,10 +143,10 @@ code .
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-همچنین می‌توانید اول preflight را اجرا کنید:
+همچنین می‌توانید اول سرور را بررسی کنید:
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### خطای Permission denied در SSH
@@ -195,10 +195,10 @@ cd ~
 mkdir -p projects
 ```
 
-از نگهداری `~/.ssh` یا `~/.meridian` زیر `/mnt/c/` خودداری کنید. مسیرهای mount شده از Windows می‌توانند permissionهای متفاوتی داشته باشند و SSH آن‌ها را رد کند.
+از نگهداری `~/.ssh` یا `~/.config/meridian` زیر `/mnt/c/` خودداری کنید. مسیرهای mount شده از Windows می‌توانند permissionهای متفاوتی داشته باشند و SSH آن‌ها را رد کند.
 
 ## قدم‌های بعدی
 
-- [شروع کار](/docs/fa/getting-started/) — اولین سرور خود را deploy کنید
-- [نصب](/docs/fa/installation/) — گزینه‌های نصب CLI
-- [عیب‌یابی](/docs/fa/troubleshooting/) — مشکلات رایج deploy و اتصال
+- [شروع کار](/fa/getting-started/) — اولین سرور خود را deploy کنید
+- [نصب](/fa/installation/) — گزینه‌های نصب CLI
+- [عیب‌یابی](/fa/troubleshooting/) — مشکلات رایج deploy و اتصال

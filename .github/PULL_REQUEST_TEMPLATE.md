@@ -12,8 +12,8 @@
 - [ ] `make ci` passes locally
 - [ ] Updated relevant documentation surfaces (see below)
 
-### If modifying connection info templates:
-- [ ] All connection-info templates are in sync (CSS/JS/app links)
+### If modifying connection pages:
+- [ ] PWA templates, assets, and app metadata are in sync
 - [ ] Tested light and dark mode
 
 ### If adding a new CLI command:
@@ -21,9 +21,9 @@
 - [ ] Updated README.md commands table
 - [ ] Updated CLAUDE.md subcommands list
 
-### If modifying credential handling:
-- [ ] Tested with existing credential files (backward compat)
-- [ ] Updated `ServerCredentials` dataclass if needed
+### If modifying cluster state or secrets:
+- [ ] Tested loading and saving an existing v4 `cluster.yml`
+- [ ] Updated the relevant typed cluster model
 
 ### If modifying provisioner steps:
 - [ ] Step returns proper StepResult (ok/changed/skipped/failed)

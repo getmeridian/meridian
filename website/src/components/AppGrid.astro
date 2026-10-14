@@ -1,17 +1,26 @@
 ---
 /**
- * AppGrid — app download links from shared data file (single source of truth).
- * CI validates these links match connection-info.html.j2.
+ * AppGrid — the recommended apps from the shared data file (single source of truth).
+ * Connection pages list the same apps first and link the rest per platform.
+ * CI validates these links match the PWA app metadata in render.py.
  */
 import appsData from '../data/apps.json';
+import { createT } from '../i18n/t';
+
+interface Props {
+  locale?: string;
+}
 
 interface App {
   name: string;
   platform: string;
   url: string;
+  recommended?: string[];
 }
 
-const apps: App[] = appsData;
+const { locale = 'en' } = Astro.props;
+const t = createT(locale);
+const apps: App[] = (appsData as App[]).filter((app) => (app.recommended ?? []).length > 0);
 ---
 
 <div class="app-grid">
@@ -22,6 +31,7 @@ const apps: App[] = appsData;
     </a>
   ))}
 </div>
+<p class="app-grid__note" data-t="connect.apps.more" set:html={t('connect.apps.more', 'Connection pages list these apps first and link others for each platform. <a href="/demo/" data-astro-prefetch>See the demo</a>.')} />
 
 <style>
   .app-grid {
@@ -57,6 +67,14 @@ const apps: App[] = appsData;
     font-size: 0.72rem;
     color: var(--t3);
     font-family: var(--mono);
+  }
+  .app-grid__note {
+    font-size: 0.85rem;
+    color: var(--t3);
+    margin: 0 0 16px;
+  }
+  .app-grid__note a {
+    color: var(--ac);
   }
 
   @media (max-width: 540px) {

@@ -1,32 +1,44 @@
-# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
+
+ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive \
     container=docker
 
-# Preserve apt cache across builds (BuildKit cache mount)
+# Preserve downloaded packages within the image layer cache.
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
-      > /etc/apt/apt.conf.d/keep-cache
+      > /etc/apt/apt.conf.d/keep-cache; \
+    printf 'Acquire::Retries "3";\nAPT::Update::Error-Mode "any";\n' \
+      > /etc/apt/apt.conf.d/80-meridian-network
+
+# Use the Azure-colocated archive on amd64 CI runners. Ubuntu arm64 images use
+# ports.ubuntu.com and must retain the architecture-specific ports archive.
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      sed -i 's|http://archive.ubuntu.com|http://azure.archive.ubuntu.com|g' \
+        /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || \
+      sed -i 's|http://archive.ubuntu.com|http://azure.archive.ubuntu.com|g' \
+        /etc/apt/sources.list 2>/dev/null || true; \
+    fi
 
 # ---------- OS packages (everything Meridian expects on a VPS) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd systemd-sysv dbus \
     openssh-server openssh-client sudo \
     curl wget openssl ca-certificates \
     python3 python3-pip python3-venv \
     iproute2 iptables nftables netcat-openbsd \
-    qrencode dnsutils jq unzip socat \
+    dnsutils jq unzip socat \
     ufw cron fail2ban unattended-upgrades apt-listchanges \
     apt-transport-https gnupg software-properties-common \
     procps psmisc less vim-tiny
 
+# Trust the local Pebble endpoint used for short-lived IP certificates.
+COPY tests/systemlab/fixtures/pebble-ca.pem /usr/local/share/ca-certificates/pebble-ca.crt
+RUN update-ca-certificates
+
 # ---------- nginx from official repo (1.27+, http2 on; directive) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    curl -fsSL https://nginx.org/keys/nginx_signing.key \
+RUN curl -fsSL https://nginx.org/keys/nginx_signing.key \
       -o /etc/apt/keyrings/nginx.asc \
     && chmod 644 /etc/apt/keyrings/nginx.asc \
     && . /etc/os-release \
@@ -37,9 +49,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get install -y --no-install-recommends nginx
 
 # ---------- Docker CE (Meridian checks dpkg-query -s docker-ce) ----------
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    install -m 0755 -d /etc/apt/keyrings \
+RUN install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
        -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
@@ -63,9 +73,9 @@ RUN mkdir -p /run/sshd /root/.ssh \
 COPY tests/systemlab/fixtures/controller_authorized_keys /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# ---------- Docker daemon config (nested: vfs driver, no iptables) ----------
+# ---------- Docker daemon config (nested: vfs driver, default bridge NAT) ----------
 RUN mkdir -p /etc/docker \
-    && printf '{"storage-driver":"vfs","iptables":false}\n' \
+    && printf '{"storage-driver":"vfs"}\n' \
        > /etc/docker/daemon.json
 
 # ---------- systemd wiring ----------

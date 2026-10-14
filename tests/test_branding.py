@@ -1,4 +1,4 @@
-"""Tests for branding — color validation, emoji extraction, icon processing."""
+"""Tests for branding — palette validation, emoji extraction, icon processing."""
 
 from __future__ import annotations
 
@@ -14,36 +14,43 @@ from meridian.branding import (
     _extract_emoji,
     _is_private_ip,
     _process_image_url,
+    normalize_icon,
     process_icon,
-    validate_color,
 )
-
-# ---------------------------------------------------------------------------
-# validate_color
-# ---------------------------------------------------------------------------
+from meridian.core.inputs import PAGE_PALETTES, validate_optional_palette_value
 
 
-class TestValidateColor:
-    @pytest.mark.parametrize("name", ["ocean", "sunset", "forest", "lavender", "rose", "slate"])
-    def test_valid_palette_names(self, name: str) -> None:
-        assert validate_color(name) == name
+class TestPalette:
+    @pytest.mark.parametrize("raw,expected", [("ocean", "ocean"), (" OCEAN ", "ocean"), ("Slate", "slate"), ("", "")])
+    def test_known_palettes_normalize(self, raw: str, expected: str) -> None:
+        assert validate_optional_palette_value(raw) == expected
 
-    @pytest.mark.parametrize("raw,expected", [("OCEAN", "ocean"), ("Ocean", "ocean"), ("SUNSET", "sunset")])
-    def test_case_insensitive(self, raw: str, expected: str) -> None:
-        assert validate_color(raw) == expected
+    @pytest.mark.parametrize("invalid", ["blue", "red", "purple"])
+    def test_unknown_palette_lists_the_choices(self, invalid: str) -> None:
+        with pytest.raises(ValueError, match="ocean, sunset, forest, lavender, rose, slate"):
+            validate_optional_palette_value(invalid)
 
-    def test_whitespace_trimmed(self) -> None:
-        assert validate_color(" ocean ") == "ocean"
-        assert validate_color("\tocean\n") == "ocean"
+    def test_page_palettes_match_the_page(self) -> None:
+        from pathlib import Path
 
-    @pytest.mark.parametrize("invalid", ["blue", "", "none", "red", "  "])
-    def test_invalid_returns_empty(self, invalid: str) -> None:
-        assert validate_color(invalid) == ""
+        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
+        for palette in PAGE_PALETTES:
+            assert f"  {palette}:" in app_js
 
 
-# ---------------------------------------------------------------------------
-# _extract_emoji
-# ---------------------------------------------------------------------------
+class TestNormalizeIcon:
+    def test_emoji_and_saved_data_uri_pass(self) -> None:
+        assert normalize_icon(" 🛡️ ") == "🛡️"
+        assert normalize_icon("data:image/png;base64,iVBORw0KGgo=") == "data:image/png;base64,iVBORw0KGgo="
+
+    def test_plain_words_are_refused(self) -> None:
+        with pytest.raises(ValueError, match="emoji"):
+            normalize_icon("shield")
+
+    def test_unusable_image_url_is_refused(self) -> None:
+        with patch("meridian.branding._process_image_url", return_value=""):
+            with pytest.raises(ValueError, match="Could not use the image"):
+                normalize_icon("https://example.com/icon.png")
 
 
 class TestExtractEmoji:
@@ -79,11 +86,6 @@ class TestExtractEmoji:
         assert _extract_emoji("") == ""
 
 
-# ---------------------------------------------------------------------------
-# process_icon
-# ---------------------------------------------------------------------------
-
-
 class TestProcessIcon:
     def test_emoji_input_returns_emoji(self) -> None:
         assert process_icon("🚀") == "🚀"
@@ -106,11 +108,6 @@ class TestProcessIcon:
         mock_process.return_value = ""
         process_icon("http://198.51.100.1/icon.png")
         mock_process.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# _is_private_ip
-# ---------------------------------------------------------------------------
 
 
 class TestIsPrivateIp:
@@ -139,11 +136,6 @@ class TestIsPrivateIp:
     def test_gaierror_returns_false(self, mock_getaddrinfo: MagicMock) -> None:
         mock_getaddrinfo.side_effect = socket.gaierror("Name resolution failed")
         assert _is_private_ip("nonexistent.example.com") is False
-
-
-# ---------------------------------------------------------------------------
-# _process_image_url
-# ---------------------------------------------------------------------------
 
 
 def _make_minimal_png() -> bytes:

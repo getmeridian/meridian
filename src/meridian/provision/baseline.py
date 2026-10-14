@@ -1,0 +1,128 @@
+"""Shared host-baseline provisioning recipe."""
+
+from __future__ import annotations
+
+import hashlib
+import shlex
+from dataclasses import dataclass
+
+from meridian.provision.common import (
+    AUTO_UPGRADES_CONF,
+    FAIL2BAN_JAIL_CONF,
+    FAIL2BAN_JAIL_PATH,
+    FAIL2BAN_PACKAGES,
+    REQUIRED_PACKAGES,
+    CheckDiskSpace,
+    ConfigureBBR,
+    ConfigureFail2ban,
+    ConfigureFirewall,
+    EnableAutoUpgrades,
+    HardenSSH,
+    InstallPackages,
+    SetTimezone,
+)
+from meridian.provision.docker import InstallDocker
+from meridian.provision.steps import ProvisionContext, Step
+
+
+@dataclass(frozen=True)
+class BaselineCheck:
+    """One read-only assertion matching the shared baseline recipe."""
+
+    name: str
+    command: str
+
+
+def build_server_baseline_steps(
+    ctx: ProvisionContext,
+    *,
+    install_docker: bool,
+) -> list[Step]:
+    """Build the shared OS baseline in execution order, optionally including Docker."""
+    steps: list[Step] = [
+        CheckDiskSpace(),
+        InstallPackages(REQUIRED_PACKAGES + (FAIL2BAN_PACKAGES if ctx.harden else [])),
+        EnableAutoUpgrades(),
+        SetTimezone(),
+    ]
+    if ctx.harden:
+        steps += [HardenSSH(), ConfigureFail2ban()]
+    steps.append(ConfigureBBR())
+    if ctx.harden:
+        # Public ports belong to the reviewed plan's tagged firewall rules.
+        steps.append(ConfigureFirewall())
+    if install_docker:
+        steps.append(InstallDocker())
+    return steps
+
+
+def build_server_baseline_checks(
+    ctx: ProvisionContext,
+    *,
+    install_docker: bool,
+) -> list[BaselineCheck]:
+    """Build read-only checks covering every durable baseline effect."""
+    packages = [*REQUIRED_PACKAGES, *(FAIL2BAN_PACKAGES if ctx.harden else [])]
+    package_args = " ".join(shlex.quote(package) for package in packages)
+    upgrade_path = "/etc/apt/apt.conf.d/20auto-upgrades"
+    upgrade_digest = hashlib.sha256(AUTO_UPGRADES_CONF.encode()).hexdigest()
+    jail_digest = hashlib.sha256(FAIL2BAN_JAIL_CONF.encode()).hexdigest()
+    checks = [
+        BaselineCheck(
+            "packages",
+            "test \"$(dpkg-query -W -f='${Status}\\n' "
+            f"{package_args} 2>/dev/null | grep -c '^install ok installed$')\" -eq {len(packages)}",
+        ),
+        BaselineCheck(
+            "automatic_upgrades",
+            f"printf '%s  %s\\n' {shlex.quote(upgrade_digest)} {shlex.quote(upgrade_path)} "
+            "| sha256sum --check --status -",
+        ),
+        BaselineCheck(
+            "timezone",
+            'test "$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null)" = UTC',
+        ),
+        BaselineCheck(
+            "bbr",
+            "if sysctl -n net.ipv4.tcp_congestion_control >/dev/null 2>&1 && "
+            "sysctl -n net.core.default_qdisc >/dev/null 2>&1; then "
+            'test "$(sysctl -n net.ipv4.tcp_congestion_control)" = bbr && '
+            'test "$(sysctl -n net.core.default_qdisc)" = fq; fi',
+        ),
+    ]
+    if ctx.harden:
+        checks.extend(
+            [
+                BaselineCheck(
+                    "ssh_hardening",
+                    "sshd -t && sshd -T | grep -qx 'passwordauthentication no' && "
+                    "sshd -T | grep -qx 'kbdinteractiveauthentication no'",
+                ),
+                BaselineCheck(
+                    "fail2ban",
+                    f"printf '%s  %s\\n' {shlex.quote(jail_digest)} {shlex.quote(FAIL2BAN_JAIL_PATH)} "
+                    "| sha256sum --check --status - && systemctl is-active --quiet fail2ban",
+                ),
+                BaselineCheck(
+                    "firewall",
+                    # Absent UFW (stock Debian) is drift to install, not a missing inspection tool.
+                    "command -v ufw >/dev/null 2>&1 || exit 1; "
+                    "ufw status | grep -qx 'Status: active' && "
+                    "ufw status verbose | grep -q '^Default: deny (incoming), allow (outgoing)' && "
+                    "ports=$(sshd -T 2>/dev/null | awk '$1 == \"port\" {print $2}'); "
+                    'test -n "$ports" || ports=22; rules=$(ufw show added 2>/dev/null); '
+                    "for port in $ports; do printf '%s\\n' \"$rules\" | "
+                    'grep -Fq "allow ${port}/tcp" || exit 1; done',
+                ),
+            ]
+        )
+    if install_docker:
+        checks.append(
+            BaselineCheck(
+                "docker",
+                # Absent Docker is drift to install (exit 1), not a missing inspection tool.
+                "command -v docker >/dev/null 2>&1 || exit 1; "
+                "docker info >/dev/null 2>&1 && docker compose version >/dev/null 2>&1",
+            )
+        )
+    return checks

@@ -1,0 +1,52 @@
+{
+  "$defs": {
+    "ClientCreated": {
+      "additionalProperties": false,
+      "description": "Client metadata returned after creation, with their handoff links.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "page_url": {
+          "default": "",
+          "title": "Page Url",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "subscription_url": {
+          "default": "",
+          "title": "Subscription Url",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "id",
+        "status"
+      ],
+      "title": "ClientCreated",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for adding one or more clients.",
+  "properties": {
+    "clients": {
+      "items": {
+        "$ref": "#/$defs/ClientCreated"
+      },
+      "title": "Clients",
+      "type": "array"
+    }
+  },
+  "title": "ClientAddResult",
+  "type": "object"
+}

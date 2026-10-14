@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "InputField": {
+      "additionalProperties": false,
+      "description": "One UI-renderable input field requested by a workflow.",
+      "properties": {
+        "default": {
+          "default": null,
+          "title": "Default"
+        },
+        "help_text": {
+          "default": "",
+          "title": "Help Text",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "boolean",
+            "choice",
+            "confirmation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/InputOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "secret": {
+          "default": false,
+          "title": "Secret",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "kind"
+      ],
+      "title": "InputField",
+      "type": "object"
+    },
+    "InputOption": {
+      "additionalProperties": false,
+      "description": "One selectable value for a workflow field.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ],
+      "title": "InputOption",
+      "type": "object"
+    },
+    "InputSection": {
+      "additionalProperties": false,
+      "description": "Logical grouping for workflow fields.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "field_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Field Ids",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "title": "InputSection",
+      "type": "object"
+    },
+    "WorkflowPlan": {
+      "additionalProperties": false,
+      "description": "Current workflow state for a CLI, UI, or process client.",
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/InputField"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "needs_input": {
+          "title": "Needs Input",
+          "type": "boolean"
+        },
+        "ready_request_schema": {
+          "default": "",
+          "title": "Ready Request Schema",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/InputSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "needs_input"
+      ],
+      "title": "WorkflowPlan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for `meridian api workflow NAME --json`.",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "workflow": {
+      "$ref": "#/$defs/WorkflowPlan"
+    }
+  },
+  "required": [
+    "name",
+    "workflow"
+  ],
+  "title": "ApiWorkflowResult",
+  "type": "object"
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  .sizes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .size h3 { margin-top: 6px; }
+  .size .spec { font: 600 26px/1.1 var(--heading); margin-top: 12px; }
+  .size .spec span { font: 400 15px/1 var(--body); color: var(--t2); margin-left: 4px; }
+  .size p { font-size: 15.5px; }
+  .checks { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  ul { list-style: none; margin-top: 10px; }
+  li { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--b1); color: var(--t2); font-size: 16px; }
+  li:first-child { border-top: none; }
+  li::before { content: "✓"; color: var(--ok); font-weight: 600; flex: none; }
+  li.x::before { content: "✕"; color: var(--err); }
+  li b { color: var(--t1); font-weight: 600; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">Choosing a VPS</div>
+  <h1>The address matters more than the specs</h1>
+  <p class="lede">Size is easy. Test the address from your users' networks before you commit to a host.</p>
+  <div class="body">
+    <div class="sizes">
+      <div class="card size"><div class="label">First server</div><h3>Control server + exit</h3><div class="spec">2 GB<span>RAM</span> · 2<span>cores</span></div><p>Remnawave panel, PostgreSQL, Valkey, and Xray in Docker.</p></div>
+      <div class="card size"><div class="label">More exits</div><h3>Exit</h3><div class="spec">1 GB<span>RAM</span> · 1<span>core</span></div><p>One Remnawave node container. No panel.</p></div>
+      <div class="card size"><div class="label">Domestic entry</div><h3>Relay</h3><div class="spec">Smallest<span>plan</span></div><p>Realm only, no Docker. Size its traffic like the exit's.</p></div>
+    </div>
+    <div class="checks">
+      <div class="card"><div class="label">Before you deploy</div><ul>
+        <li><span><b>Public IPv4</b>; <code>meridian scan</code> is IPv4-only</span></li>
+        <li><span><b>TCP and UDP 443</b> open in the provider's cloud firewall too</span></li>
+        <li><span><b>Fresh Debian or Ubuntu LTS</b>, SSH key, root or passwordless sudo</span></li>
+        <li><span><b>2 GB free disk</b>, clock within <b>30 seconds</b></span></li>
+        <li><span><b>Hourly billing</b>: a blocked address costs an hour</span></li>
+        <li class="x"><span><b>No exit inside the censored country</b></span></li>
+      </ul></div>
+      <div class="card"><div class="label">Test before you commit</div><ul>
+        <li><span><code>meridian check IP</code>: target, 443, reachability, OS, disk, clock</span></li>
+        <li><span>Deploy, then <code>meridian test</code> and <code>test --probe</code></span></li>
+        <li><span>From <b>inside</b> users' networks: home line <b>and</b> mobile</span></li>
+        <li><span>Test again after a few days; blocks can arrive late</span></li>
+        <li><span>Keep a second exit at a <b>different provider and network</b></span></li>
+      </ul></div>
+    </div>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>RAM and core minimums are Remnawave's own requirements</span></div>
+</div>
+</body></html>

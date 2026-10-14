@@ -25,52 +25,44 @@
     <text y="0" class="t d">$</text>
     <text x="16" y="0" class="tb bw">meridian deploy 198.51.100.42 --yes</text>
 
-    <!-- Header -->
-    <text x="0" y="32" class="tb w">  Meridian</text>
-    <text x="90" y="32" class="t d">v3.6.0</text>
+    <!-- Camouflage target and start -->
+    <text x="0" y="32" class="t c">  →</text><text x="28" y="32" class="t w">Looking for a camouflage site in the server's own network (about a minute)...</text>
+    <text x="0" y="52" class="t c">  →</text><text x="28" y="52" class="t w">No usable site next to the server; using a well-known camouflage target</text>
+    <text x="0" y="72" class="t c">  →</text><text x="28" y="72" class="t w">First deployment: installing the control plane and proxy</text>
+    <text x="0" y="92" class="t c">  →</text><text x="28" y="92" class="t w">Applying the reviewed topology; this takes a few minutes on a fresh server...</text>
 
-    <!-- Config -->
-    <text x="0" y="60" class="t c">  → Configuring server at 198.51.100.42...</text>
-    <text x="0" y="78" class="t c">  → XHTTP: enabled (enhanced stealth)</text>
+    <!-- Reviewed apply: one line per change -->
+    <text x="0" y="122" class="t g">  ✓</text><text x="28" y="122" class="t w">Prepare server</text><text x="145" y="122" class="t d">on 198.51.100.42</text>
+    <text x="0" y="142" class="t g">  ✓</text><text x="28" y="142" class="t w">Firewall rule</text><text x="138" y="142" class="t d">on 198.51.100.42</text>
+    <text x="0" y="162" class="t g">  ✓</text><text x="28" y="162" class="t w">Install the control panel</text><text x="232" y="162" class="t d">on 198.51.100.42</text>
+    <text x="0" y="182" class="t g">  ✓</text><text x="28" y="182" class="t w">TLS certificate</text><text x="153" y="182" class="t d">on 198.51.100.42</text>
+    <text x="0" y="202" class="t g">  ✓</text><text x="28" y="202" class="t w">Web server config</text><text x="169" y="202" class="t d">on 198.51.100.42</text>
+    <text x="0" y="222" class="t g">  ✓</text><text x="28" y="222" class="t w">Register proxy node</text>
+    <text x="0" y="242" class="t g">  ✓</text><text x="28" y="242" class="t w">Proxy profile</text>
+    <text x="0" y="262" class="t g">  ✓</text><text x="28" y="262" class="t w">Start proxy node</text><text x="161" y="262" class="t d">on 198.51.100.42</text>
+    <text x="0" y="282" class="t g">  ✓</text><text x="28" y="282" class="t w">Published connection</text>
+    <text x="0" y="302" class="t g">  ✓</text><text x="28" y="302" class="t w">User</text>
 
-    <!-- Steps -->
-    <text x="0" y="108" class="t g">  ✓</text><text x="28" y="108" class="t w">Install system packages</text><text x="280" y="108" class="t d">(all packages present)</text>
-    <text x="0" y="128" class="t g">  ✓</text><text x="28" y="128" class="t w">Enable automatic security updates</text><text x="310" y="128" class="t d">(already configured)</text>
-    <text x="0" y="148" class="t g">  ✓</text><text x="28" y="148" class="t w">Set timezone to UTC</text><text x="210" y="148" class="t d">(already UTC)</text>
-    <text x="0" y="168" class="t g">  ✓</text><text x="28" y="168" class="t w">Harden SSH configuration</text><text x="255" y="168" class="t d">(already hardened)</text>
-    <text x="0" y="188" class="t g">  ✓</text><text x="28" y="188" class="t w">Enable BBR congestion control</text><text x="290" y="188" class="t d">(already enabled)</text>
-    <text x="0" y="208" class="t g">  ✓</text><text x="28" y="208" class="t w">Configure firewall</text>
-    <text x="0" y="228" class="t g">  ✓</text><text x="28" y="228" class="t w">Install Docker</text><text x="165" y="228" class="t d">(docker-ce already installed)</text>
-    <text x="0" y="248" class="t g">  ✓</text><text x="28" y="248" class="t w">Deploy 3x-ui panel</text>
-    <text x="0" y="268" class="t g">  ✓</text><text x="28" y="268" class="t w">Configure panel</text><text x="170" y="268" class="t d">(credentials saved)</text>
-    <text x="0" y="288" class="t g">  ✓</text><text x="28" y="288" class="t w">Log in to panel</text><text x="170" y="288" class="t d">(port 2053)</text>
-    <text x="0" y="308" class="t g">  ✓</text><text x="28" y="308" class="t w">Create Reality inbound</text><text x="230" y="308" class="t d">(port 10443)</text>
-    <text x="0" y="328" class="t g">  ✓</text><text x="28" y="328" class="t w">Create XHTTP inbound</text><text x="225" y="328" class="t d">(127.0.0.1:12345)</text>
-    <text x="0" y="348" class="t g">  ✓</text><text x="28" y="348" class="t w">Verify Xray configuration</text><text x="260" y="348" class="t d">(Xray running)</text>
-    <text x="0" y="368" class="t g">  ✓</text><text x="28" y="368" class="t w">Install nginx</text><text x="160" y="368" class="t d">(SNI routing + TLS configured)</text>
-    <text x="0" y="388" class="t g">  ✓</text><text x="28" y="388" class="t w">Deploy connection page</text><text x="230" y="388" class="t d">(live)</text>
-
-    <!-- Success -->
-    <text x="0" y="420" class="tb g">  ✓ All steps completed successfully</text>
+    <!-- Verification -->
+    <text x="0" y="332" class="t g">  ✓</text><text x="28" y="332" class="t w">Server converged</text>
+    <text x="0" y="352" class="t g">  ✓</text><text x="28" y="352" class="t w">Verified the control plane, node, and subscription</text>
+    <text x="0" y="372" class="t g">  ✓</text><text x="28" y="372" class="t w">Traffic verified end to end through the delivered subscription</text>
 
     <!-- Done block -->
-    <text x="0" y="452" class="tb g">  Done!</text>
-    <text x="0" y="478" class="t g">  ✓</text><text x="28" y="478" class="t w">Your proxy server is live and ready to use.</text>
+    <text x="0" y="408" class="tb g">  Done!</text><text x="47" y="408" class="t w">Your proxy server is live.</text>
+
+    <!-- Handoff -->
+    <text x="0" y="442" class="tb bw">  Share this link</text>
+    <text x="0" y="464" class="tb c">  https://198.51.100.42/xxxxxxxx/.../</text>
+    <text x="0" y="484" class="t d">  (They open it, scan the QR code, and connect)</text>
+
+    <text x="0" y="518" class="tb bw">  Subscription URL</text><text x="133" y="518" class="t d">(for Xray/V2Ray apps)</text>
+    <text x="0" y="540" class="tb c">  https://198.51.100.42/xxxxxxxx/sub/...</text>
 
     <!-- Next steps -->
-    <text x="0" y="510" class="tb bw">  Next steps:</text>
-
-    <text x="0" y="538" class="t g">  1.</text>
-    <text x="32" y="538" class="t w">Share this link with whoever needs access:</text>
-    <text x="32" y="558" class="tb c">     https://198.51.100.42/xxxxxxxx/.../</text>
-    <text x="32" y="576" class="t d">     (They open it, scan the QR code, and connect)</text>
-
-    <text x="0" y="606" class="t g">  3.</text>
-    <text x="32" y="606" class="t w">Test that the proxy works:</text>
-    <text x="32" y="626" class="tb c">     meridian test 198.51.100.42</text>
-
-    <text x="0" y="656" class="t g">  4.</text>
-    <text x="32" y="656" class="t w">Share access with friends:</text>
-    <text x="32" y="676" class="tb c">     meridian client add alice</text>
+    <text x="0" y="578" class="tb bw">  Next</text>
+    <text x="32" y="602" class="t c">meridian test 198.51.100.42</text><text x="267" y="602" class="t w">verify it from your machine</text>
+    <text x="32" y="624" class="t c">meridian client add alice</text><text x="267" y="624" class="t w">give someone else their own link</text>
+    <text x="32" y="646" class="t c">meridian setup</text><text x="267" y="646" class="t w">add relays or more servers</text>
   </g>
 </svg>

@@ -5,19 +5,98 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-MERIDIAN_HOME = Path(os.environ.get("MERIDIAN_HOME", Path.home() / ".meridian"))
-CREDS_BASE = MERIDIAN_HOME / "credentials"
-CACHE_DIR = MERIDIAN_HOME / "cache"
-SERVERS_FILE = MERIDIAN_HOME / "servers"
-SERVER_CREDS_DIR = Path("/etc/meridian")
+# Meridian 3.x keeps its state here; 4.x never writes to it.
+LEGACY_HOME = Path.home() / ".meridian"
+# Only Meridian 4 writes servers.json (3.x used `servers`), so it marks a 4.x home.
+_V4_MARKER = "servers.json"
 
-DEFAULT_SNI = "www.cloudflare.com"
-DEFAULT_FINGERPRINT = "chrome"
-DEFAULT_PANEL_PORT = 2053
+
+def default_home() -> Path:
+    """Where Meridian 4 keeps local state when MERIDIAN_HOME is not set.
+
+    The XDG config directory keeps 4.x clear of 3.x's ~/.meridian. A 4.x fleet already
+    kept in ~/.meridian-v4 (the first beta guide) or ~/.meridian (4.0 development builds)
+    stays where it is, so nobody loses access to a fleet or has to move folders.
+    """
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    preferred = (Path(xdg) if os.path.isabs(xdg) else Path.home() / ".config") / "meridian"
+    if preferred.exists():
+        return preferred
+    for earlier in (Path.home() / ".meridian-v4", LEGACY_HOME):
+        if (earlier / _V4_MARKER).is_file():
+            return earlier
+    return preferred
+
+
+def display_path(path: Path) -> str:
+    """Show a path under the home directory as ~/..., the way people type it."""
+    try:
+        return "~/" + path.relative_to(Path.home()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+MERIDIAN_HOME = Path(os.environ["MERIDIAN_HOME"]) if os.environ.get("MERIDIAN_HOME") else default_home()
+HOME_DISPLAY = display_path(MERIDIAN_HOME)
+CLUSTER_CONFIG = MERIDIAN_HOME / "cluster.yml"
+CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
+CACHE_DIR = MERIDIAN_HOME / "cache"
+SERVER_PROFILES_FILE = MERIDIAN_HOME / "servers.json"
+SETUP_DRAFT_FILE = MERIDIAN_HOME / "setup.json"
+PREFERENCES_FILE = MERIDIAN_HOME / "preferences.json"
+MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
+
+DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"
-CONNECT_TEST_URL = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "").strip()
-CONNECT_TEST_URL_IPV4 = "https://api.ipify.org"
-CONNECT_TEST_URL_IPV6 = "https://api6.ipify.org"
+
+# Remnawave panel + node
+# Tested tuple, pinned to multi-arch (amd64 + arm64) index digests so a
+# re-pushed tag cannot change what a fresh server runs. Remnawave pins are
+# installed on fresh servers and never used to downgrade a newer tag the
+# operator chose (see meridian.remnawave.versions); PostgreSQL and Valkey are
+# Meridian-owned and always rendered as pinned. Move the three Remnawave pins
+# together, then refresh every digest with scripts/pin_image_digests.py.
+REMNAWAVE_BACKEND_IMAGE = (
+    "remnawave/backend:3.4.5@sha256:b16d724b90fd7c9fec2df04bd28938a671cafc62894105068e11550ee3449c56"
+)
+REMNAWAVE_NODE_IMAGE = "remnawave/node:3.4.2@sha256:1f97485b4bc7e4944f1ae95cc57d176376813b0022e9567b705f384f1a2e909d"
+REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE = (
+    "remnawave/subscription-page:8.0.0@sha256:04e8d479afb3598024e4018e9e15cd7fe879938250090a690ba39f1ee91b79ac"
+)
+REMNAWAVE_POSTGRES_IMAGE = (
+    "postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+)
+REMNAWAVE_VALKEY_IMAGE = (
+    "valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11"
+)
+REMNAWAVE_MIN_VERSION = "3.4.0"  # oldest panel API Meridian speaks
+REMNAWAVE_TESTED_MAJOR = 3  # newer majors run with a warning
+REMNAWAVE_PANEL_PORT = 3000  # internal port, nginx reverse-proxied
+REMNAWAVE_NODE_API_PORT = 3010  # node API port (panel→node mTLS communication)
+REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to avoid node API conflict)
+# Runtime directories and container names live in meridian.host_runtime.
+
+# Exit-IP observers are single-stack: a dual-stack exit would otherwise answer
+# a dual-stack observer over IPv6 and fail the egress match against its IPv4.
+_CONNECT_TEST_URL_OVERRIDE = os.environ.get("MERIDIAN_CONNECT_TEST_URL", "").strip()
+CONNECT_TEST_URLS_IPV4 = (
+    (_CONNECT_TEST_URL_OVERRIDE,)
+    if _CONNECT_TEST_URL_OVERRIDE
+    else (
+        "https://api.ipify.org",
+        "https://ipv4.icanhazip.com",
+        "https://v4.ident.me",
+    )
+)
+CONNECT_TEST_URLS_IPV6 = (
+    (_CONNECT_TEST_URL_OVERRIDE,)
+    if _CONNECT_TEST_URL_OVERRIDE
+    else (
+        "https://api6.ipify.org",
+        "https://ipv6.icanhazip.com",
+        "https://v6.ident.me",
+    )
+)
 DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip().lower() in {
     "1",
     "true",
@@ -27,27 +106,45 @@ DISABLE_UPDATE_CHECK = os.environ.get("MERIDIAN_DISABLE_UPDATE_CHECK", "").strip
 
 PYPI_PACKAGE = "meridian-vpn"
 PYPI_JSON_URL = f"https://pypi.org/pypi/{PYPI_PACKAGE}/json"
-GITHUB_REPO = "https://github.com/uburuntu/meridian"
-GITHUB_ISSUES = f"{GITHUB_REPO}/issues"
-WEBSITE_URL = "https://getmeridian.org"
+GITHUB_REPO = "https://github.com/getmeridian/meridian"
+BETA_REPORT_URL = f"{GITHUB_REPO}/issues/new?template=v4_beta.yml"
 
 # Update throttle (seconds)
 UPDATE_CHECK_INTERVAL = 60
 
+# Primary-key fingerprints of third-party apt repositories Meridian adds
+APT_KEY_FINGERPRINTS: dict[str, frozenset[str]] = {
+    "docker": frozenset({"9DC858229FC7DD38854AE2D88D81803C0EBFCD88"}),
+    "nginx": frozenset(
+        {
+            "573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62",
+            "8540A6F18833A80E9C1653A42FD21310B49F6B46",
+            "9E9BE90EACBCDE69FE9B204CBCDCD8A38D88A2B3",
+        }
+    ),
+    "cloudflare-warp": frozenset({"C068A2B5771775193CBE1F2F6E2DD2174FA1C3BA"}),
+}
+
+# acme.sh (TLS certificates) — the script is pinned and checksum-verified before it runs as root
+ACME_SH_VERSION = "3.1.6"
+ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8d7"
+
 # Relay (Realm TCP relay)
 REALM_VERSION = "2.9.3"
 REALM_GITHUB_URL = "https://github.com/zhboner/realm/releases/download"
-RELAY_SERVICE_NAME = "meridian-relay"
 
 # SHA256 digests for Realm tarball verification (keyed by target triple)
 REALM_SHA256: dict[str, str] = {
     "x86_64-unknown-linux-gnu": "2eba86f1a1e47c1bfe9d6fd682ef8667bd05e57c3aeb0ec37806aabe2ce74a0c",
     "aarch64-unknown-linux-gnu": "9937daacdcdfcac9fd78d25819f2de0a5c3357c2c49e686679d812343ab8661e",
 }
-RELAY_CONFIG_PATH = "/etc/meridian/realm.toml"
+# Relay hosts expose bland names: providers scan process lists and unit names
+# for proxy software. The binary is still Realm; only its installed name changes.
+RELAY_BINARY_PATH = "/usr/local/bin/netfwd"
+LEGACY_REALM_BINARY_PATH = "/usr/local/bin/realm"
 
 # Xray client binary (for connection verification)
-XRAY_VERSION = "26.2.6"  # matches xray bundled in 3x-ui 2.8.11
+XRAY_VERSION = "26.7.28"  # matches xray bundled in remnawave/node:3.4.2
 XRAY_GITHUB_URL = "https://github.com/XTLS/Xray-core/releases/download"
 XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
     ("Darwin", "arm64"): "Xray-macos-arm64-v8a.zip",
@@ -56,43 +153,16 @@ XRAY_ASSET_MAP: dict[tuple[str, str], str] = {
     ("Linux", "aarch64"): "Xray-linux-arm64-v8a.zip",
 }
 
-
-def is_ipv4(s: str) -> bool:
-    """Check if string looks like an IPv4 address."""
-    parts = s.split(".")
-    if len(parts) != 4:
-        return False
-    return all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
-
-
-def is_ip(s: str) -> bool:
-    """Check if string is a valid IPv4 or IPv6 address."""
-    import ipaddress
-
-    try:
-        ipaddress.ip_address(s)
-        return True
-    except ValueError:
-        return False
-
-
-def sanitize_ip_for_path(ip: str) -> str:
-    """Convert an IP address to a filesystem-safe directory name.
-
-    IPv4 addresses are returned unchanged (backward compatible).
-    IPv6 colons are replaced with hyphens: 2001:db8::1 -> 2001-db8--1
-    """
-    if ":" in ip:
-        return ip.replace(":", "-")
-    return ip
-
-
-def creds_dir_for(ip: str, *, local_mode: bool) -> Path:
-    """Determine the local credential directory for a server.
-
-    Root in local mode reads/writes /etc/meridian directly.
-    Everything else uses ~/.meridian/credentials/<ip>.
-    """
-    if local_mode and os.geteuid() == 0:
-        return SERVER_CREDS_DIR
-    return CREDS_BASE / sanitize_ip_for_path(ip)
+# RealiTLScanner (remote SNI discovery helper)
+REALITL_SCANNER_VERSION = "0.2.3"
+REALITL_SCANNER_GITHUB_URL = "https://github.com/XTLS/RealiTLScanner/releases/download"
+REALITL_SCANNER_ASSETS: dict[str, tuple[str, str]] = {
+    "x86_64": (
+        "RealiTLScanner-linux-amd64",
+        "a55595446de9f1c2e6c5c3cd766a7320a11115947df48f101749bb62c8055592",
+    ),
+    "aarch64": (
+        "RealiTLScanner-linux-arm64",
+        "27bdd3e53d4391c66c8df3391d3c3fb5eb2dc356125f2fb33ac58fcaaf8f88b3",
+    ),
+}

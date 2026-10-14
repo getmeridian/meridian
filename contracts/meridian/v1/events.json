@@ -1,0 +1,20 @@
+{
+  "event_schema": "event",
+  "schema": "meridian.event-types/v1",
+  "types": [
+    "command.started",
+    "command.completed",
+    "command.failed",
+    "command.cancel_requested",
+    "command.cancelled",
+    "plan.action.started",
+    "plan.action.completed",
+    "plan.action.failed",
+    "plan.action.skipped",
+    "provision.step.started",
+    "provision.step.completed",
+    "provision.step.failed",
+    "warning",
+    "error"
+  ]
+}

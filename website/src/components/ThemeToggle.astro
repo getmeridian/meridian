@@ -30,7 +30,7 @@
     if (!btn) return;
 
     function isDark() {
-      var saved = localStorage.getItem('meridian-theme');
+      var saved = localStorage.getItem('starlight-theme') || localStorage.getItem('meridian-theme');
       if (saved === 'dark' || saved === 'light') return saved === 'dark';
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
@@ -39,6 +39,7 @@
       btn.dataset.state = dark ? 'dark' : 'light';
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       localStorage.setItem('meridian-theme', dark ? 'dark' : 'light');
+      localStorage.setItem('starlight-theme', dark ? 'dark' : 'light');
     }
 
     apply(isDark());

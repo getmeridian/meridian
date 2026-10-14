@@ -7,117 +7,154 @@ section: guides
 
 ## 中继节点解决的问题
 
-当出口服务器的 IP 被封锁时，客户端会失去访问权限。中继节点为他们提供了一个国内入口点，更难被封锁：
+当出口服务器的 IP 被封锁时，用户失去访问。中继为他们提供一个国内入口点，更难被阻止：
 
 ```
-客户端 → 中继节点（国内 IP）→ 出口服务器（国外）→ 互联网
+Client → Relay (domestic IP) → Exit server (abroad) → Internet
 ```
 
-审查机构看到的是发往国内 IP 的流量。中继节点将原始 TCP 转发到出口服务器 — 所有加密都是客户端和出口服务器之间的端到端加密。中继节点永远看不到明文。
+审查者看到发往国内 IP 的流量。中继转发原始 TCP 到出口；加密是端到端的客户端和出口之间，所以中继永不见明文。
 
-## 中继节点如何工作
+## 中继如何工作
 
-中继节点运行 [Realm](https://github.com/zhboner/realm)，一个轻量级零复制 TCP 转发器（~5MB Rust 二进制文件）。它在端口 443（可配置）上监听，并将所有流量转发到出口服务器的端口 443。没有 Docker、没有 VPN 软件、没有管理面板。
+中继运行 [Realm](https://github.com/zhboner/realm)，一个小零复制 TCP 转发器。它在端口 443（可配置）上监听并转发到出口的 Reality 监听器。中继上没有 Docker 和面板运行。
 
-所有协议都可以通过中继工作：
-- **Reality** — 端到端握手，中继完全透明
-- **XHTTP** — 通过中继路由，显式 `sni=` 参数
-- **WSS** — 域名模式，通过 `sni=domain&host=domain` 路由
+中继承载 **Reality** 流量。XHTTP、WSS 和 Hysteria2 停留在出口自己的地址和域名上，并在同一订阅中作为替代方案。
 
-## 部署中继节点
+## 部署中继
 
-首先按常规方式部署出口服务器。然后部署指向它的中继节点：
+首先部署出口，然后指向它的中继：
 
 ```bash
-meridian relay deploy RELAY_IP --exit EXIT_IP
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-配置程序：
-1. 安装所需的包并启用 BBR
-2. 配置 UFW 防火墙（允许 SSH + 中继端口）
-3. 下载 Realm 二进制文件（版本固定、SHA256 验证）
-4. 写入 Realm 配置并启动 systemd 服务
-5. 验证中继 → 出口连接
+Meridian 将中继添加到您的拓扑并应用它：
+1. 准备中继服务器（包、BBR、SSH 加固、仅打开 SSH 和中继端口的防火墙）
+2. 安装 Realm（版本固定、SHA256 验证）作为 systemd 服务
+3. 指向中继到出口的 Reality 监听器
+4. 在每个客户端的订阅中发布中继
 
 ### 标志
 
-| 标志 | 默认值 | 说明 |
+| 标志 | 默认 | 说明 |
 |------|---------|-------------|
 | `--exit/-e EXIT` | （必需） | 出口服务器 IP 或名称 |
 | `--name NAME` | （自动） | 中继的友好名称（例如 `ru-moscow`） |
 | `--port/-p PORT` | 443 | 中继服务器上的监听端口 |
-| `--user/-u USER` | root | 中继服务器上的 SSH 用户 |
+| `--sni HOST` | 出口的目标 | 此中继的 Reality 伪装目标；省略使用出口的 |
+| `--user/-u USER` | root | 中继上的 SSH 用户 |
+| `--ssh-port PORT` | 22 | 中继服务器的 SSH 端口 |
 | `--yes/-y` | | 跳过确认提示 |
 
-### 包含所有选项的示例
+### 包含所有选项的例子
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+  --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
 ## 客户端如何连接
 
-部署中继节点后，所有现有的客户端连接页面都会**自动重新生成**。中继 URL 显示为推荐连接，直接 URL 作为备份。
-
-添加新客户端时，中继 URL 会自动包含：
+现有客户端在下次订阅刷新时收到中继，他们的连接页面列出它。新客户端自动获得它：
 
 ```bash
-meridian client add alice --server 1.2.3.4   # 包含中继 URL
+meridian client add alice   # 中继包括
 ```
 
-## 管理中继节点
+## 管理中继
 
 ```bash
-meridian relay list                    # 所有出口服务器上的所有中继节点
-meridian relay list --exit 1.2.3.4     # 特定出口的中继节点
-meridian relay check RELAY_IP          # 4 点健康检查
-meridian relay remove RELAY_IP         # 停止服务 + 从配置中移除
+meridian relay list                       # 所有中继
+meridian relay list --exit 198.51.100.10  # 一个出口的中继
 ```
 
-### 健康检查
-
-`meridian relay check` 测试四个方面：
-
-| 检查 | 测试内容 |
-|-------|---------------|
-| SSH 到中继 | 能否连接到中继服务器？ |
-| Realm 服务 | systemd 服务是否活跃？ |
-| 中继 → 出口 TCP | 中继能否在端口 443 上到达出口服务器？ |
-| 本地 → 中继 TCP | 本地机器能否在其监听端口上到达中继？ |
-
-### 移除中继
+检查中继的跳跃 — 每个 Realm 服务正在运行，每个跳跃到达下一个，公共入口接受连接 — 然后通过整条路由测试真实流量：
 
 ```bash
-meridian relay remove RELAY_IP [--exit EXIT_IP] [--yes]
+meridian check 203.0.113.10
+meridian test
 ```
 
-这会停止 Realm 服务、从出口服务器凭证中移除中继，并重新生成所有客户端连接页面（回到仅直接 URL）。
+检查也测量每个跳跃：从每个跳跃它下载出口的伪装网站通过下一个跳跃，发送客户端发送的相同 SNI，并报告连接时间、首字节时间和到达的字节数。在大约 8 到 32 KB 之间冻结的传输是该跳跃上限制的签名，并报告为警告；通常的修复是来自不同提供商的中继主机（另一个网络或 ASN）。如果伪装网站的主页小于 32 KB，跳跃检查是不确定的而不是通过。
 
-## 多个中继节点
-
-您可以将多个中继节点连接到一个出口服务器 — 例如，不同城市或 ISP 中的中继节点：
+要停用中继，删除通过它的链。Meridian 显示它将删除什么，请求确认并清理 Realm 服务、防火墙规则和已发布的入口点；现有客户端在下次订阅刷新时丢失中继：
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay remove 203.0.113.10
 ```
 
-客户端在其连接页面上看到所有中继选项。
+## 多个中继
+
+将多个中继连接到一个出口，例如在不同的城市或网络：
+
+```bash
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
+```
+
+客户端在他们的订阅中收到每个中继。对于超过一个跳的中继链，使用 `meridian setup`。
+
+## 移动白名单
+
+在俄罗斯的某些移动互联网限制期间，运营商仅允许已批准站点和地址列表通过。报告因运营商、地区和周而异，没有运营商公布其列表。Meridian 不检测或跟踪白名单；本部分涵盖您今天可以设置的内容和哪些保持手动。
+
+### 部署者报告什么
+
+- **网络不同。** 有些似乎仅查看连接宣布的服务器名称（SNI）。其他还检查目标 IP。仅检查名称的地方，具有允许的名称的直接 Reality 路径可以通过。其中 IP 也被检查的地方，第一个跳跃必须是列表上的地址。
+- **国内云地址是通常的第一个跳跃。** 并非提供商范围的每个地址都被列出：人们描述一个提供商范围的一个子网被允许而来自同一提供商的另一个不是。提供商也可能限制私人客户、限制服务器重新创建的频率或塑造带宽。
+- **外国 CDN 地址通常在移动网络上不被允许。** 将[域名模式](/zh/domain-mode/)通过 Cloudflare 视为家庭连接的回退，而不是白名单答案。
+- **中继到出口的链接也可能被中断。** 到达用户的中继仍然可能丢失到外国出口的连接。
+
+### 在允许的地址上中继
+
+在其地址在您用户移动网络上允许的国内提供商上租用小服务器。维护的允许范围列表存在，但仅来自在限制活跃时移动连接的测试证明它。然后将其添加为中继并给予它允许的名称：
+
+```bash
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
+```
+
+使用 `--sni`，只有这个中继在订阅中的条目宣布那个名称。Meridian 将名称添加到出口的 Reality 监听器（相同密钥）并为中继提供其自己的监听器在出口上。它仅路由该名称到 Reality，发送其他所有内容到伪装网站，并仅从中继的最后一个跳跃可到达。出口自己的伪装目标和其他条目不改变。该名称不必从出口可到达，因为出口仍然呈现其自己的伪装目标。到达中继而没有有效密钥的探测因此被转发到那个目标而不是获得代理答案。
+
+然后检查中继并从重要的网络测试：
+
+```bash
+meridian check 203.0.113.10
+meridian test
+```
+
+来自您自己机器的 `meridian test` 无法告诉您白名单移动网络允许什么。在有该网络限制的真实设备上尝试。
+
+### 选择出口 SNI
+
+`meridian deploy` 和 `meridian node add` 上的 `--sni` 为出口的直接 Reality 路径设置伪装目标。目标必须是出口可用 TLS 1.3 到达的网站，部署检查真实流量通过它并在没有通过停止。在部署前用 `meridian check IP --sni HOST` 检查候选者。在仅检查名称的网络上，允许的名称可能让直接路径通过，但是名称是否有效取决于运营商，所以测试每个。
+
+### Meridian 不做的
+
+- 它不告诉您中继的 IP 是否在任何运营商列表上，或限制是否有效。
+- 它不通过国内 CDN 设置前置。域名模式为 Cloudflare 构建和测试。
+- 中继仅承载 Reality。XHTTP、WSS 和 Hysteria2 停留在出口上。
+- 它不通过第三方呼叫或消息传递服务隧道。
 
 ## 故障排查
 
 ### 端口冲突
 
-另一个服务正在中继上使用端口 443。使用 `ss -tlnp sport = :443` 检查并停止冲突的服务，或使用 `--port 8443` 指定不同的端口。
+另一服务正在中继上使用监听端口。用 `ss -tlnp sport = :443` 检查并停止它，或用 `--port 8443` 选择另一端口。
 
 ### 防火墙阻止
 
-确保在中继的云提供商防火墙 / 安全组上打开了端口 443，而不仅仅是 UFW。
+确保中继端口在您的云提供商防火墙或安全组上打开，不仅仅在 UFW。
 
-### 出口服务器无法到达
+### 出口无法到达
 
-中继必须能够在端口 443 上到达出口服务器。使用 `curl -I https://EXIT_IP` 从中继测试，或运行 `meridian relay check`。
+中继必须到达出口的 Reality 端口。运行 `meridian test` 以检查端到端的路由，并运行 `meridian check EXIT` 以检查出口本身。
 
-### 中继服务未启动
+### 中继服务不运行
 
-检查 Realm 服务：`systemctl status meridian-relay`。查看日志：`journalctl -u meridian-relay --no-pager -n 20`。
+在中继服务器上，列出转发器服务并阅读其日志。中继主机使用中立名称（`netfwd-*` 单位、`/etc/netfwd/` 配置），所以其上没有命名 Meridian、Realm 或中继：
+
+```bash
+systemctl list-units 'netfwd-*'
+journalctl -u 'netfwd-*' --no-pager -n 20
+```

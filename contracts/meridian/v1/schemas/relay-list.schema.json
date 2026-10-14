@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "RelayListEntry": {
+      "additionalProperties": false,
+      "description": "Configured relay metadata plus optional live host status.",
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Enabled"
+        },
+        "exit_node_ip": {
+          "title": "Exit Node Ip",
+          "type": "string"
+        },
+        "ip": {
+          "title": "Ip",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer"
+        },
+        "sni": {
+          "title": "Sni",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ip",
+        "name",
+        "exit_node_ip",
+        "port",
+        "sni",
+        "enabled"
+      ],
+      "title": "RelayListEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for listing configured relays.",
+  "properties": {
+    "relays": {
+      "items": {
+        "$ref": "#/$defs/RelayListEntry"
+      },
+      "title": "Relays",
+      "type": "array"
+    }
+  },
+  "title": "RelayListResult",
+  "type": "object"
+}

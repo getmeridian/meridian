@@ -1,43 +1,37 @@
 # tests
 
 ```bash
-make test                              # pytest only (855 tests, ~40s)
-make system-lab                        # multi-node Docker lab (~3 min)
-uv run pytest tests/ -v --tb=short     # verbose
+make test                              # pytest only (~2000 tests, ~45s)
+make system-lab                        # multi-node Docker lab (~15 min)
 uv run pytest tests/ -k "test_name"    # by pattern
 ```
 
-## Test layers
+## Design decisions
 
-| Layer | What | Where | Speed |
-|-------|------|-------|-------|
-| **Unit** | MockConnection-based provisioner steps, config parsing, credential handling | `tests/` (pytest) | ~40s |
-| **Integration** | Real 3x-ui Docker container, panel API | `tests/test_integration_3xui.py` | ~30s |
-| **E2E** | Single-container deploy lifecycle (mocked systemctl) | `tests/e2e/` | ~10 min |
-| **System lab** | Multi-node deploy + relay via real SSH, real systemd, real Docker | `tests/systemlab/` | ~3 min |
+| Layer | What | Where |
+|-------|------|-------|
+| **Unit** | MockConnection steps, config parsing, cluster handling, pure system-lab contracts | `tests/` |
+| **Deploy** | Mock-based topology setup (runtime, editor, persistence, node container) | `tests/test_setup_*.py` |
+| **Command** | Mock-based command tests (node, fleet, client, recover) | `tests/test_*_commands.py` |
+| **System lab** | Real multi-node deploy via Docker: panel+node, relay, connection tests | `tests/systemlab/` |
 
-## Testing philosophy
+**Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
+**MockConnection** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring; first match wins, unmatched commands succeed, so register only what differs.
+**`tmp_home`** isolates the Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store.
+**Shared doubles and builders live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `CancellationFlag`, and `topology.py` (`single_exit_intent`, `resource_plan`, `firewall_resource`, `panel_mock`). Search there before writing a local intent, plan, or panel builder.
 
-**Integration-level verification** — tests ensure contracts hold (API returns X → we handle Y), not that every function has a unit test. The codebase is integration-heavy; mocking away SSH and APIs doesn't verify real behavior.
+## What's done well
 
-**MockConnection pattern** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring match. First match wins. Exact matching is too brittle for shell commands with quoting and pipes.
-
-## Fixture organization
-
-Top-level `conftest.py` provides:
-- **`tmp_home`** — isolates `~/.meridian/` per test via env var + monkeypatch. Both env AND config module constants must be patched (cached imports leak state otherwise).
-- **`sample_proxy_yml`** / **`sample_v1_proxy_yml`** — return Paths, not content. Callers read explicitly.
-- **`servers_file`** / **`creds_dir`** — pre-built directory structures.
-
-## Conventions
-
-- **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation.
-- **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
+- **Quirk-named tests** — e.g., `test_login_uses_form_urlencoded_not_json()`. The test name IS the documentation; docstrings only explain a non-obvious why.
+- **Tables over near-duplicates** — cases that differ only in inputs and expected outcome are one `@pytest.mark.parametrize` table with `ids`; each distinct case keeps its own row.
 - **Idempotency dual-path** — provisioner tests verify both "needs change" and "already done" paths.
-- **`_strip_ansi()`** — strip Rich color codes before asserting on CLI output.
+- **RFC 5737 IPs** — always `198.51.100.x` for test data, never real IPs.
 
 ## Pitfalls
-
-- **Module-level mutable state** — globals like `_warned_servers` can leak between tests. Clear in fixtures.
-- **`tmp_home` must patch both** — env var AND `meridian.config` attributes. Missing either causes tests to touch real home directory.
-- **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". If a `conn.run()` call combines multiple commands (e.g., `grep ... && sed ... || printf ...`), the mock matches the whole string on the first keyword. Keep each `conn.run()` to a single command, or use a more specific pattern in the mock.
+- **`tmp_home` must patch both** — env var AND `meridian.config` attributes.
+- **MockConnection substring matching** — `when("grep", rc=1)` matches ANY command containing "grep". Use specific patterns.
+- **Don't restate registries** — a test that copies a constant, catalog, or schema list fails on every legitimate edit; assert behaviour or let the contract drift check do it.
+- **`make dead-code` flags production code only tests use** — keep system-lab-only helpers in `tests/systemlab/subscription_client.py`.
+- **System-lab collection** — pure `tests/systemlab/test_*.py` tests run under normal pytest; Docker runs only through `make system-lab`.
+- **Wizard prompts read `/dev/tty`** — `CliRunner` input never reaches them; drive journeys with the label-matched scripted IO, and the real terminal path with `pexpect` (`test_setup_wizard_tty.py`).
+- **V4 command JSON** — validate compiled-resource plan/apply variants through their advertised envelopes, including terminal errors.

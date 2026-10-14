@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  .ladder { display: grid; gap: 12px; }
+  .step { display: grid; grid-template-columns: 34px 150px 1fr 240px; gap: 18px; align-items: center; background: var(--s1); border: 1px solid var(--b1); border-radius: 12px; padding: 16px 20px; }
+  .who { font: 500 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--t3); }
+  .step h3 { font: 600 19px/1.25 var(--heading); }
+  .step p { color: var(--t2); margin-top: 3px; font-size: 16px; }
+  .tells { font-size: 15px; color: var(--t2); border-left: 2px solid var(--b1); padding-left: 14px; }
+  .tells b { color: var(--t1); font-weight: 600; display: block; font-size: 12px; font-family: var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
+  .verdict { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .verdict .card { padding: 16px 20px; }
+  .verdict h4 { font: 600 17px/1.25 var(--heading); }
+  .verdict p { font-size: 15.5px; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">The tech friend's guide</div>
+  <h1>"It doesn't work": four steps, in order</h1>
+  <p class="lede">Start with what the person can do on their phone, then test from your own computer.</p>
+  <div class="body">
+    <div class="ladder">
+      <div class="step"><span class="num">1</span><span class="who">They do it<br>on the page</span><div><h3>Tap "Check my connection"</h3><p>On their connection page. They send you the report.</p></div><div class="tells"><b>Safe to share</b>The report contains no links.</div></div>
+      <div class="step"><span class="num">2</span><span class="who">They do it<br>in the app</span><div><h3>Refresh the subscription, fix the clock</h3><p>Turn on automatic date and time.</p></div><div class="tells"><b>Common cause</b>A wrong device clock drops connections.</div></div>
+      <div class="step"><span class="num">3</span><span class="who">You run it</span><div><h3><code>meridian test 198.51.100.10</code></h3><p>Sends real traffic through the delivered subscription.</p></div><div class="tells"><b>Tells you</b>Which step failed: network, TLS, subscription, or proxy.</div></div>
+      <div class="step"><span class="num">4</span><span class="who">You run it</span><div><h3><code>meridian check</code>, then <code>meridian doctor</code></h3><p>Server health over SSH; a full report if you need help.</p></div><div class="tells"><b>Shareable</b><code>doctor</code> redacts links and secrets.</div></div>
+    </div>
+    <div class="verdict">
+      <div class="card"><h4>Fails from your network, works from another?</h4><p>The server's IP is probably blocked where you are. Add a second exit or move this one with <code>meridian node replace</code>.</p></div>
+      <div class="card"><h4>One link leaked?</h4><p><code>meridian client remove</code> it and add a new client. Everyone else keeps working.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>One client per person, never a shared link</span></div>
+</div>
+</body></html>

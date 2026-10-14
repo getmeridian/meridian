@@ -6,11 +6,13 @@
 
 **Light-first, warm palette** — default is warm cream (#FDFAF6). Dark mode uses warm charcoal (#1C1E28), never pure black. Both modes maintain the brand warmth.
 
-**Theme override via `data-theme`** — `data-theme="dark"` or `data-theme="light"` on `<html>` overrides OS preference. No attribute = follow OS. ThemeToggle component in the nav manages this. FOUC prevented by early `<script>` in `<head>` that reads localStorage before paint.
+**Theme override via `data-theme`** — `dark` or `light` on `<html>` overrides the OS preference, no attribute follows it; the nav's two-state ThemeToggle sets it, and the early head script (`src/layouts/CLAUDE.md`) applies it before paint.
 
-**Three font families** — Fraunces (serif headings, editorial feel), Source Sans 3 (body), JetBrains Mono (code). All self-hosted as variable WOFF2. `font-display: swap` prevents invisible text.
+**Three font families** — Fraunces (headings), Source Sans 3 (body), JetBrains Mono (code), all self-hosted variable WOFF2 with `font-display: swap`.
 
 **Color naming is generic** — `--ac` (accent), `--t1` (text primary), `--s1` (surface). Requires familiarity but keeps the token set small and composable.
+
+**Starlight theme** — `starlight.css` maps the palette onto Starlight's `--sl-color-*` scale (white = strongest text, black = page background, inverted for light mode) and applies Fraunces to headings. Change both files when the palette moves.
 
 ## What's done well
 
@@ -20,6 +22,5 @@
 
 ## Pitfalls
 
-- **No manual dark mode toggle** — RESOLVED. ThemeToggle component cycles system/light/dark.
 - **No explicit z-index scale** — sticky elements may conflict as layering increases.
 - **Shadows hardcode rgba** — should derive from tokens for true dark mode adaptability.

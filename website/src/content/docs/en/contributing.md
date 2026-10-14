@@ -7,20 +7,20 @@ section: reference
 
 ## Reporting issues
 
-- **Bug?** Use the [bug report template](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml) — run `meridian doctor` first
-- **Connection issue?** Use the [connection issue template](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml) — run `meridian test` and `meridian preflight` first
-- **Feature idea?** Use the [feature request template](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
-- **Security vulnerability?** See [Security](/docs/en/security/) — do NOT open a public issue
+- **Bug?** Use the [bug report template](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — run `meridian doctor` first
+- **Connection issue?** Use the [connection issue template](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — run `meridian test` and `meridian check` first
+- **Feature idea?** Use the [feature request template](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
+- **Security vulnerability?** See [Security](/en/security/) — do NOT open a public issue
 
 ## Development setup
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
 # Install CLI in editable mode with dev dependencies
 make install
 
-# Install pre-push hook (11 fast checks before every push)
+# Install the pre-push hook (fast checks before every push)
 make hooks
 
 # Run full CI locally
@@ -41,9 +41,12 @@ The CLI is a Python package (`src/meridian/`) distributed via PyPI as `meridian-
 Key modules:
 - `cli.py` — Typer app, subcommand registration
 - `commands/` — one module per subcommand
-- `credentials.py` — `ServerCredentials` dataclass
+- `cluster.py` + `cluster_persistence.py` — typed `cluster.yml` state and persistence
 - `servers.py` — `ServerRegistry` for known servers
-- `provision/` — idempotent step pipeline
+- `setup/` — `meridian setup` wizard state and the shared runtime behind deploy, setup, and apply
+- `compiler/` — turns the topology into a reviewed, hash-identified list of resources (no I/O)
+- `reconciler/` — observes and applies those resources with checkpoints
+- `provision/` — server preparation steps (packages, hardening, Docker, Realm)
 
 ## Pull requests
 
@@ -56,8 +59,8 @@ Key modules:
 ## Key conventions
 
 - **Shell values use `shlex.quote()`** — never interpolate unsanitized values
-- **Connection-info templates must stay in sync** (CSS/JS/app links)
-- **nginx config** goes in `/etc/nginx/conf.d/meridian-*.conf`, not the main nginx.conf
+- **PWA assets must stay in sync** (`templates/pwa/` and the application catalog)
+- **nginx config** is written per resource as `meridian-v4-*.conf` files under `/etc/nginx/stream.d/` and `/etc/nginx/sites-available/`
 - **Provisioner steps** return `StepResult` (ok/changed/skipped/failed)
 
 ## Testing

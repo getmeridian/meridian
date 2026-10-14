@@ -7,7 +7,7 @@
 const tabs = [
   { key: 'install', label: 'Deploy', i18n: 'builder.tab.deploy' },
   { key: 'relay', label: 'Relay', i18n: 'builder.tab.relay' },
-  { key: 'check', label: 'Preflight', i18n: 'builder.tab.preflight' },
+  { key: 'check', label: 'Check', i18n: 'builder.tab.preflight' },
   { key: 'scan', label: 'SNI Scan', i18n: 'builder.tab.scan' },
   { key: 'diag', label: 'Doctor', i18n: 'builder.tab.doctor' },
   { key: 'uninstall', label: 'Teardown', i18n: 'builder.tab.teardown' },
@@ -33,14 +33,14 @@ const tabs = [
   <div class="builder__body">
     <!-- Tab description -->
     <p class="builder__desc" id="builder-desc" data-t="builder.desc.deploy">
-      Deploy VLESS+Reality proxy. Configures Docker, Xray, firewall, and TLS automatically.
+      Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.
     </p>
 
     <!-- Fields -->
     <div class="builder__fields">
       <div class="builder__field" id="row-ip">
         <label class="builder__label" for="f-ip" data-t="builder.field.ip">Server IP</label>
-        <input id="f-ip" type="text" placeholder="123.45.67.89 or local" class="builder__input" />
+        <input id="f-ip" type="text" placeholder="198.51.100.10 or local" class="builder__input" />
         <span class="builder__hint" data-t="builder.field.ip.hint">Your VPS public IPv4 address, or "local" to deploy on this server. Leave empty for interactive mode.</span>
       </div>
 
@@ -52,7 +52,7 @@ const tabs = [
 
       <div class="builder__field" id="row-exit">
         <label class="builder__label" for="f-exit" data-t="builder.field.exit">Exit server</label>
-        <input id="f-exit" type="text" placeholder="1.2.3.4 or server-name" class="builder__input" />
+        <input id="f-exit" type="text" placeholder="198.51.100.10 or server-name" class="builder__input" />
         <span class="builder__hint" data-t="builder.field.exit.hint">IP or name of the exit server this relay forwards to. Must be deployed first.</span>
       </div>
 
@@ -62,7 +62,7 @@ const tabs = [
           <span data-t="builder.field.domain">Domain</span>
         </label>
         <input id="f-domain" type="text" placeholder="example.com" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.domain.hint">Optional. Adds CDN fallback via Cloudflare and web panel access.</span>
+        <span class="builder__hint" data-t="builder.field.domain.hint">Optional. Moves XHTTP to your domain and adds WSS; both can run through the Cloudflare CDN.</span>
       </div>
 
       <div class="builder__field" id="row-sni">
@@ -70,8 +70,8 @@ const tabs = [
           <input id="f-sni-on" type="checkbox" class="builder__checkbox" />
           <span data-t="builder.field.sni">Custom SNI</span>
         </label>
-        <input id="f-sni" type="text" placeholder="www.cloudflare.com" class="builder__input builder__input--toggle" />
-        <span class="builder__hint" data-t="builder.field.sni.hint">Site that Reality impersonates. Default: www.cloudflare.com. Use <code>meridian scan</code> for optimal targets.</span>
+        <input id="f-sni" type="text" placeholder="auto" class="builder__input builder__input--toggle" />
+        <span class="builder__hint" data-t="builder.field.sni.hint">Site that Reality impersonates. Leave empty and deploy picks one that works from your server. Use <code>meridian scan</code> to find a same-network target.</span>
       </div>
 
       <div class="builder__field" id="row-name">
@@ -155,7 +155,7 @@ const tabs = [
 <script>
   const TAB_CONFIG: Record<string, { desc: string; show: string[]; cmd: string; descKey: string }> = {
     install: {
-      desc: 'Deploy VLESS+Reality proxy. Configures Docker, Xray, firewall, and TLS automatically.',
+      desc: 'Deploy Reality, XHTTP, and Hysteria2 on one server. Sets up Docker, the Remnawave panel, nginx, the firewall, and TLS.',
       show: ['ip', 'user', 'domain', 'sni', 'name', 'display-name', 'icon', 'color', 'yes'],
       cmd: 'deploy',
       descKey: 'builder.desc.deploy',
@@ -163,13 +163,13 @@ const tabs = [
     relay: {
       desc: 'Deploy a TCP relay — forwards traffic through a domestic server to your exit server abroad.',
       show: ['ip', 'user', 'exit', 'relay-name', 'port', 'yes'],
-      cmd: 'relay deploy',
+      cmd: 'relay add',
       descKey: 'builder.desc.relay',
     },
     check: {
-      desc: 'Test if your server is compatible — checks SNI, ports, DNS, OS, disk, ASN match.',
+      desc: 'Check a new server is compatible (SNI, ports, DNS, OS, disk), or a deployed one is healthy.',
       show: ['ip', 'user', 'domain', 'sni', 'ai'],
-      cmd: 'preflight',
+      cmd: 'check',
       descKey: 'builder.desc.preflight',
     },
     scan: {
@@ -185,7 +185,7 @@ const tabs = [
       descKey: 'builder.desc.doctor',
     },
     uninstall: {
-      desc: 'Remove proxy container, configs, and firewall rules. Docker and system packages are kept.',
+      desc: 'Remove the panel and node containers, nginx files, certificates, and firewall rules. Docker and system packages stay.',
       show: ['ip', 'user', 'yes'],
       cmd: 'teardown',
       descKey: 'builder.desc.teardown',
@@ -269,7 +269,7 @@ const tabs = [
     if (user && user !== 'root') args.push('--user ' + user);
     if (cfg.show.includes('exit') && exitServer) args.push('--exit ' + exitServer);
     if (cfg.show.includes('domain') && domOn && dom) args.push('--domain ' + dom);
-    if (cfg.show.includes('sni') && sniOn && sni && sni !== 'www.cloudflare.com') args.push('--sni ' + sni);
+    if (cfg.show.includes('sni') && sniOn && sni) args.push('--sni ' + sni);
     if (cfg.show.includes('name') && clientName && clientName !== 'default') args.push('--client-name ' + clientName);
     if (cfg.show.includes('display-name') && displayNameVal) args.push('--display-name "' + displayNameVal + '"');
     if (cfg.show.includes('icon') && iconVal) args.push('--icon "' + iconVal + '"');
@@ -292,14 +292,15 @@ const tabs = [
       } else {
         wizard.style.display = 'none';
         if (/^locally?$/i.test(ip)) {
-          status.textContent = 'Deploys on this server without SSH. Must run as root on the VPS.';
+          status.textContent = 'Deploys on this server without SSH. Run it on the VPS as root or with passwordless sudo.';
           status.className = 'builder__status builder__status--ok';
         } else if (domOn && !dom) {
           status.textContent = 'Enter a domain or uncheck to skip.';
           status.className = 'builder__status';
         } else {
-          const mode = domOn ? 'Reality + CDN fallback' : 'Reality-only';
-          status.textContent = 'Deploys ' + mode + '.';
+          status.textContent = domOn
+            ? 'Deploys Reality, XHTTP, and Hysteria2, plus WSS on your domain.'
+            : 'Deploys Reality, XHTTP, and Hysteria2.';
           status.className = 'builder__status builder__status--ok';
         }
       }
@@ -310,11 +311,11 @@ const tabs = [
           status.textContent = 'Enter the relay IP and exit server. The exit server must be deployed first.';
           status.className = 'builder__status';
         } else {
-          status.textContent = 'Routes traffic through the relay to your exit server.';
+          status.textContent = 'Adds Reality entries that enter through the relay; other methods still connect to the exit.';
           status.className = 'builder__status builder__status--ok';
         }
       } else if (curTab === 'check') {
-        status.textContent = ip ? 'Runs preflight checks without installing anything.' : 'Enter your server IP to run the preflight.';
+        status.textContent = ip ? 'Runs checks without installing anything.' : 'Enter your server IP to check it.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       } else if (curTab === 'scan') {
         status.textContent = ip ? "Scans server's /24 subnet for same-network TLS targets." : 'Enter your server IP to find optimal SNI targets.';
@@ -325,7 +326,7 @@ const tabs = [
           : 'Enter your server IP to collect diagnostics.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       } else {
-        status.textContent = ip ? 'Removes Meridian. Docker and system packages are kept.' : 'IP is auto-detected from saved credentials if omitted.';
+        status.textContent = ip ? 'Removes Meridian. Docker and system packages stay.' : 'Uses your saved server when you have only one.';
         status.className = ip ? 'builder__status builder__status--ok' : 'builder__status';
       }
     }

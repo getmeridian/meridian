@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "Reviewed V4 compiler-plan metadata returned before confirmation.",
+  "properties": {
+    "plan_hash": {
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "resource_count": {
+      "minimum": 0,
+      "title": "Resource Count",
+      "type": "integer"
+    },
+    "retiring_resources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Retiring Resources",
+      "type": "array"
+    },
+    "review_hash": {
+      "default": "",
+      "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+      "title": "Review Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_hash",
+    "resource_count"
+  ],
+  "title": "CompiledApplyPreview",
+  "type": "object"
+}

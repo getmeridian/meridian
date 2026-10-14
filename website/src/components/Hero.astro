@@ -19,11 +19,11 @@ const t = createT(locale);
 
     <h1 class="hero__title" data-t="hero.title" set:html={t('hero.title', 'Share <em>secure internet</em> with the people you&nbsp;care&nbsp;about')} />
 
-    <p class="hero__sub" data-t="hero.sub">{t('hero.sub', 'One command sets up an undetectable proxy server — firewall, TLS, routing, all hardened by default. Share access via QR\u00a0codes.')}</p>
+    <p class="hero__sub" data-t="hero.sub">{t('hero.sub', 'One command sets up a proxy server that is hard to tell apart from ordinary HTTPS, with the firewall, TLS, and routing configured for you. Share access with a link or QR\u00a0code.')}</p>
 
     <div class="hero__actions">
       <a href="#setup" class="hero__btn hero__btn--primary" data-t="hero.cta">{t('hero.cta', 'Get started')}</a>
-      <a href={`/docs/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
+      <a href={`/${locale}/getting-started/`} class="hero__btn hero__btn--secondary" data-astro-prefetch data-t="hero.docs">
         {t('hero.docs', 'Read the docs')}
       </a>
     </div>

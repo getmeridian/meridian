@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Deploy a censorship-resistant proxy server — hardened by default, shared via QR code"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "uburuntu" }]
 keywords = ["vpn", "proxy", "vless", "reality", "xray"]
 classifiers = [
@@ -16,17 +16,20 @@ classifiers = [
     "Environment :: Console",
     "Topic :: Internet :: Proxy Servers",
     "Topic :: System :: Networking",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "typer>=0.12",
+    "typer>=0.26",
     "rich>=13.0",
     "pyyaml>=6.0",
     "packaging>=23.0",
     "jinja2>=3.0",
     "segno>=1.5",
+    "httpx>=0.27",
+    "pydantic>=2.11",
 ]
 
 [project.scripts]
@@ -34,15 +37,33 @@ meridian = "meridian.cli:app"
 
 [project.urls]
 Homepage = "https://getmeridian.org"
-Repository = "https://github.com/uburuntu/meridian"
-Issues = "https://github.com/uburuntu/meridian/issues"
+Repository = "https://github.com/getmeridian/meridian"
+Issues = "https://github.com/getmeridian/meridian/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "ruff>=0.4", "mypy>=1.0", "types-PyYAML>=6.0"]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+    "mypy>=1.0",
+    "types-PyYAML>=6.0",
+    "hatchling>=1.31.0",
+    "fastapi>=0.128",
+    "uvicorn>=0.30",
+    "pexpect>=4.9; sys_platform != 'win32'",
+]
+# Experimental local web UI (`meridian studio`): pip install 'meridian-vpn[studio]'
+studio = ["fastapi>=0.128", "uvicorn>=0.30"]
+
+[dependency-groups]
+# Cloud SDKs for the local-only real-VM harness (tests/realvm/); never published.
+realvm = ["hcloud>=2.0"]
 
 [tool.hatch.version]
 path = "VERSION"
 pattern = "(?P<version>.+)"
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/meridian"]
@@ -50,16 +71,13 @@ packages = ["src/meridian"]
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/.github",
-    "/docs",
     "/website",
     "/tests",
     "/dist",
     "*.tar",
     "*.tar.gz",
-    "/docker-compose.test.yml",
     "/context7.json",
     "/Makefile",
-    "/BACKLOG.md",
     "/CODE_OF_CONDUCT.md",
     "/CONTRIBUTING.md",
     "/SECURITY.md",
@@ -68,7 +86,7 @@ exclude = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
@@ -76,7 +94,12 @@ select = ["E", "F", "I", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# tests/realvm/ provisions real cloud VMs — opt-in, never auto-collected.
+# Invoke manually via `make real-lab` (see tests/realvm/README.md).
+# Pure tests under tests/systemlab/ are safe for normal collection; Docker is
+# still orchestrated only via `make system-lab`.
+norecursedirs = ["realvm"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 ignore_missing_imports = true

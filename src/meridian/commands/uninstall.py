@@ -2,109 +2,180 @@
 
 from __future__ import annotations
 
-import shutil
-
 import typer
 
+from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import load_cluster, load_topology_cluster, make_panel
 from meridian.commands.resolve import (
     ensure_server_connection,
-    fetch_credentials,
     resolve_server,
-    try_resolve_server,
 )
-from meridian.config import CREDS_BASE, RELAY_SERVICE_NAME, SERVERS_FILE, sanitize_ip_for_path
-from meridian.console import err_console, fail, info, ok, prompt, warn
-from meridian.credentials import ServerCredentials
-from meridian.servers import ServerRegistry
-from meridian.ssh import ServerConnection
+from meridian.compiler.deployment import deployment_server_refs
+from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
+from meridian.console import confirm, err_console, fail, info, ok, warn
+from meridian.core.errors import LocalStateError
+from meridian.remnawave import RemnawaveError, RemnawaveNotFoundError
+from meridian.servers import ServerEntry, ServerRegistry
+
+
+def _remove_saved_server_or_fail(registry: ServerRegistry, server_ip: str) -> None:
+    """Remove a stale connection profile after teardown, with a truthful partial failure."""
+    try:
+        registry.remove(server_ip)
+    except LocalStateError as exc:
+        fail(
+            "Remote teardown completed, but the saved server profile was retained",
+            hint=f"{exc} Remove it with `meridian server remove {server_ip}` after repairing local state.",
+            hint_type=exc.category,
+        )
+    except OSError as exc:
+        fail(
+            "Remote teardown completed, but the saved server profile was retained",
+            hint=f"{exc} Check {HOME_DISPLAY} permissions, then run `meridian server remove {server_ip}`.",
+            hint_type="system",
+        )
+
+
+def _topology_references(cluster: ClusterConfig, entry: ServerEntry) -> list[str]:
+    """Return current topology roles that still require a saved server."""
+    intent = cluster.topology_intent
+    if intent is None:
+        return []
+    identities = {entry.id, entry.name, entry.host}
+    references: list[str] = []
+    if intent.control.server_ref in identities:
+        references.append("control plane")
+    references.extend(f"exit {item.id}" for item in intent.exits if item.server_ref in identities)
+    references.extend(
+        f"relay {item.id}" for item in intent.transparent_relays if identities.intersection(item.hop_server_refs)
+    )
+    references.extend(f"routing gateway {item.id}" for item in intent.routing_gateways if item.server_ref in identities)
+    for workload in cluster.workloads:
+        if workload.active and identities.intersection(workload.server_refs):
+            references.append(f"active workload {workload.id}")
+    return list(dict.fromkeys(references))
+
+
+def _deregister_panel_node(cluster: ClusterConfig, server_ip: str) -> None:
+    """Drop a role-less server's stale panel node after its remote uninstall."""
+    try:
+        with make_panel(cluster) as panel:
+            api_node = panel.find_node_by_address(server_ip)
+            if api_node is not None:
+                try:
+                    panel.disable_node(api_node.uuid)
+                except RemnawaveError:
+                    warn(f"Could not disable node {server_ip} in the panel; deleting it anyway")
+                try:
+                    panel.delete_node(api_node.uuid)
+                except RemnawaveNotFoundError:
+                    pass
+    except RemnawaveError as exc:
+        fail(
+            f"Remote uninstall completed, but panel cleanup failed: {exc}",
+            hint="Retry teardown when the panel is available; local state was retained.",
+            hint_type="system",
+        )
+    info(f"Removed node {server_ip} from the panel")
 
 
 def run(
     ip: str = "",
-    user: str = "root",
+    user: str = "",
     yes: bool = False,
-    requested_server: str = "",
+    *,
+    ssh_port: int = 0,
 ) -> None:
     """Uninstall Meridian from a server."""
-    registry = ServerRegistry(SERVERS_FILE)
+    registry = ServerRegistry(SERVER_PROFILES_FILE)
 
-    # If no IP given and resolution fails, prompt for it
-    if not ip:
-        resolved = try_resolve_server(registry, requested_server=requested_server, user=user)
-        if not resolved:
-            server_ip = prompt("Server IP to uninstall from")
-            if not server_ip:
-                fail("Server IP is required for uninstall", hint_type="user")
-            resolved = resolve_server(registry, explicit_ip=server_ip, user=user)
-    else:
-        resolved = resolve_server(registry, requested_server=requested_server, explicit_ip=ip, user=user)
+    resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
 
-    # Confirmation
+    # Roles change only through the reviewed topology, so teardown refuses a
+    # server that still carries one -- unless it is the whole fleet.
+    cluster = load_cluster()
+    if cluster.is_configured and cluster.topology_intent is None:
+        load_topology_cluster()  # refuses with rebuild guidance
+    if cluster.topology_intent is not None:
+        try:
+            saved_server = registry.find(resolved.ip)
+        except LocalStateError as exc:
+            fail(exc)
+        if saved_server is None:
+            fail(
+                f"Cannot tell which roles {resolved.ip} has in your topology",
+                hint="Restore its saved server profile before attempting teardown.",
+                hint_type="user",
+            )
+        references = _topology_references(cluster, saved_server)
+        entire_fleet = deployment_server_refs(cluster.topology_intent) == {saved_server.id}
+        if references and not entire_fleet:
+            fail(
+                f"Server {resolved.ip} still has roles in your topology: {', '.join(references)}",
+                hint="Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown.",
+                hint_type="user",
+            )
+    is_panel_host = bool(cluster.panel.server_ip) and cluster.panel.server_ip == resolved.ip
+
+    # Confirm only after proving that ownership and dependency guards permit
+    # the selected teardown.
     err_console.print()
     warn(f"This will remove Meridian from {resolved.ip}.")
     warn("Docker and system packages will NOT be touched.")
-    err_console.print()
-
-    if not yes:
-        answer = prompt("Continue? (y/N)")
-        if answer.lower() != "y":
-            info("Cancelled.")
-            raise typer.Exit()
+    if not yes and not confirm("Continue?"):
+        info("Cancelled.")
+        raise typer.Exit(1)
     err_console.print()
 
     resolved = ensure_server_connection(resolved)
-    fetch_credentials(resolved)
 
     info(f"Removing Meridian from {resolved.ip}...")
     err_console.print()
 
-    # Stop relay nodes that forward to this exit
-    proxy_file = resolved.creds_dir / "proxy.yml"
-    if proxy_file.exists():
-        creds = ServerCredentials.load(proxy_file)
-        if creds.relays:
-            info(f"Stopping {len(creds.relays)} relay node(s)...")
-            for relay in creds.relays:
-                try:
-                    relay_conn = ServerConnection(ip=relay.ip, user=user)
-                    relay_conn.check_ssh()
-                    relay_conn.run(f"systemctl stop {RELAY_SERVICE_NAME} 2>/dev/null", timeout=15)
-                    relay_conn.run(f"systemctl disable {RELAY_SERVICE_NAME} 2>/dev/null", timeout=10)
-                    ok(f"Relay {relay.ip} stopped")
-                except Exception:
-                    warn(f"Could not reach relay {relay.ip} — service may still be running")
-                # Clean up local relay metadata
-                relay_creds_dir = CREDS_BASE / sanitize_ip_for_path(relay.ip)
-                relay_file = relay_creds_dir / "relay.yml"
-                if relay_file.exists():
-                    relay_file.unlink()
-                registry.remove(relay.ip)
-            err_console.print()
-
-    # Run uninstall via provisioner
+    from meridian.provision.progress import RichStepRenderer
     from meridian.provision.steps import ProvisionContext, Provisioner
     from meridian.provision.uninstall import Uninstall
 
     ctx = ProvisionContext(
         ip=resolved.ip,
         user=resolved.user,
-        creds_dir=str(resolved.creds_dir),
     )
 
     provisioner = Provisioner([Uninstall()])
-    results = provisioner.run(resolved.conn, ctx)
+    results = provisioner.run(resolved.conn, ctx, renderer=RichStepRenderer())
 
     failed = [r for r in results if r.status == "failed"]
     if failed:
         fail("Uninstall failed", hint=failed[0].detail, hint_type="system")
 
-    # Remove from server registry
-    registry.remove(resolved.ip)
+    # Reconcile panel and local topology only after remote uninstall succeeds.
+    # A failed panel delete leaves the local node entry as the retry record;
+    # rerunning the remote uninstall is idempotent.
+    from meridian.config import CLUSTER_CONFIG, SETUP_DRAFT_FILE
 
-    # Remove local credentials
-    creds_dir = CREDS_BASE / sanitize_ip_for_path(resolved.ip)
-    if creds_dir.exists():
-        shutil.rmtree(creds_dir)
+    if cluster.is_configured:
+        if is_panel_host:
+            # Panel host torn down — entire cluster config is invalid
+            try:
+                cluster.backup()
+                CLUSTER_CONFIG.unlink(missing_ok=True)
+                SETUP_DRAFT_FILE.unlink(missing_ok=True)
+            except (LocalStateError, OSError) as exc:
+                fail(
+                    "Remote panel-host teardown completed, but cluster.yml could not be archived or removed",
+                    hint=(
+                        f"{exc} The saved cluster is now stale; repair local permissions, then archive or remove it "
+                        "before another deployment. The saved server profile was retained."
+                    ),
+                    hint_type="system",
+                )
+            info("Removed cluster.yml (panel host was torn down)")
+        else:
+            _deregister_panel_node(cluster, resolved.ip)
+
+    # Registry deletion is last: a stale saved connection is recoverable, but
+    # deleting it before topology persistence would discard retry information.
+    _remove_saved_server_or_fail(registry, resolved.ip)
 
     err_console.print()
     ok("Uninstall complete.")

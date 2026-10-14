@@ -1,0 +1,32 @@
+# Topology: single — one exit node. Validates the baseline deploy against real infrastructure.
+#
+# Exercises what the Docker system-lab cannot:
+# - Real Let's Encrypt certificate (not Pebble)
+# - Real UFW packet filtering (Docker bridge reaches all ports regardless)
+# - Real SSH hardening (pubkey-only, fail2ban)
+#
+# Provider: Hetzner Cloud. Change `provider:` to switch (once other providers are implemented).
+
+name: single
+description: "Single exit node — smoke test on real hardware"
+
+provider: hetzner
+region: nbg1           # Nuremberg DE — cheapest, closest EU datacenter
+size: cx23             # 2 vCPU, 4 GB — new-gen x86 (CX22 was deprecated late 2025)
+image: ubuntu-24.04
+
+nodes:
+  - role: exit          # what Meridian sees it as
+    name: exit-1
+    harden: true
+
+verify:
+  tier_alpha:
+    - le_certificate_issuer           # openssl: certificate issuer is Let's Encrypt
+    - ufw_external_ports_if_nmap_available  # optional nmap: no unexpected tested TCP ports
+    - sshd_pubkey_only                # ssh -o PasswordAuthentication=yes nobody@IP → fail
+    - fail2ban_active                 # systemctl is-active fail2ban
+    - fleet_status_connected          # enveloped JSON reports a connected node
+    - client_add_list_remove_roundtrip # add, list, then remove a real panel client
+    - declarative_plan                # meridian plan exits 0 or 2
+    - subscription_url_200            # canonical subscription URL returns HTTP 200

@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "Public event types emitted by meridian-core operation streams.",
+  "properties": {
+    "event_schema": {
+      "default": "event",
+      "title": "Event Schema",
+      "type": "string"
+    },
+    "schema": {
+      "const": "meridian.event-types/v1",
+      "default": "meridian.event-types/v1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "types"
+  ],
+  "title": "EventTypeCatalog",
+  "type": "object"
+}

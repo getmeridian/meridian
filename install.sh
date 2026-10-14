@@ -3,55 +3,69 @@
 # Meridian CLI Installer
 #
 # Installs `meridian` from PyPI via uv (preferred) or pipx (fallback).
-# Detects and migrates old bash CLI installations automatically.
 #
 # Usage:
 #   curl -sSf https://getmeridian.org/install.sh | bash
+#   MERIDIAN_VERSION=4.0.0 bash install.sh    # install one exact release
+#
+# Every release attaches this script and SHA256SUMS; the docs show how to
+# verify them before running. uv's installer is pinned by version and hash.
 # =============================================================================
 set -euo pipefail
 
 R='\033[0m' B='\033[1m' D='\033[2m'
-G='\033[32m' C='\033[36m' Y='\033[33m' RED='\033[31m'
+G='\033[32m' C='\033[36m' RED='\033[31m'
 
 info()  { printf "  ${C}→${R} %s\n" "$*"; }
 ok()    { printf "  ${G}✓${R} %s\n" "$*"; }
-warn()  { printf "  ${Y}!${R} %s\n" "$*"; }
 fail()  { printf "\n  ${RED}✗ %s${R}\n" "$*" >&2; exit 1; }
 
 PYPI_PACKAGE="meridian-vpn"
+# release.yml fills this in on the website's copy while main carries a beta,
+# so the site's installer matches the docs it publishes.
+MERIDIAN_DEFAULT_VERSION=""
+MERIDIAN_VERSION="${MERIDIAN_VERSION:-$MERIDIAN_DEFAULT_VERSION}"
+if [[ -n "$MERIDIAN_VERSION" ]]; then
+  [[ "$MERIDIAN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$ ]] || fail "MERIDIAN_VERSION must look like 4.0.0"
+  PYPI_PACKAGE="meridian-vpn==$MERIDIAN_VERSION"
+fi
+
+# uv's installer carries the SHA-256 of every uv archive it downloads, so pinning
+# the installer's own hash pins the whole chain. Bump both together.
+UV_VERSION="0.12.19"
+UV_INSTALLER_SHA256="61b349611f1b6e1ba33645f30c36da5287df2609dd7af8605d96a031435eb35b"
 
 printf "\n"
 printf "  ${B}Meridian Installer${R}\n"
 printf "\n"
 
 # =============================================================================
-# Detect and migrate old bash CLI
-# =============================================================================
-OLD_MERIDIAN=$(command -v meridian 2>/dev/null || true)
-if [[ -n "$OLD_MERIDIAN" ]] && grep -q 'MERIDIAN_VERSION=' "$OLD_MERIDIAN" 2>/dev/null; then
-  warn "Found old bash CLI at $OLD_MERIDIAN"
-  info "Migrating to Python package..."
-  if rm -f "$OLD_MERIDIAN" 2>/dev/null; then
-    ok "Old CLI removed (credentials preserved)"
-  else
-    warn "Cannot remove $OLD_MERIDIAN (permission denied). Remove manually: sudo rm $OLD_MERIDIAN"
-  fi
-  # Clean up old playbook cache (now bundled in package)
-  rm -rf "$HOME/.meridian/playbooks" 2>/dev/null || true
-fi
-
-# =============================================================================
 # Install uv if not present
 # =============================================================================
 install_uv() {
-  info "Installing uv (Python package manager)..."
+  info "Installing uv $UV_VERSION (Python package manager)..."
+  local url="https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-installer.sh"
+  local script actual
+  script=$(mktemp)
   if command -v curl &>/dev/null; then
-    curl -LsSf https://astral.sh/uv/install.sh </dev/null 2>/dev/null | bash 2>/dev/null
+    curl -fLsS "$url" -o "$script" </dev/null || { rm -f "$script"; return 1; }
   elif command -v wget &>/dev/null; then
-    wget -qO- https://astral.sh/uv/install.sh </dev/null 2>/dev/null | bash 2>/dev/null
+    wget -qO "$script" "$url" </dev/null || { rm -f "$script"; return 1; }
   else
+    rm -f "$script"
     return 1
   fi
+  if command -v sha256sum &>/dev/null; then
+    actual=$(sha256sum "$script" | awk '{print $1}')
+  else
+    actual=$(shasum -a 256 "$script" | awk '{print $1}')
+  fi
+  if [[ "$actual" != "$UV_INSTALLER_SHA256" ]]; then
+    rm -f "$script"
+    fail "uv installer checksum mismatch (expected $UV_INSTALLER_SHA256, got $actual)"
+  fi
+  sh "$script" </dev/null >/dev/null 2>&1
+  rm -f "$script"
   # Source uv's env to get it on PATH
   # shellcheck disable=SC1091
   [[ -f "$HOME/.local/bin/env" ]] && source "$HOME/.local/bin/env" 2>/dev/null || true
@@ -96,7 +110,7 @@ if [[ "$INSTALLED" != true ]] && command -v pip3 &>/dev/null; then
 fi
 
 if [[ "$INSTALLED" != true ]]; then
-  fail "Could not install meridian. Please install uv first: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  fail "Could not install meridian. Install uv (https://docs.astral.sh/uv/) or pipx, then re-run this script."
 fi
 
 # =============================================================================
@@ -182,13 +196,13 @@ if [[ "$PATH_ADDED" == "1" ]]; then
   printf "  ${D}Then:${R}\n\n"
 fi
 printf "  ${B}Quick start:${R}\n"
-printf "     ${C}meridian deploy${R}              ${D}# deploy proxy (interactive wizard)${R}\n"
-printf "     ${C}meridian deploy 1.2.3.4${R}      ${D}# deploy to specific server${R}\n\n"
+printf "     ${C}meridian setup${R}               ${D}# guided setup (interactive wizard)${R}\n"
+printf "     ${C}meridian deploy 198.51.100.10${R} ${D}# deploy to specific server${R}\n\n"
 printf "  ${B}Before deploying:${R}\n"
-printf "     ${C}meridian preflight 1.2.3.4${R}   ${D}# validate server (ports, OS, DNS)${R}\n"
-printf "     ${C}meridian scan 1.2.3.4${R}        ${D}# find best SNI target nearby${R}\n\n"
+printf "     ${C}meridian check 198.51.100.10${R} ${D}# validate server (ports, OS, DNS)${R}\n"
+printf "     ${C}meridian scan 198.51.100.10${R}  ${D}# find best SNI target nearby${R}\n\n"
 printf "  ${B}After deploying:${R}\n"
-printf "     ${C}meridian test 1.2.3.4${R}        ${D}# test connection from your device${R}\n"
+printf "     ${C}meridian test 198.51.100.10${R}  ${D}# test connection from your device${R}\n"
 printf "     ${C}meridian client add alice${R}    ${D}# share access with others${R}\n"
 printf "     ${C}meridian client list${R}         ${D}# view all clients${R}\n\n"
 printf "  ${D}All commands: meridian --help${R}\n"

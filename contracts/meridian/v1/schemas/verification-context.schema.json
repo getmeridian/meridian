@@ -1,0 +1,53 @@
+{
+  "additionalProperties": false,
+  "description": "Secret-free Meridian metadata available while verifying a target.",
+  "properties": {
+    "domain": {
+      "default": "",
+      "title": "Domain",
+      "type": "string"
+    },
+    "mode": {
+      "default": "generic",
+      "enum": [
+        "generic",
+        "meridian"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "protocols": {
+      "items": {
+        "enum": [
+          "reality",
+          "xhttp",
+          "wss",
+          "hysteria2"
+        ],
+        "type": "string"
+      },
+      "title": "Protocols",
+      "type": "array"
+    },
+    "roles": {
+      "items": {
+        "enum": [
+          "panel",
+          "exit",
+          "relay",
+          "routing_gateway"
+        ],
+        "type": "string"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "sni": {
+      "default": "",
+      "title": "Sni",
+      "type": "string"
+    }
+  },
+  "title": "VerificationContext",
+  "type": "object"
+}

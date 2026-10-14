@@ -2,135 +2,175 @@
 
 from __future__ import annotations
 
+import json
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
 
-from meridian.console import confirm, fail, prompt
+from meridian.console import confirm, fail, info, prompt, prompt_secret, set_json_mode, set_quiet_mode, warn
+
+_REPORT_LINK = "github.com/getmeridian/meridian/issues"
 
 
-class TestFail:
-    def test_raises_typer_exit(self) -> None:
-        with pytest.raises(typer.Exit) as exc_info:
-            fail("broken")
-        assert exc_info.value.exit_code == 1
-
-    def test_fail_with_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """fail() with hint should include both message and hint in stderr."""
-        with pytest.raises(typer.Exit):
-            fail("deployment failed", hint="try meridian check")
-        captured = capsys.readouterr()
-        assert "deployment failed" in captured.err
-        assert "try meridian check" in captured.err
-
-    def test_fail_without_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(typer.Exit):
-            fail("just a message")
-        captured = capsys.readouterr()
-        assert "just a message" in captured.err
-        # Should still include the report link
-        assert "github.com" in captured.err
-
-    def test_fail_includes_report_link(self, capsys: pytest.CaptureFixture[str]) -> None:
-        with pytest.raises(typer.Exit):
-            fail("error occurred")
-        captured = capsys.readouterr()
-        assert "github.com/uburuntu/meridian/issues" in captured.err
-
-    def test_fail_hint_type_user_no_github_link(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """hint_type='user' should not show GitHub link."""
-        with pytest.raises(typer.Exit):
-            fail("Invalid IP address", hint_type="user")
-        captured = capsys.readouterr()
-        assert "Invalid IP address" in captured.err
-        assert "github.com" not in captured.err
-        assert "diagnostics" not in captured.err
-
-    def test_fail_hint_type_system_suggests_diagnostics(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """hint_type='system' should suggest meridian doctor."""
-        with pytest.raises(typer.Exit):
-            fail("SSH connection failed", hint_type="system")
-        captured = capsys.readouterr()
-        assert "SSH connection failed" in captured.err
-        assert "doctor" in captured.err
-        assert "github.com" not in captured.err
-
-    def test_fail_hint_type_bug_is_default(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Default hint_type='bug' shows GitHub link."""
-        with pytest.raises(typer.Exit):
-            fail("unexpected state", hint_type="bug")
-        captured = capsys.readouterr()
-        assert "github.com/uburuntu/meridian/issues" in captured.err
+@pytest.mark.parametrize(
+    ("kwargs", "exit_code"),
+    [
+        ({}, 1),
+        ({"hint_type": "user"}, 2),
+        ({"hint_type": "system"}, 3),
+        # A cooperative cancel is its own outcome, never the interrupt code.
+        ({"hint_type": "cancelled"}, 5),
+        ({"hint_type": "user", "exit_code": 42}, 42),
+    ],
+)
+def test_fail_exit_code_follows_hint_type(kwargs: dict, exit_code: int) -> None:
+    with pytest.raises(typer.Exit) as exc_info:
+        fail("broken", **kwargs)
+    assert exc_info.value.exit_code == exit_code
 
 
-def _make_tty_mock(input_text: str) -> MagicMock:
-    """Create a context manager mock that simulates /dev/tty with given input."""
-    tty_io = StringIO(input_text + "\n")
-    mock_cm = MagicMock()
-    mock_cm.__enter__ = MagicMock(return_value=tty_io)
-    mock_cm.__exit__ = MagicMock(return_value=False)
-    return mock_cm
+@pytest.mark.parametrize(
+    ("hint_type", "present", "absent"),
+    [
+        ("bug", [_REPORT_LINK], []),
+        ("user", [], ["github.com", "diagnostics"]),
+        ("system", ["doctor"], ["github.com"]),
+    ],
+)
+def test_fail_footer_follows_hint_type(capsys, hint_type: str, present: list[str], absent: list[str]) -> None:
+    with pytest.raises(typer.Exit):
+        fail("deployment failed", hint="try meridian check", hint_type=hint_type)
+    err = capsys.readouterr().err
+    assert "deployment failed" in err
+    assert "try meridian check" in err
+    for needle in present:
+        assert needle in err
+    for needle in absent:
+        assert needle not in err
 
 
-class TestConfirm:
-    def test_confirm_y(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("y")):
-            assert confirm("Deploy?") is True
-
-    def test_confirm_Y(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("Y")):
-            assert confirm("Deploy?") is True
-
-    def test_confirm_yes(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("yes")):
-            assert confirm("Deploy?") is True
-
-    def test_confirm_empty_enter_defaults_yes(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("")):
-            assert confirm("Deploy?") is True
-
-    def test_confirm_n_raises_exit(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("n")):
-            with pytest.raises(typer.Exit) as exc_info:
-                confirm("Deploy?")
-            assert exc_info.value.exit_code == 1
-
-    def test_confirm_N_raises_exit(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("N")):
-            with pytest.raises(typer.Exit):
-                confirm("Deploy?")
-
-    def test_confirm_no_tty_defaults_to_reject(self) -> None:
-        """When /dev/tty is not available (CI), default to reject."""
-        with patch("builtins.open", side_effect=OSError("No TTY")):
-            with pytest.raises(typer.Exit):
-                confirm("Deploy?")
+def test_fail_defaults_to_the_bug_report_footer(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit):
+        fail("just a message")
+    err = capsys.readouterr().err
+    assert "just a message" in err
+    assert _REPORT_LINK in err
 
 
-class TestPrompt:
-    def test_prompt_returns_input(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("1.2.3.4")):
-            result = prompt("IP address")
-        assert result == "1.2.3.4"
+def test_fail_renders_message_and_hint_as_plain_text(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit):
+        fail("[red]message[/red]", hint="[bold]hint[/bold]", hint_type="user")
 
-    def test_prompt_empty_returns_default(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("")):
-            result = prompt("IP address", default="10.0.0.1")
-        assert result == "10.0.0.1"
+    captured = capsys.readouterr().err
+    assert "[red]message[/red]" in captured
+    assert "[bold]hint[/bold]" in captured
 
-    def test_prompt_no_tty_returns_default(self) -> None:
-        with patch("builtins.open", side_effect=OSError("No TTY")):
-            result = prompt("IP address", default="fallback")
-        assert result == "fallback"
 
-    def test_prompt_no_tty_no_default(self) -> None:
-        with patch("builtins.open", side_effect=OSError("No TTY")):
-            result = prompt("IP address")
-        assert result == ""
+@pytest.fixture
+def json_mode():
+    set_json_mode(True)
+    set_quiet_mode(True)
+    yield
+    set_json_mode(False)
+    set_quiet_mode(False)
 
-    def test_prompt_strips_whitespace(self) -> None:
-        with patch("builtins.open", return_value=_make_tty_mock("  hello  ")):
-            result = prompt("Name")
-        assert result == "hello"
+
+def test_fail_json_mode_emits_structured_redacted_error(json_mode, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit) as exc_info:
+        fail("Invalid token api_token=secret-token", hint="Set password=hunter2 again", hint_type="user")
+
+    assert exc_info.value.exit_code == 2
+    out = capsys.readouterr().out
+    data = json.loads(out)
+    assert data["schema"] == "meridian.output/v1"
+    assert data["command"] == "cli.error"
+    assert data["status"] == "failed"
+    assert data["exit_code"] == 2
+    assert data["errors"][0]["code"] == "MERIDIAN_USER_ERROR"
+    assert data["errors"][0]["category"] == "user"
+    assert "secret-token" not in out
+    assert "hunter2" not in out
+
+
+def test_fail_json_mode_emits_cancelled_status(json_mode, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(typer.Exit) as exc_info:
+        fail("Cancelled by user", hint_type="cancelled")
+
+    assert exc_info.value.exit_code == 5
+    data = json.loads(capsys.readouterr().out)
+    assert data["status"] == "cancelled"
+    assert data["errors"][0]["category"] == "cancelled"
+
+
+def test_status_helpers_render_dynamic_text_without_markup(capsys: pytest.CaptureFixture[str]) -> None:
+    info("[red]saved name[/red]")
+    warn("[bold]remote output[/bold]")
+
+    captured = capsys.readouterr().err
+    assert "[red]saved name[/red]" in captured
+    assert "[bold]remote output[/bold]" in captured
+
+
+def _tty(input_text: str) -> MagicMock:
+    """A /dev/tty stand-in that answers *input_text*."""
+    tty = MagicMock()
+    tty.__enter__.return_value = StringIO(input_text + "\n")
+    return tty
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"), [("y", True), ("Y", True), ("yes", True), ("", True), ("n", False), ("N", False)]
+)
+def test_confirm_answers(answer: str, expected: bool) -> None:
+    with patch("builtins.open", return_value=_tty(answer)):
+        assert confirm("Deploy?") is expected
+
+
+def test_confirm_without_a_tty_rejects() -> None:
+    # CI has no /dev/tty; never assume consent.
+    with patch("builtins.open", side_effect=OSError("No TTY")):
+        assert confirm("Deploy?") is False
+
+
+@pytest.mark.parametrize(("answer", "expected"), [("", False), ("n", False), ("y", True), ("yes", True)])
+def test_confirm_defaulting_to_no_needs_an_explicit_yes(answer: str, expected: bool) -> None:
+    with patch("builtins.open", return_value=_tty(answer)):
+        assert confirm("Install a key?", default=False) is expected
+
+
+def test_secret_prompt_reads_hidden_input_and_never_echoes_it(capsys: pytest.CaptureFixture[str]) -> None:
+    with (
+        patch("meridian.console.has_tty", return_value=True),
+        patch("meridian.console.getpass.getpass", return_value="s3cret") as hidden,
+    ):
+        assert prompt_secret("SSH password") == "s3cret"
+
+    hidden.assert_called_once()
+    assert "s3cret" not in capsys.readouterr().err
+
+
+def test_secret_prompt_without_a_tty_returns_empty() -> None:
+    with (
+        patch("meridian.console.has_tty", return_value=False),
+        patch("meridian.console.getpass.getpass") as hidden,
+    ):
+        assert prompt_secret("SSH password") == ""
+
+    hidden.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("answer", "default", "expected"),
+    [("198.51.100.10", "", "198.51.100.10"), ("", "198.51.100.11", "198.51.100.11"), ("  hello  ", "", "hello")],
+)
+def test_prompt_answers(answer: str, default: str, expected: str) -> None:
+    with patch("builtins.open", return_value=_tty(answer)):
+        assert prompt("Name", default=default) == expected
+
+
+@pytest.mark.parametrize("default", ["fallback", ""])
+def test_prompt_without_a_tty_returns_the_default(default: str) -> None:
+    with patch("builtins.open", side_effect=OSError("No TTY")):
+        assert prompt("IP address", default=default) == default

@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "Request that targets an existing relay.",
+  "properties": {
+    "exit_arg": {
+      "default": "",
+      "pattern": "^\\S*$",
+      "title": "Exit Arg",
+      "type": "string"
+    },
+    "relay_ip": {
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Relay Ip",
+      "type": "string"
+    },
+    "user": {
+      "default": "",
+      "pattern": "^$|^[a-zA-Z0-9._-]+$",
+      "title": "User",
+      "type": "string"
+    },
+    "yes": {
+      "default": false,
+      "title": "Yes",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "relay_ip"
+  ],
+  "title": "RelayTargetRequest",
+  "type": "object"
+}

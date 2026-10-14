@@ -1,201 +1,129 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uburuntu/meridian/main/website/public/img/logo-512.png" width="80" alt="Meridian">
+  <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/logo-512.png" width="80" alt="Meridian">
 </p>
 
 <h1 align="center">Meridian</h1>
 
 <p align="center">
-  <a href="https://github.com/uburuntu/meridian/actions/workflows/ci.yml"><img src="https://github.com/uburuntu/meridian/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/getmeridian/meridian/actions/workflows/ci.yml"><img src="https://github.com/getmeridian/meridian/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://pypi.org/project/meridian-vpn/"><img src="https://img.shields.io/pypi/v/meridian-vpn" alt="PyPI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://github.com/uburuntu/meridian/stargazers"><img src="https://img.shields.io/github/stars/uburuntu/meridian" alt="GitHub stars"></a>
+  <a href="https://github.com/getmeridian/meridian/stargazers"><img src="https://img.shields.io/github/stars/getmeridian/meridian" alt="GitHub stars"></a>
 </p>
 
-<p align="center">Deploy it right. Share it easily.<br>One command sets up an undetectable proxy — firewall, TLS, routing, all hardened by default.</p>
+<p align="center"><b>Deploy it right. Share it easily.</b><br>One command turns a fresh VPS into a hardened VLESS+Reality proxy and gives you a link to share.</p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uburuntu/meridian/main/website/public/img/deploy-terminal.svg" width="720" alt="Meridian deploy terminal output">
+  <img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/img/overview.webp" width="760" alt="meridian deploy sets up the firewall, SSH, nginx SNI routing on port 443, Xray (Reality, XHTTP, Hysteria2), the Remnawave panel, and a Let's Encrypt IP certificate, then gives your people a connection page and subscription URL">
 </p>
 
-## What is this
-
-Most proxy setups leak — an open port here, a TLS mismatch there, a fingerprint that gives the server away. Meridian locks every layer down automatically: firewall, certificates, SNI routing, fingerprinting. You deploy in one command. Your people connect via QR code. That's it.
-
-When your IP gets blocked, redeploy and be back in minutes.
-
-Whether you're the "tech friend" setting up VPN for people you care about, a power user managing multiple servers, or an NGO providing access in a censored region — Meridian handles the complexity so you can focus on staying connected.
-
-See [SECURITY.md](SECURITY.md) for the threat model and what Meridian protects against (and what it doesn't).
-
-## Why Meridian?
-
-Meridian ships the strongest available protocol — today that's VLESS+Reality — and configures it so your server is indistinguishable from any other website. Nothing left open, nothing to give it away.
-
-| | Meridian | Raw 3x-ui | Marzban | Hiddify Manager |
-|---|---|---|---|---|
-| Install | One command | Manual Docker + config | Docker + CLI | Script + web UI |
-| Client handoff | QR + hosted page | Manual URL sharing | Panel-only | Panel-only |
-| Architecture | nginx+Xray (hardened) | Xray only | Xray+Nginx | Xray+Nginx |
-| Relay support | Built-in L4 relay | Manual | No | Manual |
-| Rebuild workflow | `deploy NEW_IP` | Start over | Reconfigure | Reconfigure |
-
-Meridian is an **orchestrator** — it configures Docker, Xray, nginx, firewall, BBR, and TLS certificates automatically. You focus on deploying and sharing access, not debugging configs.
+A proxy that works can still give itself away: an open admin port, a self-signed certificate, a container that skips the firewall. Meridian sets up every layer correctly, tests the server with real traffic, and hands each person a connection page with a QR code. When an address gets blocked, add or move a server; apps pick up the change on their next refresh.
 
 ## Install
 
-Works on **macOS and Linux**. Windows users: use WSL.
+macOS or Linux (on Windows, use WSL):
 
 ```bash
 curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
-Or install directly from PyPI:
+Or from PyPI: `uv tool install meridian-vpn` (or `pipx install meridian-vpn`).
 
-```bash
-uv tool install meridian-vpn    # recommended
-pipx install meridian-vpn       # alternative
-```
+You need a fresh Debian or Ubuntu VPS you can reach over SSH with a key, as root or a user with passwordless sudo. Meridian runs on your computer, not on the server.
 
 ## Quick start
 
 ```bash
-meridian deploy                       # interactive wizard
-meridian deploy 1.2.3.4               # deploy to server
-meridian deploy local                 # deploy on this server (no SSH needed)
-meridian deploy 1.2.3.4 --domain d.io # with CDN fallback
+meridian deploy 198.51.100.10 --client-name alice
 ```
 
-After setup, your server is a fully functional proxy. Share access:
+When it prints "Done", send Alice her connection page link. She opens it, installs the recommended app, and taps once to connect. Then:
 
 ```bash
-meridian client add alice            # generate keys for a friend
-meridian client list                 # see all clients
-meridian client remove alice         # revoke access
+meridian client add bob carol      # one client per person
+meridian client show bob           # print his link again
+meridian test                      # real traffic through the delivered subscription
 ```
 
-By default, the deploy wizard blocks `.ru` domains and Russian IPs through the proxy to reduce exposure of your VPS IP in Russian-service logs. If you need those sites over Meridian, deploy with `--no-geo-block`.
+Re-run `deploy` at any time: keys, paths, and clients are kept. `meridian setup` asks the same questions as a guided wizard.
 
-Each client gets a connection page hosted on the server with QR codes, one-tap deep links, and [live usage stats](https://getmeridian.org/demo). Share the URL directly — no file transfer needed.
+## What one deploy sets up
 
-## How deployment works
+- **Methods:** VLESS+Reality and XHTTP on TCP 443, Hysteria2 on UDP 443 with salamander. Every subscription lists all of them, and capable apps switch on their own.
+- **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Deploy picks the target from the server's own network.
+- **Hardening:** key-only SSH, fail2ban, UFW opening only SSH and 443, no public container ports, a Let's Encrypt certificate for the IP. No domain needed.
+- **Panel:** Remnawave on a secret HTTPS path. Shared links never reveal it.
 
-The typical workflow: run Meridian on **your machine** and it connects to the VPS via SSH. You can also run it directly on the VPS (`deploy local`).
-
-```
-Your machine                       VPS
-┌────────────────┐    SSH    ┌────────────────┐
-│  meridian CLI  │ ────────→ │  proxy server  │
-│  ~/.meridian/  │           │                │
-└────────────────┘           └────────────────┘
-```
-
-After `meridian deploy 1.2.3.4`, credentials are cached at `~/.meridian/` on your machine. Later commands (`client add`, `client list`, `test`) automatically use them — no need to re-specify the server.
-
-Managing multiple servers? Use names:
+Options worth knowing:
 
 ```bash
-meridian deploy 1.2.3.4 --display-name finland
-meridian client add alice --server finland
+meridian deploy 198.51.100.10 --domain vpn.example.com   # XHTTP + WSS through Cloudflare when the IP is blocked
+meridian deploy 198.51.100.10 --display-name "Family VPN" # label on every connection page
+meridian deploy 198.51.100.10 --no-geo-block             # allow Russian sites through the proxy (blocked by default)
+meridian deploy local                                    # run on the server itself
 ```
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/uburuntu/meridian/main/website/public/img/connection-page.png" width="360" alt="Connection page with QR codes">
-</p>
+## Grow the fleet
 
-## How it works
+```bash
+meridian node add 198.51.100.20 --name germany        # another exit
+meridian relay add 203.0.113.10 --exit 198.51.100.10  # domestic entry point (Realm TCP forwarder)
+meridian node replace EXIT_ID 198.51.100.30           # move a blocked exit, keys and clients included
+meridian setup                                        # any shape: relay chains, routing gateways
+```
 
-Meridian deploys [VLESS+Reality](https://github.com/XTLS/Xray-core) — a protocol that makes your server indistinguishable from a legitimate website:
+Every change edits one topology in `~/.config/meridian/cluster.yml`. `meridian plan` shows what would change; `meridian apply` applies exactly that, with checkpoints, so an interrupted run resumes. Back up that folder: it holds your keys and panel access.
 
-| Censorship method | How Meridian beats it |
-|---|---|
-| **Deep Packet Inspection** | Traffic is byte-for-byte identical to normal HTTPS. No proxy signatures. |
-| **Active probing** | Censors connecting to your server get a real TLS certificate from microsoft.com. Only clients with your private key reach the proxy. |
-| **TLS fingerprinting** | uTLS impersonates Chrome's exact Client Hello, matching billions of real devices. |
-| **IP blocking** | Domain mode routes through Cloudflare CDN as a fallback — no direct IP exposure. |
+## When something breaks
 
-## Architecture
+```bash
+meridian test 198.51.100.10           # which step fails: network, TLS, subscription, or proxy
+meridian test 198.51.100.10 --probe   # the server as a censor sees it (run from inside the censored network)
+meridian check                        # server health over SSH
+meridian doctor --ai                  # redacted report, ready to paste into an AI chat
+```
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/uburuntu/meridian/main/website/public/img/architecture.svg" width="720" alt="Meridian architecture — nginx SNI routing, TLS, Xray Reality">
-</p>
-
-**Standalone mode** — nginx on port 443 routes Reality traffic to Xray via SNI inspection. nginx also provides TLS (Let's Encrypt IP certificate via acme.sh) for hosted connection pages, panel access, and XHTTP transport. No domain needed.
-
-**Domain mode** — Same architecture, plus nginx handles VLESS+WSS through Cloudflare CDN as a fallback when the server IP is blocked.
-
-**Relay mode** — A lightweight TCP forwarder (Realm) on a domestic server forwards port 443 to the exit server abroad. All protocols work through the relay with end-to-end encryption.
-
-## What you need
-
-- A VPS (Debian/Ubuntu) with root SSH key access — $5/month from any provider
-- Recommended: Finland, Netherlands, Sweden, Germany (low latency, not flagged)
-- Optional: a domain pointed to the server (for CDN fallback via Cloudflare)
+IP blocked? Follow the [recovery guide](https://getmeridian.org/en/recovery/). Users can run "Check my connection" on their own page.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `meridian deploy [IP\|local]` | Deploy proxy server (interactive wizard if no IP) |
-| `meridian client add NAME` | Add a named client key |
-| `meridian client show NAME` | Show connection info (QR code, URLs, shareable link) |
-| `meridian client list` | List all clients |
-| `meridian client remove NAME` | Remove a client key |
-| `meridian relay deploy RELAY_IP` | Deploy a relay node (TCP forwarder) |
-| `meridian relay list` | List relay nodes |
-| `meridian relay remove RELAY_IP` | Remove a relay node |
-| `meridian relay check RELAY_IP` | Check relay health |
-| `meridian server add [IP]` | Add a server to local registry |
-| `meridian server list` | List known servers |
-| `meridian server remove NAME` | Remove a server from registry |
-| `meridian preflight [IP]` | Pre-flight server validation (ports, SNI, OS, disk) |
-| `meridian scan [IP]` | Find optimal SNI targets on server's network |
-| `meridian test [IP]` | Test reachability + verify actual proxy connections |
-| `meridian probe [IP\|DOMAIN]` | Probe server as a censor would — check if deployment is detectable |
-| `meridian doctor [IP]` | Collect info for bug reports (alias: `rage`) |
-| `meridian update` | Update Meridian to the latest version |
-| `meridian teardown [IP]` | Remove proxy from server |
+| | |
+|---|---|
+| `deploy`, `setup` | Set up one server, or any fleet with the wizard |
+| `client add\|show\|list\|enable\|disable\|remove` | The people who connect |
+| `node add\|list\|replace\|remove`, `relay add\|list\|remove` | Exits and relays |
+| `route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
+| `plan`, `apply` | Review and apply the topology |
+| `test`, `check`, `scan`, `doctor` | Verify, inspect, find camouflage targets, report |
+| `fleet status\|inventory\|upgrade`, `panel` | Fleet overview, Remnawave upgrades, panel access |
+| `teardown`, `update` | Remove Meridian from a server; update the CLI |
+| `help agents` | Explain Meridian to an AI agent |
 
-See the [full CLI reference](https://getmeridian.org/docs/en/cli-reference/) for all commands and flags.
+Every command takes `--help`; most take `--json`. Full list: [CLI reference](https://getmeridian.org/en/cli-reference/).
 
 ## Client apps
 
-After setup, connect with any of these apps:
+| App | Platforms |
+|-----|-----------|
+| [Happ](https://happ.su/) | iOS, Android, Windows, macOS, Linux |
+| [FlClashX](https://github.com/pluralplay/FlClashX/releases/latest) | Android, Windows, macOS, Linux |
+| [Clash Mi](https://clashmi.app/download) | iOS, Android, Windows, macOS, Linux |
+| [Throne](https://github.com/throneproj/Throne/releases/latest) | Windows, macOS, Linux |
 
-| Platform | App |
-|----------|-----|
-| iOS | [v2RayTun](https://apps.apple.com/app/v2raytun/id6476628951) |
-| Android | [v2rayNG](https://github.com/2dust/v2rayNG/releases/latest) |
-| Windows | [v2rayN](https://github.com/2dust/v2rayN/releases/latest) |
-| All platforms | [Hiddify](https://github.com/hiddify/hiddify-app/releases/latest) |
+The connection page recommends one for each device and links more.
 
-## Common scenarios
-
-**My IP got blocked** — The most common scenario in censored regions. Get a new VPS, run `meridian deploy NEW_IP`, then re-add clients with `meridian client add`. If you're in domain mode, update the DNS A record to point at the new IP and re-run deploy. If you're not using domain mode yet, consider switching (`--domain`) to get a CDN fallback through Cloudflare — when the IP is blocked, the WSS/CDN link still works.
-
-**Sharing with family** — After `meridian client add alice`, you get a shareable URL hosted on the server. Send the link by email, iMessage, or any messenger. They open it on their phone, install the app (one tap), scan the QR code, and connect. No file transfer needed.
-
-**First-time VPS setup** — Rent a VPS from any provider (DigitalOcean, Hetzner, Vultr — $4–6/month). Choose Debian 12 or Ubuntu 22.04+. Make sure you have SSH key access (not just password). Then run `meridian deploy YOUR_SERVER_IP`.
-
-## Troubleshooting
-
-Not connecting? Run `meridian test` to check if the server is reachable, or use the [web-based ping tool](https://getmeridian.org/ping).
-
-Something else not working? Get instant AI-powered help:
+## AI agents
 
 ```bash
-meridian doctor --ai        # copies an AI-ready prompt to clipboard
+meridian help agents
 ```
 
-Paste the prompt into ChatGPT, Claude, or any AI assistant for personalized troubleshooting.
+prints a guide for Claude Code, Codex, Cursor, and other agents: how Meridian works and how to drive it safely (`--yes`, `--json` envelopes, exit codes, `meridian api` contracts). Every docs page is also served as Markdown, indexed at [getmeridian.org/llms.txt](https://getmeridian.org/llms.txt).
 
-Or [open an issue](https://github.com/uburuntu/meridian/issues) with `meridian doctor` output.
+## More
 
-## Docs
-
-Full documentation, interactive command builder, and setup guides:
-
-**[getmeridian.org](https://getmeridian.org)** · [Connection page demo](https://getmeridian.org/demo)
-
-## Community
-
-- [Вастрик.Клуб](https://vas3k.club/project/31264/) — launch post (78 upvotes, 3k+ views)
+- **Docs:** [getmeridian.org](https://getmeridian.org) · [connection page demo](https://getmeridian.org/demo) · [architecture](https://getmeridian.org/en/architecture/)
+- **Upgrading from 3.x:** Meridian 4 replaces 3x-ui with Remnawave and is not an in-place upgrade; every user gets a new link. [How to move](https://getmeridian.org/en/installation/#upgrading-from-3x).
+- **Security:** [SECURITY.md](SECURITY.md) covers the threat model, including what Meridian does not protect against.
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) · [issues](https://github.com/getmeridian/meridian/issues) (attach `meridian doctor` output)
+- **License:** [MIT](LICENSE)

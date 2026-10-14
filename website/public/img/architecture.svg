@@ -26,11 +26,19 @@
 
   <!-- Edge: Internet → nginx -->
   <line x1="400" y1="81" x2="400" y2="120" class="edge"/>
-  <text x="440" y="105" class="edge-label">Port 443</text>
+  <text x="410" y="105" class="edge-label">TCP 443</text>
+
+  <!-- Xray Hysteria2 (UDP, straight to Xray) -->
+  <rect x="565" y="120" width="190" height="40" class="node node-main"/>
+  <text x="660" y="145" text-anchor="middle" class="label">Xray Hysteria2</text>
+
+  <!-- Edge: Internet → Hysteria2 -->
+  <path d="M 432 60 L 590 120" class="edge-dashed"/>
+  <text x="520" y="78" class="edge-label">UDP 443 (salamander)</text>
 
   <!-- Xray Reality -->
   <rect x="80" y="230" width="200" height="40" class="node node-main"/>
-  <text x="180" y="255" text-anchor="middle" class="label">Xray Reality :10443</text>
+  <text x="180" y="255" text-anchor="middle" class="label">Xray Reality :10xxx</text>
 
   <!-- nginx http -->
   <rect x="520" y="230" width="200" height="40" class="node node-accent"/>
@@ -41,15 +49,15 @@
   <text x="220" y="192" class="edge-label">SNI = camouflage</text>
 
   <path d="M 470 160 L 620 230" class="edge"/>
-  <text x="530" y="192" class="edge-label">SNI = server IP</text>
+  <text x="568" y="190" class="edge-label">no SNI / server IP</text>
 
   <!-- Connection Page -->
   <rect x="420" y="330" width="170" height="36" class="node node-main"/>
   <text x="505" y="353" text-anchor="middle" class="label">Connection Page</text>
 
-  <!-- 3x-ui Panel -->
+  <!-- Remnawave Panel -->
   <rect x="610" y="330" width="140" height="36" class="node node-main"/>
-  <text x="680" y="353" text-anchor="middle" class="label">3x-ui Panel</text>
+  <text x="680" y="353" text-anchor="middle" class="label">Remnawave Panel</text>
 
   <!-- Xray XHTTP -->
   <rect x="420" y="400" width="170" height="36" class="node node-main"/>
@@ -62,9 +70,9 @@
   <!-- Edges: nginx http → children -->
   <line x1="580" y1="270" x2="505" y2="330" class="edge"/>
   <line x1="660" y1="270" x2="680" y2="330" class="edge"/>
-  <line x1="580" y1="270" x2="505" y2="400" class="edge"/>
-  <path d="M 660 270 L 680 400" class="edge-dashed"/>
-  <text x="720" y="385" class="edge-label" font-style="italic">domain mode</text>
+  <path d="M 530 270 L 400 300 L 400 418 L 420 418" class="edge"/>
+  <path d="M 715 270 L 775 300 L 775 418 L 750 418" class="edge-dashed"/>
+  <text x="784" y="318" class="edge-label" font-style="italic" transform="rotate(90 784 318)">domain mode</text>
 
   <!-- nginx ACME -->
   <rect x="80" y="330" width="200" height="36" class="node node-main"/>
@@ -72,5 +80,5 @@
 
   <!-- Edge: Internet → nginx ACME -->
   <path d="M 368 65 Q 60 65 60 340 L 80 348" class="edge"/>
-  <text x="42" y="200" class="edge-label" transform="rotate(-90 42 200)">Port 80</text>
+  <text x="42" y="200" class="edge-label" transform="rotate(-90 42 200)">TCP 80</text>
 </svg>

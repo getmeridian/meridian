@@ -1,29 +1,35 @@
-# website — Astro static site (getmeridian.org)
+# website — Astro site (getmeridian.org): landing, Starlight docs, blog, Studio
 
 ```bash
-cd website && npm install && npm run build   # Astro + Pagefind
+cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 ```
 
 ## Design decisions
 
-**Why Astro** — static generation means every page is a flat HTTP request. Content collections integrate natively with markdown docs. File-based routing. Minimal JS shipped (islands architecture).
+**Static Astro** — every page is a flat HTTP request with minimal shipped JS; content collections hold docs and blog.
 
-**i18n strategy** — docs are per-locale markdown files (`src/content/docs/{locale}/`). Landing page uses client-side `data-t` attribute swapping. English is baked into HTML; non-EN languages swap at runtime. This is asymmetric but avoids shipping EN translations in JS.
+**Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/` with Starlight's sidebar, search, TOC, RTL, and Expressive Code. `astro.config.mjs` builds the sidebar from English `order`/`section` frontmatter and redirects every old `/docs/{locale}/{page}/` URL; `/docs/` stays the stable entry. Overrides live in `src/components/starlight/`, the route middleware in `src/lib/docs-route.ts`, the theme in `src/styles/starlight.css`.
 
-**Self-hosted everything** — fonts (woff2), no CDN, no Google. Zero external requests. Target users live in censored regions where external resources are blocked.
+**Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, `/md/...`, `/context-hub.md` cover LLM tooling. All of them go through `src/lib/docs-markdown.ts`.
 
-**Machine-readable endpoints** — `/llms.txt` (AI index), `/llms-full.txt` (all docs concatenated), `/md/[slug]` (raw markdown per doc), `/context-hub.md`. These make the project AI-native.
+**i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
+
+**Self-hosted everything** — the root rule, enforced: `scripts/check-runtime-assets.mjs` fails the build on any external request.
+
+**pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a one-week release age, and refuses trust downgrades; allows build scripts only for explicitly trusted packages.
 
 ## Website ↔ CLI relationship
 
 - **App links**: `src/data/apps.json` is SOT. CI validates against template + Python constants.
-- **AI docs**: en/ markdown → `make ai-docs` → bundled `ai-reference.md`. CI generates automatically.
+- **AI docs**: en/ markdown → `make ai-docs` → bundled `ai-reference.md`. CI generates automatically. The agent guide is the CLI's `src/meridian/data/agents.md`.
 - **install.sh**: deployed to `getmeridian.org/install.sh` by CI release workflow.
+- **Studio contracts**: `pnpm run contracts:generate` builds `src/studio/generated/` from checked-in `contracts/meridian/v1`.
 
 ## Pitfalls
 
-- **Single language picker** — one LanguagePicker in the nav header handles all pages. On docs pages it reads available locales from `#docs-locales` JSON and navigates to locale-specific URLs. On landing page it does client-side DOM swap.
-- **Language switch reload asymmetry** — EN reloads page (build-time HTML), non-EN does client-side DOM swap. Consolidating would simplify but requires shipping EN translations.
-- **Early `<head>` scripts** — detect lang + theme from localStorage before paint. Prevents RTL layout shift and dark mode flash.
-- **SEO structured data** — JSON-LD schemas (FAQPage, Organization, BreadcrumbList, Article) are baked at build time. Hreflang links on docs pages connect locale variants for search engines.
-- **Sitemap i18n** — Astro sitemap integration generates entries for all locale paths.
+- **Theme and language cross the docs boundary** — landing uses `meridian-theme`/`meridian-lang`, Starlight `starlight-theme`; ThemeToggle writes both and a Starlight head script copies them, or switching sections flips the theme.
+- **Astro builds every `.md` under `src/pages`** — the `drop-contributor-notes` integration deletes the `/CLAUDE/` pages that folder notes produce.
+- **Links are validated** — `starlight-links-validator` fails the build on a broken docs link or anchor; translated headings have translated anchors. Custom pages (blog, demo, ping, studio) are excluded because Starlight can't see them.
+- **Remark plugins need the unified processor** — Astro 7 defaults to Sätteri; pass plugins to `unified()` from `@astrojs/markdown-remark` (Starlight needs it too).
+- **Starlight owns Astro i18n** — never add a top-level `i18n` block; Starlight derives it from `locales`.
+- **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "description": "Execution result for one V4 compiler resource.",
+  "properties": {
+    "changed": {
+      "title": "Changed",
+      "type": "boolean"
+    },
+    "error": {
+      "default": "",
+      "title": "Error",
+      "type": "string"
+    },
+    "resource_id": {
+      "title": "Resource Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "converged",
+        "applied",
+        "failed",
+        "unknown",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "success": {
+      "title": "Success",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "resource_id",
+    "status",
+    "success",
+    "changed"
+  ],
+  "title": "CompiledApplyActionResult",
+  "type": "object"
+}

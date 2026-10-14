@@ -1,0 +1,281 @@
+"""Fail-closed, privacy-preserving preflight behavior."""
+
+from __future__ import annotations
+
+import time
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
+import typer
+
+from meridian.commands.health import run as run_check
+from meridian.ssh import CommandResult
+
+pytestmark = pytest.mark.usefixtures("tmp_home")
+
+
+class FakeConnection:
+    def __init__(
+        self,
+        *,
+        sni_reachable: bool,
+        ss_returncode: int = 0,
+        ss_stdout: str = "",
+        meridian_managed: bool = False,
+        dns_returncode: int = 0,
+        sni_returncode: int = 0,
+        ownership_returncode: int = 0,
+        clock_available: bool = True,
+    ) -> None:
+        self.sni_reachable = sni_reachable
+        self.ss_returncode = ss_returncode
+        self.ss_stdout = ss_stdout
+        self.meridian_managed = meridian_managed
+        self.dns_returncode = dns_returncode
+        self.sni_returncode = sni_returncode
+        self.ownership_returncode = ownership_returncode
+        self.clock_available = clock_available
+        self.commands: list[str] = []
+
+    def run(self, command: str, **_kwargs: object) -> CommandResult:
+        self.commands.append(command)
+        stdout = ""
+        if "openssl s_client" in command and self.sni_reachable:
+            stdout = "CONNECTED\n"
+        elif "getent ahostsv4" in command and self.dns_returncode == 0:
+            stdout = "203.0.113.20\n"
+        elif command.startswith("ss -H -tlnp"):
+            stdout = self.ss_stdout
+        elif "meridian-v4-*.conf" in command and self.meridian_managed:
+            stdout = "managed\n"
+        elif "nohup python3 -c" in command:
+            stdout = "4242\n"
+        elif command == "date +%s" and self.clock_available:
+            stdout = f"{int(time.time())}\n"
+        if command.startswith("ss -H -tlnp"):
+            returncode = self.ss_returncode
+        elif "openssl s_client" in command or "/dev/tcp/" in command:
+            returncode = self.sni_returncode
+        elif "meridian-v4-*.conf" in command:
+            returncode = self.ownership_returncode
+        elif "getent " in command:
+            returncode = self.dns_returncode
+        else:
+            returncode = 0
+        return CommandResult(args=command, returncode=returncode, stdout=stdout)
+
+
+def _run_preflight(
+    connection: FakeConnection,
+    *,
+    os_info: str = "Ubuntu 24.04 LTS",
+    disk_mb: int | None = 4096,
+    external_reachable: bool = True,
+    local_mode: bool = False,
+    address: str = "198.51.100.20",
+) -> None:
+    resolved = SimpleNamespace(ip=address, user="root", conn=connection, local_mode=local_mode)
+    facts = MagicMock()
+    facts.os_release.return_value = SimpleNamespace(pretty_name=os_info, id="ubuntu" if os_info else "")
+    facts.free_disk_mb.return_value = disk_mb
+    with (
+        patch("meridian.commands.health.resolve_server", return_value=resolved),
+        patch("meridian.commands.health.ensure_server_connection", return_value=resolved),
+        patch("meridian.diagnostics.preflight.ServerFacts", return_value=facts),
+        patch("meridian.diagnostics.preflight.tcp_connect", return_value=external_reachable),
+    ):
+        run_check(resolved.ip, sni="cdn.test")
+
+
+def test_preflight_resolves_registered_hostname_for_external_probe() -> None:
+    connection = FakeConnection(sni_reachable=True)
+    with patch("meridian.commands.health.resolve_hostname", return_value="198.51.100.20") as resolve:
+        _run_preflight(connection, address="exit.example.test")
+
+    resolve.assert_called_once_with("exit.example.test", timeout=5)
+
+
+def test_preflight_connects_on_the_requested_ssh_port() -> None:
+    connection = FakeConnection(sni_reachable=True)
+    resolved = SimpleNamespace(ip="198.51.100.20", user="root", conn=connection, local_mode=False)
+    with (
+        patch("meridian.commands.health.resolve_server", side_effect=SystemExit) as resolve,
+        pytest.raises(SystemExit),
+    ):
+        run_check(resolved.ip, ssh_port=2222)
+
+    assert resolve.call_args.kwargs["port"] == 2222
+
+
+def test_preflight_returns_findings_exit_when_required_sni_is_unreachable() -> None:
+    connection = FakeConnection(sni_reachable=False)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, external_reachable=True)
+
+    assert exc_info.value.exit_code == 4
+
+
+def test_preflight_uses_server_resolver_without_third_party_metadata_calls() -> None:
+    connection = FakeConnection(sni_reachable=True)
+
+    _run_preflight(connection)
+
+    commands = "\n".join(connection.commands)
+    assert "getent ahostsv4" in commands
+    assert "curl " not in commands
+    assert "dig " not in commands
+
+
+def test_preflight_returns_unavailable_exit_when_listener_evidence_fails() -> None:
+    connection = FakeConnection(sni_reachable=True, ss_returncode=127)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 3
+    assert sum(command.startswith("ss -H -tlnp") for command in connection.commands) == 1
+
+
+@pytest.mark.parametrize(
+    ("connection", "os_info", "disk_mb"),
+    [
+        (FakeConnection(sni_reachable=True), "", 4096),
+        (FakeConnection(sni_reachable=True), "Ubuntu 24.04 LTS", None),
+        (FakeConnection(sni_reachable=True, clock_available=False), "Ubuntu 24.04 LTS", 4096),
+    ],
+)
+def test_preflight_fails_closed_when_required_server_facts_are_missing(
+    connection: FakeConnection,
+    os_info: str,
+    disk_mb: int | None,
+) -> None:
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, os_info=os_info, disk_mb=disk_mb)
+
+    assert exc_info.value.exit_code == 3
+
+
+def test_preflight_findings_take_precedence_over_unavailable_evidence() -> None:
+    connection = FakeConnection(sni_reachable=False, ss_returncode=127)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 4
+
+
+def test_preflight_does_not_trust_process_name_without_meridian_marker() -> None:
+    connection = FakeConnection(
+        sni_reachable=True,
+        ss_stdout='LISTEN 0 4096 *:443 *:* users:(("nginx",pid=42,fd=6))',
+    )
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, external_reachable=True)
+
+    assert exc_info.value.exit_code == 4
+
+
+def test_preflight_accepts_known_listener_with_meridian_marker() -> None:
+    connection = FakeConnection(
+        sni_reachable=True,
+        ss_stdout='LISTEN 0 4096 *:443 *:* users:(("nginx",pid=42,fd=6))',
+        meridian_managed=True,
+    )
+
+    _run_preflight(connection, external_reachable=True)
+
+
+def test_preflight_reports_blocked_firewall_with_temporary_listener() -> None:
+    connection = FakeConnection(sni_reachable=True)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, external_reachable=False)
+
+    assert exc_info.value.exit_code == 4
+    assert any("nohup python3 -c" in command for command in connection.commands)
+    assert any(command.startswith("kill 4242") for command in connection.commands)
+
+
+def test_preflight_marks_external_reachability_unavailable_in_local_mode() -> None:
+    connection = FakeConnection(sni_reachable=True)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, local_mode=True)
+
+    assert exc_info.value.exit_code == 3
+    assert not any("nohup python3 -c" in command for command in connection.commands)
+
+
+def test_preflight_treats_dns_negative_as_completed_finding() -> None:
+    connection = FakeConnection(sni_reachable=True, dns_returncode=2)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 4
+
+
+def test_preflight_treats_missing_dns_tool_as_unavailable() -> None:
+    connection = FakeConnection(sni_reachable=True, dns_returncode=127)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 3
+
+
+@pytest.mark.parametrize("returncode", [124, 255])
+def test_preflight_treats_lost_sni_transport_as_unavailable(returncode: int) -> None:
+    connection = FakeConnection(sni_reachable=False, sni_returncode=returncode)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 3
+
+
+@pytest.mark.parametrize("returncode", [124, 255])
+def test_preflight_treats_lost_dns_transport_as_unavailable(returncode: int) -> None:
+    connection = FakeConnection(sni_reachable=True, dns_returncode=returncode)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection)
+
+    assert exc_info.value.exit_code == 3
+
+
+def test_preflight_treats_lost_listener_ownership_probe_as_unavailable() -> None:
+    connection = FakeConnection(
+        sni_reachable=True,
+        ss_stdout='LISTEN 0 4096 *:443 *:* users:(("nginx",pid=42,fd=6))',
+        meridian_managed=True,
+        ownership_returncode=255,
+    )
+
+    with pytest.raises(typer.Exit) as exc_info:
+        _run_preflight(connection, external_reachable=True)
+
+    assert exc_info.value.exit_code == 3
+
+
+@pytest.mark.parametrize(
+    ("os_release", "status"),
+    [
+        ('PRETTY_NAME="Debian GNU/Linux 13 (trixie)"\nID=debian\n', "passed"),
+        ('PRETTY_NAME="Linux Mint 22"\nID=linuxmint\nID_LIKE="ubuntu debian"\n', "warning"),
+        ('PRETTY_NAME="CentOS Stream 10 (Coughlan)"\nID="centos"\nID_LIKE="rhel fedora"\n', "failed"),
+    ],
+)
+def test_server_os_fails_only_systems_without_apt(os_release: str, status: str) -> None:
+    from meridian.diagnostics.preflight import _server_os
+    from meridian.facts import ServerFacts
+
+    conn = MagicMock()
+    conn.run.return_value = SimpleNamespace(returncode=0, stdout=os_release, stderr="")
+
+    check = _server_os(ServerFacts(conn))
+
+    assert check.findings[0].status == status

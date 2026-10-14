@@ -1,7 +1,8 @@
 """Server branding — palettes, icon processing, validation.
 
-Handles emoji detection, image download/resize, and color palette
-definitions. UX philosophy: never reject input when we can fix it.
+Handles emoji detection and image download/resize; palettes live in
+``meridian.core.inputs.PAGE_PALETTES`` (colors in the page's app.js).
+UX philosophy: never reject input when we can fix it.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import base64
 import io
 import ipaddress
 import logging
+import re
 import socket
 import unicodedata
 import urllib.error
@@ -17,31 +19,6 @@ import urllib.request
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Color palettes — curated presets with dark + light mode variants
-# ---------------------------------------------------------------------------
-
-PALETTES: dict[str, dict[str, str]] = {
-    "ocean": {"dark": "#5b9cf5", "light": "#2b7de9"},
-    "sunset": {"dark": "#e57c4e", "light": "#c4602a"},
-    "forest": {"dark": "#4CD68A", "light": "#1E8C52"},
-    "lavender": {"dark": "#9b8cf5", "light": "#6b5de9"},
-    "rose": {"dark": "#f56b8a", "light": "#d94468"},
-    "slate": {"dark": "#8B8FA2", "light": "#646880"},
-}
-
-PALETTE_LABELS: dict[str, str] = {
-    "ocean": "Ocean (blue)",
-    "sunset": "Sunset (coral)",
-    "forest": "Forest (green)",
-    "lavender": "Lavender (purple)",
-    "rose": "Rose (pink)",
-    "slate": "Slate (gray)",
-}
-
-# Suggested emoji for the wizard picker
-ICON_SUGGESTIONS = ["🛡️", "🌐", "🔐", "🚀", "⚡", "🏔️", "🌊", "🔒"]
 
 # Max image download size (10 MB raw, will be resized)
 _MAX_DOWNLOAD = 10 * 1024 * 1024
@@ -51,12 +28,26 @@ _ICON_SIZE = 128
 _MAX_DATA_URI = 300 * 1024
 
 
-def validate_color(color: str) -> str:
-    """Validate and normalize a palette name. Returns name or empty string."""
-    normalized = color.strip().lower()
-    if normalized in PALETTES:
-        return normalized
-    return ""
+_DATA_URI = re.compile(r"data:image/(?:png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+")
+
+
+def normalize_icon(raw_input: str) -> str:
+    """Return a connection-page icon (emoji or image data URI); ValueError when unusable.
+
+    An image URL is downloaded here, once, because the page itself never makes
+    external requests. A saved data URI passes through unchanged.
+    """
+    text = raw_input.strip()
+    if not text or _DATA_URI.fullmatch(text):
+        return text
+    icon = process_icon(text)
+    if icon:
+        return icon
+    if text.startswith(("http://", "https://")):
+        raise ValueError(
+            f"Could not use the image at {text}: download it from this machine as PNG, JPEG, WebP, GIF, or SVG."
+        )
+    raise ValueError("Use an emoji such as 🛡️ or an image URL.")
 
 
 def process_icon(raw_input: str) -> str:
@@ -170,7 +161,7 @@ def _process_image_url(url: str) -> str:
         return ""
 
     # Try Pillow for smart resize
-    result = _resize_with_pillow(data, content_type)
+    result = _resize_with_pillow(data)
     if result:
         return result
 
@@ -178,7 +169,7 @@ def _process_image_url(url: str) -> str:
     return _fallback_raw(data, content_type)
 
 
-def _resize_with_pillow(data: bytes, content_type: str) -> str:
+def _resize_with_pillow(data: bytes) -> str:
     """Resize image using Pillow. Returns data URI or empty string."""
     try:
         from PIL import Image
@@ -212,7 +203,7 @@ def _resize_with_pillow(data: bytes, content_type: str) -> str:
 
         b64 = base64.b64encode(png_bytes).decode()
         return f"data:image/png;base64,{b64}"
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         logger.warning("Pillow processing failed: %s", exc)
         return ""
 

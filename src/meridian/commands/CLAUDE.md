@@ -2,38 +2,36 @@
 
 ## Design decisions
 
-**One file per command** — keeps concerns isolated. Each is a Typer sub-app registered in `cli.py`.
-
-**Server resolution cascade** in `resolve.py` — strict priority order ensures predictable behavior:
-1. Explicit IP → 2. `--server` name → 3. `local` keyword → 4. Single-server auto-select → 5. Multi-server prompt → 6. Fail with hint
-
-**Three-step pattern**: resolve → ensure connection → fetch credentials. Every server-touching command follows this. Deviating causes subtle bugs.
-
-**Version mismatch check** — `fetch_credentials()` compares `deployed_with` against running CLI. Warns once per server per session. Non-blocking.
-
-**CLI UX vision** — every command output is a guided experience, not a status dump:
-- **Educate** — explain *why*, not just what. A user who runs `deploy` should understand Reality camouflage without reading docs. Help text teaches; it doesn't just label flags.
-- **Unbreak paths** — every error and broken state must suggest the recovery protocol. Deployment failed? → `meridian preflight`. Server unreachable? → `meridian test`. Weird state? → `meridian teardown` + `meridian deploy`.
-- **Upsell the next step** — after `deploy`, suggest `test` and `client add`. After `client add`, suggest `client list` and `test`. Every command's output should make the user aware of what's possible next. The CLI is a guided tour, not a dead end.
-- **Cohesive flag language** — same flag means the same thing everywhere. No `--name` meaning three different things on three commands.
-
-**Wizard UX conventions** — the deploy wizard uses `console.py` helpers exclusively:
-- **`choose()`** for any decision with 2+ options. Never raw Y/n prompts. Shows numbered list, user picks a number. Default is always 1.
-- **`prompt()`** for free-text input (IP address, domain, server name). Show defaults in brackets.
-- **`confirm()`** only for the final deploy confirmation. One per command, at the end.
-- **Section pattern**: bold header → dim description → blank line → `choose()`/`prompt()`.
-- **`rich.status.Status`** spinner for any operation >5 seconds (scan, download). Same style as provisioner steps.
-- **Summary Panel** before deploy: show all chosen settings so user can review before confirming.
+**One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps; both parse flags and defer to the command module.
+**Commands edit intent** — fleet commands load `cluster.yml` through `load_topology_cluster()`. `client`, `node`, `relay`, and `route` add/remove edit `topology_intent` and apply it through `_helpers.apply_reviewed_intent()` (progress from `apply_progress()`); removals let reviewed retirement delete what vanished (`topology_removal.py`, `node_replace.py`). Never mutate panel or server state beside the compiled plan.
+**One target vocabulary** — `cli_options.py` owns the shared `SERVER` argument and option types; `meridian.resolve.parse_target()`/`merge_target()` read `[user@]host[:port]`, saved names, and `local` like ssh. `resolve.py` adds prompts around the cascade: target, local mode, single saved server, else fail with candidates.
+**One JSON switch** — every `--json` is `cli_options.Json` and every JSON-implying flag uses `enable_json_output`, so bodies only read `is_json_mode()`. The root callback resolves argv through Click (`cli_catalog`); global `--json` works exactly where the command declares it. Never re-parse argv by hand.
+**Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve UI clients: no prompts or Rich, the final `meridian.output/v1` envelope on stdout, JSONL on stderr. Hidden `--cancel-file` stops at the next safe point with a `cancelled` envelope (exit 5).
+**Health surface** — `check` (`health.py`) dispatches by role to preflight, server, or relay (`relay_check.py`) scopes; `test` runs one active client's delivered Xray JSON end to end, once per public entry when bare (`--probe`, or `probe`, for the censor view; `--basic` refuses `--client`); `doctor` bundles a report. All render through `check_render.py`: negative evidence exits 4, unavailable evidence 3, full pass 0. `logs` prints plain tails of what the server's roles run (`diagnostics/logs.py`) and exits 3 when one is unreadable.
+**Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices with text from `meridian.i18n` and prompts from `wizard_prompts.py`; smart defaults replace questions, and compile/apply/verify stay in `meridian.setup`.
+**Agent guide** — `meridian help agents` prints `data/agents.md` as plain Markdown; `test_help_command.py` fails if it names a missing command. Keep it free of release talk.
+**Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and a pointer to the new spelling.
 
 ## What's done well
 
-- **`local` keyword everywhere** — `deploy local`, `check local`, `--server local` all work. Case-insensitive. Same code path.
+- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
-
-- **Local mode has two entry points** — `local` keyword and root auto-detect. They converge on `local_mode=True` but differ on `creds_dir`.
-- **Registry mixes exits and relays** — relay nodes are stored in `~/.meridian/servers` too. New relay entries carry an explicit role tag; legacy ones still need inference from local relay metadata or cached exit creds. Never let implicit auto-select depend only on whichever exit happens to have a local `proxy.yml`.
-- **Write commands must fail closed on refresh/sync** — if a command mutates credentials, a stale local cache cannot be trusted and a failed post-save sync must abort before success output or handoff artifact generation.
-- **`deploy` refresh is asymmetric** — first deploy may legitimately have nothing to fetch, but redeploy must abort if forced refresh fails and Meridian state already exists either locally or on the server. Never treat “no local cache” as proof of a fresh machine.
-- **`console.fail()` always exits** — raises `typer.Exit(1)`. Only call from command entry points, never library code.
-- **`dev` subcommand is hidden** — not shown in `--help`. Intentional — developer tools only.
+- `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
+- Reach Click only through `meridian.cli_types` — Typer ≥ 0.26 vendors it and production has no `click` package (architecture-tested).
+- `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
+- Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
+- Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
+- Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
+- Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
+- Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.
+- Never render saved admin credentials except `panel --show-password`; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
+- A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
+- `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
+- The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
+- Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
+- `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing.
+- Bare `test` follows the intent, not the saved-server count: removed servers stay saved.
+- A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry (`None` unless it declares `--json`); `test_cli_catalog.py` enforces it.
+- `deploy` port preflight (`port_check.py`) covers every port nginx binds, including loopback 8443/8444; a missed one failed mid-deploy on `nginx -t`.
+- Page palettes live in `core.inputs.PAGE_PALETTES` (tested against `app.js`); normalize `--icon` with `branding.normalize_icon()` before SSH, and a redeploy merges unnamed branding flags from saved values.

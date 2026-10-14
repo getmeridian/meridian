@@ -4,19 +4,20 @@
 
 **Stateless + presentational** — most components take props and render HTML. Interactivity is minimal vanilla JS (`is:inline`). No framework state.
 
-**i18n via `data-t` attributes** — all visible text uses `data-t="key"`. Consumer JS reads and swaps. Avoids baking translations into component markup.
+**Translatable text carries `data-t`** — see `src/i18n/CLAUDE.md`.
 
-**Copy-to-clipboard pattern** — `CopyButton.astro` shared by `CodeBlock` and `CommandBuilder`. Clipboard API with `execCommand` fallback. State tracked via `[data-copied]` CSS attribute.
+**Copy-to-clipboard pattern** — `CopyButton.astro` (used by `CodeBlock`) tries the Clipboard API, falls back to `execCommand`, and signals state with a `[data-copied]` attribute.
 
-**Fast animations, always visible** — CSS transitions should feel instant (most under 100ms; decorative transforms like accordion chevron rotation can be slightly longer). Never hide interactive elements behind hover — components must be visible at all times. Hover states are for visual feedback, not for revealing content.
+**Fast animations, always visible** — transitions feel instant (most under 100ms; decorative transforms may run longer); never hide interactive elements behind hover, which is for feedback only.
+
+**Starlight overrides** — `starlight/` replaces `SocialIcons` (Blog and Demo links), `PageTitle` (Copy page, View as Markdown, Open in ChatGPT/Claude), and `MarkdownContent` (adds `Mermaid`). Wrap Starlight's default component instead of copying it.
 
 ## What's done well
 
-- **Accordion `> summary` rule** — child combinator prevents style leaking into nested `<details>`. Learned from a real bug where parent chevrons appeared on nested toggles.
 - **RTL-aware** — Callout border flips, Timeline reverses, code blocks force LTR via `unicode-bidi: embed`.
-- **CommandBuilder** — 6-tab interactive tool, no framework. Config objects drive both UI and command string. localStorage persistence survives page reload.
+- **CommandBuilder** — one config object per tab drives both the UI and the command string; choices persist in localStorage.
 
 ## Pitfalls
 
 - **CommandBuilder localStorage has no schema versioning** — field renames break saved state silently.
-- **BEM naming** — Nav uses BEM (`nav__inner`, `nav__links`). Other components don't. Be consistent when adding new ones.
+- **BEM naming** — components use `block__element` classes (`nav__inner`, `accordion__trigger`); new ones follow suit.

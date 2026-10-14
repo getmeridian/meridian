@@ -4,6 +4,373 @@ All notable changes to Meridian are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [4.0.0] - Unreleased
+
+Meridian 4 is a new foundation: the Remnawave panel replaces 3x-ui, and one
+reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet.
+
+### Read first: this is not an in-place upgrade
+- Meridian 4 cannot manage servers deployed by 3.x, and existing client links
+  cannot carry over to Remnawave. Your 3.x servers keep working.
+- To keep managing them, stay on 3.x: `uv tool install 'meridian-vpn<4'`.
+- To move: deploy a fresh server with 4.0, give your users the new links, then
+  `meridian teardown` the old server (it also removes 3x-ui).
+- 3.x and 4.0 cannot share a server, since both need port 443. 4.0 refuses to
+  deploy onto a server that still runs 3.x (or 2.x) instead of taking it over.
+- Requires Python 3.11+.
+- **Both versions fit on one computer** — 4.0 keeps its state in
+  `~/.config/meridian` (or `$XDG_CONFIG_HOME/meridian`) and leaves 3.x state in
+  `~/.meridian` alone. A fleet set up with a 4.0 beta in `~/.meridian-v4` or
+  `~/.meridian` is found there, so the release manages it without moving files.
+
+### Working in the Remnawave panel
+- **`meridian panel`** — prints the admin panel URL and login (`--show-password`
+  for the password) and lists what Meridian manages versus what is yours.
+- **Your panel edits stick** — Meridian now owns only each client's existence,
+  name, and squads. Disabling a client (with `client disable` or in the panel),
+  traffic limits, expiry, and descriptions set in the panel survive every
+  `apply`; before, the next apply re-enabled disabled or limited clients, and a
+  description edit made every apply fail. Disabled, limited, or expired clients
+  no longer mark `fleet status` as degraded.
+- **`meridian check` says whether node plugins can work** — Remnawave's node
+  plugins (Torrent Blocker, ingress and egress filters) need a 5.7+ kernel
+  and otherwise silently do nothing; every exit and
+  gateway now reports "Node plugin readiness" with the fix. The docs explain
+  turning plugins on in the panel. Server inbounds now sniff traffic
+  (route-only, destinations untouched), so Torrent Blocker can recognize
+  BitTorrent once you enable it.
+- **Connect a bot safely** — the client guide shows how to give a community bot
+  its own scoped, expiring panel token and which endpoints a read-only bot
+  needs, instead of sharing Meridian's full-access token.
+
+### Deploy
+- **One command, verified end to end** — `meridian deploy IP` sets up the panel
+  and proxy, picks a camouflage target the server can actually use, pushes real
+  traffic through the delivered subscription, and only then prints "Done" with a
+  shareable connection page and QR code. Re-running it resumes or redeploys.
+- **A setup wizard anyone can follow** — `meridian setup` is a guided,
+  resumable wizard for one server or many (exits, Realm relays, routing
+  gateways with failover). It speaks English, Russian, Persian, and Chinese
+  (asked first, remembered, or `--lang`), explains each term in one plain
+  sentence, accepts `local` for the machine you are on, skips routing questions
+  unless you have a gateway, suggests five short server names (astra, boba,
+  foxtrot…), and ends with a plain summary before anything
+  changes. Running `meridian` alone in a terminal offers to start it.
+- **Review before change** — `meridian plan` shows what `meridian apply` would do
+  (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
+- **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
+  adds WSS (Cloudflare CDN fallback). Blocking Russian destinations stays on
+  by default (`--no-geo-block` to turn it off).
+- **Camouflage next door** — without `--sni`, a first deploy (and `node add`)
+  scans the server's own subnet and prefers a site whose DNS really points
+  there and that passes Reality's TLS 1.3 + HTTP/2 check, so the SNI and the
+  server's IP look like they belong together. Well-known targets remain the
+  fallback, and real traffic still decides.
+- **Client IPs stay private unless you ask** — by default the panel records
+  the server's own address for every TCP connection, so it never stores where
+  users connect from. `--client-ips` (or `forward_client_ips` in the topology)
+  passes real addresses to Xray and the panel, through the PROXY protocol and
+  X-Forwarded-For, for Remnawave's per-user IP limits; the camouflage site
+  never sees the header.
+- **TLS fingerprint is a setting** — every Reality, XHTTP, and WSS link presents
+  the `chrome` fingerprint by default (XHTTP and WSS used to send none, which
+  exposed the client library); `--fingerprint` or the topology's path
+  `fingerprint` switches it when a region starts flagging one.
+- **Shrink a running fleet** — `meridian node remove` and `meridian relay remove`
+  edit the topology, show every resource they will delete, and clean up the
+  panel node, node container, Realm units, firewall rules, and published Hosts.
+  `meridian plan` lists removals too, and the review covers them.
+- **Move an exit to another server** — `meridian node replace EXIT SERVER`
+  keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
+  settings, and relays, so clients keep working, then cleans up the old server
+  through the reviewed apply. The control server can't be moved yet.
+- **`meridian fleet upgrade`** — compares the Remnawave images each server runs
+  with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
+  Newer or floating tags you chose are kept, and PostgreSQL never moves to a new
+  major version in place. `meridian update` points to it when a fleet exists.
+- **One health command: `meridian check`** — checks whatever the server is in
+  your fleet: pre-flight readiness for a new server; panel connection,
+  containers (including Docker health, so a crash-looping service is flagged),
+  every compiled port, TLS, and disk for control, exit, and gateway servers;
+  and each Realm hop for relays. With no server it checks the whole fleet, and
+  `--json` returns one typed report. `meridian test --probe` (short form:
+  `meridian probe`) shows a server the way a censor's scanner would.
+  `preflight`, `rage`, `node check`, and `relay check` are gone: each now stops
+  with a one-line pointer to the new command (exit 2, or a JSON error envelope
+  with `--json`).
+- **`meridian logs SERVER`** — shows a server's recent logs without logging in:
+  the node, panel, and nginx on control, exit, and gateway servers, and the
+  Realm units on relays. `--grep TEXT` keeps matching lines, `--lines N` sets
+  how many, and `--component` picks node, panel, nginx, or relay. Every line is
+  redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
+  path), so the output is safe to share; `doctor` now masks that path too.
+- **`cluster.yml` stops growing with every apply** — each apply kept a full copy
+  of every resource binding, so a small fleet's file passed 300 KB after a few
+  dozen changes. Older copies of the same remote resource are now dropped when a
+  change commits; the next apply shrinks existing files.
+- **`client show` keeps the connection-page link** — `client add` and `deploy`
+  printed each client's page link but never recorded that the page was
+  published, so `client show` and `--json` later offered only the
+  subscription URL.
+- **`meridian plan` no longer calls pending changes unavailable** — after any
+  topology edit (even one new client) it listed clients, hosts, and squads as
+  "observation failed" and exited 3, because their dependencies only get
+  their new identities during apply. It now shows them as `recheck … after`
+  those dependencies and exits 2, as for any pending change.
+- **`meridian doctor` reads the node again** — its node log section said
+  "container not running" and its Xray process check failed on every exit
+  (the node's logs aren't plain text and its image has no `pgrep`), so every
+  report came out partial with exit 3.
+- **"What is blocked?"** — `meridian test --probe` now tells a blocked server
+  IP from a blocked camouflage SNI by comparing the server with and without the
+  SNI against the real camouflage site, and inconclusive stays inconclusive.
+  It also catches throttling: a ~50 KB download from the control server (and
+  through the CDN when WSS uses one) that freezes after about 16–24 KB is
+  flagged with a suggestion to change the IP. `meridian check` runs the
+  download check too when it's run from another machine.
+- **`meridian test` says how each path fails** — every delivered path reports
+  its time to first byte, and a failed one is reported as "connects, but no
+  traffic passes" or "unreachable". `--json` adds `data.transports`.
+- **Name the server first, like ssh** — every server command takes one target:
+  an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
+  default to the saved values (else `root` and `22`) everywhere, including
+  `deploy`, `node add`, `relay add`, and `server add`. The old `--server NAME`
+  option stops with a pointer to the positional target.
+- **`relay deploy` is now `relay add`**, matching `node add`, `client add`, and
+  `server add`. The old name stops with a pointer to the new one.
+- **Run Meridian on the server itself** — after `meridian deploy local` (or on
+  any saved server whose IP is on this machine), later commands such as
+  `client add`, `doctor`, and `node add` run locally with sudo instead of
+  SSHing back into the same machine. The same fleet copied to a laptop keeps
+  using SSH.
+- **Servers that came with only a password** — when a server refuses your SSH
+  keys but accepts a password, `meridian deploy` and `meridian setup` ask
+  whether to create a key for Meridian and install it. Say yes, type the
+  password once (hidden, never saved), and the deploy continues; the key is
+  saved with the server for later commands. Without a terminal, with `--yes`,
+  or with `--json`, they stop with the `ssh-copy-id` command instead.
+
+- **Per-domain routes on an exit** — `meridian route add EXIT --via
+  warp|direct|block VALUES...` sends chosen domains, `geosite:` lists, or
+  `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
+  exit's default egress (for example, AI services that block datacenter IPs).
+  `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **Relays look like nothing in particular** — nothing a hosting provider can
+  list on a relay (service, binary, config path, firewall comment) names
+  Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.
+- **`meridian check` measures each relay leg** — every hop downloads the exit's
+  camouflage page through the next hop with the clients' SNI and reports
+  connect time, first byte, and bytes received; a freeze in the 8–32 KB
+  throttling window suggests moving the relay to another provider.
+- **`meridian test` tests the whole fleet** — with no target and several saved
+  servers it tests every exit and relay entry in turn instead of asking which
+  one, and exits with the worst result.
+- `meridian test` names each path like its subscription entry ("Reality ·
+  Chrome", "XHTTP · Firefox", "Hysteria2 · UDP") instead of calling every
+  VLESS path "VLESS".
+- With several exits, subscriptions list the first server's entries ahead of
+  later ones within each method instead of sorting them by exit name.
+
+### Sharing
+- **Connection names show where traffic exits** — entries lead with the exit's
+  flag and country ("🇩🇪 DE · Reality · Chrome"), and the panel shows the same
+  flag on the node. Deploy, `node add`, and the setup wizard look the country up
+  once from the address's Regional Internet Registry; set `--country` when it is
+  wrong (anycast or leased ranges).
+- **A redesigned connection page** — two clear steps (install an app, add the
+  connection with one tap), the subscription QR beside them on a computer for
+  setting up a phone, and everything else folded into quiet panels: every
+  individual connection with Open, Copy, and QR, "Not connecting?" tips with
+  the self-check, and the router guide. Russian pages no longer rename the
+  first connection "Основной", and `meridian dev preview` shows a realistic
+  page. Without a `--server-name`, the header names the exit countries
+  ("🇩🇪 Germany · 🇳🇱 Netherlands") in the page's language.
+- **A WebRTC leak tip on the connection page** — "Not connecting?" now says that
+  an app running as a proxy only can let websites in a browser see the real IP
+  address, and to turn on the app's VPN (TUN) mode. Shown in English, Russian,
+  Persian, and Chinese, with no external links.
+- Connection pages are built from each user's real subscription, so relays and
+  every enabled protocol appear.
+- Subscription links live under the connection-page path and never reveal the
+  admin panel's address.
+- **Apps refresh subscriptions every 6 hours** — every subscription sends
+  `profile-update-interval`, so Happ, Clash Verge, and other apps that read it
+  pick up new exits and relays within hours. Meridian keeps the header set in
+  the panel; other response headers you add stay yours.
+- `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
+  the user and their page; links stop working immediately.
+- **Connection pages recommend apps per platform** — Happ first, then
+  FlClashX and Clash Mi (plus Throne on desktop), with a link to the router
+  guide and a note on subscription refresh and app updates. v2rayNG and
+  Streisand import links are fixed, Throne import is added, and the broken
+  v2rayN button is gone. App icons now ship once in a shared cached file, so
+  each page loads about 70 KB less.
+- **"Check my connection"** — the page tests the device clock, whether data
+  keeps flowing (the throttling freeze), and the subscription from the
+  visitor's own network, then copies a report without links or secrets that
+  they can send you.
+- **Every deploy offers every method** — without a domain, XHTTP
+  and Hysteria2 now run on the server's IP address (Let's Encrypt certifies
+  IPs), next to Reality, so a block on one method leaves the others. A domain
+  carries XHTTP and adds WebSocket through the Cloudflare CDN. Hysteria2 is on
+  by default (`--no-hysteria2` turns it off), and the wizard only asks for an
+  optional domain instead of a list of backup methods.
+- **Hysteria2 is disguised** — its UDP traffic is wrapped in salamander
+  obfuscation, so censors see random packets instead of QUIC with a readable
+  server name. Every subscription format carries the setting automatically.
+- **Entries have readable names** — apps show "Reality · Chrome", "XHTTP ·
+  Firefox", "WebSocket · CDN", or "Hysteria2 · UDP" (plus the exit's name when
+  you have several, and "via relay" for relay entries) instead of internal IDs.
+- **Every direct TLS method comes in two fingerprints** — Reality and XHTTP
+  are offered with both a Chrome and a Firefox TLS fingerprint, so if
+  censors block one fingerprint, the other entry keeps working. Automatic
+  switching never mixes the two: Russian filtering reportedly stretches a
+  2-minute freeze to 10 minutes when a new fingerprint arrives during it.
+  Xray JSON apps get a separate "Automatic · Firefox" entry, Mihomo apps can
+  pick the copies by hand, and sing-box apps (which can't keep them out of
+  automatic switching) don't get them.
+- **Russian sites work with the VPN on** — Xray JSON and Mihomo subscriptions
+  send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
+  traffic directly and refuse foreign QUIC, while the exit's block stays as a
+  safety net. Plain Base64 imports still need the app's own routing settings.
+- **sing-box apps get a Meridian profile** — sing-box-based apps (SFA, SFI,
+  Karing) pick the fastest working entry automatically, can still choose one
+  by hand, and send local-network and `.ru`/`.su`/`.рф` sites directly. Nothing
+  is downloaded at startup, so the app starts even when GitHub is blocked.
+  sing-box has no XHTTP, so those entries are left out.
+
+### Docs and agents
+- **An agent guide** — `meridian help agents` prints a Markdown guide that
+  explains how Meridian works and how to drive it safely: non-interactive
+  flags, JSON envelopes, plan before apply, exit codes, and which outputs are
+  secrets. `meridian help COMMAND` shows any command's help, git-style.
+- **Docs for people and agents** — getmeridian.org's docs have search, a
+  per-page table of contents, and proper right-to-left Persian. Every page is
+  also served as Markdown (add `.md` to its address), with Copy page and Open
+  in ChatGPT or Claude buttons, and `/llms.txt` indexes it all. Old `/docs/...`
+  links redirect.
+
+### Security and correctness
+- **Starts with current Typer** — Typer 0.26 stopped installing Click, and a
+  fresh install of an earlier beta failed at launch with `No module named
+  'click'`. Meridian now needs Typer 0.26 or later and uses the Click it ships.
+- **The installer can be verified** — every release attaches `install.sh` and
+  its `SHA256SUMS`, the installation guide shows how to check them, and the
+  script pins uv's installer by version and SHA-256 instead of piping the
+  latest one into a shell. `MERIDIAN_VERSION=4.0.0` installs one exact release.
+- **Exits and the control server look like ordinary hosts** — containers and
+  directories no longer name the proxy software: `docker ps` shows `ctlsvc-api`,
+  `ctlsvc-db`, `ctlsvc-cache`, `ctlsvc-web`, and `netagent`, in `/opt/ctlsvc`
+  and `/opt/netagent`, like relays' `netfwd`. Servers deployed with a 4.0 beta
+  move over on the next `meridian apply`: the panel directory, with its database
+  and secrets, is renamed in place, so users, client links, and API tokens stay.
+  `meridian check` and `meridian doctor` name the role behind each container,
+  and `meridian teardown` removes both the old and the new names.
+- **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
+  default cut long uploads off on 3.x when a client chose a streaming XHTTP
+  mode. 4.0 serves packet-up only and now also lifts the limit.
+- **Removing or moving an exit cleans up its certificate** — the acme.sh
+  renewal, the certificate files, and (with the server's last certificate)
+  the port-80 challenge listener go, instead of renewing forever.
+- **A relay with its own camouflage site really imitates it** — `relay add
+  --sni` gave clients the new name while the exit answered probes with its own
+  site's certificate (a `www.google.com` certificate for `yandex.ru`), which
+  gives the relay away. Each relay name now gets its own Reality listener on
+  the exit, and anything else sent through the relay reaches that site.
+- **Debian 12 deploys finish** — fail2ban there found no SSH log file and
+  stopped right after starting, which failed server preparation; it now reads
+  the system journal on every supported release, and a package Debian only
+  remembers is no longer mistaken for an installed one.
+- **Re-running a command resumes it** — `relay add` for a relay that is already
+  declared finishes it instead of failing on a duplicate listener, and a bare
+  `meridian test` after removing servers tests what is left instead of asking
+  which saved server to use.
+- **Page branding is checked before anything changes** — an unknown `--color`
+  or an `--icon` that is neither an emoji nor a reachable image stops deploy
+  with the valid choices; a redeploy that names only some branding flags keeps
+  the rest. `client disable --json` no longer claims the next apply re-enables
+  the client.
+- No request logging on Meridian's web server; panel secrets are never rotated
+  on restart; the live SSH port is never firewalled; teardown removes everything
+  Meridian created and nothing it didn't: fail2ban stays on, and nginx keeps
+  running when it serves your own sites, as do your own HAProxy/Caddy.
+- Deploy checks the loopback ports its nginx serves the panel on (8443 and
+  8444) before changing anything, and names the process holding one, instead
+  of failing halfway through on `nginx -t`.
+- An out-of-date copy of `cluster.yml` can't undo newer changes. The
+  control server records the last change applied, and `apply` refuses to run
+  from an older copy or while another machine is applying.
+- Mihomo-based apps (FlClash, Clash Verge, ClashMi) and sing-box routers
+  connect again. By default the Remnawave node's Xray rejects clients that
+  announce a version below 26.3.27, and those apps announce 1.8.x, so their
+  Reality connections failed with "authentication failed". Exits now accept any
+  client that speaks Reality.
+- Setup no longer opens an untagged `443/udp` firewall rule, and the next apply
+  removes the one earlier v4 builds left. Removing or moving a node also deletes
+  the `remnawave/node` image and its node API firewall rule; Docker itself stays
+  installed.
+- Panel and connection-page links typed or copied without the trailing slash
+  now open; they used to redirect to an internal port and fail.
+- Subscriptions list Reality first, then XHTTP, WSS, and Hysteria2 last. Apps
+  use the first entry by default, and Hysteria2 (UDP, often blocked) used to
+  lead. sing-box and Stash no longer show a duplicate "automatic fallback"
+  server.
+- XHTTP links work. Apps sending the default `chrome` fingerprint speak
+  HTTP/2, and the server answered in HTTP/1.1, so no traffic passed.
+- A fresh deploy with Hysteria2 converges. The node started before its
+  certificate existed, so Xray refused to run and the deploy stopped.
+- Stock Debian 13 servers deploy and join as exits. The baseline treated a
+  missing `ufw` as an unreadable check, waited for a `dnsutils` package Debian
+  no longer ships, and WARP needed `lsb_release`.
+- Servers without apt (CentOS, Fedora, Alpine) are refused by name before
+  anything changes, instead of failing halfway at "apt-get: command not found";
+  `meridian check` reports them as a failure rather than a warning.
+- Reality keys come from the panel instead of a Docker container or an
+  unverified Xray download on the exit, so a fresh exit without `unzip` or
+  Docker no longer fails at its Proxy profile.
+- Adding or removing an exit renames existing subscription entries instead of
+  leaving the old ones behind. Before, every entry appeared twice, and a stale
+  Firefox copy slipped into the automatic failover group.
+- `meridian check` and `meridian test` are fail-closed: skipped evidence is never
+  reported as a pass.
+- Mihomo and sing-box subscriptions are tested with the real engines, not only
+  parsed: every change runs `mihomo -t` (Mihomo 1.19.32) and `sing-box check`
+  (sing-box 1.14.3) on what a real panel delivers. The client-management docs
+  list the tested apps and engine versions.
+- Downloaded binaries (Xray, Realm, RealiTLScanner) are checksum-verified, and
+  every container image is pinned to its tested multi-arch digest (amd64 and
+  arm64), so a re-pushed tag cannot change what a fresh server runs.
+- `meridian update` stays on the current major version; `--major` moves to the
+  next one after you have read its release notes.
+
+### Remnawave versions
+Fresh deploys install the versions below. Meridian requires at least backend
+3.4.0 and never downgrades a Remnawave you upgraded yourself; it warns when the
+running version is newer than the tested one. `meridian fleet upgrade` moves
+the backend, node, and subscription page to their newest digest-pinned
+release in the same major without a Meridian update (`--tested` keeps the
+versions below), and the choice is saved for later applies.
+
+| Component | Version |
+|---|---|
+| `remnawave/backend` | `3.4.5` (minimum `3.4.0`) |
+| `remnawave/node` | `3.4.2` |
+| `remnawave/subscription-page` | `8.0.0` |
+| `postgres` (panel database) | `17.11-alpine` |
+| `valkey/valkey` (panel cache) | `9.1.2-alpine` |
+| Xray-core (test client) | `26.7.28` |
+| Realm (relay forwarder) | `2.9.3` |
+| RealiTLScanner (`meridian scan`) | `0.2.3` |
+
+### Not yet available
+- `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
+  A running deploy can be cancelled; it stops after its current step and resumes on the next run.
+
+### Removed
+- 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.
+- `meridian fleet recover`, `apply --parallel`/`--prune-extras`, and the
+  `desired_*` lists in `cluster.yml`.
+
 ## [3.17.3] - 2026-10-12
 
 ### Changed
@@ -45,7 +412,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 - **Manual 3x-ui inbounds no longer crash client commands** — `list_inbounds()` handles empty or malformed JSON from manually-created panel inbounds (#16)
 - **DebianBanner no longer blocks deploy on some OpenSSH builds** — verification is skipped when `sshd -T` doesn't recognize the directive (#20)
 - **BBR no longer blocks deploy on containers** — `sysctl` failures due to missing kernel tunables (containers, old kernels) return a warning instead of failing the entire deploy. Other sysctl errors still fail
-- **SSH drop-in priority** — `99-meridian.conf` ensures Meridian's sshd hardening takes precedence over cloud-init overrides (loads last, wins)
+- **SSH drop-in priority** — `00-meridian.conf` ensures Meridian's sshd hardening takes precedence over cloud-init overrides
 - **SCP directory copy** — fixed `-r` flag compatibility with OpenSSH ≥ 9.0 (SFTP protocol default)
 
 ## [3.16.1] - 2026-04-10

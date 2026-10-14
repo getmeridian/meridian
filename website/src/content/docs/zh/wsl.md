@@ -115,7 +115,7 @@ meridian deploy
 meridian deploy 198.51.100.10
 ```
 
-Meridian 会把凭据保存在 WSL 内的 `~/.meridian/`。后续命令也从同一个 WSL 发行版运行，这样它才能找到缓存的服务器凭据：
+Meridian 会把凭据保存在 WSL 内的 `~/.config/meridian/`。后续命令也从同一个 WSL 发行版运行，这样它才能找到缓存的服务器凭据：
 
 ```bash
 meridian client add alice
@@ -143,10 +143,10 @@ code .
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-也可以先运行 preflight 检查：
+也可以先检查服务器：
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### SSH 提示 Permission denied
@@ -195,10 +195,10 @@ cd ~
 mkdir -p projects
 ```
 
-避免把 `~/.ssh` 或 `~/.meridian` 放在 `/mnt/c/` 下。Windows 挂载路径可能有不同的权限，SSH 会拒绝它们。
+避免把 `~/.ssh` 或 `~/.config/meridian` 放在 `/mnt/c/` 下。Windows 挂载路径可能有不同的权限，SSH 会拒绝它们。
 
 ## 后续步骤
 
-- [快速开始](/docs/zh/getting-started/) — 部署您的第一台服务器
-- [安装](/docs/zh/installation/) — CLI 安装选项
-- [故障排除](/docs/zh/troubleshooting/) — 常见部署和连接问题
+- [快速开始](/zh/getting-started/) — 部署您的第一台服务器
+- [安装](/zh/installation/) — CLI 安装选项
+- [故障排除](/zh/troubleshooting/) — 常见部署和连接问题

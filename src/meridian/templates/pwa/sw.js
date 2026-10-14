@@ -3,6 +3,7 @@ var CACHE_VERSION = 'pwa-v1';
 var SHELL_ASSETS = [
   '../pwa/styles.css',
   '../pwa/app.js',
+  '../pwa/selfcheck.js',
   '../pwa/icon.svg',
 ];
 
@@ -29,10 +30,16 @@ self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
   var path = url.pathname;
 
+  /* Straight to the network: the self-check must measure the live path, the
+     subscription must never be cached, and the Cache API stores GETs only */
+  if (event.request.method !== 'GET' ||
+      path.indexOf('/sub/') !== -1 ||
+      path.endsWith('/probe.bin')) {
+    return;
+  }
+
   /* Network-first for dynamic per-client data */
-  if (path.endsWith('/config.json') ||
-      path.endsWith('/sub.txt') ||
-      path.indexOf('/stats/') !== -1) {
+  if (path.endsWith('/config.json')) {
     event.respondWith(networkFirst(event.request));
     return;
   }

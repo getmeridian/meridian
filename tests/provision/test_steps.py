@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from meridian.core.output import OperationContext
 from meridian.provision.steps import ProvisionContext, Provisioner, StepResult
-
-from .conftest import MockConnection
-
-# ---------------------------------------------------------------------------
-# Mock step helpers
-# ---------------------------------------------------------------------------
+from tests.support.mock_connection import MockConnection
+from tests.support.reporters import CaptureReporter
 
 
 @dataclass
@@ -25,11 +22,6 @@ class MockStep:
     def run(self, conn, ctx) -> StepResult:
         self.ran = True
         return StepResult(name=self.name, status=self.status, detail=self.detail)
-
-
-# ---------------------------------------------------------------------------
-# ProvisionContext tests
-# ---------------------------------------------------------------------------
 
 
 class TestProvisionContextDomainMode:
@@ -56,27 +48,25 @@ class TestProvisionContextNeedsWebServer:
         assert ctx.needs_web_server is False
 
 
-class TestProvisionContextDictAccess:
-    def test_dict_access(self):
+class TestProvisionContextInterStepState:
+    def test_path_fields_are_typed(self):
         ctx = ProvisionContext(ip="198.51.100.1")
-        ctx["key"] = "val"
-        assert ctx["key"] == "val"
-        assert "key" in ctx
+        ctx.web_base_path = "panel"
+        ctx.info_page_path = "connect"
 
-    def test_dict_get_default(self):
+        assert ctx.web_base_path == "panel"
+        assert ctx.info_page_path == "connect"
+
+    def test_object_fields_default_to_none(self):
         ctx = ProvisionContext(ip="198.51.100.1")
-        assert ctx.get("missing", "default") == "default"
+        assert ctx.panel_api is None
+        assert ctx.cluster is None
 
 
 class TestProvisionContextDefaults:
     def test_harden_defaults_true(self):
-        ctx = ProvisionContext(ip="1.2.3.4")
+        ctx = ProvisionContext(ip="198.51.100.10")
         assert ctx.harden is True
-
-
-# ---------------------------------------------------------------------------
-# Provisioner tests
-# ---------------------------------------------------------------------------
 
 
 class TestProvisioner:
@@ -134,3 +124,43 @@ class TestProvisioner:
         results = provisioner.run(conn, ctx)
 
         assert results[0].duration_ms >= 0
+
+    def test_provisioner_emits_step_events_without_rich_rendering(self):
+        steps = [MockStep(name="A", status="changed"), MockStep(name="B", status="skipped")]
+
+        conn = MockConnection()
+        ctx = ProvisionContext(ip="198.51.100.1")
+        reporter = CaptureReporter()
+        operation = OperationContext(operation_id="op-provision", started_at="2026-05-04T21:00:00Z")
+        provisioner = Provisioner(steps=steps)
+
+        provisioner.run(conn, ctx, reporter=reporter, operation=operation)
+
+        assert [event.type for event in reporter.events] == [
+            "provision.step.started",
+            "provision.step.completed",
+            "provision.step.started",
+            "provision.step.completed",
+        ]
+        assert {event.operation_id for event in reporter.events} == {"op-provision"}
+        assert reporter.events[1].data["status"] == "changed"
+        assert reporter.events[3].data["status"] == "skipped"
+
+    def test_provisioner_emits_failed_step_event(self):
+        steps = [MockStep(name="A", status="failed", detail="nope"), MockStep(name="B", status="ok")]
+
+        conn = MockConnection()
+        ctx = ProvisionContext(ip="198.51.100.1")
+        reporter = CaptureReporter()
+        operation = OperationContext(operation_id="op-provision", started_at="2026-05-04T21:00:00Z")
+        provisioner = Provisioner(steps=steps)
+
+        provisioner.run(conn, ctx, reporter=reporter, operation=operation)
+
+        assert [event.type for event in reporter.events] == [
+            "provision.step.started",
+            "provision.step.failed",
+        ]
+        assert reporter.events[-1].level == "error"
+        assert reporter.events[-1].data["status"] == "failed"
+        assert reporter.events[-1].data["detail"] == "nope"

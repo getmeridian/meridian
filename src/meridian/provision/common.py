@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import shlex
 
+from meridian.facts import ServerFacts
+from meridian.provision.ensure import ensure_file_content, ensure_packages, ensure_service_running, ensure_ufw_rule
 from meridian.provision.steps import ProvisionContext, StepContext, StepResult
 from meridian.ssh import ServerConnection
 
@@ -11,6 +13,13 @@ from meridian.ssh import ServerConnection
 MIN_DISK_SPACE_MB = 2048
 
 # Packages required by the deployment stack
+# Debian 12 logs only to the journal (no auth.log) while its fail2ban reads log files by
+# default, so the sshd jail found nothing and fail2ban exited; the journal backend works on
+# every supported release and needs the python3-systemd binding.
+FAIL2BAN_PACKAGES = ["fail2ban", "python3-systemd"]
+FAIL2BAN_JAIL_PATH = "/etc/fail2ban/jail.d/sshd-journal.local"
+FAIL2BAN_JAIL_CONF = "[sshd]\nenabled = true\nbackend = systemd\n"
+
 REQUIRED_PACKAGES = [
     "curl",
     "cron",
@@ -25,11 +34,12 @@ REQUIRED_PACKAGES = [
     "python3-pip",
     "unattended-upgrades",
     "apt-listchanges",
-    "dnsutils",
+    # Debian 13 keeps "dnsutils" only as a virtual name, which dpkg-query never reports installed.
+    "bind9-dnsutils",
 ]
 
 # Auto-upgrades config content
-_AUTO_UPGRADES_CONF = """\
+AUTO_UPGRADES_CONF = """\
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 APT::Periodic::AutocleanInterval "7";
@@ -41,8 +51,9 @@ _BBR_SETTINGS = {
     "net.ipv4.tcp_congestion_control": "bbr",
 }
 
-_SSH_HARDENING_DROPIN_PATH = "/etc/ssh/sshd_config.d/00-meridian.conf"
-_SSH_HARDENING_DROPIN_OLD_PATH = "/etc/ssh/sshd_config.d/99-meridian.conf"
+_SSH_HARDENING_DROPIN_PATH = "/etc/ssh/sshd_config.d/00-hardening.conf"
+# Earlier releases named the drop-in after the project; a neutral name keeps hosts unremarkable.
+_SSH_HARDENING_DROPIN_OLD_PATHS = ("/etc/ssh/sshd_config.d/99-meridian.conf", "/etc/ssh/sshd_config.d/00-meridian.conf")
 _SSH_HARDENING_DROPIN = """\
 PasswordAuthentication no
 KbdInteractiveAuthentication no
@@ -51,45 +62,18 @@ DebianBanner no
 """
 
 
-def _parse_ssh_ports(output: str) -> list[int]:
-    """Parse one or more SSH ports from command output."""
-    ports: list[int] = []
-    seen: set[int] = set()
-
-    for line in output.splitlines():
-        for token in line.replace(",", " ").split():
-            if not token.isdigit():
-                continue
-            port = int(token)
-            if not (1 <= port <= 65535) or port in seen:
-                continue
-            seen.add(port)
-            ports.append(port)
-            break
-
-    return ports
-
-
 def detect_ssh_ports(conn: ServerConnection) -> list[int]:
-    """Detect effective sshd listen ports, falling back to 22."""
-    commands = [
-        r"""sshd -T 2>/dev/null | awk '$1 == "port" {print $2}'""",
-        (
-            r"""grep -hEi '^[[:space:]]*Port[[:space:]]+[0-9]+' """
-            r"""/etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null """
-            r"""| awk '{print $2}'"""
-        ),
-    ]
+    """Detect effective sshd listen ports plus the port this session arrived on.
 
-    for command in commands:
-        result = conn.run(command, timeout=15)
-        if result.returncode != 0:
-            continue
-        ports = _parse_ssh_ports(result.stdout)
-        if ports:
-            return ports
-
-    return [22]
+    ``sshd -T`` misses socket-activated overrides (``ssh.socket``) and
+    ``ListenAddress host:port`` forms; the live session port is the one port
+    we know works, so it must never be firewalled before ``ufw enable``.
+    """
+    ports = set(ServerFacts(conn).ssh_ports())
+    connected = getattr(conn, "port", None)
+    if not getattr(conn, "local_mode", False) and isinstance(connected, int) and 0 < connected < 65536:
+        ports.add(connected)
+    return sorted(ports)
 
 
 class CheckDiskSpace:
@@ -98,14 +82,9 @@ class CheckDiskSpace:
     name = "Check disk space"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        result = conn.run("df -BM --output=avail / | tail -1", timeout=15)
-        if result.returncode != 0:
+        avail_mb = ServerFacts(conn).free_disk_mb("/")
+        if avail_mb is None:
             return StepResult(name=self.name, status="skipped", detail="could not check disk space")
-
-        try:
-            avail_mb = int(result.stdout.strip().rstrip("M"))
-        except (ValueError, AttributeError):
-            return StepResult(name=self.name, status="skipped", detail="could not parse df output")
 
         if avail_mb < MIN_DISK_SPACE_MB:
             return StepResult(
@@ -126,19 +105,9 @@ class InstallPackages:
         self._packages = packages or REQUIRED_PACKAGES
 
     def run(self, conn: ServerConnection, ctx: StepContext) -> StepResult:
-        # Check which packages are already installed
-        check_cmd = "dpkg-query -W -f='${Package}\\n' " + " ".join(self._packages) + " 2>/dev/null"
-        result = conn.run(check_cmd, timeout=15)
-        installed = set(result.stdout.strip().splitlines()) if result.returncode == 0 else set()
-
-        missing = [p for p in self._packages if p not in installed]
-        if not missing:
-            return StepResult(name=self.name, status="ok", detail="all packages present")
-
-        # Update apt cache first
-        update = conn.run("DEBIAN_FRONTEND=noninteractive apt-get update -qq", timeout=180)
-        if update.returncode != 0:
-            stderr = update.stderr.strip()
+        result = ensure_packages(conn, self._packages)
+        if not result.ok:
+            stderr = result.detail
             if "no longer has a Release file" in stderr:
                 return StepResult(
                     name=self.name,
@@ -151,27 +120,10 @@ class InstallPackages:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"apt-get update failed: {stderr[:200]}",
+                detail=f"apt failed: {stderr[:200]}",
             )
 
-        # Install missing packages
-        pkg_list = " ".join(missing)
-        install = conn.run(
-            f"DEBIAN_FRONTEND=noninteractive apt-get install -y -qq {pkg_list}",
-            timeout=300,
-        )
-        if install.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"apt-get install failed: {install.stderr.strip()[:200]}",
-            )
-
-        return StepResult(
-            name=self.name,
-            status="changed",
-            detail=f"installed {len(missing)} packages",
-        )
+        return StepResult(name=self.name, status="changed" if result.changed else "ok", detail=result.detail)
 
 
 class EnableAutoUpgrades:
@@ -180,26 +132,15 @@ class EnableAutoUpgrades:
     name = "Enable automatic security updates"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        conf_path = "/etc/apt/apt.conf.d/20auto-upgrades"
-
-        # Check if config already matches
-        check = conn.run(f"cat {conf_path} 2>/dev/null", timeout=15)
-        if check.returncode == 0 and check.stdout.strip() == _AUTO_UPGRADES_CONF.strip():
-            return StepResult(name=self.name, status="ok", detail="already configured")
-
-        # Write the config
-        # Use heredoc to avoid shell quoting issues
-        write_cmd = f"cat > {conf_path} << 'MERIDIAN_EOF'\n{_AUTO_UPGRADES_CONF}MERIDIAN_EOF"
-        result = conn.run(write_cmd, timeout=15)
-        if result.returncode != 0:
+        result = ensure_file_content(conn, "/etc/apt/apt.conf.d/20auto-upgrades", AUTO_UPGRADES_CONF, mode="644")
+        if not result.ok:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"failed to write config: {result.stderr.strip()[:200]}",
+                detail=f"failed to write config: {result.detail}",
             )
-        conn.run(f"chmod 644 {conf_path}", timeout=15)
 
-        return StepResult(name=self.name, status="changed")
+        return StepResult(name=self.name, status="changed" if result.changed else "ok", detail=result.detail)
 
 
 class SetTimezone:
@@ -234,25 +175,28 @@ class HardenSSH:
     name = "Harden SSH configuration"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        commands: list = []
         changed = False
-        check = conn.run(f"cat {_SSH_HARDENING_DROPIN_PATH} 2>/dev/null", timeout=15)
-        if check.returncode != 0 or check.stdout.strip() != _SSH_HARDENING_DROPIN.strip():
-            write_cmd = (
-                "mkdir -p /etc/ssh/sshd_config.d && "
-                f"cat > {_SSH_HARDENING_DROPIN_PATH} << 'MERIDIAN_EOF'\n{_SSH_HARDENING_DROPIN}MERIDIAN_EOF"
+        ensure = ensure_file_content(
+            conn,
+            _SSH_HARDENING_DROPIN_PATH,
+            _SSH_HARDENING_DROPIN,
+            mode="644",
+            create_parent=True,
+        )
+        if not ensure.ok:
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=f"failed to write sshd hardening drop-in: {ensure.detail}",
+                commands=commands,
             )
-            result = conn.run(write_cmd, timeout=15)
-            if result.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to write sshd hardening drop-in: {result.stderr.strip()[:200]}",
-                )
-            conn.run(f"chmod 644 {_SSH_HARDENING_DROPIN_PATH}", timeout=15)
-            conn.run(f"rm -f {_SSH_HARDENING_DROPIN_OLD_PATH}", timeout=15)
+        if ensure.changed:
+            rm_result = conn.run(f"rm -f {' '.join(_SSH_HARDENING_DROPIN_OLD_PATHS)}", timeout=15)
+            commands.append(rm_result)
             # Neutralize conflicting settings in other drop-ins (e.g., cloud-init)
             # so our values are authoritative regardless of load order.
-            conn.run(
+            neutralize = conn.run(
                 "for f in /etc/ssh/sshd_config.d/*.conf; do "
                 f'[ "$f" = "{_SSH_HARDENING_DROPIN_PATH}" ] && continue; '
                 "sed -i -E "
@@ -263,15 +207,18 @@ class HardenSSH:
                 '"$f" 2>/dev/null; done',
                 timeout=15,
             )
+            commands.append(neutralize)
             changed = True
 
         # Validate config before restarting
         validate = conn.run("sshd -t", timeout=15)
+        commands.append(validate)
         if validate.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"sshd config validation failed: {validate.stderr.strip()[:200]}",
+                commands=commands,
             )
 
         # Validate effective settings too — cloud-init drop-ins can override the main file.
@@ -283,39 +230,46 @@ class HardenSSH:
 
         for setting in _required:
             effective = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
+            commands.append(effective)
             if effective.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail=f"effective sshd setting mismatch: expected '{setting}'",
+                    commands=commands,
                 )
 
         for setting in _optional:
             effective = conn.run(f"sshd -T | grep -qi '^{setting.split()[0]}'", timeout=15)
+            commands.append(effective)
             if effective.returncode != 0:
                 # sshd doesn't recognize this directive — skip verification
                 continue
             check = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
+            commands.append(check)
             if check.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail=f"effective sshd setting mismatch: expected '{setting}'",
+                    commands=commands,
                 )
 
         if not changed:
-            return StepResult(name=self.name, status="ok", detail="already hardened")
+            return StepResult(name=self.name, status="ok", detail="already hardened", commands=commands)
 
         # Restart sshd (service is named "sshd" on some distros, "ssh" on others)
         restart = conn.run("systemctl restart sshd 2>/dev/null || systemctl restart ssh", timeout=15)
+        commands.append(restart)
         if restart.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
                 detail=f"sshd restart failed: {restart.stderr.strip()[:200]}",
+                commands=commands,
             )
 
-        return StepResult(name=self.name, status="changed")
+        return StepResult(name=self.name, status="changed", commands=commands)
 
 
 class ConfigureFail2ban:
@@ -327,27 +281,38 @@ class ConfigureFail2ban:
     name = "Configure fail2ban"
 
     def run(self, conn: ServerConnection, ctx: StepContext) -> StepResult:
+        jail = ensure_file_content(conn, FAIL2BAN_JAIL_PATH, FAIL2BAN_JAIL_CONF, mode="644")
+        if not jail.ok:
+            return StepResult(name=self.name, status="failed", detail=f"failed to write the sshd jail: {jail.detail}")
         active = conn.run("systemctl is-active fail2ban", timeout=15)
-        if active.returncode == 0 and active.stdout.strip() == "active":
+        if not jail.changed and active.returncode == 0 and active.stdout.strip() == "active":
             return StepResult(name=self.name, status="ok", detail="already running")
 
-        # Enable and start service
-        enable = conn.run("systemctl enable fail2ban", timeout=15)
-        if enable.returncode != 0:
+        result = ensure_service_running(conn, "fail2ban", restart=True)
+        if not result.ok:
+            operation = getattr(result.result, "operation_name", "") if result.result else ""
+            failed_enable = "enable" in operation or "enable" in result.detail.lower()
+            prefix = "failed to enable fail2ban" if failed_enable else "failed to start fail2ban"
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"failed to enable fail2ban: {enable.stderr.strip()[:200]}",
+                detail=f"{prefix}: {result.detail}",
             )
-        start = conn.run("systemctl restart fail2ban", timeout=30)
-        if start.returncode != 0:
+        # fail2ban reports a successful start, then exits once it fails to load a jail.
+        settled = conn.run("sleep 2; systemctl is-active fail2ban", timeout=20)
+        if settled.returncode != 0 or settled.stdout.strip() != "active":
+            log = conn.run("journalctl -u fail2ban -n 5 --no-pager -o cat", timeout=15)
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"failed to start fail2ban: {start.stderr.strip()[:200]}",
+                detail=f"fail2ban stopped right after starting: {log.stdout.strip()[-300:]}",
             )
 
-        return StepResult(name=self.name, status="changed", detail="enabled and started")
+        return StepResult(
+            name=self.name,
+            status="changed",
+            detail=result.detail or "restarted",
+        )
 
 
 class ConfigureBBR:
@@ -356,12 +321,10 @@ class ConfigureBBR:
     name = "Enable BBR congestion control"
 
     def run(self, conn: ServerConnection, ctx: StepContext) -> StepResult:
+        facts = ServerFacts(conn)
         # Check if BBR is already enabled
-        check = conn.run("sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null", timeout=15)
-        if check.returncode == 0 and check.stdout.strip() == "bbr":
-            qdisc = conn.run("sysctl -n net.core.default_qdisc 2>/dev/null", timeout=15)
-            if qdisc.returncode == 0 and qdisc.stdout.strip() == "fq":
-                return StepResult(name=self.name, status="ok", detail="already enabled")
+        if facts.sysctl("net.ipv4.tcp_congestion_control") == "bbr" and facts.sysctl("net.core.default_qdisc") == "fq":
+            return StepResult(name=self.name, status="ok", detail="already enabled")
 
         # Apply sysctl settings
         for key, value in _BBR_SETTINGS.items():
@@ -386,41 +349,19 @@ class ConfigureBBR:
             # Remove existing entries and append new ones
             q_key = shlex.quote(key)
             q_value = shlex.quote(value)
-            conn.run(f"sed -i '/^{key}/d' /etc/sysctl.conf", timeout=15)
+            conn.run(f"sed -i '/^{q_key}/d' /etc/sysctl.conf", timeout=15)
             conn.run(f"printf '%s = %s\\n' {q_key} {q_value} >> /etc/sysctl.conf", timeout=15)
 
         return StepResult(name=self.name, status="changed")
 
 
-class EnsurePort443:
-    """Ensure port 443 is allowed if ufw is already active.
-
-    Used when --no-harden skips full firewall configuration. Without this,
-    a pre-existing firewall blocks the deployment silently.
-    """
-
-    name = "Ensure port 443"
-
-    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        check = conn.run("which ufw", timeout=15)
-        if check.returncode != 0:
-            return StepResult(name=self.name, status="ok", detail="ufw not installed")
-
-        ufw_status = conn.run("ufw status", timeout=15)
-        if ufw_status.returncode != 0 or "Status: active" not in ufw_status.stdout:
-            return StepResult(name=self.name, status="ok", detail="ufw not active")
-
-        result = conn.run("ufw allow 443/tcp", timeout=15)
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to allow HTTPS: {result.stderr.strip()[:200]}",
-            )
-
-        if "Skipping" in result.stdout:
-            return StepResult(name=self.name, status="ok", detail="already allowed")
-        return StepResult(name=self.name, status="changed", detail="port 443 added to ufw")
+# Prints and deletes (highest number first) bare `443/udp ALLOW IN Anywhere` rules
+# with no comment; tagged meridian-v4 rules and narrower operator rules stay.
+_DELETE_UNTAGGED_UDP_443 = (
+    "ufw status numbered 2>/dev/null"
+    r" | sed -n 's/^\[ *\([0-9][0-9]*\)\] 443\/udp\( (v6)\)\{0,1\} *ALLOW IN *Anywhere\( (v6)\)\{0,1\} *$/\1/p'"
+    ' | sort -rn | while read -r rule; do ufw --force delete "$rule" >/dev/null && echo "$rule"; done; true'
+)
 
 
 class ConfigureFirewall:
@@ -429,100 +370,97 @@ class ConfigureFirewall:
     name = "Configure firewall"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        # Check if ufw is available
-        check = conn.run("which ufw 2>/dev/null", timeout=15)
-        if check.returncode != 0:
-            # ufw not found — try to install it explicitly
-            conn.run("apt-get update -qq && apt-get install -y -qq ufw", timeout=120)
+        commands: list = []
+        facts = ServerFacts(conn)
+        ufw = facts.ufw_state()
+        ufw_active = ufw.active
+        if not ufw.installed:
+            install = ensure_packages(conn, ["ufw"], timeout=120)
+            if not install.ok:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail="ufw not available — install it manually: apt-get install ufw",
+                    commands=commands,
+                )
             recheck = conn.run("which ufw", timeout=15)
+            commands.append(recheck)
             if recheck.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
                     detail="ufw not available — install it manually: apt-get install ufw",
+                    commands=commands,
                 )
+            status = conn.run("ufw status", timeout=15)
+            commands.append(status)
+            ufw_active = status.returncode == 0 and "Status: active" in status.stdout
 
         changed = False
 
-        # Check if ufw is already active
-        ufw_status = conn.run("ufw status", timeout=15)
-        ufw_active = ufw_status.returncode == 0 and "Status: active" in ufw_status.stdout
-
         # Allow the live sshd port(s) instead of assuming 22.
         for ssh_port in detect_ssh_ports(conn):
-            result = conn.run(f"ufw allow {ssh_port}/tcp", timeout=15)
-            if result.returncode != 0:
+            result = ensure_ufw_rule(conn, f"allow {ssh_port}/tcp")
+            if not result.ok:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"failed to allow SSH port {ssh_port}: {result.stderr.strip()[:200]}",
+                    detail=f"failed to allow SSH port {ssh_port}: {result.detail}",
+                    commands=commands,
                 )
-            if "Skipping" not in result.stdout:
+            if result.changed:
                 changed = True
 
-        # Allow HTTPS (port 443)
-        result = conn.run("ufw allow 443/tcp", timeout=15)
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to allow HTTPS: {result.stderr.strip()[:200]}",
-            )
-        if "Skipping" not in result.stdout:
+        # Earlier 4.0 betas let the control-plane bootstrap open an untagged
+        # 443/udp rule even without Hysteria2; compiled rules always carry a
+        # meridian-v4 comment, so only the untagged one is removed.
+        stale = conn.run(_DELETE_UNTAGGED_UDP_443, timeout=30)
+        commands.append(stale)
+        if stale.returncode == 0 and stale.stdout.strip():
             changed = True
 
-        # Domain mode or hosted page: allow port 80 for ACME challenges
-        if ctx.needs_web_server:
-            result = conn.run("ufw allow 80/tcp", timeout=15)
-            if result.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"failed to allow HTTP: {result.stderr.strip()[:200]}",
-                )
-            if "Skipping" not in result.stdout:
-                changed = True
-        else:
-            # Cleanup stale port 80 rule if switching from domain/hosted mode
-            result = conn.run("ufw delete allow 80/tcp 2>/dev/null", timeout=15)
-            if result.returncode == 0 and "Skipping" not in result.stdout and "Could not" not in result.stdout:
-                changed = True
-
-        # Do not delete arbitrary user-managed rules. Meridian only owns the
-        # standard public ports it opens itself (22/80/443), so cleanup is
-        # limited to the stale port-80 rule above when web serving is disabled.
+        # Do not delete arbitrary user-managed rules; the reviewed plan owns
+        # every public port through tagged rules.
 
         # Set default policies and enable
-        result = conn.run("ufw default deny incoming", timeout=15)
-        if result.returncode != 0:
+        default_incoming = conn.run("ufw default deny incoming", timeout=15)
+        commands.append(default_incoming)
+        if default_incoming.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"ufw default deny incoming failed: {result.stderr.strip()[:200]}",
+                detail=f"ufw default deny incoming failed: {default_incoming.stderr.strip()[:200]}",
+                commands=commands,
             )
-        result = conn.run("ufw default allow outgoing", timeout=15)
-        if result.returncode != 0:
+        default_outgoing = conn.run("ufw default allow outgoing", timeout=15)
+        commands.append(default_outgoing)
+        if default_outgoing.returncode != 0:
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"ufw default allow outgoing failed: {result.stderr.strip()[:200]}",
+                detail=f"ufw default allow outgoing failed: {default_outgoing.stderr.strip()[:200]}",
+                commands=commands,
             )
 
         # Enable ufw (non-interactive) -- only counts as changed if it wasn't active
         if not ufw_active:
-            result = conn.run("echo y | ufw enable", timeout=30)
-            if result.returncode != 0:
+            enable = conn.run("ufw --force enable", timeout=30)
+            commands.append(enable)
+            if enable.returncode != 0:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"ufw enable failed: {result.stderr.strip()[:200]}",
+                    detail=f"ufw enable failed: {enable.stderr.strip()[:200]}",
+                    commands=commands,
                 )
             changed = True
         else:
             # Reload to apply any rule changes
-            conn.run("ufw reload", timeout=30)
+            reload_result = conn.run("ufw reload", timeout=30)
+            commands.append(reload_result)
 
         return StepResult(
             name=self.name,
             status="changed" if changed else "ok",
+            commands=commands,
         )

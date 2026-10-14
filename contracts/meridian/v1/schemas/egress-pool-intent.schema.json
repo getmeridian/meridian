@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "description": "An ordered set of exits used for server-side failover.",
+  "properties": {
+    "exit_refs": {
+      "items": {
+        "maxLength": 48,
+        "minLength": 1,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Exit Refs",
+      "type": "array"
+    },
+    "fail_closed": {
+      "default": true,
+      "title": "Fail Closed",
+      "type": "boolean"
+    },
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "probe_url": {
+      "default": "https://www.apple.com/library/test/success.html",
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Probe Url",
+      "type": "string"
+    },
+    "strategy": {
+      "const": "least_ping",
+      "default": "least_ping",
+      "title": "Strategy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "exit_refs"
+  ],
+  "title": "EgressPoolIntent",
+  "type": "object"
+}

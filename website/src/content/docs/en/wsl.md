@@ -115,7 +115,7 @@ Or provide the server IP directly:
 meridian deploy 198.51.100.10
 ```
 
-Meridian stores credentials under `~/.meridian/` inside WSL. Run follow-up commands from the same WSL distribution so it can find the cached server credentials:
+Meridian stores credentials under `~/.config/meridian/` inside WSL. Run follow-up commands from the same WSL distribution so it can find the cached server credentials:
 
 ```bash
 meridian client add alice
@@ -143,10 +143,10 @@ Some interactive terminal prompts can behave differently under WSL. If the deplo
 meridian deploy 198.51.100.10 --sni www.cloudflare.com
 ```
 
-You can also run a preflight check first:
+You can also check the server first:
 
 ```bash
-meridian preflight 198.51.100.10
+meridian check 198.51.100.10
 ```
 
 ### Permission denied over SSH
@@ -195,10 +195,10 @@ cd ~
 mkdir -p projects
 ```
 
-Avoid storing `~/.ssh` or `~/.meridian` under `/mnt/c/`. Windows-mounted paths can have different permissions, which SSH rejects.
+Avoid storing `~/.ssh` or `~/.config/meridian` under `/mnt/c/`. Windows-mounted paths can have different permissions, which SSH rejects.
 
 ## Next steps
 
-- [Getting Started](/docs/en/getting-started/) — deploy your first server
-- [Installation](/docs/en/installation/) — CLI install options
-- [Troubleshooting](/docs/en/troubleshooting/) — common deployment and connection issues
+- [Getting Started](/en/getting-started/) — deploy your first server
+- [Installation](/en/installation/) — CLI install options
+- [Troubleshooting](/en/troubleshooting/) — common deployment and connection issues

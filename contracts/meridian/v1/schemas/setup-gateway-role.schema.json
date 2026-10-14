@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "description": "One saved server assigned an Xray routing-gateway workload.",
+  "properties": {
+    "bridge_path_ref": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Bridge Path Ref",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "server_ref",
+    "bridge_path_ref"
+  ],
+  "title": "SetupGatewayRole",
+  "type": "object"
+}

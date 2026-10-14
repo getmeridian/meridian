@@ -1,0 +1,510 @@
+{
+  "$defs": {
+    "CompiledPlanDriftResult": {
+      "additionalProperties": false,
+      "description": "One V4 compiler resource that does not match remote state.",
+      "properties": {
+        "error": {
+          "default": "",
+          "title": "Error",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id"
+      ],
+      "title": "CompiledPlanDriftResult",
+      "type": "object"
+    },
+    "CompiledPlanResourceResult": {
+      "additionalProperties": false,
+      "description": "Secret-free identity for one reviewed V4 compiler resource.",
+      "properties": {
+        "dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "desired_hash": {
+          "title": "Desired Hash",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "server_baseline",
+            "control_plane_runtime",
+            "config_profile",
+            "inbound",
+            "node_binding",
+            "node_runtime",
+            "host",
+            "internal_squad",
+            "external_squad",
+            "access_user",
+            "service_user",
+            "subscription_template",
+            "subscription_settings",
+            "nginx_artifact",
+            "realm_hop",
+            "firewall_rule",
+            "certificate",
+            "routing_gateway",
+            "egress_pool",
+            "route_rule",
+            "probe"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "logical_id": {
+          "title": "Logical Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "logical_id",
+        "kind",
+        "desired_hash"
+      ],
+      "title": "CompiledPlanResourceResult",
+      "type": "object"
+    },
+    "CompiledPlanResult": {
+      "additionalProperties": false,
+      "description": "Read-only drift result for a V4 compiler plan.",
+      "properties": {
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "drifted_resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Drifted Resources",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "observation_errors": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Observation Errors",
+          "type": "array"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanResourceResult"
+          },
+          "title": "Resources",
+          "type": "array"
+        },
+        "retiring_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retiring Resources",
+          "type": "array"
+        },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
+        },
+        "state_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "State Changes",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "Conditions that will make apply refuse, such as a stale state copy.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "converged",
+        "summary",
+        "exit_code"
+      ],
+      "title": "CompiledPlanResult",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "Empty data object used by envelopes without command-specific failure data.",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "ErrorModel": {
+      "additionalProperties": false,
+      "description": "Structured error safe for JSON/API clients.",
+      "properties": {
+        "category": {
+          "enum": [
+            "user",
+            "system",
+            "bug",
+            "cancelled"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "cause": {
+          "additionalProperties": true,
+          "title": "Cause",
+          "type": "object"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "exit_code": {
+          "default": 1,
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "hint": {
+          "default": "",
+          "title": "Hint",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "MeridianError",
+      "type": "object"
+    },
+    "PlanCommandData": {
+      "additionalProperties": false,
+      "description": "Success data returned by plan execution.",
+      "properties": {
+        "converged": {
+          "title": "Converged",
+          "type": "boolean"
+        },
+        "drifted_resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Drifted Resources",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "observation_errors": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanDriftResult"
+          },
+          "title": "Observation Errors",
+          "type": "array"
+        },
+        "plan_hash": {
+          "title": "Plan Hash",
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/CompiledPlanResourceResult"
+          },
+          "title": "Resources",
+          "type": "array"
+        },
+        "retiring_resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retiring Resources",
+          "type": "array"
+        },
+        "review_hash": {
+          "default": "",
+          "description": "Plan hash bound to the exact retirement set; equals plan_hash when nothing is removed.",
+          "title": "Review Hash",
+          "type": "string"
+        },
+        "state_changes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "State Changes",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "Conditions that will make apply refuse, such as a stale state copy.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "plan_hash",
+        "converged",
+        "summary",
+        "exit_code"
+      ],
+      "title": "PlanCommandData",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": false,
+      "description": "Structured summary shown in JSON envelopes and UI dashboards.",
+      "properties": {
+        "changed": {
+          "default": false,
+          "title": "Changed",
+          "type": "boolean"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "Summary",
+      "type": "object"
+    },
+    "_PlanSuccessEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "plan",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/PlanCommandData"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "maxItems": 0,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "changed",
+            "no_changes"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_PlanSuccessEnvelope",
+      "type": "object"
+    },
+    "_PlanTerminalEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "const": "plan",
+          "title": "Command",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompiledPlanResult"
+            },
+            {
+              "$ref": "#/$defs/EmptyData"
+            }
+          ],
+          "title": "Data"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "minItems": 1,
+          "title": "Errors",
+          "type": "array"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "meridian_version": {
+          "title": "Meridian Version",
+          "type": "string"
+        },
+        "operation_id": {
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "meridian.output/v1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "string"
+        },
+        "status": {
+          "const": "failed",
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "$ref": "#/$defs/Summary"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ErrorModel"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema",
+        "meridian_version",
+        "command",
+        "operation_id",
+        "started_at",
+        "duration_ms",
+        "status",
+        "exit_code",
+        "summary",
+        "warnings",
+        "errors",
+        "data"
+      ],
+      "title": "_PlanTerminalEnvelope",
+      "type": "object"
+    }
+  },
+  "description": "Envelope schema for `meridian plan --json`.",
+  "discriminator": {
+    "mapping": {
+      "changed": "#/$defs/_PlanSuccessEnvelope",
+      "failed": "#/$defs/_PlanTerminalEnvelope",
+      "no_changes": "#/$defs/_PlanSuccessEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/_PlanSuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/_PlanTerminalEnvelope"
+    }
+  ],
+  "title": "PlanOutputEnvelope"
+}

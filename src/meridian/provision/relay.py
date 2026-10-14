@@ -1,48 +1,30 @@
 """Relay node provisioner — deploys Realm TCP relay via SSH.
 
-A relay node is a lightweight TCP forwarder (no Docker, no 3x-ui, no panel).
+A relay node is a lightweight TCP forwarder with no Docker or panel.
 It runs Realm to forward port 443 to an exit server, preserving end-to-end
 VLESS+Reality encryption between the client and the exit.
 """
 
 from __future__ import annotations
 
+import re
 import shlex
-import time
 from dataclasses import dataclass, field
 
 from meridian.config import (
     REALM_GITHUB_URL,
     REALM_SHA256,
     REALM_VERSION,
-    RELAY_CONFIG_PATH,
-    RELAY_SERVICE_NAME,
+    RELAY_BINARY_PATH,
 )
-from meridian.provision.common import detect_ssh_ports
 from meridian.provision.steps import StepResult
 from meridian.ssh import ServerConnection
 
 # Minimal packages needed on a relay node
-_RELAY_PACKAGES = ["curl", "wget", "ufw", "ca-certificates"]
-
-# Realm systemd service template
-_SYSTEMD_UNIT = """\
-[Unit]
-Description=Meridian Relay (Realm TCP forwarder)
-After=network.target
-StartLimitIntervalSec=300
-StartLimitBurst=5
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/realm -c {config_path}
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=65535
-
-[Install]
-WantedBy=multi-user.target
-"""
+_REALM_VERSION_RE = re.compile(
+    r"^\s*Realm\s+(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)(?=\s|$)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -73,86 +55,28 @@ class RelayContext:
                 raise ValueError(f"Invalid port for {field_name}: {port!r} (must be 1-65535)")
 
 
+def parse_realm_version(output: str) -> str:
+    """Extract Realm's semver without mistaking feature suffixes for it."""
+    match = _REALM_VERSION_RE.match(output)
+    return match.group(1) if match is not None else ""
+
+
 # ---------------------------------------------------------------------------
 # Relay provisioning steps
 # ---------------------------------------------------------------------------
 
 
-class ConfigureRelayFirewall:
-    """Configure UFW firewall on relay node."""
-
-    name = "Configure relay firewall"
-
-    def run(self, conn: ServerConnection, ctx: RelayContext) -> StepResult:
-        check = conn.run("which ufw 2>/dev/null", timeout=15)
-        if check.returncode != 0:
-            # ufw not found — try to install it explicitly
-            conn.run("apt-get update -qq && apt-get install -y -qq ufw", timeout=120)
-            recheck = conn.run("which ufw", timeout=15)
-            if recheck.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail="ufw not available — install it manually: apt-get install ufw",
-                )
-
-        changed = False
-
-        ufw_status = conn.run("ufw status", timeout=15)
-        ufw_active = ufw_status.returncode == 0 and "Status: active" in ufw_status.stdout
-
-        # Allow the live sshd port(s) instead of assuming 22.
-        for ssh_port in detect_ssh_ports(conn):
-            result = conn.run(f"ufw allow {ssh_port}/tcp", timeout=15)
-            if result.returncode != 0:
-                return StepResult(name=self.name, status="failed", detail=f"failed to allow SSH port {ssh_port}")
-            if "Skipping" not in result.stdout:
-                changed = True
-
-        # Allow relay port
-        result = conn.run(f"ufw allow {ctx.listen_port}/tcp", timeout=15)
-        if result.returncode != 0:
-            return StepResult(name=self.name, status="failed", detail="failed to allow relay port")
-        if "Skipping" not in result.stdout:
-            changed = True
-
-        result = conn.run("ufw default deny incoming", timeout=15)
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"ufw default deny incoming failed: {result.stderr.strip()[:200]}",
-            )
-        result = conn.run("ufw default allow outgoing", timeout=15)
-        if result.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"ufw default allow outgoing failed: {result.stderr.strip()[:200]}",
-            )
-
-        if not ufw_active:
-            result = conn.run("echo y | ufw enable", timeout=30)
-            if result.returncode != 0:
-                return StepResult(name=self.name, status="failed", detail="ufw enable failed")
-            changed = True
-        else:
-            conn.run("ufw reload", timeout=30)
-
-        return StepResult(name=self.name, status="changed" if changed else "ok")
-
-
 class InstallRealm:
-    """Download and install Realm binary from GitHub releases."""
+    """Download Realm from GitHub releases and install it under a neutral name (``RELAY_BINARY_PATH``)."""
 
-    name = "Install Realm TCP relay"
+    name = "Install TCP forwarder"
 
     def run(self, conn: ServerConnection, ctx: RelayContext) -> StepResult:
-        # Check if Realm is already installed at the right version
-        check = conn.run("realm --version 2>/dev/null", timeout=15)
+        binary = shlex.quote(RELAY_BINARY_PATH)
+        # Check if the forwarder is already installed at the right version
+        check = conn.run(f"{binary} --version 2>/dev/null", timeout=15)
         if check.returncode == 0:
-            # Parse version from output like "realm 2.9.3"
-            installed_version = check.stdout.strip().split()[-1] if check.stdout.strip() else ""
+            installed_version = parse_realm_version(check.stdout)
             if installed_version == ctx.realm_version:
                 return StepResult(name=self.name, status="ok", detail=f"v{ctx.realm_version} already installed")
 
@@ -174,7 +98,7 @@ class InstallRealm:
         q_url = shlex.quote(url)
 
         download = conn.run(
-            f"curl -fsSL {q_url} -o /tmp/realm.tar.gz",
+            f"curl -fsSL {q_url} -o /tmp/fwd.tar.gz",
             timeout=120,
         )
         if download.returncode != 0:
@@ -187,10 +111,10 @@ class InstallRealm:
         # Verify SHA256 checksum (supply chain protection)
         expected_hash = REALM_SHA256.get(target, "")
         if expected_hash:
-            check = conn.run("sha256sum /tmp/realm.tar.gz | cut -d' ' -f1", timeout=15)
+            check = conn.run("sha256sum /tmp/fwd.tar.gz | cut -d' ' -f1", timeout=15)
             actual_hash = check.stdout.strip()
             if actual_hash != expected_hash:
-                conn.run("rm -f /tmp/realm.tar.gz", timeout=15)
+                conn.run("rm -f /tmp/fwd.tar.gz", timeout=15)
                 return StepResult(
                     name=self.name,
                     status="failed",
@@ -198,10 +122,11 @@ class InstallRealm:
                 )
 
         # Extract and install
+        # Extract into a private directory so the upstream file name never lands in a shared path.
         extract = conn.run(
-            "tar xzf /tmp/realm.tar.gz -C /tmp && "
-            "install -m 755 /tmp/realm /usr/local/bin/realm && "
-            "rm -f /tmp/realm.tar.gz /tmp/realm",
+            'd=$(mktemp -d) && tar xzf /tmp/fwd.tar.gz -C "$d" && '
+            f'install -m 755 "$d/realm" {binary} && '
+            'rm -rf "$d" /tmp/fwd.tar.gz',
             timeout=30,
         )
         if extract.returncode != 0:
@@ -212,173 +137,8 @@ class InstallRealm:
             )
 
         # Verify
-        verify = conn.run("realm --version", timeout=15)
-        if verify.returncode != 0:
-            return StepResult(name=self.name, status="failed", detail="realm binary not working after install")
+        verify = conn.run(f"{binary} --version", timeout=15)
+        if verify.returncode != 0 or parse_realm_version(verify.stdout) != ctx.realm_version:
+            return StepResult(name=self.name, status="failed", detail="forwarder version mismatch after install")
 
         return StepResult(name=self.name, status="changed", detail=f"installed v{ctx.realm_version}")
-
-
-class ConfigureRealm:
-    """Write Realm config and systemd service, then start."""
-
-    name = "Configure Realm relay"
-
-    def run(self, conn: ServerConnection, ctx: RelayContext) -> StepResult:
-        # IPs are validated in RelayContext.__post_init__, safe for config interpolation
-
-        # Listen on all interfaces — dual-stack [::] for IPv6, 0.0.0.0 for IPv4
-        if ":" in ctx.relay_ip:
-            listen_addr = f"[::]:{ctx.listen_port}"
-        else:
-            listen_addr = f"0.0.0.0:{ctx.listen_port}"
-
-        # Remote address: bracket IPv6 for host:port notation
-        if ":" in ctx.exit_ip:
-            remote_addr = f"[{ctx.exit_ip}]:{ctx.exit_port}"
-        else:
-            remote_addr = f"{ctx.exit_ip}:{ctx.exit_port}"
-
-        # Write Realm config
-        config_content = (
-            "[network]\n"
-            "no_tcp = false\n"
-            "use_udp = false\n"
-            "\n"
-            "[[endpoints]]\n"
-            f'listen = "{listen_addr}"\n'
-            f'remote = "{remote_addr}"\n'
-        )
-
-        conn.run("mkdir -p /etc/meridian", timeout=15)
-
-        q_config = shlex.quote(config_content)
-        write_config = conn.run(
-            f"printf '%s' {q_config} > {RELAY_CONFIG_PATH}.tmp && mv {RELAY_CONFIG_PATH}.tmp {RELAY_CONFIG_PATH}",
-            timeout=15,
-        )
-        if write_config.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write config: {write_config.stderr.strip()[:200]}",
-            )
-        conn.run(f"chmod 600 {RELAY_CONFIG_PATH}", timeout=15)
-
-        # Write relay metadata
-        relay_meta = (
-            f"role: relay\nexit_ip: {ctx.exit_ip}\nexit_port: {ctx.exit_port}\nlisten_port: {ctx.listen_port}\n"
-        )
-        q_meta = shlex.quote(relay_meta)
-        conn.run(
-            f"printf '%s' {q_meta} > /etc/meridian/relay.yml.tmp && "
-            "mv /etc/meridian/relay.yml.tmp /etc/meridian/relay.yml",
-            timeout=15,
-        )
-        conn.run("chmod 600 /etc/meridian/relay.yml", timeout=15)
-
-        # Write systemd service
-        unit_content = _SYSTEMD_UNIT.format(config_path=RELAY_CONFIG_PATH)
-        q_unit = shlex.quote(unit_content)
-        service_path = f"/etc/systemd/system/{RELAY_SERVICE_NAME}.service"
-        write_service = conn.run(
-            f"printf '%s' {q_unit} > {service_path}.tmp && mv {service_path}.tmp {service_path}",
-            timeout=15,
-        )
-        if write_service.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write service: {write_service.stderr.strip()[:200]}",
-            )
-
-        # Reload systemd, enable and (re)start service
-        conn.run("systemctl daemon-reload", timeout=30)
-        conn.run(f"systemctl enable {RELAY_SERVICE_NAME}", timeout=15)
-        restart = conn.run(f"systemctl restart {RELAY_SERVICE_NAME}", timeout=30)
-        if restart.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"service restart failed: {restart.stderr.strip()[:200]}",
-            )
-
-        return StepResult(
-            name=self.name,
-            status="changed",
-            detail=f"forwarding :{ctx.listen_port} -> {ctx.exit_ip}:{ctx.exit_port}",
-        )
-
-
-class VerifyRelay:
-    """Verify Realm service is running and relay->exit connectivity works."""
-
-    name = "Verify relay connectivity"
-
-    def run(self, conn: ServerConnection, ctx: RelayContext) -> StepResult:
-        # Check service is running — retry because Realm needs time to bind
-        max_retries = 4
-        for attempt in range(max_retries):
-            status_result = conn.run(f"systemctl is-active {RELAY_SERVICE_NAME}", timeout=15)
-            if status_result.returncode == 0 and status_result.stdout.strip() == "active":
-                break
-            if attempt < max_retries - 1:
-                time.sleep(2)
-        else:
-            # All retries exhausted
-            logs = conn.run(f"journalctl -u {RELAY_SERVICE_NAME} --no-pager -n 10", timeout=15)
-            detail = logs.stdout.strip()[-200:] if logs.returncode == 0 else "service not active"
-            return StepResult(name=self.name, status="failed", detail=detail)
-
-        # Test TCP connectivity from relay to exit
-        # IPs are validated in RelayContext.__post_init__
-        tcp_test = conn.run(
-            f"nc -z -w 5 {ctx.exit_ip} {ctx.exit_port} 2>/dev/null",
-            timeout=15,
-        )
-        if tcp_test.returncode != 0:
-            # Fallback: same-server relay may not reach its own public IP
-            # (cloud firewalls often block self-connect). Try the relay's
-            # listen port on localhost instead — proves Realm is forwarding.
-            localhost_test = conn.run(
-                f"nc -z -w 3 127.0.0.1 {ctx.listen_port} 2>/dev/null",
-                timeout=15,
-            )
-            if localhost_test.returncode == 0:
-                return StepResult(
-                    name=self.name,
-                    status="ok",
-                    detail="service active, relay port accepting connections",
-                )
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=(
-                    f"relay cannot reach exit {ctx.exit_ip}:{ctx.exit_port}. "
-                    f"Check: 1) exit server is running and accepts connections on port {ctx.exit_port}, "
-                    f"2) exit server firewall allows the relay IP, "
-                    f"3) relay server allows outbound to port {ctx.exit_port}. "
-                    f"Test manually: ssh relay-server 'nc -z -w 5 {ctx.exit_ip} {ctx.exit_port}'"
-                ),
-            )
-
-        return StepResult(name=self.name, status="ok", detail="service active, exit reachable")
-
-
-# ---------------------------------------------------------------------------
-# Pipeline builder
-# ---------------------------------------------------------------------------
-
-
-def build_relay_steps(ctx: RelayContext) -> list:
-    """Assemble the relay deployment step pipeline."""
-    from meridian.provision.common import ConfigureBBR, InstallPackages
-
-    return [
-        InstallPackages(packages=_RELAY_PACKAGES),
-        ConfigureBBR(),
-        ConfigureRelayFirewall(),
-        InstallRealm(),
-        ConfigureRealm(),
-        VerifyRelay(),
-    ]

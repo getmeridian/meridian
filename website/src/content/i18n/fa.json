@@ -1,0 +1,9 @@
+{
+  "meridian.nav.blog": "وبلاگ",
+  "meridian.nav.demo": "نمونه",
+  "meridian.page.copy": "کپی صفحه",
+  "meridian.page.copied": "کپی شد",
+  "meridian.page.view": "نمایش به‌صورت Markdown",
+  "meridian.page.open": "باز کردن در {{assistant}}",
+  "meridian.page.prompt": "{{url}} را بخوان و در کار با Meridian به من کمک کن."
+}

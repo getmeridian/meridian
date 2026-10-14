@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "Logical grouping for workflow fields.",
+  "properties": {
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "field_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Field Ids",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "title"
+  ],
+  "title": "InputSection",
+  "type": "object"
+}

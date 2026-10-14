@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import NoReturn
+import getpass
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, NoReturn, cast
 
 import typer
 from rich.console import Console
@@ -19,43 +24,158 @@ _theme = Theme(
     }
 )
 
-console = Console(theme=_theme, highlight=False)
-err_console = Console(theme=_theme, stderr=True, highlight=False)
+
+class ConsoleState:
+    """Encapsulates mutable console globals for testability."""
+
+    __slots__ = ("err_console", "json_mode", "quiet_mode")
+
+    def __init__(self) -> None:
+        self.err_console = Console(theme=_theme, stderr=True, highlight=False)
+        self.json_mode: bool = False
+        self.quiet_mode: bool = False
+
+
+_state = ConsoleState()
+
+# Shared handle for callers that need direct Rich rendering.
+err_console = _state.err_console
+
+_error_command: ContextVar[str] = ContextVar("meridian_error_command", default="cli.error")
+_error_timer: ContextVar[Any | None] = ContextVar("meridian_error_timer", default=None)
+_user_error_exit: ContextVar[int | None] = ContextVar("meridian_user_error_exit", default=None)
+
+
+def set_json_mode(enabled: bool) -> None:
+    """Set JSON output mode."""
+    _state.json_mode = enabled
+
+
+def is_json_mode() -> bool:
+    """Check if JSON output mode is active."""
+    return _state.json_mode
+
+
+def set_quiet_mode(enabled: bool) -> None:
+    """Set quiet mode — suppresses info/ok/warn/banner output."""
+    _state.quiet_mode = enabled
+
+
+def is_quiet_mode() -> bool:
+    """Check if quiet mode is active."""
+    return _state.quiet_mode
+
+
+@contextmanager
+def error_context(
+    command: str,
+    *,
+    timer: Any | None = None,
+    user_error_exit_code: int | None = None,
+) -> Iterator[None]:
+    """Attach command metadata to JSON errors emitted by fail().
+
+    ``user_error_exit_code`` remaps user errors for commands whose exit 2 means
+    something else (``plan`` uses 2 for "changes pending").
+    """
+    command_token = _error_command.set(command)
+    timer_token = _error_timer.set(timer)
+    exit_token = _user_error_exit.set(user_error_exit_code)
+    try:
+        yield
+    finally:
+        _error_command.reset(command_token)
+        _error_timer.reset(timer_token)
+        _user_error_exit.reset(exit_token)
 
 
 def info(msg: str) -> None:
-    err_console.print(f"  [info]\u2192[/info] {msg}")
+    if not _state.quiet_mode:
+        err_console.print(f"  [info]\u2192[/info] {escape(msg)}")
 
 
 def ok(msg: str) -> None:
-    err_console.print(f"  [ok]\u2713[/ok] {msg}")
+    if not _state.quiet_mode:
+        err_console.print(f"  [ok]\u2713[/ok] {escape(msg)}")
 
 
 def warn(msg: str) -> None:
-    err_console.print(f"  [warn]![/warn] {msg}")
+    if not _state.quiet_mode:
+        err_console.print(f"  [warn]![/warn] {escape(msg)}")
 
 
-def fail(msg: str, *, hint: str = "", hint_type: str = "bug") -> NoReturn:
-    """Print an error message and exit with code 1.
+_EXIT_CODES = {"user": 2, "system": 3, "bug": 1, "cancelled": 5}
+
+
+def fail(
+    msg: str | Exception,
+    *,
+    hint: str = "",
+    hint_type: str = "bug",
+    exit_code: int | None = None,
+) -> NoReturn:
+    """Print an error message and exit.
 
     Args:
-        msg: The error message to display.
+        msg: The error message to display, or a ``MeridianError`` instance
+            whose fields are used directly (hint/hint_type/exit_code kwargs
+            are ignored when a ``MeridianError`` is passed).
         hint: Optional hint shown below the error.
         hint_type: Controls the footer line shown:
             "user"   -- input validation errors; no GitHub link shown.
             "system" -- infrastructure errors; suggests 'meridian doctor'.
             "bug"    -- unexpected errors (default); shows GitHub issues link.
+        exit_code: Explicit exit code. If None, derived from hint_type
+            (user=2, system=3, bug=1).
     """
-    err_console.print(f"\n  [error]\u2717 {msg}[/error]")
+    from meridian.core.errors import MeridianError
+
+    if isinstance(msg, MeridianError):
+        hint = msg.hint
+        hint_type = msg.category
+        exit_code = msg.exit_code
+    message = str(msg)
+    code = exit_code if exit_code is not None else _EXIT_CODES.get(hint_type, 1)
+    user_override = _user_error_exit.get()
+    if hint_type == "user" and user_override is not None and code == _EXIT_CODES["user"]:
+        code = user_override
+    if _state.json_mode:
+        from meridian.core.models import ErrorCategory, ErrorModel
+        from meridian.core.output import command_envelope
+        from meridian.renderers import emit_json
+
+        category = cast(ErrorCategory, hint_type if hint_type in ("user", "system", "bug", "cancelled") else "bug")
+        emit_json(
+            command_envelope(
+                command=_error_command.get(),
+                summary=message,
+                status="cancelled" if category == "cancelled" else "failed",
+                exit_code=code,
+                errors=[
+                    ErrorModel(
+                        code=f"MERIDIAN_{category.upper()}_ERROR",
+                        category=category,
+                        message=message,
+                        hint=hint,
+                        retryable=category == "system",
+                        exit_code=code,
+                    )
+                ],
+                timer=_error_timer.get(),
+            )
+        )
+        raise typer.Exit(code=code)
+
+    err_console.print(f"\n  [error]\u2717 {escape(message)}[/error]")
     if hint:
-        err_console.print(f"  [dim]{hint}[/dim]")
-    if hint_type == "user":
+        err_console.print(f"  [dim]{escape(hint)}[/dim]")
+    if hint_type in ("user", "cancelled"):
         err_console.print()
     elif hint_type == "system":
         err_console.print("  [dim]Run: meridian doctor  (to collect server info)[/dim]\n")
     else:  # "bug"
-        err_console.print("  [dim]Report: https://github.com/uburuntu/meridian/issues[/dim]\n")
-    raise typer.Exit(code=1)
+        err_console.print("  [dim]Report: https://github.com/getmeridian/meridian/issues[/dim]\n")
+    raise typer.Exit(code=code)
 
 
 def line() -> None:
@@ -64,7 +184,24 @@ def line() -> None:
 
 
 def banner(version: str) -> None:
+    if _state.quiet_mode:
+        return
+    if re.search(r"\d(a|b|rc)\d+$", version):
+        from meridian.config import BETA_REPORT_URL
+
+        err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim] [warn]beta[/warn]")
+        err_console.print(f"  [dim]Report what works and what doesn't: {BETA_REPORT_URL}[/dim]\n")
+        return
     err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
+
+
+def has_tty() -> bool:
+    """Whether prompts can reach a terminal (they read /dev/tty, so piped stdin is fine)."""
+    try:
+        with open("/dev/tty"):
+            return True
+    except OSError:
+        return False
 
 
 def prompt(message: str, default: str = "") -> str:
@@ -82,22 +219,27 @@ def prompt(message: str, default: str = "") -> str:
     return value or default
 
 
-def confirm(message: str = "Continue?") -> bool:
-    """Y/n confirmation prompt. Returns True on accept, raises typer.Exit(1) on reject.
-
-    Accepts: y, Y, Enter (default yes).
-    Rejects: n, N (raises typer.Exit(1)).
-    """
+def confirm(message: str = "Continue?", *, default: bool = True) -> bool:
+    """Yes/no confirmation prompt; Enter takes *default*. No terminal means no."""
+    choices = "[Y/n]" if default else "[y/N]"
     try:
         with open("/dev/tty") as tty:
-            err_console.print(f"\n  [info]\u2192[/info] {message} [dim][Y/n][/dim] ", end="")
+            err_console.print(f"\n  [info]\u2192[/info] {escape(message)} [dim]{escape(choices)}[/dim] ", end="")
             answer = tty.readline().strip().lower()
     except OSError:
-        # No TTY available — default to reject (don't auto-confirm destructive ops)
-        raise typer.Exit(code=1)
-    if answer in ("", "y", "yes"):
-        return True
-    raise typer.Exit(code=1)
+        return False
+    return answer in ("y", "yes") or (default and answer == "")
+
+
+def prompt_secret(message: str) -> str:
+    """Hidden-input prompt on /dev/tty; '' without a terminal. Never echoes or logs the answer."""
+    if not has_tty():
+        return ""
+    err_console.print(f"  [info]\u2192[/info] {escape(message)}: ", end="")
+    try:
+        return getpass.getpass("")
+    except EOFError:
+        return ""
 
 
 def choose(message: str, options: list[str], *, default: int = 1) -> int:
@@ -107,7 +249,7 @@ def choose(message: str, options: list[str], *, default: int = 1) -> int:
     Falls back to default on empty input or invalid choice.
     """
     for i, opt in enumerate(options, 1):
-        err_console.print(f"    {i}. {opt}")
+        err_console.print(f"    {i}. {escape(opt)}")
     err_console.print()
     answer = prompt(f"{message}, or press Enter for ({default})")
     if not answer:

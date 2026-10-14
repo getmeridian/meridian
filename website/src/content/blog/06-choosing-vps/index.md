@@ -4,79 +4,93 @@ author: Meridian Team
 category: Guide
 tags:
   - vps
-  - server
   - hosting
-  - proxy
+  - ip-blocking
+  - relay
   - guide
-  - performance
-  - network
-title: "What your VPS provider doesn't tell you: picking the right server for a proxy"
-description: "Not all VPS providers are equal when it comes to running a proxy. Here's what to look for — network quality, IP reputation, peering, and the providers that work best in practice."
-readingTime: 12
+title: "Choosing a VPS for a proxy: the address matters more than the specs"
+description: "What to check in a VPS for a Meridian exit or relay, how to test an address before you pay for it, and what to do when it gets blocked."
+readingTime: 5
 ---
 
 ![Choosing the right VPS for a proxy server](./hero.webp)
 
-When you decide to run your own proxy server, the first decision you face is where to host it. The internet is flooded with offers for virtual private servers (VPS) for as little as five dollars a month. It is tempting to assume that cheaper is better, especially when the task of running a proxy does not seem to demand much in terms of raw computing power. This assumption, however, is a common pitfall that can lead to a frustrating experience and a poorly performing proxy.
+Meridian configures the server correctly, but it can't change where the server lives. A perfect Reality setup on an address your users' network blocks still doesn't connect.
 
-The truth is that for a proxy server, the conventional metrics of server performance—CPU cores, RAM, and storage—are secondary. A proxy's effectiveness is not determined by its processing muscle but by the quality of its network connection. A five-dollar server with excellent network peering and a clean IP address will consistently outperform a twenty-dollar server on a congested, poorly connected network. The most important factors are the ones that VPS providers are often least transparent about: network quality, IP reputation, and peering arrangements.
+![VPS checklist: the control server needs 2 GB RAM and 2 cores, an extra exit 1 GB and 1 core, a relay the smallest plan. Before deploying: public IPv4, TCP and UDP 443 open, fresh Debian or Ubuntu LTS, 2 GB free disk, clock within 30 seconds, hourly billing, no exit inside the censored country. Then test from inside users' networks.](./checklist.webp)
 
-## What actually matters: network quality, IP reputation, and peering
+## Two kinds of servers
 
-Let's break down the three pillars of a high-performing proxy server. First is **network quality**. This is not about the advertised bandwidth, but about consistency. It means low packet loss and stable latency. A connection with high packet loss will feel slow and unreliable, causing frequent disconnects and sluggish browsing, no matter how much bandwidth is available. Consistent latency, even if it is not the absolute lowest, is better than a connection that spikes unpredictably. Second is **IP reputation**. Every server has an IP address, and that IP address has a history. If the IP address was previously used for sending spam or other malicious activities, it might be on a blocklist. Many large services preemptively block entire IP ranges from known data centers that are popular for hosting proxies and VPNs. A server with a 'dirty' IP will find itself unable to connect to many common websites and services. Finally, there is **peering**. This refers to how a provider’s network connects to other networks, particularly the ones your users are on. Good peering to your target region means a more direct, less congested path for your traffic. A provider might have a massive pipe to the internet in general, but poor peering to a specific country's ISPs can result in slow speeds for users in that region.
+- **Exit**: carries all traffic to the open internet. It goes outside the censored country.
+- **Relay**: a small TCP forwarder in front of an exit, usually inside the country. It needs a reachable address and little else.
 
-```mermaid
-graph TD
-    A[What region are your users in?] --> B{Need domestic relay?};
-    B -->|Yes| C{Budget?};
-    B -->|No| D{Budget?};
-    C --> E[Hetzner/Oracle Cloud];
-    D --> F[DigitalOcean/Vultr/Linode];
-```
+## Size: modest, but not the smallest plan for the panel
 
-## Location strategy: why server location matters more than specs
+Your first server is the control server. It runs the Remnawave panel, PostgreSQL, and Valkey in Docker, plus Xray. Remnawave's own requirements page asks for at least 2 GB of RAM and 2 cores for the panel, and 1 GB and 1 core for a node. An extra exit added with `meridian node add` runs no panel. A relay runs only Realm, a zero-copy forwarder, with no Docker at all.
 
-The physical location of your proxy server has a profound impact on its performance for your users. It is a common mistake to choose a server based on price or brand recognition alone, without considering geography. A server in Frankfurt serving users in Moscow will have a completely different performance profile than one located in Helsinki. The latency, or the time it takes for data to travel from the user to the server and back, is largely determined by the physical distance and the number of network hops between them. More importantly, the path the data takes is dictated by the peering relationships between the server's ISP and the user's ISP. A server that is geographically closer to your users' typical ISP peering points will almost always provide a faster and more reliable connection. This is why understanding where your users are and how their local internet infrastructure works is a critical first step in choosing a server location.
+Meridian refuses to deploy with less than 2 GB of free disk.
 
-## The IP reputation problem: shared IPs and pre-blocked subnets
+## The address: reputation is the real risk
 
-One of the most common frustrations when setting up a proxy is discovering that your brand new server is already blocked by the services you want to access. This is the IP reputation problem. Many low-cost VPS providers pack a large number of customers onto shared IP addresses. If one of those customers engages in abusive behavior, the entire IP can be blacklisted. Even with a dedicated IP, you might find yourself in a "bad neighborhood." Some providers, especially those popular for hosting proxies and VPNs, have entire IP ranges that are preemptively blocked by major content platforms and streaming services. These services know that traffic from these datacenter ranges is more likely to be from proxies, and they take a heavy-handed approach to blocking it.
+Censors block a single IP, a subnet, or a whole hosting network. Large, popular hosting networks are the most likely to be blocked wholesale. Deployers in Russia report blocks that took down neighboring customers who never ran a proxy. A smaller host in a less obvious place often lasts longer, but a host everyone recommends stops being obscure.
 
-This is not just a theoretical problem; it happens constantly. You might find that your proxy cannot access a specific streaming site, a gaming service, or even a simple news website. The only way to know for sure is to test. This is why Meridian includes a built-in preflight check. Before you commit to a full deployment, you can run a quick test to assess the server's connectivity and see if its IP address is already flagged by common services. It is a simple step that can save you hours of troubleshooting down the line.
+You can't read reputation off a pricing page; you test it (below). Two details change the result:
 
-## Providers that work well in practice
+- **Mobile networks are stricter than home lines.** The same IP can work at home and fail on every mobile operator.
+- **Blocks can arrive late.** Some addresses work for days, then get throttled.
 
-Choosing a provider can feel like a gamble, but some have a better track record than others for proxy hosting. This is not an advertisement, but a summary of what has worked well based on community experience. **Hetzner** is often praised for its excellent network peering in Europe and for providing clean IP addresses at a reasonable price. **DigitalOcean** is a reliable all-rounder with a good global footprint, making it a solid choice if your users are spread across different regions. For those on a tight budget or just looking to experiment, the **Oracle Cloud free tier** offers a surprisingly capable server at no cost, making it a great option for testing.
+## Location: routing beats distance
 
-Other providers like **Vultr** and **Linode** (now part of Akamai) are also popular choices with extensive datacenter locations. It is important to remember that the quality of any provider can change over time. A provider with clean IPs today might have a reputation problem in six months as its service gets discovered and abused. The key is to stay flexible and be prepared to migrate if performance degrades. The community forums and discussion groups around self-hosted proxies are often the best source of up-to-date information on which providers are currently delivering the best performance.
+Pick a country with good routing to your users and low latency from their networks. Measure from those networks, not from your laptop abroad: a nearby country with poor routes to their ISPs can be slower than a farther one.
 
-## The relay strategy: domestic entry point + foreign exit server
+The host's network also shapes your camouflage. Reality impersonates a real TLS 1.3 site, and a censor sees that site's name next to your server's IP. A site whose DNS points into the same network looks ordinary; a famous foreign site on a VPS address stands out. A first deploy scans the server's subnet for such neighbors, so a network full of real sites gives better candidates. Don't pick `apple.com` or `icloud.com` by hand (their networks don't match hosting providers), and never `www.microsoft.com`: its certificate chain is too large for Reality, so the deploy converges and no traffic passes.
 
-For users in regions with aggressive internet filtering, even a well-chosen foreign server can be slow or unreliable. The connection might be unstable, or the latency might be too high for a good experience. In these cases, a more advanced setup known as a **relay strategy** can make a world of difference. This involves using two servers instead of one. The first server, the **relay**, is located in the same country as the user. This provides a fast, low-latency local connection. The relay server then forwards the traffic to the second server, the **exit server**, which is located in a country with unrestricted internet access. This exit server has the clean, foreign IP address that unblocks content.
+## IPv4, ports, and the clean OS
 
-This architecture splits the network path into two distinct legs. The first leg, from the user to the domestic relay, is fast and stable. The second leg, from the relay to the foreign exit, is handled by the high-quality networks of the datacenter providers. This setup can dramatically improve performance and reliability for users in challenging network environments. Meridian has built-in support for this relay architecture, making it easy to configure and deploy.
+- **Get a public IPv4 address.** Some hosts charge extra for it. Many client networks still have no IPv6, and `meridian scan` works on IPv4 only.
+- **Port 443 must be free and reachable.** Meridian serves Reality, XHTTP, and the panel on TCP 443, and Hysteria2 on UDP 443. Open both in the provider's cloud firewall or security group, not only on the server.
+- **Start from a fresh Debian or Ubuntu LTS image** with SSH key login, as root or a user with passwordless sudo. Avoid hosts that preinstall control panels, web servers, or firewalls you don't control.
+- **The clock must be within 30 seconds** of the device you deploy from. Reality depends on it.
 
-```mermaid
-graph LR
-    subgraph userRegion [User Region]
-        User -- Fast, low latency --> Relay["Relay Server (Domestic)"]
-    end
-    subgraph exitRegion [Unfiltered Region]
-        Exit["Exit Server (Abroad)"] -- Clean IP --> Internet
-    end
-    Relay -- Secure Tunnel --> Exit
-```
+## Bandwidth: read the fair-use clause
 
-## Testing before committing: using Meridian's preflight and SNI scan
+"Unlimited" usually means a fair-use limit, often several terabytes a month. Some hosts shape cheap or free plans to a low speed. Check the real port speed. A relay carries everything its users send through it, so size its traffic the same way as the exit's.
 
-We have established that not all servers are created equal. To avoid wasting time and money on a server that is not up to the task, you should always test before you deploy. Meridian provides two powerful tools for this purpose. The `meridian preflight` command runs a series of checks on a fresh server to ensure it meets the requirements for a successful deployment. It checks for things like the operating system version, virtualization type, and whether the required ports are open. It also runs a quick connectivity test to major services to give you an early warning about potential IP reputation issues.
+## Payment, account, and billing
 
-For users of the Reality protocol, the `meridian scan` command is an essential tool. It probes a list of popular websites to find the best **SNI (Server Name Indication)** targets for your server's location. For a deeper understanding of why SNI camouflage matters, see our [technical breakdown of VLESS+Reality](/blog/01-why-vless-reality/). A good SNI target is a website that is not blocked in your target region and has a fast, reliable connection from your server. Running these checks before you deploy can help you avoid common pitfalls and ensure that your proxy works as expected from the very beginning.
+Pick payment methods and signup checks you accept, and keep the account apart from your personal identity if privacy matters. Prefer **hourly billing** over a small discount: a blocked address then costs an hour, not a month.
 
-## When to rebuild: recognizing IP blocks and the fast migration workflow
+## Where not to put an exit
 
-No matter how carefully you choose your server, there is always a chance that its IP address will eventually get blocked. It is an unavoidable reality of running a proxy. The key is not to prevent blocks altogether, but to be able to recover from them quickly. When you notice that your proxy is no longer able to connect to certain sites, or when your users report that their connections are failing, it is likely that the IP has been blocked.
+Keep exits outside the censored country. A domestic host works under local rules and can see and act on your server; Russian hosts are reported to demand identity checks and take proxy servers down.
 
-This is where Meridian’s fast migration workflow comes in. Instead of trying to debug the old server, the most efficient solution is to simply get a new one. You can spin up a new VPS with a different provider in minutes. Then, you run a single command: `meridian deploy NEW_IP`. Meridian will deploy a fresh instance of your proxy on the new server. After the deployment completes, you will need to re-add your clients using `meridian client add <name>` and share the new connection pages with your users. While this does require a few extra steps, the entire process—from recognizing a block to being back online with a new IP and redistributing access—can be completed in under fifteen minutes.
+## A domestic relay as the second server
 
-For more details on getting started, deploying your first server, or setting up a relay, check out the [Meridian documentation](https://getmeridian.org/docs/en/getting-started). You can also read our guides on [sharing access with your tech-averse friends](/blog/03-tech-friend-guide/) and the [deep-dive into Meridian's architecture](/blog/04-meridian-architecture/).
+When foreign IPs are blocked, a relay gives users a domestic entry point. It forwards raw TCP to the exit's Reality listener. Encryption runs end to end between the client and the exit, so the relay host sees connections to your exit and their volume, not the content.
+
+Know the limits before you rent one:
+
+- Relays carry Reality only. XHTTP, WSS, and Hysteria2 stay on the exit's own address and remain in the subscription as alternatives.
+- The person who rents the relay carries the risk. It is in their name, under local law, and the host can demand identity checks or end the service.
+- The relay-to-exit link can be throttled too. `meridian check RELAY_IP` measures each leg; a transfer that freezes between roughly 8 and 32 KB is the throttling signature, and the usual fix is a relay at a different provider and network.
+
+## Test before you commit
+
+1. Rent the smallest suitable plan with hourly billing or a refund window.
+2. Run `meridian check 198.51.100.10`. It checks the camouflage target, port 443, outside reachability, OS, disk, and clock without installing anything.
+3. Deploy, then run `meridian test` and `meridian test --probe` from inside your users' network, on a home line and on mobile. `--probe` reports whether the server IP or the camouflage name looks blocked. Results from outside the censored network prove little.
+4. Test again after a few days. If it fails, rent a new address and repeat.
+
+## When the IP gets blocked
+
+Every subscription lists all of a fleet's paths, and apps that use the Xray JSON or Mihomo subscription switch between them on their own. So:
+
+- Keep a second exit at a **different provider and network**, so one blocked range doesn't take everything down.
+- Add [domain mode](/en/domain-mode/), so XHTTP and WSS reach Cloudflare instead of your IP.
+- Add a relay for networks that block the exit's address.
+
+When an exit is blocked and the control server is still reachable, rent a new server and either add it with `meridian node add 198.51.100.20` or move the blocked exit with `meridian node replace exit-1 198.51.100.20`. Clients keep their accounts and pick up the change on their next subscription refresh. Keep the old server for a while; blocks are sometimes lifted.
+
+The control server itself can't be moved that way. Choose its host with the most care.
+
+Full steps: [Choosing hosting](/en/hosting/) and [IP blocked recovery](/en/recovery/).

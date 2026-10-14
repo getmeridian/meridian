@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "EgressOverrideIntent": {
+      "additionalProperties": false,
+      "description": "Send matching destinations through WARP, directly, or nowhere, ahead of the exit's default egress.",
+      "properties": {
+        "action": {
+          "enum": [
+            "warp",
+            "direct",
+            "block"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 48,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match": {
+          "enum": [
+            "domain",
+            "geosite",
+            "geoip"
+          ],
+          "title": "Match",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "match",
+        "values",
+        "action"
+      ],
+      "title": "EgressOverrideIntent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One saved server assigned an exit workload ID.",
+  "properties": {
+    "egress_overrides": {
+      "items": {
+        "$ref": "#/$defs/EgressOverrideIntent"
+      },
+      "title": "Egress Overrides",
+      "type": "array"
+    },
+    "geo_block": {
+      "default": false,
+      "title": "Geo Block",
+      "type": "boolean"
+    },
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "region": {
+      "default": "",
+      "maxLength": 2,
+      "pattern": "^$|^[A-Za-z]{2}$",
+      "title": "Region",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    },
+    "warp": {
+      "default": false,
+      "title": "Warp",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "server_ref"
+  ],
+  "title": "SetupExitRole",
+  "type": "object"
+}

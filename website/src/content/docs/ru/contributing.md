@@ -1,26 +1,26 @@
 ---
-title: Участие в разработке
-description: Настройка разработки, рекомендации PR и подход к тестированию.
+title: Способствование
+description: Настройка разработки, руководства PR и подход к тестированию.
 order: 12
 section: reference
 ---
 
-## Сообщение об ошибках
+## Сообщение о проблемах
 
-- **Ошибка?** Используйте [шаблон отчёта об ошибке](https://github.com/uburuntu/meridian/issues/new?template=bug_report.yml) — сначала запустите `meridian doctor`
-- **Проблема с подключением?** Используйте [шаблон проблемы подключения](https://github.com/uburuntu/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian preflight`
-- **Идея функции?** Используйте [шаблон запроса функции](https://github.com/uburuntu/meridian/issues/new?template=feature_request.yml)
-- **Уязвимость безопасности?** Смотрите [Security](/docs/ru/security/) — НЕ открывайте публичный issue
+- **Ошибка?** Используйте [шаблон отчёта об ошибке](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) — сначала запустите `meridian doctor`
+- **Проблема подключения?** Используйте [шаблон проблемы подключения](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) — сначала запустите `meridian test` и `meridian check`
+- **Идея функции?** Используйте [шаблон запроса функции](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
+- **Уязвимость безопасности?** См. [Безопасность](/ru/security/) — НЕ открывайте публичную проблему
 
 ## Настройка разработки
 
 ```bash
-git clone https://github.com/uburuntu/meridian.git && cd meridian
+git clone https://github.com/getmeridian/meridian.git && cd meridian
 
-# Установить CLI в режиме редактирования с зависимостями разработки
+# Установить CLI в редактируемом режиме с зависимостями разработки
 make install
 
-# Установить pre-push hook (11 быстрых проверок перед каждым push)
+# Установить крючок pre-push (быстрые проверки перед каждым push)
 make hooks
 
 # Запустить полный CI локально
@@ -36,30 +36,33 @@ make templates         # Jinja2 template validation
 
 ## Структура проекта
 
-CLI — это Python пакет (`src/meridian/`) распространяемый через PyPI как `meridian-vpn`.
+CLI — это Python пакет (`src/meridian/`) распределённый через PyPI как `meridian-vpn`.
 
 Ключевые модули:
-- `cli.py` — Typer приложение, регистрация подкоманд
+- `cli.py` — Typer приложение, регистрация подкоманды
 - `commands/` — один модуль на подкоманду
-- `credentials.py` — dataclass `ServerCredentials`
+- `cluster.py` + `cluster_persistence.py` — типизированное состояние `cluster.yml` и persisance
 - `servers.py` — `ServerRegistry` для известных серверов
-- `provision/` — идемпотентный конвейер шагов
+- `setup/` — состояние мастера `meridian setup` и общий runtime позади deploy, setup и apply
+- `compiler/` — преобразует топологию в рассмотренный, хеш-идентифицированный список ресурсов (нет I/O)
+- `reconciler/` — наблюдает и применяет эти ресурсы с контрольными точками
+- `provision/` — шаги подготовки сервера (пакеты, затвердевание, Docker, Realm)
 
 ## Pull requests
 
-1. Форкните репозиторий и создайте ветку из `main`
-2. Сделайте сосредоточенные, минимальные изменения
-3. Убедитесь что CI проходит: `make ci`
-4. Тестируйте на реальном сервере если возможно
+1. Раздвойте репо и создайте ветку из `main`
+2. Сделайте сфокусированные, минимальные изменения
+3. Убедитесь, что CI прошёл: `make ci`
+4. Протестируйте на реальном сервере, если возможно
 5. Откройте PR с чётким описанием
 
 ## Ключевые соглашения
 
-- **Shell значения используют `shlex.quote()`** — никогда не интерполируйте несанитизированные значения
-- **Шаблоны connection-info должны быть синхронизированы** (CSS/JS/app ссылки)
-- **Конфиг nginx** идёт в `/etc/nginx/conf.d/meridian-*.conf`, не в основной nginx.conf
+- **Значения оболочки используют `shlex.quote()`** — никогда не интерполируйте неизатёртые значения
+- **PWA ресурсы должны оставаться синхронизированными** (`templates/pwa/` и каталог приложения)
+- **конфигурация nginx** записывается для каждого ресурса как файлы `meridian-v4-*.conf` под `/etc/nginx/stream.d/` и `/etc/nginx/sites-available/`
 - **Шаги provisioner** возвращают `StepResult` (ok/changed/skipped/failed)
 
 ## Тестирование
 
-CI проверяет: Python тесты, ruff lint, mypy типы, рендеринг шаблонов и синтаксис shell скриптов. Полное развертывание тестирование требует реальный VPS.
+CI проверяет: Python тесты, ruff lint, mypy типы, рендеринг шаблонов и синтаксис shell скрипта. Полное тестирование развёртывания требует реального VPS.

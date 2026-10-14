@@ -1,0 +1,593 @@
+"""V4 relay artifacts are executable, isolated, and rollback-safe."""
+
+from __future__ import annotations
+
+import subprocess
+from typing import cast
+from unittest.mock import MagicMock
+
+import pytest
+
+from meridian.cluster import ClusterConfig
+from meridian.compiler.models import (
+    NginxArtifactPayload,
+    NginxRouteSpec,
+    RealmHopPayload,
+    ResourcePlan,
+    ResourcePostcondition,
+    make_resource,
+)
+from meridian.config import REALM_VERSION, RELAY_BINARY_PATH
+from meridian.provision.steps import StepResult
+from meridian.reconciler.realm_driver import RealmHopDriver
+from meridian.reconciler.resources import (
+    ResourceAction,
+    ResourceReconcileError,
+    UnknownResourceOutcome,
+    build_resource_actions,
+    observation_converges,
+)
+from meridian.reconciler.server_drivers import ServerDriverContext
+from meridian.reconciler.server_render import (
+    legacy_realm_config_path,
+    legacy_realm_service_name,
+    realm_config_path,
+    realm_service_name,
+    render_nginx_artifact,
+    render_realm_config,
+    render_realm_unit,
+)
+from meridian.remnawave import MeridianPanel
+from meridian.ssh import ServerConnection
+from tests.support.topology import resource_plan
+
+ADDRESSES = {
+    "srv-exit": "198.51.100.10",
+    "srv-relay-core": "198.51.100.20",
+    "srv-relay-edge": "198.51.100.30",
+}
+
+
+class StatefulConnection:
+    def __init__(
+        self,
+        *,
+        files: dict[str, str] | None = None,
+        fail_first_restart: bool = False,
+        restart_returncode: int = 1,
+        realm_ready: bool = False,
+    ) -> None:
+        self.files = dict(files or {})
+        self.calls: list[str] = []
+        self.fail_first_restart = fail_first_restart
+        self.restart_returncode = restart_returncode
+        self.restart_count = 0
+        self.realm_ready = realm_ready
+        self.ip = "198.51.100.30"
+        self.user = "root"
+        self.local_mode = False
+        self.needs_sudo = False
+
+    def run(
+        self,
+        command: str,
+        timeout: int = 30,
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        self.calls.append(command)
+        if command.startswith("systemctl restart "):
+            self.restart_count += 1
+            if self.fail_first_restart and self.restart_count == 1:
+                return _result(returncode=self.restart_returncode, stderr="restart failed")
+        if self.realm_ready and command.startswith("systemctl is-active "):
+            return _result(stdout="active\n")
+        if self.realm_ready and command.startswith("ss -H -lnt"):
+            return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
+        if self.realm_ready and command.startswith(f"{RELAY_BINARY_PATH} --version"):
+            return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
+        return _result()
+
+    def get_text(
+        self,
+        path: str,
+        timeout: int = 30,
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        if path not in self.files:
+            return _result(returncode=1, stderr=f"cat: {path}: No such file or directory")
+        return _result(stdout=self.files[path])
+
+    def put_text(
+        self,
+        path: str,
+        text: str,
+        timeout: int = 30,
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        self.files[path] = text
+        return _result()
+
+
+def test_realm_chain_configs_target_the_next_hop_downstream() -> None:
+    core = RealmHopPayload(
+        chain_ref="relay-a",
+        hop_index=0,
+        server_ref="srv-relay-core",
+        listen_port=443,
+        target_server_ref="srv-exit",
+        target_port=443,
+        advertised=False,
+    )
+    edge = RealmHopPayload(
+        chain_ref="relay-a",
+        hop_index=1,
+        server_ref="srv-relay-edge",
+        listen_port=443,
+        target_server_ref="srv-relay-core",
+        target_port=443,
+        advertised=True,
+    )
+
+    core_config = render_realm_config(core, ADDRESSES)
+    edge_config = render_realm_config(edge, ADDRESSES)
+
+    assert 'remote = "198.51.100.10:443"' in core_config
+    assert 'remote = "198.51.100.20:443"' in edge_config
+    assert "198.51.100.30" not in edge_config
+
+
+def test_stream_artifact_accepts_custom_sni_and_preserves_camouflage_fallback() -> None:
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=443,
+        layer="stream",
+        fallback_server_name="www.microsoft.com",
+        routes=[
+            NginxRouteSpec(
+                match="sni",
+                server_names=["relay.example.com"],
+                backend_server_ref="srv-exit",
+                backend_port=10443,
+                protocol="reality",
+            ),
+            NginxRouteSpec(
+                match="sni",
+                server_names=["www.microsoft.com"],
+                backend_server_ref="srv-exit",
+                backend_port=10443,
+                protocol="reality",
+            ),
+        ],
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, ADDRESSES)
+
+    assert "relay.example.com meridian_upstream_" in rendered
+    assert "www.microsoft.com meridian_upstream_" in rendered
+    assert "server www.microsoft.com:443;" in rendered
+    assert "default meridian_fallback_" in rendered
+    assert "server 127.0.0.1:10443;" in rendered
+
+
+def test_stream_artifact_routes_no_sni_to_local_control_https() -> None:
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=443,
+        layer="stream",
+        routes=[
+            NginxRouteSpec(
+                match="sni",
+                server_names=[""],
+                backend_server_ref="srv-exit",
+                backend_port=8443,
+            )
+        ],
+    )
+
+    rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, ADDRESSES)
+
+    assert '    "" meridian_upstream_' in rendered
+    assert "server 127.0.0.1:8443;" in rendered
+
+
+def test_realm_restart_failure_restores_previous_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan, action = _realm_plan_and_action()
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    conn = StatefulConnection(
+        files={
+            config_path: "previous config\n",
+            unit_path: "previous unit\n",
+        },
+        fail_first_restart=True,
+    )
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+    monkeypatch.setattr(
+        "meridian.reconciler.realm_driver.InstallRealm.run",
+        lambda *_args, **_kwargs: StepResult(name="Install Realm", status="unchanged"),
+    )
+
+    with pytest.raises(ResourceReconcileError, match="previous configuration restored"):
+        RealmHopDriver(context).apply(action, None)
+
+    assert conn.files[config_path] == "previous config\n"
+    assert conn.files[unit_path] == "previous unit\n"
+    assert conn.restart_count == 2
+
+
+def test_realm_services_are_isolated_by_logical_identity() -> None:
+    first = "realm:relay-a:0"
+    second = "realm:relay-b:0"
+
+    assert realm_service_name(first) != realm_service_name(second)
+    assert realm_config_path(first) != realm_config_path(second)
+
+
+def test_realm_observation_reads_version_before_feature_suffixes() -> None:
+    plan, action = _realm_plan_and_action()
+    payload = action.resource.payload
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    conn = StatefulConnection(
+        files={
+            config_path: render_realm_config(payload, ADDRESSES),
+            unit_path: render_realm_unit(action.resource.logical_id),
+        },
+        realm_ready=True,
+    )
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+
+    assert observation_converges(action, RealmHopDriver(context).observe(action, None))
+
+
+def _realm_observation_case() -> tuple[RealmHopDriver, ResourceAction, MagicMock]:
+    plan, action = _realm_plan_and_action()
+    payload = action.resource.payload
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    legacy_unit_path = f"/etc/systemd/system/{legacy_realm_service_name(action.resource.logical_id)}.service"
+    conn = MagicMock(spec=ServerConnection)
+
+    def get_text(path: str, **_kwargs: object):
+        if path == config_path:
+            return _result(stdout=render_realm_config(payload, ADDRESSES))
+        if path == unit_path:
+            return _result(stdout=render_realm_unit(action.resource.logical_id))
+        if path == legacy_unit_path:
+            return _result(returncode=1, stderr="cat: unit: No such file or directory")
+        raise AssertionError(path)
+
+    def run(command: str, **_kwargs: object):
+        if command.startswith("systemctl is-active"):
+            return _result(stdout="active\n")
+        if command.startswith("ss -H -lnt"):
+            return _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n")
+        if command.startswith(f"{RELAY_BINARY_PATH} --version"):
+            return _result(stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]\n")
+        raise AssertionError(command)
+
+    conn.get_text.side_effect = get_text
+    conn.run.side_effect = run
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: conn,
+        server_addresses=ADDRESSES,
+    )
+    return RealmHopDriver(context), action, conn
+
+
+def test_realm_missing_configuration_is_confirmed_absent() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.get_text.side_effect = [
+        _result(returncode=1, stderr="cat: config: No such file or directory"),
+        _result(stdout=render_realm_unit(action.resource.logical_id)),
+        _result(returncode=1, stderr="cat: unit: No such file or directory"),
+    ]
+
+    observation = driver.observe(action, None)
+
+    assert observation.exists is False
+
+
+def test_realm_unreadable_configuration_is_unavailable_evidence() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.get_text.side_effect = [
+        _result(returncode=1, stderr="cat: config: Permission denied"),
+        _result(stdout=render_realm_unit(action.resource.logical_id)),
+        _result(returncode=1, stderr="cat: unit: No such file or directory"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm configuration evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_inactive_service_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(returncode=3, stdout="inactive\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+def test_realm_rejects_systemd_daemon_failure() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(returncode=1, stderr="System has not been booted with systemd"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm service evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_rejects_failed_listener_inspection() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(returncode=127, stderr="ss: command not found"),
+        _result(stdout=f"Realm {REALM_VERSION}\n"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="TCP listener inspection evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_missing_managed_binary_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(returncode=127, stderr="realm: command not found"),
+    ]
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize("returncode", [124, 255])
+def test_realm_rejects_unavailable_version_evidence(returncode: int) -> None:
+    driver, action, conn = _realm_observation_case()
+    conn.run.side_effect = [
+        _result(stdout="active\n"),
+        _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
+        _result(returncode=returncode, stderr="version inspection unavailable"),
+    ]
+
+    with pytest.raises(ResourceReconcileError, match="Realm version evidence is unavailable"):
+        driver.observe(action, None)
+
+
+def test_realm_restart_timeout_is_reobserved_without_guessing_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan, action = _realm_plan_and_action()
+    config_path = realm_config_path(action.resource.logical_id)
+    unit_path = f"/etc/systemd/system/{realm_service_name(action.resource.logical_id)}.service"
+    conn = StatefulConnection(
+        files={
+            config_path: "previous config\n",
+            unit_path: "previous unit\n",
+        },
+        fail_first_restart=True,
+        restart_returncode=124,
+    )
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+    monkeypatch.setattr(
+        "meridian.reconciler.realm_driver.InstallRealm.run",
+        lambda *_args, **_kwargs: StepResult(name="Install Realm", status="unchanged"),
+    )
+
+    with pytest.raises(UnknownResourceOutcome, match="observation is required"):
+        RealmHopDriver(context).apply(action, None)
+
+    assert conn.files[config_path] != "previous config\n"
+    assert conn.files[unit_path] != "previous unit\n"
+    assert conn.restart_count == 1
+
+
+def _migration_case(
+    monkeypatch: pytest.MonkeyPatch, *, legacy: bool, fail_first_restart: bool = False
+) -> tuple[RealmHopDriver, ResourceAction, StatefulConnection]:
+    plan, action = _realm_plan_and_action()
+    logical_id = action.resource.logical_id
+    files = {}
+    if legacy:
+        files = {
+            legacy_realm_config_path(logical_id): "legacy config\n",
+            f"/etc/systemd/system/{legacy_realm_service_name(logical_id)}.service": "legacy unit\n",
+        }
+    conn = StatefulConnection(files=files, fail_first_restart=fail_first_restart)
+    context = ServerDriverContext(
+        plan=plan,
+        cluster=ClusterConfig(),
+        panel=cast(MeridianPanel, object()),
+        connection_for=lambda _server_ref: cast(ServerConnection, conn),
+        server_addresses=ADDRESSES,
+    )
+    monkeypatch.setattr(
+        "meridian.reconciler.realm_driver.InstallRealm.run",
+        lambda *_args, **_kwargs: StepResult(name="Install TCP forwarder", status="ok"),
+    )
+    return RealmHopDriver(context), action, conn
+
+
+def test_fresh_realm_hop_uses_neutral_names_and_never_touches_legacy_units(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=False)
+    logical_id = action.resource.logical_id
+
+    receipt = driver.apply(action, None)
+
+    service = realm_service_name(logical_id)
+    assert receipt.remote_id == service
+    unit = conn.files[f"/etc/systemd/system/{service}.service"]
+    config = conn.files[realm_config_path(logical_id)]
+    for exposed in (service, realm_config_path(logical_id), unit, config, RELAY_BINARY_PATH):
+        for word in ("meridian", "realm", "relay", "proxy", "vpn"):
+            assert word not in exposed.lower()
+    assert not any(legacy_realm_service_name(logical_id) in call for call in conn.calls)
+
+
+def test_legacy_realm_hop_is_stopped_before_the_renamed_unit_binds_then_removed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=True)
+    logical_id = action.resource.logical_id
+    legacy = legacy_realm_service_name(logical_id)
+
+    receipt = driver.apply(action, None)
+
+    assert receipt.remote_id == realm_service_name(logical_id)
+    stop = conn.calls.index(f"systemctl stop {legacy}")
+    restart = conn.calls.index(f"systemctl restart {realm_service_name(logical_id)}")
+    disable = f"systemctl disable --now {legacy}"
+    cleanup = next(index for index, call in enumerate(conn.calls) if call.startswith(disable))
+    assert stop < restart < cleanup
+    assert legacy_realm_config_path(logical_id) in conn.calls[cleanup]
+    assert "/usr/local/bin/realm" in conn.calls[cleanup]
+
+
+def test_failed_migration_restarts_the_legacy_unit_and_keeps_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    driver, action, conn = _migration_case(monkeypatch, legacy=True, fail_first_restart=True)
+    logical_id = action.resource.logical_id
+    legacy = legacy_realm_service_name(logical_id)
+
+    with pytest.raises(ResourceReconcileError, match="previous configuration restored"):
+        driver.apply(action, None)
+
+    assert conn.calls[-1] == f"systemctl start {legacy}"
+    assert f"systemctl disable --now {realm_service_name(logical_id)} >/dev/null 2>&1" in conn.calls
+    assert not any(call.startswith(f"systemctl disable --now {legacy}") for call in conn.calls)
+    assert any(call == f"rm -f {realm_config_path(logical_id)}" for call in conn.calls)
+    assert conn.files[legacy_realm_config_path(logical_id)] == "legacy config\n"
+
+
+def test_converged_hop_beside_a_legacy_unit_is_drift() -> None:
+    driver, action, conn = _realm_observation_case()
+    logical_id = action.resource.logical_id
+    payload = action.resource.payload
+    conn.get_text.side_effect = [
+        _result(stdout=render_realm_config(payload, ADDRESSES)),
+        _result(stdout=render_realm_unit(logical_id)),
+        _result(stdout="legacy unit\n"),
+    ]
+
+    observation = driver.observe(action, None)
+
+    assert observation.exists is True
+    assert not observation_converges(action, observation)
+
+
+def _realm_plan_and_action() -> tuple[ResourcePlan, ResourceAction]:
+    resource = make_resource(
+        "realm:relay-a:1",
+        RealmHopPayload(
+            chain_ref="relay-a",
+            hop_index=1,
+            server_ref="srv-relay-edge",
+            listen_port=443,
+            target_server_ref="srv-relay-core",
+            target_port=443,
+            advertised=True,
+        ),
+        postconditions=[
+            ResourcePostcondition(
+                kind="listening",
+                target_ref="srv-relay-edge",
+                detail="tcp:443",
+            )
+        ],
+    )
+    plan = resource_plan(resource)
+    return plan, build_resource_actions(plan, 1)[0]
+
+
+def _result(
+    *,
+    returncode: int = 0,
+    stdout: str = "",
+    stderr: str = "",
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+        args=[],
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
+def test_v4_http_artifact_redirects_relatively_and_speaks_http2() -> None:
+    from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec
+    from meridian.reconciler.server_render import render_nginx_artifact
+
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=8444,
+        layer="http",
+        tls_hostname="edge.example.com",
+        routes=[
+            NginxRouteSpec(
+                match="host_path",
+                server_names=["edge.example.com"],
+                path="/ws-a",
+                backend_server_ref="srv-exit",
+                backend_port=20443,
+                protocol="wss",
+            )
+        ],
+    )
+    rendered = render_nginx_artifact("nginx:srv-exit:http:8444", payload, ADDRESSES)
+    assert "listen 127.0.0.1:8444 ssl;" in rendered
+    assert "absolute_redirect off;" in rendered
+    # Xray XHTTP with a browser fingerprint always speaks HTTP/2; HTTP/1.1 replies broke it.
+    assert "    http2 on;\n" in rendered
+
+
+def test_v4_location_artifact_proxies_without_upstream_blocks() -> None:
+    from meridian.compiler.models import NginxArtifactPayload, NginxRouteSpec
+    from meridian.reconciler.server_render import nginx_artifact_path, render_nginx_artifact
+
+    payload = NginxArtifactPayload(
+        server_ref="srv-exit",
+        listener_port=8443,
+        layer="location",
+        tls_hostname="198.51.100.10",
+        routes=[
+            NginxRouteSpec(
+                match="host_path",
+                server_names=["198.51.100.10"],
+                path="0123456789abcdef",
+                backend_server_ref="srv-exit",
+                backend_port=20443,
+                protocol="xhttp",
+            )
+        ],
+    )
+    rendered = render_nginx_artifact("nginx:main:x:location", payload, ADDRESSES)
+    # Included inside the panel's server block, where upstream and server blocks are invalid.
+    assert "upstream" not in rendered and "server {" not in rendered
+    assert "location = /0123456789abcdef {" in rendered
+    assert "proxy_pass http://127.0.0.1:20443;" in rendered
+    assert nginx_artifact_path("nginx:main:x:location", "location").startswith("/etc/nginx/meridian-v4-locations/")

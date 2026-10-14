@@ -68,8 +68,7 @@ details summary:focus-visible {
 
 /* RTL support */
 [dir="rtl"] pre,
-[dir="rtl"] code,
-[dir="rtl"] .mono {
+[dir="rtl"] code {
   direction: ltr;
   text-align: left;
   unicode-bidi: embed;

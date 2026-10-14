@@ -1,0 +1,72 @@
+---
+interface Props {
+  helpKey: string;
+  text: string;
+}
+
+const { helpKey, text } = Astro.props;
+const tooltipId = `studio-help-${helpKey}`;
+---
+
+<span class="studio__help" data-help-key={helpKey}>
+  <button class="studio__help-trigger" type="button" aria-label={`Help: ${text}`} aria-describedby={tooltipId}>i</button>
+  <span class="studio__help-popover" id={tooltipId} role="tooltip">{text}</span>
+</span>
+
+<style>
+  .studio__help {
+    cursor: help;
+    display: inline-flex;
+    position: relative;
+  }
+
+  .studio__help-trigger {
+    align-items: center;
+    background: var(--s1);
+    border: 1px solid var(--b2);
+    border-radius: 999px;
+    color: var(--t2);
+    cursor: help;
+    display: inline-flex;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 900;
+    height: 22px;
+    justify-content: center;
+    padding: 0;
+    width: 22px;
+  }
+
+  .studio__help-popover {
+    background: var(--s1);
+    border: 1px solid var(--b2);
+    border-radius: var(--r);
+    box-shadow: var(--shadow-lg);
+    color: var(--t1);
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.4;
+    max-width: min(330px, 82vw);
+    opacity: 0;
+    padding: 10px 11px;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    transform: translateY(-4px);
+    transition: opacity 0.12s, transform 0.12s;
+    width: max-content;
+    z-index: 50;
+  }
+
+  .studio__help:focus-within .studio__help-popover,
+  .studio__help:hover .studio__help-popover {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .studio__help-trigger:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--studio-focus, var(--ac)), transparent 70%);
+    outline-offset: 2px;
+  }
+</style>

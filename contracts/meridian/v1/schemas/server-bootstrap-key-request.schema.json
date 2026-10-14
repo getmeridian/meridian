@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "key_policy": {
+            "const": "use_existing"
+          }
+        },
+        "required": [
+          "key_policy"
+        ]
+      },
+      "then": {
+        "properties": {
+          "public_key": {
+            "minLength": 1
+          }
+        },
+        "required": [
+          "public_key"
+        ]
+      }
+    }
+  ],
+  "description": "Request metadata for installing or verifying key-based SSH access.\n\nPasswords are intentionally excluded from this public contract. Executable\nEngine mode must pass one-time password secrets through a separate secret\nchannel and never write them into generated schemas, logs, or event data.",
+  "properties": {
+    "disable_password_auth": {
+      "default": false,
+      "title": "Disable Password Auth",
+      "type": "boolean"
+    },
+    "key_policy": {
+      "default": "generate_meridian",
+      "enum": [
+        "generate_meridian",
+        "use_existing"
+      ],
+      "title": "Key Policy",
+      "type": "string"
+    },
+    "public_key": {
+      "default": "",
+      "title": "Public Key",
+      "type": "string"
+    },
+    "server_ref": {
+      "maxLength": 120,
+      "minLength": 1,
+      "pattern": "^[^\\r\\n\\t]+$",
+      "title": "Server Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "server_ref"
+  ],
+  "title": "ServerBootstrapKeyRequest",
+  "type": "object"
+}

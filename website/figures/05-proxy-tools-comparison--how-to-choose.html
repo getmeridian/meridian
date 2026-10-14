@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="shared.css">
+<style>
+  .rows { display: grid; gap: 10px; }
+  .r { display: grid; grid-template-columns: 1fr 34px 250px; align-items: center; background: var(--s1); border: 1px solid var(--b1); border-radius: 12px; padding: 15px 20px; }
+  .r .need { font-size: 17.5px; }
+  .r .tool { font: 600 20px/1.2 var(--heading); }
+  .r .tool small { display: block; font: 400 13.5px/1.3 var(--body); color: var(--t2); margin-top: 3px; }
+  .r.me { border-color: #c8933a66; background: linear-gradient(var(--ac-bg), var(--ac-bg)), var(--s1); }
+  .r.me .tool { color: var(--ac-ink); }
+  .grid2 { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid2 .card { padding: 16px 20px; }
+  .grid2 h4 { font: 600 16.5px/1.25 var(--heading); }
+  .grid2 p { font-size: 15.5px; margin-top: 4px; }
+</style></head><body>
+<div class="fig">
+  <div class="eyebrow">Self-hosted proxy tools</div>
+  <h1>Start from what you need</h1>
+  <p class="lede">The tools differ less in protocols than in who does the server work.</p>
+  <div class="body">
+    <div class="rows">
+      <div class="r"><span class="need">Many protocols and per-user controls in a browser</span><span class="arrow">→</span><span class="tool">3x-ui<small>web panel for Xray-core</small></span></div>
+      <div class="r"><span class="need">Every Remnawave knob, your own reverse proxy and domain</span><span class="arrow">→</span><span class="tool">Remnawave<small>assembled by hand</small></span></div>
+      <div class="r"><span class="need">Setup from a desktop app, WireGuard-family protocols</span><span class="arrow">→</span><span class="tool">Outline or Amnezia<small>app-first</small></span></div>
+      <div class="r"><span class="need">One Reality server for a few people</span><span class="arrow">→</span><span class="tool">reality-ezpz<small>install script, no web panel</small></span></div>
+      <div class="r me"><span class="need">Reality, XHTTP, Hysteria2, and CDN fallback set up correctly on one or many servers, with relays and a reviewed plan for every change</span><span class="arrow">→</span><span class="tool">Meridian<small>CLI that builds a Remnawave fleet</small></span></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h4>Five questions that separate them</h4><p>What you install · who sets up certificates, firewall, and 443 · how users get connected · several servers? · can you see a change before it happens?</p></div>
+      <div class="card"><h4>Where Meridian is the wrong choice</h4><p>You need VMess, Trojan, Shadowsocks, WireGuard, or OpenVPN · the server hosts other services · you'd rather not use a terminal.</p></div>
+    </div>
+  </div>
+  <div class="foot"><span>getmeridian.org</span><span>Claims checked against each project's own docs</span></div>
+</div>
+</body></html>

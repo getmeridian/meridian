@@ -1,0 +1,7 @@
+# Deliberate exceptions for scripts/find_dead_code.py.
+# One `qualified.name  # reason` per line; the reason is required.
+# Allowlisted names count as production roots, so their callees stay quiet too.
+# A class entry covers its members; `package.*` covers everything below it.
+# Unused parameters use `qualified.name(param)`. Entries that no longer match
+# a finding are reported as stale-allowlist: delete them.
+

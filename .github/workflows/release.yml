@@ -11,13 +11,23 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+    # Only main's CI can release; without this, every PR run queued a skipped Release run.
+    branches: [main]
+  # Pre-releases (betas) are published by pushing their tag, e.g. v4.0.0b1.
+  # Tag pushes run this file from the tagged commit, so a beta branch ships
+  # with its own packaging steps; workflow_run always uses main's copy.
+  push:
+    tags: ["v*.*.*a*", "v*.*.*b*", "v*.*.*rc*"]
 
 jobs:
   deploy-pages:
     name: Deploy GitHub Pages
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.head_branch == 'main'
     permissions:
       pages: write
@@ -29,37 +39,47 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          # Starlight dates each docs page from its last commit.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: website/package-lock.json
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
 
       - name: Build Astro site
         run: |
           cd website
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Generate PWA demo page
-        run: |
-          sudo apt-get install -y qrencode
-          uv run meridian dev preview --output website/dist/demo
+        run: uv run meridian dev preview --output website/dist/demo
 
-      - name: Add deploy artifacts
+      - name: Add website artifacts
         run: |
-          # Copy CLI files into Astro dist
+          # Copy the CLI installer into Astro dist
           cp install.sh website/dist/install.sh
-          cp setup.sh website/dist/setup.sh
           cp VERSION website/dist/version
+          # While main carries a beta, the site documents it, so its installer installs it.
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          if echo "$VERSION" | grep -qE '(a|b|rc)[0-9]+$'; then
+            sed -i "s/^MERIDIAN_DEFAULT_VERSION=\"\"$/MERIDIAN_DEFAULT_VERSION=\"$VERSION\"/" website/dist/install.sh
+            grep -qx "MERIDIAN_DEFAULT_VERSION=\"$VERSION\"" website/dist/install.sh
+          fi
           # Generate checksums
           cd website/dist
-          sha256sum install.sh setup.sh > SHA256SUMS
+          sha256sum install.sh > SHA256SUMS
           cd ../..
           # Bundle AI docs
           mkdir -p website/dist/ai
@@ -80,7 +100,10 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       github.event.workflow_run.head_branch == 'main'
     permissions:
       contents: write
@@ -100,11 +123,17 @@ jobs:
       - name: Check if tag already exists
         id: check_tag
         run: |
-          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          # A pre-release VERSION on main is never published as the latest stable
+          # release; betas ship only through their own tag (see the prerelease job).
+          if echo "${{ steps.version.outputs.version }}" | grep -qE '(a|b|rc)[0-9]+$'; then
+            echo "VERSION is a pre-release; skipping the stable release"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
 
       - name: Determine release type from semver
         id: semver
@@ -112,7 +141,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude '*a*' --exclude '*b*' --exclude '*rc*' 2>/dev/null || echo "")
           if [ -z "$PREV_TAG" ]; then
             echo "type=major" >> "$GITHUB_OUTPUT"
             echo "notes=Initial release" >> "$GITHUB_OUTPUT"
@@ -140,7 +169,7 @@ jobs:
             sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '$d' > /tmp/release-notes.md
           else
             # Fallback to git log if version not in CHANGELOG
-            PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            PREV_TAG=$(git describe --tags --abbrev=0 --exclude '*a*' --exclude '*b*' --exclude '*rc*' 2>/dev/null || echo "")
             if [ -n "$PREV_TAG" ]; then
               git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" --no-merges > /tmp/release-notes.md
             else
@@ -168,7 +197,10 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
-          gh release create "$TAG" \
+          # The installer and its checksum ride every release, a second origin
+          # next to the copy on GitHub Pages (getmeridian/meridian#38).
+          sha256sum install.sh > SHA256SUMS
+          gh release create "$TAG" install.sh SHA256SUMS \
             --title "$TITLE" \
             --notes-file /tmp/release-notes.md \
             --latest
@@ -178,26 +210,104 @@ jobs:
     outputs:
       released: ${{ steps.create_release.outputs.created || 'false' }}
 
+  prerelease:
+    name: Create GitHub pre-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.repository == 'getmeridian/meridian'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Verify the tag names a pre-release VERSION
+        id: version
+        run: |
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION $VERSION"
+            exit 1
+          fi
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$'; then
+            echo "Only pre-releases are published from tags; stable releases go through main"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "base=$(echo "$VERSION" | sed -E 's/(a|b|rc)[0-9]+$//')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Unit tests
+        run: |
+          uv sync --extra dev
+          uv run pytest -q -p no:cacheprovider
+
+      - name: Create pre-release
+        id: create_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BASE: ${{ steps.version.outputs.base }}
+        run: |
+          {
+            cat .github/BETA.md
+            echo
+            sed -n "/^## \[$BASE\]/,/^## \[/p" CHANGELOG.md | sed '$d'
+          } > /tmp/release-notes.md
+          sha256sum install.sh > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" install.sh SHA256SUMS \
+            --verify-tag \
+            --prerelease \
+            --title "Meridian $VERSION (beta)" \
+            --notes-file /tmp/release-notes.md
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+    outputs:
+      released: ${{ steps.create_release.outputs.created || 'false' }}
+
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: release
-    if: needs.release.outputs.released == 'true'
+    needs: [release, prerelease]
+    # always(): one of the two release jobs is skipped for every event.
+    if: >-
+      always() &&
+      (needs.release.outputs.released == 'true' || needs.prerelease.outputs.released == 'true')
     environment: pypi
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+
       - name: Build package
         run: |
           pip install hatchling build
+          cd website
+          pnpm install --frozen-lockfile
+          pnpm run contracts:check
+          pnpm run build
+          cd ..
+          cp VERSION website/dist/version
+          find website/dist -name .DS_Store -delete
           # Generate AI reference from human docs (not committed, built fresh)
           mkdir -p src/meridian/data
           for f in website/src/content/docs/en/cli-reference.md website/src/content/docs/en/architecture.md website/src/content/docs/en/troubleshooting.md website/src/content/docs/en/deploy.md website/src/content/docs/en/relay.md website/src/content/docs/en/recovery.md; do
@@ -205,6 +315,7 @@ jobs:
             echo ""
           done > src/meridian/data/ai-reference.md
           python -m build
+          python scripts/verify_package_assets.py dist/*.whl
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,0 +1,71 @@
+{
+  "additionalProperties": false,
+  "description": "One explicit first-match routing rule.",
+  "properties": {
+    "action": {
+      "default": "route",
+      "enum": [
+        "route",
+        "block"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "id": {
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "match": {
+      "default": "all",
+      "enum": [
+        "all",
+        "country",
+        "domain",
+        "ip",
+        "network"
+      ],
+      "title": "Match",
+      "type": "string"
+    },
+    "match_values": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Match Values",
+      "type": "array"
+    },
+    "priority": {
+      "minimum": 0,
+      "title": "Priority",
+      "type": "integer"
+    },
+    "source_gateway_ref": {
+      "default": "",
+      "maxLength": 48,
+      "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+      "title": "Source Gateway Ref",
+      "type": "string"
+    },
+    "target_ref": {
+      "default": "",
+      "maxLength": 48,
+      "pattern": "^$|^[a-z0-9][a-z0-9_-]*$",
+      "title": "Target Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "priority"
+  ],
+  "title": "OrderedRouteIntent",
+  "type": "object"
+}

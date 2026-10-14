@@ -7,101 +7,91 @@ section: guides
 
 ## 诊断
 
-从本地机器运行（无需 SSH）：
+从您自己的机器运行（无需 SSH）：
 
 ```
-meridian test IP
+meridian test 198.51.100.10
 ```
 
-如果 TCP 端口 443 检查失败，IP 可能被您的 ISP 或政府封锁。这是受审查地区最常见的问题。
+如果 TCP 检查在端口 443 从您的网络失败但从其他地方工作（另一网络、VPN、[ping 工具](https://getmeridian.org/ping)），IP 最可能被阻止了。TCP 失败到处发生通常意味着云防火墙或服务器关闭。
 
-## 紧急缓解
+## 立即缓解
 
-如果您使用**域名模式**（`--domain`）部署，您的 WSS/CDN 连接仍然有效——它通过 Cloudflare 的 CDN 路由，完全绕过 IP 封锁。告诉用户切换到其连接页面上的 WSS 连接链接。
+如果您用**域名**部署（`--domain`）且记录通过 Cloudflare 代理，XHTTP 和 WSS 路径仍然工作 — 它们到达 Cloudflare，不是您被阻止的 IP。使用 Xray JSON 或 Mihomo 订阅的应用自动切换；其他应用可以手动选择 XHTTP 或 WSS 条目。
 
-如果您已部署**中继**，通过中继连接的客户端不受影响——他们连接到中继的本地 IP，而不是被封锁的出站 IP。
+如果您有**中继**，通过它连接的客户端不受影响，只要中继本身仍能到达出口。
 
 ## 恢复选项
 
-### 选项 A：部署新服务器
+### 添加替代出口
 
-如果客户端少且没有中继，这是最快的方式：
+最快的路径，只要您的控制平面服务器（运行面板的那个）仍可从您的机器到达：
 
 ```bash
 # 1. 从您的提供商获得新 VPS（新 IP）
-# 2. 部署 Meridian
-meridian deploy NEW_IP
-
-# 3. 重新添加每个客户端
-meridian client add alice --server NEW_IP
-meridian client add bob --server NEW_IP
-
-# 4. 向用户发送新的连接页面
+# 2. 将其添加到集群
+meridian node add 198.51.100.20 --name replacement
 ```
 
-部署是幂等的——在同一 IP 上重新运行是安全的，并从中断处继续。
+客户端保留他们的账户。他们在下次订阅刷新时收到新出口 — 如果没有自动发生，请要求他们在应用中刷新。
 
-### 选项 B：新出站服务器 + 现有中继
+### 或将被阻止的出口移到新服务器
 
-如果您已部署中继，这是最佳方案——您的客户端保留中继连接，同时交换其后的出站服务器：
+`node replace` 将出口移到新服务器，保留其 ID、密钥、协议路径和中继，然后清理旧服务器：
 
 ```bash
-# 1. 部署新出站服务器
-meridian deploy NEW_EXIT_IP
-
-# 2. 在新出站上重新添加客户端
-meridian client add alice --server NEW_EXIT_IP
-meridian client add bob --server NEW_EXIT_IP
-
-# 3. 将中继切换到新出站
-meridian relay remove RELAY_IP --exit OLD_EXIT_IP
-meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
-
-# 客户端自动重新连接——中继 IP 不变
+meridian node replace exit-1 198.51.100.20
 ```
 
-### 选项 C：添加域名模式以实现 CDN 回退
+客户端在下次订阅刷新时获取新地址。控制平面服务器无法以这种方式移动：其地址是每个订阅 URL 的一部分。
 
-如果您之前未使用域名模式，现在添加它以防止未来中断：
+### 添加域名用于 CDN 回退
+
+如果您之前未使用域名，添加一个到新出口：
 
 ```bash
-meridian deploy NEW_IP --domain proxy.example.com
+meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-使用域名模式，即使服务器 IP 被封锁，WSS/CDN 连接也能工作——流量通过 Cloudflare 路由。有关 Cloudflare 设置的详细信息，请参阅[域名模式指南](/docs/zh/domain-mode/)。
+见 [Domain mode](/en/domain-mode/) 的 Cloudflare 步骤。
 
-## 主动防御
+### 添加中继
 
-在 IP 被封锁**之前**设置弹性：
+中继在国内服务器上为用户提供一个入口点，在外国 IP 被阻止时保持可到达：
 
-1. **部署中继**——为客户端提供本地入口点。当出站 IP 被封锁时，交换中继后的出站，无需触及客户端：
-   ```bash
-   meridian relay deploy RELAY_IP --exit EXIT_IP
-   ```
+```bash
+meridian relay add 203.0.113.10 --exit 198.51.100.20
+```
 
-2. **启用域名模式**——添加即使 IP 被封锁也能工作的 WSS/CDN 回退：
-   ```bash
-   meridian deploy EXIT_IP --domain proxy.example.com
-   ```
+要让中继指向不同的出口，请先用 `meridian relay remove` 移除它，再用 `meridian relay add` 重新添加，并将 `--exit` 设为新出口。
 
-3. **两者都使用**——最大弹性。客户端有三条路径：中继（本地）、CDN（Cloudflare）和直接（如果未被封锁）。
+### 如果控制平面服务器丢失
 
-## 客户端迁移
+`node add` 和 `relay add` 需要面板。如果托管它的服务器消失且无法恢复，Meridian 无法迁移其客户端：用 `meridian deploy` 部署新服务器，然后用 `meridian client add` 重新创建每个客户端。每个人获得新链接。
 
-每个客户端都必须在新服务器上手动重新添加——尚无自动迁移工具。工作流程：
+## 从多台机器管理
 
-1. 部署新服务器
-2. 为每个客户端运行 `meridian client add NAME`
-3. 与用户共享新的连接页面（二维码、可共享 URL 或 HTML 文件）
+您 Meridian 了解的关于集群的所有内容都位于您部署的机器上的 `~/.config/meridian/` 中。要从第二台机器管理集群，将整个目录复制到该机器，并在您在其他地方进行每次更改后再复制一次。
 
-连接页面自动生成，包含所有可用的连接选项（直接、中继、CDN）。如果启用了服务器托管的页面，可共享的 URL 会自动更新。
+您无法意外撤销另一台机器的工作。控制服务器保留最后应用变更的小记录（`/var/lib/meridian/fence.json`）。在改变任何事情之前，Meridian 比较您的副本与该记录，`meridian plan` 提前警告如果应用会被拒绝：
+
+- **"另一台机器改变了这个集群"**：您的副本过期了。从最后应用的机器复制 `~/.config/meridian/`，然后再次运行命令。
+- **"另一个应用正在运行"**：有人现在正在改变集群。等他们完成。如果该运行崩溃，其声明在 30 分钟内过期；您自己机器上的崩溃运行根本不会阻止您。
+- **"此控制服务器属于集群的不同副本"**：这个 `~/.config/meridian/` 从未从管理集群的机器复制过。
+
+## 块前准备
+
+1. **添加中继**在国内服务器上：`meridian relay add RELAY_IP --exit EXIT_IP`
+2. **使用域名** CDN 回退：用 `--domain vpn.example.com` 部署
+3. **两者** — 客户端然后有三个进入方式：中继（国内）、CDN（Cloudflare）和直接
+4. **备份 `~/.config/meridian/`** — 它是让您从另一台机器管理集群的方式
 
 ## 保留旧服务器
 
-不要立即关闭旧服务器——它可能在数天或数周后解封。您可以定期检查：
+不要立即拆卸被阻止的服务器 — 块有时在天数或数周后被解除。检查不时：
 
 ```bash
-meridian test OLD_IP
+meridian test 198.51.100.10
 ```
 
-如果恢复了，您有一个备用出站服务器准备就绪。
+当您不再需要它时，使用 `meridian node remove` 删除它。

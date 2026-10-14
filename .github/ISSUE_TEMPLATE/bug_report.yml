@@ -26,7 +26,7 @@ body:
       label: Setup mode
       options:
         - Standalone (no domain)
-        - Domain mode (with Caddy + HAProxy)
+        - Domain mode (nginx + Cloudflare CDN)
         - Uninstall
         - "Not sure"
     validations:

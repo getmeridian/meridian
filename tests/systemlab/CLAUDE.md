@@ -1,59 +1,39 @@
-# tests/systemlab — Multi-node system validation lab
+# tests/systemlab — Multi-node Docker validation
 
 ```bash
-make system-lab               # ~3 min (cached images), ~5 min (cold)
-# or manually:
-bash tests/systemlab/scripts/setup-fixtures.sh
-docker compose -f tests/systemlab/compose.yml up --build \
-  --abort-on-container-exit --exit-code-from controller
-docker compose -f tests/systemlab/compose.yml down -v
+make system-lab
+uv run pytest tests/systemlab/ -q
 ```
-
-## What is tested
-
-The system lab deploys Meridian across two separate containers via SSH — exactly like a real VPS deployment — and verifies the full relay data path.
-
-### Commands exercised
-
-| # | Command | What it validates |
-|---|---------|-------------------|
-| 1 | `meridian deploy EXIT_IP --user root --yes --no-harden` | Full provisioner pipeline: Docker install, 3x-ui panel, Xray Reality+XHTTP inbounds, nginx SNI routing, TLS bootstrap cert |
-| 2 | `meridian client add alice` | Panel API client creation, credential generation, connection page rendering |
-| 3 | `meridian relay deploy RELAY_IP --exit EXIT_IP --sni www.google.com --yes` | Realm install, relay firewall (ufw), per-relay Xray inbound on exit, nginx relay-map, credential sync |
-| 4 | **Reality direct** (xray client → exit:443) | VLESS+Reality tunnel through nginx SNI routing — proves port, UUID, keys, SNI all match |
-| 5 | **Reality via relay** (xray client → relay:443 → exit) | Realm TCP forwarding + per-relay Xray inbound — proves relay port, relay SNI, and full tunnel chain |
-| 6 | `meridian teardown EXIT_IP --yes` | 3x-ui removal, nginx cleanup, credential removal |
-
-### Checks asserted
-
-- `proxy.yml` credentials file exists after deploy
-- 3x-ui container is running (`docker ps`)
-- nginx config is valid (`nginx -t`)
-- `meridian-relay` systemd service is active after relay deploy
-- Reality tunnel returns HTTP response through SOCKS5 (direct + via relay)
-
-### What is NOT tested (phase 2)
-
-- **XHTTP/TLS** — needs domain mode + Pebble cert (Pebble runs but can't issue IP certs)
-- **Domain mode / WSS** — needs internal DNS via pebble-challtestsrv
-- **IP verification** — xray `geoip:private` blocks lab IPs; x-ui regenerates routing rules
-- **Idempotent redeploy** — deploy-over-existing not exercised
-- **WARP** — Cloudflare WARP client not installed in lab
-
 ## Design decisions
 
-**Real systemd, real SSH** — containers run `/sbin/init`, services managed by real unit files. No mocked systemctl.
+**Real services over mocks** — privileged systemd/SSH containers stand in for two exits, two relay hops, and a routing gateway; the controller deploys through the same CLI and SSH paths as a VPS.
+**Nested Docker** — exits run their own Docker daemon and pull the pinned Remnawave backend, database, Valkey, subscription-page, and node images.
+**Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
+**Small fail-fast stages** — the controller runs bootstrap, single deploy, fleet deploy, subscription, resilience, and removal scripts under `scripts/stages/`; Make always tears Compose down. Pure contract tests run in normal pytest.
 
-**Separate Docker daemon** — exit node runs its own `dockerd` (vfs driver, no iptables). 3x-ui pulls from GHCR inside this nested daemon.
+## What's done well
 
-**Static IPs** — deterministic `172.30.0.0/24` bridge so SSH known_hosts, credential paths, and deploy commands are stable.
-
-**Fixtures generated at runtime** — SSH keypair and Pebble CA created by `setup-fixtures.sh`, never committed (`.gitignore`).
+- Fresh deploy verifies the Remnawave containers, both exits, the routing gateway, and both Realm hops.
+- Remnawave's delivered Xray config is executed directly; Base64, Mihomo, and sing-box documents are parsed and endpoint-checked, and the last two also pass `mihomo -t` and `sing-box check` at versions pinned (with per-arch checksums) in the controller image.
+- Resilience proves both one-exit-down directions and fail-closed all-down behavior through the `leastPing` pool.
+- Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real Host mutation but before observation.
+- Removal checks both relays, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent.
 
 ## Pitfalls
-
-- **xray `geoip:private` blocks lab IPs** — can't use internal echo service; x-ui regenerates config on restart. Test uses an external exit-IP endpoint.
-- **Pebble can't issue IP certs** — ACME protocol limitation. Infrastructure is ready; needs domain mode (phase 2).
-- **Relay remove fails** — credential sync bug: `_refresh_exit_credentials_or_fail` overwrites local relay data. Product bug, not test bug.
-- **systemd reports `degraded`** — some kernel features missing in containers. Accepted.
-- **Base image build is slow** — docker-ce from official repo. Uses BuildKit apt cache mounts. Cached after first build.
+- **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up; rerun a stage with `docker compose exec controller bash /workspace/tests/systemlab/scripts/stages/40-removal.sh` (copy edited scripts in with `docker compose cp`).
+- `scripts/panel-ui-check.py` is the only browser-level proof of the panel UI behind the secret path; run it locally after every backend bump, never in CI. The UI's own `ungh.cc` fetches are Remnawave's, not a Meridian leak.
+- A running node API precedes panel `is_connected`; keep the stage grace period and runtime polling.
+- Route the external connectivity probe explicitly to the pool; a fixed exit route makes failover assertions meaningless.
+- Intermediate Realm hops must never appear as canonical subscription endpoints.
+- Images trust the fixture CA for Pebble's HTTPS endpoint; the controller must also install Pebble's runtime issuance root before verified panel access.
+- Preflight must prove a real base-image pull (bridge DNS can pass while the daemon resolver fails), repair DNS only for the dedicated Meridian Colima profile, and keep local Docker state out of build contexts.
+- Nested Docker must keep bridge NAT, or the panel container loses its return path to sibling nodes.
+- `systemd` may report `degraded` inside privileged containers; accept it when required services are healthy.
+- The controller image must copy the Hatch build hook before `pip install .`.
+- Hardened exits must allow TCP and UDP 443 (Hysteria2 is on by default).
+- Tie interruption markers to an exact logical resource; never simulate recovery by editing `cluster.yml` checkpoints.
+- Fast reruns remove nested containers, volumes, and networks before and after validation but keep pulled images.
+- Client startup failures must never satisfy negative proxy tests; version Xray runtime assets with the binary.
+- Lab exits egress through Docker NAT, so an exit-IP mismatch counts only as traffic evidence, never a passed egress check.
+- Qualify a Reality target only by authenticated Xray traffic, never raw TLS reachability.
+- `sing-box check` resolves no outbound tags and `mihomo -t` downloads missing geodata: keep the graph check in `subscription_client.py`, pin new rule files in the image, and move the client-management docs with any engine pin.

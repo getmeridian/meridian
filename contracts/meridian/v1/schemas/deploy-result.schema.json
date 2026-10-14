@@ -1,0 +1,109 @@
+{
+  "additionalProperties": false,
+  "description": "Result returned after a deploy/redeploy operation completes.",
+  "properties": {
+    "client_name": {
+      "title": "Client Name",
+      "type": "string"
+    },
+    "connection_page_path": {
+      "title": "Connection Page Path",
+      "type": "string"
+    },
+    "connection_page_url": {
+      "default": "",
+      "title": "Connection Page Url",
+      "type": "string"
+    },
+    "domain": {
+      "title": "Domain",
+      "type": "string"
+    },
+    "geo_block": {
+      "title": "Geo Block",
+      "type": "boolean"
+    },
+    "harden": {
+      "title": "Harden",
+      "type": "boolean"
+    },
+    "mode": {
+      "enum": [
+        "first_deploy",
+        "redeploy"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "node_count": {
+      "title": "Node Count",
+      "type": "integer"
+    },
+    "panel_secret_path": {
+      "title": "Panel Secret Path",
+      "type": "string"
+    },
+    "panel_url": {
+      "title": "Panel Url",
+      "type": "string"
+    },
+    "relay_count": {
+      "title": "Relay Count",
+      "type": "integer"
+    },
+    "server_ip": {
+      "title": "Server Ip",
+      "type": "string"
+    },
+    "sni": {
+      "title": "Sni",
+      "type": "string"
+    },
+    "ssh_port": {
+      "title": "Ssh Port",
+      "type": "integer"
+    },
+    "ssh_user": {
+      "title": "Ssh User",
+      "type": "string"
+    },
+    "subscription_url": {
+      "default": "",
+      "title": "Subscription Url",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "test_command": {
+      "default": "",
+      "title": "Test Command",
+      "type": "string"
+    },
+    "warp": {
+      "title": "Warp",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "mode",
+    "server_ip",
+    "ssh_user",
+    "ssh_port",
+    "domain",
+    "sni",
+    "client_name",
+    "harden",
+    "warp",
+    "geo_block",
+    "panel_url",
+    "panel_secret_path",
+    "connection_page_path",
+    "node_count",
+    "relay_count",
+    "summary"
+  ],
+  "title": "DeployResult",
+  "type": "object"
+}

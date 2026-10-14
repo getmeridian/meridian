@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "One structured observation produced by a verification check.",
+  "properties": {
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    },
+    "remediation": {
+      "default": "",
+      "title": "Remediation",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "warning",
+        "skipped"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "status",
+    "message"
+  ],
+  "title": "VerificationFinding",
+  "type": "object"
+}

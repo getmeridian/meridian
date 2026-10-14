@@ -1,0 +1,421 @@
+"""Process API regressions for V4 compiler-backed plan and apply."""
+
+from __future__ import annotations
+
+import io
+import json
+from contextlib import redirect_stdout
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+import pytest
+import typer
+
+from meridian.cluster import ClusterConfig
+from meridian.commands._helpers import ReviewedApplyPersistenceError
+from meridian.commands.apply import run as run_apply_command
+from meridian.commands.plan import run as run_plan_command
+from meridian.commands.v4_topology import run_v4_apply, run_v4_plan
+from meridian.compiler import TopologyCompileError
+from meridian.console import set_json_mode
+from meridian.core.errors import LocalStateError
+from meridian.core.output import OperationContext
+from tests.support.topology import reality_path, single_exit_intent
+
+_PLAN_HASH = "a" * 64
+
+
+def _cluster() -> ClusterConfig:
+    return ClusterConfig(topology_intent=single_exit_intent(paths=[reality_path("reality", "www.microsoft.com")]))
+
+
+def _resource(logical_id: str = "firewall:srv-exit:443") -> SimpleNamespace:
+    return SimpleNamespace(
+        logical_id=logical_id,
+        payload=SimpleNamespace(kind="firewall_rule"),
+        desired_hash="b" * 64,
+        dependencies=[],
+    )
+
+
+def _action_result(
+    *,
+    status: str,
+    changed: bool,
+    error: str = "",
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        action=SimpleNamespace(resource=_resource()),
+        status=status,
+        succeeded=status in {"converged", "applied"},
+        changed=changed,
+        error=error,
+    )
+
+
+def _execution(*results: SimpleNamespace) -> SimpleNamespace:
+    items = list(results)
+    return SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        generation=4,
+        results=items,
+        all_succeeded=all(item.succeeded for item in items),
+        changed=any(item.changed for item in items),
+        failed=[item for item in items if not item.succeeded],
+        retired=[],
+        retirement_errors=[],
+    )
+
+
+def _runtime(result: SimpleNamespace) -> MagicMock:
+    runtime = MagicMock()
+    runtime.review.return_value = SimpleNamespace(
+        plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]),
+        retiring=(),
+        review_hash=_PLAN_HASH,
+    )
+    runtime.apply_intent.return_value = result
+    return runtime
+
+
+def _run_apply_json(result: SimpleNamespace, *, yes: bool = True) -> tuple[dict, int | None, MagicMock]:
+    runtime = _runtime(result)
+    output = io.StringIO()
+    exit_code = None
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+    ):
+        try:
+            run_v4_apply(
+                _cluster(),
+                yes=yes,
+                json_output=True,
+                operation=OperationContext(),
+            )
+        except typer.Exit as exc:
+            exit_code = exc.exit_code
+    return json.loads(output.getvalue()), exit_code, runtime
+
+
+def test_v4_apply_json_noop_uses_typed_compiled_result() -> None:
+    payload, exit_code, runtime = _run_apply_json(_execution(_action_result(status="converged", changed=False)))
+
+    assert exit_code is None
+    assert payload["status"] == "no_changes"
+    assert payload["exit_code"] == 0
+    assert payload["data"]["plan_hash"] == _PLAN_HASH
+    assert payload["data"]["generation"] == 4
+    assert payload["data"]["all_succeeded"] is True
+    assert payload["data"]["counts"] == {"actions": 1, "succeeded": 1, "failed": 0, "skipped": 0}
+    assert payload["data"]["actions"][0]["status"] == "converged"
+    runtime.apply_intent.assert_called_once_with(
+        _cluster().topology_intent,
+        expected_plan_hash=_PLAN_HASH,
+    )
+
+
+def test_v4_apply_json_partial_failure_is_one_terminal_envelope() -> None:
+    payload, exit_code, _runtime_mock = _run_apply_json(
+        _execution(
+            _action_result(status="applied", changed=True),
+            _action_result(status="failed", changed=False, error="firewall reload failed"),
+        )
+    )
+
+    assert exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["exit_code"] == 3
+    assert payload["data"]["changed"] is True
+    assert payload["data"]["all_succeeded"] is False
+    assert payload["data"]["counts"] == {"actions": 2, "succeeded": 1, "failed": 1, "skipped": 0}
+    assert payload["errors"][0]["code"] == "MERIDIAN_APPLY_FAILED"
+
+
+def test_v4_apply_json_confirmation_returns_typed_preview() -> None:
+    payload, exit_code, _runtime_mock = _run_apply_json(_execution(), yes=False)
+
+    assert exit_code == 2
+    assert payload["status"] == "failed"
+    assert payload["data"] == {
+        "plan_hash": _PLAN_HASH,
+        "resource_count": 1,
+        "review_hash": _PLAN_HASH,
+        "retiring_resources": [],
+    }
+    assert payload["errors"][0]["code"] == "MERIDIAN_CONFIRMATION_REQUIRED"
+
+
+@pytest.mark.parametrize("command", ["apply", "plan"])
+@pytest.mark.parametrize(
+    "error",
+    [
+        LocalStateError("Saved panel credentials are missing."),
+        TopologyCompileError("The reviewed topology cannot be represented."),
+    ],
+)
+def test_v4_typed_exception_emits_one_terminal_json_envelope(command: str, error: Exception) -> None:
+    output = io.StringIO()
+    target = f"meridian.commands.{command}.run_v4_{command}"
+    kwargs = {"yes": True} if command == "apply" else {}
+    runner = run_apply_command if command == "apply" else run_plan_command
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
+            patch(target, side_effect=error),
+            redirect_stdout(output),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            runner(**kwargs)
+    finally:
+        set_json_mode(False)
+
+    payload = json.loads(output.getvalue())
+    # plan reserves exit 2 for "changes pending", so its user errors exit 1.
+    assert exc_info.value.exit_code == (2 if command == "apply" else 1)
+    assert payload["command"] == command
+    assert payload["status"] == "failed"
+    assert payload["data"] == {}
+    assert len(payload["errors"]) == 1
+    assert payload["errors"][0]["category"] == "user"
+
+
+def test_v4_apply_persistence_failure_is_typed_system_error() -> None:
+    runtime = _runtime(_execution())
+    runtime.apply_intent.side_effect = ReviewedApplyPersistenceError("disk full")
+    output = io.StringIO()
+    set_json_mode(True)
+    try:
+        with (
+            patch("meridian.cluster.ClusterConfig.load", return_value=_cluster()),
+            patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+            patch("meridian.servers.ServerRegistry"),
+            redirect_stdout(output),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_apply_command(yes=True)
+    finally:
+        set_json_mode(False)
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["errors"][0]["category"] == "system"
+    assert "remote state may have changed" in payload["errors"][0]["message"]
+
+
+def test_v4_plan_json_uses_typed_compiled_result() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
+        retiring=[],
+        fence_warning="",
+        converged=True,
+        drifted=[],
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    cluster.active_plan_hash = _PLAN_HASH
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 0
+    assert payload["status"] == "no_changes"
+    assert payload["data"]["plan_hash"] == _PLAN_HASH
+    assert payload["data"]["converged"] is True
+    assert payload["data"]["resources"] == [
+        {
+            "logical_id": "firewall:srv-exit:443",
+            "kind": "firewall_rule",
+            "desired_hash": "b" * 64,
+            "dependencies": [],
+        }
+    ]
+
+
+def test_v4_plan_warns_when_apply_would_refuse_a_stale_copy() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
+        retiring=[],
+        fence_warning="Another machine changed this fleet. Copy ~/.meridian from it.",
+        converged=True,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    cluster.active_plan_hash = _PLAN_HASH
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit),
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert payload["data"]["warnings"] == ["Another machine changed this fleet. Copy ~/.meridian from it."]
+
+
+def test_v4_plan_reports_generation_activation_when_resources_match() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
+        retiring=[],
+        fence_warning="",
+        converged=True,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 2
+    assert payload["status"] == "changed"
+    assert payload["data"]["drifted_resources"] == []
+    assert payload["data"]["state_changes"] == ["activate this reviewed plan as the current generation"]
+    assert "requires activation" in payload["summary"]["text"]
+
+
+def test_v4_plan_observation_error_is_typed_inconclusive_failure() -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_PLAN_HASH,
+        retiring=[],
+        fence_warning="",
+        converged=False,
+        inspections=[
+            SimpleNamespace(
+                action=SimpleNamespace(resource=resource),
+                error="observation failed: panel unavailable",
+                converged=False,
+            )
+        ],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    output = io.StringIO()
+
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as exc_info,
+    ):
+        run_v4_plan(_cluster(), json_output=True, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert exc_info.value.exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["data"]["exit_code"] == 3
+    assert payload["errors"][0]["code"] == "MERIDIAN_PLAN_EVIDENCE_UNAVAILABLE"
+    assert payload["data"]["drifted_resources"] == []
+    assert payload["data"]["observation_errors"][0]["logical_id"] == resource.logical_id
+
+
+_REVIEW_HASH = "c" * 64
+
+
+def test_v4_apply_preview_lists_retirements_and_applies_only_the_retirement_bound_hash() -> None:
+    result = _execution(_action_result(status="converged", changed=False))
+    result.retired = ["realm:relay-a:0"]
+    result.changed = True
+    runtime = _runtime(result)
+    runtime.review.return_value = SimpleNamespace(
+        plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]),
+        retiring=(SimpleNamespace(logical_id="realm:relay-a:0"),),
+        review_hash=_REVIEW_HASH,
+    )
+    preview = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(preview),
+        pytest.raises(typer.Exit),
+    ):
+        run_v4_apply(_cluster(), yes=False, json_output=True, operation=OperationContext())
+    applied = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(applied),
+    ):
+        run_v4_apply(_cluster(), yes=True, json_output=True, operation=OperationContext())
+
+    data = json.loads(preview.getvalue())["data"]
+    assert data["review_hash"] == _REVIEW_HASH
+    assert data["retiring_resources"] == ["realm:relay-a:0"]
+    runtime.apply_intent.assert_called_once_with(_cluster().topology_intent, expected_plan_hash=_REVIEW_HASH)
+    payload = json.loads(applied.getvalue())
+    assert payload["status"] == "changed"
+    assert payload["data"]["retired_resources"] == ["realm:relay-a:0"]
+    assert payload["data"]["retirement_errors"] == []
+
+
+def test_v4_plan_shows_resources_to_remove_and_the_hash_that_binds_them(capsys) -> None:
+    resource = _resource()
+    inspection = SimpleNamespace(
+        plan_hash=_PLAN_HASH,
+        review_hash=_REVIEW_HASH,
+        retiring=["node:exit-b", "realm:relay-a:0"],
+        fence_warning="",
+        converged=False,
+        inspections=[SimpleNamespace(action=SimpleNamespace(resource=resource), error="", converged=True)],
+    )
+    runtime = MagicMock()
+    runtime.inspect_intent.return_value = inspection
+    cluster = _cluster()
+    cluster.active_plan_hash = _PLAN_HASH
+    output = io.StringIO()
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        redirect_stdout(output),
+        pytest.raises(typer.Exit) as json_exit,
+    ):
+        run_v4_plan(cluster, json_output=True, operation=OperationContext())
+    with (
+        patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
+        patch("meridian.servers.ServerRegistry"),
+        pytest.raises(typer.Exit) as text_exit,
+    ):
+        run_v4_plan(cluster, json_output=False, operation=OperationContext())
+
+    payload = json.loads(output.getvalue())
+    assert json_exit.value.exit_code == text_exit.value.exit_code == 2
+    assert payload["status"] == "changed"
+    assert payload["data"]["review_hash"] == _REVIEW_HASH
+    assert payload["data"]["retiring_resources"] == ["node:exit-b", "realm:relay-a:0"]
+    assert payload["summary"]["text"] == "2 resources will be removed."
+    text = capsys.readouterr().err
+    assert _REVIEW_HASH in text
+    assert "remove node:exit-b" in text and "remove realm:relay-a:0" in text

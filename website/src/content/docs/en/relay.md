@@ -7,117 +7,154 @@ section: guides
 
 ## What relays solve
 
-When your exit server's IP gets blocked, clients lose access. A relay node gives them a domestic entry point that's harder to block:
+When your exit server's IP gets blocked, users lose access. A relay gives them a domestic entry point that is harder to block:
 
 ```
 Client → Relay (domestic IP) → Exit server (abroad) → Internet
 ```
 
-Censors see traffic to a domestic IP. The relay forwards raw TCP to the exit server — all encryption is end-to-end between client and exit. The relay never sees plaintext.
+Censors see traffic to a domestic IP. The relay forwards raw TCP to the exit; encryption is end to end between the client and the exit, so the relay never sees plaintext.
 
 ## How relays work
 
-A relay runs [Realm](https://github.com/zhboner/realm), a lightweight zero-copy TCP forwarder (~5MB Rust binary). It listens on port 443 (configurable) and forwards all traffic to the exit server's port 443. No Docker, no VPN software, no management panel.
+A relay runs [Realm](https://github.com/zhboner/realm), a small zero-copy TCP forwarder. It listens on port 443 (configurable) and forwards to the exit's Reality listener. No Docker and no panel run on the relay.
 
-All protocols work through the relay:
-- **Reality** — end-to-end handshake, relay fully transparent
-- **XHTTP** — routed through relay with explicit `sni=` parameter
-- **WSS** — domain mode, routed with `sni=domain&host=domain`
+Relays carry **Reality** traffic. XHTTP, WSS, and Hysteria2 stay on the exit's own address and domain, and remain in the same subscription as alternatives.
 
 ## Deploy a relay
 
-First, deploy your exit server normally. Then deploy a relay pointing to it:
+Deploy the exit first, then point a relay at it:
 
 ```bash
-meridian relay deploy RELAY_IP --exit EXIT_IP
+meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-The provisioner:
-1. Installs required packages and enables BBR
-2. Configures UFW firewall (allow SSH + relay port)
-3. Downloads Realm binary (version-pinned, SHA256-verified)
-4. Writes Realm config and starts the systemd service
-5. Verifies relay → exit connectivity
+Meridian adds the relay to your topology and applies it:
+1. Prepares the relay server (packages, BBR, SSH hardening, a firewall that opens only SSH and the relay port)
+2. Installs Realm (version-pinned, SHA256-verified) as a systemd service
+3. Points the relay at the exit's Reality listener
+4. Publishes the relay in every client's subscription
 
 ### Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--exit/-e EXIT` | (required) | Exit server IP or name |
-| `--name NAME` | (auto) | Friendly name for the relay (e.g., `ru-moscow`) |
+| `--name NAME` | (auto) | Friendly name for the relay (e.g. `ru-moscow`) |
 | `--port/-p PORT` | 443 | Listen port on the relay server |
+| `--sni HOST` | exit's target | Reality camouflage target for this relay; omit it to use the exit's |
 | `--user/-u USER` | root | SSH user on the relay |
+| `--ssh-port PORT` | 22 | SSH port on the relay server |
 | `--yes/-y` | | Skip confirmation prompts |
 
 ### Example with all options
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow --port 443 --user ubuntu
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow \
+  --port 443 --sni dl.google.com --user ubuntu --ssh-port 2222 --yes
 ```
 
 ## How clients connect
 
-After deploying a relay, all existing client connection pages are **automatically regenerated**. Relay URLs are shown as the recommended connection, with direct URLs as backup.
-
-When you add new clients, relay URLs are included automatically:
+Existing clients receive the relay on their next subscription refresh, and their connection pages list it. New clients get it automatically:
 
 ```bash
-meridian client add alice --server 1.2.3.4   # relay URLs included
+meridian client add alice   # relay included
 ```
 
 ## Manage relays
 
 ```bash
-meridian relay list                    # all relays across all exit servers
-meridian relay list --exit 1.2.3.4     # relays for a specific exit
-meridian relay check RELAY_IP          # 4-point health check
-meridian relay remove RELAY_IP         # stop service + remove from config
+meridian relay list                       # all relays
+meridian relay list --exit 198.51.100.10  # relays for one exit
 ```
 
-### Health check
-
-`meridian relay check` tests four things:
-
-| Check | What it tests |
-|-------|---------------|
-| SSH to relay | Can you connect to the relay server? |
-| Realm service | Is the systemd service active? |
-| Relay → exit TCP | Can the relay reach the exit server on port 443? |
-| Local → relay TCP | Can your machine reach the relay on its listen port? |
-
-### Remove a relay
+Check a relay's hops — each Realm service is running, each hop reaches the next, and the public entry accepts connections — then test real traffic through the whole route:
 
 ```bash
-meridian relay remove RELAY_IP [--exit EXIT_IP] [--yes]
+meridian check 203.0.113.10
+meridian test
 ```
 
-This stops the Realm service, removes the relay from exit server credentials, and regenerates all client connection pages (back to direct URLs only).
+The check also measures each leg: from every hop it downloads the exit's camouflage site through the next hop, sending the same SNI clients send, and reports the connect time, the time to first byte, and how many bytes arrived. A transfer that freezes between roughly 8 and 32 KB is the signature of throttling on that leg and is reported as a warning; the usual fix is a relay host at a different provider (another network, or ASN). If the camouflage site's home page is smaller than 32 KB, the leg check is inconclusive rather than passing.
+
+To retire a relay, remove the chains through it. Meridian shows what it will delete, asks for confirmation, and cleans up the Realm service, firewall rules, and published entry points; existing clients lose the relay on their next subscription refresh:
+
+```bash
+meridian relay remove 203.0.113.10
+```
 
 ## Multiple relays
 
-You can attach multiple relays to one exit server — for example, relays in different cities or ISPs:
+Attach several relays to one exit, for example in different cities or networks:
 
 ```bash
-meridian relay deploy 10.0.0.5 --exit 1.2.3.4 --name ru-moscow
-meridian relay deploy 10.0.0.6 --exit 1.2.3.4 --name ru-spb
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-moscow
+meridian relay add 203.0.113.11 --exit 198.51.100.10 --name ru-spb
 ```
 
-Clients see all relay options on their connection page.
+Clients receive every relay in their subscription. For relay chains with more than one hop, use `meridian setup`.
+
+## Mobile whitelists
+
+During some mobile internet restrictions in Russia, operators let through only an approved list of sites and addresses. Reports vary by operator, region, and week, and no operator publishes its list. Meridian does not detect or track whitelists; this section covers what you can set up today and what stays manual.
+
+### What deployers report
+
+- **Networks differ.** Some seem to look only at the server name (SNI) a connection announces. Others also check the destination IP. Where only the name is checked, a direct Reality path with an allowed name can pass. Where the IP is checked too, the first hop has to be an address on the list.
+- **Domestic cloud addresses are the usual first hop.** Not every address from a provider is listed: people describe one subnet of a provider's range being allowed while another from the same provider is not. Providers may also limit private customers, cap how often you can recreate a server, or shape bandwidth.
+- **Foreign CDN addresses are generally not allowed on mobile networks.** Treat [domain mode](/en/domain-mode/) through Cloudflare as a fallback for home connections, not as a whitelist answer.
+- **The relay-to-exit link can be disrupted too.** A relay that reaches users can still lose its connection to a foreign exit.
+
+### A relay on an allowed address
+
+Rent a small server on a domestic provider whose address is allowed on your users' mobile networks. Community-maintained lists of allowed ranges exist, but only a test from a mobile connection while restrictions are active proves it. Then add it as a relay and give it an allowed name:
+
+```bash
+meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
+```
+
+With `--sni`, only this relay's entry in the subscription announces that name. Meridian adds the name to the exit's Reality listener (same keys) and gives the relay its own listener on the exit. It routes only that name to Reality, sends everything else to the camouflage site, and is reachable only from the relay's last hop. The exit's own camouflage target and its other entries don't change. The name doesn't have to be reachable from the exit, because the exit still presents its own camouflage target. A prober that reaches the relay without a valid key is therefore forwarded to that target instead of getting a proxy answer.
+
+Then check the relay and test from the network that matters:
+
+```bash
+meridian check 203.0.113.10
+meridian test
+```
+
+`meridian test` from your own machine can't tell you what a whitelisted mobile network allows. Try it on a real device on that network.
+
+### Pick an exit SNI
+
+`--sni` on `meridian deploy` and `meridian node add` sets the camouflage target for the exit's direct Reality path. The target must be a site the exit can reach with TLS 1.3, and deploy checks real traffic through it and stops if none passes. Before deploying, check a candidate with `meridian check IP --sni HOST`. On a network that checks names only, an allowed name may let the direct path through, but whether a name works depends on the operator, so test each one.
+
+### What Meridian doesn't do
+
+- It doesn't tell you whether a relay's IP is on any operator's list, or whether restrictions are active.
+- It doesn't set up fronting through a domestic CDN. Domain mode is built and tested for Cloudflare.
+- A relay carries Reality only. XHTTP, WSS, and Hysteria2 stay on the exit.
+- It doesn't tunnel through third-party calling or messaging services.
 
 ## Troubleshooting
 
 ### Port conflict
 
-Another service is using port 443 on the relay. Check with `ss -tlnp sport = :443` and stop the conflicting service, or use a different port with `--port 8443`.
+Another service is using the listen port on the relay. Check with `ss -tlnp sport = :443` and stop it, or pick another port with `--port 8443`.
 
 ### Firewall blocking
 
-Ensure port 443 is open on the relay's cloud provider firewall / security group, not just UFW.
+Make sure the relay port is open in your cloud provider's firewall or security group, not only in UFW.
 
-### Exit server unreachable
+### Exit unreachable
 
-The relay must be able to reach the exit server on port 443. Test with `curl -I https://EXIT_IP` from the relay, or run `meridian relay check`.
+The relay must reach the exit's Reality port. Run `meridian test` to check the route end to end, and `meridian check EXIT` to check the exit itself.
 
-### Relay service not started
+### Relay service not running
 
-Check the Realm service: `systemctl status meridian-relay`. View logs: `journalctl -u meridian-relay --no-pager -n 20`.
+On the relay server, list the forwarder services and read their logs. Relay hosts use neutral names (`netfwd-*` units, `/etc/netfwd/` configs) so nothing on them names Meridian, Realm, or a relay:
+
+```bash
+systemctl list-units 'netfwd-*'
+journalctl -u 'netfwd-*' --no-pager -n 20
+```

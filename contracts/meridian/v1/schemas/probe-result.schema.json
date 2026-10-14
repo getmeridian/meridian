@@ -1,0 +1,248 @@
+{
+  "$defs": {
+    "VerificationCheck": {
+      "additionalProperties": false,
+      "description": "One independently reportable verification check.",
+      "properties": {
+        "duration_ms": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/VerificationFinding"
+          },
+          "title": "Findings",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status"
+      ],
+      "title": "VerificationCheck",
+      "type": "object"
+    },
+    "VerificationContext": {
+      "additionalProperties": false,
+      "description": "Secret-free Meridian metadata available while verifying a target.",
+      "properties": {
+        "domain": {
+          "default": "",
+          "title": "Domain",
+          "type": "string"
+        },
+        "mode": {
+          "default": "generic",
+          "enum": [
+            "generic",
+            "meridian"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "protocols": {
+          "items": {
+            "enum": [
+              "reality",
+              "xhttp",
+              "wss",
+              "hysteria2"
+            ],
+            "type": "string"
+          },
+          "title": "Protocols",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "enum": [
+              "panel",
+              "exit",
+              "relay",
+              "routing_gateway"
+            ],
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "sni": {
+          "default": "",
+          "title": "Sni",
+          "type": "string"
+        }
+      },
+      "title": "VerificationContext",
+      "type": "object"
+    },
+    "VerificationCounts": {
+      "additionalProperties": false,
+      "description": "Aggregate check counts by terminal status.",
+      "properties": {
+        "checks": {
+          "minimum": 0,
+          "title": "Checks",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "skipped": {
+          "minimum": 0,
+          "title": "Skipped",
+          "type": "integer"
+        },
+        "warnings": {
+          "minimum": 0,
+          "title": "Warnings",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checks",
+        "passed",
+        "failed",
+        "warnings",
+        "skipped"
+      ],
+      "title": "VerificationCounts",
+      "type": "object"
+    },
+    "VerificationFinding": {
+      "additionalProperties": false,
+      "description": "One structured observation produced by a verification check.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "remediation": {
+          "default": "",
+          "title": "Remediation",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed",
+            "warning",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "status",
+        "message"
+      ],
+      "title": "VerificationFinding",
+      "type": "object"
+    },
+    "VerificationTarget": {
+      "additionalProperties": false,
+      "description": "Requested and resolved identity of one verification target.",
+      "properties": {
+        "requested": {
+          "title": "Requested",
+          "type": "string"
+        },
+        "resolved_ip": {
+          "default": "",
+          "title": "Resolved Ip",
+          "type": "string"
+        },
+        "server_ref": {
+          "default": "",
+          "title": "Server Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requested"
+      ],
+      "title": "VerificationTarget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "External fingerprint and exposure verification result.",
+  "properties": {
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/VerificationCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "context": {
+      "$ref": "#/$defs/VerificationContext"
+    },
+    "counts": {
+      "$ref": "#/$defs/VerificationCounts"
+    },
+    "exit_code": {
+      "enum": [
+        0,
+        3,
+        4
+      ],
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "target": {
+      "$ref": "#/$defs/VerificationTarget"
+    },
+    "verdict": {
+      "enum": [
+        "passed",
+        "findings",
+        "inconclusive"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "target",
+    "verdict",
+    "exit_code",
+    "counts"
+  ],
+  "title": "ProbeResult",
+  "type": "object"
+}

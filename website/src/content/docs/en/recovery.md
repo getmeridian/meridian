@@ -7,101 +7,91 @@ section: guides
 
 ## Diagnose
 
-Run from your local machine (no SSH needed):
+Run from your own machine (no SSH needed):
 
 ```
-meridian test IP
+meridian test 198.51.100.10
 ```
 
-If the TCP port 443 check fails, the IP is likely blocked by your ISP or government. This is the most common issue in censored regions.
+If the TCP check on port 443 fails from your network but works from elsewhere (another network, a VPN, the [ping tool](https://getmeridian.org/ping)), the IP is most likely blocked. A TCP failure everywhere usually means a cloud firewall or a server that is down.
 
 ## Immediate relief
 
-If you deployed with **domain mode** (`--domain`), your WSS/CDN connection still works — it routes through Cloudflare's CDN, bypassing the IP block entirely. Tell your users to switch to the WSS connection link on their connection page.
+If you deployed with a **domain** (`--domain`) and the record is proxied through Cloudflare, the XHTTP and WSS paths still work — they reach Cloudflare, not your blocked IP. Apps using the Xray JSON or Mihomo subscription switch over on their own; others can pick the XHTTP or WSS entry by hand.
 
-If you have a **relay** deployed, clients connecting through the relay are unaffected — they're connecting to the relay's domestic IP, not the blocked exit IP.
+If you have a **relay**, clients connecting through it are unaffected as long as the relay itself can still reach the exit.
 
 ## Recovery options
 
-### Option A: Deploy a new server
+### Add a replacement exit
 
-The fastest path if you have few clients and no relay:
+The fastest path, as long as your control-plane server (the one running the panel) is still reachable from your machine:
 
 ```bash
 # 1. Get a new VPS from your provider (new IP)
-# 2. Deploy Meridian
-meridian deploy NEW_IP
-
-# 3. Re-add each client
-meridian client add alice --server NEW_IP
-meridian client add bob --server NEW_IP
-
-# 4. Send new connection pages to your users
+# 2. Add it to the fleet
+meridian node add 198.51.100.20 --name replacement
 ```
 
-The deploy is idempotent — re-running on the same IP is safe and picks up where it left off.
+Clients keep their accounts. They receive the new exit on their next subscription refresh — ask them to refresh in their app if it doesn't happen on its own.
 
-### Option B: New exit server + existing relay
+### Or move the blocked exit to a new server
 
-Best if you have a relay deployed — your clients keep their relay connection while you swap the exit server behind it:
+`node replace` moves an exit to a fresh server, keeping its ID, keys, protocol paths, and relays, then cleans up the old server:
 
 ```bash
-# 1. Deploy new exit server
-meridian deploy NEW_EXIT_IP
-
-# 2. Re-add clients on new exit
-meridian client add alice --server NEW_EXIT_IP
-meridian client add bob --server NEW_EXIT_IP
-
-# 3. Switch relay to new exit
-meridian relay remove RELAY_IP --exit OLD_EXIT_IP
-meridian relay deploy RELAY_IP --exit NEW_EXIT_IP
-
-# Clients reconnect automatically — relay IP unchanged
+meridian node replace exit-1 198.51.100.20
 ```
 
-### Option C: Add domain mode for CDN fallback
+Clients pick up the new address on their next subscription refresh. The control-plane server can't be moved this way: its address is part of every subscription URL.
 
-If you weren't using domain mode before, add it now to prevent future disruption:
+### Add a domain for CDN fallback
+
+If you weren't using a domain, add one to the new exit:
 
 ```bash
-meridian deploy NEW_IP --domain proxy.example.com
+meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-With domain mode, the WSS/CDN connection works even when the server IP is blocked — traffic routes through Cloudflare. See the [Domain mode guide](/docs/en/domain-mode/) for Cloudflare setup.
+See [Domain mode](/en/domain-mode/) for the Cloudflare steps.
 
-## Proactive defense
+### Add a relay
 
-Set up resilience **before** your IP gets blocked:
-
-1. **Deploy a relay** — gives clients a domestic entry point. When the exit IP is blocked, swap the exit behind the relay without touching clients:
-   ```bash
-   meridian relay deploy RELAY_IP --exit EXIT_IP
-   ```
-
-2. **Enable domain mode** — adds WSS/CDN fallback that works even if the IP is blocked:
-   ```bash
-   meridian deploy EXIT_IP --domain proxy.example.com
-   ```
-
-3. **Both** — maximum resilience. Clients have three paths: relay (domestic), CDN (Cloudflare), and direct (if unblocked).
-
-## Client migration
-
-Each client must be re-added manually on the new server — there is no automated migration tool yet. The workflow:
-
-1. Deploy new server
-2. `meridian client add NAME` for each client
-3. Share new connection pages with users (QR code, shareable URL, or HTML file)
-
-Connection pages are auto-generated with all available connection options (direct, relay, CDN). If you have server-hosted pages enabled, the shareable URLs update automatically.
-
-## Keep your old server
-
-Don't tear down the old server immediately — it may become unblocked after days or weeks. You can check periodically:
+A relay on a domestic server gives users an entry point that stays reachable when foreign IPs are blocked:
 
 ```bash
-meridian test OLD_IP
+meridian relay add 203.0.113.10 --exit 198.51.100.20
 ```
 
-If it comes back, you have a spare exit server ready to go.
+To point a relay at a different exit, remove it with `meridian relay remove` and add it again with `--exit` set to the new exit.
+
+### If the control-plane server is lost
+
+`node add` and `relay add` need the panel. If the server that hosted it is gone and cannot be restored, Meridian can't carry its clients over: deploy a fresh server with `meridian deploy`, then recreate each client with `meridian client add`. Each person gets a new link.
+
+## Managing from more than one machine
+
+Everything Meridian knows about a fleet lives in `~/.config/meridian/` on the machine you deploy from. To manage the fleet from a second machine, copy that whole directory over, and copy it again after each change you make elsewhere.
+
+You can't accidentally undo another machine's work. The control server keeps a small record of the last change applied (`/var/lib/meridian/fence.json`). Before changing anything, Meridian compares your copy with that record, and `meridian plan` warns ahead of time if an apply would be refused:
+
+- **"Another machine changed this fleet"**: your copy is out of date. Copy `~/.config/meridian/` from the machine that applied last, then run the command again.
+- **"Another apply is running"**: someone is changing the fleet right now. Wait for them to finish. If that run crashed, its claim expires within 30 minutes; a crashed run on your own machine doesn't block you at all.
+- **"This control server belongs to a different copy of the fleet"**: this `~/.config/meridian/` was never copied from the machine that manages the fleet.
+
+## Prepare before a block
+
+1. **Add a relay** on a domestic server: `meridian relay add RELAY_IP --exit EXIT_IP`
+2. **Use a domain** for CDN fallback: deploy with `--domain vpn.example.com`
+3. **Both** — clients then have three ways in: relay (domestic), CDN (Cloudflare), and direct
+4. **Back up `~/.config/meridian/`** — it is what lets you manage the fleet from another machine
+
+## Keep the old server
+
+Don't tear down the blocked server right away — blocks are sometimes lifted after days or weeks. Check now and then:
+
+```bash
+meridian test 198.51.100.10
+```
+
+When you no longer need it, remove it with `meridian node remove`.
