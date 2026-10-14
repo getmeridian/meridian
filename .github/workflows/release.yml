@@ -191,7 +191,10 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
-          gh release create "$TAG" \
+          # The installer and its checksum ride every release, a second origin
+          # next to the copy on GitHub Pages (getmeridian/meridian#38).
+          sha256sum install.sh > SHA256SUMS
+          gh release create "$TAG" install.sh SHA256SUMS \
             --title "$TITLE" \
             --notes-file /tmp/release-notes.md \
             --latest
@@ -247,7 +250,8 @@ jobs:
             echo
             sed -n "/^## \[$BASE\]/,/^## \[/p" CHANGELOG.md | sed '$d'
           } > /tmp/release-notes.md
-          gh release create "$GITHUB_REF_NAME" \
+          sha256sum install.sh > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" install.sh SHA256SUMS \
             --verify-tag \
             --prerelease \
             --title "Meridian $VERSION (beta)" \

@@ -12,10 +12,25 @@ curl -sSf https://getmeridian.org/install.sh | bash
 ```
 
 This script:
-1. Installs [uv](https://docs.astral.sh/uv/) if it is not present, with pipx or pip as fallbacks
-2. Installs `meridian-vpn` from PyPI
+1. Installs [uv](https://docs.astral.sh/uv/) if it is not present, with pipx or pip as fallbacks. The uv installer is pinned by version and checked against its SHA-256 before it runs.
+2. Installs `meridian-vpn` from PyPI (set `MERIDIAN_VERSION=4.0.0` to install one exact release)
 3. Adds the tool directory to your shell PATH when needed
 4. Creates `/usr/local/bin/meridian` only when passwordless sudo is available
+
+## Verified install
+
+Every [GitHub release](https://github.com/getmeridian/meridian/releases) attaches `install.sh` and its `SHA256SUMS`. To check the script before running it, download both from the release and verify:
+
+```
+VERSION=4.0.0
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
+curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
+sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
+less install.sh                  # optional: read it
+MERIDIAN_VERSION=$VERSION bash install.sh
+```
+
+To check the copy at getmeridian.org instead, compare `curl -sSf https://getmeridian.org/install.sh | sha256sum` with the release's `SHA256SUMS`; they match unless the script changed after that release.
 
 ## Manual install
 

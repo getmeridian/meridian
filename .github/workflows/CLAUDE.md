@@ -12,6 +12,8 @@
 
 **Pre-releases from tags** — pushing `vX.Y.ZbN` (or `aN`/`rcN`) runs `release.yml` from the tagged commit: unit tests, a GitHub pre-release with `.github/BETA.md` plus the upcoming `X.Y.Z` CHANGELOG section, then the same PyPI gate. Stable releases still come only from main. Installers and `meridian update` on stable builds never pick a pre-release.
 
+**Verifiable installer** — stable and pre-release jobs attach `install.sh` and `SHA256SUMS` to the GitHub release (a second origin beside Pages); `install.sh` pins uv's installer by version and SHA-256, bumped together.
+
 **OIDC publishing** — Pages deploy uses trusted publisher (no token). PyPI requires `environment: pypi` approval gate + OIDC. No long-lived secrets.
 
 ## What's done well

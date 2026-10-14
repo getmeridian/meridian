@@ -204,6 +204,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   links redirect.
 
 ### Security and correctness
+- **The installer can be verified** — every release attaches `install.sh` and
+  its `SHA256SUMS`, the installation guide shows how to check them, and the
+  script pins uv's installer by version and SHA-256 instead of piping the
+  latest one into a shell. `MERIDIAN_VERSION=4.0.0` installs one exact release.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.
