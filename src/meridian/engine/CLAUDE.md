@@ -6,7 +6,7 @@
 - **Core is the contract source** - Engine calls `meridian.core` validation, planning, models, reporters, and events instead of redefining request/result shapes.
 - **Adapters stay explicit** - filesystem state, server registries, SSH, and panel clients are passed in or isolated behind small runtime helpers.
 - **Only for execution** - static Studio uses generated contracts without Engine; Engine serves the executable UI: SSH, files, secrets, operation state, events, and cancellation.
-- **Localhost API** - `meridian studio` serves a FastAPI app on `127.0.0.1` with contract/workflow discovery, server onboarding, deploy dry-run, and process-local deploy operations.
+- **Localhost API** - `meridian studio` serves a FastAPI app on `127.0.0.1` (stable port 7391, else the next free one up to 7400, because browsers keep the Studio draft per origin) with contract/workflow discovery, server onboarding, deploy dry-run, and process-local deploy operations.
 - **Cancellation is a request, not a kill** - `POST /operations/{id}/cancel` returns a typed `outcome`; a running deploy gets a marker file (`adapters/cancellation.py`) and its child stops at the next safe point. Nothing signals or kills the child.
 - **Routes are module-level** - `routes.py` holds standalone handlers on an APIRouter; `api.py` wires `app.state` and includes the router. No closures capture injected services.
 

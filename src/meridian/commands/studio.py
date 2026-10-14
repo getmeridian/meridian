@@ -10,12 +10,17 @@ from pathlib import Path
 
 import uvicorn
 
-from meridian.console import err_console, fail, info, ok
+from meridian.console import err_console, fail, info, ok, warn
 from meridian.engine.api import create_engine_app
 from meridian.engine.assets import resolve_studio_assets
 
 
-def run(port: int = 0, *, assets_dir: str = "", no_open: bool = False) -> None:
+# Browsers keep Studio's draft per origin, so the same port across launches keeps it.
+DEFAULT_PORT = 7391
+_FALLBACK_PORTS = 9
+
+
+def run(port: int | None = None, *, assets_dir: str = "", no_open: bool = False) -> None:
     """Serve Studio and the localhost Engine API."""
     host = "127.0.0.1"
     resolved_port = _choose_port(host, port)
@@ -56,18 +61,31 @@ def studio_url(host: str, port: int, session_key: str) -> str:
     return f"http://{host}:{port}/studio/#k={session_key}"
 
 
-def _choose_port(host: str, requested: int) -> int:
+def _choose_port(host: str, requested: int | None) -> int:
+    """An explicit port must be free; by default prefer the stable port, then its neighbours."""
     if requested:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.bind((host, requested))
-        except OSError:
+        if not _port_is_free(host, requested):
             fail(
                 f"Localhost port {requested} is unavailable",
                 hint="Choose another --port, or use --port 0 to select one automatically.",
                 hint_type="user",
             )
         return requested
+    if requested is None:
+        for candidate in range(DEFAULT_PORT, DEFAULT_PORT + _FALLBACK_PORTS + 1):
+            if _port_is_free(host, candidate):
+                if candidate != DEFAULT_PORT:
+                    warn(f"Port {DEFAULT_PORT} is busy; using {candidate}. Drafts saved on {DEFAULT_PORT} stay there")
+                return candidate
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind((host, 0))
         return int(sock.getsockname()[1])
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((host, port))
+    except OSError:
+        return False
+    return True

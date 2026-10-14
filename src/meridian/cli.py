@@ -259,12 +259,13 @@ def _offer_setup_or_help(ctx: typer.Context, *, interactive: bool) -> None:
 
 @app.command("studio", rich_help_panel=ADVANCED)
 def studio_cmd(
-    port: int = typer.Option(
-        0,
+    port: int | None = typer.Option(
+        None,
         "--port",
         min=0,
         max=65535,
-        help="Localhost port; 0 picks an available high port",
+        show_default=False,
+        help="Localhost port (default 7391, or the next free one, so browser drafts survive restarts); 0 picks any",
     ),
     assets_dir: str = typer.Option("", "--assets-dir", help="Directory containing built Studio assets"),
     no_open: bool = typer.Option(False, "--no-open", help="Print the URL without opening a browser"),

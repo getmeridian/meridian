@@ -386,11 +386,13 @@ meridian studio [--port PORT] [--assets-dir DIRECTORY] [--no-open]
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--port PORT` | 0 | 从 0 到 65535 的 localhost 端口；`0` 选择空闲高端口 |
+| `--port PORT` | 7391 | 从 0 到 65535 的本地端口；`0` 表示任选一个空闲端口 |
 | `--assets-dir DIRECTORY` | 捆绑资产 | 使用构建的 Studio 资产目录而不是打包复制 |
 | `--no-open` | | 打印本地 URL 无需打开浏览器 |
 
-如果端口被占用或资产缺失，Studio 失败清晰。显式资产目录必须包含 `studio/index.html`。
+Studio 会打印并打开形如 `http://127.0.0.1:7391/studio/#k=…` 的地址。`#k=` 后面的部分是密钥，每次启动都会变化；只有从该地址打开的浏览器标签页才能使用 Engine，因此同一台电脑上的其他程序和其他用户都无法使用。请妥善保密。重启 Studio 后，请打开它打印的新地址。
+
+不带 `--port` 时，Studio 使用端口 7391；如果被占用，则依次尝试后面的空闲端口，最多到 7400，这样浏览器为 Studio 保存的草稿下次仍然在。如果显式指定的 `--port` 已被占用，Studio 会给出清晰的错误并退出，缺少资产时也一样。显式指定的资产目录必须包含 `studio/index.html`。
 
 ### meridian api
 

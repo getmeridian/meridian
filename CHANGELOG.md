@@ -376,6 +376,7 @@ versions below), and the choice is saved for later applies.
   still sent a removed post-quantum option.
   Studio's Engine no longer hands its key to any local program: `meridian studio` prints (and
   opens) an address ending in `#k=…`, and only a tab opened from it can use the Engine.
+  Studio now listens on port 7391 by default, so the draft your browser keeps survives a restart.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.

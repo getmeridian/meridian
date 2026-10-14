@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 import typer
 
-from meridian.commands.studio import _choose_port, run
+from meridian.commands.studio import DEFAULT_PORT, _choose_port, run
 
 
 def test_explicit_assets_directory_must_contain_studio(tmp_path: Path) -> None:
@@ -38,6 +38,36 @@ def test_requested_port_must_be_available() -> None:
             _choose_port("127.0.0.1", port)
 
     assert exc_info.value.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("busy", "expected"),
+    [
+        (set(), DEFAULT_PORT),
+        ({DEFAULT_PORT}, DEFAULT_PORT + 1),
+        ({DEFAULT_PORT, DEFAULT_PORT + 1, DEFAULT_PORT + 2}, DEFAULT_PORT + 3),
+    ],
+    ids=["free", "next", "skips-several"],
+)
+def test_default_port_is_stable_so_browser_drafts_survive_restarts(busy: set[int], expected: int) -> None:
+    with patch("meridian.commands.studio._port_is_free", side_effect=lambda _host, port: port not in busy):
+        assert _choose_port("127.0.0.1", None) == expected
+
+
+def test_default_port_falls_back_to_any_free_port_when_its_range_is_busy() -> None:
+    with patch("meridian.commands.studio._port_is_free", return_value=False):
+        port = _choose_port("127.0.0.1", None)
+
+    assert port not in range(DEFAULT_PORT, DEFAULT_PORT + 10)
+    assert 0 < port < 65536
+
+
+def test_port_zero_picks_any_free_port() -> None:
+    with patch("meridian.commands.studio._port_is_free") as probe:
+        port = _choose_port("127.0.0.1", 0)
+
+    probe.assert_not_called()
+    assert port > 0
 
 
 def test_missing_studio_extra_explains_how_to_install(monkeypatch) -> None:

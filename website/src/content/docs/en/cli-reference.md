@@ -386,11 +386,13 @@ meridian studio [--port PORT] [--assets-dir DIRECTORY] [--no-open]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--port PORT` | 0 | Localhost port from 0 to 65535; `0` picks a free high port |
+| `--port PORT` | 7391 | Localhost port from 0 to 65535; `0` picks any free port |
 | `--assets-dir DIRECTORY` | bundled assets | Use a built Studio asset directory instead of the packaged copy |
 | `--no-open` | | Print the local URL without opening a browser |
 
-Studio fails clearly if the port is taken or the assets are missing. An explicit asset directory must contain `studio/index.html`.
+Studio prints and opens an address like `http://127.0.0.1:7391/studio/#k=…`. The part after `#k=` is a key that changes on every launch; only a browser tab opened from that address can use the Engine, so other programs and other users on the same computer cannot. Keep it private. After restarting Studio, open the new address it prints.
+
+Without `--port`, Studio uses port 7391, or the next free port up to 7400, so the draft your browser saves for Studio is still there next time. An explicit `--port` that is taken fails clearly, as do missing assets. An explicit asset directory must contain `studio/index.html`.
 
 ### meridian api
 
