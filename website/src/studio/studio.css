@@ -1,10 +1,9 @@
 .studio {
-  /* Derived from the site tokens so a palette change carries over; the accent
-     is mixed toward the text color so button labels keep their contrast. */
-  --studio-accent-bg: color-mix(in srgb, var(--ac), var(--t1) 45%);
-  --studio-accent-ink: var(--s1);
+  /* The site's accent pair: a gold fill with --on-ac labels, --ac-text for text. */
+  --studio-accent-bg: var(--ac);
+  --studio-accent-ink: var(--on-ac);
   --studio-accent-soft: var(--ac2);
-  --studio-accent-text: color-mix(in srgb, var(--ac), var(--t1) 40%);
+  --studio-accent-text: var(--ac-text);
   --studio-focus: var(--blue);
   line-height: 1.45;
   margin: 0 auto;

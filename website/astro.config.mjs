@@ -86,11 +86,14 @@ export default defineConfig({
       routeMiddleware: './src/lib/docs-route.ts',
       head: [
         {
-          // Landing and docs share one theme and language choice.
+          // Landing and docs share one theme. The language choice is only written when the
+          // reader picks a language (src/i18n/CLAUDE.md); reading a docs page isn't a choice.
           tag: 'script',
           content:
-            "try{var s=localStorage,t=s.getItem('meridian-theme');if(t&&!s.getItem('starlight-theme'))s.setItem('starlight-theme',t);s.setItem('meridian-lang',document.documentElement.lang.slice(0,2))}catch(e){}",
+            "try{var s=localStorage,t=s.getItem('meridian-theme');if(t&&!s.getItem('starlight-theme'))s.setItem('starlight-theme',t)}catch(e){}",
         },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#FDFAF6', media: '(prefers-color-scheme: light)' } },
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#1C1E28', media: '(prefers-color-scheme: dark)' } },
       ],
       disable404Route: true,
       credits: false,
