@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import platform
-import re
 import shlex
 
 import typer
@@ -16,7 +15,7 @@ from meridian.console import err_console, fail, line
 from meridian.core.errors import LocalStateError
 from meridian.core.execution import ServerConnection as ServerConnectionLike
 from meridian.core.inputs import validate_hostname_value
-from meridian.core.redaction import REDACTED, redact_string
+from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.facts import ServerFacts
 from meridian.servers import ServerRegistry
@@ -92,6 +91,7 @@ def run(
     local_os = platform.platform()
 
     cluster = load_cluster()
+    known_secrets = cluster.secret_values()
     deployed_with = (cluster.panel.deployed_with if cluster.panel.server_ip == resolved.ip else "") or "unknown"
 
     local_info = f"OS: {local_os}\nMeridian: {__version__}\nServer deployed with: {deployed_with}"
@@ -244,14 +244,14 @@ def run(
     if xray_expected:
         log_cmd = "docker logs remnawave-node --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
         xray_logs = evidence_conn.run(log_cmd, timeout=15).stdout.strip() or "container not running"
-        xray_logs = _redact_secrets(xray_logs)
+        xray_logs = redact_diagnostic_text(xray_logs, known_secrets)
         sections.append(("Remnawave Node Logs", f"$ {log_cmd}\n{xray_logs}"))
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:
         nginx_cmd = "tail -10 /var/log/nginx/error.log 2>/dev/null"
         nginx_errors = evidence_conn.run(nginx_cmd, timeout=10).stdout.strip() or "no errors or log not found"
-        nginx_errors = _redact_secrets(nginx_errors)
+        nginx_errors = redact_diagnostic_text(nginx_errors, known_secrets)
         sections.append(("Nginx Errors", f"$ {nginx_cmd}\n{nginx_errors}"))
         cert_port = 8443
         cert_sni = "localhost"
@@ -313,7 +313,7 @@ def run(
     err_console.print()
     err_console.print("  [bold]Diagnostics collected.[/bold]\n")
 
-    diag_text = _redact_secrets(_format_sections(sections))
+    diag_text = redact_diagnostic_text(_format_sections(sections), known_secrets)
 
     if ai:
         from meridian.ai import build_ai_prompt
@@ -377,27 +377,6 @@ def _check_cert_expiry(
             return f"valid until {expiry_fmt} ({days_left} days)"
     except (ValueError, IndexError):
         return f"raw: {date_str}"
-
-
-def _redact_secrets(text: str) -> str:
-    """Apply the central free-form redactor plus diagnostics-only key and UUID masking."""
-    text = redact_string(text).replace(REDACTED, "[REDACTED]")
-    # Bare `key=` is too generic for redact_string's public JSON surfaces, but
-    # log lines quoting Xray or Reality keys need it here.
-    text = re.sub(
-        r"(?P<key>\bkey\b)(?P<sep>\s*[:=]\s*)[^\s,;]+",
-        lambda match: f"{match.group('key')}{match.group('sep')}[REDACTED]",
-        text,
-        flags=re.IGNORECASE,
-    )
-    # Redact UUIDs
-    text = re.sub(
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-        "[UUID-REDACTED]",
-        text,
-        flags=re.IGNORECASE,
-    )
-    return text
 
 
 def _format_sections(sections: list[tuple[str, str]]) -> str:

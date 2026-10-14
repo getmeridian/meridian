@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import fields, is_dataclass
 from enum import Enum
 from typing import Any
@@ -147,6 +148,30 @@ def redact_string(value: str) -> str:
     )
     redacted = _ENV_ASSIGNMENT_RE.sub(lambda m: f"{m.group('key')}{m.group('sep')}{REDACTED}", redacted)
     return _ASSIGNMENT_RE.sub(lambda m: f"{m.group('key')}{m.group('sep')}{REDACTED}", redacted)
+
+
+# Diagnostic text (doctor reports, `meridian logs`) is read by people, so it also
+# masks bare `key=` values, subscription IDs, and UUIDs that public JSON keeps.
+DIAGNOSTIC_REDACTED = "[REDACTED]"
+_DIAGNOSTIC_KEY_RE = re.compile(r"(?P<key>\bkey\b)(?P<sep>\s*[:=]\s*)[^\s,;]+", re.I)
+_SUBSCRIPTION_ID_RE = re.compile(r"(?P<prefix>/sub/)[^\s/?#\"'`]+")
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
+# Shorter known values (empty strings, `sub`) would mask ordinary words.
+_KNOWN_SECRET_MIN_LENGTH = 6
+
+
+def redact_diagnostic_text(text: str, known: Iterable[str] = ()) -> str:
+    """Redact free-form diagnostic text: `redact_string()`, *known* literal secrets, keys, and UUIDs.
+
+    *known* carries values only local state can recognize, such as the panel's
+    secret path, which appear bare in server logs (``GET /<secret>/api``).
+    """
+    for value in sorted({item for item in known if len(item) >= _KNOWN_SECRET_MIN_LENGTH}, key=len, reverse=True):
+        text = text.replace(value, DIAGNOSTIC_REDACTED)
+    text = redact_string(text).replace(REDACTED, DIAGNOSTIC_REDACTED)
+    text = _DIAGNOSTIC_KEY_RE.sub(lambda m: f"{m.group('key')}{m.group('sep')}{DIAGNOSTIC_REDACTED}", text)
+    text = _SUBSCRIPTION_ID_RE.sub(lambda m: f"{m.group('prefix')}{DIAGNOSTIC_REDACTED}", text)
+    return _UUID_RE.sub("[UUID-REDACTED]", text)
 
 
 def _is_json_schema_property_map(value: dict[Any, Any]) -> bool:

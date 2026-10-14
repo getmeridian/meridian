@@ -12,33 +12,33 @@ from meridian.commands.diagnostics import (
     _check_cert_expiry,
     _EvidenceConnection,
     _format_sections,
-    _redact_secrets,
     run,
 )
+from meridian.core.redaction import redact_diagnostic_text
 from meridian.ssh import CommandResult, SSHError
 
 
 class TestRedactSecrets:
     def test_redacts_uuid(self) -> None:
         text = "client id: 550e8400-e29b-41d4-a716-446655440000"
-        assert "[UUID-REDACTED]" in _redact_secrets(text)
-        assert "550e8400" not in _redact_secrets(text)
+        assert "[UUID-REDACTED]" in redact_diagnostic_text(text)
+        assert "550e8400" not in redact_diagnostic_text(text)
 
     def test_redacts_password(self) -> None:
         text = "Password: s3cret!pass"
-        result = _redact_secrets(text)
+        result = redact_diagnostic_text(text)
         assert "s3cret" not in result
         assert "Password: [REDACTED]" in result
 
     def test_redacts_key(self) -> None:
         text = "Key=WBNp7SHzGMaqp6ohXMfJHUy"
-        result = _redact_secrets(text)
+        result = redact_diagnostic_text(text)
         assert "WBNp7" not in result
         assert "Key=[REDACTED]" in result
 
     def test_preserves_non_secret_text(self) -> None:
         text = "nginx started on port 443"
-        assert _redact_secrets(text) == text
+        assert redact_diagnostic_text(text) == text
 
     @pytest.mark.parametrize(
         ("text", "secret"),
@@ -57,10 +57,22 @@ class TestRedactSecrets:
         ],
     )
     def test_redacts_structured_and_free_form_secret_shapes(self, text: str, secret: str) -> None:
-        result = _redact_secrets(text)
+        result = redact_diagnostic_text(text)
 
         assert secret not in result
         assert "[REDACTED]" in result
+
+    def test_known_secrets_are_masked_where_no_pattern_sees_them(self) -> None:
+        text = 'request: "GET /a1b2c3d4e5f6/api/users HTTP/2.0", path "sub"'
+
+        result = redact_diagnostic_text(text, known=("a1b2c3d4e5f6", "sub", ""))
+
+        assert result == 'request: "GET /[REDACTED]/api/users HTTP/2.0", path "sub"'
+
+    def test_subscription_ids_in_request_paths_are_masked(self) -> None:
+        result = redact_diagnostic_text("GET /page/sub/Xk3PqR8sTu HTTP/1.1")
+
+        assert result == "GET /page/sub/[REDACTED] HTTP/1.1"
 
 
 class TestFormatSections:

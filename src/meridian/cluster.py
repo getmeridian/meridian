@@ -379,6 +379,26 @@ class ClusterConfig:
         """Whether the cluster has a panel configured."""
         return bool(self.panel.url and self.panel.api_token)
 
+    def secret_values(self) -> tuple[str, ...]:
+        """Saved values that must never appear in diagnostic text, such as server logs.
+
+        Paths are included because they show up bare in request lines, where
+        no pattern-based redaction can recognize them.
+        """
+        values = [
+            self.panel.api_token,
+            self.panel.admin_pass,
+            self.panel.secret_path,
+            self.panel.sub_path,
+            self.subscription_page.path if self.subscription_page else "",
+            self.telegram.bot_token if self.telegram else "",
+            *(keys.private_key for workload in self.workloads for keys in workload.reality_keys.values()),
+            *(allocation.path for allocation in self.allocations.values()),
+        ]
+        if self.topology_intent is not None:
+            values.extend(path.path for exit_ in self.topology_intent.exits for path in exit_.paths)
+        return tuple(dict.fromkeys(value for value in values if value))
+
 
 def _is_valid_uuid(s: str) -> bool:
     """Check if a string matches UUID format (lowercase or uppercase hex)."""
