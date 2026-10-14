@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 import socket
 import threading
 import webbrowser
@@ -9,7 +10,7 @@ from pathlib import Path
 
 import uvicorn
 
-from meridian.console import fail, info, ok
+from meridian.console import err_console, fail, info, ok
 from meridian.engine.api import create_engine_app
 from meridian.engine.assets import resolve_studio_assets
 
@@ -33,17 +34,26 @@ def run(port: int = 0, *, assets_dir: str = "", no_open: bool = False) -> None:
             hint="Reinstall Meridian with Studio assets, or pass --assets-dir after building the website.",
             hint_type="system",
         )
-    app = create_engine_app(assets_dir=assets, host=host, port=resolved_port)
-    url = f"http://{host}:{resolved_port}/studio/"
+    session_key = secrets.token_urlsafe(32)
+    app = create_engine_app(assets_dir=assets, host=host, port=resolved_port, session_key=session_key)
+    url = studio_url(host, resolved_port, session_key)
 
     info(f"Serving Studio assets from {assets}")
-    ok(f"Meridian Studio running at {url}")
+    ok("Meridian Studio is running. Open this address:")
+    # soft_wrap keeps the long key on one line, so copying it from the terminal works.
+    err_console.print(f"    {url}", soft_wrap=True, markup=False, highlight=False)
+    info("The address carries a key that changes on every launch; keep it private")
     info("Press Ctrl+C to stop; a running deploy finishes its current step first")
 
     if not no_open:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
 
     uvicorn.run(app, host=host, port=resolved_port, log_level="warning", access_log=False)
+
+
+def studio_url(host: str, port: int, session_key: str) -> str:
+    """The Studio address with its key in the fragment, which browsers never send to a server."""
+    return f"http://{host}:{port}/studio/#k={session_key}"
 
 
 def _choose_port(host: str, requested: int) -> int:

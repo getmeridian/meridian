@@ -20,30 +20,66 @@ from meridian.ssh import CommandResult
 from meridian.ssh_keys import KeyMaterial
 
 
+_KEY = {"x-meridian-csrf": "test-csrf"}
+
+
+def _app(app_port: int = 8765, **kwargs: object) -> Any:
+    return create_engine_app(assets_dir=None, host="127.0.0.1", port=app_port, session_key="test-csrf", **kwargs)
+
+
 def _client(app_port: int = 8765, **kwargs: object) -> TestClient:
-    app = create_engine_app(assets_dir=None, host="127.0.0.1", port=app_port, csrf_token="test-csrf", **kwargs)
-    return TestClient(app, base_url=f"http://127.0.0.1:{app_port}")
+    return TestClient(_app(app_port, **kwargs), base_url=f"http://127.0.0.1:{app_port}", headers=_KEY)
 
 
-def test_engine_health_exposes_csrf_and_disables_api_cache() -> None:
-    client = _client()
+def _keyless_client() -> TestClient:
+    return TestClient(_app(), base_url="http://127.0.0.1:8765")
 
-    response = client.get("/api/v1/health")
+
+def test_engine_health_never_reveals_the_session_key() -> None:
+    response = _keyless_client().get("/api/v1/health")
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert "connect-src 'self'" in response.headers["content-security-policy"]
-    assert response.json()["csrf_token"] == "test-csrf"
+    assert "test-csrf" not in response.text
     assert response.json()["assets"]["available"] is False
     assert "path" not in response.json()["assets"]
 
 
-def test_engine_rejects_untrusted_host_origin_and_missing_csrf() -> None:
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/api/v1/servers"),
+        ("GET", "/api/v1/operations"),
+        ("GET", "/api/v1/operations/op-1/diagnostics"),
+        ("GET", "/api/v1/schemas"),
+        ("POST", "/api/v1/deploy/dry-run"),
+        ("POST", "/api/v1/servers"),
+    ],
+    ids=["servers", "operations", "diagnostics", "schemas", "dry-run", "add-server"],
+)
+@pytest.mark.parametrize("presented", [None, "", "wrong-key"], ids=["missing", "empty", "wrong"])
+def test_engine_api_requires_the_session_key(method: str, path: str, presented: str | None) -> None:
+    headers = {} if presented is None else {"x-meridian-csrf": presented}
+
+    response = _keyless_client().request(method, path, headers=headers, json={})
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["category"] == "user"
+    assert "meridian studio" in response.json()["detail"]["hint"]
+
+
+def test_engine_rejects_untrusted_host_and_origin_even_with_the_key() -> None:
     client = _client()
 
     assert client.get("/api/v1/health", headers={"host": "evil.example"}).status_code == 403
-    assert client.get("/api/v1/health", headers={"origin": "http://evil.example"}).status_code == 403
-    assert client.post("/api/v1/deploy/dry-run", json={"ip": "198.51.100.10"}).status_code == 403
+    assert client.get("/api/v1/servers", headers={"origin": "http://evil.example"}).status_code == 403
+    assert client.get("/api/v1/servers", headers={"sec-fetch-site": "cross-site"}).status_code == 403
+
+
+def test_engine_refuses_to_start_without_a_session_key() -> None:
+    with pytest.raises(ValueError, match="session key"):
+        create_engine_app(assets_dir=None, session_key="")
 
 
 def test_engine_exposes_contracts_workflows_and_saved_servers() -> None:
@@ -686,7 +722,7 @@ def test_engine_serves_missing_assets_page_and_static_assets(tmp_path: Path) -> 
     assets = tmp_path / "dist"
     (assets / "studio").mkdir(parents=True)
     (assets / "studio" / "index.html").write_text("studio html", encoding="utf-8")
-    app = create_engine_app(assets_dir=assets, host="127.0.0.1", port=8765, csrf_token="test-csrf")
+    app = create_engine_app(assets_dir=assets, host="127.0.0.1", port=8765, session_key="test-csrf")
     client = TestClient(app, base_url="http://127.0.0.1:8765")
 
     response = client.get("/studio/")

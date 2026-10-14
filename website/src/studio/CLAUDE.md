@@ -8,7 +8,7 @@
 
 **Static plus local Engine** — Static Studio remains the safe fallback; executable Studio talks to `meridian studio` for localhost-only SSH, files, secrets, operations, and dry-runs.
 
-**Adapters over contracts** — `staticAdapter.js`, `localEngineAdapter.js`, and `storageAdapter.js` consume generated contracts, never command modules.
+**Adapters over contracts** — `staticAdapter.js`, `engineSession.js`, and `storageAdapter.js` consume generated contracts, never command modules.
 
 **Guided cockpit UX** — Keep beginner-facing Studio screens focused on one task. Use the journey rail, contextual help, and command sheet instead of always-visible JSON/CLI panels.
 
@@ -16,7 +16,7 @@
 
 - Generated TypeScript keeps Studio aligned with Pydantic schemas without hand-written wire types.
 - Static adapter logic is pure browser-safe JavaScript with Node tests; it may persist non-secret wizard progress in versioned localStorage.
-- LocalEngine adapter detects `meridian studio` and uses CSRF-protected typed endpoints without breaking static hosting.
+- `engineSession.js` probes health (static vs Engine), takes the Engine key from the `#k=` fragment into sessionStorage (stripped with `history.replaceState`), sends it on every call, and locks on a 401 instead of guessing.
 - Operation state copy and the Cancel control's visibility live in pure `operationState.js`; the page only renders what it returns.
 - Help copy and journey structure live in `helpCatalog.js`; reusable Studio UI fragments live under `components/`.
 
@@ -28,4 +28,5 @@
 - Keep Engine assumptions behind adapters; static Studio still uses generated fixtures, exported requests, copied CLI, or pasted output.
 - Persist only non-secret Studio draft progress in browser storage. Never persist pasted machine output by default.
 - Never include SSH passwords in draft JSON, copied commands, generated contracts, storage, or URLs.
+- The Engine key lives only in this tab's sessionStorage, never localStorage, drafts, logs, or a URL left in history.
 - Cancel means "stop at the next safe point": keep the control disabled (not hidden) while `cancel_requested`, and render `cancelled` from `snapshot.cancellation`, including whether the server changed.

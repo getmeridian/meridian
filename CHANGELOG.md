@@ -374,6 +374,8 @@ versions below), and the choice is saved for later applies.
   A running deploy can be cancelled; it stops after its current step and resumes on the next run.
   Preview and deploy from Studio work again; the betas refused every request because Studio
   still sent a removed post-quantum option.
+  Studio's Engine no longer hands its key to any local program: `meridian studio` prints (and
+  opens) an address ending in `#k=…`, and only a tab opened from it can use the Engine.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.

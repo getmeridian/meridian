@@ -503,7 +503,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
 <script>
   // @ts-nocheck
   import { studioJourneySteps } from '../studio/helpCatalog.js';
-  import { cancelOperation, connectLocalEngine, engineGet, enginePost } from '../studio/localEngineAdapter.js';
+  import { createEngineSession, operationPath } from '../studio/engineSession.js';
   import {
     cancelControl,
     describeCancellation,
@@ -619,6 +619,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
   };
   const commands = buildCliCommands();
   let journey = loadJourneyDraft(window.localStorage);
+  const session = createEngineSession();
   let engine = null;
   let savedServers = [];
   let savedServersLoaded = false;
@@ -1075,7 +1076,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
   async function refreshSavedServers() {
     if (!engine) return;
     try {
-      const payload = await engineGet('/api/v1/servers');
+      const payload = await session.get('/api/v1/servers');
       savedServers = Array.isArray(payload.servers) ? payload.servers : [];
       savedServersLoaded = true;
     } catch {
@@ -1399,7 +1400,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     if (!engine || !currentOperationId) return;
     els.cancelOperation.disabled = true;
     try {
-      const payload = await cancelOperation(engine, currentOperationId);
+      const payload = await session.cancelOperation(currentOperationId);
       const outcome = describeCancelOutcome(payload.outcome);
       currentOperationSnapshot = payload.operation || currentOperationSnapshot;
       setStatus(outcome.title, outcome.detail, outcome.tone);
@@ -1442,7 +1443,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     resetTerminalPanels();
     persist();
     try {
-      const payload = await enginePost(engine, '/api/v1/deploy/start', request);
+      const payload = await session.post('/api/v1/deploy/start', request);
       currentOperationId = payload.operation?.id || '';
       currentOperationSnapshot = payload.operation || null;
       journey.activeOperationId = currentOperationId;
@@ -1474,9 +1475,9 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     window.clearTimeout(pollTimer);
     try {
       const [statusPayload, eventsPayload, resultPayload] = await Promise.all([
-        engineGet(`/api/v1/operations/${currentOperationId}`),
-        engineGet(`/api/v1/operations/${currentOperationId}/events?after_seq=${lastEventSeq}`),
-        engineGet(`/api/v1/operations/${currentOperationId}/result`),
+        session.get(operationPath(currentOperationId)),
+        session.get(operationPath(currentOperationId, `events?after_seq=${lastEventSeq}`)),
+        session.get(operationPath(currentOperationId, 'result')),
       ]);
       const state = statusPayload.operation?.state || 'running';
       currentOperationSnapshot = statusPayload.operation || currentOperationSnapshot;
@@ -1558,7 +1559,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     const operationId = lastFailure?.operationId || lastTerminalOperationId;
     if (!engine || !operationId) return;
     try {
-      const payload = await engineGet(`/api/v1/operations/${operationId}/diagnostics`);
+      const payload = await session.get(operationPath(operationId, 'diagnostics'));
       await navigator.clipboard.writeText(payload.markdown || formatJson(payload));
       setStatus('Diagnostics copied', 'The report is redacted and ready to paste into a support conversation.', 'ok');
     } catch (error) {
@@ -1741,16 +1742,16 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     if (event.target === els.commandSheet) closeCommandSheet();
   });
   els.saveServer.addEventListener('click', () =>
-    runAction('Server save', () => enginePost(engine, '/api/v1/servers', serverDraft())),
+    runAction('Server save', () => session.post('/api/v1/servers', serverDraft())),
   );
   els.saveAndValidate.addEventListener('click', async () => {
     if (!engine) return;
     setStatus('Saving and checking SSH', 'Studio is saving this server profile before validating the connection.', 'running');
     try {
-      const saved = await enginePost(engine, '/api/v1/servers', serverDraft());
+      const saved = await session.post('/api/v1/servers', serverDraft());
       handleActionPayload('Server save', saved);
       const body = { server_ref: saved.server?.id || journey.selectedServerId };
-      const validation = await enginePost(engine, '/api/v1/servers/validate', body);
+      const validation = await session.post('/api/v1/servers/validate', body);
       handleActionPayload('SSH validation', validation);
       renderPayload(validation);
       await refreshSavedServers();
@@ -1768,7 +1769,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
   els.validateServer.addEventListener('click', () =>
     runAction('SSH validation', () => {
       const body = journey.selectedServerId ? { server_ref: journey.selectedServerId } : { draft: serverDraft() };
-      return enginePost(engine, '/api/v1/servers/validate', body);
+      return session.post('/api/v1/servers/validate', body);
     }, { nextStep: 'keys', requireReadiness: 'sshValidated' }),
   );
   els.bootstrapKey.addEventListener('click', async () => {
@@ -1776,8 +1777,8 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
       await runAction('SSH key setup', async () => {
         const saved = journey.selectedServerId
           ? { server: { id: journey.selectedServerId } }
-          : await enginePost(engine, '/api/v1/servers', serverDraft());
-        return enginePost(engine, '/api/v1/servers/bootstrap-key', {
+          : await session.post('/api/v1/servers', serverDraft());
+        return session.post('/api/v1/servers/bootstrap-key', {
           disable_password_auth: fields.disablePasswordAuth.checked,
           key_policy: 'generate_meridian',
           password: fields.password.value,
@@ -1802,7 +1803,7 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
   });
   els.runDryRun.addEventListener('click', () => {
     if (engine) {
-      runAction('Deploy dry-run', () => enginePost(engine, '/api/v1/deploy/dry-run', deployRequest(false)), {
+      runAction('Deploy dry-run', () => session.post('/api/v1/deploy/dry-run', deployRequest(false)), {
         nextStep: 'review',
       });
     } else {
@@ -1869,15 +1870,27 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
       els.parseStatus.textContent = error instanceof Error ? error.message : 'Could not parse output';
     }
   });
-  connectLocalEngine().then(async (detected) => {
-    engine = detected;
+  function engineStatus(state) {
+    if (state === 'ready') return ['Local Studio available', 'Save servers, install keys, preview, and deploy locally.'];
+    if (state === 'locked') {
+      return ['Studio needs its address', 'Open the address `meridian studio` printed in Terminal; it ends with #k=.'];
+    }
+    return ['Static command mode', 'Generate commands and JSON. Run `meridian studio` and open the address it prints for guided actions.'];
+  }
+  session.onChange((state) => {
+    engine = state === 'ready' ? session : null;
+    const [title, detail] = engineStatus(state);
+    setStatus(title, detail, state === 'locked' ? 'warning' : 'ok');
+    render();
+  });
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash.includes('k=')) session.handshake().then(() => refreshSavedServers());
+  });
+  session.handshake().then(async (state) => {
+    engine = state === 'ready' ? session : null;
     journey.mode = engine ? 'engine' : 'static';
-    setStatus(
-      engine ? 'Local Studio available' : 'Static command mode',
-      engine
-        ? 'Save servers, install keys, preview, and deploy locally.'
-        : 'Generate commands and JSON. Launch `meridian studio` for guided actions.',
-    );
+    const [title, detail] = engineStatus(state);
+    setStatus(title, detail, state === 'locked' ? 'warning' : 'ok');
     persist();
     await refreshSavedServers();
     if (engine && currentOperationId) {

@@ -56,3 +56,44 @@ def test_missing_studio_extra_explains_how_to_install(monkeypatch) -> None:
 
     assert result.exit_code == 2
     assert "meridian-vpn[studio]" in result.output
+
+
+def test_studio_hands_the_browser_its_key_only_in_the_url_fragment(tmp_path: Path, capsys) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_app(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    with (
+        patch("meridian.commands.studio.resolve_studio_assets", return_value=tmp_path),
+        patch("meridian.commands.studio.create_engine_app", side_effect=fake_app),
+        patch("meridian.commands.studio.uvicorn.run") as serve,
+        patch("meridian.commands.studio.webbrowser.open") as browser,
+    ):
+        run(port=0, no_open=True)
+
+    key = str(captured["session_key"])
+    port = int(str(captured["port"]))
+    assert len(key) >= 32
+    assert f"http://127.0.0.1:{port}/studio/#k={key}" in capsys.readouterr().err.replace("\n", "")
+    serve.assert_called_once()
+    browser.assert_not_called()
+
+
+def test_each_launch_gets_a_new_key(tmp_path: Path) -> None:
+    keys: list[str] = []
+
+    def fake_app(**kwargs: object) -> object:
+        keys.append(str(kwargs["session_key"]))
+        return object()
+
+    with (
+        patch("meridian.commands.studio.resolve_studio_assets", return_value=tmp_path),
+        patch("meridian.commands.studio.create_engine_app", side_effect=fake_app),
+        patch("meridian.commands.studio.uvicorn.run"),
+    ):
+        run(port=0, no_open=True)
+        run(port=0, no_open=True)
+
+    assert keys[0] != keys[1]

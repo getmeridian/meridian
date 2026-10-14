@@ -16,6 +16,7 @@
 - Only a `cancelled` deploy envelope (exit 5) means a clean stop; exit 130 without an envelope is an interruption with possibly unknown outcomes and must surface as a failure.
 - Deploy dry-run compiles through `setup/single_server.py::preview_single_server_deploy()`, the same preview `deploy --dry-run` uses; never add a parallel deploy planner.
 - Never expose raw shell, arbitrary file access, or unredacted secrets from Engine APIs.
-- Keep localhost security hostile by default: Host/Origin checks, CSRF, no permissive CORS.
+- Keep localhost security hostile by default: Host/Origin/Sec-Fetch-Site checks, the per-launch session key on every API call but health, CSP `script-src 'self'`, no permissive CORS.
+- Never return the session key from an endpoint — any local user can call 127.0.0.1; `meridian studio` hands it over only in the `#k=` fragment of the address it prints (health once served it, so anyone on a shared machine could drive deploys).
 - Password bootstrap is one-time only: never in generated contracts, logs, events, browser storage, or profiles.
 - Keep human wording and terminal rendering in CLI adapters.
