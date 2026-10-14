@@ -372,6 +372,8 @@ versions below), and the choice is saved for later applies.
 ### Not yet available
 - `meridian studio` (local web UI) is experimental and needs `pip install 'meridian-vpn[studio]'`.
   A running deploy can be cancelled; it stops after its current step and resumes on the next run.
+  Preview and deploy from Studio work again; the betas refused every request because Studio
+  still sent a removed post-quantum option.
 
 ### Removed
 - 3x-ui, HAProxy and Caddy support; per-server `proxy.yml` credentials.

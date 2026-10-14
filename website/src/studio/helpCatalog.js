@@ -77,7 +77,6 @@ export const studioHelp = {
   domain: "Optional. Use it when you already own a domain pointed at this server.",
   color: "Only affects the connection page appearance.",
   icon: "Optional emoji or image URL shown on connection pages.",
-  pq: "Experimental. Keep off unless you specifically want to test it.",
   warp: "Routes outbound server traffic through WARP. Useful for some networks, unnecessary for most first installs.",
   pastedOutput: "Optional advanced tool. Paste one JSON envelope or JSONL events from the CLI to inspect them.",
 };

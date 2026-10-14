@@ -5,12 +5,11 @@ import test from "node:test";
 import {
   buildCliCommands,
   buildCommandPack,
-  buildDeployRequest,
   buildDeployRequestFromJourney,
   buildServerCliCommands,
   buildServerConnectionDraft,
   formatJson,
-  initialFormState,
+  JOURNEY_DEPLOY_FIELDS,
   parseSshCommand,
   parseEnvelope,
   parseEventStream,
@@ -18,6 +17,7 @@ import {
   validateServerConnectionDraft,
   validateDeployRequest,
 } from "./staticAdapter.js";
+import { createDefaultJourneyState } from "./storageAdapter.js";
 
 const repoRoot = new URL("../../../", import.meta.url);
 
@@ -34,39 +34,51 @@ const serverWorkflow = await readJson("contracts/meridian/v1/workflows/server-on
 const deployRequestSchema = await readJson("contracts/meridian/v1/schemas/deploy-request.schema.json");
 const serverConnectionDraftSchema = await readJson("contracts/meridian/v1/schemas/server-connection-draft.schema.json");
 
-test("builds a DeployRequest from generated workflow form state", () => {
-  const state = {
-    ...initialFormState(workflow),
-    client_name: "alice",
-    confirm: true,
-    ip: "198.51.100.10",
-    server_name: "Family VPN",
-    user: "admin",
+function journey(overrides = {}) {
+  const base = createDefaultJourneyState();
+  return {
+    ...base,
+    ...overrides,
+    deploy: { ...base.deploy, ...overrides.deploy },
+    server: { ...base.server, host: "198.51.100.10", ...overrides.server },
   };
+}
 
-  assert.deepEqual(buildDeployRequest(state), {
-    client_name: "alice",
-    color: "ocean",
-    domain: "",
-    geo_block: true,
-    harden: true,
-    icon: "",
-    ip: "198.51.100.10",
-    server_name: "Family VPN",
-    sni: "www.google.com",
-    user: "admin",
-    warp: false,
-    yes: true,
-  });
+test("every key the journey builds is a DeployRequest property", () => {
+  const known = new Set(Object.keys(deployRequestSchema.properties));
+  const byAddress = buildDeployRequestFromJourney(journey(), deployRequestSchema);
+  const bySavedServer = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo" }), deployRequestSchema);
+
+  for (const key of [...JOURNEY_DEPLOY_FIELDS, ...Object.keys(byAddress), ...Object.keys(bySavedServer)]) {
+    assert.ok(known.has(key), `${key} is not in deploy-request.schema.json`);
+  }
+});
+
+test("a fresh journey builds a request the schema accepts", () => {
+  const request = buildDeployRequestFromJourney(journey(), deployRequestSchema);
+
+  assert.deepEqual(validateDeployRequest(request, deployRequestSchema, workflow), []);
+});
+
+test("keys the schema does not declare never reach the request", () => {
+  const request = buildDeployRequestFromJourney(journey({ deploy: { pq: true } }), deployRequestSchema);
+
+  assert.equal("pq" in request, false);
+});
+
+test("validation refuses keys outside a closed schema", () => {
+  const request = { ...buildDeployRequestFromJourney(journey(), deployRequestSchema), pq: false };
+
+  const errors = validateDeployRequest(request, deployRequestSchema, workflow);
+
+  assert.deepEqual(errors.map((error) => error.field), ["pq"]);
 });
 
 test("validates request fields with readable messages", () => {
-  const request = buildDeployRequest({
-    ...initialFormState(workflow),
-    client_name: "bad name!",
-    ip: "198.51.100",
-    user: "bad user",
-  });
+  const request = buildDeployRequestFromJourney(
+    journey({ deploy: { client_name: "bad name!" }, server: { host: "198.51.100", ssh_user: "bad user" } }),
+    deployRequestSchema,
+  );
 
   assert.deepEqual(new Set(validateDeployRequest(request, deployRequestSchema, workflow).map((error) => error.message)), new Set([
     "Enter a valid IP address, or use local when running Meridian on the target server.",
@@ -76,12 +88,7 @@ test("validates request fields with readable messages", () => {
 });
 
 test("allows deploy request validation by saved server reference", () => {
-  const request = buildDeployRequest({
-    ...initialFormState(workflow),
-    ip: "",
-    requested_server: "srv-demo",
-    user: "",
-  });
+  const request = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo", server: { host: "" } }), deployRequestSchema);
 
   const errors = validateDeployRequest(request, deployRequestSchema, workflow);
 
@@ -99,7 +106,6 @@ test("builds deploy requests from the beginner journey state", () => {
       geo_block: true,
       harden: true,
       icon: "",
-      pq: false,
       server_name: "Family VPN",
       sni: "www.google.com",
       warp: false,
@@ -121,7 +127,6 @@ test("builds deploy requests from the beginner journey state", () => {
     harden: true,
     icon: "",
     ip: "198.51.100.10",
-    pq: false,
     server_name: "Family VPN",
     sni: "www.google.com",
     ssh_port: 2222,
@@ -131,29 +136,21 @@ test("builds deploy requests from the beginner journey state", () => {
   });
 });
 
+test("cleared fields take the workflow defaults only when the request is built", () => {
+  const state = journey({ deploy: { client_name: "", server_name: "  ", sni: "" }, server: { ssh_port: "", ssh_user: "" } });
+
+  const request = buildDeployRequestFromJourney(state, deployRequestSchema);
+
+  assert.equal(request.client_name, "default");
+  assert.equal(request.server_name, "My VPN");
+  assert.equal(request.sni, "www.google.com");
+  assert.equal(request.user, "root");
+  assert.equal(request.ssh_port, 22);
+  assert.equal(state.deploy.client_name, "");
+});
+
 test("builds deploy requests by saved server reference and hides raw connection fields", () => {
-  const request = buildDeployRequestFromJourney({
-    confirmDeploy: false,
-    deploy: {
-      client_name: "default",
-      color: "ocean",
-      domain: "",
-      geo_block: true,
-      harden: true,
-      icon: "",
-      pq: false,
-      server_name: "Family VPN",
-      sni: "www.google.com",
-      warp: false,
-    },
-    selectedServerId: "srv-demo",
-    server: {
-      host: "198.51.100.10",
-      ssh_port: 2222,
-      ssh_user: "ubuntu",
-      title: "Family VPN",
-    },
-  });
+  const request = buildDeployRequestFromJourney(journey({ selectedServerId: "srv-demo", server: { ssh_port: 2222 } }));
 
   assert.equal(request.requested_server, "srv-demo");
   assert.equal("ip" in request, false);
@@ -170,7 +167,6 @@ test("builds request-file CLI commands", () => {
 
 test("builds a server connection draft from onboarding state", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100.10",
     ssh_port: "2222",
     ssh_user: "ubuntu",
@@ -187,7 +183,6 @@ test("builds a server connection draft from onboarding state", () => {
 
 test("validates server onboarding fields with readable messages", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100",
     ssh_port: "70000",
     ssh_user: "bad user",
@@ -217,7 +212,6 @@ test("auto-generates a server title when beginners leave it blank", () => {
 
 test("validation errors include human labels, not only raw field ids", () => {
   const draft = buildServerConnectionDraft({
-    ...initialFormState(serverWorkflow),
     host: "198.51.100",
     ssh_port: "70000",
     ssh_user: "bad user",
@@ -247,7 +241,6 @@ test("validates generated schema maxLength constraints", () => {
         geo_block: true,
         harden: true,
         icon: "",
-        pq: false,
         server_name: "Family VPN",
         sni: "www.google.com",
         warp: false,

@@ -1,4 +1,7 @@
-const IPV4_RE = /^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+import { workflowDefaults } from "./contractDefaults.js";
+import { deployRequestSchema, deployWorkflow, serverOnboardingWorkflow } from "./generated/index.js";
+
+const IPV4_RE =/^(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
 const FIELD_LABELS = {
   client_name: "First client",
@@ -14,55 +17,63 @@ const FIELD_LABELS = {
   user: "SSH user",
 };
 
-export function initialFormState(workflow) {
-  const state = {};
-  for (const field of workflow.fields) {
-    state[field.id] = field.default ?? (field.kind === "boolean" || field.kind === "confirmation" ? false : "");
-  }
-  return state;
-}
+const DEPLOY_DEFAULTS = workflowDefaults(deployWorkflow);
+const SERVER_DEFAULTS = workflowDefaults(serverOnboardingWorkflow);
 
-export function buildDeployRequest(formState) {
+// Deploy options the journey edits. Each must be a DeployRequest property: the
+// Engine model forbids extra keys, so a stale field turns every request into a 422.
+export const JOURNEY_DEPLOY_FIELDS = [
+  "client_name",
+  "color",
+  "domain",
+  "geo_block",
+  "harden",
+  "icon",
+  "server_name",
+  "sni",
+  "warp",
+];
+
+// The one DeployRequest builder: Engine dry-run/deploy and the downloaded
+// deploy.json both come from here. Empty fields take the workflow contract's
+// defaults at build time, so a cleared input stays cleared in the draft.
+export function buildDeployRequestFromJourney(journey, schema = deployRequestSchema) {
+  const deploy = journey.deploy ?? {};
   const request = {};
-  for (const [key, rawValue] of Object.entries(formState)) {
-    if (key === "confirm") {
-      request.yes = Boolean(rawValue);
-      continue;
-    }
-    if (typeof rawValue === "string") {
-      request[key] = rawValue.trim();
+  for (const key of JOURNEY_DEPLOY_FIELDS) {
+    const fallback = DEPLOY_DEFAULTS[key];
+    const raw = deploy[key];
+    if (typeof fallback === "boolean") {
+      request[key] = typeof raw === "boolean" ? raw : fallback;
     } else {
-      request[key] = rawValue;
+      request[key] = String(raw ?? "").trim() || String(fallback ?? "");
     }
   }
-  if (!("yes" in request)) {
-    request.yes = false;
-  }
-  return request;
-}
-
-export function buildDeployRequestFromJourney(journey) {
-  const request = {
-    client_name: String(journey.deploy?.client_name ?? "default").trim() || "default",
-    color: String(journey.deploy?.color ?? "ocean").trim() || "ocean",
-    domain: String(journey.deploy?.domain ?? "").trim(),
-    geo_block: Boolean(journey.deploy?.geo_block ?? true),
-    harden: Boolean(journey.deploy?.harden ?? true),
-    icon: String(journey.deploy?.icon ?? "").trim(),
-    pq: Boolean(journey.deploy?.pq ?? false),
-    server_name: String(journey.deploy?.server_name ?? "My VPN").trim() || "My VPN",
-    sni: String(journey.deploy?.sni ?? "www.google.com").trim() || "www.google.com",
-    warp: Boolean(journey.deploy?.warp ?? false),
-    yes: Boolean(journey.confirmDeploy),
-  };
+  request.yes = Boolean(journey.confirmDeploy);
   if (journey.selectedServerId) {
     request.requested_server = String(journey.selectedServerId);
   } else {
     request.ip = String(journey.server?.host ?? "").trim();
-    request.user = String(journey.server?.ssh_user ?? "root").trim() || "root";
-    request.ssh_port = Number(journey.server?.ssh_port ?? 22);
+    request.user = String(journey.server?.ssh_user ?? "").trim() || String(SERVER_DEFAULTS.ssh_user ?? "root");
+    request.ssh_port = sshPortValue(journey.server?.ssh_port);
   }
-  return request;
+  return pickSchemaProperties(request, schema);
+}
+
+// Keep only what the generated schema declares, so no request carries a key
+// the Engine would reject.
+export function pickSchemaProperties(request, schema) {
+  const allowed = schema.properties ?? {};
+  return Object.fromEntries(Object.entries(request).filter(([key]) => key in allowed));
+}
+
+function sshPortValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return Number.parseInt(String(SERVER_DEFAULTS.ssh_port ?? "22"), 10);
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : Number.NaN;
 }
 
 export function buildServerConnectionDraft(formState) {
@@ -98,6 +109,15 @@ function validateRequest(request, schema, workflow) {
     const value = request[field.id];
     if (value === undefined || value === null || String(value).trim() === "") {
       errors.push({ field: field.id, label: field.label, message: `${field.label} is required.` });
+    }
+  }
+
+  if (schema.additionalProperties === false) {
+    const known = schema.properties ?? {};
+    for (const field of Object.keys(request)) {
+      if (!(field in known)) {
+        errors.push({ field, label: labelFor(field), message: `${labelFor(field)} is not an option this Meridian version accepts.` });
+      }
     }
   }
 

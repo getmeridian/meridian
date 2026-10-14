@@ -367,13 +367,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
                 <span>Icon <StudioHelp helpKey="icon" text={studioHelp.icon} /></span>
                 <input id="deploy-icon" type="text" />
               </label>
-              <label class="studio__choice-card" for="deploy-pq">
-                <input id="deploy-pq" type="checkbox" />
-                <span>
-                  <strong>Post-quantum encryption <StudioHelp helpKey="pq" text={studioHelp.pq} /></strong>
-                  <small>{studioHelp.pq}</small>
-                </span>
-              </label>
               <label class="studio__choice-card" for="deploy-warp">
                 <input id="deploy-warp" type="checkbox" />
                 <span>
@@ -564,7 +557,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     domain: $('deploy-domain'),
     color: $('deploy-color'),
     icon: $('deploy-icon'),
-    pq: $('deploy-pq'),
     warp: $('deploy-warp'),
     confirm: $('confirm-deploy'),
   };
@@ -785,7 +777,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     fields.domain.value = journey.deploy.domain;
     fields.color.value = journey.deploy.color;
     fields.icon.value = journey.deploy.icon;
-    fields.pq.checked = Boolean(journey.deploy.pq);
     fields.warp.checked = Boolean(journey.deploy.warp);
     fields.confirm.checked = Boolean(journey.confirmDeploy);
 
@@ -1589,7 +1580,6 @@ const colorOptions = workflowOptions(deployWorkflow, 'color') as Array<{ label: 
     journey.deploy.domain = fields.domain.value;
     journey.deploy.color = fields.color.value || workflowOptions(deployWorkflow, 'color')[0]?.value || 'ocean';
     journey.deploy.icon = fields.icon.value;
-    journey.deploy.pq = fields.pq.checked;
     journey.deploy.warp = fields.warp.checked;
     journey.confirmDeploy = fields.confirm.checked;
     journey.selectedServerId = fields.savedServer.value;

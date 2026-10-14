@@ -24,6 +24,7 @@
 
 - Do not hand-edit `generated/`; change Python contracts, export contracts, then regenerate.
 - Do not let Astro concerns leak into `meridian.core`.
+- Build every DeployRequest (Engine calls and `deploy.json`) with `buildDeployRequestFromJourney()`; it keeps only generated-schema keys, because `DeployRequest` forbids extras and a removed option (`pq`) once made every Studio request a 422.
 - Keep Engine assumptions behind adapters; static Studio still uses generated fixtures, exported requests, copied CLI, or pasted output.
 - Persist only non-secret Studio draft progress in browser storage. Never persist pasted machine output by default.
 - Never include SSH passwords in draft JSON, copied commands, generated contracts, storage, or URLs.
