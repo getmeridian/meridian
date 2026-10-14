@@ -95,6 +95,7 @@
   "routing.source": "Which routing gateway does this rule belong to?",
   "access.explain": "Each person gets their own link and QR code. You can add or remove people later with `meridian client add` and `meridian client remove`.",
   "access.users": "Names of the people (or devices) who will connect, comma-separated",
+  "access.usernames": "Pages and links show these names as typed; the panel stores Latin usernames: {pairs}",
   "review.title": "Here is what will be set up:",
   "review.control": "Control panel",
   "review.exit": "Exit",
@@ -140,5 +141,6 @@
   "error.address_required": "Enter the server's address, or 'local' for this machine.",
   "error.users_required": "Enter at least one name.",
   "error.users_twice": "Each name must be different, even ignoring capital letters.",
+  "error.user_name": "\"{name}\" can't be used: a name needs 1 to {max} printable characters.",
   "error.need_exit": "At least one server must be an exit."
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Iterable
 from typing import Annotated
 
 from pydantic import AfterValidator, Field, WithJsonSchema
@@ -23,6 +24,9 @@ _OPTIONAL_NAME_PATTERN = rf"^$|{_NAME_PATTERN}"
 _TOPOLOGY_ID_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
 _OPTIONAL_TOPOLOGY_ID_PATTERN = rf"^$|{_TOPOLOGY_ID_PATTERN}"
 _ACCESS_USERNAME_PATTERN = r"^[A-Za-z0-9_-]+$"
+ACCESS_USERNAME_MIN_LENGTH = 3
+ACCESS_USERNAME_MAX_LENGTH = 36
+DISPLAY_NAME_MAX_LENGTH = 40
 _SSH_USER_PATTERN = r"^[a-zA-Z0-9._-]+$"
 _OPTIONAL_SSH_USER_PATTERN = rf"^$|{_SSH_USER_PATTERN}"
 _SELECTOR_PATTERN = r"^\S+$"
@@ -156,11 +160,49 @@ def validate_optional_topology_id_value(value: str) -> str:
 
 def validate_access_username_value(value: str) -> str:
     """Validate a Remnawave access username at the public intent boundary."""
-    if len(value) < 3 or len(value) > 36:
-        raise ValueError("Access usernames must be between 3 and 36 characters.")
+    if not ACCESS_USERNAME_MIN_LENGTH <= len(value) <= ACCESS_USERNAME_MAX_LENGTH:
+        low, high = ACCESS_USERNAME_MIN_LENGTH, ACCESS_USERNAME_MAX_LENGTH
+        raise ValueError(f"Access usernames must be between {low} and {high} characters.")
     if _ACCESS_USERNAME_RE.fullmatch(value) is None:
         raise ValueError("Access usernames can use only letters, numbers, hyphens, and underscores.")
     return value
+
+
+def validate_display_name_value(value: str) -> str:
+    """Validate how a person's name is shown; any script, unlike panel usernames."""
+    value = value.strip()
+    if not value:
+        raise ValueError("Display names cannot be empty.")
+    if len(value) > DISPLAY_NAME_MAX_LENGTH:
+        raise ValueError(f"Display names must be {DISPLAY_NAME_MAX_LENGTH} characters or fewer.")
+    if "," in value or not all(char.isprintable() for char in value):
+        raise ValueError("Display names can contain only printable characters and no commas.")
+    return value
+
+
+def access_username_for(name: str, taken: Iterable[str] = ()) -> str:
+    """The panel username for a typed name: the name itself when Remnawave accepts it.
+
+    Otherwise a lowercase Latin transliteration (Биба → biba, 王小明 → wangxiaoming),
+    numbered when it collides with a *taken* username, ignoring case.
+    """
+    name = validate_display_name_value(name)
+    try:
+        base = validate_access_username_value(name)
+    except ValueError:
+        from anyascii import anyascii
+
+        latin = re.sub(r"[^a-z0-9_]+", "-", anyascii(name).lower()).strip("-_")
+        base = latin[:ACCESS_USERNAME_MAX_LENGTH].strip("-_")
+        if len(base) < ACCESS_USERNAME_MIN_LENGTH:
+            base = f"user-{base}".strip("-")
+    used = {username.lower() for username in taken}
+    candidate, number = base, 1
+    while candidate in used:
+        number += 1
+        suffix = f"-{number}"
+        candidate = base[: ACCESS_USERNAME_MAX_LENGTH - len(suffix)].rstrip("-_") + suffix
+    return candidate
 
 
 def validate_server_title_value(value: str) -> str:
@@ -333,11 +375,16 @@ AccessUsernameValue = Annotated[
         {
             "type": "string",
             "pattern": _ACCESS_USERNAME_PATTERN,
-            "minLength": 3,
-            "maxLength": 36,
+            "minLength": ACCESS_USERNAME_MIN_LENGTH,
+            "maxLength": ACCESS_USERNAME_MAX_LENGTH,
         }
     ),
     AfterValidator(validate_access_username_value),
+]
+DisplayNameValue = Annotated[
+    str,
+    WithJsonSchema({"type": "string", "minLength": 1, "maxLength": DISPLAY_NAME_MAX_LENGTH}),
+    AfterValidator(validate_display_name_value),
 ]
 ServerTitleValue = Annotated[
     str,

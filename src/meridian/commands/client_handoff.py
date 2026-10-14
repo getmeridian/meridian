@@ -12,6 +12,8 @@ from meridian.commands.client_state import persist_client_state
 from meridian.console import err_console, fail
 from meridian.core.clients import PanelUserLike
 from meridian.core.command_inputs import ClientNameRequest
+from meridian.core.inputs import validate_access_username_value, validate_display_name_value
+from meridian.core.topology import assign_access_usernames
 from meridian.remnawave import MeridianPanel, RemnawaveError, User
 from meridian.ssh import SSHError
 
@@ -42,6 +44,39 @@ def format_status(status: str) -> str:
 def validate_client_name(name: str) -> None:
     """Validate one client name at the command boundary."""
     validate_command_input(ClientNameRequest, "Invalid client name", name=name)
+
+
+def resolve_client_name(cluster: ClusterConfig, name: str) -> str:
+    """The panel username a typed client name means: a username or a display name (Биба)."""
+    intent = cluster.topology_intent
+    found = intent.access.find_user(name) if intent is not None else None
+    if found is not None:
+        return found
+    try:
+        validate_access_username_value(name)
+    except ValueError:
+        fail(
+            f"Client '{name}' is not one of your fleet's clients",
+            hint="Check client names with: meridian client list",
+            hint_type="user",
+        )
+    return name
+
+
+def new_client_usernames(cluster: ClusterConfig, names: list[str]) -> tuple[list[str], dict[str, str]]:
+    """Panel usernames for names being added, plus display names where they differ.
+
+    A name the fleet already has maps to its existing username, so the caller can
+    refuse it as already declared.
+    """
+    for name in names:
+        try:
+            validate_display_name_value(name)
+        except ValueError as exc:
+            fail(f"Invalid client name '{name}': {exc}", hint_type="user")
+    access = cluster.topology_intent.access if cluster.topology_intent is not None else None
+    usernames = assign_access_usernames(names, known=access, reserved=access.users if access else ())
+    return usernames, {user: name for user, name in zip(usernames, names, strict=True) if user != name}
 
 
 def get_user_or_fail(panel: MeridianPanel, name: str, *, action: str) -> User | None:

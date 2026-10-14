@@ -13,6 +13,7 @@ from meridian.setup.editor import (
     add_access_users_to_intent,
     add_exit_to_intent,
     add_relay_to_intent,
+    remove_access_user_from_intent,
     remove_exit_from_intent,
     remove_relays_from_intent,
 )
@@ -151,3 +152,10 @@ def test_remove_exit_surfaces_the_broken_rule_as_plain_text() -> None:
 def test_remove_relays_rejects_unknown_chain() -> None:
     with pytest.raises(ValueError, match="not in the topology: relay-x"):
         remove_relays_from_intent(_intent(), {"relay-x"})
+
+
+def test_display_names_ride_along_when_users_are_added_and_leave_with_them() -> None:
+    intent = add_access_users_to_intent(single_exit_intent(), ["biba", "boba"], {"biba": "Биба", "boba": "Боба"})
+
+    assert intent.access.display_names == {"biba": "Биба", "boba": "Боба"}
+    assert remove_access_user_from_intent(intent, "biba").access.display_names == {"boba": "Боба"}

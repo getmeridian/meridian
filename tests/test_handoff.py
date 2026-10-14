@@ -123,3 +123,25 @@ def test_published_pages_are_recorded_so_later_reads_show_the_link(tmp_home, mon
 
     assert links[0].page_url
     assert connection_page_deployed(ClusterConfig.load(), "vless-1")
+
+
+def test_page_greets_the_person_by_the_name_they_typed() -> None:
+    from tests.support.topology import single_exit_intent
+
+    intent = single_exit_intent(users=("alice", "boba"))
+    intent = intent.model_copy(
+        update={"access": intent.access.model_copy(update={"display_names": {"alice": "Алиса"}})}
+    )
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.1/adminsecret", server_ip="198.51.100.1", sub_path="pages"),
+        topology_intent=intent,
+    )
+    panel = SimpleNamespace(fetch_subscription=lambda _short: SimpleNamespace(content=_subscription()))
+    conn = MockConnection()
+
+    links = publish_connection_page(cluster, panel, conn, _user())  # type: ignore[arg-type]
+
+    assert (links.username, links.name) == ("alice", "Алиса")
+    assert json.loads(conn.write_map["/var/www/private/vless-1/config.json"])["client_name"] == "Алиса"
+    page = conn.write_map["/var/www/private/vless-1/index.html"]
+    assert "Алиса" in (page.decode() if isinstance(page, bytes) else page)

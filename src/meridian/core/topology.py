@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Iterable, Sequence
 from typing import Final, Literal, Self
 
 from pydantic import Field, HttpUrl, ValidationInfo, field_validator, model_validator
 
 from meridian.core.inputs import (
     AccessUsernameValue,
+    DisplayNameValue,
     OptionalCountryCodeValue,
     OptionalHostnameValue,
     OptionalTopologyIdValue,
@@ -18,6 +20,8 @@ from meridian.core.inputs import (
     ServerReferenceValue,
     ServerTitleValue,
     TopologyIdValue,
+    access_username_for,
+    validate_access_username_value,
     validate_country_code_value,
     validate_hostname_value,
 )
@@ -255,10 +259,17 @@ class OrderedRouteIntent(CoreModel):
 
 
 class AccessIntent(CoreModel):
-    """Meridian-owned access squad and human users."""
+    """Meridian-owned access squad and human users.
+
+    `users` are panel usernames (Latin only, as Remnawave requires); `display_names`
+    keeps the name as typed, in any script, for users whose username differs from it.
+    """
 
     squad_name: ServerTitleValue = "Meridian Access"
     users: list[AccessUsernameValue] = Field(min_length=1)
+    display_names: dict[AccessUsernameValue, DisplayNameValue] = Field(
+        default_factory=dict, exclude_if=lambda names: not names
+    )
 
     @field_validator("users")
     @classmethod
@@ -266,6 +277,60 @@ class AccessIntent(CoreModel):
         if len(users) != len({user.lower() for user in users}):
             raise ValueError("Access usernames must be unique, ignoring case.")
         return users
+
+    @model_validator(mode="after")
+    def validate_display_names(self) -> Self:
+        unknown = sorted(set(self.display_names) - set(self.users))
+        if unknown:
+            raise ValueError("Display names refer to unknown users: " + ", ".join(unknown))
+        shown = [self.display_name(user).casefold() for user in self.users]
+        if len(shown) != len(set(shown)):
+            raise ValueError("Each person needs a different name.")
+        return self
+
+    def display_name(self, username: str) -> str:
+        """The name to show for a user: as typed, else the username."""
+        return self.display_names.get(username, username)
+
+    def find_user(self, name: str) -> str | None:
+        """The username a person means by *name*: a username or a display name, ignoring case."""
+        if name in self.users:
+            return name
+        wanted = name.strip().casefold()
+        for user in self.users:
+            if wanted in {user.casefold(), self.display_name(user).casefold()}:
+                return user
+        return None
+
+
+def assign_access_usernames(
+    names: Sequence[str], *, known: AccessIntent | None = None, reserved: Iterable[str] = ()
+) -> list[str]:
+    """Panel usernames for typed names, in order.
+
+    A name *known* already has keeps its username, a name Remnawave accepts claims
+    itself next, and the rest are transliterated around those and *reserved*.
+    """
+    users: list[str | None] = []
+    for name in names:
+        found = known.find_user(name) if known is not None else None
+        users.append(found if found is not None and found not in users else None)
+    for index, name in enumerate(names):
+        claimed = {user.lower() for user in users if user is not None}
+        if users[index] is None and _accepted_username(name) and name.lower() not in claimed:
+            users[index] = name
+    for index, name in enumerate(names):
+        if users[index] is None:
+            users[index] = access_username_for(name, taken=[*reserved, *(user for user in users if user)])
+    return [user for user in users if user is not None]
+
+
+def _accepted_username(name: str) -> bool:
+    try:
+        validate_access_username_value(name)
+    except ValueError:
+        return False
+    return True
 
 
 class DeliveryIntent(CoreModel):

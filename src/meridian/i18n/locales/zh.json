@@ -95,6 +95,7 @@
   "routing.source": "此规则属于哪个路由网关？",
   "access.explain": "每个人都会获得自己的链接和二维码。你可以稍后使用 `meridian client add` 和 `meridian client remove` 添加或删除人员。",
   "access.users": "将连接的人员（或设备）的名称，用逗号分隔",
+  "access.usernames": "页面和链接会按输入的原样显示这些名称；面板存储的是拉丁字母用户名：{pairs}",
   "review.title": "将设置的内容是：",
   "review.control": "控制面板",
   "review.exit": "出口",
@@ -140,5 +141,6 @@
   "error.address_required": "输入服务器地址或 'local' 表示此机器。",
   "error.users_required": "请至少输入一个名称。",
   "error.users_twice": "名称不能重复（大小写不同也算重复）。",
+  "error.user_name": "“{name}”无法使用：名称需要 1 到 {max} 个可打印字符。",
   "error.need_exit": "至少一台服务器必须是出口。"
 }

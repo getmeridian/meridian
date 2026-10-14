@@ -20,7 +20,8 @@ from meridian.config import DEFAULT_SNI
 from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.errors import LocalStateError
 from meridian.core.inputs import (
-    validate_access_username_value,
+    DISPLAY_NAME_MAX_LENGTH,
+    validate_display_name_value,
     validate_hostname_value,
     validate_optional_country_code_value,
     validate_optional_hostname_value,
@@ -46,6 +47,7 @@ from meridian.core.topology import (
     OrderedRouteIntent,
     RouteMatchKind,
     TopologyServerShelfItem,
+    assign_access_usernames,
 )
 from meridian.i18n import t, words
 from meridian.registry_country import registry_country
@@ -413,15 +415,15 @@ class SetupWizard:
     # 5. users
     def _access(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("access.explain"))
-        answer = self.prompt.ask(t("access.users"), default="default", validate=_check_users)
-        users = [value.strip() for value in answer.split(",")]
+        previous = draft.access.access if draft.access is not None else None
+        default = ", ".join(previous.display_name(user) for user in previous.users) if previous else "default"
+        answer = self.prompt.ask(t("access.users"), default=default, validate=_check_users)
+        access = _access_intent(_split_names(answer), previous)
+        renamed = [f"{name} → {user}" for user, name in access.display_names.items()]
+        if renamed:
+            self.prompt.say(t("access.usernames", pairs=", ".join(renamed)), style="dim")
         title = draft.roles.control.title if draft.roles is not None else "Meridian"
-        self.service.configure_access(
-            SetupAccessSelection(
-                access=AccessIntent(users=[user for user in users if user]),
-                delivery=DeliveryIntent(profile_title=title),
-            )
-        )
+        self.service.configure_access(SetupAccessSelection(access=access, delivery=DeliveryIntent(profile_title=title)))
 
     # 6-9. review, apply, verify, handoff
     def _review(self, draft: SetupDraft) -> None:
@@ -455,7 +457,7 @@ class SetupWizard:
         verification = self._verification or self.runtime.verify(draft)
         self.prompt.say(t("handoff.ready"), style="bold green")
         for links in self.runtime.publish_handoff(sorted(verification.subscription_urls)):
-            self.io.write(f"  [bold]{escape(links.username)}[/bold]")
+            self.io.write(f"  [bold]{escape(links.name)}[/bold]")
             if links.page_url:
                 self.io.write(f"    {escape(t('handoff.page'))} [bold]{escape(links.page_url)}[/bold]")
             else:
@@ -498,7 +500,7 @@ class SetupWizard:
             row(t("review.relay"), f"{hops} → {relay.exit_ref}")
         for gateway in intent.routing_gateways:
             row(t("review.gateway"), server(gateway.server_ref))
-        row(t("review.users"), ", ".join(intent.access.users))
+        row(t("review.users"), ", ".join(intent.access.display_name(user) for user in intent.access.users))
         self.prompt.explain(t("review.ru_direct"))
         self.prompt.say(t("review.plan", hash=review.review_hash[:12], count=len(review.plan.resources)), style="dim")
         if review.retiring:
@@ -551,11 +553,27 @@ def _required(message: str) -> Callable[[str], None]:
     return check
 
 
+def _split_names(value: str) -> list[str]:
+    return [name.strip() for name in value.split(",") if name.strip()]
+
+
 def _check_users(value: str) -> None:
-    names = [name.strip() for name in value.split(",") if name.strip()]
+    names = _split_names(value)
     if not names:
         raise ValueError(t("error.users_required"))
     for name in names:
-        validate_access_username_value(name)
-    if len({name.lower() for name in names}) != len(names):
+        try:
+            validate_display_name_value(name)
+        except ValueError:
+            raise ValueError(t("error.user_name", name=name, max=DISPLAY_NAME_MAX_LENGTH)) from None
+    if len({name.casefold() for name in names}) != len(names):
         raise ValueError(t("error.users_twice"))
+
+
+def _access_intent(names: Sequence[str], previous: AccessIntent | None) -> AccessIntent:
+    """Panel usernames for typed names; a name already in the draft keeps its username."""
+    users = assign_access_usernames(names, known=previous)
+    return AccessIntent(
+        users=users,
+        display_names={user: name for user, name in zip(users, names, strict=True) if user != name},
+    )

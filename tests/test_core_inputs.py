@@ -189,3 +189,46 @@ def test_wrapped_validation_error_is_operator_readable() -> None:
     assert "- ssh_port:" in error.hint
     assert "ValidationError" not in error.hint
     assert "pydantic" not in error.hint.lower()
+
+
+@pytest.mark.parametrize(
+    ("name", "taken", "expected"),
+    [
+        ("Biba", (), "Biba"),
+        ("Биба", (), "biba"),
+        ("Биба", ("Biba",), "biba-2"),
+        ("Мария Анна", (), "mariya-anna"),
+        ("王小明", (), "wangxiaoming"),
+        ("Ли", (), "user-li"),
+        ("😀", (), "grinning"),
+    ],
+    ids=["latin-kept", "cyrillic", "taken-ignoring-case", "spaces", "chinese", "too-short", "emoji"],
+)
+def test_typed_names_become_valid_panel_usernames(name: str, taken: tuple[str, ...], expected: str) -> None:
+    from meridian.core.inputs import access_username_for, validate_access_username_value
+
+    username = access_username_for(name, taken)
+
+    assert username == expected
+    assert validate_access_username_value(username) == username
+
+
+def test_access_display_names_are_omitted_when_empty_and_findable_when_set() -> None:
+    from meridian.core.topology import AccessIntent
+
+    assert "display_names" not in AccessIntent(users=["default"]).model_dump(mode="json")
+    access = AccessIntent(users=["biba", "Boba"], display_names={"biba": "Биба"})
+    assert [access.find_user(name) for name in ("биба", "BIBA", "boba", "nobody")] == ["biba", "biba", "Boba", None]
+    assert access.display_name("biba") == "Биба" and access.display_name("Boba") == "Boba"
+
+
+@pytest.mark.parametrize(
+    ("display_names", "message"),
+    [({"ghost": "Призрак"}, "unknown users"), ({"biba": "boba"}, "different name")],
+    ids=["unknown-user", "shown-twice"],
+)
+def test_access_display_names_must_name_declared_users_once(display_names: dict[str, str], message: str) -> None:
+    from meridian.core.topology import AccessIntent
+
+    with pytest.raises(ValidationError, match=message):
+        AccessIntent(users=["biba", "boba"], display_names=display_names)

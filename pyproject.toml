@@ -29,8 +29,9 @@ dependencies = [
     "jinja2>=3.0",
     "segno>=1.5",
     "httpx>=0.27",
-    "pydantic>=2.11",
+    "pydantic>=2.12",
     "prompt-toolkit>=3.0.43",
+    "anyascii>=0.3.2",
 ]
 
 [project.scripts]

@@ -21,6 +21,15 @@ wheels = [
 ]
 
 [[package]]
+name = "anyascii"
+version = "0.3.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/ba/edebda727008390936da4a9bf677c19cd63b32d51e864656d2cbd1028e25/anyascii-0.3.3.tar.gz", hash = "sha256:c94e9dd9d47b3d9494eca305fef9447d00b4bf1a32aff85aa746fa3ec7fb95c3", size = 264680, upload-time = "2025-06-29T03:33:30.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c2/76/783b75a21ce3563b8709050de030ae253853b147bd52e141edc1025aa268/anyascii-0.3.3-py3-none-any.whl", hash = "sha256:f5ab5e53c8781a36b5a40e1296a0eeda2f48c649ef10c3921c1381b1d00dee7a", size = 345090, upload-time = "2025-06-29T03:33:28.356Z" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.13.0"
 source = { registry = "https://pypi.org/simple" }
@@ -436,6 +445,7 @@ wheels = [
 name = "meridian-vpn"
 source = { editable = "." }
 dependencies = [
+    { name = "anyascii" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "packaging" },
@@ -470,6 +480,7 @@ realvm = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyascii", specifier = ">=0.3.2" },
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.128" },
     { name = "fastapi", marker = "extra == 'studio'", specifier = ">=0.128" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.31.0" },
@@ -479,7 +490,7 @@ requires-dist = [
     { name = "packaging", specifier = ">=23.0" },
     { name = "pexpect", marker = "sys_platform != 'win32' and extra == 'dev'", specifier = ">=4.9" },
     { name = "prompt-toolkit", specifier = ">=3.0.43" },
-    { name = "pydantic", specifier = ">=2.11" },
+    { name = "pydantic", specifier = ">=2.12" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.0" },

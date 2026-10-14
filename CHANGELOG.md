@@ -60,6 +60,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   Esc goes back), typed answers are checked as you enter them, and the
   camouflage list leads with sites found in the exit's own network.
   `MERIDIAN_PLAIN_PROMPTS=1` keeps the numbered prompts.
+- **Names in any script** — `setup` and `client add` take people's names as
+  typed (Биба, مریم, 王小明); connection pages and output show them, and the
+  panel gets a Latin username (`biba`). Other client commands accept either.
 - **Camouflage scans work on cloud servers** — VPSes that get a `/32` address
   (Hetzner Cloud and others) now scan their surrounding `/24`; the scan used to
   cover only the server itself, so `deploy` and `node add` always fell back to

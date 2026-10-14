@@ -632,3 +632,32 @@ def test_names_that_differ_only_by_case_are_reasked(tmp_path) -> None:
 
     assert _wizard(service, shelf, io, lambda *_args: None).run() == "saved"
     assert any("even ignoring capital letters" in line for line in io.output)
+
+
+def test_names_in_any_script_keep_their_spelling_and_get_latin_panel_usernames(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY[:-1], ("Names of the people", "Биба, Boba, 王小明"), ("Set this up now?", "no")]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+
+    draft = store.load()
+    assert draft is not None and draft.access is not None
+    access = draft.access.access
+    assert access.users == ["biba", "Boba", "wangxiaoming"]
+    assert access.display_names == {"biba": "Биба", "wangxiaoming": "王小明"}
+    assert any("Биба → biba" in line for line in io.output)
+    assert any("Биба, Boba, 王小明" in line for line in io.output)  # the review shows the typed names
+
+
+def test_going_back_to_users_keeps_existing_usernames() -> None:
+    from meridian.commands.setup_wizard import _access_intent
+
+    previous = _access_intent(["Биба", "Biba"], None)
+    assert previous.users == ["biba-2", "Biba"]  # a name the panel accepts claims itself first
+
+    again = _access_intent(["Biba", "Ли", "Биба"], previous)
+
+    assert again.users == ["Biba", "user-li", "biba-2"]
+    assert again.display_names == {"user-li": "Ли", "biba-2": "Биба"}

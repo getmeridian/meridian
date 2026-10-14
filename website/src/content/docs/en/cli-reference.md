@@ -114,7 +114,7 @@ meridian client remove NAME [--yes] [--json]
 | `--repair-page` | | Republish the client's connection page (`client show`) |
 | `--yes`, `-y` | | Confirm `client remove`; required with `--json` |
 
-**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`).
+**`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`).
 
 **`client show`** — prints the connection page, subscription URL, status, traffic, and last-seen time. `--repair-page` republishes a missing page; if that fails, the links are still shown with a warning and exit `3`.
 

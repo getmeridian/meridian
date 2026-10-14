@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import NoReturn
 
 import typer
@@ -33,6 +33,7 @@ def run_add_v4(
     cluster: ClusterConfig,
     operation: OperationContext,
     *,
+    display_names: Mapping[str, str] | None = None,
     publish_handoff: Callable[[ClusterConfig, list[str]], list[HandoffLinks]],
 ) -> None:
     """Add access users through the reviewed compiler and resource drivers."""
@@ -59,7 +60,7 @@ def run_add_v4(
                     hint_type="user",
                 )
 
-    updated = add_access_users_to_intent(intent, names)
+    updated = add_access_users_to_intent(intent, names, display_names)
     result = apply_reviewed_intent(
         cluster,
         ServerRegistry(SERVER_PROFILES_FILE),
@@ -106,18 +107,19 @@ def run_add_v4(
         )
         return
 
-    ok(f"Added {len(succeeded)} client(s): {', '.join(names)}")
+    shown = display_names or {}
+    ok(f"Added {len(succeeded)} client(s): {', '.join(shown.get(name, name) for name in names)}")
     handoff_failed = False
     for links in handoffs:
         if len(succeeded) > 1:
             err_console.print()
-            err_console.print(f"  [bold]— {escape(links.username)} —[/bold]")
+            err_console.print(f"  [bold]— {escape(links.name)} —[/bold]")
         if not links.subscription_url:
             handoff_failed = True
-            warn(f"Client '{links.username}' was added, but its links are unavailable: {links.error}")
+            warn(f"Client '{links.name}' was added, but its links are unavailable: {links.error}")
             continue
         if links.error:
-            warn(f"Connection page for '{links.username}' is unavailable: {links.error}")
+            warn(f"Connection page for '{links.name}' is unavailable: {links.error}")
         print_handoff_links(links.subscription_url, page_url=links.page_url)
 
     err_console.print()

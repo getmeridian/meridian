@@ -1,7 +1,22 @@
 {
   "additionalProperties": false,
-  "description": "Meridian-owned access squad and human users.",
+  "description": "Meridian-owned access squad and human users.\n\n`users` are panel usernames (Latin only, as Remnawave requires); `display_names`\nkeeps the name as typed, in any script, for users whose username differs from it.",
   "properties": {
+    "display_names": {
+      "patternProperties": {
+        "^[A-Za-z0-9_-]+$": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 36,
+        "minLength": 3
+      },
+      "title": "Display Names",
+      "type": "object"
+    },
     "squad_name": {
       "default": "Meridian Access",
       "maxLength": 80,
