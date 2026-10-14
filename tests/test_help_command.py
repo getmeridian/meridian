@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import click
 from typer.testing import CliRunner
 
 from meridian.cli import app
@@ -19,10 +20,11 @@ def test_help_agents_prints_the_bundled_guide_as_plain_markdown() -> None:
 
 def test_help_command_path_shows_that_commands_help() -> None:
     result = runner.invoke(app, ["help", "node", "add"])
+    output = click.unstyle(result.stdout)  # CI forces color, which splits "--name" with style codes
 
     assert result.exit_code == 0
-    assert "meridian node add" in result.stdout
-    assert "--name" in result.stdout
+    assert "meridian node add" in output
+    assert "--name" in output
 
 
 def test_bare_help_matches_the_top_level_help() -> None:
