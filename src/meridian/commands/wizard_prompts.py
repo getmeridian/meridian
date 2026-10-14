@@ -6,9 +6,9 @@ chosen language, so a mistyped keyboard layout never strands anyone.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from rich.markup import escape
 
@@ -20,6 +20,38 @@ class WizardIO(Protocol):
     def write(self, message: str = "") -> None: ...
 
     def ask(self, label: str, *, default: str = "") -> str: ...
+
+
+Validate = Callable[[str], object]
+"""Raises ValueError with a readable message when the answer is unusable."""
+
+
+@runtime_checkable
+class Pickers(Protocol):
+    """Optional `WizardIO` controls for a capable terminal (`wizard_terminal.py`)."""
+
+    def text(self, label: str, *, default: str = "", validate: Validate | None = None) -> str: ...
+
+    def select(
+        self,
+        label: str,
+        choices: Sequence[Choice],
+        *,
+        default: str = "",
+        other: str = "",
+        validate_other: Validate | None = None,
+        details: str = "",
+    ) -> str: ...
+
+    def multiselect(
+        self,
+        label: str,
+        choices: Sequence[Choice],
+        *,
+        checked: Sequence[str] = (),
+        actions: Sequence[Choice] = (),
+        details: str = "",
+    ) -> list[str]: ...
 
 
 class RichWizardIO:
@@ -60,6 +92,7 @@ class Prompter:
 
     def __init__(self, io: WizardIO) -> None:
         self.io = io
+        self.pickers = io if isinstance(io, Pickers) else None
         self.details = ""
 
     def say(self, text: str, *, style: str = "") -> None:
@@ -70,9 +103,14 @@ class Prompter:
         for line in text.splitlines():
             self.say(f"  {line}" if line else "", style="dim")
 
-    def ask(self, label: str, *, default: str = "") -> str:
+    def ask(self, label: str, *, default: str = "", validate: Validate | None = None) -> str:
+        """Read one answer; navigation words raise ``Navigation`` and ``validate`` re-asks."""
         while True:
-            value = self.io.ask(label, default=default).strip()
+            if self.pickers is not None:
+                value = self.pickers.text(label, default=default, validate=_unless_word(validate))
+            else:
+                value = self.io.ask(label, default=default)
+            value = value.strip()
             command = value.lower()
             if command in words("word.details"):
                 self.explain(self.details)
@@ -80,6 +118,12 @@ class Prompter:
             for name in _NAVIGATION:
                 if command in words(f"word.{name}"):
                     raise Navigation(name)
+            if validate is not None and self.pickers is None:
+                try:
+                    validate(value)
+                except ValueError as exc:
+                    self.say(str(exc), style="error")
+                    continue
             return value
 
     def yes_no(self, label: str, *, default: bool, hint: str = "") -> bool:
@@ -99,20 +143,41 @@ class Prompter:
             return list(range(1, count + 1))
         return parse_numbers(answer, count)
 
-    def choose(self, label: str, choices: Sequence[Choice], *, default: str = "") -> str:
-        """Show a numbered list and return the chosen value (by number or by value)."""
+    def choose(
+        self,
+        label: str,
+        choices: Sequence[Choice],
+        *,
+        default: str = "",
+        other: str = "",
+        validate_other: Validate | None = None,
+    ) -> str:
+        """Pick one value; with ``other`` the reader may type their own, checked by ``validate_other``."""
+        if self.pickers is not None:
+            return self.pickers.select(
+                label, choices, default=default, other=other, validate_other=validate_other, details=self.details
+            )
         for index, choice in enumerate(choices, 1):
             hint = f" — {choice.hint}" if choice.hint else ""
             self.io.write(f"  [bold]{index}[/bold]) {escape(choice.label)}[dim]{escape(hint)}[/dim]")
         values = [choice.value for choice in choices]
         default_number = str(values.index(default) + 1) if default in values else "1"
-        answer = self.ask(label, default=default_number)
-        if answer in values:
-            return answer
-        numbers = parse_numbers(answer, len(choices))
-        if len(numbers) != 1:
-            raise ValueError(t("error.one_number"))
-        return values[numbers[0] - 1]
+        while True:
+            answer = self.ask(label, default=default_number)
+            if answer in values:
+                return answer
+            if other and not answer.isdigit():
+                try:
+                    if validate_other is not None:
+                        validate_other(answer)
+                except ValueError as exc:
+                    self.say(str(exc), style="error")
+                    continue
+                return answer
+            numbers = parse_numbers(answer, len(choices))
+            if len(numbers) != 1:
+                raise ValueError(t("error.one_number"))
+            return values[numbers[0] - 1]
 
     def language(self) -> Locale:
         """Step zero: pick the wizard language (shown in every language at once)."""
@@ -122,6 +187,18 @@ class Prompter:
                 return choose_locale(self.choose("Language / Язык / زبان / 语言", choices, default=system_locale()))
             except ValueError:
                 continue
+
+
+def _unless_word(validate: Validate | None) -> Validate | None:
+    """Let navigation and details words through the picker's validation; ``ask`` acts on them."""
+    if validate is None:
+        return None
+    reserved = {word for key in (*_NAVIGATION, "details") for word in words(f"word.{key}")}
+
+    def check(value: str) -> object:
+        return None if value.strip().lower() in reserved else validate(value)
+
+    return check
 
 
 def choose_locale(value: str) -> Locale:

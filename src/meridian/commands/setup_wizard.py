@@ -10,14 +10,21 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from typing import Literal, cast
+from typing import Literal, NamedTuple, cast
 
 import typer
 from pydantic import ValidationError
 from rich.markup import escape
 
 from meridian.config import DEFAULT_SNI
+from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.errors import LocalStateError
+from meridian.core.inputs import (
+    validate_access_username_value,
+    validate_hostname_value,
+    validate_optional_country_code_value,
+    validate_optional_hostname_value,
+)
 from meridian.core.setup import (
     SETUP_STAGE_ORDER,
     SetupAccessSelection,
@@ -38,6 +45,7 @@ from meridian.core.topology import (
     EgressPoolIntent,
     OrderedRouteIntent,
     RouteMatchKind,
+    TopologyServerShelfItem,
 )
 from meridian.i18n import t, words
 from meridian.registry_country import registry_country
@@ -47,12 +55,21 @@ from meridian.setup.runtime import SetupReview, SetupRuntime, SetupVerification
 from meridian.setup.service import SetupDraftService
 from meridian.setup.shelf import ServerShelf
 
-from .wizard_prompts import Choice, Navigation, Prompter, RichWizardIO, WizardIO, parse_numbers, primary_word
+from .wizard_prompts import Choice, Navigation, Prompter, WizardIO, parse_numbers, primary_word
+from .wizard_terminal import wizard_io
 
 WizardOutcome = Literal["completed", "saved"]
 RegisterServer = Callable[[str, str, str, int], None]
-# Returns the camouflage target a saved server can actually use, or "" when unknown.
-SuggestSni = Callable[[str], str]
+
+
+class CamouflageSites(NamedTuple):
+    """What a saved server can camouflage as: sites in its own network, then reachable well-known ones."""
+
+    nearby: list[str]
+    reachable: list[str]
+
+
+SuggestSni = Callable[[str], CamouflageSites]
 Role = Literal["exit", "relay", "gateway", "control"]
 
 _PROTOCOL_LABELS = {"reality": "Reality", "xhttp": "XHTTP", "wss": "WSS", "hysteria2": "Hysteria2"}
@@ -78,7 +95,7 @@ class SetupWizard:
         self.shelf = shelf
         self.runtime = runtime
         self.register_server = register_server
-        self.io = io or RichWizardIO()
+        self.io = io or wizard_io()
         self.prompt = Prompter(self.io)
         self.auto_approve = auto_approve
         self.ask_language = ask_language
@@ -96,7 +113,7 @@ class SetupWizard:
         self.prompt.say(t("wizard.intro"), style="bold")
         if draft.completed_stages:
             self.prompt.say(t("wizard.resuming", stage=t(f"stage.{draft.current_stage}")), style="info")
-        self.prompt.say(t("wizard.navigation"), style="dim")
+        self.prompt.say(t("wizard.navigation_keys" if self.prompt.pickers else "wizard.navigation"), style="dim")
         while True:
             draft = self.service.load_or_create()
             stage = draft.current_stage
@@ -138,6 +155,19 @@ class SetupWizard:
         adding = not self.shelf.items(draft.roles)
         while True:
             items = self.shelf.items(draft.roles)
+            if not adding and self.prompt.pickers is not None:
+                picked = self.prompt.pickers.multiselect(
+                    t("servers.pick_list"),
+                    [Choice(item.server_ref, item.title, _server_hint(item)) for item in items],
+                    checked=[item.server_ref for item in items],
+                    actions=[Choice("", t("servers.add_action"))],
+                    details=self.prompt.details,
+                )
+                if picked == [""]:
+                    adding = True
+                    continue
+                self.service.select_servers(picked)
+                return
             if not adding:
                 for index, item in enumerate(items, 1):
                     ready = item.validation_state in {"validated", "key_ready"}
@@ -163,9 +193,7 @@ class SetupWizard:
             adding = False
 
     def _add_server(self, taken: list[str]) -> bool:
-        address = self.prompt.ask(t("servers.address"))
-        if not address:
-            raise ValueError(t("error.address_required"))
+        address = self.prompt.ask(t("servers.address"), validate=_required(t("error.address_required")))
         ideas = suggest_server_names(taken)
         if address.lower() == "local":
             default_name = "this-server"
@@ -220,7 +248,11 @@ class SetupWizard:
             exit_id = _unique_id(_resource_id(titles[ref], "exit"), used)
             self.prompt.say(t("roles.exit_header", server=titles[ref]), style="bold")
             # The registry lookup runs only for a server without a saved answer.
-            region = self.prompt.ask(t("roles.region"), default=regions.get(ref) or registry_country(hosts[ref]))
+            region = self.prompt.ask(
+                t("roles.region"),
+                default=regions.get(ref) or registry_country(hosts[ref]),
+                validate=validate_optional_country_code_value,
+            )
             warp = self.prompt.yes_no(t("roles.warp"), default=False, hint=t("roles.warp_hint"))
             geo_block = self.prompt.yes_no(t("roles.geo_block"), default=True, hint=t("roles.geo_block_hint"))
             exits.append(
@@ -261,7 +293,7 @@ class SetupWizard:
                 )
 
         self.prompt.explain(t("roles.panel_domain_hint", server=titles[control_ref]))
-        public_hostname = self.prompt.ask(t("roles.panel_domain"))
+        public_hostname = self.prompt.ask(t("roles.panel_domain"), validate=validate_optional_hostname_value)
         title = self.prompt.ask(t("roles.title"), default="Meridian")
         self.service.assign_roles(
             SetupRoleSelection(
@@ -291,14 +323,23 @@ class SetupWizard:
         for exit_ in draft.roles.exits:
             title, host = hosts.get(exit_.server_ref, (exit_.id, ""))
             self.prompt.say(t("paths.exit_header", server=title, address=host), style="bold")
-            suggested = ""
+            sites = CamouflageSites([], [])
             if self.suggest_sni is not None:
                 self.prompt.say(t("paths.sni_probe", server=title), style="dim")
-                suggested = self.suggest_sni(exit_.server_ref)
-                if not suggested:
+                sites = self.suggest_sni(exit_.server_ref)
+                if not sites.nearby and not sites.reachable:
                     self.prompt.say(t("paths.sni_unreachable", server=title), style="warn")
-            reality_sni = self.prompt.ask(t("paths.sni"), default=suggested or DEFAULT_SNI)
-            domain = self.prompt.ask(t("paths.domain", address=host))
+            hints = {sni: t("paths.sni_reachable") for sni in sites.reachable}
+            hints.update({sni: t("paths.sni_nearby") for sni in sites.nearby})
+            candidates = list(dict.fromkeys([*sites.nearby, *sites.reachable, *REALITY_SNI_CANDIDATES]))
+            reality_sni = self.prompt.choose(
+                t("paths.sni"),
+                [Choice(sni, sni, hints.get(sni, "")) for sni in candidates],
+                default=next(iter([*sites.nearby, *sites.reachable]), DEFAULT_SNI),
+                other=t("paths.sni_custom"),
+                validate_other=validate_hostname_value,
+            )
+            domain = self.prompt.ask(t("paths.domain", address=host), validate=validate_optional_hostname_value)
             if domain:
                 self.prompt.explain(t("paths.wss_warning"))
             paths = default_exit_paths(exit_.id, address=host, reality_sni=reality_sni, domain=domain)
@@ -351,7 +392,8 @@ class SetupWizard:
     # 5. users
     def _access(self, draft: SetupDraft) -> None:
         self.prompt.explain(t("access.explain"))
-        users = [value.strip() for value in self.prompt.ask(t("access.users"), default="default").split(",")]
+        answer = self.prompt.ask(t("access.users"), default="default", validate=_check_users)
+        users = [value.strip() for value in answer.split(",")]
         title = draft.roles.control.title if draft.roles is not None else "Meridian"
         self.service.configure_access(
             SetupAccessSelection(
@@ -468,3 +510,25 @@ def _validation_message(exc: Exception) -> str:
         first = exc.errors()[0]
         return str(first["msg"]).removeprefix("Value error, ")
     return str(exc)
+
+
+def _server_hint(item: TopologyServerShelfItem) -> str:
+    """``user@host:port · status`` for a server row."""
+    status = t("servers.ready") if item.validation_state in {"validated", "key_ready"} else item.validation_state
+    return f"{item.ssh_user}@{item.host}:{item.ssh_port} · {status}"
+
+
+def _required(message: str) -> Callable[[str], None]:
+    def check(value: str) -> None:
+        if not value.strip():
+            raise ValueError(message)
+
+    return check
+
+
+def _check_users(value: str) -> None:
+    names = [name.strip() for name in value.split(",") if name.strip()]
+    if not names:
+        raise ValueError(t("error.users_required"))
+    for name in names:
+        validate_access_username_value(name)

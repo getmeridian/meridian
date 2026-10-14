@@ -56,6 +56,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   unless you have a gateway, suggests five short server names (astra, boba,
   foxtrot…), and ends with a plain summary before anything
   changes. Running `meridian` alone in a terminal offers to start it.
+  Choices are arrow-key lists and checklists (Space toggles, `?` explains,
+  Esc goes back), typed answers are checked as you enter them, and the
+  camouflage list leads with sites found in the exit's own network.
+  `MERIDIAN_PLAIN_PROMPTS=1` keeps the numbered prompts.
 - **Camouflage scans work on cloud servers** — VPSes that get a `/32` address
   (Hetzner Cloud and others) now scan their surrounding `/24`; the scan used to
   cover only the server itself, so `deploy` and `node add` always fell back to
