@@ -240,6 +240,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "doctor": None,
+    "logs": None,
     "plan": CommandOutput(
         data_schema="plan-command-data",
         failure_data_schema="plan-failure",

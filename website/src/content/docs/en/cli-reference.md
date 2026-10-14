@@ -323,6 +323,27 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor follows the server's roles: a relay-only server isn't diagnosed as an exit, and routing gateways are labeled separately. Missing tools or a lost SSH connection make the report inconclusive (exit `3`); sections already collected are still shown.
 
+### meridian logs
+
+Show a server's recent logs, redacted, without logging in to it.
+
+```
+meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
+              [--user USER] [--ssh-port PORT]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--lines`, `-n N` | `100` | Lines to show from each log (`1`–`10000`) |
+| `--grep`, `-g TEXT` | | Only lines containing this text; case-insensitive, matched literally rather than as a regex |
+| `--component`, `-c NAME` | all | Only `node`, `panel`, `nginx`, or `relay`; repeat to pick several |
+
+`logs` reads what the server's roles run: exits and routing gateways show the Remnawave node container, the control server shows the panel containers (backend, database, Valkey, subscription page), both show the nginx error log, and relays show their Realm units' journal. `--user` and `--ssh-port` override the saved SSH user and port.
+
+Every line passes through the same redaction as `meridian doctor`: tokens, passwords, keys, UUIDs, subscription IDs, and the panel's and connection page's secret paths are replaced with `[REDACTED]`, so the output is safe to paste into a bug report. Lines print as plain text with terminal control characters removed.
+
+A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing container, a lost SSH connection) is shown as unavailable and the command exits `3`.
+
 ### meridian panel
 
 Show the Remnawave admin panel URL and admin username, and what Meridian manages there versus what is yours to change.
@@ -432,9 +453,9 @@ These recur across commands; each command accepts only the options listed in its
 
 | Flag | Used by |
 |------|---------|
-| `SERVER` argument | deploy, check, scan, test, doctor, teardown, node add, relay add, server add |
-| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
-| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
+| `SERVER` argument | deploy, check, scan, test, doctor, logs, teardown, node add, relay add, server add |
+| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
+| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
 | `--sni HOST` | deploy, check, node add, relay add, test, doctor |
 | `--domain DOMAIN` | deploy, check, node add, test |
 

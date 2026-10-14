@@ -57,7 +57,7 @@ section: guides
 3. Reality SNI 目标从服务器无法到达
 
 **修复：**
-1. 检查 Xray：`docker logs remnawave-node --tail 20`
+1. 检查 Xray：`meridian logs IP -c node -n 20`
 2. 检查端口：`ss -tlnp sport = :443` — 应该是 nginx
 3. 测试 SNI：`meridian check IP --sni HOST`
 
@@ -111,7 +111,7 @@ section: guides
 
 ### Xray 无法在节点容器中启动
 
-检查容器：`docker logs remnawave-node --tail 50`。常见原因是主机上的端口冲突（节点运行在 `network_mode: host`，所以来自 `cluster.yml` 的端口必须空闲）、无法到达的面板（节点启动需要面板的 `node_secret_key`）或缺失 `NET_ADMIN` 能力。
+检查容器：`meridian logs IP -c node -n 50`。常见原因是主机上的端口冲突（节点运行在 `network_mode: host`，所以来自 `cluster.yml` 的端口必须空闲）、无法到达的面板（节点启动需要面板的 `node_secret_key`）或缺失 `NET_ADMIN` 能力。
 
 **修复：** 运行 `meridian check IP` 并在重新部署前遵循其补救。要验证 Remnawave 面板状态，登录管理 UI 在 `https://<IP>/<secret_path>/` 并检查 **Nodes** — 节点应该是 `connected`；`meridian fleet status` 从 CLI 表面相同信息。
 

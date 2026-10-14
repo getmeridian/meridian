@@ -40,7 +40,7 @@ _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
     (SERVERS, ("node", "relay", "route", "fleet", "server")),
-    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "plan", "apply")),
+    (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply")),
     (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
 )
 # Option panels inside `deploy --help`.
@@ -642,6 +642,39 @@ def doctor_cmd(
     from meridian.commands.diagnostics import run
 
     run(ip, sni, user, ai, ssh_port=ssh_port)
+
+
+@app.command("logs", rich_help_panel=CHECK_AND_FIX)
+def logs_cmd(
+    ip: Target = "",
+    lines: int = typer.Option(100, "--lines", "-n", min=1, max=10_000, help="Lines to show from each log"),
+    pattern: str = typer.Option(
+        "", "--grep", "-g", metavar="TEXT", help="Only lines containing this text (case-insensitive, not a regex)"
+    ),
+    component: list[str] = typer.Option(
+        [],
+        "--component",
+        "-c",
+        metavar="NAME",
+        help="Only this component: node, panel, nginx, or relay (repeatable)",
+        show_default=False,
+    ),
+    user: User = "",
+    ssh_port: SshPort = 0,
+) -> None:
+    """Show a server's recent node, panel, nginx, and relay logs, redacted
+
+    Reads the logs of what the server's fleet roles run, over SSH, and masks
+    secrets, panel and connection-page paths, tokens, and UUIDs.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian logs 198.51.100.10[/cyan]                 Last 100 lines of each log
+      [cyan]meridian logs exit-de --grep error -n 50[/cyan]    Last 50 lines mentioning "error"
+      [cyan]meridian logs 198.51.100.10 -c nginx[/cyan]        Only the nginx error log
+    """
+    from meridian.commands.logs import run
+
+    run(ip, user=user, ssh_port=ssh_port, lines=lines, pattern=pattern, components=component)
 
 
 @app.command("panel", rich_help_panel=ADVANCED)

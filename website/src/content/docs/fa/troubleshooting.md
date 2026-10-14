@@ -53,7 +53,7 @@ section: guides
 3. هدف SNI Reality از سرور قابل رسیدن نیست
 
 **راه‌حل‌ها:**
-1. Xray را بررسی کنید: `docker logs remnawave-node --tail 20`
+1. Xray را بررسی کنید: `meridian logs IP -c node -n 20`
 2. درگاه را بررسی کنید: `ss -tlnp sport = :443` — باید nginx باشد
 3. SNI را آزمایش کنید: `meridian check IP --sni HOST`
 
@@ -107,7 +107,7 @@ SSH دستی را امتحان کنید: `ssh root@SERVER_IP`. مطمئن شوی
 
 ### Xray در node container شروع نمی‌شود
 
-Container را بررسی کنید: `docker logs remnawave-node --tail 50`. علت‌های معمول تصادم درگاه روی host (node در `network_mode: host` اجرا می‌شود، بنابراین درگاه‌های `cluster.yml` باید آزاد باشند)، panel غیرقابل دسترس (ثبت گره نیاز به `node_secret_key` پنل در boot دارد) یا `NET_ADMIN` capability گمشده.
+Container را بررسی کنید: `meridian logs IP -c node -n 50`. علت‌های معمول تصادم درگاه روی host (node در `network_mode: host` اجرا می‌شود، بنابراین درگاه‌های `cluster.yml` باید آزاد باشند)، panel غیرقابل دسترس (ثبت گره نیاز به `node_secret_key` پنل در boot دارد) یا `NET_ADMIN` capability گمشده.
 
 **راه‌حل:** `meridian check IP` را اجرا کنید و remediation آن را قبل از redeploy دنبال کنید. برای تأیید وضعیت پنل Remnawave، وارد UI مدیریت در `https://<IP>/<secret_path>/` شوید و **Nodes** را بررسی کنید — گره باید `connected` باشد؛ `meridian fleet status` همان اطلاعات را از CLI نشان می‌دهد.
 

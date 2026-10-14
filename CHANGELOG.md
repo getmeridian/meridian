@@ -93,6 +93,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `preflight`, `rage`, `node check`, and `relay check` are gone: each now stops
   with a one-line pointer to the new command (exit 2, or a JSON error envelope
   with `--json`).
+- **`meridian logs SERVER`** — shows a server's recent logs without logging in:
+  the node, panel, and nginx on control, exit, and gateway servers, and the
+  Realm units on relays. `--grep TEXT` keeps matching lines, `--lines N` sets
+  how many, and `--component` picks node, panel, nginx, or relay. Every line is
+  redacted like `meridian doctor` (tokens, keys, UUIDs, and the panel's secret
+  path), so the output is safe to share; `doctor` now masks that path too.
 - **"What is blocked?"** — `meridian test --probe` now tells a blocked server
   IP from a blocked camouflage SNI by comparing the server with and without the
   SNI against the real camouflage site, and inconclusive stays inconclusive.

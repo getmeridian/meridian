@@ -17,6 +17,7 @@ from meridian.core.execution import ServerConnection as ServerConnectionLike
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.checks import command_evidence_unavailable
+from meridian.diagnostics.logs import NGINX_ERROR_LOG
 from meridian.facts import ServerFacts
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult, ServerConnection, SSHError
@@ -249,7 +250,7 @@ def run(
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:
-        nginx_cmd = "tail -10 /var/log/nginx/error.log 2>/dev/null"
+        nginx_cmd = f"tail -10 {shlex.quote(NGINX_ERROR_LOG)} 2>/dev/null"
         nginx_errors = evidence_conn.run(nginx_cmd, timeout=10).stdout.strip() or "no errors or log not found"
         nginx_errors = redact_diagnostic_text(nginx_errors, known_secrets)
         sections.append(("Nginx Errors", f"$ {nginx_cmd}\n{nginx_errors}"))

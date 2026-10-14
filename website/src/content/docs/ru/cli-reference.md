@@ -323,6 +323,27 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor следует ролям сервера: сервер только ретранслятора не диагностируется как выход, и маршрутизирующие шлюзы помечены отдельно. Отсутствующие инструменты или потерянное SSH подключение делают отчёт неубедительным (выход `3`); уже собранные секции всё ещё показаны.
 
+### meridian logs
+
+Показать последние журналы сервера в отредактированном виде, не входя на него.
+
+```
+meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
+              [--user USER] [--ssh-port PORT]
+```
+
+| Флаг | По умолчанию | Описание |
+|------|---------|-------------|
+| `--lines`, `-n N` | `100` | Сколько строк показать из каждого журнала (`1`–`10000`) |
+| `--grep`, `-g TEXT` | | Только строки с этим текстом; без учёта регистра, ищется буквально, а не как регулярное выражение |
+| `--component`, `-c NAME` | все | Только `node`, `panel`, `nginx` или `relay`; повторите, чтобы выбрать несколько |
+
+`logs` читает то, что запускают роли сервера: выходы и маршрутизирующие шлюзы показывают контейнер узла Remnawave, управляющий сервер показывает контейнеры панели (бэкенд, база данных, Valkey, страница подписки), оба показывают журнал ошибок nginx, а ретрансляторы показывают журнал своих юнитов Realm. `--user` и `--ssh-port` переопределяют сохранённого SSH пользователя и порт.
+
+Каждая строка проходит ту же редакцию, что и в `meridian doctor`: токены, пароли, ключи, UUID, идентификаторы подписок и секретные пути панели и страницы подключения заменяются на `[REDACTED]`, поэтому вывод безопасно вставлять в отчёт об ошибке. Строки печатаются простым текстом, управляющие символы терминала удалены.
+
+Сервер без роли в флоте или `--component`, который он не запускает, завершается с кодом `2` до подключения. Журнал, который не удалось прочитать (нет контейнера, потеряно SSH подключение), показывается как недоступный, и команда завершается с кодом `3`.
+
 ### meridian panel
 
 Показать URL админ-панели Remnawave и имя администратора, и что Meridian управляет там против того что ваше для изменения.
@@ -432,9 +453,9 @@ JSON вывод использует конверт `meridian.output/v1` (`schem
 
 | Флаг | Использовано |
 |------|---------|
-| `SERVER` аргумент | deploy, check, scan, test, doctor, teardown, node add, relay add, server add |
-| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
-| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, teardown |
+| `SERVER` аргумент | deploy, check, scan, test, doctor, logs, teardown, node add, relay add, server add |
+| `--user`, `-u USER` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
+| `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
 | `--sni HOST` | deploy, check, node add, relay add, test, doctor |
 | `--domain DOMAIN` | deploy, check, node add, test |
 

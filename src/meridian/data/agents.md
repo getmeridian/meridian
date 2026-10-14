@@ -29,7 +29,7 @@ You are probably helping one of two people:
 4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, or `client remove`. Removal deletes the panel and server state for what disappears, and people relying on it lose access.
 5. **Treat links as secrets.** Connection pages and subscription URLs grant access. They appear in full only in the output of the command that produced them (`deploy`, `client add`, `client show`). Hand each one only to the person it belongs to, and don't log it. Never run `meridian panel --show-password` unless the user asks for the panel password.
 6. **Test from the right place.** `meridian check` inspects servers over SSH. `meridian test` sends real traffic from the machine it runs on, and `meridian test --probe` (short form: `meridian probe`) checks what a censor sees. Results about blocking only mean something when run from inside the censored network.
-7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report.
+7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report. `meridian logs SERVER` shows recent node, panel, nginx, and relay logs with the same redaction; narrow it with `--grep TEXT` and `--component NAME`.
 
 ## Exit codes
 

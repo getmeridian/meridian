@@ -323,6 +323,27 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 医生遵循服务器的角色：纯中继服务器不诊断为出口，路由网关单独标记。缺失工具或失去 SSH 连接使报告不确定（退出 `3`）；已收集的部分仍显示。
 
+### meridian logs
+
+无需登录服务器，即可显示其最近的日志（已脱敏）。
+
+```
+meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
+              [--user USER] [--ssh-port PORT]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--lines`, `-n N` | `100` | 每个日志显示的行数（`1`–`10000`） |
+| `--grep`, `-g TEXT` | | 仅显示包含此文本的行；不区分大小写，按字面匹配而非正则表达式 |
+| `--component`, `-c NAME` | 全部 | 仅 `node`、`panel`、`nginx` 或 `relay`；重复使用可选择多个 |
+
+`logs` 读取服务器各角色所运行的内容：出口和路由网关显示 Remnawave 节点容器，控制服务器显示面板容器（后端、数据库、Valkey、订阅页面），二者都显示 nginx 错误日志，中继则显示其 Realm 单元的日志。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。
+
+每一行都经过与 `meridian doctor` 相同的脱敏处理：令牌、密码、密钥、UUID、订阅 ID，以及面板和连接页面的秘密路径都会被替换为 `[REDACTED]`，因此输出可以安全地粘贴到错误报告中。各行以纯文本打印，并已去除终端控制字符。
+
+没有舰队角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（容器缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
+
 ### meridian panel
 
 显示 Remnawave 管理面板 URL 和管理员用户名，以及 Meridian 管理的内容与您可以改变的内容。
@@ -432,9 +453,9 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 
 | 标志 | 被使用 |
 |------|---------|
-| `SERVER` 参数 | deploy、check、scan、test、doctor、teardown、node add、relay add、server add |
-| `--user`, `-u USER` | deploy、check、node add、relay add、server add、scan、doctor、teardown |
-| `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、teardown |
+| `SERVER` 参数 | deploy、check、scan、test、doctor、logs、teardown、node add、relay add、server add |
+| `--user`, `-u USER` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown |
+| `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown |
 | `--sni HOST` | deploy、check、node add、relay add、test、doctor |
 | `--domain DOMAIN` | deploy、check、node add、test |
 

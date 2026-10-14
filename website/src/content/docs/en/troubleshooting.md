@@ -57,7 +57,7 @@ Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 3. Reality SNI target is unreachable from the server
 
 **Fixes:**
-1. Check Xray: `docker logs remnawave-node --tail 20`
+1. Check Xray: `meridian logs IP -c node -n 20`
 2. Check port: `ss -tlnp sport = :443` — should be nginx
 3. Test SNI: `meridian check IP --sni HOST`
 
@@ -111,7 +111,7 @@ Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `
 
 ### Xray fails to start in the node container
 
-Check the container: `docker logs remnawave-node --tail 50`. Common causes are a port collision on the host (node runs in `network_mode: host`, so ports from `cluster.yml` must be free), an unreachable panel (node registration needs the panel's `node_secret_key` at boot), or a missing `NET_ADMIN` capability.
+Check the container: `meridian logs IP -c node -n 50`. Common causes are a port collision on the host (node runs in `network_mode: host`, so ports from `cluster.yml` must be free), an unreachable panel (node registration needs the panel's `node_secret_key` at boot), or a missing `NET_ADMIN` capability.
 
 **Fix:** run `meridian check IP` and follow its remediation before redeploying. To verify Remnawave panel state, log into the admin UI at `https://<IP>/<secret_path>/` and check **Nodes** → the node should be `connected`; `meridian fleet status` surfaces the same information from the CLI.
 

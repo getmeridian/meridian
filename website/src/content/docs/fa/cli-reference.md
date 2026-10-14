@@ -323,6 +323,27 @@ meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 
 Doctor از نقش‌های سرور پیروی می‌کند: سرور relay-only به عنوان exit تشخیص نمی‌شود، و routing gateways به طور جداگانه برچسب‌گذاری می‌شوند. ابزارهای missing یا اتصال SSH گم گزارش را inconclusive می‌کند (exit `3`)؛ بخش‌های قبلاً جمع‌آوری‌شده همچنان نشان داده می‌شوند.
 
+### meridian logs
+
+لاگ‌های اخیر یک سرور را، redacted و بدون ورود به آن، نشان دهید.
+
+```
+meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
+              [--user USER] [--ssh-port PORT]
+```
+
+| پرچم | پیش‌فرض | توضیح |
+|------|---------|-------------|
+| `--lines`, `-n N` | `100` | تعداد خطوطی که از هر لاگ نشان داده می‌شود (`1`–`10000`) |
+| `--grep`, `-g TEXT` | | فقط خطوط حاوی این متن؛ بدون حساسیت به حروف بزرگ و کوچک و به‌صورت لفظی تطبیق داده می‌شود، نه به‌عنوان regex |
+| `--component`, `-c NAME` | همه | فقط `node`، `panel`، `nginx` یا `relay`؛ برای انتخاب چند مورد تکرار کنید |
+
+`logs` همان چیزی را می‌خواند که نقش‌های سرور اجرا می‌کنند: exitها و routing gatewayها کانتینر node ‏Remnawave را نشان می‌دهند، سرور کنترل کانتینرهای پنل (backend، پایگاه داده، Valkey، صفحهٔ اشتراک) را نشان می‌دهد، هر دو لاگ خطای nginx را نشان می‌دهند و relayها ژورنال unitهای Realm خود را. `--user` و `--ssh-port` کاربر SSH ذخیره‌شده و پورت را جایگزین می‌کنند.
+
+هر خط از همان redaction دستور `meridian doctor` عبور می‌کند: توکن‌ها، رمزهای عبور، کلیدها، UUIDها، شناسه‌های اشتراک و مسیرهای مخفی پنل و صفحهٔ اتصال با `[REDACTED]` جایگزین می‌شوند، پس خروجی را می‌توان با اطمینان در گزارش باگ چسباند. خطوط به‌صورت متن ساده چاپ می‌شوند و کاراکترهای کنترلی ترمینال حذف شده‌اند.
+
+سروری بدون نقش در فلیت، یا `--component` که اجرا نمی‌کند، پیش از اتصال با کد `2` خارج می‌شود. لاگی که خوانده نشود (کانتینر missing، اتصال SSH گم‌شده) به‌صورت در دسترس نیست نشان داده می‌شود و دستور با کد `3` خارج می‌شود.
+
 ### meridian panel
 
 URL پنل مدیریت Remnawave و نام کاربری مدیریت را نشان دهید، و آنچه Meridian در آنجا مدیریت می‌کند درمقابل آنچه برای تغییر مال شما است.
@@ -432,9 +453,9 @@ JSON output پاکت `meridian.output/v1` را استفاده می‌کند (`sc
 
 | پرچم | استفاده‌شده توسط |
 |------|---------|
-| `SERVER` argument | deploy، check، scan، test، doctor، teardown، node add، relay add، server add |
-| `--user`, `-u USER` | deploy، check، node add، relay add، server add، scan، doctor، teardown |
-| `--ssh-port PORT` | deploy، check، node add، relay add، server add، scan، doctor، teardown |
+| `SERVER` argument | deploy، check، scan، test، doctor، logs، teardown، node add، relay add، server add |
+| `--user`, `-u USER` | deploy، check، node add، relay add، server add، scan، doctor، logs، teardown |
+| `--ssh-port PORT` | deploy، check، node add، relay add، server add، scan، doctor، logs، teardown |
 | `--sni HOST` | deploy، check، node add، relay add، test، doctor |
 | `--domain DOMAIN` | deploy، check، node add، test |
 

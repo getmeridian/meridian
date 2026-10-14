@@ -57,7 +57,7 @@ section: guides
 3. Целевой SNI Reality недоступен с сервера
 
 **Решения:**
-1. Проверьте Xray: `docker logs remnawave-node --tail 20`
+1. Проверьте Xray: `meridian logs IP -c node -n 20`
 2. Проверьте порт: `ss -tlnp sport = :443` — должен быть nginx
 3. Протестируйте SNI: `meridian check IP --sni HOST`
 
@@ -99,7 +99,7 @@ section: guides
 
 ### Xray не запускается в контейнере узла
 
-Проверьте контейнер: `docker logs remnawave-node --tail 50`. Частые причины: порт на хосте уже занят (узел работает с `network_mode: host`, поэтому порты из `cluster.yml` должны быть свободны), панель недоступна (при запуске узлу нужен выданный панелью `node_secret_key`) или отсутствует разрешение Linux `NET_ADMIN`.
+Проверьте контейнер: `meridian logs IP -c node -n 50`. Частые причины: порт на хосте уже занят (узел работает с `network_mode: host`, поэтому порты из `cluster.yml` должны быть свободны), панель недоступна (при запуске узлу нужен выданный панелью `node_secret_key`) или отсутствует разрешение Linux `NET_ADMIN`.
 
 **Решение:** запустите `meridian check IP` и выполните предложенные исправления перед переразворачиванием. Чтобы проверить состояние панели Remnawave, откройте интерфейс администратора по адресу `https://<IP>/<secret_path>/` и перейдите в **Nodes**: узел должен иметь статус `connected`. Команда `meridian fleet status` показывает те же сведения в CLI.
 
