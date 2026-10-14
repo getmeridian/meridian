@@ -106,10 +106,21 @@ export interface SetupIntent {
 }
 /**
  * Meridian-owned access squad and human users.
+ *
+ * `users` are panel usernames (Latin only, as Remnawave requires); `display_names`
+ * keeps the name as typed, in any script, for users whose username differs from it.
  */
 export interface AccessIntent {
+  display_names?: DisplayNames;
   squad_name?: SquadName;
   users: Users;
+}
+export interface DisplayNames {
+  /**
+   * This interface was referenced by `DisplayNames`'s JSON-Schema definition
+   * via the `patternProperty` "^[A-Za-z0-9_-]+$".
+   */
+  [k: string]: string;
 }
 /**
  * One server that owns the Remnawave control-plane workload.

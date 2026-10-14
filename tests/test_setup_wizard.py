@@ -6,9 +6,12 @@ from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import cast
 
+import pytest
+
 from meridian.cluster import ManagedResourceBinding
-from meridian.commands.setup_wizard import SetupWizard
+from meridian.commands.setup_wizard import CamouflageSites, SetupWizard
 from meridian.compiler import compile_topology
+from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.setup import SetupDraft
 from meridian.handoff import HandoffLinks
 from meridian.servers import ServerEntry, ServerRegistry
@@ -20,6 +23,7 @@ from meridian.setup.runtime import (
 )
 from meridian.setup.service import SetupDraftService
 from meridian.setup.shelf import ServerShelf
+from tests.support.topology import single_exit_intent
 
 
 class _ScriptedIO:
@@ -440,7 +444,6 @@ def test_language_step_comes_first_and_switches_the_following_prompts(tmp_path) 
 
 
 def test_setup_without_a_terminal_refuses_instead_of_taking_defaults(tmp_home, monkeypatch) -> None:
-    import pytest
     import typer
 
     from meridian.commands import setup_v4
@@ -451,28 +454,36 @@ def test_setup_without_a_terminal_refuses_instead_of_taking_defaults(tmp_home, m
     assert exc_info.value.exit_code == 2
 
 
-def test_camouflage_default_is_what_the_exit_can_reach_and_warns_when_nothing_is(tmp_path) -> None:
-    for suggestion, expected in (("dl.google.com", "dl.google.com"), ("", "www.google.com")):
-        store, shelf, service = _services(tmp_path / (suggestion or "none"))
-        probed: list[str] = []
-        io = _ScriptedIO([*_TWO_SERVER_JOURNEY[:11], ("Names of the people", "save")])
-        wizard = SetupWizard(
-            service=service,
-            shelf=shelf,
-            runtime=cast(SetupRuntime, _Runtime()),
-            register_server=lambda *_args: None,
-            io=io,
-            suggest_sni=lambda ref, value=suggestion: (probed.append(ref), value)[1],
-        )
+@pytest.mark.parametrize(
+    ("sites", "expected"),
+    [
+        (CamouflageSites(["shop.example.net"], ["dl.google.com"]), "shop.example.net"),
+        (CamouflageSites([], ["dl.google.com"]), "dl.google.com"),
+        (CamouflageSites([], []), "www.google.com"),
+    ],
+    ids=["nearby-site-wins", "reachable-known-site", "nothing-reachable"],
+)
+def test_camouflage_default_prefers_the_exit_network_then_what_it_reaches(tmp_path, sites, expected) -> None:
+    store, shelf, service = _services(tmp_path)
+    probed: list[str] = []
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY[:11], ("Names of the people", "save")])
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime()),
+        register_server=lambda *_args: None,
+        io=io,
+        suggest_sni=lambda ref: (probed.append(ref), sites)[1],
+    )
 
-        assert wizard.run() == "saved"
+    assert wizard.run() == "saved"
 
-        draft = store.load()
-        assert draft is not None and draft.paths is not None
-        assert draft.paths.exits[0].paths[0].reality_sni == expected
-        assert probed == ["srv-exit"]
-        warned = any("could not reach the usual camouflage sites" in line for line in io.output)
-        assert warned is (not suggestion)
+    draft = store.load()
+    assert draft is not None and draft.paths is not None
+    assert draft.paths.exits[0].paths[0].reality_sni == expected
+    assert probed == ["srv-exit"]
+    warned = any("could not reach the usual camouflage sites" in line for line in io.output)
+    assert warned is (not sites.nearby and not sites.reachable)
 
 
 def test_new_remote_server_defaults_to_an_unused_name_idea(tmp_path) -> None:
@@ -491,3 +502,192 @@ def test_new_remote_server_defaults_to_an_unused_name_idea(tmp_path) -> None:
     assert name in SERVER_NAME_IDEAS and name != "astra"
     [ideas] = [line for line in io.output if "Name ideas:" in line]
     assert name in ideas and "astra" not in ideas
+
+
+class _PickerIO(_ScriptedIO):
+    """A terminal with pickers: lists answer from ``picks``, text fields from ``answers``."""
+
+    def __init__(self, answers: Sequence[tuple[str, str]], picks: Sequence[tuple[str, object]]) -> None:
+        super().__init__(answers)
+        self.picks = list(picks)
+        self.calls: list[tuple[str, list[str], str]] = []
+
+    def text(self, label: str, *, default: str = "", validate=None) -> str:
+        value = self.ask(label, default=default)
+        if validate is not None:
+            validate(value)
+        return value
+
+    def _pick(self, label: str) -> object:
+        fragment, answer = self.picks.pop(0)
+        assert fragment in label, f"Expected a picker containing {fragment!r}, got {label!r}"
+        return answer
+
+    def select(self, label, choices, *, default="", other="", validate_other=None, details="") -> str:
+        self.calls.append(("select", [choice.value for choice in choices], default))
+        answer = str(self._pick(label)) or default
+        if answer not in [choice.value for choice in choices] and validate_other is not None:
+            validate_other(answer)
+        return answer
+
+    def multiselect(self, label, choices, *, checked=(), actions=(), details="") -> list[str]:
+        self.calls.append(("multiselect", [choice.value for choice in choices], ",".join(checked)))
+        return cast(list[str], self._pick(label))
+
+
+def test_terminal_pickers_check_servers_and_offer_probed_and_typed_camouflage_sites(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _PickerIO(
+        [
+            ("Country code", ""),
+            ("WARP", ""),
+            ("Refuse Russian sites", ""),
+            ("Domain for the control panel", ""),
+            ("Name of this VPN", ""),
+            ("Domain pointed at", ""),
+            ("Names of the people", "save"),
+        ],
+        [
+            ("Which servers", ["srv-control", "srv-exit"]),
+            ("control panel", "srv-control"),
+            ("Job for control", "control"),
+            ("Job for exit", ""),
+            ("Camouflage site", "www.example.org"),
+        ],
+    )
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime()),
+        register_server=lambda *_args: None,
+        io=io,
+        suggest_sni=lambda _ref: CamouflageSites(["shop.example.net"], ["dl.google.com"]),
+    )
+
+    assert wizard.run() == "saved"
+
+    assert io.calls[0] == ("multiselect", ["srv-control", "srv-exit"], "srv-control,srv-exit")
+    assert io.calls[-1] == (
+        "select",
+        ["shop.example.net", "dl.google.com", *(sni for sni in REALITY_SNI_CANDIDATES if sni != "dl.google.com")],
+        "shop.example.net",
+    )
+    draft = store.load()
+    assert draft is not None and draft.paths is not None
+    assert draft.paths.exits[0].paths[0].reality_sni == "www.example.org"
+
+
+class _FailingReview(_Runtime):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reviews = 0
+
+    def review(self, draft: SetupDraft) -> SetupReview:
+        self.reviews += 1
+        raise ValueError("Compiled resource logical IDs must be lowercase stable identifiers.")
+
+
+def test_a_failing_automatic_stage_asks_what_next_instead_of_looping(tmp_path) -> None:
+    _store, shelf, service = _services(tmp_path)
+    runtime = _FailingReview()
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY, ("What next?", "1"), ("Names of the people", "save")]  # 1 = back to users
+    )
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, runtime),
+        register_server=lambda *_args: None,
+        io=io,
+    )
+
+    assert wizard.run() == "saved"
+    assert runtime.reviews == 1
+    assert sum("lowercase stable identifiers" in line for line in io.output) == 1
+
+
+def test_auto_approve_stops_on_a_failing_stage(tmp_path) -> None:
+    from meridian.core.errors import LocalStateError
+
+    store, shelf, service = _services(tmp_path)
+    store.save(SetupDraft.from_intent(single_exit_intent()))
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _FailingReview()),
+        register_server=lambda *_args: None,
+        io=_ScriptedIO([]),
+        auto_approve=True,
+    )
+
+    with pytest.raises(LocalStateError, match="lowercase stable identifiers"):
+        wizard.run()
+
+
+def test_names_that_differ_only_by_case_are_reasked(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY[:-1], ("Names of the people", "Biba, biba"), ("Names of the people", "save")]
+    )
+
+    assert _wizard(service, shelf, io, lambda *_args: None).run() == "saved"
+    assert any("even ignoring capital letters" in line for line in io.output)
+
+
+def test_names_in_any_script_keep_their_spelling_and_get_latin_panel_usernames(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO(
+        [*_TWO_SERVER_JOURNEY[:-1], ("Names of the people", "Биба, Boba, 王小明"), ("Set this up now?", "no")]
+    )
+
+    assert _wizard(service, shelf, io).run() == "saved"
+
+    draft = store.load()
+    assert draft is not None and draft.access is not None
+    access = draft.access.access
+    assert access.users == ["biba", "Boba", "wangxiaoming"]
+    assert access.display_names == {"biba": "Биба", "wangxiaoming": "王小明"}
+    assert any("Биба → biba" in line for line in io.output)
+    assert any("Биба, Boba, 王小明" in line for line in io.output)  # the review shows the typed names
+
+
+def test_going_back_to_users_keeps_existing_usernames() -> None:
+    from meridian.commands.setup_wizard import _access_intent
+
+    previous = _access_intent(["Биба", "Biba"], None)
+    assert previous.users == ["biba-2", "Biba"]  # a name the panel accepts claims itself first
+
+    again = _access_intent(["Biba", "Ли", "Биба"], previous)
+
+    assert again.users == ["Biba", "user-li", "biba-2"]
+    assert again.display_names == {"user-li": "Ли", "biba-2": "Биба"}
+
+
+class _RuntimeWithPanel(_Runtime):
+    def verify(self, draft: SetupDraft) -> SetupVerification:
+        return SetupVerification(
+            plan_hash=draft.applied_plan_hash,
+            node_count=1,
+            subscription_urls={"default": "https://panel.example/pages/sub/default"},
+            panel_url="https://198.51.100.10/secretpanel/",
+            admin_user="admin-a1b2",
+        )
+
+
+def test_handoff_shows_the_admin_panel_and_login_and_points_to_the_password_command(tmp_path) -> None:
+    _store, shelf, service = _services(tmp_path)
+    io = _ScriptedIO([*_TWO_SERVER_JOURNEY, ("Set this up now?", "yes")])
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _RuntimeWithPanel()),
+        register_server=lambda *_args: None,
+        io=io,
+    )
+
+    assert wizard.run() == "completed"
+
+    handoff = "\n".join(io.output[io.output.index(next(line for line in io.output if "Admin panel" in line)) :])
+    assert "https://198.51.100.10/secretpanel/" in handoff
+    assert "admin-a1b2" in handoff
+    assert "meridian panel --show-password" in handoff

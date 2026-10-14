@@ -8,7 +8,7 @@
 **One JSON switch** — every `--json` is `cli_options.Json` and every JSON-implying flag uses `enable_json_output`, so bodies only read `is_json_mode()`. The root callback resolves argv through Click (`cli_catalog`); global `--json` works exactly where the command declares it. Never re-parse argv by hand.
 **Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve UI clients: no prompts or Rich, the final `meridian.output/v1` envelope on stdout, JSONL on stderr. Hidden `--cancel-file` stops at the next safe point with a `cancelled` envelope (exit 5).
 **Health surface** — `check` (`health.py`) dispatches by role to preflight, server, or relay (`relay_check.py`) scopes; `test` runs one active client's delivered Xray JSON end to end, once per public entry when bare (`--probe`, or `probe`, for the censor view; `--basic` refuses `--client`); `doctor` bundles a report. All render through `check_render.py`: negative evidence exits 4, unavailable evidence 3, full pass 0. `logs` prints plain tails of what the server's roles run (`diagnostics/logs.py`) and exits 3 when one is unreadable.
-**Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices with text from `meridian.i18n` and prompts from `wizard_prompts.py`; smart defaults replace questions, and compile/apply/verify stay in `meridian.setup`.
+**Presentation-only wizard** — `setup_v4.py` and `setup_wizard.py` collect resumable choices with text from `meridian.i18n` and prompts from `wizard_prompts.py`; smart defaults replace questions, and compile/apply/verify stay in `meridian.setup`. `wizard_terminal.py` adds prompt_toolkit lists, checklists, and validated text fields (the `Pickers` protocol); `wizard_io()` falls back to numbered prompts without a capable terminal or with `MERIDIAN_PLAIN_PROMPTS`.
 **Agent guide** — `meridian help agents` prints `data/agents.md` as plain Markdown; `test_help_command.py` fails if it names a missing command. Keep it free of release talk.
 **Retired spellings** — `cli.RENAMED`/`RENAMED_OPTIONS` refuse old commands and flags with exit 2 and a pointer to the new spelling.
 
@@ -29,6 +29,8 @@
 - A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
 - `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
 - The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
+- An error in a setup stage that asks nothing (review, apply, verify) offers back/retry/save, and `--yes` raises it; re-running the stage looped forever on the same error.
+- Pickers open the terminal's real device (`os.ttyname`), never the `/dev/tty` alias (macOS kqueue refuses it with EOFError), and accept Ctrl+J as Enter (pexpect and some terminals send a bare line feed); validate through `Prompter.ask(validate=)` so both modes re-ask.
 - Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
 - `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing.
 - Bare `test` follows the intent, not the saved-server count: removed servers stay saved.

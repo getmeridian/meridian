@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import ValidationError
@@ -21,7 +22,9 @@ from meridian.core.topology import (
 from meridian.setup.default_paths import default_exit_paths
 
 
-def add_access_users_to_intent(intent: SetupIntent, usernames: list[str]) -> SetupIntent:
+def add_access_users_to_intent(
+    intent: SetupIntent, usernames: list[str], display_names: Mapping[str, str] | None = None
+) -> SetupIntent:
     """Return validated intent with new access users in stable request order."""
     existing = set(intent.access.users)
     duplicates = [username for username in usernames if username in existing]
@@ -31,6 +34,7 @@ def add_access_users_to_intent(intent: SetupIntent, usernames: list[str]) -> Set
     payload["access"] = AccessIntent(
         squad_name=intent.access.squad_name,
         users=[*intent.access.users, *usernames],
+        display_names={**intent.access.display_names, **(display_names or {})},
     ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 
@@ -43,7 +47,11 @@ def remove_access_user_from_intent(intent: SetupIntent, username: str) -> SetupI
     if not remaining:
         raise ValueError("A fleet needs at least one client; add another before removing the last one")
     payload = intent.model_dump(mode="json")
-    payload["access"] = AccessIntent(squad_name=intent.access.squad_name, users=remaining).model_dump(mode="json")
+    payload["access"] = AccessIntent(
+        squad_name=intent.access.squad_name,
+        users=remaining,
+        display_names={user: name for user, name in intent.access.display_names.items() if user != username},
+    ).model_dump(mode="json")
     return SetupIntent.model_validate(payload)
 
 

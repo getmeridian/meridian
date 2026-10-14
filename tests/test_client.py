@@ -149,6 +149,22 @@ class TestRunAdd:
         with _cli(cluster), pytest.raises(typer.Exit):
             run_add(names=names)
 
+    def test_add_keeps_a_typed_name_and_gives_the_panel_a_latin_username(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+        panel.get_user.side_effect = [None, _make_user("biba")]
+        runtime = MagicMock()
+        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, changed=True, failed=[])
+
+        with (
+            _cli(_make_cluster(tmp_home, users=["default"]), panel, runtime=runtime),
+            patch("meridian.commands.client.publish_connection_pages", return_value=[]) as publish_handoff,
+        ):
+            run_add(names=["Биба"])
+
+        access = runtime.apply_intent.call_args.args[0].access
+        assert (access.users, access.display_names) == (["default", "biba"], {"biba": "Биба"})
+        assert publish_handoff.call_args.args[1] == ["biba"]
+
 
 class TestRunShow:
     def test_handoff_urls_render_as_plain_text(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -360,6 +376,29 @@ class TestRunRemove:
         assert runtime.apply_intent.call_args.args[0].access.users == ["alice"]
         remove_page.assert_called_once_with(cluster, _make_user("bob").vless_uuid)
         panel.delete_user.assert_not_called()  # retirement owns the delete
+
+    def test_remove_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
+        cluster = _make_cluster(tmp_home, users=["alice", "biba"])
+        cluster.topology_intent = cluster.topology_intent.model_copy(  # type: ignore[union-attr]
+            update={"access": AccessIntent(users=["alice", "biba"], display_names={"biba": "Биба"})}
+        )
+        panel = _make_panel_mock()
+        panel.get_user.return_value = _make_user("biba")
+        runtime = MagicMock()
+        runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failure_summary="")
+
+        with _cli(cluster, panel, runtime=runtime), patch("meridian.handoff.remove_connection_page", return_value=""):
+            run_remove(name="биба", yes=True)
+
+        access = runtime.apply_intent.call_args.args[0].access
+        assert (access.users, access.display_names) == (["alice"], {})
+
+    def test_an_unknown_name_in_any_script_is_refused_before_the_panel(self, tmp_home: Path) -> None:
+        with _cli(_make_cluster(tmp_home)) as panel_cls, pytest.raises(typer.Exit) as exc_info:
+            run_disable(name="Призрак")
+
+        assert exc_info.value.exit_code == 2
+        panel_cls.assert_not_called()
 
     def test_unfinished_retirement_is_a_system_error(self, tmp_home: Path) -> None:
         runtime = MagicMock()

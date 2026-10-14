@@ -12,6 +12,7 @@
 - **Verification is four-state** - passed, failed, warning, skipped; skipped evidence is inconclusive, never a pass.
 - **Cooperative cancellation** - `core/cancellation.py` owns the token protocol, `OperationCancellation`, and `OperationCancelledError`; workers poll only at safe points.
 - **Narrow panel interfaces** - services depend on protocols such as `FleetPanelClient` and `ClientPanelClient`, not the concrete Remnawave client.
+- **Two names per person** - `AccessIntent.users` are Remnawave usernames (Latin only); `display_names` keeps the typed name when it differs and is omitted when empty. `assign_access_usernames()` is the one place that maps typed names to usernames (known first, Latin names claim themselves, the rest transliterate via anyascii); look people up with `find_user()`.
 
 ## What's done well
 - No barrel re-exports in `__init__.py`; consumers import specific submodules.

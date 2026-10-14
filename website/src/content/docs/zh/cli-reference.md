@@ -54,7 +54,7 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 | `--restart` | | 启动前放弃保存的设置进度 |
 | `--yes`, `-y` | | 批准审核并应用无需询问 |
 
-第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.config/meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问）、用户、平实语言摘要和应用。在任何提示处你可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.config/meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
+第一个问题是语言（English, Русский, فارسی, 中文），从你的终端预选并记住在 `~/.config/meridian/preferences.json`；`--lang` 或 `MERIDIAN_LANG` 跳过它。然后向导走过服务器（一个 IP、`user@IP:port` 或 `local` 用于此机器）、每个服务器做什么、连接方法、路由（仅当你有路由网关时才被提问）、用户、平实语言摘要和应用。选项以列表形式呈现：用方向键移动（或按选项的编号），用空格键切换复选项，按 `?` 查看详情，按 Enter 确认，按 Esc 返回，按 Ctrl+C 退出。凡是列表提供“其他”的地方，你都可以输入自己的值。在文本字段中，你还可以输入 `back`、`details`、`save` 或 `quit`（或你的语言中的相同单词）。对于伪装网站，向导会先扫描出口所在的网络（约一分钟），并把这些网站排在知名网站之前。设置 `MERIDIAN_PLAIN_PROMPTS=1` 可使用编号提示（当终端无法绘制列表时会自动使用）。在终端中不带命令运行 `meridian`，在任何 VPN 存在之前，提供启动向导。进度在每个阶段后保存在 `~/.config/meridian/setup.json` 中，所以再次运行 `meridian setup` 继续；密码和私钥永不存储在那里。`--intent` 不会替换现有草稿除非也给出 `--restart`。当应用成功时，设置验证每个节点和订阅并打印每个用户的连接页面。
 
 ### meridian plan
 
@@ -114,7 +114,7 @@ meridian client remove NAME [--yes] [--json]
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
 | `--yes`, `-y` | | 确认 `client remove`；`--json` 需要 |
 
-**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。
+**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、流量和最后看到时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
 

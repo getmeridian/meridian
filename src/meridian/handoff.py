@@ -33,6 +33,12 @@ class HandoffLinks:
     subscription_url: str = ""
     page_url: str = ""
     error: str = ""
+    display_name: str = ""  # the name as typed (Биба) when it differs from the panel username
+
+    @property
+    def name(self) -> str:
+        """The person's name for output: as typed, else the username."""
+        return self.display_name or self.username
 
 
 def protocol_key(url: str) -> str:
@@ -101,22 +107,30 @@ def publish_connection_page(
 
     subscription_url = cluster.panel.subscription_url(user.short_uuid)
     target = page_url(cluster, user)
+    intent = cluster.topology_intent
+    shown = intent.access.display_names.get(user.username, "") if intent is not None else ""
     if not subscription_url or not target:
-        return HandoffLinks(user.username, subscription_url, error="the connection-page path is not configured")
+        return HandoffLinks(
+            user.username, subscription_url, error="the connection-page path is not configured", display_name=shown
+        )
     try:
         document = panel.fetch_subscription(user.short_uuid)
     except RemnawaveError as exc:
-        return HandoffLinks(user.username, subscription_url, error=f"could not read the subscription: {exc}")
+        return HandoffLinks(
+            user.username, subscription_url, error=f"could not read the subscription: {exc}", display_name=shown
+        )
     links = subscription_protocol_urls(document.content)
     if not links:
-        return HandoffLinks(user.username, subscription_url, error="the subscription has no connection links yet")
+        return HandoffLinks(
+            user.username, subscription_url, error="the subscription has no connection links yet", display_name=shown
+        )
 
     host = urlsplit(cluster.panel.url).hostname or ""
     files = generate_client_files(
         links,
         server_ip=cluster.panel.server_ip,
         domain="" if host == cluster.panel.server_ip else host,
-        client_name=user.username,
+        client_name=shown or user.username,
         server_name=cluster.branding.server_name,
         server_icon=cluster.branding.icon,
         color=cluster.branding.color,
@@ -126,9 +140,9 @@ def publish_connection_page(
     error = upload_client_files(conn, user.vless_uuid, files)
     if error:
         logger.warning("Could not upload connection page for %s: %s", user.username, error)
-        return HandoffLinks(user.username, subscription_url, error=error)
+        return HandoffLinks(user.username, subscription_url, error=error, display_name=shown)
     mark_connection_page_deployed(cluster, user.vless_uuid)
-    return HandoffLinks(user.username, subscription_url, page_url=target)
+    return HandoffLinks(user.username, subscription_url, page_url=target, display_name=shown)
 
 
 def control_connection(cluster: ClusterConfig) -> ServerConnection:

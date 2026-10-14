@@ -15,7 +15,9 @@ from meridian.commands._helpers import format_traffic, load_topology_cluster, ma
 from meridian.commands.client_handoff import (
     format_status,
     get_user_or_fail,
+    new_client_usernames,
     print_handoff_links,
+    resolve_client_name,
     resolve_page_url,
     validate_client_name,
 )
@@ -44,16 +46,22 @@ def run_add(names: list[str]) -> None:
     with error_context("client.add", timer=operation.timer):
         seen: set[str] = set()
         for name in names:
-            validate_client_name(name)
-        for name in names:
-            if name.lower() in seen:
+            if name.strip().casefold() in seen:
                 fail(
                     f"Duplicate client name in batch: '{name}'",
                     hint="Remove the duplicate and try again",
                     hint_type="user",
                 )
-            seen.add(name.lower())
-        run_add_v4(names, load_topology_cluster(), operation, publish_handoff=publish_connection_pages)
+            seen.add(name.strip().casefold())
+        cluster = load_topology_cluster()
+        usernames, display_names = new_client_usernames(cluster, names)
+        run_add_v4(
+            usernames,
+            cluster,
+            operation,
+            display_names=display_names,
+            publish_handoff=publish_connection_pages,
+        )
 
 
 def run_show(name: str, repair_page: bool = False) -> None:
@@ -64,8 +72,9 @@ def run_show(name: str, repair_page: bool = False) -> None:
 
 
 def _show(*, name: str, repair_page: bool, operation: OperationContext) -> None:
-    validate_client_name(name)
     cluster = load_topology_cluster()
+    name = resolve_client_name(cluster, name)
+    validate_client_name(name)
     access_users = _access_users(cluster)
     repaired = False
     repair_persistence_error = ""
@@ -206,9 +215,11 @@ def _list(*, operation: OperationContext) -> None:
     table.add_column("Traffic", style="dim")
     table.add_column("Last seen", style="dim")
 
+    access = require_intent(cluster).access
     for client in result.clients.clients:
+        shown = access.display_name(client.username)
         table.add_row(
-            escape(client.username),
+            escape(shown if shown == client.username else f"{shown} ({client.username})"),
             format_status(client.status),
             format_traffic(client.traffic_used_bytes, client.traffic_limit_bytes),
             escape(client.last_seen or "-"),
@@ -230,14 +241,16 @@ def run_remove(name: str, yes: bool = False) -> None:
     """Remove a client from the proxy cluster."""
     operation = OperationContext()
     with error_context("client.remove", timer=operation.timer):
-        validate_client_name(name)
         if is_json_mode() and not yes:
             fail(
                 "Client removal requires explicit confirmation in JSON mode",
                 hint="Pass --yes to confirm the mutation.",
                 hint_type="user",
             )
-        run_remove_v4(name, load_topology_cluster(), operation, yes=yes)
+        cluster = load_topology_cluster()
+        name = resolve_client_name(cluster, name)
+        validate_client_name(name)
+        run_remove_v4(name, cluster, operation, yes=yes)
 
 
 def run_enable(name: str) -> None:
@@ -253,8 +266,9 @@ def run_disable(name: str) -> None:
 def _set_enabled(name: str, action: Literal["enable", "disable"]) -> None:
     operation = OperationContext()
     with error_context(f"client.{action}", timer=operation.timer):
-        validate_client_name(name)
         cluster = load_topology_cluster()
+        name = resolve_client_name(cluster, name)
+        validate_client_name(name)
         require_access_user(cluster, name)
         with make_panel(cluster) as panel:
             client = get_user_or_fail(panel, name, action="load")

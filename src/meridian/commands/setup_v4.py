@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from meridian import i18n
 from meridian.commands.apply_progress import apply_progress
-from meridian.commands.setup_wizard import SetupWizard
+from meridian.commands.setup_wizard import CamouflageSites, SetupWizard
 from meridian.config import (
     SERVER_PROFILES_FILE,
     SETUP_DRAFT_FILE,
@@ -104,19 +104,21 @@ def _load_intent(source: str) -> SetupIntent:
         )
 
 
-def _suggest_sni(registry: ServerRegistry, server_ref: str) -> str:
-    """First camouflage candidate the exit server reaches over TLS 1.3 + HTTP/2 ('' if none or unknown)."""
+def _suggest_sni(registry: ServerRegistry, server_ref: str) -> CamouflageSites:
+    """Sites in the exit's own subnet, like `deploy` finds, then the known targets it reaches over TLS 1.3."""
+    from meridian.diagnostics.camouflage import neighbor_camouflage_targets
     from meridian.diagnostics.preflight import reachable_reality_targets
     from meridian.resolve import connection_for_entry
 
     entry = registry.find(server_ref)
     if entry is None:
-        return ""
+        return CamouflageSites([], [])
     try:
-        targets = reachable_reality_targets(connection_for_entry(entry))
+        conn = connection_for_entry(entry)
+        nearby = neighbor_camouflage_targets(conn, entry.host, limit=3)
+        return CamouflageSites(nearby, reachable_reality_targets(conn))
     except (MeridianError, OSError):
-        return ""
-    return targets[0] if targets else ""
+        return CamouflageSites([], [])
 
 
 def _remember_language(code: str) -> None:

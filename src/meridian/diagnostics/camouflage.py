@@ -105,7 +105,8 @@ def _server_network(conn: ServerConnection, ip: str) -> ipaddress.IPv4Network:
     except ValueError:
         network = None
     if isinstance(network, ipaddress.IPv4Network):
-        return network
+        # Cloud VPSes (Hetzner, others) get a /32 point-to-point address; their neighbours share the /24.
+        return network.supernet(new_prefix=24) if network.prefixlen > 24 else network
     try:
         address = ipaddress.ip_address(ip)
     except ValueError as exc:

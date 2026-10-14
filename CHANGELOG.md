@@ -56,6 +56,19 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   unless you have a gateway, suggests five short server names (astra, boba,
   foxtrot…), and ends with a plain summary before anything
   changes. Running `meridian` alone in a terminal offers to start it.
+  Choices are arrow-key lists and checklists (Space toggles, `?` explains,
+  Esc goes back), typed answers are checked as you enter them, and the
+  camouflage list leads with sites found in the exit's own network.
+  `MERIDIAN_PLAIN_PROMPTS=1` keeps the numbered prompts. The final screen also
+  shows the admin panel address and login (the password stays behind
+  `meridian panel --show-password`).
+- **Names in any script** — `setup` and `client add` take people's names as
+  typed (Биба, مریم, 王小明); connection pages and output show them, and the
+  panel gets a Latin username (`biba`). Other client commands accept either.
+- **Camouflage scans work on cloud servers** — VPSes that get a `/32` address
+  (Hetzner Cloud and others) now scan their surrounding `/24`; the scan used to
+  cover only the server itself, so `deploy` and `node add` always fell back to
+  a well-known site.
 - **Review before change** — `meridian plan` shows what `meridian apply` would do
   (exit 0 converged, 1 config error, 2 changes pending, 3 evidence unavailable).
 - **Paths** — Reality, XHTTP, and Hysteria2 on UDP/443 by default; `--domain`
