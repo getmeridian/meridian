@@ -34,11 +34,11 @@ echo ""
 
 check "VERSION format" bash -c '
     VERSION=$(cat VERSION | tr -d "[:space:]")
-    echo "$VERSION" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+$"
+    echo "$VERSION" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$"
 '
 
 check "CHANGELOG has VERSION entry" bash -c '
-    VERSION=$(cat VERSION | tr -d "[:space:]")
+    VERSION=$(cat VERSION | tr -d "[:space:]" | sed -E "s/(a|b|rc)[0-9]+$//")  # a beta ships under its release entry
     grep -q "## \[$VERSION\]" CHANGELOG.md
 '
 

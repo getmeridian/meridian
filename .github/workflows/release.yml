@@ -144,8 +144,8 @@ jobs:
             echo "notes=Initial release" >> "$GITHUB_OUTPUT"
           else
             PREV="${PREV_TAG#v}"
-            IFS='.' read -r pm pi pp <<< "$PREV"
-            IFS='.' read -r cm ci cp <<< "$VERSION"
+            IFS='.' read -r pm pi _ <<< "$PREV"
+            IFS='.' read -r cm ci _ <<< "$VERSION"
             if [ "$pm" != "$cm" ]; then
               echo "type=major" >> "$GITHUB_OUTPUT"
             elif [ "$pi" != "$ci" ]; then

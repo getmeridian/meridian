@@ -6,10 +6,10 @@ body:
     attributes:
       value: |
         Before reporting, please check:
-        - **Reachability test**: Run `meridian test` or use [getmeridian.org/ping](https://getmeridian.org/ping) to verify the server is reachable
+        - **Traffic test**: Run `meridian test` (add `--probe` for the censor's view of your server)
+        - **Server health**: Run `meridian check`
         - **Clock sync**: Device clock must be accurate within 30 seconds
         - **Client app**: Try a different app (v2rayNG, Hiddify, v2RayTun)
-        - **Pre-flight**: Run `meridian preflight` to test your server environment
 
   - type: dropdown
     id: symptom
@@ -39,7 +39,9 @@ body:
         - Primary (Reality)
         - XHTTP
         - Backup (WSS/CDN)
-        - Both fail
+        - Hysteria2 (UDP)
+        - All of them fail
+        - Not sure
     validations:
       required: true
 
@@ -53,9 +55,9 @@ body:
 
   - type: textarea
     attributes:
-      label: Test / pre-flight output
+      label: Test / check output
       description: |
-        Run: `meridian test` and/or `meridian preflight`
+        Run: `meridian test` and/or `meridian check`
       render: text
     validations:
       required: false

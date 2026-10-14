@@ -23,11 +23,12 @@ body:
   - type: dropdown
     id: mode
     attributes:
-      label: Setup mode
+      label: What were you doing?
       options:
-        - Standalone (no domain)
-        - Domain mode (nginx + Cloudflare CDN)
-        - Uninstall
+        - meridian setup (guided, one or more servers)
+        - meridian deploy (one server)
+        - Adding or removing clients, nodes, or relays
+        - meridian teardown
         - "Not sure"
     validations:
       required: true
@@ -38,7 +39,8 @@ body:
       label: When does it fail?
       options:
         - During SSH connection
-        - During server provisioning
+        - During setup questions or review
+        - During server provisioning or apply
         - After setup — connection doesn't work
         - After setup — connection stopped working
         - Other

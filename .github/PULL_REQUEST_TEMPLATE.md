@@ -11,15 +11,16 @@
 - [ ] I have read `CONTRIBUTING.md`
 - [ ] `make ci` passes locally
 - [ ] Updated relevant documentation surfaces (see below)
+- [ ] Updated the nearest folder `CLAUDE.md` (pitfall for a bug fix, design note for a design change)
 
 ### If modifying connection pages:
 - [ ] PWA templates, assets, and app metadata are in sync
 - [ ] Tested light and dark mode
 
 ### If adding a new CLI command:
-- [ ] Added help smoke test in `tests/test_cli.py`
-- [ ] Updated README.md commands table
-- [ ] Updated CLAUDE.md subcommands list
+- [ ] Added a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `COMMAND_OUTPUTS` entry
+- [ ] Documented it in `cli-reference.md` for every locale (`tests/validate_cli_docs.py`)
+- [ ] Updated the README.md commands table
 
 ### If modifying cluster state or secrets:
 - [ ] Tested loading and saving an existing v4 `cluster.yml`

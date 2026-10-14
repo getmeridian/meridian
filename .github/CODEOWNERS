@@ -9,6 +9,10 @@ src/meridian/templates/ @uburuntu
 src/meridian/cluster.py @uburuntu
 src/meridian/cluster_persistence.py @uburuntu
 src/meridian/ssh.py @uburuntu
+src/meridian/ssh_keys.py @uburuntu
+src/meridian/core/redaction.py @uburuntu
+src/meridian/reconciler/ @uburuntu
+src/meridian/remnawave/ @uburuntu
 
 # Provisioner (server deployment logic)
 src/meridian/provision/ @uburuntu
