@@ -15,7 +15,7 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     certificate_directory,
 )
-from meridian.config import REMNAWAVE_NODE_DIR
+from meridian.host_runtime import LEGACY_NODE_DIR, NODE_DIR
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_realm_config_path,
@@ -193,21 +193,23 @@ def test_realm_hop_refuses_a_service_name_that_does_not_match_its_resource() -> 
     assert conn.calls == []
 
 
-def test_node_runtime_container_and_compose_dir_are_removed() -> None:
+@pytest.mark.parametrize("remote_id", [NODE_DIR, LEGACY_NODE_DIR], ids=["neutral", "pre-rename"])
+def test_node_runtime_container_and_compose_dir_are_removed_under_both_names(remote_id: str) -> None:
     conn = MockConnection()
 
     _runtime_driver(conn).retire(
-        ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+        ManagedResourceBinding(logical_id="node:exit-b", remote_id=remote_id, server_ref="srv-exit-b")
     )
 
     command, rule_cleanup = conn.calls
-    assert f"docker compose -f {REMNAWAVE_NODE_DIR}/docker-compose.yml down" in command
+    assert f"docker compose -f {NODE_DIR}/docker-compose.yml down" in command
     # Its Docker-internal API rule goes too, under the neutral and the pre-rename comment.
     assert "grep -F -e '# fw-node-api' -e '# Meridian node API (Docker internal)'" in rule_cleanup
     assert "ufw --force delete" in rule_cleanup
-    assert "docker rm -f remnawave-node" in command
-    assert f"rm -rf {REMNAWAVE_NODE_DIR};" in command
-    assert "/opt/remnawave " not in command and "/opt/remnawave;" not in command
+    assert "docker rm -f netagent" in command and "docker rm -f remnawave-node" in command
+    assert f"rm -rf {NODE_DIR};" in command and f"rm -rf {LEGACY_NODE_DIR} && test ! -e {LEGACY_NODE_DIR}" in command
+    # The control plane's directories are a separate project and stay.
+    assert "/opt/remnawave" not in command and "/opt/ctlsvc" not in command
     # The pulled node image goes too; Docker itself (baseline-installed, maybe operator-used) stays.
     assert "docker images -q remnawave/node" in command and "docker image rm $ids" in command
     assert "apt-get" not in command and "purge" not in command
@@ -217,7 +219,7 @@ def test_node_runtime_replaced_on_the_same_server_is_only_forgotten() -> None:
     conn = MockConnection()
 
     _runtime_driver(conn, plan=_plan_with_node("srv-exit-b")).retire(
-        ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+        ManagedResourceBinding(logical_id="node:exit-b", remote_id=NODE_DIR, server_ref="srv-exit-b")
     )
 
     assert conn.calls == []
@@ -229,7 +231,7 @@ def test_node_runtime_removal_failure_is_reported() -> None:
 
     with pytest.raises(ResourceReconcileError, match="Cannot connect to the Docker daemon"):
         _runtime_driver(conn).retire(
-            ManagedResourceBinding(logical_id="node:exit-b", remote_id=REMNAWAVE_NODE_DIR, server_ref="srv-exit-b")
+            ManagedResourceBinding(logical_id="node:exit-b", remote_id=NODE_DIR, server_ref="srv-exit-b")
         )
 
 

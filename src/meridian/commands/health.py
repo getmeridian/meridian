@@ -39,6 +39,7 @@ from meridian.diagnostics.evidence import check_from_result, finding, finish_che
 from meridian.diagnostics.network import resolve_hostname
 from meridian.diagnostics.node_plugins import check_node_plugin_host
 from meridian.diagnostics.preflight import collect_preflight
+from meridian.host_runtime import NODE, PANEL_CORE, SUBSCRIPTION_PAGE, RuntimeContainer
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.resolve import connection_for_entry, local_entry, merge_target
 from meridian.servers import ServerEntry, ServerRegistry
@@ -47,7 +48,6 @@ from meridian.ssh_ui import RichSSHUI
 from meridian.verification import deployment_verification_context
 
 _TITLES = {"preflight": "Pre-flight check", "server": "Server health", "relay": "Relay hops"}
-_PANEL_CONTAINERS = ("remnawave", "remnawave-db", "remnawave-redis")
 
 
 def run(
@@ -269,16 +269,17 @@ def _server_report(
     message = "Running on this server" if conn.local_mode else f"Connected as {conn.user}"
     checks.append(finish_check("ssh", "SSH", [finding("ssh", "passed", message)], started))
 
-    containers: list[str] = []
+    containers: list[RuntimeContainer] = []
     if {"exit", "gateway"} & set(roles):
-        containers.append("remnawave-node")
+        containers.append(NODE)
     if "control" in roles:
-        containers.extend(_PANEL_CONTAINERS)
+        containers.extend(PANEL_CORE)
         if cluster.subscription_page is not None and cluster.subscription_page.deployed:
-            containers.append("remnawave-subscription-page")
-    for name in containers:
-        checks.append(check_from_result(f"container:{name}", f"Container {name}", check_container_running(conn, name)))
-    if "remnawave-node" in containers:
+            containers.append(SUBSCRIPTION_PAGE)
+    for container in containers:
+        result = check_container_running(conn, container.name, container.legacy)
+        checks.append(check_from_result(f"container:{container.name}", container.label, result))
+    if NODE in containers:
         checks.append(check_node_plugin_host(conn))
 
     try:

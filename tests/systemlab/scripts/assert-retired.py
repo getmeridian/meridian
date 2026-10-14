@@ -20,11 +20,10 @@ from meridian.cluster import ClusterConfig
 from meridian.compiler.names import service_username
 from meridian.compiler.routing import edge_id
 from meridian.config import SERVER_PROFILES_FILE
+from meridian.host_runtime import LEGACY_NODE_DIR, NODE, NODE_DIR
 from meridian.reconciler.server_render import artifact_token, firewall_marker, realm_service_name
 from meridian.remnawave import MeridianPanel
 from meridian.servers import ServerRegistry
-
-NODE_DIR = "/opt/remnanode"
 
 
 def _active() -> dict[str, dict[str, str]]:
@@ -62,10 +61,12 @@ def _server_leftover(logical_id: str, kind: str, host: str) -> str:
         if _ssh_succeeds(host, f"{listing} | grep -qF -- {token}"):
             return f"nginx file {token} still present"
     elif kind == "node_runtime":
-        if _ssh_succeeds(host, "docker ps -a --format '{{.Names}}' | grep -qx remnawave-node"):
-            return "remnawave-node container still exists"
-        if _ssh_succeeds(host, f"test -e {NODE_DIR}"):
-            return f"{NODE_DIR} still exists"
+        for name in (NODE.name, NODE.legacy):
+            if _ssh_succeeds(host, f"docker ps -a --format '{{{{.Names}}}}' | grep -qx {shlex.quote(name)}"):
+                return f"{name} container still exists"
+        for directory in (NODE_DIR, LEGACY_NODE_DIR):
+            if _ssh_succeeds(host, f"test -e {shlex.quote(directory)}"):
+                return f"{directory} still exists"
     return ""
 
 

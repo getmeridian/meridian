@@ -20,6 +20,7 @@ from meridian.diagnostics.images import (
     node_components,
     observe_images,
 )
+from meridian.host_runtime import PANEL_DATABASE
 from meridian.remnawave.versions import UPGRADABLE_PINS, ImageStatus, data_major, effective_pins, parse_image
 
 if TYPE_CHECKING:
@@ -190,7 +191,7 @@ def _explain_held(observed: list[ServerImages]) -> None:
             f"{data_major(image.pinned)}, and a major upgrade needs a dump and restore"
         )
         info(
-            "Back up first (`docker exec remnawave-db pg_dumpall -U meridian > remnawave.sql`), "
+            f"Back up first (`docker exec {PANEL_DATABASE.name} pg_dumpall -U meridian > panel.sql`), "
             "then follow the Remnawave PostgreSQL upgrade guide. Meridian never moves a PostgreSQL major."
         )
 

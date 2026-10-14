@@ -74,8 +74,7 @@ REMNAWAVE_TESTED_MAJOR = 3  # newer majors run with a warning
 REMNAWAVE_PANEL_PORT = 3000  # internal port, nginx reverse-proxied
 REMNAWAVE_NODE_API_PORT = 3010  # node API port (panel→node mTLS communication)
 REMNAWAVE_SUBSCRIPTION_PAGE_PORT = 3020  # host port (internal 3010 remapped to avoid node API conflict)
-REMNAWAVE_PANEL_DIR = "/opt/remnawave"
-REMNAWAVE_NODE_DIR = "/opt/remnanode"
+# Runtime directories and container names live in meridian.host_runtime.
 
 # Exit-IP observers are single-stack: a dual-stack exit would otherwise answer
 # a dual-stack observer over IPv6 and fail the egress match against its IPv4.

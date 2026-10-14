@@ -14,8 +14,10 @@ from meridian.compiler.models import (
     NodeRuntimePayload,
     certificate_directory,
 )
-from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+from meridian.config import REMNAWAVE_NODE_IMAGE
+from meridian.host_runtime import LEGACY_NODE_DIR, NODE, NODE_DIR
 from meridian.node_deploy import delete_node_api_rules
+from meridian.provision.runtime_migration import remove_legacy_node_command
 from meridian.reconciler.resources import ResourceReconcileError
 from meridian.reconciler.server_render import (
     legacy_firewall_marker,
@@ -183,7 +185,7 @@ class RealmHopRetirement:
 
 
 class NodeRuntimeRetirement:
-    """Stop and delete the remnawave-node container, its Compose directory, and its image.
+    """Stop and delete the node container, its Compose directory, and its image, under both names.
 
     The control plane lives in a separate Compose project, so it keeps running.
     When the reviewed plan still runs a node on the same server, the directory
@@ -195,7 +197,7 @@ class NodeRuntimeRetirement:
     context: Any
 
     def retire(self, binding: ManagedResourceBinding) -> None:
-        if binding.remote_id != REMNAWAVE_NODE_DIR:
+        if binding.remote_id not in {NODE_DIR, LEGACY_NODE_DIR}:
             raise ResourceReconcileError(f"Unexpected node runtime for {binding.logical_id}: {binding.remote_id!r}")
         conn = _connection(self.context, binding)
         if any(
@@ -203,12 +205,13 @@ class NodeRuntimeRetirement:
             for resource in self.context.plan.resources
         ):
             return
-        compose = shlex.quote(f"{REMNAWAVE_NODE_DIR}/docker-compose.yml")
+        compose = shlex.quote(f"{NODE_DIR}/docker-compose.yml")
+        name = shlex.quote(NODE.name)
         result = conn.run(
             f"if [ -f {compose} ]; then docker compose -f {compose} down --remove-orphans --volumes || exit 1; fi;"
-            " if docker inspect remnawave-node >/dev/null 2>&1;"
-            " then docker rm -f remnawave-node >/dev/null || exit 1; fi;"
-            f" rm -rf {shlex.quote(REMNAWAVE_NODE_DIR)};"
+            f" if docker inspect --type container {name} >/dev/null 2>&1;"
+            f" then docker rm -f {name} >/dev/null || exit 1; fi;"
+            f" rm -rf {shlex.quote(NODE_DIR)}; {remove_legacy_node_command()} || exit 1;"
             # Images still used by another container refuse removal; that is fine.
             f" ids=$(docker images -q {shlex.quote(_NODE_REPOSITORY)} 2>/dev/null | sort -u);"
             ' if [ -n "$ids" ]; then docker image rm $ids >/dev/null 2>&1; fi; true',

@@ -35,5 +35,5 @@
 - **A moved exit keeps its Node** — `SERVER_PLACED` kinds retire their old placement, but the panel Node is PATCHed to the new address, never recreated.
 - **Remnawave deletes Nodes asynchronously** — `NodeRetirement` polls until the Node is gone before its Profile is deleted.
 - **Certificates retire through acme.sh's record** — match `Le_RealFullChainPath`, not the hostname; skip while the panel or a Host still uses the file; drop the ACME listener with the last one.
-- **Node runtimes share `/opt/remnanode`** — when the plan still runs a node there, only forget the old binding.
-- **Renames migrate, never orphan** — a surviving pre-rename unit or `meridian-v4-*` UFW comment is drift; stop the old unit before the new one binds, and re-add rules after deleting the old comment.
+- **Node runtimes share `host_runtime.NODE_DIR`** — when the plan still runs a node there, only forget the old binding; retirement removes both the neutral and the `remnawave-node` names.
+- **Renames migrate, never orphan** — a surviving pre-rename unit, `meridian-v4-*` UFW comment, or `remnawave*` container/directory is drift; stop the old unit before the new one binds, and re-add rules after deleting the old comment.

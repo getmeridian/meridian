@@ -14,6 +14,7 @@ from meridian.provision.containers import ComposeDeployResult
 from meridian.provision.remnawave_panel import DeployRemnawavePanel
 from meridian.provision.steps import ProvisionContext
 from tests.support.mock_connection import MockConnection
+from tests.support.runtime import migrated_panel
 
 _EXISTING_ENV = """\
 # Remnawave Panel environment
@@ -44,7 +45,7 @@ def _compose(backend: str, subscription_page: str) -> str:
 
 
 def _stopped_panel() -> MockConnection:
-    conn = MockConnection()
+    conn = migrated_panel()
     conn.when("docker inspect", rc=1)
     return conn
 
@@ -64,9 +65,9 @@ def _run(conn: MockConnection) -> tuple[object, dict[str, str]]:
 
 def test_restart_reuses_existing_secrets_and_subscription_token() -> None:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=0)
-    conn.when("cat /opt/remnawave/.env.subscription", stdout="REMNAWAVE_API_TOKEN=real-token\n")
-    conn.when("cat /opt/remnawave/.env", stdout=_EXISTING_ENV)
+    conn.when("test -f /opt/ctlsvc/.env", rc=0)
+    conn.when("cat /opt/ctlsvc/.env.subscription", stdout="REMNAWAVE_API_TOKEN=real-token\n")
+    conn.when("cat /opt/ctlsvc/.env", stdout=_EXISTING_ENV)
 
     result, env = _run(conn)
 
@@ -74,14 +75,14 @@ def test_restart_reuses_existing_secrets_and_subscription_token() -> None:
     assert "POSTGRES_PASSWORD=olddbpass" in env[".env"]
     assert "APP_SECRET=oldapp" in env[".env"]
     assert "METRICS_PASS=oldmetrics" in env[".env"]
-    assert env[".env.subscription"] == "REMNAWAVE_API_TOKEN=real-token\n"
+    assert "REMNAWAVE_API_TOKEN=real-token\n" in env[".env.subscription"]
 
 
 def test_legacy_jwt_auth_secret_becomes_app_secret() -> None:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=0)
-    conn.when("cat /opt/remnawave/.env.subscription", stdout="")
-    conn.when("cat /opt/remnawave/.env", stdout=_LEGACY_ENV)
+    conn.when("test -f /opt/ctlsvc/.env", rc=0)
+    conn.when("cat /opt/ctlsvc/.env.subscription", stdout="")
+    conn.when("cat /opt/ctlsvc/.env", stdout=_LEGACY_ENV)
 
     result, env = _run(conn)
 
@@ -94,8 +95,8 @@ def test_legacy_jwt_auth_secret_becomes_app_secret() -> None:
 
 def test_incomplete_existing_env_fails_closed() -> None:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=0)
-    conn.when("cat /opt/remnawave/.env", stdout="POSTGRES_PASSWORD=olddbpass\n")
+    conn.when("test -f /opt/ctlsvc/.env", rc=0)
+    conn.when("cat /opt/ctlsvc/.env", stdout="POSTGRES_PASSWORD=olddbpass\n")
 
     result, env = _run(conn)
 
@@ -106,8 +107,8 @@ def test_incomplete_existing_env_fails_closed() -> None:
 
 def test_database_without_env_fails_closed() -> None:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=1)
-    conn.when("test -d /opt/remnawave/data", rc=0)
+    conn.when("test -f /opt/ctlsvc/.env", rc=1)
+    conn.when("test -d /opt/ctlsvc/data", rc=0)
 
     result, env = _run(conn)
 
@@ -118,8 +119,8 @@ def test_database_without_env_fails_closed() -> None:
 
 def test_fresh_install_generates_secrets() -> None:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=1)
-    conn.when("test -d /opt/remnawave/data", rc=1)
+    conn.when("test -f /opt/ctlsvc/.env", rc=1)
+    conn.when("test -d /opt/ctlsvc/data", rc=1)
 
     result, env = _run(conn)
 
@@ -133,10 +134,10 @@ def test_fresh_install_generates_secrets() -> None:
 
 def _restart_with_compose(compose: str) -> str:
     conn = _stopped_panel()
-    conn.when("test -f /opt/remnawave/.env", rc=0)
-    conn.when("cat /opt/remnawave/.env.subscription", stdout="")
-    conn.when("cat /opt/remnawave/.env", stdout=_EXISTING_ENV)
-    conn.when("cat /opt/remnawave/docker-compose.yml", stdout=compose)
+    conn.when("test -f /opt/ctlsvc/.env", rc=0)
+    conn.when("cat /opt/ctlsvc/.env.subscription", stdout="")
+    conn.when("cat /opt/ctlsvc/.env", stdout=_EXISTING_ENV)
+    conn.when("cat /opt/ctlsvc/docker-compose.yml", stdout=compose)
     result, env = _run(conn)
     assert result.status == "changed"
     return env["docker-compose.yml"]
@@ -164,13 +165,13 @@ def test_restart_upgrades_images_older_than_the_pins() -> None:
 
 
 def test_running_panel_below_floor_is_upgraded_not_skipped() -> None:
-    conn = MockConnection()
+    conn = migrated_panel()
     conn.when("docker inspect", stdout="true\n")
-    conn.when("test -f /opt/remnawave/.env", rc=0)
-    conn.when("cat /opt/remnawave/.env.subscription", stdout="REMNAWAVE_API_TOKEN=real-token\n")
-    conn.when("cat /opt/remnawave/.env", stdout=_LEGACY_ENV)
+    conn.when("test -f /opt/ctlsvc/.env", rc=0)
+    conn.when("cat /opt/ctlsvc/.env.subscription", stdout="REMNAWAVE_API_TOKEN=real-token\n")
+    conn.when("cat /opt/ctlsvc/.env", stdout=_LEGACY_ENV)
     conn.when(
-        "cat /opt/remnawave/docker-compose.yml",
+        "cat /opt/ctlsvc/docker-compose.yml",
         stdout=_compose("remnawave/backend:2.8.0", "remnawave/subscription-page:7.2.6"),
     )
 
@@ -182,10 +183,10 @@ def test_running_panel_below_floor_is_upgraded_not_skipped() -> None:
 
 
 def test_running_panel_at_or_above_floor_is_left_alone() -> None:
-    conn = MockConnection()
+    conn = migrated_panel()
     conn.when("docker inspect", stdout="true\n")
     conn.when(
-        "cat /opt/remnawave/docker-compose.yml",
+        "cat /opt/ctlsvc/docker-compose.yml",
         stdout=_compose("remnawave/backend:3.4.1", "remnawave/subscription-page:8.0.0"),
     )
 
@@ -214,5 +215,5 @@ def test_subscription_page_token_is_applied_by_recreating_not_restarting() -> No
 
     assert configure_subscription_page(conn, "token-value") is True
     assert any(b"REMNAWAVE_API_TOKEN=token-value" in text for _path, text, _kw in conn.writes)
-    conn.assert_called_with_pattern("up -d --no-deps --force-recreate remnawave-subscription-page")
+    conn.assert_called_with_pattern("up -d --no-deps --force-recreate ctlsvc-web")
     conn.assert_not_called_with_pattern("compose restart")

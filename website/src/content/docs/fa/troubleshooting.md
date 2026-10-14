@@ -42,7 +42,7 @@ section: guides
 **راه‌حل‌ها:**
 1. کنسول cloud provider را بررسی کنید — مطمئن شوید درگاه 443/TCP inbound مجاز است
 2. از شبکه دیگری امتحان کنید (داده تلفن، Wi-Fi دیگر)
-3. SSH شوید و بررسی کنید: `docker ps` (آیا `remnawave` و `remnawave-node` اجرا می‌شوند؟)، `systemctl status nginx`، `ss -tlnp sport = :443`
+3. SSH شوید و بررسی کنید: `docker ps` (آیا `ctlsvc-api` و `netagent` اجرا می‌شوند؟)، `systemctl status nginx`، `ss -tlnp sport = :443`
 4. UFW را بررسی کنید: `ufw status` — باید 443/tcp ALLOW نشان دهد
 
 ### handshake TLS ناموفق
@@ -101,6 +101,10 @@ Deploys و applies checkpoint شده‌اند. علت گزارش‌شده را �
 
 بسته‌های Docker متضاد از distro repos. Meridian خود را حذف می‌کند اما Docker قبلاً اجرا می‌شود با containers، پرش می‌کند تا اختلال جلوگیری شود.
 
+### rename پنل هنگام upgrade متوقف می‌شود
+
+`meridian apply` پنلی را که توسط نسخه beta 4.0 deploy شده از `/opt/remnawave` به `/opt/ctlsvc` منتقل می‌کند. پیش از stop کردن هر چیزی، اگر هر دو دایرکتوری وجود داشته باشند یا `/opt/remnawave` یک mount point باشد، ادامه نمی‌دهد. دایرکتوری‌ای را که `data/` و `.env` پنل در آن است به‌عنوان `/opt/ctlsvc` نگه دارید (یا volume را همان‌جا mount کنید)، دیگری را کنار بگذارید و دوباره `meridian apply` را اجرا کنید. rename‌ای که وسط کار قطع شده باشد در apply بعدی ادامه پیدا می‌کند.
+
 ### خطاهای اتصال SSH
 
 SSH دستی را امتحان کنید: `ssh root@SERVER_IP`. مطمئن شوید دسترسی مبتنی بر کلید داریدید. اگر root نیستید `--user` flag استفاده کنید.
@@ -126,7 +130,7 @@ certificate برای دامنه شما تنها زمانی می‌تواند ص�
 [راهنمای بازیابی IP مسدود](/fa/recovery/) را برای گزینه‌های بازیابی (خروجی جایگزین، relay، fallback CDN) ببینید.
 
 علت‌های دیگر:
-- سرور reboot شد و سرویس‌ها شروع نشدند → `meridian plan` نشان می‌دهد چه چیز خاموش است و `meridian apply` تعمیر می‌کند. دستی: `docker compose up -d` در `/opt/remnawave` و `/opt/remnanode`، سپس `systemctl restart nginx`
+- سرور reboot شد و سرویس‌ها شروع نشدند → `meridian plan` نشان می‌دهد چه چیز خاموش است و `meridian apply` تعمیر می‌کند. دستی: `docker compose up -d` در `/opt/ctlsvc` و `/opt/netagent`، سپس `systemctl restart nginx`
 - دیسک پر — `df -h /`، `docker system prune -af`
 
 ## سرعت کم
@@ -174,7 +178,7 @@ meridian doctor
 |---------|-----------------|
 | ماشین محلی | سازگاری OS |
 | سرور | نسخه OS، uptime (reboot اخیر؟)، استفاده دیسک/memory |
-| Docker | آیا containers `remnawave` و `remnawave-node` اجرا می‌شوند؟ وضعیت باید "Up" باشد |
+| Docker | آیا containers `ctlsvc-api` و `netagent` اجرا می‌شوند؟ وضعیت باید "Up" باشد |
 | لاگ‌های گره Remnawave | خطاهای شروع گره، "failed to start" ورودی‌ها، مسائل certificate |
 | درگاه‌های گوش‌دهنده | درگاه 443 باید nginx را نشان دهد. اگر گمشده، proxy اجرا نمی‌شود |
 | firewall (UFW) | درگاه 443/tcp باید ALLOW باشد. اگر فهرست‌نشده، مسدود است |

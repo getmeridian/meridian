@@ -84,7 +84,7 @@ pass "exit removal retired the node runtime, panel node/profile, bridge, firewal
 require_command \
   "control plane still running on exit A" \
   ssh root@"$EXIT_A_IP" \
-  "docker ps --format '{{.Names}}' | grep -qx remnawave"
+  "docker ps --format '{{.Names}}' | grep -qx ctlsvc-api"
 
 meridian plan
 pass "plan converged after exit removal"

@@ -46,7 +46,7 @@ Add `--ai` to check or doctor for an AI-ready diagnostic prompt.
 **Fixes:**
 1. Check cloud provider console — ensure port 443/TCP is allowed inbound
 2. Try from a different network (mobile data, another Wi-Fi)
-3. SSH in and check: `docker ps` (are `remnawave` and `remnawave-node` running?), `systemctl status nginx`, `ss -tlnp sport = :443`
+3. SSH in and check: `docker ps` (are `ctlsvc-api` and `netagent` running?), `systemctl status nginx`, `ss -tlnp sport = :443`
 4. Check UFW: `ufw status` — should show 443/tcp ALLOW
 
 ### TLS handshake fails
@@ -105,6 +105,10 @@ Another service (Apache, Nginx) is using port 443. Stop it or use a clean server
 
 Conflicting Docker packages from distro repos. Meridian auto-removes them, but if Docker is already running with containers, it skips to avoid disruption.
 
+### Panel rename stops during an upgrade
+
+`meridian apply` moves a panel deployed by a 4.0 beta from `/opt/remnawave` to `/opt/ctlsvc`. Before stopping anything it refuses when both directories exist or `/opt/remnawave` is a mount point. Keep the directory that holds the panel's `data/` and `.env` as `/opt/ctlsvc` (or mount the volume there), move the other aside, then run `meridian apply` again. A rename interrupted midway resumes on the next apply.
+
 ### SSH connection errors
 
 Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `--user` flag if not root. If the server accepts only a password, run `meridian deploy` in a terminal without `--yes` and let it install a key (see [Password-only servers](/en/deploy/#password-only-servers)), or run `ssh-copy-id root@SERVER_IP` once.
@@ -130,7 +134,7 @@ The certificate for your domain can only be issued once the domain's A record po
 See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replacement exit, relay, CDN fallback).
 
 Other causes:
-- Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/remnawave` and `/opt/remnanode`, then `systemctl restart nginx`
+- Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/ctlsvc` and `/opt/netagent`, then `systemctl restart nginx`
 - Disk full → `df -h /`, `docker system prune -af`
 
 ## Slow speeds
@@ -178,7 +182,7 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 |---------|-----------------|
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
-| Docker | Are the `remnawave` and `remnawave-node` containers running? Status should be "Up" |
+| Docker | Are the `ctlsvc-api` (panel) and `netagent` (node) containers running? Status should be "Up" |
 | Remnawave Node Logs | Node startup errors, "failed to start" entries, certificate issues |
 | Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |

@@ -19,6 +19,7 @@ from meridian.config import (
     REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE,
     REMNAWAVE_TESTED_MAJOR,
 )
+from meridian.host_runtime import PANEL_DIR
 
 from .runtime import RemnawaveError
 
@@ -243,7 +244,7 @@ def check_panel_version(version: str) -> str:
     if floor is not None and parsed < floor:
         raise RemnawaveError(
             f"Remnawave {version} is older than the minimum supported {REMNAWAVE_MIN_VERSION}",
-            hint="Upgrade the panel (re-run setup, or update the image tags in /opt/remnawave) and retry.",
+            hint=f"Upgrade the panel (re-run setup, or update the image tags in {PANEL_DIR}) and retry.",
             category="user",
         )
     if parsed[0] > REMNAWAVE_TESTED_MAJOR:

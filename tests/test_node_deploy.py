@@ -62,7 +62,7 @@ def test_wait_for_node_connected_polls_panel_state(_sleep: MagicMock) -> None:
     assert panel.get_node.call_count == 3
 
 
-_NODE_DIR = "/opt/remnanode"
+_NODE_DIR = "/opt/netagent"
 
 
 def _result(rc: int = 0, stdout: str = "", stderr: str = "") -> SimpleNamespace:
@@ -86,7 +86,7 @@ def _commands(conn: MagicMock) -> list[str]:
 
 
 def _healthy(cmd: str) -> SimpleNamespace | None:
-    return _result(stdout="true\n") if "docker inspect remnawave-node" in cmd else None
+    return _result(stdout="true\n") if "docker inspect netagent" in cmd else None
 
 
 @patch("meridian.health.time.sleep")
@@ -155,7 +155,7 @@ def test_node_health_gate_retries_until_healthy(mono: MagicMock, sleep: MagicMoc
     _advancing_clock(mono)
     health = iter([_result(1), _result(1), _result(stdout="true\n")])
 
-    _deploy(caplog, lambda cmd: next(health) if "docker inspect remnawave-node" in cmd else None)
+    _deploy(caplog, lambda cmd: next(health) if "docker inspect netagent" in cmd else None)
 
     assert not caplog.records
     assert sleep.call_count >= 2
@@ -167,9 +167,9 @@ def test_unhealthy_node_warns_after_polling_but_still_opens_the_node_api(mono, _
     _advancing_clock(mono)
 
     def respond(cmd: str) -> SimpleNamespace | None:
-        if "docker inspect remnawave-node" in cmd:
+        if "docker inspect netagent" in cmd:
             return _result(1)
-        if "docker logs remnawave-node" in cmd:
+        if "docker logs netagent" in cmd:
             return _result(stdout="ERROR: could not connect\n")
         return None
 
@@ -178,7 +178,7 @@ def test_unhealthy_node_warns_after_polling_but_still_opens_the_node_api(mono, _
     assert len(caplog.records) == 1
     assert "health" in caplog.records[0].message.lower()
     # A 30s timeout at a 3s interval polls about ten times.
-    assert sum("docker inspect remnawave-node" in c for c in commands) >= 5
+    assert sum("docker inspect netagent" in c for c in commands) >= 5
     assert sum("ufw allow" in c for c in commands) == 1
 
 

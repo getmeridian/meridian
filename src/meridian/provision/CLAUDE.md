@@ -24,6 +24,7 @@
 - **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its 1m default; serve packet-up only.
 - **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
+- **Panel data is the directory, never a named volume** — PostgreSQL uses the `./data` bind mount and the Compose `name:` is pinned; `runtime_migration.py` moves `/opt/remnawave` by one rename after stopping the old stack, refusing mounts or two directories first.
 - **`docker compose restart` keeps the old environment** — after an `env_file` change, `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
 - **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.

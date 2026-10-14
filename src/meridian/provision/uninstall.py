@@ -5,6 +5,18 @@ Removes proxy components but leaves Docker engine and system packages intact.
 
 from __future__ import annotations
 
+import shlex
+
+from meridian.host_runtime import (
+    CONTAINERS,
+    LEGACY_NODE_DIR,
+    LEGACY_PANEL_DIR,
+    LEGACY_PANEL_NETWORK,
+    LEGACY_PANEL_SOCKET_VOLUME,
+    NODE_DIR,
+    PANEL_DIR,
+    PANEL_PROJECT,
+)
 from meridian.provision.nginx import LEGACY_PROXY_CLEANUP
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.ssh import ServerConnection
@@ -20,10 +32,25 @@ NGINX_STOP_UNLESS_SHARED = (
 )
 
 
+def _compose_removal(*directories: str) -> list[str]:
+    """Bring each Compose project down (images and volumes too), then delete its directory."""
+    commands = []
+    for directory in directories:
+        quoted = shlex.quote(directory)
+        commands += [f"cd {quoted} && docker compose down --rmi all -v 2>/dev/null; true", f"rm -rf {quoted}"]
+    return commands
+
+
+def _remove_containers(*names: str) -> str:
+    """Remove containers a missing or edited compose file no longer names."""
+    return f"docker rm -f {' '.join(shlex.quote(name) for name in names)} >/dev/null 2>&1; true"
+
+
 class Uninstall:
     """Remove all Meridian proxy components from the server.
 
-    Removes: Remnawave containers (panel, node, db, redis), Docker volumes,
+    Removes: Remnawave containers (panel, node, db, redis) under their neutral
+    and pre-rename names, Docker volumes,
     nginx Meridian configs, Realm units, TLS certificates, web files, cron
     jobs, server credentials, CLI symlink, UFW rules (including tagged V4
     rules).
@@ -39,12 +66,9 @@ class Uninstall:
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
         commands = [
-            # Remnawave panel stack (backend + PostgreSQL + Valkey)
-            "cd /opt/remnawave && docker compose down --rmi all -v 2>/dev/null; true",
-            "rm -rf /opt/remnawave",
-            # Remnawave node
-            "cd /opt/remnanode && docker compose down --rmi all -v 2>/dev/null; true",
-            "rm -rf /opt/remnanode",
+            # Remnawave panel stack and node, under their neutral and pre-rename names
+            *_compose_removal(PANEL_DIR, LEGACY_PANEL_DIR, NODE_DIR, LEGACY_NODE_DIR),
+            _remove_containers(*(name for container in CONTAINERS for name in (container.name, container.legacy))),
             # Meridian 3.x panel (3x-ui), so teardown also clears pre-4.0 deployments
             "cd /opt/3x-ui && docker compose down --rmi all 2>/dev/null; true",
             "rm -rf /opt/3x-ui",
@@ -58,8 +82,12 @@ class Uninstall:
                 " done; true"
             ),
             "rm -rf /usr/local/bin/netfwd /etc/netfwd",
-            # Docker volumes (may remain after compose down)
-            "docker volume rm valkey-socket remnawave-db-data 2>/dev/null; true",
+            # Docker objects that may remain after compose down (pre-rename projects took the directory name)
+            (
+                f"docker volume rm {PANEL_PROJECT}_valkey-socket {LEGACY_PANEL_SOCKET_VOLUME}"
+                " valkey-socket remnawave-db-data 2>/dev/null; true"
+            ),
+            f"docker network rm {PANEL_PROJECT}_internal {LEGACY_PANEL_NETWORK} 2>/dev/null; true",
             # nginx: Meridian's files and systemd restart override, then the service (see NGINX_STOP_UNLESS_SHARED)
             "rm -f /etc/nginx/conf.d/meridian-http.conf /etc/nginx/stream.d/meridian.conf",
             "rm -rf /etc/nginx/stream.d/relay-maps",

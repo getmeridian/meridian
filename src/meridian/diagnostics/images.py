@@ -15,6 +15,14 @@ from meridian.config import (
     REMNAWAVE_VALKEY_IMAGE,
 )
 from meridian.core.execution import ServerConnection
+from meridian.host_runtime import (
+    NODE,
+    PANEL_BACKEND,
+    PANEL_CACHE,
+    PANEL_DATABASE,
+    SUBSCRIPTION_PAGE,
+    RuntimeContainer,
+)
 from meridian.remnawave.versions import ImageStatus, image_status
 
 Component = Literal["backend", "subscription_page", "postgres", "valkey", "node"]
@@ -25,31 +33,35 @@ class ImageComponent:
     """One Meridian-run container and the image the CLI pins for it."""
 
     component: Component
-    container: str
+    runtime: RuntimeContainer
     pinned: str
     data: bool = False
     cross_major: bool = True
+
+    @property
+    def container(self) -> str:
+        return self.runtime.name
 
 
 def control_components(pins: Mapping[str, str] | None = None) -> tuple[ImageComponent, ...]:
     """The control server's containers against *pins* (``effective_pins()``; this CLI's pins by default)."""
     images = pins or {}
     return (
-        ImageComponent("backend", "remnawave", images.get("remnawave_backend_image", REMNAWAVE_BACKEND_IMAGE)),
+        ImageComponent("backend", PANEL_BACKEND, images.get("remnawave_backend_image", REMNAWAVE_BACKEND_IMAGE)),
         ImageComponent(
             "subscription_page",
-            "remnawave-subscription-page",
+            SUBSCRIPTION_PAGE,
             images.get("remnawave_subscription_page_image", REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE),
         ),
-        ImageComponent("postgres", "remnawave-db", REMNAWAVE_POSTGRES_IMAGE, data=True, cross_major=False),
-        ImageComponent("valkey", "remnawave-redis", REMNAWAVE_VALKEY_IMAGE, data=True),
+        ImageComponent("postgres", PANEL_DATABASE, REMNAWAVE_POSTGRES_IMAGE, data=True, cross_major=False),
+        ImageComponent("valkey", PANEL_CACHE, REMNAWAVE_VALKEY_IMAGE, data=True),
     )
 
 
 def node_components(pins: Mapping[str, str] | None = None) -> tuple[ImageComponent, ...]:
     """A node server's container against *pins*."""
     images = pins or {}
-    return (ImageComponent("node", "remnawave-node", images.get("remnawave_node_image", REMNAWAVE_NODE_IMAGE)),)
+    return (ImageComponent("node", NODE, images.get("remnawave_node_image", REMNAWAVE_NODE_IMAGE)),)
 
 
 CHANGES: frozenset[ImageStatus] = frozenset({"upgrade", "absent"})
@@ -88,12 +100,18 @@ _ABSENT = "-"
 def observe_images(
     conn: ServerConnection, components: tuple[ImageComponent, ...], *, server_ref: str, label: str
 ) -> ServerImages:
-    """Read each container's configured image with `docker inspect`; never mutates the server."""
-    containers = " ".join(shlex.quote(component.container) for component in components)
+    """Read each container's configured image with `docker inspect`; never mutates the server.
+
+    A server not yet migrated still runs the pre-rename container, which reports for its component.
+    """
+    pairs = " ".join(
+        f"{shlex.quote(component.container)}:{shlex.quote(component.runtime.legacy)}" for component in components
+    )
     command = (
         "command -v docker >/dev/null 2>&1 || exit 127; "
-        f"for c in {containers}; do "
-        "image=$(docker inspect --format '{{.Config.Image}}' \"$c\" 2>/dev/null) || image=-; "
+        f"for pair in {pairs}; do c=${{pair%%:*}}; "
+        "image=$(docker inspect --format '{{.Config.Image}}' \"$c\" 2>/dev/null"
+        " || docker inspect --format '{{.Config.Image}}' \"${pair#*:}\" 2>/dev/null) || image=-; "
         'printf \'%s\\t%s\\n\' "$c" "${image:--}"; done'
     )
     try:

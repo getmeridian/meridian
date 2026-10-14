@@ -5,11 +5,12 @@ subscription page as Docker containers on the server. The panel listens
 on 127.0.0.1:3000 and is never exposed directly — nginx reverse-proxies
 to it. The subscription page listens on 127.0.0.1:3020.
 
-Four containers:
-  - remnawave (NestJS backend, port 3000 app + 3001 metrics)
-  - remnawave-db (PostgreSQL 17)
-  - remnawave-redis (Valkey 9, Unix socket only)
-  - remnawave-subscription-page (subscription frontend, port 3020)
+Four containers, named in ``meridian.host_runtime`` (neutral names, so the
+host's ``docker ps`` shows nothing telling):
+  - backend (NestJS, port 3000 app + 3001 metrics)
+  - database (PostgreSQL 17, data in the ``data/`` bind mount)
+  - cache (Valkey 9, Unix socket only)
+  - subscription page (subscription frontend, port 3020)
 """
 
 from __future__ import annotations
@@ -20,12 +21,21 @@ from typing import TYPE_CHECKING
 
 from meridian.config import (
     REMNAWAVE_BACKEND_IMAGE,
-    REMNAWAVE_PANEL_DIR,
     REMNAWAVE_PANEL_PORT,
     REMNAWAVE_POSTGRES_IMAGE,
     REMNAWAVE_SUBSCRIPTION_PAGE_PORT,
     REMNAWAVE_VALKEY_IMAGE,
 )
+from meridian.host_runtime import (
+    PANEL_BACKEND,
+    PANEL_CACHE,
+    PANEL_CORE,
+    PANEL_DATABASE,
+    PANEL_DIR,
+    PANEL_PROJECT,
+    SUBSCRIPTION_PAGE,
+)
+from meridian.provision.runtime_migration import adopt_legacy_panel
 from meridian.provision.steps import ProvisionContext, StepResult
 from meridian.remnawave.versions import (
     effective_image,
@@ -39,11 +49,12 @@ from meridian.ssh import ServerConnection
 if TYPE_CHECKING:
     from meridian.cluster import TelegramConfig
 
-# Container names
-_PANEL_CONTAINER = "remnawave"
-_DB_CONTAINER = "remnawave-db"
-_REDIS_CONTAINER = "remnawave-redis"
-_SUBSCRIPTION_PAGE_CONTAINER = "remnawave-subscription-page"
+# Container names double as Compose service names (and so as hostnames on the network).
+_PANEL_CONTAINER = PANEL_BACKEND.name
+_DB_CONTAINER = PANEL_DATABASE.name
+_REDIS_CONTAINER = PANEL_CACHE.name
+_SUBSCRIPTION_PAGE_CONTAINER = SUBSCRIPTION_PAGE.name
+_NETWORK = "internal"
 
 _METRICS_PORT = 3001
 _SUBSCRIPTION_PAGE_INTERNAL_PORT = 3010  # container-internal port
@@ -60,23 +71,25 @@ def render_panel_compose(
     """Render the docker-compose.yml for the Remnawave panel stack.
 
     Based on: https://github.com/remnawave/backend/blob/main/docker-compose-prod.yml
+    The project name is pinned, so Docker object names never follow the directory.
+    PostgreSQL keeps its data in the ``./data`` bind mount beside this file, never in
+    a named volume, so moving the directory moves the database with it.
     """
     return f"""\
-# Remnawave Panel - VPN Management Interface
-# Based on: https://github.com/remnawave/backend/blob/main/docker-compose-prod.yml
 # Managed by Meridian. Manual edits will be overwritten on next run.
+name: {PANEL_PROJECT}
 services:
-  remnawave:
+  {_PANEL_CONTAINER}:
     image: {image}
     container_name: {_PANEL_CONTAINER}
     restart: always
     depends_on:
-      remnawave-db:
+      {_DB_CONTAINER}:
         condition: service_healthy
-      remnawave-redis:
+      {_REDIS_CONTAINER}:
         condition: service_healthy
     networks:
-      - remnawave-net
+      - {_NETWORK}
     volumes:
       - valkey-socket:/var/run/valkey
     ports:
@@ -100,12 +113,12 @@ services:
         max-size: "100m"
         max-file: "5"
 
-  remnawave-db:
+  {_DB_CONTAINER}:
     image: {postgres_image}
     container_name: {_DB_CONTAINER}
     restart: always
     networks:
-      - remnawave-net
+      - {_NETWORK}
     volumes:
       - ./data:/var/lib/postgresql/data
     environment:
@@ -127,12 +140,12 @@ services:
         max-size: "100m"
         max-file: "5"
 
-  remnawave-redis:
+  {_REDIS_CONTAINER}:
     image: {valkey_image}
     container_name: {_REDIS_CONTAINER}
     restart: always
     networks:
-      - remnawave-net
+      - {_NETWORK}
     volumes:
       - valkey-socket:/var/run/valkey
     command: >
@@ -155,15 +168,15 @@ services:
         max-size: "100m"
         max-file: "5"
 
-  remnawave-subscription-page:
+  {_SUBSCRIPTION_PAGE_CONTAINER}:
     image: {subscription_page_image}
     container_name: {_SUBSCRIPTION_PAGE_CONTAINER}
     restart: always
     depends_on:
-      remnawave:
+      {_PANEL_CONTAINER}:
         condition: service_healthy
     networks:
-      - remnawave-net
+      - {_NETWORK}
     ports:
       - "127.0.0.1:{subscription_page_host_port}:{_SUBSCRIPTION_PAGE_INTERNAL_PORT}"
     env_file:
@@ -175,7 +188,7 @@ services:
         max-file: "5"
 
 networks:
-  remnawave-net:
+  {_NETWORK}:
     driver: bridge
 
 volumes:
@@ -197,6 +210,8 @@ def _render_panel_env(
     # Telegram: enabled when bot_token is configured
     tg_enabled = bool(telegram and telegram.bot_token)
 
+    # The database name and role live inside PostgreSQL's data directory; they keep
+    # their first-install values (only the service hostname follows the neutral names).
     lines = f"""\
 # Remnawave Panel environment
 # Managed by Meridian. Manual edits will be overwritten on next run.
@@ -205,7 +220,7 @@ APP_PORT={panel_port}
 METRICS_PORT={_METRICS_PORT}
 API_INSTANCES=1
 
-DATABASE_URL=postgresql://meridian:{db_password}@remnawave-db:5432/remnawave
+DATABASE_URL=postgresql://meridian:{db_password}@{_DB_CONTAINER}:5432/remnawave
 
 REDIS_SOCKET=/var/run/valkey/valkey.sock
 
@@ -242,6 +257,20 @@ POSTGRES_DB=remnawave
 
 
 _PERSISTENT_PANEL_SECRETS = ("POSTGRES_PASSWORD", "APP_SECRET", "METRICS_PASS")
+_TOKEN_KEY = "REMNAWAVE_API_TOKEN"
+
+
+def _parse_env(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.lstrip().startswith("#"):
+            values[key.strip()] = value.strip()
+    return values
+
+
+def _env_value(text: str, key: str) -> str:
+    return _parse_env(text).get(key, "")
 
 
 def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict[str, str] | StepResult | None:
@@ -270,12 +299,7 @@ def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict
         return None
 
     current = conn.get_text(env_path, timeout=15)
-    values: dict[str, str] = {}
-    if current.returncode == 0:
-        for line in current.stdout.splitlines():
-            key, sep, value = line.partition("=")
-            if sep and not key.lstrip().startswith("#"):
-                values[key.strip()] = value.strip()
+    values = _parse_env(current.stdout) if current.returncode == 0 else {}
     if not values.get("APP_SECRET") and values.get("JWT_AUTH_SECRET"):
         values["APP_SECRET"] = values["JWT_AUTH_SECRET"]
     missing = [key for key in _PERSISTENT_PANEL_SECRETS if not values.get(key)]
@@ -289,7 +313,7 @@ def _load_existing_panel_secrets(conn: ServerConnection, panel_dir: str) -> dict
 
 
 def render_subscription_env(
-    panel_url: str = "http://remnawave:3000",
+    panel_url: str = f"http://{_PANEL_CONTAINER}:{REMNAWAVE_PANEL_PORT}",
     api_token: str = "",
 ) -> str:
     """Render the .env.subscription file for the Remnawave subscription page."""
@@ -306,7 +330,7 @@ REMNAWAVE_API_TOKEN={api_token}
 def configure_subscription_page(
     conn: ServerConnection,
     api_token: str,
-    panel_dir: str = REMNAWAVE_PANEL_DIR,
+    panel_dir: str = PANEL_DIR,
 ) -> bool:
     """Write the subscription page .env with a real API token and restart the container.
 
@@ -367,7 +391,12 @@ class DeployRemnawavePanel:
         self.sub_public_domain = sub_public_domain
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        panel_dir = REMNAWAVE_PANEL_DIR
+        panel_dir = PANEL_DIR
+        # First, before reading anything from the directory: a pre-rename stack
+        # moves here with its data and secrets, then deploys as a restart.
+        migration_error = adopt_legacy_panel(conn)
+        if migration_error:
+            return StepResult(name=self.name, status="failed", detail=migration_error)
         panel_port = REMNAWAVE_PANEL_PORT
         sub_page_host_port = REMNAWAVE_SUBSCRIPTION_PAGE_PORT
         # Keep operator-upgraded images; pinned tags only replace older ones.
@@ -403,7 +432,7 @@ class DeployRemnawavePanel:
 
         # -- Idempotency: are all core containers already running? --
         core_running = True
-        for name in (_PANEL_CONTAINER, _DB_CONTAINER, _REDIS_CONTAINER):
+        for name in (container.name for container in PANEL_CORE):
             check = conn.run(
                 f"docker inspect -f '{{{{.State.Running}}}}' {name} 2>/dev/null",
                 timeout=15,
@@ -500,12 +529,13 @@ class DeployRemnawavePanel:
             metrics_password=metrics_password,
             telegram=ctx.cluster.telegram if ctx.cluster else None,
         )
-        # Keep the subscription page's real API token if bootstrap already wrote one.
+        # Keep the subscription page's real API token if bootstrap already wrote one;
+        # the panel URL is re-rendered because it names the backend service.
         sub_env_content = render_subscription_env()
         if existing is not None:
             current_sub_env = conn.get_text(f"{panel_dir}/.env.subscription", timeout=15)
-            if current_sub_env.returncode == 0 and current_sub_env.stdout.strip():
-                sub_env_content = current_sub_env.stdout
+            if current_sub_env.returncode == 0:
+                sub_env_content = render_subscription_env(api_token=_env_value(current_sub_env.stdout, _TOKEN_KEY))
         compose_content = render_panel_compose(
             image=image,
             panel_port=panel_port,

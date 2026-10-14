@@ -106,15 +106,19 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 
 ## Docker containers
 
+Container and directory names are neutral, so a host reading `docker ps` or `/opt` sees nothing that names proxy software (images keep their upstream tags). `meridian check` and `meridian doctor` show the role behind each name.
+
 **On the control-plane server:**
-- `remnawave` — backend API and admin UI on `127.0.0.1:3000`
-- `remnawave-db` — PostgreSQL (users, hosts, profiles)
-- `remnawave-redis` — Valkey cache
-- `remnawave-subscription-page` — subscription frontend on `127.0.0.1:3020`
-- `remnawave-node` — Xray, in host networking with `NET_ADMIN`
+- `ctlsvc-api` — Remnawave backend API and admin UI on `127.0.0.1:3000`
+- `ctlsvc-db` — PostgreSQL (users, hosts, profiles)
+- `ctlsvc-cache` — Valkey cache
+- `ctlsvc-web` — Remnawave subscription frontend on `127.0.0.1:3020`
+- `netagent` — Remnawave node (Xray), in host networking with `NET_ADMIN`
 
 **On every other exit:**
-- `remnawave-node` only, registered with the panel through a per-node secret
+- `netagent` only, registered with the panel through a per-node secret
+
+Servers deployed by a 4.0 beta ran these as `remnawave*` from `/opt/remnawave` and `/opt/remnanode`. The next `meridian apply` stops them, moves the panel directory (its PostgreSQL `data/` and `.env` secrets) to `/opt/ctlsvc` in one rename, and starts the renamed containers. Users, client links, and API tokens stay the same.
 
 ## Teardown
 
@@ -123,13 +127,13 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 ## File locations
 
 ### On the control-plane server
-- `/opt/remnawave/` — panel compose file and `.env`
+- `/opt/ctlsvc/` — panel compose file, `.env`, and PostgreSQL `data/`
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI routing
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS sites and reverse proxy
 - `/etc/ssl/meridian/` — certificates
 
 ### On each exit
-- `/opt/remnanode/` — node compose file and `.env`
+- `/opt/netagent/` — node compose file and `.env`
 
 ### On each relay
 - `/etc/netfwd/` — Realm configuration, run from `/usr/local/bin/netfwd` by `netfwd-*` systemd services. Relay hosts carry no Meridian-named units, paths, or firewall comments (`fw-*`)

@@ -23,6 +23,7 @@ from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import PanelSetupError, ProvisioningError
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.host_runtime import PANEL_BACKEND
 from meridian.node_deploy import (
     check_panel_api_ready,
     create_api_token,
@@ -179,7 +180,7 @@ def ensure_control_plane_access(
             hint=(
                 f"Panel should be at {base_url}\n"
                 f"Check: ssh {resolved.user}@{resolved.ip} "
-                "docker logs remnawave --tail 30"
+                f"docker logs {PANEL_BACKEND.name} --tail 30"
             ),
         )
 

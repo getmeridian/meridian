@@ -198,7 +198,7 @@ def test_doctor_uses_v4_roles_and_redacts_the_final_report() -> None:
     assert "diagnostic-secret" not in rendered
     assert "[REDACTED]" in rendered
     assert not any("pgrep -f xray" in command for command in connection.commands)
-    assert not any("docker logs remnawave-node" in command for command in connection.commands)
+    assert not any("docker logs" in command for command in connection.commands)
     listener_command = next(command for command in connection.commands if command.startswith("ss -tulnp"))
     assert all(f"sport = :{port}" in listener_command for port in (7443, 9443, 18443, 39001))
     assert "sport = :8444" not in listener_command
@@ -307,9 +307,23 @@ def test_doctor_keeps_relay_only_diagnostics_role_specific() -> None:
     rendered = "\n".join(str(call.args[0]) for call in render.call_args_list if call.args)
     commands = [call.args[0] for call in connection.run.call_args_list]
     assert "Roles: relay" in rendered
-    assert "Remnawave Node Logs" not in rendered
+    assert "Exit node Logs" not in rendered
     assert "Nginx Errors" not in rendered
     assert "TLS Certificate" not in rendered
     assert "Geo-blocking" not in rendered
     assert any("ss -tlnp sport = :7443" in command for command in commands)
     assert not any("pgrep -f xray" in command for command in commands)
+
+
+def test_doctor_names_the_role_behind_each_neutral_container_name() -> None:
+    from meridian.commands.diagnostics import container_roles
+
+    roles = container_roles("ctlsvc-api\nnetagent\nremnawave-db\nmy-app\n")
+
+    assert roles.splitlines() == [
+        "Container roles:",
+        "ctlsvc-api: Panel backend",
+        "netagent: Exit node",
+        "remnawave-db: Panel database, pre-rename (meridian apply renames it)",
+    ]
+    assert container_roles("my-app\n") == ""

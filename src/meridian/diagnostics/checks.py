@@ -69,8 +69,12 @@ def check_disk_space(conn: ServerConnection, *, min_free_mb: int = 1024) -> Chec
     )
 
 
-def check_container_running(conn: ServerConnection, container_name: str) -> CheckResult:
-    """Check whether a Docker container is running by name."""
+def check_container_running(conn: ServerConnection, container_name: str, legacy_name: str = "") -> CheckResult:
+    """Check whether a Docker container is running by name.
+
+    A missing container whose pre-rename ``legacy_name`` still exists has not been
+    migrated yet; that finding points at ``meridian apply`` instead of a restart.
+    """
     q_name = shlex.quote(container_name)
     result = conn.run(
         "command -v docker >/dev/null 2>&1 || exit 127; "
@@ -87,6 +91,14 @@ def check_container_running(conn: ServerConnection, container_name: str) -> Chec
         )
 
     if result.returncode != 0:
+        legacy = legacy_name and conn.run(f"docker inspect --type container {shlex.quote(legacy_name)}", timeout=15)
+        if legacy and legacy.returncode == 0:
+            return CheckResult(
+                name=f"container:{container_name}",
+                status="failed",
+                detail=f"Still runs under its pre-rename name {legacy_name!r}",
+                remediation="Run `meridian apply` to rename it; its data stays.",
+            )
         return CheckResult(
             name=f"container:{container_name}",
             status="failed",

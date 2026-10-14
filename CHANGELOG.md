@@ -236,6 +236,14 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   its `SHA256SUMS`, the installation guide shows how to check them, and the
   script pins uv's installer by version and SHA-256 instead of piping the
   latest one into a shell. `MERIDIAN_VERSION=4.0.0` installs one exact release.
+- **Exits and the control server look like ordinary hosts** — containers and
+  directories no longer name the proxy software: `docker ps` shows `ctlsvc-api`,
+  `ctlsvc-db`, `ctlsvc-cache`, `ctlsvc-web`, and `netagent`, in `/opt/ctlsvc`
+  and `/opt/netagent`, like relays' `netfwd`. Servers deployed with a 4.0 beta
+  move over on the next `meridian apply`: the panel directory, with its database
+  and secrets, is renamed in place, so users, client links, and API tokens stay.
+  `meridian check` and `meridian doctor` name the role behind each container,
+  and `meridian teardown` removes both the old and the new names.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.

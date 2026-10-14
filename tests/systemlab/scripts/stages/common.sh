@@ -34,7 +34,7 @@ wait_for_node_api() {
   local elapsed=0
   while [ "$elapsed" -lt 90 ]; do
     if ssh root@"$host" \
-      "docker ps --filter name=remnawave-node --format '{{.Status}}' | grep -q Up && ss -tlnp sport = :3010 | grep -q LISTEN" \
+      "docker ps --filter name=netagent --format '{{.Status}}' | grep -q Up && ss -tlnp sport = :3010 | grep -q LISTEN" \
       >/dev/null 2>&1
     then
       sleep 5
@@ -49,7 +49,7 @@ wait_for_node_api() {
 
 restart_node() {
   local host=$1
-  ssh root@"$host" docker start remnawave-node >/dev/null
+  ssh root@"$host" docker start netagent >/dev/null
   wait_for_node_api "$host"
 }
 

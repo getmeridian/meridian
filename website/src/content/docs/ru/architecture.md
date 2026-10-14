@@ -106,15 +106,19 @@ Backend-порты Xray достигаются через nginx; UFW блоки�
 
 ## Docker контейнеры
 
+Имена контейнеров и каталогов нейтральны: хост, где смотрят `docker ps` или `/opt`, не увидит ничего, что называет прокси-ПО (образы сохраняют свои исходные теги). `meridian check` и `meridian doctor` показывают роль, стоящую за каждым именем.
+
 **На сервере контроль-плана:**
-- `remnawave` — backend API и админ-интерфейс на `127.0.0.1:3000`
-- `remnawave-db` — PostgreSQL (пользователи, хосты, профили)
-- `remnawave-redis` — кэш Valkey
-- `remnawave-subscription-page` — фронтенд подписки на `127.0.0.1:3020`
-- `remnawave-node` — Xray, в сетевом хостинге с `NET_ADMIN`
+- `ctlsvc-api` — backend API и админ-интерфейс Remnawave на `127.0.0.1:3000`
+- `ctlsvc-db` — PostgreSQL (пользователи, хосты, профили)
+- `ctlsvc-cache` — кэш Valkey
+- `ctlsvc-web` — фронтенд подписки Remnawave на `127.0.0.1:3020`
+- `netagent` — узел Remnawave (Xray), в сетевом хостинге с `NET_ADMIN`
 
 **На каждом другом выходе:**
-- `remnawave-node` только, зарегистрирован у панели через секретный ключ узла
+- `netagent` только, зарегистрирован у панели через секретный ключ узла
+
+Серверы, развёрнутые бета-версией 4.0, запускали их как `remnawave*` из `/opt/remnawave` и `/opt/remnanode`. Следующий `meridian apply` останавливает их, одним переименованием переносит каталог панели (её `data/` PostgreSQL и секреты `.env`) в `/opt/ctlsvc` и запускает переименованные контейнеры. Пользователи, клиентские ссылки и API-токены остаются прежними.
 
 ## Демонтаж
 
@@ -123,13 +127,13 @@ Backend-порты Xray достигаются через nginx; UFW блоки�
 ## Расположения файлов
 
 ### На сервере контроль-плана
-- `/opt/remnawave/` — файл compose панели и `.env`
+- `/opt/ctlsvc/` — файл compose панели, `.env` и `data/` PostgreSQL
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI маршрутизация
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS сайты и обратный прокси
 - `/etc/ssl/meridian/` — сертификаты
 
 ### На каждом выходе
-- `/opt/remnanode/` — файл compose узла и `.env`
+- `/opt/netagent/` — файл compose узла и `.env`
 
 ### На каждом ретрансляторе
 - `/etc/netfwd/` — конфигурация Realm, запущена из `/usr/local/bin/netfwd` через сервисы `netfwd-*` systemd. На хостах ретрансляторов нет модулей с названиями Meridian, путей или комментариев брандмауэра (`fw-*`).

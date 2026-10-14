@@ -97,13 +97,13 @@ def test_control_and_exit_server_checks_node_panel_and_subscription_page_contain
     containers = _run(fleet, "exit-a").containers
 
     assert containers.call_args_list == [
-        call(fleet.conn, name)
-        for name in (
-            "remnawave-node",
-            "remnawave",
-            "remnawave-db",
-            "remnawave-redis",
-            "remnawave-subscription-page",
+        call(fleet.conn, name, legacy)
+        for name, legacy in (
+            ("netagent", "remnawave-node"),
+            ("ctlsvc-api", "remnawave"),
+            ("ctlsvc-db", "remnawave-db"),
+            ("ctlsvc-cache", "remnawave-redis"),
+            ("ctlsvc-web", "remnawave-subscription-page"),
         )
     ]
     fleet.panel.get_node.assert_called_once_with("node-uuid")

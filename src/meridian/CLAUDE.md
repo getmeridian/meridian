@@ -10,6 +10,7 @@
 **Protocol keys** — `core/topology.py` owns the protocol vocabulary; `handoff.protocol_key()` classifies delivered links.
 **Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in `ExitIntent.region` (`--country` overrides), keeping the compiler pure.
 **Local home** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian` (`~/.config/meridian`), adopting an older 4.x home (`~/.meridian-v4`, `~/.meridian`) only if XDG is absent and it holds `servers.json`; `MERIDIAN_HOME` overrides.
+**Neutral host names** — `host_runtime.py` is the one place for container, Compose project, and `/opt` names (`ctlsvc-*`, `netagent`); `legacy` names are read only to migrate and clean up, and images keep upstream tags.
 **Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); `load_topology_cluster()` refuses pre-topology files with rebuild guidance.

@@ -56,17 +56,27 @@ def test_disk_space(stdout: str, rc: int, status: str, detail: str) -> None:
     ],
 )
 def test_container_running(stdout: str, rc: int, status: str, detail: str) -> None:
-    result = check_container_running(_conn("docker inspect", stdout=stdout, rc=rc), "remnawave-node")
-    assert result.name == "container:remnawave-node"
+    result = check_container_running(_conn("docker inspect", stdout=stdout, rc=rc), "netagent")
+    assert result.name == "container:netagent"
     assert result.status == status
     assert detail in result.detail
 
 
 def test_running_but_unhealthy_container_is_a_warning_not_a_pass() -> None:
-    result = check_container_running(_conn("docker inspect", stdout="true unhealthy\n"), "remnawave-subscription-page")
+    result = check_container_running(_conn("docker inspect", stdout="true unhealthy\n"), "ctlsvc-web")
 
     assert result.status == "warning"
     assert "docker logs" in result.remediation
+
+
+@pytest.mark.parametrize(("legacy_rc", "remediation"), [(0, "meridian apply"), (1, "Deploy or restart")])
+def test_missing_container_with_a_pre_rename_twin_points_at_apply(legacy_rc: int, remediation: str) -> None:
+    conn = MockConnection().when("--type container remnawave-node", rc=legacy_rc).when("docker inspect", rc=1)
+
+    result = check_container_running(conn, "netagent", "remnawave-node")
+
+    assert result.status == "failed"
+    assert remediation in result.remediation
 
 
 @pytest.mark.parametrize(

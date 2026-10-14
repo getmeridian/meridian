@@ -61,7 +61,7 @@ pass "client remove retired the panel user and kept the others"
 
 meridian teardown "$EXIT_B_IP" --yes
 test ! -e "$MERIDIAN_HOME/cluster.yml"
-ssh root@"$EXIT_B_IP" 'test ! -e /opt/remnawave && test ! -e /etc/nginx/stream.d/meridian.conf'
+ssh root@"$EXIT_B_IP" 'test ! -e /opt/ctlsvc && test ! -e /opt/netagent && test ! -e /etc/nginx/stream.d/meridian.conf'
 pass "teardown removed the deployment and local fleet state"
 
 meridian server add "$EXIT_B_IP" --name exit-b

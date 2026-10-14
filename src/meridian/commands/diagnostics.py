@@ -19,9 +19,22 @@ from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.diagnostics.logs import NGINX_ERROR_LOG
 from meridian.facts import ServerFacts
+from meridian.host_runtime import NODE, container_role
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult, ServerConnection, SSHError
 from meridian.verification import DeploymentVerificationContext, deployment_verification_context
+
+# The node container's current name, or its pre-rename one on a server not yet migrated.
+_NODE_CONTAINER = (
+    "\"$(docker inspect --type container --format '{{.Name}}' "
+    f'{shlex.quote(NODE.name)} {shlex.quote(NODE.legacy)} 2>/dev/null | head -1 | tr -d /)"'
+)
+
+
+def container_roles(names: str) -> str:
+    """Name each Meridian container's role (the neutral names say nothing); empty when none run."""
+    lines = [f"{name}: {container_role(name)}" for name in names.split() if container_role(name)]
+    return "Container roles:\n" + "\n".join(lines) if lines else ""
 
 
 class _EvidenceConnection:
@@ -222,13 +235,16 @@ def run(
         _collect("docker --version 2>&1", fallback="not installed"),
         _collect("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1", fallback="no containers"),
     ]
+    names = evidence_conn.run("docker ps -a --format '{{.Names}}' 2>/dev/null", timeout=10).stdout
+    if legend := container_roles(names):
+        docker_parts.append(legend)
     sections.append(("Docker", "\n".join(docker_parts)))
 
     if not xray_expected:
         xray_status = "not expected for this server's configured roles"
     else:
         xray_pid_raw = evidence_conn.run(
-            "docker exec remnawave-node pgrep -f xray 2>/dev/null",
+            f"docker exec {_NODE_CONTAINER} pgrep -f xray 2>/dev/null",
             timeout=10,
         ).stdout.strip()
         if xray_pid_raw:
@@ -239,14 +255,14 @@ def run(
 
     if xray_expected:
         sections.append(
-            ("Xray Version", _collect("docker exec remnawave-node rw-core version 2>/dev/null", timeout=15))
+            ("Xray Version", _collect(f"docker exec {_NODE_CONTAINER} rw-core version 2>/dev/null", timeout=15))
         )
 
     if xray_expected:
-        log_cmd = "docker logs remnawave-node --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
+        log_cmd = f"docker logs {_NODE_CONTAINER} --tail 50 2>&1 | grep -v '^\\s*$' | sort -u | tail -20"
         xray_logs = evidence_conn.run(log_cmd, timeout=15).stdout.strip() or "container not running"
         xray_logs = redact_diagnostic_text(xray_logs, known_secrets)
-        sections.append(("Remnawave Node Logs", f"$ {log_cmd}\n{xray_logs}"))
+        sections.append((f"{NODE.role} Logs", f"$ {log_cmd}\n{xray_logs}"))
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:

@@ -52,6 +52,7 @@ from meridian.panel_bootstrap import (
     run_provisioner,
 )
 from meridian.provision.ensure import ensure_file_content
+from meridian.provision.runtime_migration import LEGACY_PANEL_DIR_ABSENT
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.remnawave_drivers import (
     RemnawaveDriverContext,
@@ -85,7 +86,11 @@ from meridian.reconciler.server_drivers import (
     ServerDriverContext,
     build_server_drivers,
 )
-from meridian.reconciler.server_evidence import file_content_or_absent, require_successful_evidence
+from meridian.reconciler.server_evidence import (
+    file_content_or_absent,
+    negated_path_is_absent,
+    require_successful_evidence,
+)
 from meridian.reconciler.workloads import (
     PanelRealityKeyFactory,
     WorkloadStateManager,
@@ -573,6 +578,10 @@ def _control_runtime_ready(
         and (not expected_hostname or actual_hostname == expected_hostname)
     )
     if not identity_matches:
+        return False
+    # A surviving pre-rename panel directory is drift: bootstrap moves it.
+    legacy = connection.run(LEGACY_PANEL_DIR_ABSENT, timeout=15)
+    if not negated_path_is_absent(action.resource.logical_id, legacy, "legacy panel directory"):
         return False
     attestation = connection.get_text(_CONTROL_ATTESTATION_PATH, timeout=15)
     expected_attestation = _control_runtime_attestation(action, plan)

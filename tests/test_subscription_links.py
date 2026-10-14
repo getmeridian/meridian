@@ -10,7 +10,7 @@ from meridian.provision.containers import ComposeDeployResult
 from meridian.provision.nginx_render import render_nginx_ip_config
 from meridian.provision.remnawave_panel import DeployRemnawavePanel
 from meridian.provision.steps import ProvisionContext
-from tests.support.mock_connection import MockConnection
+from tests.support.runtime import migrated_panel
 
 
 def test_subscription_url_uses_the_connection_page_path() -> None:
@@ -42,10 +42,10 @@ def test_nginx_exposes_only_the_panel_subscription_route_under_the_page_path() -
 
 
 def test_panel_advertises_subscriptions_on_the_public_path() -> None:
-    conn = MockConnection()
+    conn = migrated_panel()
     conn.when("docker inspect", rc=1)
-    conn.when("test -f /opt/remnawave/.env", rc=1)
-    conn.when("test -d /opt/remnawave/data", rc=1)
+    conn.when("test -f /opt/ctlsvc/.env", rc=1)
+    conn.when("test -d /opt/ctlsvc/data", rc=1)
     captured: dict[str, str] = {}
 
     def fake_deploy(_conn, _work_dir, _compose, *, env_files, **_kwargs):

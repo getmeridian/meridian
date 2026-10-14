@@ -712,3 +712,22 @@ def test_adding_an_exit_that_sorts_first_never_reruns_the_control_bootstrap(tmp_
         return _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan)
 
     assert attestation(grown) == attestation(base)
+
+
+def test_surviving_pre_rename_panel_directory_makes_the_control_runtime_drift() -> None:
+    """Bootstrap then moves it; the attestation alone would call the runtime converged."""
+    from meridian.setup.runtime import _control_runtime_ready
+
+    action = SimpleNamespace(
+        resource=SimpleNamespace(logical_id="control", payload=ControlPlaneRuntimePayload(server_ref="srv-control"))
+    )
+    cluster = ClusterConfig(panel=PanelConfig(api_token="token", server_ip="198.51.100.10", ssh_user="root"))
+    entry = ServerEntry(host="198.51.100.10", user="root")
+    connection = MagicMock(spec=ServerConnection)
+    connection.run.return_value = SimpleNamespace(returncode=1, stdout="", stderr="")
+
+    ready = _control_runtime_ready(action, None, cluster, entry, connection, MagicMock())  # type: ignore[arg-type]
+
+    assert ready is False
+    assert connection.run.call_args.args[0] == "test ! -e /opt/remnawave"
+    connection.get_text.assert_not_called()

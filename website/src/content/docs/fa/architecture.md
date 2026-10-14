@@ -106,15 +106,19 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 
 ## Docker containers
 
+نام containerها و دایرکتوری‌ها خنثی است؛ پس میزبانی که `docker ps` یا `/opt` را نگاه می‌کند چیزی نمی‌بیند که نام نرم‌افزار proxy را بدهد (images همان tagهای upstream خود را نگه می‌دارند). `meridian check` و `meridian doctor` نقش پشت هر نام را نشان می‌دهند.
+
 **روی سرور control-plane:**
-- `remnawave` — backend API و admin UI روی `127.0.0.1:3000`
-- `remnawave-db` — PostgreSQL (users, hosts, profiles)
-- `remnawave-redis` — Valkey cache
-- `remnawave-subscription-page` — subscription frontend روی `127.0.0.1:3020`
-- `remnawave-node` — Xray، در host networking با `NET_ADMIN`
+- `ctlsvc-api` — backend API و admin UI مربوط به Remnawave روی `127.0.0.1:3000`
+- `ctlsvc-db` — PostgreSQL (users, hosts, profiles)
+- `ctlsvc-cache` — Valkey cache
+- `ctlsvc-web` — subscription frontend مربوط به Remnawave روی `127.0.0.1:3020`
+- `netagent` — node مربوط به Remnawave (Xray)، در host networking با `NET_ADMIN`
 
 **روی هر exit دیگر:**
-- `remnawave-node` تنها، از طریق secret per-node با پنل ثبت شده
+- `netagent` تنها، از طریق secret per-node با پنل ثبت شده
+
+سرورهایی که توسط نسخه beta 4.0 deploy شده‌اند این‌ها را با نام `remnawave*` از `/opt/remnawave` و `/opt/remnanode` اجرا می‌کردند. `meridian apply` بعدی آن‌ها را stop می‌کند، دایرکتوری پنل (یعنی `data/` مربوط به PostgreSQL و secretهای `.env`) را با یک rename به `/opt/ctlsvc` منتقل می‌کند و containerهای تغییرنام‌یافته را start می‌کند. Users، لینک‌های client و API tokenها بدون تغییر می‌مانند.
 
 ## Teardown
 
@@ -123,13 +127,13 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 ## محل فایل‌ها
 
 ### روی سرور control-plane
-- `/opt/remnawave/` — فایل compose پنل و `.env`
+- `/opt/ctlsvc/` — فایل compose پنل، `.env` و `data/` مربوط به PostgreSQL
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI routing
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — سایت‌های TLS و reverse proxy
 - `/etc/ssl/meridian/` — گواهینامه‌ها
 
 ### روی هر exit
-- `/opt/remnanode/` — فایل compose node و `.env`
+- `/opt/netagent/` — فایل compose node و `.env`
 
 ### روی هر relay
 - `/etc/netfwd/` — پیکربندی Realm، اجرا شده از `/usr/local/bin/netfwd` توسط سرویس‌های systemd `netfwd-*`. میزبان‌های relay هیچ واحد مریدیان‌نام‌شده، مسیر یا نظر firewall (`fw-*`) ندارند.

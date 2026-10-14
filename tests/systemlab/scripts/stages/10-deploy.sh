@@ -44,16 +44,21 @@ fi
 pass "reviewed setup applied and verified"
 
 for container in \
-  remnawave \
-  remnawave-db \
-  remnawave-redis \
-  remnawave-node
+  ctlsvc-api \
+  ctlsvc-db \
+  ctlsvc-cache \
+  netagent
 do
   require_command \
     "$container running on control/exit A" \
     ssh root@"$EXIT_A_IP" \
     "docker ps --format '{{.Names}}' | grep -qx '$container'"
 done
+
+require_command \
+  "no proxy names in container names or /opt on control/exit A" \
+  ssh root@"$EXIT_A_IP" \
+  "! docker ps -a --format '{{.Names}}' | grep -Eqi 'remna|xray|vless|vpn|proxy|meridian' && ! ls /opt | grep -Eqi 'remna|xray|vless|vpn|proxy|meridian'"
 
 for host in "$EXIT_B_IP" "$GATEWAY_IP"; do
   wait_for_node_api "$host"

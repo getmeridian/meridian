@@ -106,15 +106,19 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 
 ## Docker 容器
 
+容器和目录的名称是中性的，因此主机上查看 `docker ps` 或 `/opt` 的人看不到任何点明代理软件的名字（镜像保留其上游标签）。`meridian check` 和 `meridian doctor` 会显示每个名称背后的角色。
+
 **在控制平面服务器上：**
-- `remnawave` — 后端 API 和管理 UI 在 `127.0.0.1:3000`
-- `remnawave-db` — PostgreSQL（用户、主机、配置文件）
-- `remnawave-redis` — Valkey 缓存
-- `remnawave-subscription-page` — 订阅前端在 `127.0.0.1:3020`
-- `remnawave-node` — Xray，在 host network 中，带 `NET_ADMIN`
+- `ctlsvc-api` — Remnawave 后端 API 和管理 UI 在 `127.0.0.1:3000`
+- `ctlsvc-db` — PostgreSQL（用户、主机、配置文件）
+- `ctlsvc-cache` — Valkey 缓存
+- `ctlsvc-web` — Remnawave 订阅前端在 `127.0.0.1:3020`
+- `netagent` — Remnawave 节点（Xray），在 host network 中，带 `NET_ADMIN`
 
 **在其他每个出口上：**
-- 仅 `remnawave-node`，通过每个节点的密钥在面板注册
+- 仅 `netagent`，通过每个节点的密钥在面板注册
+
+由 4.0 测试版部署的服务器以 `remnawave*` 的名称从 `/opt/remnawave` 和 `/opt/remnanode` 运行这些容器。下一次 `meridian apply` 会停止它们，通过一次重命名把面板目录（其 PostgreSQL `data/` 和 `.env` 密钥）移到 `/opt/ctlsvc`，然后启动重命名后的容器。用户、客户端链接和 API 令牌保持不变。
 
 ## 卸载
 
@@ -123,13 +127,13 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 ## 文件位置
 
 ### 在控制平面服务器上
-- `/opt/remnawave/` — 面板 compose 文件和 `.env`
+- `/opt/ctlsvc/` — 面板 compose 文件、`.env` 和 PostgreSQL `data/`
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI 路由
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS 网站和反向代理
 - `/etc/ssl/meridian/` — 证书
 
 ### 在每个出口上
-- `/opt/remnanode/` — 节点 compose 文件和 `.env`
+- `/opt/netagent/` — 节点 compose 文件和 `.env`
 
 ### 在每个中继上
 - `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）。

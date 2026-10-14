@@ -15,15 +15,22 @@ from meridian.compiler.models import (
     ResourcePlan,
     ServerBaselinePayload,
 )
-from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+from meridian.config import REMNAWAVE_NODE_IMAGE
 from meridian.core.cancellation import CancellationToken
 from meridian.core.inputs import is_ip
 from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.host_runtime import LEGACY_NODE_DIR, NODE, NODE_DIR
 from meridian.node_deploy import deploy_node_container, render_node_compose, wait_for_node_connected
 from meridian.provision.baseline import build_server_baseline_checks, build_server_baseline_steps
 from meridian.provision.ensure import ensure_file_content, ensure_ufw_rule, ufw_rule_present
 from meridian.provision.nginx import InstallNginx
+from meridian.provision.runtime_migration import (
+    LEGACY_NODE_PROBE,
+    remove_legacy_node_command,
+    restart_legacy_node,
+    stop_legacy_node,
+)
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert
 from meridian.provision.warp import InstallWarp
@@ -567,6 +574,15 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
 
 
 class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
+    """The panel-managed node container under its neutral name.
+
+    Nodes deployed before neutral naming run as ``remnawave-node`` from
+    ``/opt/remnanode``. Observation reports them as drift; apply stops the legacy
+    container (same host ports), deploys the renamed one with the legacy image
+    choice, and deletes the legacy container and directory only once the panel
+    sees the new node, starting the legacy container again if it never does.
+    """
+
     def __init__(self, context: ServerDriverContext) -> None:
         self.context = context
 
@@ -580,26 +596,37 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
         binding: ManagedResourceBinding | None,
     ) -> ResourceObservation:
         payload = _payload(action, NodeRuntimePayload)
+        logical_id = action.resource.logical_id
         conn = self.context.connection(payload.server_ref)
-        compose_path = f"{REMNAWAVE_NODE_DIR}/docker-compose.yml"
+        compose_path = f"{NODE_DIR}/docker-compose.yml"
         compose = conn.get_text(compose_path, timeout=15)
-        compose_content = file_content_or_absent(action.resource.logical_id, compose, "node compose file")
+        compose_content = file_content_or_absent(logical_id, compose, "node compose file")
         expected_compose = render_node_compose(self._image(compose_content))
         running = conn.run(
-            "docker inspect remnawave-node --format '{{.State.Running}}' 2>&1",
+            f"docker inspect {shlex.quote(NODE.name)} --format '{{{{.State.Running}}}}' 2>&1",
             timeout=15,
         )
-        container_running = docker_container_running(action.resource.logical_id, running, "remnawave-node")
+        container_running = docker_container_running(logical_id, running, NODE.name)
+        legacy_probe = conn.run(LEGACY_NODE_PROBE, timeout=15)
+        require_successful_evidence(logical_id, legacy_probe, "pre-rename node inspection")
+        legacy = bool({"container", "dir"} & set(legacy_probe.stdout.split()))
         node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
         node = self.context.panel.get_node(node_uuid) if node_uuid else None
         warp_ok = True
         if payload.warp:
             warp = conn.run("warp-cli --accept-tos status 2>/dev/null", timeout=15)
-            warp_output = managed_command_output(action.resource.logical_id, warp, "WARP status")
+            warp_output = managed_command_output(logical_id, warp, "WARP status")
             warp_ok = warp_output is not None and "Connected" in warp_output
         exists = compose_content is not None
         connected = node is not None and node.is_connected
-        matches = exists and compose_content == expected_compose and container_running and connected and warp_ok
+        matches = (
+            exists
+            and not legacy
+            and compose_content == expected_compose
+            and container_running
+            and connected
+            and warp_ok
+        )
         satisfied: set[str] = set()
         if exists:
             satisfied.add("exists")
@@ -607,7 +634,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
             satisfied.add("connected")
         return build_observation(
             action,
-            remote_id=REMNAWAVE_NODE_DIR,
+            remote_id=NODE_DIR,
             exists=exists,
             matches=matches,
             projection={
@@ -615,6 +642,7 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
                 "running": container_running,
                 "connected": connected,
                 "warp": warp_ok,
+                "legacy": legacy,
             },
             satisfied=satisfied,
         )
@@ -638,15 +666,31 @@ class NodeRuntimeDriver(retirement.NodeRuntimeRetirement):
             secret = self.context.panel.get_node_secret_key()
         if not secret:
             raise ResourceReconcileError(f"Remnawave returned no node secret for workload {payload.workload_ref!r}.")
-        current = conn.get_text(f"{REMNAWAVE_NODE_DIR}/docker-compose.yml", timeout=15)
-        image = self._image(current.stdout if current.returncode == 0 else None)
+        current = conn.get_text(f"{NODE_DIR}/docker-compose.yml", timeout=15)
+        legacy_compose = conn.get_text(f"{LEGACY_NODE_DIR}/docker-compose.yml", timeout=15)
+        legacy = conn.run(LEGACY_NODE_PROBE, timeout=15)
+        if legacy.returncode != 0:
+            raise ResourceReconcileError("Could not check the server for a pre-rename node container.")
+        survivors = set(legacy.stdout.split())
+        has_legacy_container = "container" in survivors
+        # A first rename carries the operator's image choice over from the legacy compose file.
+        compose_source = current if current.returncode == 0 else legacy_compose
+        image = self._image(compose_source.stdout if compose_source.returncode == 0 else None)
+        # Same host ports: the legacy container must release them before the renamed one binds.
+        if has_legacy_container and not stop_legacy_node(conn):
+            raise ResourceReconcileError(f"Could not stop the pre-rename node container {NODE.legacy}.")
         deployed = deploy_node_container(conn, secret, node_api_port=payload.api_port, image=image)
-        if not deployed:
-            raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
         node_uuid = self.context.remote_id(payload.binding_ref, action.generation)
-        if not node_uuid or not wait_for_node_connected(self.context.panel, node_uuid):
+        connected = deployed and bool(node_uuid) and wait_for_node_connected(self.context.panel, node_uuid)
+        if not connected:
+            if has_legacy_container:
+                restart_legacy_node(conn, NODE_DIR)
+            if not deployed:
+                raise ResourceReconcileError(f"Remnawave node runtime {payload.workload_ref!r} did not become healthy.")
             raise ResourceReconcileError(f"Node runtime {payload.workload_ref!r} did not connect to the panel.")
-        return ResourceApplyReceipt(remote_id=REMNAWAVE_NODE_DIR)
+        if survivors and conn.run(remove_legacy_node_command(), timeout=60).returncode != 0:
+            raise ResourceReconcileError(f"The renamed node runs, but {NODE.legacy} or {LEGACY_NODE_DIR} remains.")
+        return ResourceApplyReceipt(remote_id=NODE_DIR)
 
 
 def _baseline_context(

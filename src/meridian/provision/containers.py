@@ -56,7 +56,7 @@ def deploy_compose_stack(
 
     Args:
         conn: SSH connection (ServerConnection or MockConnection).
-        work_dir: Directory for compose files (e.g. ``/opt/remnawave``).
+        work_dir: Directory for compose files (e.g. ``host_runtime.PANEL_DIR``).
         compose_content: Full docker-compose.yml content.
         env_files: List of EnvFile objects for environment files.
         env_content: Simple .env content (shorthand for a single env file).

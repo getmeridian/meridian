@@ -39,11 +39,11 @@ def test_images_are_read_with_docker_inspect_only() -> None:
         "docker inspect",
         stdout=_inspect_output(
             {
-                "remnawave": REMNAWAVE_BACKEND_IMAGE,
-                "remnawave-subscription-page": "remnawave/subscription-page:latest",
-                "remnawave-db": "postgres:16.9-alpine",
-                "remnawave-redis": "-",
-                "remnawave-node": _OLD_NODE,
+                "ctlsvc-api": REMNAWAVE_BACKEND_IMAGE,
+                "ctlsvc-web": "remnawave/subscription-page:latest",
+                "ctlsvc-db": "postgres:16.9-alpine",
+                "ctlsvc-cache": "-",
+                "netagent": _OLD_NODE,
             }
         ),
     )
@@ -68,7 +68,7 @@ def test_images_are_read_with_docker_inspect_only() -> None:
     [
         (127, "", "docker is not installed"),
         (255, "", "exit 255"),
-        (0, "remnawave-node\tx\n", "incomplete"),
+        (0, "netagent\tx\n", "incomplete"),
     ],
 )
 def test_missing_evidence_is_unavailable_not_a_mismatch(rc: int, stdout: str, error: str) -> None:
@@ -81,7 +81,8 @@ def test_missing_evidence_is_unavailable_not_a_mismatch(rc: int, stdout: str, er
     assert observed.images == ()
 
 
-def test_inspection_script_reports_absent_containers_in_a_real_shell(tmp_path: Path) -> None:
+def test_inspection_script_reports_absent_and_pre_rename_containers_in_a_real_shell(tmp_path: Path) -> None:
+    """A server not yet migrated reports its pre-rename node under the neutral name."""
     fake = tmp_path / "docker"
     fake.write_text(
         '#!/bin/sh\nfor last; do :; done\n[ "$last" = remnawave-node ] && echo remnawave/node:3.4.0 && exit 0\nexit 1\n'
@@ -96,7 +97,7 @@ def test_inspection_script_reports_absent_containers_in_a_real_shell(tmp_path: P
     )
 
     assert result.returncode == 0
-    assert result.stdout == "remnawave\t-\nremnawave-node\tremnawave/node:3.4.0\n"
+    assert result.stdout == "ctlsvc-api\t-\nnetagent\tremnawave/node:3.4.0\n"
 
 
 def _server(*images: ImageObservation, error: str = "") -> ServerImages:
@@ -104,7 +105,7 @@ def _server(*images: ImageObservation, error: str = "") -> ServerImages:
 
 
 def _image(status: str, running: str = _OLD_NODE) -> ImageObservation:
-    return ImageObservation("node", "remnawave-node", REMNAWAVE_NODE_IMAGE, running, status)  # type: ignore[arg-type]
+    return ImageObservation("node", "netagent", REMNAWAVE_NODE_IMAGE, running, status)  # type: ignore[arg-type]
 
 
 def _run(observations: list[list[ServerImages]], *, yes: bool = True) -> tuple[int, MagicMock, MagicMock]:
@@ -164,7 +165,7 @@ def test_an_image_still_behind_after_apply_is_a_system_failure() -> None:
 
 
 def test_a_held_postgres_major_is_explained_and_never_applied(capsys: pytest.CaptureFixture[str]) -> None:
-    held = ImageObservation("postgres", "remnawave-db", REMNAWAVE_POSTGRES_IMAGE, "postgres:16.9-alpine", "held_major")
+    held = ImageObservation("postgres", "ctlsvc-db", REMNAWAVE_POSTGRES_IMAGE, "postgres:16.9-alpine", "held_major")
 
     code, apply, _check = _run([[_server(held)]])
 

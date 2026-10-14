@@ -46,7 +46,7 @@ section: guides
 **修复：**
 1. 检查云提供商控制台 — 确保端口 443/TCP 入站被允许
 2. 从不同网络尝试（移动数据、另一个 Wi-Fi）
-3. SSH 进去并检查：`docker ps`（`remnawave` 和 `remnawave-node` 运行吗？）、`systemctl status nginx`、`ss -tlnp sport = :443`
+3. SSH 进去并检查：`docker ps`（`ctlsvc-api` 和 `netagent` 运行吗？）、`systemctl status nginx`、`ss -tlnp sport = :443`
 4. 检查 UFW：`ufw status` — 应该显示 443/tcp ALLOW
 
 ### TLS 握手失败
@@ -105,6 +105,10 @@ section: guides
 
 来自 distro repos 的冲突 Docker 包。Meridian 自动删除它们，但如果 Docker 已经运行有容器，它会跳过以避免中断。
 
+### 升级期间面板重命名中止
+
+`meridian apply` 会把由 4.0 测试版部署的面板从 `/opt/remnawave` 移到 `/opt/ctlsvc`。在停止任何东西之前，如果两个目录都存在，或 `/opt/remnawave` 是挂载点，它会拒绝继续。请把存放面板 `data/` 和 `.env` 的那个目录保留为 `/opt/ctlsvc`（或把卷挂载到该处），把另一个移开，然后再次运行 `meridian apply`。重命名中途被打断时，下次 apply 会接着继续。
+
 ### SSH 连接错误
 
 手动测试 SSH：`ssh root@SERVER_IP`。确保您有基于密钥的访问。如果不是 root，使用 `--user` 标志。
@@ -130,7 +134,7 @@ section: guides
 见 [IP 被阻止恢复指南](/zh/recovery/) 了解恢复选项（替代出口、中继、CDN 回退）。
 
 其他原因：
-- 服务器重启且服务未启动 → `meridian plan` 显示什么在关闭，`meridian apply` 修复它。手工操作：在 `/opt/remnawave` 和 `/opt/remnanode` 中运行 `docker compose up -d`，然后 `systemctl restart nginx`
+- 服务器重启且服务未启动 → `meridian plan` 显示什么在关闭，`meridian apply` 修复它。手工操作：在 `/opt/ctlsvc` 和 `/opt/netagent` 中运行 `docker compose up -d`，然后 `systemctl restart nginx`
 - 磁盘满 → `df -h /`、`docker system prune -af`
 
 ## 速度慢
@@ -178,7 +182,7 @@ meridian doctor
 |---------|-----------------|
 | 本地机器 | OS 兼容性 |
 | 服务器 | OS 版本、正常运行时间（最近重启？）、磁盘/内存使用 |
-| Docker | `remnawave` 和 `remnawave-node` 容器是否运行？ 状态应该是"Up" |
+| Docker | `ctlsvc-api` 和 `netagent` 容器是否运行？ 状态应该是"Up" |
 | Remnawave 节点日志 | 节点启动错误、"failed to start" 条目、证书问题 |
 | 监听端口 | 端口 443 应该显示 nginx。如果缺失，代理未运行 |
 | 防火墙 (UFW) | 端口 443/tcp 应该 ALLOW。如果未列出，它被阻止 |

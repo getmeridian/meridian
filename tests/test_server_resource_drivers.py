@@ -21,6 +21,8 @@ from meridian.compiler.models import (
     ServerBaselinePayload,
     make_resource,
 )
+from meridian.config import REMNAWAVE_NODE_IMAGE
+from meridian.provision.runtime_migration import LEGACY_NODE_PROBE
 from meridian.provision.steps import StepResult
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -40,6 +42,7 @@ from meridian.reconciler.server_drivers import (
 from meridian.reconciler.server_evidence import baseline_attestation
 from meridian.reconciler.server_render import artifact_token, nginx_artifact_path, render_nginx_artifact
 from meridian.ssh import ServerConnection
+from tests.support.mock_connection import MockConnection
 from tests.support.topology import resource_plan
 
 _LISTENING = "LISTEN 0 1024 0.0.0.0:8443 0.0.0.0:*\n"
@@ -494,10 +497,10 @@ def _node_runtime_case(*, warp: bool = False) -> tuple[NodeRuntimeDriver, Resour
         }
     )
     panel = MagicMock()
+    connection = _connection()
+    connection.run.return_value = _result()
     driver = NodeRuntimeDriver(
-        _context(
-            plan, MagicMock(spec=ServerConnection), cluster=cluster, panel=panel, node_secrets={"exit-a": "node-secret"}
-        )
+        _context(plan, connection, cluster=cluster, panel=panel, node_secrets={"exit-a": "node-secret"})
     )
     return driver, action, panel
 
@@ -517,9 +520,65 @@ def _observed_node_runtime(
 
 def test_node_runtime_missing_container_is_confirmed_drift() -> None:
     driver, action, connection = _observed_node_runtime()
-    connection.run.return_value = _result(returncode=1, stdout="Error: No such object: remnawave-node\n")
+    connection.run.side_effect = [_result(returncode=1, stdout="Error: No such object: netagent\n"), _result()]
 
     assert not observation_converges(action, driver.observe(action, None))
+
+
+@pytest.mark.parametrize("survivor", ["container", "dir"])
+def test_node_runtime_surviving_pre_rename_container_or_directory_is_drift(survivor: str) -> None:
+    from meridian.node_deploy import render_node_compose
+
+    driver, action, connection = _observed_node_runtime(compose=render_node_compose(REMNAWAVE_NODE_IMAGE))
+    assert observation_converges(action, driver.observe(action, None))
+
+    connection.run.side_effect = lambda command, **_: (
+        _result(stdout=f"{survivor}\n") if command == LEGACY_NODE_PROBE else _result(stdout="true\n")
+    )
+
+    assert not observation_converges(action, driver.observe(action, None))
+
+
+def _legacy_node_apply(*, connected: bool) -> tuple[MockConnection, list[int], MagicMock]:
+    """Apply onto a server still running the pre-rename node; returns calls, call count at deploy, and deploy."""
+    driver, action, _ = _node_runtime_case()
+    conn = MockConnection()
+    conn.when(LEGACY_NODE_PROBE, stdout="container\ndir\n")
+    conn.when("cat /opt/netagent/docker-compose.yml", rc=1, stderr="No such file or directory")
+    conn.when("cat /opt/remnanode/docker-compose.yml", stdout="services:\n  x:\n    image: remnawave/node:3.9.1\n")
+    driver.context.connection_for = lambda _ref: conn
+    at_deploy: list[int] = []
+    deploy = MagicMock(side_effect=lambda *_a, **_k: at_deploy.append(conn.call_count) or True)
+    with (
+        patch("meridian.reconciler.server_drivers.deploy_node_container", deploy),
+        patch("meridian.reconciler.server_drivers.wait_for_node_connected", return_value=connected),
+    ):
+        if connected:
+            driver.apply(action, None)
+        else:
+            with pytest.raises(ResourceReconcileError, match="did not connect"):
+                driver.apply(action, None)
+    return conn, at_deploy, deploy
+
+
+def test_node_runtime_rename_stops_the_legacy_container_first_and_removes_it_last() -> None:
+    conn, at_deploy, deploy = _legacy_node_apply(connected=True)
+
+    calls = conn.calls
+    stop = next(i for i, call in enumerate(calls) if "docker stop -t 30 remnawave-node" in call)
+    remove = next(i for i, call in enumerate(calls) if "rm -rf /opt/remnanode" in call)
+    # Same host ports: the legacy node releases them before the renamed one binds.
+    assert stop < at_deploy[0] <= remove
+    assert "docker rm -f remnawave-node" in calls[remove]
+    # The operator's newer image choice carries over from the legacy compose file.
+    assert deploy.call_args.kwargs["image"] == "remnawave/node:3.9.1"
+
+
+def test_node_runtime_rename_that_never_connects_restarts_the_legacy_container() -> None:
+    conn, _, _ = _legacy_node_apply(connected=False)
+
+    conn.assert_called_with_pattern("docker start remnawave-node")
+    conn.assert_not_called_with_pattern("rm -rf /opt/remnanode")
 
 
 @pytest.mark.parametrize(
@@ -535,7 +594,7 @@ def test_node_runtime_rejects_unavailable_docker_evidence(returncode: int, outpu
     driver, action, connection = _observed_node_runtime()
     connection.run.return_value = _result(returncode=returncode, stderr=output)
 
-    with pytest.raises(ResourceReconcileError, match="Docker container remnawave-node evidence is unavailable"):
+    with pytest.raises(ResourceReconcileError, match="Docker container netagent evidence is unavailable"):
         driver.observe(action, None)
 
 
@@ -543,6 +602,7 @@ def test_node_runtime_missing_managed_warp_binary_is_drift() -> None:
     driver, action, connection = _observed_node_runtime(warp=True)
     connection.run.side_effect = [
         _result(stdout="true\n"),
+        _result(),
         _result(returncode=127, stderr="warp-cli: command not found"),
     ]
 
@@ -551,7 +611,11 @@ def test_node_runtime_missing_managed_warp_binary_is_drift() -> None:
 
 def test_node_runtime_rejects_warp_daemon_failure() -> None:
     driver, action, connection = _observed_node_runtime(warp=True)
-    connection.run.side_effect = [_result(stdout="true\n"), _result(returncode=1, stderr="Cannot connect to daemon")]
+    connection.run.side_effect = [
+        _result(stdout="true\n"),
+        _result(),
+        _result(returncode=1, stderr="Cannot connect to daemon"),
+    ]
 
     with pytest.raises(ResourceReconcileError, match="WARP status evidence is unavailable"):
         driver.observe(action, None)

@@ -12,6 +12,7 @@ import shlex
 
 from meridian.config import REMNAWAVE_NODE_API_PORT
 from meridian.core.errors import PanelSetupError
+from meridian.host_runtime import NODE, NODE_DIR, NODE_PROJECT
 from meridian.remnawave import MeridianPanel, RemnawaveError
 from meridian.ssh import ServerConnection
 
@@ -151,14 +152,14 @@ def wait_for_node_connected(
 
 
 def render_node_compose(image: str) -> str:
-    """Render the Remnawave node Compose configuration."""
+    """Render the Remnawave node Compose configuration under its neutral project and container name."""
     return f"""\
-# Remnawave Node - Xray Proxy Node
 # Managed by Meridian. Manual edits will be overwritten on next run.
+name: {NODE_PROJECT}
 services:
-  remnawave-node:
+  {NODE.name}:
     image: {image}
-    container_name: remnawave-node
+    container_name: {NODE.name}
     restart: always
     # Required for Remnawave node plugins and IP Control, which manage
     # nftables rules in the host network namespace.
@@ -202,14 +203,14 @@ def deploy_node_container(
 ) -> bool:
     """Deploy the Remnawave node container with the given secret key.
 
-    Creates /opt/remnanode, writes docker-compose.yml and .env, pulls the
+    Creates ``NODE_DIR``, writes docker-compose.yml and .env, pulls the
     image, and starts the container. Called from the post-provisioner phase
     after the panel API has registered the node and returned the mTLS secret.
     """
-    from meridian.config import REMNAWAVE_NODE_DIR, REMNAWAVE_NODE_IMAGE
+    from meridian.config import REMNAWAVE_NODE_IMAGE
     from meridian.provision.containers import EnvFile, deploy_compose_stack
 
-    node_dir = REMNAWAVE_NODE_DIR
+    node_dir = NODE_DIR
     effective_port = REMNAWAVE_NODE_API_PORT if node_api_port is None else node_api_port
     effective_image = REMNAWAVE_NODE_IMAGE if image is None else image
 
@@ -218,7 +219,7 @@ def deploy_node_container(
 
     def _node_running() -> bool:
         check = conn.run(
-            "docker inspect remnawave-node --format '{{.State.Running}}' 2>/dev/null",
+            f"docker inspect {shlex.quote(NODE.name)} --format '{{{{.State.Running}}}}' 2>/dev/null",
             timeout=10,
         )
         return check.returncode == 0 and "true" in check.stdout.strip().lower()

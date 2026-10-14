@@ -10,14 +10,14 @@ INTERRUPTED_APPLY_LOG=/tmp/meridian-systemlab-interrupted-apply.log
 
 restore_nodes() {
   ssh root@"$EXIT_A_IP" \
-    docker start remnawave-node >/dev/null 2>&1 || true
+    docker start netagent >/dev/null 2>&1 || true
   ssh root@"$EXIT_B_IP" \
-    docker start remnawave-node >/dev/null 2>&1 || true
+    docker start netagent >/dev/null 2>&1 || true
 }
 trap restore_nodes EXIT
 
 ssh root@"$EXIT_A_IP" \
-  docker stop remnawave-node >/dev/null
+  docker stop netagent >/dev/null
 wait_for_command \
   "leastPing pool to route through exit B after exit A stops" \
   90 \
@@ -29,7 +29,7 @@ pass "canonical client survived primary exit failure"
 
 restart_node "$EXIT_A_IP"
 ssh root@"$EXIT_B_IP" \
-  docker stop remnawave-node >/dev/null
+  docker stop netagent >/dev/null
 wait_for_command \
   "leastPing pool to route through exit A after exit B stops" \
   90 \
@@ -37,7 +37,7 @@ wait_for_command \
 pass "gateway probe traversed the leastPing pool with only exit A available"
 
 ssh root@"$EXIT_A_IP" \
-  docker stop remnawave-node >/dev/null
+  docker stop netagent >/dev/null
 wait_for_command \
   "leastPing pool to fail closed after both exits stop" \
   90 \
