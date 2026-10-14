@@ -159,6 +159,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   every enabled protocol appear.
 - Subscription links live under the connection-page path and never reveal the
   admin panel's address.
+- **Apps refresh subscriptions every 6 hours** — every subscription sends
+  `profile-update-interval`, so Happ, Clash Verge, and other apps that read it
+  pick up new exits and relays within hours. Meridian keeps the header set in
+  the panel; other response headers you add stay yours.
 - `meridian client add|show|list|remove|enable|disable`. `client remove` deletes
   the user and their page; links stop working immediately.
 - **Connection pages recommend apps per platform** — Happ first, then

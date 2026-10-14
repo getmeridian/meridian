@@ -19,7 +19,7 @@
 - Users are addressed by numeric `id` (string in `User.id`); uuid-era bindings re-resolve by username, never hit `/api/users/{uuid}`.
 - 3.x answers DELETE and bulk host actions with 204 and node restart with 202: `_request` returns None; treat 2xx as success and 404 as already gone, never read `isDeleted`.
 - Remnawave's Zod pipe silently strips unknown body keys — a misspelled or removed field is a no-op, not an error. Check the contract before adding fields.
-- The subscription title lives in `customResponseHeaders["profile-title"]` as `rwEncodeBase64:<plain text>` (the panel encodes); the record is replaced wholesale, so read-merge-write it.
+- The subscription title lives in `customResponseHeaders["profile-title"]` as `rwEncodeBase64:<plain text>` (the panel encodes) beside `profile-update-interval` (whole hours, `SUBSCRIPTION_UPDATE_INTERVAL_HOURS`); the record is replaced wholesale, so read-merge-write it.
 - Reality keypairs come from `GET /api/system/tools/x25519/generate` (unpadded base64url, 30 per call); exits need no Docker, Xray, or unzip before their Profile exists, and `reality_keys.py` rejects anything that is not 32 bytes.
 - External squad headers are `responseHeadersAdd`/`responseHeadersRemove`; node Xray version is `versions.xray`; keygen returns `secretKey`.
 - Omit unmanaged subscription settings and response rules from PATCH payloads; `null` can erase panel-owned policy.

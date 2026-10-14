@@ -78,7 +78,7 @@ A disable lasts until `client enable`: apply, redeploys, and fleet changes leave
 
 Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the Remnawave admin panel stays on a separate secret path that shared links never reveal.
 
-Apps refresh subscriptions on their own, so when you add an exit or relay, clients pick it up without a new link.
+Every subscription asks apps to refresh it every 6 hours (the `profile-update-interval` header, which apps such as Happ and Clash Verge follow), so when you add an exit or relay, clients pick it up within a few hours without a new link. Apps that ignore the header refresh on their own schedule; a manual refresh in the app picks up changes at once.
 
 ## Where client data lives
 
@@ -93,7 +93,7 @@ Meridian and the panel split the work so your edits don't get overwritten:
 | Meridian manages (the next apply restores its version) | Yours to change (apply never touches these) |
 |---|---|
 | Nodes, config profiles, inbounds, published Hosts, squads | Each client's status: enable/disable, traffic limits, expiry, HWID limits, description |
-| Subscription templates and the settings Meridian sets | Users you create yourself in the panel |
+| Subscription templates and the settings Meridian sets (title, refresh interval) | Users you create yourself in the panel |
 | Which clients exist, their names, and their squads | Notifications, plugins, IP control, and other panel settings |
 
 `meridian plan` shows any difference in what Meridian manages before anything changes. Users you add in the panel are never listed, changed, or deleted by Meridian; to give someone a Meridian-managed link and connection page, use `meridian client add` instead.

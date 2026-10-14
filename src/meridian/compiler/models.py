@@ -299,9 +299,15 @@ class SubscriptionTemplatePayload(CoreModel):
     template_yaml: str = ""
 
 
+# Hours between automatic subscription refreshes, sent as ``profile-update-interval``
+# (Happ and the Clash family read whole hours). New exits and relays reach apps this fast.
+SUBSCRIPTION_UPDATE_INTERVAL_HOURS = 6
+
+
 class SubscriptionSettingsPayload(CoreModel):
     kind: Literal["subscription_settings"] = "subscription_settings"
     profile_title: str
+    update_interval_hours: int = Field(default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS, ge=1)
     randomize_hosts: bool = False
     preserve_unmanaged_response_rules: bool = True
 

@@ -9,6 +9,7 @@ import httpx
 
 from .models import (
     PROFILE_TITLE_HEADER,
+    PROFILE_UPDATE_INTERVAL_HEADER,
     ConfigProfile,
     ExternalSquad,
     Host,
@@ -328,6 +329,7 @@ class ControlPlaneMixin:
         uuid: str,
         *,
         profile_title: str | None = None,
+        profile_update_interval_hours: int | None = None,
         serve_json_at_base_subscription: bool | None = None,
         randomize_hosts: bool | None = None,
         response_rules: dict[str, Any] | None = None,
@@ -335,18 +337,24 @@ class ControlPlaneMixin:
     ) -> SubscriptionSettings:
         """PATCH panel-wide subscription settings, omitting unmanaged fields.
 
-        Remnawave 3.x dropped ``profileTitle``; the title is the
-        ``profile-title`` custom response header. The panel replaces the
-        header record wholesale, so a title change re-reads the current
-        record (unless the caller supplies it) and writes it back merged.
+        Remnawave 3.x dropped ``profileTitle``; the title and refresh
+        interval are the ``profile-title`` and ``profile-update-interval``
+        custom response headers. The panel replaces the header record
+        wholesale, so changing either re-reads the current record (unless the
+        caller supplies it) and writes it back merged.
         """
+        managed_headers: dict[str, str] = {}
         if profile_title is not None:
+            managed_headers[PROFILE_TITLE_HEADER] = encode_profile_title(profile_title)
+        if profile_update_interval_hours is not None:
+            managed_headers[PROFILE_UPDATE_INTERVAL_HEADER] = str(profile_update_interval_hours)
+        if managed_headers:
             headers = (
                 dict(custom_response_headers)
                 if custom_response_headers is not None
                 else dict(self.get_subscription_settings().custom_response_headers)
             )
-            headers[PROFILE_TITLE_HEADER] = encode_profile_title(profile_title)
+            headers.update(managed_headers)
             custom_response_headers = headers
         body: dict[str, Any] = {"uuid": uuid}
         optional_fields: tuple[tuple[str, Any], ...] = (

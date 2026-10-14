@@ -12,6 +12,8 @@ HostSecurityLayer = Literal["DEFAULT", "TLS", "NONE"]
 # ``rwEncodeBase64:`` makes the panel emit ``base64:<b64(rendered text)>`` so
 # non-ASCII titles survive HTTP headers; the text after it is plain.
 PROFILE_TITLE_HEADER = "profile-title"
+# Whole hours between automatic refreshes; apps without it use their own schedule.
+PROFILE_UPDATE_INTERVAL_HEADER = "profile-update-interval"
 _RW_ENCODE_BASE64 = "rwEncodeBase64:"
 _BASE64_RESULT = "base64:"
 
@@ -185,6 +187,12 @@ class SubscriptionSettings:
     def profile_title(self) -> str:
         """Profile title as clients see it (Remnawave 3.x ``profile-title`` header)."""
         return decode_profile_title(self.custom_response_headers.get(PROFILE_TITLE_HEADER, ""))
+
+    @property
+    def profile_update_interval_hours(self) -> int | None:
+        """Refresh interval clients receive; None when the header is absent or not whole hours."""
+        value = self.custom_response_headers.get(PROFILE_UPDATE_INTERVAL_HEADER, "").strip()
+        return int(value) if value.isdigit() else None
 
 
 @dataclass(frozen=True)

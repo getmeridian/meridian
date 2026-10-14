@@ -285,6 +285,41 @@ def test_profile_title_change_reads_and_merges_the_whole_header_record() -> None
     }
 
 
+def test_refresh_interval_merges_into_the_header_record_beside_the_title() -> None:
+    panel = _panel()
+    panel._request.side_effect = [
+        {
+            "uuid": "settings-1",
+            "customResponseHeaders": {"profile-update-interval": "12", "announce": "rwEncodeBase64:operator notice"},
+        },
+        {"uuid": "settings-1", "customResponseHeaders": {"profile-update-interval": "6"}},
+    ]
+
+    settings = panel.update_subscription_settings("settings-1", profile_title="Family", profile_update_interval_hours=6)
+
+    assert panel._request.call_args_list[1].kwargs["json"] == {
+        "uuid": "settings-1",
+        "customResponseHeaders": {
+            "profile-update-interval": "6",
+            "announce": "rwEncodeBase64:operator notice",
+            "profile-title": "rwEncodeBase64:Family",
+        },
+    }
+    assert settings.profile_update_interval_hours == 6
+
+
+@pytest.mark.parametrize(
+    ("header", "hours"),
+    [("12", 12), (" 6 ", 6), ("", None), ("1.5", None), ("soon", None)],
+    ids=["hours", "padded", "absent", "fraction", "text"],
+)
+def test_refresh_interval_header_reads_whole_hours_only(header: str, hours: int | None) -> None:
+    settings = parse_subscription_settings(
+        {"customResponseHeaders": {"profile-update-interval": header} if header else None}
+    )
+    assert settings.profile_update_interval_hours == hours
+
+
 @pytest.mark.parametrize(
     ("header", "title"),
     [

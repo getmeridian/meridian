@@ -240,7 +240,9 @@ class SubscriptionSettingsDriver:
         payload = payload_of(action, SubscriptionSettingsPayload)
         settings = self.context.panel.get_subscription_settings()
         matches = (
-            settings.profile_title == payload.profile_title and settings.randomize_hosts == payload.randomize_hosts
+            settings.profile_title == payload.profile_title
+            and settings.profile_update_interval_hours == payload.update_interval_hours
+            and settings.randomize_hosts == payload.randomize_hosts
         )
         return observed(
             action,
@@ -248,6 +250,7 @@ class SubscriptionSettingsDriver:
             matches,
             {
                 "profile_title": settings.profile_title,
+                "update_interval_hours": settings.profile_update_interval_hours,
                 "randomize_hosts": settings.randomize_hosts,
             },
         )
@@ -263,12 +266,13 @@ class SubscriptionSettingsDriver:
             lambda: self.context.panel.update_subscription_settings(
                 settings.uuid,
                 profile_title=payload.profile_title,
+                profile_update_interval_hours=payload.update_interval_hours,
                 randomize_hosts=payload.randomize_hosts,
-                # Merge the title into the record just read; the panel
-                # replaces customResponseHeaders wholesale.
+                # Merge the managed headers into the record just read; the
+                # panel replaces customResponseHeaders wholesale.
                 custom_response_headers=settings.custom_response_headers,
             ),
-            "update managed subscription title",
+            "update managed subscription title and refresh interval",
         )
         return ResourceApplyReceipt(remote_id=updated.uuid)
 

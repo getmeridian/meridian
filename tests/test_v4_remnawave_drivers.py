@@ -12,7 +12,12 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, RealityKeyBinding, WorkloadBinding
 from meridian.compiler import compile_topology
-from meridian.compiler.models import NON_XRAY_JSON_TYPES, ConfigProfilePayload, ResourcePlan
+from meridian.compiler.models import (
+    NON_XRAY_JSON_TYPES,
+    SUBSCRIPTION_UPDATE_INTERVAL_HOURS,
+    ConfigProfilePayload,
+    ResourcePlan,
+)
 from meridian.compiler.routing import edge_outbound_tag
 from meridian.core.topology import (
     AccessIntent,
@@ -406,6 +411,7 @@ class StatefulPanel:
         uuid: str,
         *,
         profile_title: str | None = None,
+        profile_update_interval_hours: int | None = None,
         response_rules: list[dict] | None = None,
         serve_json_at_base_subscription: bool | None = None,
         randomize_hosts: bool | None = None,
@@ -414,14 +420,17 @@ class StatefulPanel:
         self.calls["update_subscription_settings"] += 1
         assert uuid == self.subscription_settings.uuid
         assert response_rules is None
-        if profile_title is not None:
+        if profile_title is not None or profile_update_interval_hours is not None:
             # Mirror the adapter: the header record is replaced wholesale.
             headers = dict(
                 custom_response_headers
                 if custom_response_headers is not None
                 else self.subscription_settings.custom_response_headers
             )
-            headers["profile-title"] = f"rwEncodeBase64:{profile_title}"
+            if profile_title is not None:
+                headers["profile-title"] = f"rwEncodeBase64:{profile_title}"
+            if profile_update_interval_hours is not None:
+                headers["profile-update-interval"] = str(profile_update_interval_hours)
             self.subscription_settings.custom_response_headers = headers
         if randomize_hosts is not None:
             self.subscription_settings.randomize_hosts = randomize_hosts
@@ -1081,3 +1090,38 @@ def test_node_country_follows_the_exit_region_and_otherwise_stays_the_operators(
     assert nodes["Meridian v4 exit-a"].country_code == "DE"
     assert nodes["Meridian v4 exit-b"].country_code == "SE"
     assert panel.calls["country_node"] == 1
+
+
+def test_every_subscription_carries_the_managed_refresh_interval_and_keeps_operator_headers() -> None:
+    plan = compile_topology(_intent())
+    cluster = ClusterConfig()
+    panel = StatefulPanel()
+    panel.subscription_settings.custom_response_headers["support-url"] = "https://support.example.com"
+    workloads = WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys)
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=workloads,
+        server_addresses={"srv-control": "198.51.100.10", "srv-exit-a": "198.51.100.20", "srv-exit-b": "198.51.100.30"},
+    )
+    fallback = AlreadyConvergedDriver()
+    drivers: dict[str, object] = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+    drivers.update(build_remnawave_drivers(context))
+
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    headers = panel.subscription_settings.custom_response_headers
+    assert headers["profile-update-interval"] == str(SUBSCRIPTION_UPDATE_INTERVAL_HOURS)
+    assert headers["support-url"] == "https://support.example.com"
+    assert panel.calls["update_subscription_settings"] == 1
+
+    # Converged settings stay untouched; an edited interval is drift the next apply repairs.
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    assert panel.calls["update_subscription_settings"] == 1
+    headers["profile-update-interval"] = "48"
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    assert panel.subscription_settings.custom_response_headers["profile-update-interval"] == str(
+        SUBSCRIPTION_UPDATE_INTERVAL_HOURS
+    )
+    assert panel.subscription_settings.custom_response_headers["support-url"] == "https://support.example.com"
+    assert panel.calls["update_subscription_settings"] == 2
