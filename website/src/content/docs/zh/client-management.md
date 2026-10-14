@@ -117,7 +117,7 @@ Remnawave 的节点插件（Ingress Filter、Egress Filter、Torrent Blocker、C
 
 插件会在主机上写入 nftables 规则，因此上游还要求 Linux 内核 5.7 或更新版本；在更旧的内核上它们会悄无声息地不起作用。`meridian check` 在每个出口和网关上将其报告为 **Node plugin readiness**，并对旧内核给出警告（请升级到 Ubuntu 22.04+ 或 Debian 11+）。如果您不使用插件，可以忽略该警告。
 
-Torrent Blocker 还需要入站开启流量嗅探才能识别 BitTorrent，而 Meridian 的入站默认关闭嗅探，因此它无从生效。入站过滤器和出站过滤器按文档所述工作。
+Torrent Blocker 通过流量嗅探来识别 BitTorrent，Meridian 会在其生成的每个入站上开启嗅探（仅用于路由，因此不会改写目标地址）。在面板中开启该插件，它就会在每个出口上生效。
 
 ### 将机器人连接到面板
 

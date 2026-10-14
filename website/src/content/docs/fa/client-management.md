@@ -117,7 +117,7 @@ Node pluginهای Remnawave (‏Ingress Filter، Egress Filter، Torrent Blocker
 
 pluginها قوانین nftables را روی host می‌نویسند، بنابراین upstream به کرنل Linux نسخهٔ 5.7 یا جدیدتر هم نیاز دارد؛ روی کرنل قدیمی‌تر بی‌صدا هیچ کاری نمی‌کنند. `meridian check` این را روی هر exit و gateway با عنوان **Node plugin readiness** گزارش می‌کند و دربارهٔ کرنل قدیمی هشدار می‌دهد (به Ubuntu 22.04+ یا Debian 11+ بروید). اگر از pluginها استفاده نمی‌کنید، می‌توانید آن هشدار را نادیده بگیرید.
 
-Torrent Blocker برای تشخیص BitTorrent به sniffing ترافیک روی inbound هم نیاز دارد و inboundهای Meridian sniffing را خاموش نگه می‌دارند، پس چیزی برای عمل کردن ندارد. فیلترهای ingress و egress همان‌طور که مستند شده کار می‌کنند.
+Torrent Blocker از طریق sniffing ترافیک، BitTorrent را تشخیص می‌دهد و Meridian آن را (به‌صورت route-only، بنابراین مقصدها هرگز بازنویسی نمی‌شوند) روی هر inboundی که تولید می‌کند روشن می‌کند. plugin را در پنل فعال کنید تا روی هر exit کار کند.
 
 ### اتصال یک ربات به پنل
 
