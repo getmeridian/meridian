@@ -1,0 +1,39 @@
+---
+// Studio's own bare shell. The local Engine serves this page with CSP
+// `script-src 'self'`, so it has no inline scripts and none of the site's
+// Nav/Footer/i18n chrome: only tokens, fonts, Studio styles, and one external
+// early-theme script. Links to the website are absolute, because the Engine
+// ships only Studio's files.
+import '../styles/global.css';
+import './studio.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="canonical" href={canonicalURL} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png" />
+    <script is:inline src="/studio/theme.js"></script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+    <nav class="studio-site" aria-label="Meridian website">
+      <a href={new URL('/', Astro.site)}>Meridian</a>
+      <a href={new URL('/docs/', Astro.site)}>Docs</a>
+    </nav>
+    <slot />
+  </body>
+</html>

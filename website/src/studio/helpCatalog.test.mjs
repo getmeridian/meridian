@@ -49,3 +49,15 @@ test("Studio page is markup only: one module script and no HTML sinks", async ()
   assert.doesNotMatch(page, /@ts-nocheck/);
   assert.doesNotMatch(page, /<style/);
 });
+
+test("Studio's layout runs under the Engine CSP: no inline scripts, no site chrome", async () => {
+  const page = await readText("website/src/pages/studio.astro");
+  const layout = await readText("website/src/studio/StudioLayout.astro");
+
+  assert.match(page, /<StudioLayout\b/);
+  assert.doesNotMatch(page, /layouts\/Base\.astro/);
+  for (const script of layout.match(/<script\b[^>]*>/g) ?? []) {
+    assert.match(script, /\bsrc=/, `inline script in StudioLayout: ${script}`);
+  }
+  assert.doesNotMatch(layout, /Nav\.astro|Footer\.astro/);
+});

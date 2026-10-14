@@ -1,12 +1,11 @@
 ---
 // Markup only: behaviour lives in src/studio/app.js, wording in the presenters,
 // labels/help/defaults in the generated workflow contracts.
-import Base from '../layouts/Base.astro';
+import StudioLayout from '../studio/StudioLayout.astro';
 import StudioHelp from '../studio/components/StudioHelp.astro';
 import { contractFieldText, workflowOptions } from '../studio/contractDefaults.js';
 import { deployWorkflow, serverOnboardingWorkflow } from '../studio/generated/index.js';
 import { studioFaqs, studioHelp, studioJourneySteps } from '../studio/helpCatalog.js';
-import '../studio/studio.css';
 
 type FieldText = { label: string; help: string; placeholder: string };
 const serverField = (id: string): FieldText => contractFieldText(serverOnboardingWorkflow, id, studioHelp);
@@ -29,7 +28,7 @@ const icon = deployField('icon');
 const warp = deployField('warp');
 ---
 
-<Base title="Meridian Studio" description="Guided Meridian server setup and deploy assistant.">
+<StudioLayout title="Meridian Studio" description="Guided Meridian server setup and deploy assistant.">
   <main id="main" class="studio">
     <header class="studio__topbar" aria-labelledby="studio-title">
       <div class="studio__brand">
@@ -522,7 +521,7 @@ const warp = deployField('warp');
       </div>
     </dialog>
   </main>
-</Base>
+</StudioLayout>
 
 <script>
   // @ts-check

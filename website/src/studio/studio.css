@@ -1,31 +1,41 @@
 .studio {
-  --studio-accent-bg: #7a4d0a;
-  --studio-accent-ink: #fffaf2;
-  --studio-accent-soft: #7a4d0a14;
-  --studio-accent-text: #704605;
-  --studio-focus: #1f6feb;
+  /* Derived from the site tokens so a palette change carries over; the accent
+     is mixed toward the text color so button labels keep their contrast. */
+  --studio-accent-bg: color-mix(in srgb, var(--ac), var(--t1) 45%);
+  --studio-accent-ink: var(--s1);
+  --studio-accent-soft: var(--ac2);
+  --studio-accent-text: color-mix(in srgb, var(--ac), var(--t1) 40%);
+  --studio-focus: var(--blue);
   line-height: 1.45;
   margin: 0 auto;
   padding: 10px 0 44px;
   width: min(1180px, calc(100% - 32px));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .studio {
-    --studio-accent-bg: #f0c878;
-    --studio-accent-ink: #1c1608;
-    --studio-accent-soft: #f0c87818;
-    --studio-accent-text: #f2cf83;
-    --studio-focus: #87b7ff;
-  }
+.studio-site {
+  display: flex;
+  gap: 18px;
+  margin: 0 auto;
+  padding: 14px 0 0;
+  width: min(1180px, calc(100% - 32px));
 }
 
-[data-theme="dark"] .studio {
-  --studio-accent-bg: #f0c878;
-  --studio-accent-ink: #1c1608;
-  --studio-accent-soft: #f0c87818;
-  --studio-accent-text: #f2cf83;
-  --studio-focus: #87b7ff;
+.studio-site a {
+  color: var(--t2);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.studio-site a:first-child {
+  color: var(--t1);
+  font-family: var(--heading);
+  font-weight: 600;
+}
+
+.studio-site a:hover,
+.studio-site a:focus-visible {
+  color: var(--t1);
+  text-decoration: underline;
 }
 
 .studio section {
@@ -40,9 +50,6 @@
   grid-template-columns: minmax(0, 1fr) auto;
   justify-content: space-between;
   padding: 8px 0 12px;
-  position: sticky;
-  top: 56px;
-  z-index: 80;
 }
 
 .studio__brand {
@@ -156,7 +163,7 @@
 
 .studio__journey {
   position: sticky;
-  top: 124px;
+  top: 16px;
 }
 
 .studio__journey {
@@ -1159,7 +1166,7 @@
 }
 
 .studio__sheet::backdrop {
-  background: rgba(26, 29, 46, 0.36);
+  background: rgb(0 0 0 / 0.36);
 }
 
 .studio__sheet-head {

@@ -10,6 +10,8 @@
 
 **One job per module** — `journey.js` (pure state and step gates), `engineSession.js` (handshake, key, polling), `staticAdapter.js` (requests, validation, commands), `payloadPresenters.js` (one presenter per response schema), `views/` (one per screen, DOM only), `app.js` (the controller), `studio.css`. `studio.astro` is markup plus one module script.
 
+**Bare layout** — `StudioLayout.astro` has no Nav, i18n, or inline scripts (the Engine's CSP is `script-src 'self'`); the early theme is the external `public/studio/theme.js`, and website links are absolute because the wheel ships only Studio's files.
+
 **Guided cockpit UX** — one task per screen; the journey rail, contextual help, and native `<dialog>` command sheet replace always-visible JSON/CLI panels.
 
 ## What's done well
