@@ -80,13 +80,6 @@ jobs:
           # Generate checksums
           cd website/dist
           sha256sum install.sh > SHA256SUMS
-          cd ../..
-          # Bundle AI docs
-          mkdir -p website/dist/ai
-          for f in website/src/content/docs/en/cli-reference.md website/src/content/docs/en/architecture.md website/src/content/docs/en/troubleshooting.md website/src/content/docs/en/deploy.md website/src/content/docs/en/relay.md website/src/content/docs/en/recovery.md; do
-            awk 'BEGIN{skip=0} /^---$/{skip++;next} skip<2{next} {print}' "$f"
-            echo ""
-          done > website/dist/ai/reference.md
 
       - uses: actions/upload-pages-artifact@v4
         with:
@@ -308,12 +301,8 @@ jobs:
           cd ..
           cp VERSION website/dist/version
           find website/dist -name .DS_Store -delete
-          # Generate AI reference from human docs (not committed, built fresh)
-          mkdir -p src/meridian/data
-          for f in website/src/content/docs/en/cli-reference.md website/src/content/docs/en/architecture.md website/src/content/docs/en/troubleshooting.md website/src/content/docs/en/deploy.md website/src/content/docs/en/relay.md website/src/content/docs/en/recovery.md; do
-            awk 'BEGIN{skip=0} /^---$/{skip++;next} skip<2{next} {print}' "$f"
-            echo ""
-          done > src/meridian/data/ai-reference.md
+          # The AI reference for doctor --ai (not committed, built fresh)
+          node website/scripts/ai-docs.mjs reference src/meridian/data/ai-reference.md
           python -m build
           python scripts/verify_package_assets.py dist/*.whl
 

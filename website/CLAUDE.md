@@ -10,7 +10,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 
 **Docs run on Starlight** — `src/content/docs/{locale}/` renders at `/{locale}/{page}/` with Starlight's sidebar, search, TOC, RTL, and Expressive Code. `src/lib/docs-sidebar.mjs` lists the sidebar (sections and page order) for every locale; `astro.config.mjs` refuses a page missing from it and redirects every old `/docs/{locale}/{page}/` URL; `/docs/` stays the stable entry. Overrides live in `src/components/starlight/`, the route middleware in `src/lib/docs-route.ts`, the theme in `src/styles/starlight.css`.
 
-**Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, `/context-hub.md` cover LLM tooling. All of them go through `src/lib/docs-markdown.ts`.
+**Agent-friendly by default** — every docs page has a Markdown twin at `/{locale}/{page}.md` (linked from `<head>` and the Copy page / View as Markdown / Open in ChatGPT or Claude actions), `/agents.md` serves the CLI's `meridian help agents` guide, and `/llms.txt`, `/llms-full.txt`, and `/ai/reference.md` cover LLM tooling. Twins go through `src/lib/docs-markdown.ts`; bundles through `scripts/ai-docs.mjs`.
 
 **i18n strategy** — docs are per-locale markdown files and Starlight UI strings come from `src/content/i18n/`; non-docs pages use the client-side swap in `src/i18n/CLAUDE.md`.
 
@@ -21,7 +21,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 ## Website ↔ CLI relationship
 
 - **App links**: `src/data/apps.json` is SOT. CI validates against template + Python constants.
-- **AI docs**: en/ markdown → `make ai-docs` → bundled `ai-reference.md`. CI generates automatically. The agent guide is the CLI's `src/meridian/data/agents.md`.
+- **AI docs**: `scripts/ai-docs.mjs` is the only bundler — `/llms-full.txt` and `/ai/reference.md` at build time, and `make ai-docs` / the PyPI job write the same reference into the package as `ai-reference.md` for `doctor --ai`. The agent guide is the CLI's `src/meridian/data/agents.md`.
 - **install.sh**: deployed to `getmeridian.org/install.sh` by CI release workflow.
 - **Studio contracts**: `pnpm run contracts:generate` builds `src/studio/generated/` from checked-in `contracts/meridian/v1`.
 
