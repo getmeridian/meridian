@@ -124,6 +124,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `client add`, `doctor`, and `node add` run locally with sudo instead of
   SSHing back into the same machine. The same fleet copied to a laptop keeps
   using SSH.
+- **Servers that came with only a password** — when a server refuses your SSH
+  keys but accepts a password, `meridian deploy` and `meridian setup` ask
+  whether to create a key for Meridian and install it. Say yes, type the
+  password once (hidden, never saved), and the deploy continues; the key is
+  saved with the server for later commands. Without a terminal, with `--yes`,
+  or with `--json`, they stop with the `ssh-copy-id` command instead.
 
 - **Per-domain routes on an exit** — `meridian route add EXIT --via
   warp|direct|block VALUES...` sends chosen domains, `geosite:` lists, or

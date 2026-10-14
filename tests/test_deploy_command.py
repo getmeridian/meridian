@@ -8,12 +8,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import click
+import pytest
 from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.handoff import HandoffLinks
+from meridian.servers import ServerRegistry
 
 runner = CliRunner()
 
@@ -44,7 +46,7 @@ def test_dry_run_compiles_a_single_server_topology_without_touching_state(tmp_ho
 def test_deploy_applies_the_intent_and_hands_off_a_page(tmp_home: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
     monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
-    conn = MagicMock(port=22)
+    conn = MagicMock(port=22, identity_file="")
     resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=conn)
     runtime = MagicMock()
     runtime.apply_intent.return_value = SimpleNamespace(all_succeeded=True, failed=[], plan_hash="h" * 64)
@@ -88,7 +90,9 @@ def _fake_runtime() -> MagicMock:
 
 
 def _deploy_with(runtime: MagicMock, traffic, targets=("www.google.com", "dl.google.com"), args=()):
-    resolved = SimpleNamespace(ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22))
+    resolved = SimpleNamespace(
+        ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22, identity_file="")
+    )
     with (
         patch("meridian.commands.deploy.resolve_server", return_value=resolved),
         patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved),
@@ -224,3 +228,29 @@ def test_interactive_prompt_takes_the_same_target_syntax_as_the_argument(monkeyp
 
     assert value == "ubuntu@198.51.100.10:2222"
     assert deploy._split_target(value, "", 0) == ("198.51.100.10", "", "ubuntu", 2222)
+
+
+@pytest.mark.parametrize(("yes", "offer"), [(False, True), (True, False)], ids=["interactive", "yes"])
+def test_deploy_offers_key_setup_only_without_yes_and_saves_the_key(
+    tmp_home: Path, monkeypatch, yes: bool, offer: bool
+) -> None:
+    monkeypatch.setattr(cli, "DISABLE_UPDATE_CHECK", True)
+    monkeypatch.setattr("meridian.commands.deploy.SERVER_PROFILES_FILE", tmp_home / "servers.json")
+    key_path = str(tmp_home / "ssh" / "meridian_ed25519")
+    resolved = SimpleNamespace(
+        ip="198.51.100.10", user="root", port=22, machine_id="", conn=MagicMock(port=22, identity_file=key_path)
+    )
+    with (
+        patch("meridian.commands.deploy.resolve_server", return_value=resolved),
+        patch("meridian.commands.deploy.ensure_server_connection", return_value=resolved) as connect,
+        patch("meridian.commands.deploy.check_ports"),
+        patch("meridian.commands.deploy._camouflage_candidates", return_value=["www.google.com"]),
+        patch("meridian.commands.deploy._verify_traffic", return_value=("ok", "exit IP 198.51.100.10")),
+        patch("meridian.setup.runtime.SetupRuntime", return_value=_fake_runtime()),
+    ):
+        result = _invoke(["deploy", "198.51.100.10", *(["--yes"] if yes else [])])
+
+    assert result.exit_code == 0, result.output
+    assert connect.call_args.kwargs == {"offer_key_setup": offer}
+    entry = ServerRegistry(tmp_home / "servers.json").find("198.51.100.10")
+    assert entry is not None and entry.key_path == key_path

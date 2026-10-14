@@ -76,7 +76,7 @@ def _run(*, intent_path: str, restart: bool, yes: bool) -> None:
                 service=service,
                 shelf=shelf,
                 runtime=SetupRuntime(registry, reporter=reporter),
-                register_server=_register_server,
+                register_server=partial(_register_server, offer_key_setup=not yes),
                 auto_approve=yes,
                 ask_language=language is None and not yes and (draft is None or not draft.completed_stages),
                 on_language=_remember_language,
@@ -130,6 +130,8 @@ def _register_server(
     title: str,
     user: str,
     port: int,
+    *,
+    offer_key_setup: bool = False,
 ) -> None:
     from meridian.commands.server import run_add
 
@@ -138,4 +140,5 @@ def _register_server(
         name=title,
         user=user,
         ssh_port=port,
+        offer_key_setup=offer_key_setup,
     )

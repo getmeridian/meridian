@@ -48,14 +48,18 @@ def _replace(
 ) -> tuple[int, _Runtime, MagicMock]:
     runtime = runtime or _Runtime()
     host = new.rpartition("@")[2]
-    target = SimpleNamespace(ip=host, user="root", port=22, local_mode=False, machine_id="")
+    target = SimpleNamespace(
+        ip=host, user="root", port=22, local_mode=False, machine_id="", conn=SimpleNamespace(identity_file="")
+    )
     with (
         patch(
             "meridian.commands.node_replace.load_topology_cluster",
             return_value=ClusterConfig(topology_intent=intent or _intent()),
         ),
         patch("meridian.commands.resolve.resolve_server", return_value=target),
-        patch("meridian.commands.resolve.ensure_server_connection") as connect,
+        patch(
+            "meridian.commands.resolve.ensure_server_connection", side_effect=lambda resolved, **_: resolved
+        ) as connect,
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
     ):
         try:

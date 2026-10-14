@@ -26,6 +26,7 @@
 - Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.
 - Never render saved admin credentials except `panel --show-password`; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
 - A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
+- `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
 - The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
 - Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
 - `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing.

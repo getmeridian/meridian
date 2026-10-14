@@ -107,7 +107,7 @@ Conflicting Docker packages from distro repos. Meridian auto-removes them, but i
 
 ### SSH connection errors
 
-Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `--user` flag if not root.
+Test SSH manually: `ssh root@SERVER_IP`. Ensure you have key-based access. Use `--user` flag if not root. If the server accepts only a password, run `meridian deploy` in a terminal without `--yes` and let it install a key (see [Password-only servers](/en/deploy/#password-only-servers)), or run `ssh-copy-id root@SERVER_IP` once.
 
 ### Xray fails to start in the node container
 

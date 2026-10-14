@@ -14,7 +14,8 @@ from dataclasses import dataclass
 
 from meridian.core.inputs import is_ip
 from meridian.servers import ServerEntry, ServerRegistry, this_machine_id
-from meridian.ssh import SSHUI, ServerConnection
+from meridian.ssh import SSHUI, ServerConnection, SSHError, ssh_copy_id_command
+from meridian.ssh_keys import ensure_meridian_keypair, host_key_known, install_public_key, key_login_works
 
 LOCAL_KEYWORDS = ("local", "locally")
 
@@ -202,3 +203,46 @@ def ensure_server_connection(
     """Verify the resolved connection (SSH reachability, or passwordless sudo locally)."""
     resolved.conn.check_ssh(ui=ui)
     return resolved
+
+
+def install_meridian_key(resolved: ResolvedServer, password: str) -> ResolvedServer:
+    """Install Meridian's own SSH key with a one-time password; return the target pinned to that key.
+
+    The password reaches ssh only through the askpass environment of the one install
+    command. It is never saved, logged, or put in an error, and the connection that
+    carried it forgets it as soon as the command returns.
+    """
+    conn = resolved.conn
+    manual = ssh_copy_id_command(conn.user, conn.ip, conn.port)
+    if not host_key_known(conn.ip, conn.port):
+        raise SSHError(
+            f"The SSH host key for {conn.ip} is not trusted yet",
+            hint="Meridian sends a password only to a verified server. Retry and accept the fingerprint first.",
+            category="user",
+        )
+    key = ensure_meridian_keypair()
+    with_password = ServerConnection(conn.ip, conn.user, port=conn.port, multiplex=False, password=password)
+    del password
+    try:
+        installed = install_public_key(with_password, key.public_key)
+    finally:
+        with_password.password = ""
+    if installed.returncode != 0:
+        detail = (installed.stderr or installed.stdout).strip().splitlines()
+        reason = f": {detail[-1][:200]}" if detail else ""
+        raise SSHError(
+            f"Could not install Meridian's SSH key on {conn.ip}{reason}",
+            hint=f"Check the password and try again, or install your own key with `{manual}`.",
+            category="user",
+        )
+    keyed = ServerConnection(conn.ip, conn.user, port=conn.port, multiplex=False, identity_file=key.private_key_path)
+    if not key_login_works(keyed):
+        raise SSHError(
+            f"Meridian's SSH key is installed on {conn.ip}, but logging in with it still fails",
+            hint=(
+                "The server may refuse public keys (check PubkeyAuthentication in /etc/ssh/sshd_config), "
+                f"or install your own key with `{manual}`."
+            ),
+            category="system",
+        )
+    return ResolvedServer(ip=resolved.ip, user=resolved.user, local_mode=False, conn=keyed)

@@ -75,7 +75,7 @@ Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or chang
 ## Requirements
 
 - **Python 3.11+** (uv installs and manages it for you)
-- **SSH key access** to your server, as root or a user with passwordless sudo
+- **SSH access** to your server, as root or a user with passwordless sudo. Key login is best; if the server accepts only a password, `meridian deploy` and `meridian setup` offer to create a key for Meridian and install it with that password once (see [Password-only servers](/en/deploy/#password-only-servers))
 
 Terminal QR codes are rendered by the bundled `segno` package; no system dependency is required.
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import getpass
 import re
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -218,15 +219,27 @@ def prompt(message: str, default: str = "") -> str:
     return value or default
 
 
-def confirm(message: str = "Continue?") -> bool:
-    """Y/n confirmation prompt. Returns True on accept, False on reject."""
+def confirm(message: str = "Continue?", *, default: bool = True) -> bool:
+    """Yes/no confirmation prompt; Enter takes *default*. No terminal means no."""
+    choices = "[Y/n]" if default else "[y/N]"
     try:
         with open("/dev/tty") as tty:
-            err_console.print(f"\n  [info]\u2192[/info] {escape(message)} [dim][Y/n][/dim] ", end="")
+            err_console.print(f"\n  [info]\u2192[/info] {escape(message)} [dim]{escape(choices)}[/dim] ", end="")
             answer = tty.readline().strip().lower()
     except OSError:
         return False
-    return answer in ("", "y", "yes")
+    return answer in ("y", "yes") or (default and answer == "")
+
+
+def prompt_secret(message: str) -> str:
+    """Hidden-input prompt on /dev/tty; '' without a terminal. Never echoes or logs the answer."""
+    if not has_tty():
+        return ""
+    err_console.print(f"  [info]\u2192[/info] {escape(message)}: ", end="")
+    try:
+        return getpass.getpass("")
+    except EOFError:
+        return ""
 
 
 def choose(message: str, options: list[str], *, default: int = 1) -> int:

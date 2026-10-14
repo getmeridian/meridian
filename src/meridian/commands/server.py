@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from meridian.resolve import ResolvedServer
 
 
-def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
+def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0, *, offer_key_setup: bool = False) -> None:
     """Register a server after verifying access: over SSH, or locally for `local`/this machine."""
     from meridian.commands.resolve import resolve_server
 
@@ -35,14 +35,16 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0) -> None:
         user=resolved.user,
         ssh_port=resolved.port,
     )
-    register_server(registry, resolved, name=request.name)
+    register_server(registry, resolved, name=request.name, offer_key_setup=offer_key_setup)
     ok(f"Server added: {request.name or request.ip}")
 
 
-def register_server(registry: ServerRegistry, resolved: ResolvedServer, *, name: str = "") -> ServerEntry:
+def register_server(
+    registry: ServerRegistry, resolved: ResolvedServer, *, name: str = "", offer_key_setup: bool = False
+) -> ServerEntry:
     """Verify access to a resolved target, then save (or refresh) its profile; return the saved entry.
 
-    A saved server keeps its title unless a new name is given.
+    A saved server keeps its title unless a new name is given; a key set up on the way is saved with it.
     """
     from meridian.commands.resolve import ensure_server_connection
 
@@ -65,8 +67,9 @@ def register_server(registry: ServerRegistry, resolved: ResolvedServer, *, name:
 
     if not resolved.local_mode:
         info(f"Connecting to {resolved.ip}...")
-    ensure_server_connection(resolved)
+    resolved = ensure_server_connection(resolved, offer_key_setup=offer_key_setup)
 
+    pending_entry.key_path = resolved.conn.identity_file
     pending_entry.last_validated_at = datetime.now(UTC).isoformat()
     try:
         registry.add(pending_entry)

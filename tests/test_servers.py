@@ -247,6 +247,7 @@ def _connection_factory() -> MagicMock:
 
     def build(**kwargs: object) -> MagicMock:
         conn.port = kwargs["port"]
+        conn.identity_file = kwargs.get("identity_file", "")
         return conn
 
     return MagicMock(side_effect=build, return_value=conn)

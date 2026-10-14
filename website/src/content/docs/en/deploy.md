@@ -21,6 +21,24 @@ Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip con
 meridian deploy 198.51.100.10 --client-name alice --yes
 ```
 
+## Password-only servers
+
+Meridian logs in with SSH keys. Many VPS providers hand you only a root password, so when the server refuses your keys but accepts a password, an interactive `meridian deploy` asks:
+
+```
+→ This server accepts only a password. Create a key for Meridian and install it now? [y/N]
+```
+
+Answer `y` and type the password (hidden). Meridian creates its own key in `~/.config/meridian/ssh/meridian_ed25519`, adds it to the server's `authorized_keys`, checks that it logs in, saves it in the server profile, and carries on. The password is used for that one command and is never saved or logged. The host key is verified first, so the password only goes to the server whose fingerprint you accepted. `meridian setup` offers the same when you add a server.
+
+Without a terminal, with `--yes`, or with `--json`, Meridian never prompts: it stops with the manual command instead. Install your own key once, then rerun:
+
+```
+ssh-copy-id root@198.51.100.10
+```
+
+Hardening turns password login off after deploy, so keep the key: later commands use it automatically.
+
 ## All flags
 
 | Flag | Default | Description |

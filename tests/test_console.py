@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import typer
 
-from meridian.console import confirm, fail, info, prompt, set_json_mode, set_quiet_mode, warn
+from meridian.console import confirm, fail, info, prompt, prompt_secret, set_json_mode, set_quiet_mode, warn
 
 _REPORT_LINK = "github.com/getmeridian/meridian/issues"
 
@@ -132,6 +132,33 @@ def test_confirm_without_a_tty_rejects() -> None:
     # CI has no /dev/tty; never assume consent.
     with patch("builtins.open", side_effect=OSError("No TTY")):
         assert confirm("Deploy?") is False
+
+
+@pytest.mark.parametrize(("answer", "expected"), [("", False), ("n", False), ("y", True), ("yes", True)])
+def test_confirm_defaulting_to_no_needs_an_explicit_yes(answer: str, expected: bool) -> None:
+    with patch("builtins.open", return_value=_tty(answer)):
+        assert confirm("Install a key?", default=False) is expected
+
+
+def test_secret_prompt_reads_hidden_input_and_never_echoes_it(capsys: pytest.CaptureFixture[str]) -> None:
+    with (
+        patch("meridian.console.has_tty", return_value=True),
+        patch("meridian.console.getpass.getpass", return_value="s3cret") as hidden,
+    ):
+        assert prompt_secret("SSH password") == "s3cret"
+
+    hidden.assert_called_once()
+    assert "s3cret" not in capsys.readouterr().err
+
+
+def test_secret_prompt_without_a_tty_returns_empty() -> None:
+    with (
+        patch("meridian.console.has_tty", return_value=False),
+        patch("meridian.console.getpass.getpass") as hidden,
+    ):
+        assert prompt_secret("SSH password") == ""
+
+    hidden.assert_not_called()
 
 
 @pytest.mark.parametrize(

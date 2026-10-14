@@ -214,7 +214,8 @@ def _execute(
     except EngineError as exc:
         fail(exc)
     resolved = ensure_server_connection(
-        resolve_server(registry, explicit_ip=target.server_ip, user=target.ssh_user, port=target.ssh_port)
+        resolve_server(registry, explicit_ip=target.server_ip, user=target.ssh_user, port=target.ssh_port),
+        offer_key_setup=not request.yes,
     )
 
     cluster = ClusterConfig.load()
@@ -223,7 +224,15 @@ def _execute(
     if first_deploy:
         check_ports(resolved.conn, request.yes)
 
-    registry.add(ServerEntry(host=resolved.ip, user=resolved.user, port=resolved.port, machine_id=resolved.machine_id))
+    registry.add(
+        ServerEntry(
+            host=resolved.ip,
+            user=resolved.user,
+            port=resolved.port,
+            key_path=resolved.conn.identity_file,
+            machine_id=resolved.machine_id,
+        )
+    )
     entry = registry.find(resolved.ip)
     if entry is None or not entry.id:
         fail(

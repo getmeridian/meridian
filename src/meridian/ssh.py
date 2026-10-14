@@ -38,6 +38,10 @@ class SSHError(MeridianError):
     """Raised when an SSH operation fails."""
 
 
+class SSHPasswordOnlyError(SSHError):
+    """Key login was refused by a server that would accept a password instead."""
+
+
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _LOGGED_COMMAND_LIMIT = 200
 
@@ -95,6 +99,22 @@ def multiplex_opts(user: str, host: str, port: int) -> list[str]:
         return []
     control_path = str(path).replace("%", "%%")
     return ["-o", "ControlMaster=auto", "-o", f"ControlPath={control_path}", "-o", "ControlPersist=300"]
+
+
+_AUTH_METHODS_RE = re.compile(r"Permission denied \(([^)]*)\)")
+
+
+def offers_password_login(stderr: str) -> bool:
+    """Whether a refused SSH login lists password (or keyboard-interactive) among the server's methods."""
+    match = _AUTH_METHODS_RE.search(stderr)
+    methods = set(match.group(1).split(",")) if match else set()
+    return bool(methods & {"password", "keyboard-interactive"})
+
+
+def ssh_copy_id_command(user: str, host: str, port: int = 22) -> str:
+    """The manual command that installs the operator's own key on a password-only server."""
+    port_flag = f" -p {port}" if port != 22 else ""
+    return f"ssh-copy-id{port_flag} {shlex.quote(f'{user}@{host}')}"
 
 
 def _sudo_needs_password(stderr: str) -> bool:
@@ -400,6 +420,16 @@ class ServerConnection(_FileTransferMixin):
                     hint=(
                         "Meridian needs root or passwordless sudo. Use --user root, or allow it on the server: "
                         f"echo '{self.user} ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/meridian"
+                    ),
+                    category="user",
+                )
+            if offers_password_login(stderr):
+                manual = ssh_copy_id_command(self.user, self.ip, self.port)
+                raise SSHPasswordOnlyError(
+                    f"{self.user}@{self.ip} accepts only a password, and Meridian logs in with SSH keys",
+                    hint=(
+                        f"Install your key once with `{manual}`, then retry. In a terminal, "
+                        "`meridian deploy` (without --yes) and `meridian setup` offer to set one up."
                     ),
                     category="user",
                 )

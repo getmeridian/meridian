@@ -11,15 +11,15 @@ from rich.markup import escape
 
 from meridian import resolve as _resolve_lib
 from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
-from meridian.console import err_console, fail, info
-from meridian.core.errors import LocalStateError
+from meridian.console import confirm, err_console, fail, has_tty, info, is_json_mode, ok, prompt_secret, warn
+from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import is_ip
 from meridian.resolve import ResolvedServer
 from meridian.resolve import (
     ensure_server_connection as _ensure_server_connection,
 )
 from meridian.servers import ServerRegistry, address_is_local
-from meridian.ssh import ServerConnection, SSHError
+from meridian.ssh import ServerConnection, SSHError, SSHPasswordOnlyError
 from meridian.ssh_ui import RichSSHUI
 
 __all__ = [
@@ -181,14 +181,45 @@ def resolve_server(
         fail(exc)
 
 
-def ensure_server_connection(resolved: ResolvedServer) -> ResolvedServer:
+def ensure_server_connection(resolved: ResolvedServer, *, offer_key_setup: bool = False) -> ResolvedServer:
     """CLI wrapper — delegates to ``meridian.resolve`` with Rich SSH UI.
 
     Catches ``SSHError`` from the library layer and converts it to a
-    ``fail()`` exit with the appropriate hint.
+    ``fail()`` exit with the appropriate hint. With ``offer_key_setup``, a
+    password-only server gets an opt-in offer to install Meridian's own key;
+    without a terminal, or in JSON mode, it fails with the manual hint instead.
+    The returned target may then be pinned to that key: save
+    ``resolved.conn.identity_file`` as the profile's key path.
     """
 
     try:
         return _ensure_server_connection(resolved, ui=RichSSHUI())
+    except SSHPasswordOnlyError as exc:
+        if not offer_key_setup or is_json_mode() or not has_tty():
+            fail(exc)
+        refused = exc
     except SSHError as exc:
         fail(exc)
+    keyed = _set_up_meridian_key(resolved, refused)
+    try:
+        return _ensure_server_connection(keyed, ui=RichSSHUI())
+    except SSHError as exc:
+        fail(exc)
+
+
+def _set_up_meridian_key(resolved: ResolvedServer, refused: SSHPasswordOnlyError) -> ResolvedServer:
+    """Ask before installing Meridian's key with a one-time password; any refusal keeps the manual hint."""
+    warn(f"{resolved.user}@{resolved.ip} does not accept your SSH keys.")
+    if not confirm("This server accepts only a password. Create a key for Meridian and install it now?", default=False):
+        fail(refused)
+    password = prompt_secret(f"SSH password for {resolved.user}@{resolved.ip} (used once, never saved)")
+    if not password:
+        fail(refused)
+    try:
+        keyed = _resolve_lib.install_meridian_key(resolved, password)
+    except MeridianError as exc:
+        fail(exc)
+    finally:
+        del password
+    ok(f"Installed Meridian's SSH key ({keyed.conn.identity_file})")
+    return keyed
