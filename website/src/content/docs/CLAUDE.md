@@ -10,6 +10,8 @@
 
 **Durable prose** — write as the current release: no beta notes, no "still works for one release", no version-dated caveats.
 
+**App list from the catalog** — a line holding only `<!-- apps -->` becomes the featured apps of `src/data/apps.json` (`src/lib/apps-list.mjs`) in the page and its Markdown twin; never hand-write an app list.
+
 **Links** — link other pages as `/{locale}/{page}/` (with `#anchor` from that locale's own heading); the build validates every link.
 
 ## Pitfalls

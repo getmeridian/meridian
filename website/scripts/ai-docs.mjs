@@ -13,11 +13,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { APPS_MARKER, appListMarkdown } from '../src/lib/apps-list.mjs';
 import { DOCS_SLUGS } from '../src/lib/docs-sidebar.mjs';
 
 export const SITE = 'https://getmeridian.org';
-// Relative to the website folder, where Astro runs; bundled into the build, import.meta.url moves.
-const DOCS_DIR = path.resolve('src/content/docs');
 
 /** Pages in the AI reference, most useful for troubleshooting first. */
 export const AI_REFERENCE_PAGES = ['cli-reference', 'architecture', 'troubleshooting', 'deploy', 'relay', 'recovery'];
@@ -41,20 +40,24 @@ function frontMatter(raw) {
 export function markdownBody(raw, { absolute = false } = {}) {
   const body = raw
     .replace(FRONT_MATTER, '')
+    .replace(APPS_MARKER, () => appListMarkdown())
     .replace(/\]\(\/(en|ru|fa|zh)\/([a-z0-9-]+)\/?(#[^)]*)?\)/g, (_m, locale, slug, hash = '') => `](/${locale}/${slug}.md${hash})`)
     .trim();
   return absolute ? body.replace(/\]\(\/(?!\/)/g, `](${SITE}/`) : body;
 }
 
-/** One English page: its title, description, and body with absolute links. */
-export function readDoc(slug, docsDir = DOCS_DIR) {
-  const raw = fs.readFileSync(path.join(docsDir, 'en', `${slug}.md`), 'utf8');
+/**
+ * One English page: its title, description, and body with absolute links. Paths are relative to
+ * the website folder, where Astro runs and the CLI changes to (bundling moves import.meta.url).
+ */
+export function readDoc(slug) {
+  const raw = fs.readFileSync(path.resolve('src/content/docs/en', `${slug}.md`), 'utf8');
   const { title = slug, description = '' } = frontMatter(raw);
   return { slug, title, description, body: markdownBody(raw, { absolute: true }) };
 }
 
-function bundle(heading, intro, slugs, docsDir) {
-  const docs = slugs.map((slug) => readDoc(slug, docsDir));
+function bundle(heading, intro, slugs) {
+  const docs = slugs.map(readDoc);
   return [
     `# ${heading}`,
     '',
@@ -69,22 +72,20 @@ function bundle(heading, intro, slugs, docsDir) {
 }
 
 /** Every English docs page in one file (`/llms-full.txt`). */
-export function llmsFull(docsDir = DOCS_DIR) {
+export function llmsFull() {
   return bundle(
     'Meridian documentation',
     ['Deploy censorship-resistant proxy servers with one command, hardened by default.', `Source: ${SITE}`],
     DOCS_SLUGS,
-    docsDir,
   );
 }
 
 /** The troubleshooting subset `meridian doctor --ai` and `meridian check --ai` include. */
-export function aiReference(docsDir = DOCS_DIR) {
+export function aiReference() {
   return bundle(
     'Meridian reference for AI assistants',
     ['Selected pages of the Meridian documentation.', `All pages: ${SITE}/llms-full.txt`],
     AI_REFERENCE_PAGES,
-    docsDir,
   );
 }
 
@@ -96,7 +97,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`usage: node ai-docs.mjs {${Object.keys(BUNDLES).join('|')}} OUT`);
     process.exit(2);
   }
-  fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
-  fs.writeFileSync(out, BUNDLES[name](fileURLToPath(new URL('../src/content/docs/', import.meta.url))));
+  const target = path.resolve(out);
+  process.chdir(fileURLToPath(new URL('..', import.meta.url)));
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, BUNDLES[name]());
   console.log(`${out}: ${name} bundle`);
 }

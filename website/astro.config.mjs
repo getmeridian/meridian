@@ -5,6 +5,7 @@ import { unified } from '@astrojs/markdown-remark';
 import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import { remarkAppList } from './src/lib/apps-list.mjs';
 import { remarkDiagrams } from './src/lib/diagrams.mjs';
 import { DOCS_SIDEBAR, DOCS_SLUGS } from './src/lib/docs-sidebar.mjs';
 
@@ -121,8 +122,9 @@ export default defineConfig({
     defaultStrategy: 'hover',
   },
   markdown: {
-    // Mermaid blocks become their checked-in SVGs before Expressive Code sees them.
-    processor: unified({ remarkPlugins: [remarkDiagrams] }),
+    // Mermaid blocks become their checked-in SVGs before Expressive Code sees them;
+    // `<!-- apps -->` becomes the app list from src/data/apps.json.
+    processor: unified({ remarkPlugins: [remarkDiagrams, remarkAppList] }),
     shikiConfig: {
       themes: {
         light: 'github-light',
