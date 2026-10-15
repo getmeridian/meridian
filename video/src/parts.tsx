@@ -1,7 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { VOICE_DELAY } from "./timeline";
-import { color, font } from "./theme";
+import { useLang } from "./lang";
+import { captionCues } from "./timeline";
+import { color, font, headingFont } from "./theme";
 
 /** Fades a whole scene in and out so cuts never jump. */
 export function Fade({ children }: { children: ReactNode }) {
@@ -35,19 +36,11 @@ export function Rise({ delay = 0, children, style }: { delay?: number; children:
 }
 
 /** Subtitles: the scene's sentences, each shown for its share of the narration. */
-export function Caption({ text, seconds }: { text: string; seconds: number }) {
+export function Caption({ text, speech }: { text: string; speech: number }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g)?.map((s) => s.trim()) ?? [text];
-  const total = sentences.reduce((sum, s) => sum + s.length, 0);
-  const t = frame / fps - VOICE_DELAY;
-  let start = 0;
-  let current = "";
-  for (const sentence of sentences) {
-    const length = (sentence.length / total) * seconds;
-    if (t >= start && t < start + length) current = sentence;
-    start += length;
-  }
+  const t = frame / fps;
+  const current = captionCues(text, speech).find((cue) => t >= cue.start && t < cue.end)?.text;
   if (!current) return null;
   return (
     <div
@@ -98,7 +91,15 @@ export function Kicker({ children }: { children: ReactNode }) {
 
 export function Heading({ children, size = 64 }: { children: ReactNode; size?: number }) {
   return (
-    <div style={{ fontFamily: font.heading, fontWeight: 600, fontSize: size, lineHeight: 1.08, color: color.text }}>
+    <div
+      style={{
+        fontFamily: headingFont(useLang()),
+        fontWeight: 600,
+        fontSize: size,
+        lineHeight: 1.08,
+        color: color.text,
+      }}
+    >
       {children}
     </div>
   );

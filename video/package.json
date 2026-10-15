@@ -8,6 +8,8 @@
     "tts": "node scripts/tts.mjs",
     "still": "remotion still src/index.ts Setup out/still.png",
     "render": "remotion render src/index.ts Setup out/meridian-setup.mp4",
+    "render:ru": "remotion render src/index.ts SetupRu out/meridian-setup.ru.mp4",
+    "export": "node scripts/export.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

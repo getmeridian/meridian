@@ -20,11 +20,14 @@ export const color = {
 
 export const font = {
   sans: "'Source Sans 3', system-ui, sans-serif",
-  heading: "'Fraunces', Georgia, serif",
   mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
 };
 
-export const FPS = 30;
+// Fraunces has no Cyrillic, so Russian headings use Source Serif 4, as on the website.
+export const headingFont = (lang: string) =>
+  lang === "ru" ? "'Source Serif 4', Georgia, serif" : "'Fraunces', Georgia, serif";
+
+export { FPS } from "./timing.mjs";
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 
@@ -37,7 +40,10 @@ const faces: [string, string, string, string][] = [
   ["JetBrains Mono", "fonts/jetbrains-mono-latin.woff2", "400 600", LATIN],
   ["JetBrains Mono", "fonts/jetbrains-mono-cyrillic.woff2", "400 600", CYRILLIC],
   ["Source Sans 3", "fonts/source-sans-3-latin.woff2", "400 700", LATIN],
+  ["Source Sans 3", "fonts/source-sans-3-cyrillic.woff2", "400 700", CYRILLIC],
   ["Fraunces", "fonts/fraunces-latin.woff2", "400 600", LATIN],
+  ["Source Serif 4", "fonts/source-serif-4-latin.woff2", "400 600", LATIN],
+  ["Source Serif 4", "fonts/source-serif-4-cyrillic.woff2", "400 600", CYRILLIC],
 ];
 for (const [family, file, weight, unicodeRange] of faces) {
   loadFont({ family, url: staticFile(file), weight, unicodeRange });

@@ -1,6 +1,6 @@
 # Meridian setup video
 
-A 3–4 minute walkthrough of setting up a personal VPN with `meridian setup`, built with [Remotion](https://www.remotion.dev/) from a real recorded run.
+A 3–4 minute walkthrough of setting up a personal VPN with `meridian setup`, in English and Russian, built with [Remotion](https://www.remotion.dev/) from real recorded runs.
 
 ## Reproduce
 
@@ -8,26 +8,32 @@ A 3–4 minute walkthrough of setting up a personal VPN with `meridian setup`, b
 cd video
 pnpm install
 
-# 1. Record the wizard on a fresh lab VM (costs a few cents), then destroy it
+# 1. Record the wizard on a fresh lab VM (a few cents per take), then destroy it
 source ~/.cache/mscripts/hcloud.env
 uv run --group realvm python -m tests.realvm.lab up rec:hel1         # from the repo root
 source ~/.cache/meridian-realvm/lab-<id>/env.sh
-uv run --with pexpect --with pyte python video/recording/record.py setup "$VM_REC"
-uv run --with pyte python video/recording/snapshots.py setup --address "$VM_REC"
+uv run --with pexpect --with pyte python video/recording/record.py "$VM_REC"   # add --lang ru for the Russian cut
+uv run --with pyte python video/recording/snapshots.py setup --address "$VM_REC"      # setup-ru for Russian
 uv run --group realvm python -m tests.realvm.lab down <id>
+# Each take needs a fresh VM; add --stop-at review to rehearse without applying.
 
 # 2. Phone screenshots of the demo connection page
-uv run --with playwright python video/recording/phone.py
+uv run --with playwright python video/recording/phone.py            # English, for Mom
+uv run --with playwright python video/recording/phone.py ru Мама    # Russian
 
-# 3. Narration (dry run first; --spend calls ElevenLabs for changed scenes only)
-pnpm tts
-pnpm tts --spend
+# 3. Narration, regenerated only for scenes whose text changed
+pnpm tts                 # English: dry run with the character cost
+pnpm tts --spend         # English: call ElevenLabs
+uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ru   # Russian: local Qwen3-TTS, free
 
-# 4. Preview and render
+# 4. Preview, render, export
 pnpm studio
-node scripts/stills.mjs              # one still per scene in out/stills/
-pnpm render                          # out/meridian-setup.mp4
+node scripts/stills.mjs [--lang ru]  # one still per scene in out/stills/
+pnpm render && pnpm export           # English: out/meridian-setup.mp4
+pnpm render:ru && pnpm export ru     # Russian: out/meridian-setup.ru.mp4
 ```
 
-Edit the script in `narration/en.json`; scene visuals live in `src/scenes.tsx`.
+`export` writes the subtitles, chapters, and thumbnail to `out/`, and the 720p copy, poster, and thumbnail the website serves to `website/public/video/`. Upload text for YouTube is in `youtube.md`.
+
+Edit the narration in `narration/<lang>.json` and on-screen text in `src/copy.ts`; scene visuals live in `src/scenes.tsx`.
 Fonts are the website's (SIL Open Font License, see `public/fonts/licenses/`).

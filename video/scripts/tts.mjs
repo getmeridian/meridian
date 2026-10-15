@@ -26,6 +26,12 @@ const option = (name, fallback) => {
 const lang = option("--lang", "en");
 const only = option("--only", "")?.split(",").filter(Boolean) ?? [];
 const narration = JSON.parse(readFileSync(join(root, "narration", `${lang}.json`), "utf8"));
+if (narration.engine === "qwen3") {
+  console.log(
+    `narration/${lang}.json is voiced locally: uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ${lang}`,
+  );
+  process.exit(0);
+}
 const outDir = join(root, "public", "audio", lang);
 const manifestPath = join(outDir, "manifest.json");
 const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};

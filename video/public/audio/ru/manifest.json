@@ -1,0 +1,54 @@
+{
+  "intro": {
+    "hash": "8664cdef7575",
+    "seconds": 20.8
+  },
+  "needs": {
+    "hash": "430fa1a17b23",
+    "seconds": 22.637
+  },
+  "install": {
+    "hash": "03f38c4f3e7e",
+    "seconds": 12.051
+  },
+  "server": {
+    "hash": "b453e7803d6b",
+    "seconds": 23.797
+  },
+  "roles": {
+    "hash": "8d3e0052d7fd",
+    "seconds": 17.36
+  },
+  "camouflage": {
+    "hash": "ee01d7a06f68",
+    "seconds": 20.52
+  },
+  "users": {
+    "hash": "719ac8fa1265",
+    "seconds": 8.56
+  },
+  "apply": {
+    "hash": "f8413b60b66a",
+    "seconds": 26.151
+  },
+  "handoff": {
+    "hash": "3812c60f1980",
+    "seconds": 9.28
+  },
+  "phone": {
+    "hash": "294646c92ddd",
+    "seconds": 18.4
+  },
+  "later": {
+    "hash": "7e9ad92f226a",
+    "seconds": 14.56
+  },
+  "why": {
+    "hash": "7c615c2fecea",
+    "seconds": 19.641
+  },
+  "outro": {
+    "hash": "ed5364df2059",
+    "seconds": 6.08
+  }
+}

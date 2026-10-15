@@ -90,7 +90,7 @@ def _sub(cells: Cells, pattern: str | re.Pattern[str], replace: Callable[[re.Mat
 
 
 def sanitize(cells: Cells, address: str) -> Cells:
-    demo = DEMO_ADDRESS.ljust(len(address))[: max(len(address), len(DEMO_ADDRESS))]
+    demo = DEMO_ADDRESS
     cells = _sub(cells, re.escape(address), lambda _: demo)
     # While the address is being typed, its prefixes sit before the cursor.
     for size in range(len(address) - 1, 1, -1):

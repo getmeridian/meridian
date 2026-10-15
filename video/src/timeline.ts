@@ -1,30 +1,13 @@
-import narration from "../narration/en.json";
-import audio from "../public/audio/en/manifest.json";
-import { FPS } from "./theme";
+import en from "../narration/en.json";
+import ru from "../narration/ru.json";
+import enAudio from "../public/audio/en/manifest.json";
+import ruAudio from "../public/audio/ru/manifest.json";
+import type { Lang } from "./copy";
+import { sceneTimings } from "./timing.mjs";
 
-type Manifest = Record<string, { hash: string; seconds: number }>;
-const manifest = audio as Manifest;
+export { captionCues, FPS, VOICE_DELAY } from "./timing.mjs";
 
-export const VOICE_DELAY = 0.35; // seconds of picture before each scene's narration starts
-const TAIL = 0.9; // seconds after the narration ends
-const CHARS_PER_SECOND = 13; // a placeholder pace until a scene has audio
+const NARRATION = { en: [en, enAudio], ru: [ru, ruAudio] } as const;
 
-export type Scene = {
-  id: string;
-  text: string;
-  frames: number;
-  audio: string | null; // public path, when generated for the current text
-};
-
-export const scenes: Scene[] = narration.scenes.map((scene) => {
-  const entry = manifest[scene.id];
-  const seconds = entry ? entry.seconds : scene.text.length / CHARS_PER_SECOND;
-  return {
-    id: scene.id,
-    text: scene.text,
-    frames: Math.ceil((VOICE_DELAY + seconds + TAIL) * FPS),
-    audio: entry ? `audio/en/${scene.id}.mp3` : null,
-  };
-});
-
-export const totalFrames = scenes.reduce((sum, scene) => sum + scene.frames, 0);
+export const scenesFor = (lang: Lang) => sceneTimings(NARRATION[lang][0], NARRATION[lang][1], lang);
+export const totalFrames = (lang: Lang) => scenesFor(lang).reduce((sum, scene) => sum + scene.frames, 0);

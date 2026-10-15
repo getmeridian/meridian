@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import { AbsoluteFill, Sequence, Series, staticFile } from "remotion";
 import { Background, Caption, Fade } from "./parts";
 import { Install, Intro, Later, Needs, Outro, Phone, SetupStep, Why } from "./scenes";
-import { FPS } from "./theme";
-import { scenes, VOICE_DELAY } from "./timeline";
+import type { Lang } from "./copy";
+import { LangContext } from "./lang";
+import { FPS, scenesFor, VOICE_DELAY } from "./timeline";
 
 const VISUALS: Record<string, () => ReactNode> = {
   intro: () => <Intro />,
@@ -22,25 +23,27 @@ const VISUALS: Record<string, () => ReactNode> = {
   outro: () => <Outro />,
 };
 
-export function Video() {
+export function Video({ lang }: { lang: Lang }) {
   return (
-    <AbsoluteFill>
-      <Background />
-      <Series>
-        {scenes.map((scene) => (
-          <Series.Sequence key={scene.id} durationInFrames={scene.frames} name={scene.id}>
-            <Fade>{VISUALS[scene.id]?.()}</Fade>
-            {scene.id !== "intro" && scene.id !== "outro" ? (
-              <Caption text={scene.text} seconds={scene.frames / FPS - VOICE_DELAY - 0.9} />
-            ) : null}
-            {scene.audio ? (
-              <Sequence from={Math.round(VOICE_DELAY * FPS)}>
-                <Audio src={staticFile(scene.audio)} />
-              </Sequence>
-            ) : null}
-          </Series.Sequence>
-        ))}
-      </Series>
-    </AbsoluteFill>
+    <LangContext.Provider value={lang}>
+      <AbsoluteFill>
+        <Background />
+        <Series>
+          {scenesFor(lang).map((scene) => (
+            <Series.Sequence key={scene.id} durationInFrames={scene.frames} name={scene.id}>
+              <Fade>{VISUALS[scene.id]?.()}</Fade>
+              {scene.id !== "intro" && scene.id !== "outro" ? (
+                <Caption text={scene.text} speech={scene.speech} />
+              ) : null}
+              {scene.audio ? (
+                <Sequence from={Math.round(VOICE_DELAY * FPS)}>
+                  <Audio src={staticFile(scene.audio)} />
+                </Sequence>
+              ) : null}
+            </Series.Sequence>
+          ))}
+        </Series>
+      </AbsoluteFill>
+    </LangContext.Provider>
   );
 }
