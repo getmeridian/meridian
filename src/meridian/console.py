@@ -190,7 +190,9 @@ def banner(version: str) -> None:
         from meridian.config import BETA_REPORT_URL
 
         err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim] [warn]beta[/warn]")
-        err_console.print(f"  [dim]Report what works and what doesn't: {BETA_REPORT_URL}[/dim]\n")
+        from meridian.i18n import t
+
+        err_console.print(f"  [dim]{escape(t('cli.beta_report', url=BETA_REPORT_URL))}[/dim]\n")
         return
     err_console.print(f"\n  [bold]Meridian[/bold] [dim]v{version}[/dim]\n")
 

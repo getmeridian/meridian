@@ -15,6 +15,7 @@ from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
+from meridian.i18n import t
 from meridian.servers import ServerEntry, ServerRegistry
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0, *, offer
         ssh_port=resolved.port,
     )
     register_server(registry, resolved, name=request.name, offer_key_setup=offer_key_setup)
-    ok(f"Server added: {request.name or request.ip}")
+    ok(t("ssh.server_added", name=request.name or request.ip))
 
 
 def register_server(
@@ -66,7 +67,7 @@ def register_server(
         fail(exc)
 
     if not resolved.local_mode:
-        info(f"Connecting to {resolved.ip}...")
+        info(t("ssh.connecting", address=resolved.ip))
     resolved = ensure_server_connection(resolved, offer_key_setup=offer_key_setup)
 
     pending_entry.key_path = resolved.conn.identity_file

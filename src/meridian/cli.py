@@ -227,6 +227,11 @@ def main_callback(
         _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))
         raise typer.Exit()
 
+    if not machine_output:
+        from meridian import i18n
+
+        # Human output speaks the chosen language, else the terminal's; machine output stays English.
+        i18n.set_locale(i18n.explicit_locale() or i18n.system_locale())
     if not machine_output and not (invocation is not None and invocation.help_requested):
         banner(__version__)
 

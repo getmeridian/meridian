@@ -21,6 +21,7 @@ from typing import Any, Iterable
 from meridian.config import MERIDIAN_HOME
 from meridian.core.errors import MeridianError
 from meridian.core.redaction import redact_string
+from meridian.i18n import t
 from meridian.ssh_auth import (
     _DEFAULT_UI,
     SSHUI,
@@ -382,7 +383,8 @@ class ServerConnection(_FileTransferMixin):
         if ui is None:
             ui = _DEFAULT_UI
 
-        ui.info(f"Checking SSH connectivity to {self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else ""))
+        target = f"{self.user}@{self.ip}" + (f":{self.port}" if self.port != 22 else "")
+        ui.info(t("ssh.checking", target=target))
 
         # Verify host key on first connection
         if not _host_key_known(self.ip, self.port):
@@ -435,7 +437,7 @@ class ServerConnection(_FileTransferMixin):
                 )
             ui.ssh_failed(self.ip, self.user, stderr)
             raise SSHError(f"SSH connection failed to {self.user}@{self.ip}", category="system")
-        ui.ok("SSH connection successful")
+        ui.ok(t("ssh.connected"))
 
     def _require_local_sudo(self) -> None:
         """Fail early, with a working command, when this non-root process cannot use sudo."""

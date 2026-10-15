@@ -10,6 +10,8 @@ from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from typing import TYPE_CHECKING, Protocol
 
+from meridian.i18n import step_label
+
 if TYPE_CHECKING:
     from meridian.provision.steps import StepResult
 
@@ -61,7 +63,7 @@ class RichStepRenderer:
 
         console = Console(stderr=True, highlight=False)
         prefix = f"[{index}/{total}]"
-        with Status(f"  [cyan]{prefix} {name}[/cyan]", console=console, spinner="dots"):
+        with Status(f"  [cyan]{prefix} {step_label(name)}[/cyan]", console=console, spinner="dots"):
             yield
 
     def step_completed(self, result: StepResult) -> None:
@@ -70,18 +72,18 @@ class RichStepRenderer:
         console = Console(stderr=True, highlight=False)
         marker = "✓"
         detail = f" [dim]({result.detail})[/dim]" if result.detail else ""
-        console.print(f"  [green]{marker}[/green] {result.name}{detail}")
+        console.print(f"  [green]{marker}[/green] {step_label(result.name)}{detail}")
 
     def step_failed(self, result: StepResult) -> None:
         from rich.console import Console
 
         console = Console(stderr=True, highlight=False)
         detail = f" ({result.detail})" if result.detail else ""
-        console.print(f"  [red bold]✗[/red bold] {result.name}{detail}")
+        console.print(f"  [red bold]✗[/red bold] {step_label(result.name)}{detail}")
 
     def step_skipped(self, result: StepResult) -> None:
         from rich.console import Console
 
         console = Console(stderr=True, highlight=False)
         detail = f" ({result.detail})" if result.detail else ""
-        console.print(f"  [dim]– {result.name}{detail}[/dim]")
+        console.print(f"  [dim]– {step_label(result.name)}{detail}[/dim]")

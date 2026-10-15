@@ -53,3 +53,20 @@ def test_failure_line_carries_the_driver_error_and_stops_the_spinner(stderr: io.
 
     assert "✗ TLS certificate: acme.sh timed out" in stderr.getvalue()
     assert reporter._status is None
+
+
+def test_progress_speaks_the_wizard_language_while_events_stay_english(stderr: io.StringIO) -> None:
+    from meridian import i18n
+
+    i18n.set_locale("ru")
+    try:
+        reporter = RichApplyReporter(server_label={"srv-1": "otter"}.get)
+        reporter.emit(_event("plan.action.started", "server_baseline", "srv-1", index=1, total=1))
+        reporter.emit(OperationContext().events.event("provision.step.started", message="Install Docker"))
+        assert reporter._action == "[1/1] Подготовка сервера: otter"
+        done = {"status": "applied", "changed": True}
+        reporter.emit(_event("plan.action.completed", "server_baseline", "srv-1", index=1, total=1, **done))
+    finally:
+        i18n.set_locale("en")
+
+    assert stderr.getvalue().splitlines() == ["  ✓ Подготовка сервера: otter"]

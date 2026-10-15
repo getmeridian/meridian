@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from functools import cache
 from pathlib import Path
 from typing import Literal, cast, get_args
@@ -34,6 +35,15 @@ def t(key: str, **values: object) -> str:
     """Return the current locale's text for ``key`` with placeholders filled."""
     text = catalog(_current).get(key) or catalog(DEFAULT_LOCALE)[key]
     return text.format(**values) if values else text
+
+
+def step_label(name: str) -> str:
+    """A provisioning step's display name: ``step.<slug>`` when cataloged, else its English name.
+
+    Events keep the English name (it is part of the machine contract); only renderers translate.
+    """
+    key = "step." + re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    return catalog(_current).get(key) or catalog(DEFAULT_LOCALE).get(key) or name
 
 
 def words(key: str) -> set[str]:

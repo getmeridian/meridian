@@ -75,6 +75,24 @@ def test_dynamic_key_families_are_complete() -> None:
     assert _DYNAMIC.search(wizard)
 
 
+def test_every_resource_kind_and_step_name_has_a_progress_label() -> None:
+    from typing import get_args
+
+    from meridian.core.resources import ResourceKind
+
+    english = i18n.catalog("en")
+    assert [kind for kind in get_args(ResourceKind) if f"progress.kind.{kind}" not in english] == []
+    names = set()
+    for path in (SRC / "provision").glob("*.py"):
+        names |= set(re.findall(r'^    name = "([^"]+)"$', path.read_text(encoding="utf-8"), re.MULTILINE))
+    assert names, "no provisioning steps found"
+    i18n.set_locale("ru")
+    try:
+        assert [name for name in sorted(names) if i18n.step_label(name) == name] == []
+    finally:
+        i18n.set_locale("en")
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [

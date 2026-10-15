@@ -19,33 +19,10 @@ from meridian.core.events import (
 )
 from meridian.core.models import Event
 from meridian.core.reporters import NoopReporter, Reporter
+from meridian.i18n import step_label, t
 from meridian.servers import ServerRegistry
 
 _TERMINAL = frozenset({PLAN_ACTION_COMPLETED, PLAN_ACTION_FAILED, PLAN_ACTION_SKIPPED})
-
-RESOURCE_LABELS: dict[str, str] = {
-    "server_baseline": "Prepare server",
-    "control_plane_runtime": "Install the control panel",
-    "config_profile": "Proxy profile",
-    "inbound": "Proxy listener",
-    "node_binding": "Register proxy node",
-    "node_runtime": "Start proxy node",
-    "host": "Published connection",
-    "internal_squad": "User group",
-    "external_squad": "User group",
-    "access_user": "User",
-    "service_user": "Service user",
-    "subscription_template": "Subscription format",
-    "subscription_settings": "Subscription settings",
-    "nginx_artifact": "Web server config",
-    "realm_hop": "Relay forwarding",
-    "firewall_rule": "Firewall rule",
-    "certificate": "TLS certificate",
-    "routing_gateway": "Routing gateway",
-    "egress_pool": "Egress pool",
-    "route_rule": "Routing rule",
-    "probe": "Connection check",
-}
 
 
 class RichApplyReporter:
@@ -81,7 +58,7 @@ class RichApplyReporter:
             self._action = f"[{event.data.get('index')}/{event.data.get('total')}] {self._label(event)}"
             self._show(self._action)
         elif event.type == PROVISION_STEP_STARTED and self._action:
-            self._show(f"{self._action} — {event.message}")
+            self._show(f"{self._action} — {step_label(event.message)}")
         elif event.type == PLAN_ACTION_COMPLETED:
             if event.data.get("changed") or event.data.get("status") == "applied":
                 self._line(f"  [ok]✓[/ok] {escape(self._label(event))}")
@@ -89,7 +66,7 @@ class RichApplyReporter:
             detail = f": {event.message}" if event.message else ""
             self._line(f"  [error]✗[/error] {escape(self._label(event) + detail)}")
         elif event.type == PLAN_ACTION_SKIPPED:
-            self._line(f"  [warn]-[/warn] {escape(self._label(event))} (waits for a failed step)")
+            self._line(f"  [warn]-[/warn] {escape(t('progress.waits', label=self._label(event)))}")
         if event.type in _TERMINAL and event.data.get("index") == event.data.get("total"):
             self._action = ""
             self.close()
@@ -97,9 +74,9 @@ class RichApplyReporter:
     def _label(self, event: Event) -> str:
         if event.resource is None:
             return event.message
-        label = RESOURCE_LABELS.get(event.resource.kind, event.resource.kind.replace("_", " ").capitalize())
+        label = t(f"progress.kind.{event.resource.kind}")
         if event.resource.name:
-            return f"{label} on {self._server_label(event.resource.name)}"
+            return t("progress.on", label=label, server=self._server_label(event.resource.name))
         return label
 
     def _show(self, text: str) -> None:
