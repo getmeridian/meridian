@@ -67,25 +67,18 @@ pattern = "(?P<version>.+)"
 [tool.hatch.build.hooks.custom]
 path = "scripts/hatch_build.py"
 
+[tool.hatch.build]
+# Generated, so gitignored: the release job writes it for doctor --ai.
+artifacts = ["src/meridian/data/ai-reference.md"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/meridian"]
 
 [tool.hatch.build.targets.sdist]
-exclude = [
-    "/.github",
-    "/website",
-    "/tests",
-    "/dist",
-    "*.tar",
-    "*.tar.gz",
-    "/context7.json",
-    "/Makefile",
-    "/CODE_OF_CONDUCT.md",
-    "/CONTRIBUTING.md",
-    "/SECURITY.md",
-    "/uv.lock",
-    "CLAUDE.md",
-]
+# An allowlist: the package, what builds it, and the release notes. README,
+# LICENSE, and pyproject.toml are always included.
+only-include = ["src/meridian", "scripts/hatch_build.py", "VERSION", "CHANGELOG.md"]
+exclude = ["CLAUDE.md"]
 
 [tool.ruff]
 target-version = "py311"
