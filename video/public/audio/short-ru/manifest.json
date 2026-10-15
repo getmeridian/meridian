@@ -1,38 +1,38 @@
 {
   "hook": {
-    "hash": "80a259cfdaa5",
-    "seconds": 7.44
+    "hash": "8f78d901f883",
+    "seconds": 5.52
   },
   "needs": {
-    "hash": "7a22dad6c226",
-    "seconds": 3.28
+    "hash": "257d103ad5d0",
+    "seconds": 3.2
   },
   "install": {
-    "hash": "56b1dbb5fdf2",
-    "seconds": 3.907
+    "hash": "dcef731fd623",
+    "seconds": 4.32
   },
   "wizard": {
-    "hash": "f88e564c121d",
-    "seconds": 6.96
+    "hash": "6db79241dbab",
+    "seconds": 7.28
   },
   "camouflage": {
-    "hash": "cb8ae56cddc8",
-    "seconds": 7.12
-  },
-  "apply": {
-    "hash": "fb88930ca26a",
-    "seconds": 6.86
-  },
-  "phone": {
-    "hash": "4258090d69dd",
-    "seconds": 5.983
-  },
-  "why": {
-    "hash": "a1a33959c2c9",
+    "hash": "8fb72e4d886d",
     "seconds": 6.96
   },
-  "cta": {
-    "hash": "94429c539c94",
+  "apply": {
+    "hash": "667beff5fa65",
+    "seconds": 6.64
+  },
+  "phone": {
+    "hash": "5dfcdd5b31dc",
     "seconds": 5.68
+  },
+  "why": {
+    "hash": "0ab22132467b",
+    "seconds": 7.28
+  },
+  "cta": {
+    "hash": "f8d94aa755a7",
+    "seconds": 5.44
   }
 }

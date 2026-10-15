@@ -28,38 +28,36 @@ const name = option("--narration", option("--lang", "en"));
 const only = option("--only", "")?.split(",").filter(Boolean) ?? [];
 const narration = JSON.parse(readFileSync(join(root, "narration", `${name}.json`), "utf8"));
 const lang = narration.language ?? name;
-if (narration.engine === "qwen3") {
-  console.log(
-    `narration/${name}.json is voiced locally: uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ${name}`,
-  );
-  process.exit(0);
-}
 const outDir = join(root, "public", "audio", name);
 const manifestPath = join(outDir, "manifest.json");
 const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};
 const settings = narration.voiceSettings ?? null;
 const seed = narration.seed ?? 7;
+// Respell Latin terms the way the narrator should say them; captions keep the original text.
+const terms = Object.keys(narration.pronounce ?? {}).sort((a, b) => b.length - a.length);
+const spoken = (text) => terms.reduce((out, term) => out.replaceAll(term, narration.pronounce[term]), text);
 
 const fingerprint = (scene) =>
   createHash("sha256")
-    .update(JSON.stringify([scene.text, narration.voice, narration.model, settings, seed]))
+    .update(JSON.stringify([spoken(scene.text), narration.voice, narration.model, settings, seed]))
     .digest("hex")
     .slice(0, 12);
 
 const scenes = narration.scenes.map((scene, index) => ({
   ...scene,
   hash: fingerprint(scene),
-  previous: narration.scenes[index - 1]?.text,
-  next: narration.scenes[index + 1]?.text,
+  speech: spoken(scene.text),
+  previous: narration.scenes[index - 1] && spoken(narration.scenes[index - 1].text),
+  next: narration.scenes[index + 1] && spoken(narration.scenes[index + 1].text),
 }));
 const stale = scenes.filter(
   (scene) =>
     (only.length === 0 || only.includes(scene.id)) &&
     (manifest[scene.id]?.hash !== scene.hash || !existsSync(join(outDir, `${scene.id}.mp3`))),
 );
-const characters = stale.reduce((sum, scene) => sum + scene.text.length, 0);
+const characters = stale.reduce((sum, scene) => sum + scene.speech.length, 0);
 console.log(`${stale.length} of ${scenes.length} scenes to generate, ${characters} characters (${narration.model})`);
-for (const scene of stale) console.log(`  ${scene.id.padEnd(12)} ${scene.text.length}`);
+for (const scene of stale) console.log(`  ${scene.id.padEnd(12)} ${scene.speech.length}`);
 if (!flag("--spend") || stale.length === 0) {
   if (stale.length) console.log("Dry run; add --spend to call ElevenLabs.");
   process.exit(0);
@@ -81,7 +79,7 @@ for (const scene of stale) {
       method: "POST",
       headers: { "xi-api-key": apiKey, "content-type": "application/json", accept: "audio/mpeg" },
       body: JSON.stringify({
-        text: scene.text,
+        text: scene.speech,
         model_id: narration.model,
         language_code: lang,
         seed,
@@ -99,7 +97,7 @@ for (const scene of stale) {
       encoding: "utf8",
     }).trim(),
   );
-  spent += Number(response.headers.get("character-cost") ?? scene.text.length);
+  spent += Number(response.headers.get("character-cost") ?? scene.speech.length);
   manifest[scene.id] = { hash: scene.hash, seconds: Math.round(seconds * 1000) / 1000 };
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n"); // keep progress if a later scene fails
   console.log(`  ✓ ${scene.id} ${manifest[scene.id].seconds}s`);

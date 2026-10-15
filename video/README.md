@@ -22,9 +22,9 @@ uv run --with playwright python video/recording/phone.py            # English, f
 uv run --with playwright python video/recording/phone.py ru Мама    # Russian
 
 # 3. Narration, regenerated only for scenes whose text changed
-pnpm tts                 # English: dry run with the character cost
+pnpm tts                 # dry run with the character cost
 pnpm tts --spend         # English: call ElevenLabs
-uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ru   # Russian: local Qwen3-TTS, free
+pnpm tts --lang ru --spend
 
 # 4. Preview, render, export
 pnpm studio
@@ -34,7 +34,7 @@ pnpm render:ru && pnpm export ru     # Russian: out/meridian-setup.ru.mp4
 
 # 5. The vertical short (narration/short-<lang>.json, music/short.json)
 pnpm tts --narration short-en --spend
-uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py short-ru
+pnpm tts --narration short-ru --spend
 pnpm music short                     # ACE-Step 1.5, local; clone it to ~/.cache/ace-step/ACE-Step-1.5 and `uv sync` first
 node scripts/stills.mjs --short [--lang ru]
 pnpm render:short && pnpm export:short      # out/tiktok.en.mp4 (-14 LUFS) and its cover

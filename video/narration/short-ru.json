@@ -1,14 +1,7 @@
 {
   "language": "ru",
-  "engine": "qwen3",
-  "qwen3": {
-    "design": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
-    "clone": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
-    "language": "Russian",
-    "seed": 7,
-    "instruct": "A calm, warm adult male narrator, native Russian speaker with a clear Moscow accent, friendly and confident, measured pace, like a tech tutorial voice-over.",
-    "reference": "ru/intro"
-  },
+  "voice": "ogi2DyUAKJb7CEdqqvlU",
+  "model": "eleven_v4",
   "pronounce": {
     "getmeridian.org": "гет меридиан точка орг",
     "uv tool install meridian-vpn": "ю-ви тул инстолл меридиан ви-пи-эн",

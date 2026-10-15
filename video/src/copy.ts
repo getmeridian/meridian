@@ -85,7 +85,7 @@ const en = {
     blocked: "blocked: the app moves on",
     connected: "connected",
   },
-  outro: { footer: "Free and open source · Narration voice: elevenlabs.io" },
+  outro: { footer: "Free and open source" },
   short: {
     hook: { line1: "Your own VPN", before: "in ", accent: "10 minutes", sub: "No subscription. No VPN company." },
     needs: {
@@ -107,7 +107,7 @@ const en = {
     why: { kicker: "Three methods", title: "Hard to block" },
     cta: {
       more: "Full walkthrough on getmeridian.org",
-      footer: "Free and open source · Voice: elevenlabs.io · Music: ACE-Step",
+      footer: "Free and open source · Music: ACE-Step",
     },
   },
   thumbnail: { kicker: "Meridian · full walkthrough", after: ", start to finish" },
@@ -205,7 +205,7 @@ const ru: Copy = {
     blocked: "заблокирован: приложение переключается",
     connected: "подключено",
   },
-  outro: { footer: "Бесплатно и с открытым кодом · Озвучка: Qwen3-TTS" },
+  outro: { footer: "Бесплатно и с открытым кодом" },
   short: {
     hook: { line1: "Свой VPN", before: "за ", accent: "10 минут", sub: "Без подписки. Без VPN-компании." },
     needs: {
@@ -227,7 +227,7 @@ const ru: Copy = {
     why: { kicker: "Три способа", title: "Сложно заблокировать" },
     cta: {
       more: "Полное видео — на getmeridian.org",
-      footer: "Бесплатно и с открытым кодом · Озвучка: Qwen3-TTS · Музыка: ACE-Step",
+      footer: "Бесплатно и с открытым кодом · Музыка: ACE-Step",
     },
   },
   thumbnail: { kicker: "Meridian · полный разбор", after: " от начала до конца" },
