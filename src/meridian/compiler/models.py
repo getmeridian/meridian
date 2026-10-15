@@ -309,6 +309,9 @@ class SubscriptionSettingsPayload(CoreModel):
     profile_title: str
     update_interval_hours: int = Field(default=SUBSCRIPTION_UPDATE_INTERVAL_HOURS, ge=1)
     randomize_hosts: bool = False
+    # Apps Remnawave knows read Xray JSON (Happ, v2rayNG, Streisand, ...) get it instead of
+    # base64 links, and with it the automatic failover between entries.
+    serve_json_at_base_subscription: bool = True
     preserve_unmanaged_response_rules: bool = True
 
 

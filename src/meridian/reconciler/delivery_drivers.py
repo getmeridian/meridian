@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from typing import TypeVar, cast
 
-from meridian.cluster import ManagedResourceBinding
+from meridian.cluster import SUPPORT_PAGE, ManagedResourceBinding
 from meridian.compiler.models import (
     AccessUserPayload,
     ExternalSquadPayload,
@@ -28,6 +28,7 @@ from meridian.remnawave import (
     SubscriptionTemplate,
     User,
 )
+from meridian.remnawave.models import SEEDED_SUPPORT_URL, SUPPORT_URL_HEADER
 
 ValueT = TypeVar("ValueT")
 
@@ -240,10 +241,13 @@ class SubscriptionSettingsDriver:
     ) -> ResourceObservation:
         payload = payload_of(action, SubscriptionSettingsPayload)
         settings = self.context.panel.get_subscription_settings()
+        support_url = settings.custom_response_headers.get(SUPPORT_URL_HEADER)
         matches = (
             settings.profile_title == payload.profile_title
             and settings.profile_update_interval_hours == payload.update_interval_hours
             and settings.randomize_hosts == payload.randomize_hosts
+            and settings.serve_json_at_base_subscription == payload.serve_json_at_base_subscription
+            and support_url == self._support_headers(settings.custom_response_headers).get(SUPPORT_URL_HEADER)
         )
         return observed(
             action,
@@ -253,6 +257,8 @@ class SubscriptionSettingsDriver:
                 "profile_title": settings.profile_title,
                 "update_interval_hours": settings.profile_update_interval_hours,
                 "randomize_hosts": settings.randomize_hosts,
+                "serve_json_at_base_subscription": settings.serve_json_at_base_subscription,
+                "support_url": support_url or "",
             },
         )
 
@@ -269,13 +275,32 @@ class SubscriptionSettingsDriver:
                 profile_title=payload.profile_title,
                 profile_update_interval_hours=payload.update_interval_hours,
                 randomize_hosts=payload.randomize_hosts,
+                serve_json_at_base_subscription=payload.serve_json_at_base_subscription,
                 # Merge the managed headers into the record just read; the
                 # panel replaces customResponseHeaders wholesale.
-                custom_response_headers=settings.custom_response_headers,
+                custom_response_headers=self._support_headers(settings.custom_response_headers),
             ),
-            "update managed subscription title and refresh interval",
+            "update managed subscription title, refresh interval, and support link",
         )
         return ResourceApplyReceipt(remote_id=updated.uuid)
+
+    def _support_headers(self, headers: dict[str, str]) -> dict[str, str]:
+        """Point ``support-url`` at the support page unless the operator set their own link."""
+        current = headers.get(SUPPORT_URL_HEADER)
+        merged = dict(headers)
+        if current is not None and current != SEEDED_SUPPORT_URL and not _is_support_page(current):
+            return merged
+        desired = self.context.cluster.panel.support_url()
+        if desired:
+            merged[SUPPORT_URL_HEADER] = desired
+        else:
+            merged.pop(SUPPORT_URL_HEADER, None)
+        return merged
+
+
+def _is_support_page(url: str) -> bool:
+    """Meridian's own support link, from any earlier panel address."""
+    return url.endswith(f"/{SUPPORT_PAGE}#{{{{SHORT_UUID}}}}")
 
 
 def _optional_remote_id(

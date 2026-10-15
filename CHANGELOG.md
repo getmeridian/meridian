@@ -185,6 +185,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   later ones within each method instead of sorting them by exit name.
 
 ### Sharing
+- **Happ, v2rayNG, and other JSON-capable apps get the Xray JSON** — with it
+  comes the automatic failover between entries; they used to get plain base64
+  links. Meridian turns on Remnawave's JSON-at-base setting, which follows
+  upstream's list of apps that read it (v2RayTun and Shadowrocket keep links).
+- **The app's support button opens the person's connection page** — every
+  subscription used to send Remnawave's placeholder `https://dummy.docs.rw`. A
+  `support-url` you set yourself in the panel is kept.
 - **Connection names show where traffic exits** — entries lead with the exit's
   flag and country ("🇩🇪 DE · Reality · Chrome"), and the panel shows the same
   flag on the node. Deploy, `node add`, and the setup wizard look the country up

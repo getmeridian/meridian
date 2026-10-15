@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from meridian.ssh import ServerConnection
 
 # Static PWA assets shipped with the package (relative to templates/pwa/).
-_STATIC_FILES = ("app.js", "selfcheck.js", "styles.css", "sw.js", "icon.svg")
+_STATIC_FILES = ("app.js", "selfcheck.js", "styles.css", "sw.js", "icon.svg", "support.html", "support.js")
 # Assets whose bytes feed the service worker's cache version.
 _VERSIONED_ASSETS = ("app.js", "selfcheck.js", "styles.css", "apps.json")
 # Placeholder in sw.js (cache name) and selfcheck.js (reported page version).

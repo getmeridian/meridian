@@ -434,6 +434,8 @@ class StatefulPanel:
             self.subscription_settings.custom_response_headers = headers
         if randomize_hosts is not None:
             self.subscription_settings.randomize_hosts = randomize_hosts
+        if serve_json_at_base_subscription is not None:
+            self.subscription_settings.serve_json_at_base_subscription = serve_json_at_base_subscription
         return self.subscription_settings
 
     def create_service_user(
@@ -1090,6 +1092,41 @@ def test_node_country_follows_the_exit_region_and_otherwise_stays_the_operators(
     assert nodes["Meridian v4 exit-a"].country_code == "DE"
     assert nodes["Meridian v4 exit-b"].country_code == "SE"
     assert panel.calls["country_node"] == 1
+
+
+@pytest.mark.parametrize(
+    ("panel_url", "expected"),
+    [
+        ("https://198.51.100.10", "https://198.51.100.10/page-path/pwa/support.html#{{SHORT_UUID}}"),
+        ("", None),
+    ],
+    ids=["support-page", "no-page-path-drops-placeholder"],
+)
+def test_seeded_support_placeholder_becomes_the_support_page_and_apps_get_xray_json(
+    panel_url: str, expected: str | None
+) -> None:
+    plan = compile_topology(_intent())
+    cluster = ClusterConfig()
+    cluster.panel.url = panel_url
+    cluster.panel.sub_path = "page-path"
+    panel = StatefulPanel()
+    panel.subscription_settings.custom_response_headers["support-url"] = "https://dummy.docs.rw"
+    context = RemnawaveDriverContext(
+        panel=cast(MeridianPanel, panel),
+        plan=plan,
+        cluster=cluster,
+        workloads=WorkloadStateManager(cluster, persist=lambda _state: None, key_factory=_keys),
+        server_addresses={"srv-control": "198.51.100.10", "srv-exit-a": "198.51.100.20", "srv-exit-b": "198.51.100.30"},
+    )
+    fallback = AlreadyConvergedDriver()
+    drivers: dict[str, object] = {kind: fallback for kind in {resource.payload.kind for resource in plan.resources}}
+    drivers.update(build_remnawave_drivers(context))
+
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    assert panel.subscription_settings.custom_response_headers.get("support-url") == expected
+    assert panel.subscription_settings.serve_json_at_base_subscription is True
+    assert execute_resource_plan(plan, cluster, drivers, persist=lambda _state: None).all_succeeded
+    assert panel.calls["update_subscription_settings"] == 1
 
 
 def test_every_subscription_carries_the_managed_refresh_interval_and_keeps_operator_headers() -> None:

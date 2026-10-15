@@ -78,16 +78,18 @@ Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They l
 
 Every subscription asks apps to refresh it every 6 hours (the `profile-update-interval` header, which apps such as Happ and Clash Verge follow), so when you add an exit or relay, clients pick it up within a few hours without a new link. Apps that ignore the header refresh on their own schedule; a manual refresh in the app picks up changes at once.
 
+An app's support button opens that person's connection page, with its "Not connecting?" help. To send people somewhere else, set your own `support-url` header in the panel's subscription settings; Meridian keeps it.
+
 ### Tested apps and engines
 
 One subscription URL serves each app the format it reads. Every change to Meridian runs a multi-node test lab that fetches each format from a real Remnawave panel and checks it with the engine those apps are built on:
 
 | Format | Apps | Engine tested | What the lab checks |
 |--------|------|---------------|---------------------|
-| Xray JSON | Happ | Xray 26.7.28 | Traffic passes through every entry and through automatic failover; a wrong key is refused |
+| Xray JSON | Happ, v2rayNG, v2rayN, Streisand, V2Box | Xray 26.7.28 | Traffic passes through every entry and through automatic failover; a wrong key is refused |
 | Mihomo | FlClashX, Clash Mi | Mihomo 1.19.32 | `mihomo -t` loads the profile, its rules, and its fallback group |
 | sing-box | sing-box (SFA, SFI), Karing | sing-box 1.14.3 | `sing-box check` loads the profile, and its automatic group is the default route |
-| Base64 links | any Xray/V2Ray app | — | Every link parses and names the same servers and key as the other formats |
+| Base64 links | other Xray/V2Ray apps (v2RayTun, Shadowrocket) | — | Every link parses and names the same servers and key as the other formats |
 
 Apps ship their own engine updates, so an app may run a slightly older or newer engine than the one tested.
 
@@ -104,7 +106,7 @@ Meridian and the panel split the work so your edits don't get overwritten:
 | Meridian manages (the next apply restores its version) | Yours to change (apply never touches these) |
 |---|---|
 | Nodes, config profiles, inbounds, published Hosts, squads | Each client's status: enable/disable, traffic limits, expiry, HWID limits, description |
-| Subscription templates and the settings Meridian sets (title, refresh interval) | Users you create yourself in the panel |
+| Subscription templates and the settings Meridian sets (title, refresh interval, Xray JSON for apps that read it, the support link unless you set your own) | Users you create yourself in the panel |
 | Which clients exist, their names, and their squads | Notifications, plugins, IP control, and other panel settings |
 
 `meridian plan` shows any difference in what Meridian manages before anything changes. Users you add in the panel are never listed, changed, or deleted by Meridian; to give someone a Meridian-managed link and connection page, use `meridian client add` instead.

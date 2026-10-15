@@ -14,6 +14,10 @@ HostSecurityLayer = Literal["DEFAULT", "TLS", "NONE"]
 PROFILE_TITLE_HEADER = "profile-title"
 # Whole hours between automatic refreshes; apps without it use their own schedule.
 PROFILE_UPDATE_INTERVAL_HEADER = "profile-update-interval"
+# Where an app's support button goes. Remnawave seeds a placeholder that every
+# app then showed, so Meridian replaces it (an operator's own link stays).
+SUPPORT_URL_HEADER = "support-url"
+SEEDED_SUPPORT_URL = "https://dummy.docs.rw"
 _RW_ENCODE_BASE64 = "rwEncodeBase64:"
 _BASE64_RESULT = "base64:"
 

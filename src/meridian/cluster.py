@@ -31,6 +31,8 @@ def _load_warning(message: str, *, details: list[str] | None = None) -> None:
 
 
 CURRENT_CLUSTER_VERSION = 3
+# The shared support page (templates/pwa/support.html), under the connection-page path.
+SUPPORT_PAGE = "pwa/support.html"
 
 
 class ClusterConfigExternallyModifiedError(RuntimeError):
@@ -68,6 +70,18 @@ class PanelConfig:
             return ""
         parsed = urlsplit(self.url)
         return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/sub/{quote(short_uuid, safe='')}"
+
+    def support_url(self) -> str:
+        """Panel-wide ``support-url`` header value; empty when it cannot be built.
+
+        Pages live under each VLESS UUID, which no header template can name, so the
+        shared support page reads the person's subscription and redirects. Remnawave
+        fills ``{{SHORT_UUID}}`` per user; the fragment keeps it out of server logs.
+        """
+        if not self.url or not self.sub_path:
+            return ""
+        parsed = urlsplit(self.url)
+        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}/{SUPPORT_PAGE}#{{{{SHORT_UUID}}}}"
 
     @property
     def display_url(self) -> str:

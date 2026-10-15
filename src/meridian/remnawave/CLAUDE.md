@@ -23,6 +23,8 @@
 - Reality keypairs come from `GET /api/system/tools/x25519/generate` (unpadded base64url, 30 per call); exits need no Docker, Xray, or unzip before their Profile exists, and `reality_keys.py` rejects anything that is not 32 bytes.
 - External squad headers are `responseHeadersAdd`/`responseHeadersRemove`; node Xray version is `versions.xray`; keygen returns `secretKey`.
 - Omit unmanaged subscription settings and response rules from PATCH payloads; `null` can erase panel-owned policy.
+- Apps get Xray JSON (and its failover) only through `serveJsonAtBaseSubscription`, which upgrades the base64 fallback for upstream's list of JSON-capable User-Agents; the lab's `/json` fetch never exercised app UAs, so Happ silently got base64. Don't hand-write UA rules.
+- Custom headers pass through Remnawave's per-user template engine (`{{SHORT_UUID}}`, …); `support-url` is seeded as `https://dummy.docs.rw`, so Meridian replaces it (and only it or its own link) with `PanelConfig.support_url()`.
 - The public Xray JSON selector is `json` and returns an array of generated configs; `xray-json` is a template name and returns 403 as an unknown client type.
 - Reality Hosts use `securityLayer=DEFAULT`; `REALITY` is an Inbound transport security value, not a Host enum.
 - Hysteria2 is `hysteria2` in Meridian keys and URLs but protocol/network `hysteria` plus version `2` in Remnawave profiles.
