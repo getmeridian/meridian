@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from meridian.config import (
@@ -37,6 +38,8 @@ class RelayContext:
     listen_port: int = 443
     user: str = "root"
     realm_version: str = REALM_VERSION
+    # Tarball sha256 per target triple for realm_version; a target without one is refused.
+    realm_sha256: Mapping[str, str] = field(default_factory=lambda: dict(REALM_SHA256))
     results: list[StepResult] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -108,18 +111,18 @@ class InstallRealm:
                 detail=f"download failed: {download.stderr.strip()[:200]}",
             )
 
-        # Verify SHA256 checksum (supply chain protection)
-        expected_hash = REALM_SHA256.get(target, "")
-        if expected_hash:
-            check = conn.run("sha256sum /tmp/fwd.tar.gz | cut -d' ' -f1", timeout=15)
-            actual_hash = check.stdout.strip()
-            if actual_hash != expected_hash:
-                conn.run("rm -f /tmp/fwd.tar.gz", timeout=15)
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"checksum mismatch: expected {expected_hash[:16]}..., got {actual_hash[:16]}...",
-                )
+        # Verify SHA256 checksum (supply chain protection); never install an unpinned tarball.
+        expected_hash = ctx.realm_sha256.get(target, "")
+        check = conn.run("sha256sum /tmp/fwd.tar.gz | cut -d' ' -f1", timeout=15)
+        actual_hash = check.stdout.strip()
+        if not expected_hash or actual_hash != expected_hash:
+            conn.run("rm -f /tmp/fwd.tar.gz", timeout=15)
+            detail = (
+                f"checksum mismatch: expected {expected_hash[:16]}..., got {actual_hash[:16]}..."
+                if expected_hash
+                else f"no checksum pinned for v{ctx.realm_version} on {target}"
+            )
+            return StepResult(name=self.name, status="failed", detail=detail)
 
         # Extract and install
         # Extract into a private directory so the upstream file name never lands in a shared path.

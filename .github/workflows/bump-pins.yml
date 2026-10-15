@@ -1,0 +1,70 @@
+name: Bump pins
+
+# Weekly: raise Realm, RealiTLScanner, acme.sh, and Remnawave image pins to the
+# newest release in each tested major (scripts/bump_pins.py) and open a pull
+# request for review. Fleets can already take newer Realm and Remnawave releases
+# with `meridian fleet upgrade`; this keeps the defaults new installs get current.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: bump-pins
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump pins
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: bot/bump-pins
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install package
+        run: uv sync --extra dev
+
+      - name: Resolve newer releases
+        id: bump
+        run: |
+          status=0
+          uv run python scripts/bump_pins.py --write --summary "$RUNNER_TEMP/pr.md" || status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          git diff --quiet || echo "changed=1" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        if: steps.bump.outputs.changed == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git commit -qam "Bump pinned releases to the newest in each tested major"
+          git push --force origin "$BRANCH"
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then
+            gh pr edit "$BRANCH" --body-file "$RUNNER_TEMP/pr.md"
+          elif ! gh pr create --head "$BRANCH" --base main \
+              --title "Bump pinned releases" --body-file "$RUNNER_TEMP/pr.md"; then
+            echo "::warning::Could not open the pull request (enable 'Allow GitHub Actions to create pull requests'); compare: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH"
+          fi
+          # Pushes made with GITHUB_TOKEN trigger no pull_request runs; workflow_dispatch is exempt.
+          gh workflow run ci.yml --ref "$BRANCH"
+
+      - name: Fail when a source could not be checked
+        if: steps.bump.outputs.status != '0'
+        run: |
+          cat "$RUNNER_TEMP/pr.md"
+          exit 1

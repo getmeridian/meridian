@@ -11,6 +11,7 @@
 **Exit country** — `registry_country.py` reads the RIR country via RDAP (no geo-IP) when an exit is first named and stores it in `ExitIntent.region` (`--country` overrides), keeping the compiler pure.
 **Local home** — `config.default_home()` prefers `$XDG_CONFIG_HOME/meridian` (`~/.config/meridian`), adopting an older 4.x home (`~/.meridian-v4`, `~/.meridian`) only if XDG is absent and it holds `servers.json`; `MERIDIAN_HOME` overrides.
 **Neutral host names** — `host_runtime.py` is the one place for container, Compose project, and `/opt` names (`ctlsvc-*`, `netagent`); `legacy` names are read only to migrate and clean up, and images keep upstream tags.
+**Binary pins** — `binary_pins.py` holds the server binaries `fleet upgrade` may raise (Realm) and their trust rules; `github_releases.py` reads newer same-major releases with GitHub's per-asset sha256, saved in `ClusterConfig.binary_pins` and carried into `runtime_pins` like image pins.
 **Workload secrets** — `reconciler/workloads.py` allocates or reuses complete Reality key triples and persists them before remote mutation; `xray_workload.py` renders only reviewed protocols and egress.
 ## What's done well
 - **Forward-compatible YAML** — unknown keys land inertly in `_extra` (never store load-bearing state there); `load_topology_cluster()` refuses pre-topology files with rebuild guidance.
@@ -29,7 +30,8 @@
 - **Reality key material is atomic** — refuse partial private/public/short-ID state instead of rotating keys; `node replace` carries a workload's keys to the new server.
 - **Hysteria2 always carries salamander** — the `finalmask` password derives from the workload's Reality private key (`salamander_password()`); never store or rotate it separately.
 - **Unknown panel admin is a user error** — with no saved credentials and register and login both refused, stop with restore-or-`meridian teardown` guidance.
-- **Local Xray is evidence, not a requirement** — validate delivered configs with `run -test` (malformed fails); a missing runtime or a bad SHA2-256 sidecar is inconclusive, and that archive never runs.
+- **Local Xray is evidence, not a requirement** — validate delivered configs with `run -test` (malformed fails); a missing runtime or an archive that misses `XRAY_SHA256` is inconclusive, and that archive never runs.
+- **Deployer-side HTTPS uses httpx** — its certifi bundle verifies GitHub and Docker Hub; urllib failed certificate checks on uv-managed Pythons, so `fleet upgrade` could never see a release.
 - **Exit-IP observers are single-stack** — match the server's address family, or a dual-stack exit answers over the other one and fails the egress match.
 - **Failed traffic is classified by a direct TCP connect** — `connectivity.py` separates `no_traffic` from `unreachable`; UDP (Hysteria2) paths are never TCP-probed.
 - **Whatever adds a firewall rule retires it** — node retirement deletes the Docker-internal node API rule (`fw-node-api`, plus its pre-rename comment).

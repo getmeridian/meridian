@@ -9,7 +9,8 @@ from __future__ import annotations
 import hashlib
 import json
 import urllib.parse
-import urllib.request
+
+import httpx
 
 from meridian.core.errors import MeridianError
 from meridian.remnawave.versions import parse_image, parse_version
@@ -94,9 +95,10 @@ def _token(hub_repo: str) -> str:
 
 
 def _get(url: str, headers: dict[str, str]) -> tuple[bytes, dict[str, str]]:
-    request = urllib.request.Request(url, headers=headers)
+    # httpx carries certifi's CA bundle; urllib failed verification on uv-managed Pythons.
     try:
-        with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
-            return response.read(), {key.lower(): value for key, value in response.headers.items()}
-    except (OSError, ValueError) as exc:
+        response = httpx.get(url, headers=headers, timeout=_TIMEOUT, follow_redirects=True)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
         raise RegistryError(f"Docker Hub request failed: {exc}") from exc
+    return response.content, {key.lower(): value for key, value in response.headers.items()}

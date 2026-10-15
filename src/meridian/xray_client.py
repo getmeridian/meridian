@@ -27,6 +27,7 @@ from meridian.config import (
     MERIDIAN_HOME,
     XRAY_ASSET_MAP,
     XRAY_GITHUB_URL,
+    XRAY_SHA256,
     XRAY_VERSION,
 )
 from meridian.core.errors import MeridianError
@@ -110,26 +111,13 @@ def ensure_xray_binary(*, timeout: float = XRAY_BOOTSTRAP_TIMEOUT) -> Path | Non
         return None
 
     url = f"{XRAY_GITHUB_URL}/v{XRAY_VERSION}/{asset_name}"
-    dgst_url = f"{url}.dgst"
+    expected_sha256 = XRAY_SHA256.get(asset_name, "")
+    if not expected_sha256:
+        return None
 
     tmp_zip = None
     deadline = time.monotonic() + max(1.0, float(timeout))
     try:
-        # Download digest file for SHA256 verification
-        digest_timeout = _remaining_timeout(deadline)
-        dgst_result = subprocess.run(
-            ["curl", "-fsSL", "--max-time", f"{digest_timeout:g}", dgst_url],
-            capture_output=True,
-            text=True,
-            timeout=digest_timeout,
-            stdin=subprocess.DEVNULL,
-        )
-        if dgst_result.returncode != 0:
-            return None
-        expected_sha256 = _parse_dgst(dgst_result.stdout)
-        if not expected_sha256:
-            return None
-
         # Download binary zip
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             tmp_zip = tmp.name
@@ -145,7 +133,7 @@ def ensure_xray_binary(*, timeout: float = XRAY_BOOTSTRAP_TIMEOUT) -> Path | Non
         if dl_result.returncode != 0:
             return None
 
-        # Refuse to execute a release whose published checksum cannot be verified.
+        # Refuse to execute an archive that does not match its pinned checksum.
         sha256 = hashlib.sha256(Path(tmp_zip).read_bytes()).hexdigest()
         if sha256 != expected_sha256:
             Path(tmp_zip).unlink(missing_ok=True)
@@ -199,17 +187,6 @@ def _remaining_timeout(deadline: float) -> float:
     if remaining <= 0:
         raise subprocess.TimeoutExpired("Xray download", 0)
     return remaining
-
-
-def _parse_dgst(content: str) -> str:
-    """Extract SHA2-256 hash from xray .dgst file content."""
-    for line in content.splitlines():
-        if line.startswith("SHA2-256="):
-            digest = line.split("=", 1)[1].strip().lower()
-            if len(digest) == 64 and all(character in "0123456789abcdef" for character in digest):
-                return digest
-            return ""
-    return ""
 
 
 def _find_free_port() -> int:

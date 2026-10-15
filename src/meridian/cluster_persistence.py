@@ -16,6 +16,7 @@ from typing import Any
 
 import yaml
 
+from meridian.binary_pins import BinaryPin
 from meridian.cluster import (
     CURRENT_CLUSTER_VERSION,
     BrandingConfig,
@@ -44,6 +45,23 @@ _PANEL_FIELDS = _public_fields(PanelConfig)
 _BRANDING_FIELDS = _public_fields(BrandingConfig)
 _SUBSCRIPTION_PAGE_FIELDS = _public_fields(SubscriptionPageConfig)
 _KNOWN_TOP = _public_fields(ClusterConfig)
+
+
+def _load_binary_pins(raw: object) -> dict[str, BinaryPin]:
+    """Read saved binary pins by shape only; `effective_binary_pins` decides which to trust."""
+    if not isinstance(raw, dict):
+        return {}
+    pins: dict[str, BinaryPin] = {}
+    for name, entry in raw.items():
+        if not isinstance(entry, dict) or not isinstance(entry.get("version"), str):
+            continue
+        digests = entry.get("sha256")
+        if not isinstance(digests, dict):
+            continue
+        pins[str(name)] = BinaryPin(
+            entry["version"], {str(key): str(value) for key, value in digests.items() if isinstance(value, str)}
+        )
+    return pins
 
 
 _SSH_DEFAULTS: dict[str, Any] = {"ssh_user": "root", "ssh_port": 22}
@@ -126,6 +144,11 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         out["fleet_id"] = cfg.fleet_id
     if cfg.image_pins:
         out["image_pins"] = dict(sorted(cfg.image_pins.items()))
+    if cfg.binary_pins:
+        out["binary_pins"] = {
+            name: {"version": pin.version, "sha256": dict(sorted(pin.sha256.items()))}
+            for name, pin in sorted(cfg.binary_pins.items())
+        }
 
     out.update(serialize_cluster_v3(cfg))
 
@@ -236,6 +259,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         if isinstance(raw_pins, dict)
         else {}
     )
+    binary_pins = _load_binary_pins(data.get("binary_pins"))
     v3 = load_cluster_v3(data)
 
     # Extra fields
@@ -255,6 +279,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         connection_page_markers=connection_page_markers,
         fleet_id=fleet_id,
         image_pins=image_pins,
+        binary_pins=binary_pins,
         active_generation=v3.active_generation,
         active_plan_hash=v3.active_plan_hash,
         pending_generation=v3.pending_generation,

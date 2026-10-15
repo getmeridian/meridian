@@ -1,4 +1,4 @@
-"""`meridian fleet upgrade` -- move Remnawave to its newest release in the tested major through the reviewed apply."""
+"""`meridian fleet upgrade` -- move Remnawave and Realm to newer same-major releases through the reviewed apply."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.config import HOME_DISPLAY
 from meridian.console import confirm, err_console, fail, info, ok, warn
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
     from meridian.core.topology import SetupIntent
     from meridian.servers import ServerRegistry
+
+_BINARY_LABELS = {"realm": "Realm (relays)"}
 
 _STATUS_TEXT: dict[ImageStatus, str] = {
     "current": "[green]current[/green]",
@@ -60,19 +63,25 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
             hint_type="system",
         )
     _explain_held(observed)
+    binaries = _binary_targets(cluster, intent, tested=tested)
+    _render_binaries(binaries)
     overrides = {name: image for name, image in targets.items() if image != UPGRADABLE_PINS[name]}
-    changes = sum(len(server.changes) for server in observed)
+    binary_overrides = {name: target for name, (_, target) in binaries.items() if target != UPGRADABLE_BINARIES[name]}
+    binary_changes = sum(1 for pinned, target in binaries.values() if target.version != pinned.version)
+    changes = sum(len(server.changes) for server in observed) + binary_changes
     if not changes:
-        if overrides != cluster.image_pins:
-            _save_pins(cluster, overrides)
+        if overrides != cluster.image_pins or binary_overrides != cluster.binary_pins:
+            _save_pins(cluster, overrides, binary_overrides)
         ok("Every server already runs its target images (operator-chosen tags are kept)")
         return
     for name in overrides:
         warn(f"{_short(targets[name])} is newer than this Meridian release was tested with")
-    if not yes and not confirm(f"Apply {changes} image change(s) through the reviewed plan?"):
+    for name, pin in binary_overrides.items():
+        warn(f"{_BINARY_LABELS[name]} {pin.version} is newer than this Meridian release was tested with")
+    if not yes and not confirm(f"Apply {changes} change(s) through the reviewed plan?"):
         raise typer.Exit(1)
 
-    _save_pins(cluster, overrides)
+    _save_pins(cluster, overrides, binary_overrides)
     _apply(cluster, registry, intent)
     after = _observe(registry, intent, targets)
     behind = [(server, image) for server in after for image in server.changes]
@@ -83,7 +92,7 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
             hint="Inspect the containers with `meridian check`, then rerun `meridian fleet upgrade`.",
             hint_type="system",
         )
-    ok(f"Upgraded {changes} image(s); running the health checks")
+    ok(f"Upgraded {changes} component(s); running the health checks")
     from meridian.commands.health import run as run_check
 
     run_check()
@@ -106,9 +115,40 @@ def _target_pins(cluster: ClusterConfig, *, tested: bool) -> dict[str, str]:
     return targets
 
 
-def _save_pins(cluster: ClusterConfig, overrides: dict[str, str]) -> None:
+def _binary_targets(
+    cluster: ClusterConfig, intent: SetupIntent, *, tested: bool
+) -> dict[str, tuple[BinaryPin, BinaryPin]]:
+    """``(pinned, target)`` for each server binary the fleet runs; *tested* asks no one and moves nothing.
+
+    Realm runs only on relays, so a fleet without relay hops has nothing to upgrade.
+    """
+    from meridian.compiler import compile_topology
+    from meridian.compiler.models import RealmHopPayload
+
+    if not any(isinstance(resource.payload, RealmHopPayload) for resource in compile_topology(intent).resources):
+        return {}
+    pinned = effective_binary_pins(cluster.binary_pins)
+    if tested:
+        return {name: (pin, pin) for name, pin in pinned.items()}
+    from meridian.github_releases import ReleaseError, latest_binary_release
+
+    info("Checking GitHub for newer Realm releases in the tested major...")
+    targets: dict[str, tuple[BinaryPin, BinaryPin]] = {}
+    for name, pin in pinned.items():
+        try:
+            targets[name] = (pin, latest_binary_release(name, pin))
+        except ReleaseError as exc:
+            warn(f"{exc}; keeping {_BINARY_LABELS[name]} {pin.version}")
+            if exc.hint:
+                info(exc.hint)
+            targets[name] = (pin, pin)
+    return targets
+
+
+def _save_pins(cluster: ClusterConfig, overrides: dict[str, str], binary_overrides: dict[str, BinaryPin]) -> None:
     """Record the approved releases so every later apply renders them too."""
     cluster.image_pins = overrides
+    cluster.binary_pins = binary_overrides
     try:
         cluster.save()
     except OSError as exc:
@@ -167,6 +207,24 @@ def _render(observed: list[ServerImages]) -> None:
                 _STATUS_TEXT[image.status],
             )
     err_console.print()
+    err_console.print(table)
+    err_console.print()
+
+
+def _render_binaries(binaries: dict[str, tuple[BinaryPin, BinaryPin]]) -> None:
+    if not binaries:
+        return
+    from rich.box import ROUNDED
+    from rich.table import Table
+
+    table = Table(title="Server binaries", box=ROUNDED, pad_edge=False, padding=(0, 1))
+    table.add_column("Component", style="bold cyan")
+    table.add_column("Pinned", style="dim")
+    table.add_column("Target", style="dim")
+    table.add_column("Status")
+    for name, (pinned, target) in binaries.items():
+        status = _STATUS_TEXT["current"] if target.version == pinned.version else _STATUS_TEXT["upgrade"]
+        table.add_row(_BINARY_LABELS[name], pinned.version, target.version, status)
     err_console.print(table)
     err_console.print()
 
