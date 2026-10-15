@@ -199,6 +199,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   on the server first and is never repeated blindly.
 
 ### Sharing
+- **`meridian client reissue NAME` replaces a leaked link** — Remnawave issues
+  the client a new subscription ID and new keys, so the old subscription URL,
+  connection page, and links stop working; Meridian deletes the old page,
+  publishes a new one, and prints the new links. The client and their panel
+  settings stay, including the HWID device limit, which the panel enforces.
 - **Happ, v2rayNG, and other JSON-capable apps get the Xray JSON** — with it
   comes the automatic failover between entries; they used to get plain base64
   links. Meridian turns on Remnawave's JSON-at-base setting, which follows

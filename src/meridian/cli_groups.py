@@ -11,7 +11,9 @@ import typer
 
 from meridian.cli_options import Json, NewServer, SshPort, Target, User, Yes, enable_json_output
 
-client_app = typer.Typer(help="Manage who can connect: add, show, list, enable, disable, remove", no_args_is_help=True)
+client_app = typer.Typer(
+    help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
+)
 server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
 node_app = typer.Typer(help="Add, list, replace, or remove exit servers", no_args_is_help=True)
 relay_app = typer.Typer(help="Add, list, or remove relays that forward traffic to an exit", no_args_is_help=True)
@@ -77,6 +79,24 @@ def client_remove(
     from meridian.commands.client import run_remove
 
     run_remove(name, yes=yes)
+
+
+@client_app.command("reissue")
+def client_reissue_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    yes: Yes = False,
+    _json: Json = False,
+) -> None:
+    """Replace a client's links after a leak; the old page and subscription stop working
+
+    Keeps the client and their panel settings (limits, expiry, HWID devices).
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client reissue alice[/cyan]
+    """
+    from meridian.commands.client import run_reissue
+
+    run_reissue(name, yes=yes)
 
 
 @client_app.command("enable")

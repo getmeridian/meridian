@@ -105,6 +105,7 @@ meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
+meridian client reissue NAME [--yes] [--json]
 meridian client remove NAME [--yes] [--json]
 ```
 
@@ -112,7 +113,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
-| `--yes`, `-y` | | Confirm `client remove`; required with `--json` |
+| `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
 
 **`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`).
 
@@ -121,6 +122,8 @@ meridian client remove NAME [--yes] [--json]
 **`client list`** — lists clients with status, traffic, creation time, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
+
+**`client reissue`** — replaces a client's links after a leak. Remnawave issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, expiry, and the HWID device limit stay as set in the panel; delete devices you don't recognize there. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
 
 **`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
 

@@ -95,7 +95,7 @@ class ClientShowResult(CoreModel):
 
 
 class ClientCreated(CoreModel):
-    """Client metadata returned after creation, with their handoff links."""
+    """Client metadata returned after creation or reissue, with their handoff links."""
 
     username: str
     id: str
@@ -108,6 +108,12 @@ class ClientAddResult(CoreModel):
     """Result for adding one or more clients."""
 
     clients: list[ClientCreated] = Field(default_factory=list)
+
+
+class ClientReissueResult(CoreModel):
+    """Result for reissuing one client's links; the old ones no longer work."""
+
+    client: ClientCreated
 
 
 class ClientReference(CoreModel):
@@ -214,6 +220,19 @@ def build_client_add_result(
             )
             for username, user in users
         ]
+    )
+
+
+def build_client_reissue_result(user: PanelUserLike, *, page_url: str, subscription_url: str) -> ClientReissueResult:
+    """Build the result returned after reissuing one client's links."""
+    return ClientReissueResult(
+        client=ClientCreated(
+            username=user.username,
+            id=user.id,
+            status=user.status.lower(),
+            page_url=page_url,
+            subscription_url=subscription_url,
+        )
     )
 
 

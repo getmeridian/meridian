@@ -22,6 +22,7 @@
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
 - Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
 - Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
+- `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
 - Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
 - Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.

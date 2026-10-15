@@ -193,5 +193,9 @@
   "step.deploy_pwa_assets": "上传连接页面",
   "step.uninstall_meridian": "卸载 Meridian",
   "step.install_cloudflare_warp": "安装 Cloudflare WARP",
-  "step.install_tcp_forwarder": "安装 TCP 转发器"
+  "step.install_tcp_forwarder": "安装 TCP 转发器",
+  "client.reissue_confirm": "要为“{name}”重新签发链接吗？当前的页面和订阅会立即失效。",
+  "client.reissued": "已为“{name}”重新签发链接。旧页面和旧订阅已失效。",
+  "client.reissue_send": "把新链接发给 {name}；他们需要在应用中重新导入。",
+  "client.reissue_devices": "开启了设备数限制？请在面板中从该客户的 HWID 列表里删除你不认识的设备。"
 }

@@ -193,5 +193,9 @@
   "step.deploy_pwa_assets": "Загрузка страниц подключения",
   "step.uninstall_meridian": "Удаление Meridian",
   "step.install_cloudflare_warp": "Установка Cloudflare WARP",
-  "step.install_tcp_forwarder": "Установка перенаправления TCP (Realm)"
+  "step.install_tcp_forwarder": "Установка перенаправления TCP (Realm)",
+  "client.reissue_confirm": "Перевыпустить ссылки для «{name}»? Текущая страница и подписка сразу перестанут работать.",
+  "client.reissued": "Ссылки для «{name}» перевыпущены. Старая страница и подписка больше не работают.",
+  "client.reissue_send": "Отправьте {name} новую ссылку: в приложениях её нужно импортировать заново.",
+  "client.reissue_devices": "Включён лимит устройств? Удалите незнакомые устройства из списка HWID клиента в панели."
 }

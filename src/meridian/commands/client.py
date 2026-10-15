@@ -1,4 +1,4 @@
-"""Client management -- add, show, list, remove, enable, disable access users.
+"""Client management -- add, show, list, reissue, remove, enable, disable access users.
 
 Clients are declared in the topology's access intent; their runtime state lives in Remnawave.
 """
@@ -21,18 +21,26 @@ from meridian.commands.client_handoff import (
     resolve_page_url,
     validate_client_name,
 )
-from meridian.commands.client_state import build_client_persistence_warning, require_access_user
+from meridian.commands.client_state import (
+    build_client_persistence_warning,
+    persist_client_state,
+    require_access_user,
+)
 from meridian.commands.client_v4 import run_add_v4, run_remove_v4
-from meridian.console import err_console, error_context, fail, is_json_mode, ok, warn
-from meridian.core.clients import PanelUserLike, build_client_status_result
+from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok, warn
+from meridian.core.clients import PanelUserLike, build_client_reissue_result, build_client_status_result
 from meridian.core.fleet import public_url
 from meridian.core.models import ErrorModel, Summary
 from meridian.core.output import OperationContext, command_envelope
-from meridian.core.redaction import HANDOFF_LINK_KEYS
+from meridian.core.redaction import HANDOFF_LINK_KEYS, redact_string
 from meridian.core.services.clients import ClientNotFoundError, collect_client_list, collect_client_show
-from meridian.handoff import publish_connection_pages
+from meridian.handoff import HandoffLinks, publish_connection_pages, remove_connection_page
+from meridian.i18n import t
 from meridian.remnawave import RemnawaveError
 from meridian.renderers import emit_json
+from meridian.ssh import SSHError
+
+_PAGE_ERRORS = (OSError, RuntimeError, SSHError, RemnawaveError)
 
 
 def _access_users(cluster: ClusterConfig) -> list[str]:
@@ -251,6 +259,121 @@ def run_remove(name: str, yes: bool = False) -> None:
         name = resolve_client_name(cluster, name)
         validate_client_name(name)
         run_remove_v4(name, cluster, operation, yes=yes)
+
+
+def run_reissue(name: str, yes: bool = False) -> None:
+    """Replace a client's subscription and connection page; the old ones stop working."""
+    operation = OperationContext()
+    with error_context("client.reissue", timer=operation.timer):
+        if is_json_mode() and not yes:
+            fail(
+                "Reissuing client links requires explicit confirmation in JSON mode",
+                hint="Pass --yes to confirm the mutation.",
+                hint_type="user",
+            )
+        cluster = load_topology_cluster()
+        access = require_intent(cluster).access
+        found = access.find_user(name)
+        if found is None:
+            known = ", ".join(access.display_name(user) for user in access.users)
+            fail(
+                f"Client '{name}' is not one of your fleet's clients",
+                hint=f"Your clients: {known}" if known else "Add one with: meridian client add NAME",
+                hint_type="user",
+            )
+        name = found
+        validate_client_name(name)
+        shown = access.display_name(name)
+        if not yes and not confirm(t("client.reissue_confirm", name=shown)):
+            raise typer.Exit(1)
+        _reissue(cluster, name, shown, operation)
+
+
+def _reissue(cluster: ClusterConfig, name: str, shown: str, operation: OperationContext) -> None:
+    with make_panel(cluster) as panel:
+        user = get_user_or_fail(panel, name, action="load")
+        if user is None:
+            fail(
+                f"Client '{name}' is declared but missing from the panel",
+                hint="Run `meridian apply` to restore it, then reissue.",
+                hint_type="system",
+            )
+        # The old page goes first: a failure here changes nothing, and a rerun finds it already gone.
+        try:
+            page_error = remove_connection_page(cluster, user.vless_uuid) if user.vless_uuid else ""
+        except _PAGE_ERRORS as exc:
+            page_error = redact_string(str(exc)) or type(exc).__name__
+        if page_error:
+            fail(
+                f"Could not delete the old connection page for '{name}': {page_error}",
+                hint="Nothing was reissued; check SSH access to the control server and retry.",
+                hint_type="system",
+            )
+        try:
+            reissued = panel.revoke_user_subscription(user.id)
+        except RemnawaveError as exc:
+            fail(
+                f"Could not reissue client '{name}': {exc}",
+                hint=(exc.hint or "Check panel connectivity") + f"; then rerun `meridian client reissue {name}`.",
+                hint_type=exc.category,
+            )
+
+    try:
+        links = publish_connection_pages(cluster, [name])[0]
+    except _PAGE_ERRORS as exc:
+        links = HandoffLinks(name, error=redact_string(str(exc)) or type(exc).__name__)
+    subscription_url = links.subscription_url or cluster.panel.subscription_url(reissued.short_uuid)
+    warnings: list[ErrorModel] = []
+    if not links.page_url:
+        warnings.append(
+            ErrorModel(
+                code="MERIDIAN_CLIENT_PAGE_PUBLISH_FAILED",
+                category="system",
+                message=f"Client '{name}' has new links, but their new connection page is unavailable: {links.error}",
+                hint=f"Republish it with: meridian client show {name} --repair-page",
+                retryable=True,
+                exit_code=3,
+                details={"client": name},
+            )
+        )
+    # Records the forgotten old page even when the new one did not publish.
+    persistence_error = persist_client_state(cluster)
+    if persistence_error:
+        warnings.append(
+            build_client_persistence_warning(
+                operation="reissuing links for client", client=name, reason=persistence_error
+            )
+        )
+    exit_code = 3 if warnings else 0
+
+    if is_json_mode():
+        emit_json(
+            command_envelope(
+                command="client.reissue",
+                data=build_client_reissue_result(
+                    reissued, page_url=links.page_url, subscription_url=subscription_url
+                ).to_data(),
+                summary=Summary(text=f"Reissued links for client {name}", changed=True, counts={"reissued": 1}),
+                exit_code=exit_code,
+                warnings=warnings,
+                timer=operation.timer,
+            ),
+            reveal=HANDOFF_LINK_KEYS,
+        )
+        if exit_code:
+            raise typer.Exit(exit_code)
+        return
+
+    ok(t("client.reissued", name=shown))
+    print_handoff_links(subscription_url, page_url=links.page_url)
+    err_console.print()
+    err_console.print(f"  [dim]{escape(t('client.reissue_send', name=shown))}[/dim]")
+    err_console.print(f"  [dim]{escape(t('client.reissue_devices'))}[/dim]")
+    err_console.print()
+    for warning in warnings:
+        warn(warning.message)
+    if exit_code:
+        raise typer.Exit(exit_code)
 
 
 def run_enable(name: str) -> None:

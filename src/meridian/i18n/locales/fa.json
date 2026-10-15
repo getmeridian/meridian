@@ -193,5 +193,9 @@
   "step.deploy_pwa_assets": "بارگذاری صفحه‌های اتصال",
   "step.uninstall_meridian": "حذف Meridian",
   "step.install_cloudflare_warp": "نصب Cloudflare WARP",
-  "step.install_tcp_forwarder": "نصب فورواردر TCP"
+  "step.install_tcp_forwarder": "نصب فورواردر TCP",
+  "client.reissue_confirm": "لینک‌های «{name}» دوباره صادر شود؟ صفحه و اشتراک فعلی او فوراً از کار می‌افتند.",
+  "client.reissued": "لینک‌های «{name}» دوباره صادر شد. صفحه و اشتراک قبلی دیگر کار نمی‌کنند.",
+  "client.reissue_send": "لینک جدید را برای {name} بفرستید؛ باید دوباره آن را در برنامه‌ها وارد کند.",
+  "client.reissue_devices": "محدودیت دستگاه فعال است؟ دستگاه‌های ناآشنا را از فهرست HWID این کاربر در پنل حذف کنید."
 }

@@ -105,6 +105,7 @@ meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
+meridian client reissue NAME [--yes] [--json]
 meridian client remove NAME [--yes] [--json]
 ```
 
@@ -112,7 +113,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
-| `--yes`, `-y` | | 确认 `client remove`；`--json` 需要 |
+| `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
 **`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。
 
@@ -121,6 +122,8 @@ meridian client remove NAME [--yes] [--json]
 **`client list`** — 列出客户端带状态、流量、创建时间和最后看到。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
+
+**`client reissue`** — 在链接泄露后替换客户端的链接。Remnawave 生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额、到期时间和 HWID 设备数限制保持面板中的设置；不认识的设备请在面板中删除。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
 
 **`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 
