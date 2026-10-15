@@ -3,6 +3,15 @@
 Two uploads, one per language. Files come from `pnpm export [ru]`: the 1080p video `out/meridian-setup[.ru].mp4`, the thumbnail `out/thumbnail.<lang>.jpg`, subtitles `out/meridian-setup.<lang>.srt` (the captions are also burned into the picture, so leave the track off by default), and chapters `out/chapters.<lang>.txt`; refresh the chapters here after a re-render.
 Settings: not made for kids, monetization allowed (the narration comes from a paid ElevenLabs plan and the music from ACE-Step, MIT), category Science & Technology, licence Standard YouTube or Creative Commons. Link the two videos to each other in their descriptions once both are up.
 
+## Published
+
+| Cut | English | Русский |
+|---|---|---|
+| Walkthrough | https://youtu.be/kl-mp3bZJz0 | https://youtu.be/KS6D4uGacZ0 |
+| Short (vertical) | https://youtube.com/shorts/A8rNs_cUzdg | https://youtube.com/shorts/EGkRRdGTjU4 |
+
+The Shorts are `out/tiktok.<lang>.mp4` with the same titles as the walkthroughs. They aren't on TikTok (no account yet). After re-recording, replace the uploads and update these links.
+
 # English
 
 ## Title

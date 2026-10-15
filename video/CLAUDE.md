@@ -34,4 +34,5 @@
 ## Links
 
 - How to reproduce: `README.md`
+- Published uploads and their text: `youtube.md`
 - Lab VMs: `tests/realvm/lab.py`
