@@ -76,6 +76,12 @@ meridian test
 
 The check also measures each leg: from every hop it downloads the exit's camouflage site through the next hop, sending the same SNI clients send, and reports the connect time, the time to first byte, and how many bytes arrived. A transfer that freezes between roughly 8 and 32 KB is the signature of throttling on that leg and is reported as a warning; the usual fix is a relay host at a different provider (another network, or ASN). If the camouflage site's home page is smaller than 32 KB, the leg check is inconclusive rather than passing.
 
+To give a relay another camouflage SNI, for example when `meridian test --probe` reports its SNI blocked, change it in place. Meridian checks that the exit reaches the new site, shows the review, and applies it; the old name stops working at once, and apps switch at their next subscription refresh (every 6 hours) or a manual refresh. Pass the exit's own SNI to make the relay follow the exit again:
+
+```bash
+meridian relay sni 203.0.113.10 dl.google.com
+```
+
 To retire a relay, remove the chains through it. Meridian shows what it will delete, asks for confirmation, and cleans up the Realm service, firewall rules, and published entry points; existing clients lose the relay on their next subscription refresh:
 
 ```bash
@@ -112,7 +118,7 @@ Rent a small server on a domestic provider whose address is allowed on your user
 meridian relay add 203.0.113.10 --exit 198.51.100.10 --name ru-mobile --sni allowed.example.com
 ```
 
-With `--sni`, only this relay's entry in the subscription announces that name. Meridian adds the name to the exit's Reality listener (same keys) and gives the relay its own listener on the exit. It routes only that name to Reality, sends everything else to the camouflage site, and is reachable only from the relay's last hop. The exit's own camouflage target and its other entries don't change. The name doesn't have to be reachable from the exit, because the exit still presents its own camouflage target. A prober that reaches the relay without a valid key is therefore forwarded to that target instead of getting a proxy answer.
+With `--sni`, only this relay's entry in the subscription announces that name. Meridian gives the relay its own listener on the exit, reachable only from the relay's last hop, and a Reality listener (same keys) that imitates the name. It routes only that name to Reality and sends everything else to that site, so a prober that reaches the relay without a valid key sees the site's real certificate instead of a proxy answer. The exit's own camouflage target and its other entries don't change. The exit must reach the name with TLS 1.3 and HTTP/2; change it later with `meridian relay sni RELAY NEW_SNI`.
 
 Then check the relay and test from the network that matters:
 

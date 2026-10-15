@@ -70,3 +70,24 @@ def test_progress_speaks_the_wizard_language_while_events_stay_english(stderr: i
         i18n.set_locale("en")
 
     assert stderr.getvalue().splitlines() == ["  ✓ Подготовка сервера: otter"]
+
+
+def test_stalled_connection_is_a_translated_retry_line_not_a_failure(stderr: io.StringIO) -> None:
+    from meridian import i18n
+
+    reporter = RichApplyReporter(server_label={"srv-1": "server-1"}.get)
+    reporter.emit(_event("plan.action.started", "certificate", "srv-1", index=1, total=1))
+    stalled = {"code": "connection_stalled", "attempt": 1, "message": "connection stalled, retrying"}
+    reporter.emit(_event("warning", "certificate", "srv-1", index=1, total=1, **stalled))
+    i18n.set_locale("ru")
+    try:
+        reporter.emit(OperationContext().events.event("warning", data={"code": "connection_stalled"}))
+    finally:
+        i18n.set_locale("en")
+
+    assert stderr.getvalue().splitlines() == [
+        "  ↻ TLS certificate on server-1 — connection stalled, retrying…",
+        "  ↻ соединение зависло, повторяем…",
+    ]
+    assert reporter._status is not None  # the action is still running
+    reporter.close()

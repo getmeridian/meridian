@@ -90,6 +90,7 @@ from meridian.reconciler.server_evidence import (
     negated_path_is_absent,
     require_successful_evidence,
 )
+from meridian.reconciler.stall_retry import stall_event_notice
 from meridian.reconciler.workloads import (
     PanelRealityKeyFactory,
     WorkloadStateManager,
@@ -193,7 +194,6 @@ class SetupRuntime:
         fence_factory: FenceFactory | None = None,
     ) -> None:
         self._registry = registry
-        self._fence_factory: FenceFactory = fence_factory or SSHApplyFence
         self._cluster_loader = cluster_loader
         self._persist = persist or (lambda cluster: cluster.save())
         self._panel_factory = panel_factory
@@ -201,6 +201,9 @@ class SetupRuntime:
         self._cancellation = cancellation
         self._reporter: Reporter = reporter or NoopReporter()
         self._operation = operation or OperationContext()
+        self._fence_factory: FenceFactory = fence_factory or partial(
+            SSHApplyFence, on_stall=stall_event_notice(self._reporter, self._operation)
+        )
         self._control_bootstrap = control_bootstrap or partial(
             _bootstrap_control_plane,
             cancellation=cancellation,

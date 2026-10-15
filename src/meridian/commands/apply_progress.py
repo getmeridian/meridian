@@ -16,10 +16,12 @@ from meridian.core.events import (
     PLAN_ACTION_SKIPPED,
     PLAN_ACTION_STARTED,
     PROVISION_STEP_STARTED,
+    WARNING,
 )
 from meridian.core.models import Event
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.i18n import step_label, t
+from meridian.reconciler.stall_retry import CONNECTION_STALLED
 from meridian.servers import ServerRegistry
 
 _TERMINAL = frozenset({PLAN_ACTION_COMPLETED, PLAN_ACTION_FAILED, PLAN_ACTION_SKIPPED})
@@ -67,6 +69,9 @@ class RichApplyReporter:
             self._line(f"  [error]✗[/error] {escape(self._label(event) + detail)}")
         elif event.type == PLAN_ACTION_SKIPPED:
             self._line(f"  [warn]-[/warn] {escape(t('progress.waits', label=self._label(event)))}")
+        elif event.type == WARNING and event.data.get("code") == CONNECTION_STALLED:
+            label = f"{self._label(event)} — " if event.resource is not None else ""
+            self._line(f"  [warn]↻[/warn] {escape(label + t('progress.stalled'))}")
         if event.type in _TERMINAL and event.data.get("index") == event.data.get("total"):
             self._action = ""
             self.close()

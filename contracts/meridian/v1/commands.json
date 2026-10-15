@@ -577,6 +577,68 @@
     {
       "argv": [
         "client",
+        "reissue",
+        "NAME"
+      ],
+      "command": "client.reissue",
+      "data_schema": "client-reissue",
+      "description": "Replace a client's links after a leak; the old page and subscription stop working",
+      "envelope_schema": "client-reissue-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "client links were reissued and the new page published",
+        "1": "unexpected Meridian bug",
+        "130": "process interrupted; no JSON envelope is emitted",
+        "2": "client not found, not one of the fleet's clients, or confirmation missing",
+        "3": "links were reissued but the old page, new page, or local evidence save was incomplete; system or panel failure"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--yes",
+        "--json"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "client links were reissued and the new page published",
+          "status": "ok"
+        },
+        {
+          "category": "none",
+          "exit_code": 3,
+          "meaning": "links were reissued but the old page, new page, or local evidence save was incomplete",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "client not found, not one of the fleet's clients, or confirmation missing",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or panel failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "stable",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "client",
         "remove",
         "NAME"
       ],

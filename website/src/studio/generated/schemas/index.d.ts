@@ -23,6 +23,8 @@ export * as ClientEnableEnvelopeSchema from "./client-enable-envelope.schema";
 export * as ClientListEnvelopeSchema from "./client-list-envelope.schema";
 export * as ClientListSchema from "./client-list.schema";
 export * as ClientNameRequestSchema from "./client-name-request.schema";
+export * as ClientReissueEnvelopeSchema from "./client-reissue-envelope.schema";
+export * as ClientReissueSchema from "./client-reissue.schema";
 export * as ClientRemoveEnvelopeSchema from "./client-remove-envelope.schema";
 export * as ClientRemoveSchema from "./client-remove.schema";
 export * as ClientShowEnvelopeSchema from "./client-show-envelope.schema";

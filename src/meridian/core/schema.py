@@ -17,6 +17,7 @@ from meridian.core.cancellation import OperationCancellation
 from meridian.core.clients import (
     ClientAddResult,
     ClientListResult,
+    ClientReissueResult,
     ClientRemoveResult,
     ClientShowResult,
     ClientStatusResult,
@@ -383,6 +384,13 @@ _, _, ClientRemoveOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian client remove --json`.",
 )
 
+_, _, ClientReissueOutputEnvelope = _make_command_envelope(
+    "ClientReissue",
+    "client.reissue",
+    ClientReissueResult,
+    doc="Envelope schema for `meridian client reissue --json`.",
+)
+
 _, _, ClientEnableOutputEnvelope = _make_command_envelope(
     "ClientEnable",
     "client.enable",
@@ -482,6 +490,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-show-envelope": ClientShowOutputEnvelope,
     "client-add-envelope": ClientAddOutputEnvelope,
     "client-remove-envelope": ClientRemoveOutputEnvelope,
+    "client-reissue-envelope": ClientReissueOutputEnvelope,
     "client-enable-envelope": ClientEnableOutputEnvelope,
     "client-disable-envelope": ClientDisableOutputEnvelope,
     "node-list-envelope": NodeListOutputEnvelope,
@@ -529,6 +538,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "client-show": ClientShowResult,
     "client-add": ClientAddResult,
     "client-remove": ClientRemoveResult,
+    "client-reissue": ClientReissueResult,
     "client-status": ClientStatusResult,
     "client-name-request": ClientNameRequest,
     "server-add-request": ServerAddRequest,

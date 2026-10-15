@@ -149,6 +149,16 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         ],
         stability="stable",
     ),
+    "client.reissue": CommandOutput(
+        data_schema="client-reissue",
+        outcomes=[
+            _ok("client links were reissued and the new page published"),
+            _ok("links were reissued but the old page, new page, or local evidence save was incomplete", exit_code=3),
+            _user("client not found, not one of the fleet's clients, or confirmation missing"),
+            *_PANEL_FAILURES,
+        ],
+        stability="stable",
+    ),
     "client.enable": CommandOutput(
         data_schema="client-status",
         outcomes=[_ok("client was enabled"), _user("client not found or input error"), *_PANEL_FAILURES],
@@ -171,6 +181,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "node.replace": None,
+    "node.sni": None,
     "node.remove": None,
     "relay.add": None,
     "relay.list": CommandOutput(
@@ -184,6 +195,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "relay.remove": None,
+    "relay.sni": None,
     "route.add": CommandOutput(
         data_schema="route-mutation",
         outcomes=_route_mutation("the override was added and applied"),

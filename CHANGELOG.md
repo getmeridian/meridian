@@ -97,13 +97,21 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
   settings, and relays, so clients keep working, then cleans up the old server
   through the reviewed apply. The control server can't be moved yet.
+- **Change a camouflage SNI in one command** — `meridian node sni EXIT NEW_SNI`
+  and `meridian relay sni RELAY NEW_SNI` switch an exit or relay to another
+  site when `meridian test --probe` says the SNI is blocked. They check that
+  the exit reaches the site over TLS 1.3 with HTTP/2, show the review, and
+  apply it. The old name is replaced, not kept alongside; apps switch at their
+  next subscription refresh (every 6 hours) or a manual refresh. They, `node
+  add --sni`, and `relay add --sni` refuse Apple names and `www.microsoft.com`.
 - **`meridian fleet upgrade`** — compares the Remnawave images each server runs
   with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
   Newer or floating tags you chose are kept, and PostgreSQL never moves to a new
   major version in place. `meridian update` points to it when a fleet exists.
   With relays it also moves Realm to GitHub's newest release in the tested
   major, pinned by the sha256 GitHub publishes, so relay fixes need no Meridian
-  release either.
+  release either. Relays get Realm's static build, which runs on any glibc, and
+  a new binary replaces the running one only after it starts on that server.
 - **Pins stay current between releases** — a weekly job opens a pull request
   raising the Realm, RealiTLScanner, acme.sh, and Remnawave defaults; the local
   Xray test client is now pinned by checksum too, and a Realm tarball without a
@@ -190,8 +198,20 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   VLESS path "VLESS".
 - With several exits, subscriptions list the first server's entries ahead of
   later ones within each method instead of sorting them by exit name.
+- **A brief network stall no longer fails the apply** — every command shared one
+  SSH connection, so a stall made each later command hang until its own timeout
+  and the apply stopped. Now SSH notices a silent server within about 15 seconds,
+  drops the stuck connection, and reconnects. Read-only checks and the control
+  server's apply record retry for about a minute, and the progress shows
+  "connection stalled, retrying…". A change whose outcome is unknown is checked
+  on the server first and is never repeated blindly.
 
 ### Sharing
+- **`meridian client reissue NAME` replaces a leaked link** — Remnawave issues
+  the client a new subscription ID and new keys, so the old subscription URL,
+  connection page, and links stop working; Meridian deletes the old page,
+  publishes a new one, and prints the new links. The client and their panel
+  settings stay, including the HWID device limit, which the panel enforces.
 - **Happ, v2rayNG, and other JSON-capable apps get the Xray JSON** — with it
   comes the automatic failover between entries; they used to get plain base64
   links. Meridian turns on Remnawave's JSON-at-base setting, which follows

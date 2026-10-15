@@ -1,4 +1,4 @@
-"""Tests for client add/list/show/remove/enable/disable commands.
+"""Tests for client add/list/show/reissue/remove/enable/disable commands.
 
 Clients are the access users declared in the saved topology; runtime user
 state lives in Remnawave and is read through MeridianPanel.
@@ -17,7 +17,15 @@ import pytest
 import typer
 
 from meridian.cluster import ClusterConfig, PanelConfig
-from meridian.commands.client import run_add, run_disable, run_enable, run_list, run_remove, run_show
+from meridian.commands.client import (
+    run_add,
+    run_disable,
+    run_enable,
+    run_list,
+    run_reissue,
+    run_remove,
+    run_show,
+)
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.console import set_json_mode
 from meridian.core.topology import AccessIntent
@@ -433,6 +441,166 @@ class TestRunRemove:
         assert payload["status"] == "failed"
         assert "--yes" in payload["errors"][0]["hint"]
         panel.delete_user.assert_not_called()
+
+
+_NEW_VLESS = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+
+
+def _reissued(name: str = "alice") -> User:
+    """What Remnawave returns after revoke: same id and settings, new short UUID and VLESS UUID."""
+    user = _make_user(name)
+    return User(**{**user.__dict__, "short_uuid": "new-short-uuid-1234", "vless_uuid": _NEW_VLESS})
+
+
+@contextmanager
+def _reissue_cli(
+    cluster: ClusterConfig,
+    panel: MagicMock,
+    *,
+    json_mode: bool = False,
+    page_error: str = "",
+    published: HandoffLinks | None = None,
+) -> Iterator[tuple[MagicMock, MagicMock]]:
+    """Serve a reissue; yields the (remove_connection_page, publish_connection_pages) mocks."""
+    links = published or HandoffLinks(
+        "alice",
+        "https://198.51.100.1/pages/sub/new-short-uuid-1234",
+        page_url=f"https://198.51.100.1/pages/{_NEW_VLESS}/",
+    )
+    with (
+        _cli(cluster, panel, json_mode=json_mode),
+        patch("meridian.commands.client.remove_connection_page", return_value=page_error) as remove_page,
+        patch("meridian.commands.client.publish_connection_pages", return_value=[links]) as publish,
+        patch("meridian.commands.client.print_handoff_links"),
+    ):
+        yield remove_page, publish
+
+
+class TestRunReissue:
+    def test_revokes_by_numeric_id_and_swaps_the_page(self, tmp_home: Path) -> None:
+        cluster = _make_cluster(tmp_home)
+        panel = _make_panel_mock()
+        panel.revoke_user_subscription.return_value = _reissued()
+
+        with _reissue_cli(cluster, panel) as (remove_page, publish):
+            run_reissue(name="alice", yes=True)
+
+        panel.revoke_user_subscription.assert_called_once_with("101")
+        remove_page.assert_called_once_with(cluster, _make_user().vless_uuid)
+        publish.assert_called_once_with(cluster, ["alice"])
+        # Settings stay the operator's: nothing beside the revoke touches the user.
+        panel.delete_user.assert_not_called()
+        panel.disable_user.assert_not_called()
+        panel.enable_user.assert_not_called()
+
+    def test_json_envelope_reveals_the_new_links(self, tmp_home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        panel = _make_panel_mock()
+        panel.revoke_user_subscription.return_value = _reissued()
+
+        with _reissue_cli(_make_cluster(tmp_home), panel, json_mode=True):
+            run_reissue(name="alice", yes=True)
+
+        payload = _json(capsys)
+        assert (payload["command"], payload["status"], payload["exit_code"]) == ("client.reissue", "ok", 0)
+        assert payload["summary"]["changed"] is True
+        assert payload["data"]["client"] == {
+            "username": "alice",
+            "id": "101",
+            "status": "active",
+            "page_url": f"https://198.51.100.1/pages/{_NEW_VLESS}/",
+            "subscription_url": "https://198.51.100.1/pages/sub/new-short-uuid-1234",
+        }
+
+    def test_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
+        cluster = _make_cluster(tmp_home, users=["alice", "biba"])
+        cluster.topology_intent = cluster.topology_intent.model_copy(  # type: ignore[union-attr]
+            update={"access": AccessIntent(users=["alice", "biba"], display_names={"biba": "Биба"})}
+        )
+        panel = _make_panel_mock()
+        panel.get_user.return_value = _make_user("biba")
+        panel.revoke_user_subscription.return_value = _reissued("biba")
+
+        with _reissue_cli(cluster, panel) as (_remove_page, publish):
+            run_reissue(name="биба", yes=True)
+
+        panel.get_user.assert_called_once_with("biba")
+        publish.assert_called_once_with(cluster, ["biba"])
+
+    @pytest.mark.parametrize(
+        ("name", "users"),
+        [("ghost", ["alice", "bob"]), ("default", ["alice"])],
+        ids=["unknown", "service-user"],
+    )
+    def test_refuses_names_outside_the_access_intent_and_lists_clients(
+        self, name: str, users: list[str], tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with (
+            _cli(_make_cluster(tmp_home, users=users), json_mode=True) as panel_cls,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_reissue(name=name, yes=True)
+
+        payload = _json(capsys)
+        assert exc_info.value.exit_code == 2
+        assert payload["errors"][0]["hint"] == "Your clients: " + ", ".join(users)
+        panel_cls.assert_not_called()
+
+    def test_json_requires_yes_before_touching_anything(
+        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with _cli(_make_cluster(tmp_home), json_mode=True) as panel_cls, pytest.raises(typer.Exit) as exc_info:
+            run_reissue(name="alice", yes=False)
+
+        assert exc_info.value.exit_code == 2
+        assert "--yes" in _json(capsys)["errors"][0]["hint"]
+        panel_cls.assert_not_called()
+
+    def test_declining_the_prompt_changes_nothing(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+
+        with (
+            _reissue_cli(_make_cluster(tmp_home), panel) as (remove_page, _publish),
+            patch("meridian.commands.client.confirm", return_value=False) as ask,
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_reissue(name="alice")
+
+        assert exc_info.value.exit_code == 1
+        assert "alice" in ask.call_args.args[0]
+        remove_page.assert_not_called()
+        panel.revoke_user_subscription.assert_not_called()
+
+    def test_an_undeletable_old_page_stops_before_the_revoke(self, tmp_home: Path) -> None:
+        panel = _make_panel_mock()
+
+        with (
+            _reissue_cli(_make_cluster(tmp_home), panel, page_error="permission denied"),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_reissue(name="alice", yes=True)
+
+        assert exc_info.value.exit_code == 3
+        panel.revoke_user_subscription.assert_not_called()
+
+    def test_unpublished_new_page_is_partial_with_a_repair_hint(
+        self, tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        panel = _make_panel_mock()
+        panel.revoke_user_subscription.return_value = _reissued()
+        failed = HandoffLinks("alice", "https://198.51.100.1/pages/sub/new-short-uuid-1234", error="ssh down")
+
+        with (
+            _reissue_cli(_make_cluster(tmp_home), panel, json_mode=True, published=failed),
+            pytest.raises(typer.Exit) as exc_info,
+        ):
+            run_reissue(name="alice", yes=True)
+
+        payload = _json(capsys)
+        assert exc_info.value.exit_code == 3
+        assert payload["data"]["client"]["page_url"] == ""
+        assert payload["data"]["client"]["subscription_url"].endswith("/sub/new-short-uuid-1234")
+        assert payload["warnings"][0]["code"] == "MERIDIAN_CLIENT_PAGE_PUBLISH_FAILED"
+        assert "--repair-page" in payload["warnings"][0]["hint"]
 
 
 @pytest.mark.parametrize("command", ["add", "enable", "disable"])

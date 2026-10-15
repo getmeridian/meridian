@@ -22,8 +22,8 @@ from meridian.reconciler.resources import (
 from meridian.reconciler.server_evidence import (
     build_observation,
     file_content_or_absent,
-    managed_command_output,
     port_is_listening,
+    require_available_evidence,
     require_successful_evidence,
     service_is_active,
 )
@@ -89,7 +89,9 @@ class RealmHopDriver(retirement.RealmHopRetirement):
         expected_version = runtime_pin(self.context.plan, "realm_version", REALM_VERSION)
         service_active = service_is_active(logical_id, active, "Realm service")
         require_successful_evidence(logical_id, listening, "TCP listener inspection")
-        version_output = managed_command_output(logical_id, version, "Realm version")
+        # A binary that runs and fails (a missing glibc symbol) is broken, not unobservable: reinstall it.
+        require_available_evidence(logical_id, version, "Realm version", missing_managed_binary=True)
+        version_output = version.stdout if version.returncode == 0 else None
         exists = config_content is not None and unit_content is not None
         port_listening = port_is_listening(listening.stdout, payload.listen_port)
         version_ok = version_output is not None and parse_realm_version(version_output) == expected_version

@@ -105,6 +105,7 @@ meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
+meridian client reissue NAME [--yes] [--json]
 meridian client remove NAME [--yes] [--json]
 ```
 
@@ -112,7 +113,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（所有客户端命令） |
 | `--repair-page` | | 重新发布客户端的连接页面（`client show`） |
-| `--yes`, `-y` | | 确认 `client remove`；`--json` 需要 |
+| `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
 **`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或面板中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而面板只接受拉丁字母、数字、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。
 
@@ -121,6 +122,8 @@ meridian client remove NAME [--yes] [--json]
 **`client list`** — 列出客户端带状态、流量、创建时间和最后看到。带 `--json`，返回 `data.summary` 计数和 `data.clients[]`。
 
 **`client enable` / `client disable`** — 立即恢复或暂停客户端。禁用持续到你运行 `client enable`；应用（包括重新部署和 `client add`、`node add`、`relay add`）保持客户端的状态不变。
+
+**`client reissue`** — 在链接泄露后替换客户端的链接。Remnawave 生成新的订阅 ID 和新的密钥，因此旧的订阅 URL、连接页面和链接全部失效。Meridian 先删除旧页面，再发布新页面并打印新链接。状态、限额、到期时间和 HWID 设备数限制保持面板中的设置；不认识的设备请在面板中删除。除非 `--yes`，否则要求确认；不属于你的客户端的名称会被拒绝。如果新页面无法发布，仍会显示链接并给出警告，退出码为 `3`（用 `client show --repair-page` 修复）。
 
 **`client remove`** — 从拓扑中删除客户端，删除面板用户和其连接页面。除非 `--yes`，否则要求确认。最后一个客户端无法删除。不要直接在面板中删除用户；Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
 
@@ -152,6 +155,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node sni EXIT NEW_SNI [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -175,6 +179,8 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 
 **`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（节点容器、镜像和目录；其 nginx 文件、防火墙规则和证书）；Docker 和保存的服务器保留。对于控制服务器拒绝（移动面板会改变每个订阅 URL），以及对于已经有角色的新服务器拒绝。
 
+**`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。
+
 ### meridian relay
 
 管理中继 — Realm TCP 转发器，给用户一个到国外出口的国内入口点。中继承载 Reality 流量。
@@ -183,6 +189,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -199,6 +206,8 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 **`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
 **`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
+
+**`relay sni`** — 为通过某服务器的中继链（或按 ID 指定的一条链；用 `--exit` 缩小范围）设置新的伪装 SNI。它拒绝与 `node sni` 相同的名称，检查出口能否访问该站点（中继自己的名称由出口上的 Reality 侦听器提供），审查、确认并应用。传入出口自己的 SNI 会让中继重新跟随出口。应用在下次订阅刷新时切换。
 
 要检查中继的跳跃，运行 `meridian check RELAY`。
 

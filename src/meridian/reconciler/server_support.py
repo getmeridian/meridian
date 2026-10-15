@@ -27,8 +27,14 @@ def runtime_pin_group(plan: ResourcePlan, prefix: str) -> dict[str, str]:
 
 
 def raise_if_timeout(action: ResourceAction, result: object | None) -> None:
-    if result is not None and getattr(result, "returncode", None) == 124:
+    """A mutation that timed out or lost its SSH connection (exit 255) may have run: observe before retrying."""
+    returncode = getattr(result, "returncode", None) if result is not None else None
+    if returncode == 124:
         raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")
+    if returncode == 255:
+        raise UnknownResourceOutcome(
+            f"Lost the SSH connection while mutating {action.resource.logical_id}; observation is required."
+        )
 
 
 def raise_if_step_timeout(action: ResourceAction, result: StepResult) -> None:

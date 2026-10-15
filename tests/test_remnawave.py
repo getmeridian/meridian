@@ -346,6 +346,15 @@ class TestUsers:
         assert _call(client, 0)[:2] == ("POST", "api/users/5/actions/enable")
         assert _call(client, 1)[:2] == ("POST", "api/users/5/actions/disable")
 
+    def test_revoke_issues_a_new_short_uuid_by_numeric_id(self) -> None:
+        """3.4.5 contract: POST /users/{userId}/actions/revoke; revokeOnlyPasswords=false also rotates shortUuid."""
+        panel, client = _wired_panel(
+            _mock_response(200, {"response": {"id": 5, "username": "alice", "shortUuid": "new", "vlessUuid": "v2"}})
+        )
+        user = panel.revoke_user_subscription("5")
+        assert _call(client) == ("POST", "api/users/5/actions/revoke", {"revokeOnlyPasswords": False})
+        assert (user.short_uuid, user.vless_uuid) == ("new", "v2")
+
     def test_delete_user_accepts_204_and_reports_missing(self) -> None:
         panel, client = _wired_panel(_empty_response(204), _mock_response(404))
         assert panel.delete_user("5") is True

@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "ClientCreated": {
+      "additionalProperties": false,
+      "description": "Client metadata returned after creation or reissue, with their handoff links.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "page_url": {
+          "default": "",
+          "title": "Page Url",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "subscription_url": {
+          "default": "",
+          "title": "Subscription Url",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "id",
+        "status"
+      ],
+      "title": "ClientCreated",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result for reissuing one client's links; the old ones no longer work.",
+  "properties": {
+    "client": {
+      "$ref": "#/$defs/ClientCreated"
+    }
+  },
+  "required": [
+    "client"
+  ],
+  "title": "ClientReissueResult",
+  "type": "object"
+}

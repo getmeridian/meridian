@@ -3,7 +3,7 @@
 ## Design decisions
 
 **One file per command** — `cli.py` registers top-level commands and the root callback, `cli_groups.py` the sub-apps; both parse flags and defer to the command module.
-**Commands edit intent** — fleet commands load `cluster.yml` through `load_topology_cluster()`. `client`, `node`, `relay`, and `route` add/remove edit `topology_intent` and apply it through `_helpers.apply_reviewed_intent()` (progress from `apply_progress()`); removals let reviewed retirement delete what vanished (`topology_removal.py`, `node_replace.py`). Never mutate panel or server state beside the compiled plan.
+**Commands edit intent** — fleet commands load `cluster.yml` through `load_topology_cluster()`. `client`, `node`, `relay`, and `route` add/remove edit `topology_intent` and apply it through `_helpers.apply_reviewed_intent()` (progress from `apply_progress()`); removals let reviewed retirement delete what vanished (`topology_removal.py`, `node_replace.py`). `node sni`/`relay sni` (`sni.py`) replace a camouflage SNI outright: a Reality listener imitates one site, so a lingering old name would answer with the new site's certificate. Never mutate panel or server state beside the compiled plan.
 **One target vocabulary** — `cli_options.py` owns the shared `SERVER` argument and option types; `meridian.resolve.parse_target()`/`merge_target()` read `[user@]host[:port]`, saved names, and `local` like ssh. `resolve.py` adds prompts around the cascade: target, local mode, single saved server, else fail with candidates.
 **One JSON switch** — every `--json` is `cli_options.Json` and every JSON-implying flag uses `enable_json_output`, so bodies only read `is_json_mode()`. The root callback resolves argv through Click (`cli_catalog`); global `--json` works exactly where the command declares it. Never re-parse argv by hand.
 **Machine deploy mode** — `deploy --json`, `--events=jsonl`, `--request FILE`, and `--dry-run` serve UI clients: no prompts or Rich, the final `meridian.output/v1` envelope on stdout, JSONL on stderr. Hidden `--cancel-file` stops at the next safe point with a `cancelled` envelope (exit 5).
@@ -14,7 +14,7 @@
 
 ## What's done well
 
-- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
+- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.
@@ -22,6 +22,7 @@
 - `confirm()` returns a bool; callers must `raise typer.Exit(1)` on False.
 - Build core request models and render wrapped validation errors before opening SSH or panel connections; rebuild a model from untrusted data, never `model_copy(update=...)`.
 - Teardown refuses a server that still holds intent roles (only a whole single-server fleet goes in one step) and deletes the saved profile last.
+- `client reissue` deletes the old page before revoking: the page directory is the old VLESS UUID, which the revoke replaces, so a page left behind could never be found again.
 - Removals refuse the control server and its dependents before review; `node remove --force` only extends the edit to relay chains into that exit.
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
 - Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.

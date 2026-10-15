@@ -71,7 +71,7 @@ export interface ClientAddResult {
   clients?: Clients;
 }
 /**
- * Client metadata returned after creation, with their handoff links.
+ * Client metadata returned after creation or reissue, with their handoff links.
  */
 export interface ClientCreated {
   id: Id;

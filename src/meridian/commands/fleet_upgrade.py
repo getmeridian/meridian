@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import typer
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from meridian.core.topology import SetupIntent
     from meridian.servers import ServerRegistry
 
-_BINARY_LABELS = {"realm": "Realm (relays)"}
+_BINARY_LABELS = {"realm": "Realm"}
 
 _STATUS_TEXT: dict[ImageStatus, str] = {
     "current": "[green]current[/green]",
@@ -64,10 +65,21 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
         )
     _explain_held(observed)
     binaries = _binary_targets(cluster, intent, tested=tested)
-    _render_binaries(binaries)
+    relays = _observe_relays(registry, intent) if binaries else []
+    realm_target = binaries["realm"][1].version if binaries else ""
+    _render_binaries(relays, realm_target)
+    if any(not relay.available for relay in relays):
+        for relay in relays:
+            if not relay.available:
+                warn(f"{relay.label}: could not read its Realm version ({relay.error})")
+        fail(
+            "Cannot tell what an upgrade would change on every relay",
+            hint="Restore SSH access (check with `meridian check SERVER`), then rerun `meridian fleet upgrade`.",
+            hint_type="system",
+        )
     overrides = {name: image for name, image in targets.items() if image != UPGRADABLE_PINS[name]}
     binary_overrides = {name: target for name, (_, target) in binaries.items() if target != UPGRADABLE_BINARIES[name]}
-    binary_changes = sum(1 for pinned, target in binaries.values() if target.version != pinned.version)
+    binary_changes = sum(1 for relay in relays if relay.running != realm_target)
     changes = sum(len(server.changes) for server in observed) + binary_changes
     if not changes:
         if overrides != cluster.image_pins or binary_overrides != cluster.binary_pins:
@@ -84,9 +96,13 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
     _save_pins(cluster, overrides, binary_overrides)
     _apply(cluster, registry, intent)
     after = _observe(registry, intent, targets)
+    relays_after = _observe_relays(registry, intent) if binaries else []
     behind = [(server, image) for server in after for image in server.changes]
-    if behind or any(not server.available for server in after):
+    behind_relays = [relay for relay in relays_after if relay.running != realm_target]
+    unreadable = any(not server.available for server in after) or any(not relay.available for relay in relays_after)
+    if behind or behind_relays or unreadable:
         _render(after)
+        _render_binaries(relays_after, realm_target)
         fail(
             "The apply finished, but some servers still do not run their target images",
             hint="Inspect the containers with `meridian check`, then rerun `meridian fleet upgrade`.",
@@ -143,6 +159,61 @@ def _binary_targets(
                 info(exc.hint)
             targets[name] = (pin, pin)
     return targets
+
+
+@dataclass(frozen=True)
+class RelayRealm:
+    """The Realm version one relay runs; ``""`` when it is missing or does not start, ``error`` when unreadable."""
+
+    server_ref: str
+    label: str
+    running: str = ""
+    error: str = ""
+
+    @property
+    def available(self) -> bool:
+        return not self.error
+
+
+def _observe_relays(registry: ServerRegistry, intent: SetupIntent) -> list[RelayRealm]:
+    """Read the installed Realm version on every relay, in parallel and read-only.
+
+    The saved pin only says what the next apply installs; a failed upgrade leaves it ahead of the relay.
+    """
+    from meridian.compiler import compile_topology
+    from meridian.compiler.models import RealmHopPayload
+    from meridian.config import RELAY_BINARY_PATH
+    from meridian.provision.relay import parse_realm_version
+    from meridian.resolve import connection_for_entry
+
+    servers = list(
+        dict.fromkeys(
+            resource.payload.server_ref
+            for resource in compile_topology(intent).resources
+            if isinstance(resource.payload, RealmHopPayload)
+        )
+    )
+
+    def observe(server_ref: str) -> RelayRealm:
+        try:
+            entry = registry.find(server_ref)
+        except LocalStateError as exc:
+            return RelayRealm(server_ref, server_ref, error=str(exc))
+        if entry is None:
+            return RelayRealm(server_ref, server_ref, error="the saved server profile is missing")
+        label = entry.name or entry.host
+        try:
+            result = connection_for_entry(entry).run(f"{RELAY_BINARY_PATH} --version 2>/dev/null", timeout=15)
+        except Exception as exc:  # noqa: BLE001 - any transport failure is unavailable evidence
+            return RelayRealm(server_ref, label, error=str(exc) or type(exc).__name__)
+        if result.returncode in (124, 255):
+            detail = result.stderr.strip().splitlines()
+            return RelayRealm(server_ref, label, error=detail[-1] if detail else f"exit {result.returncode}")
+        # Missing (127) or failing to start (a missing glibc symbol) both mean the next apply installs it.
+        return RelayRealm(server_ref, label, parse_realm_version(result.stdout) if result.returncode == 0 else "")
+
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(servers)))) as executor:
+        return list(executor.map(observe, servers))
 
 
 def _save_pins(cluster: ClusterConfig, overrides: dict[str, str], binary_overrides: dict[str, BinaryPin]) -> None:
@@ -211,20 +282,24 @@ def _render(observed: list[ServerImages]) -> None:
     err_console.print()
 
 
-def _render_binaries(binaries: dict[str, tuple[BinaryPin, BinaryPin]]) -> None:
-    if not binaries:
+def _render_binaries(relays: list[RelayRealm], target: str) -> None:
+    if not relays:
         return
     from rich.box import ROUNDED
     from rich.table import Table
 
     table = Table(title="Server binaries", box=ROUNDED, pad_edge=False, padding=(0, 1))
-    table.add_column("Component", style="bold cyan")
-    table.add_column("Pinned", style="dim")
+    table.add_column("Server", style="bold cyan")
+    table.add_column("Component")
+    table.add_column("Running", style="dim")
     table.add_column("Target", style="dim")
     table.add_column("Status")
-    for name, (pinned, target) in binaries.items():
-        status = _STATUS_TEXT["current"] if target.version == pinned.version else _STATUS_TEXT["upgrade"]
-        table.add_row(_BINARY_LABELS[name], pinned.version, target.version, status)
+    for relay in relays:
+        if not relay.available:
+            table.add_row(escape(relay.label), "Realm", "-", "-", "[red]unavailable[/red]")
+            continue
+        status: ImageStatus = "current" if relay.running == target else "upgrade" if relay.running else "absent"
+        table.add_row(escape(relay.label), "Realm", relay.running or "absent", target, _STATUS_TEXT[status])
     err_console.print(table)
     err_console.print()
 

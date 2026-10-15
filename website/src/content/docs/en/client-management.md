@@ -68,6 +68,20 @@ meridian client enable alice
 
 A disable lasts until `client enable`: apply, redeploys, and fleet changes leave it alone.
 
+## Replacing a leaked link
+
+If a client's link or connection page reaches someone it shouldn't, replace it:
+
+```
+meridian client reissue alice
+```
+
+Remnawave gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Everything else the panel holds for the client stays: status, traffic limit and usage, expiry, description, and HWID device limit.
+
+The HWID device limit lives in the panel, not in the link. Devices already registered stay on the client's HWID list after a reissue and keep taking slots, even though their old link no longer connects. Open the client in the panel and delete devices you don't recognize, so the limit counts only the client's own. Meridian adds no claim tickets or device binding of its own.
+
+With `--json`, pass `--yes`. The new links appear only in that command's output.
+
 ## Removing a client
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client. Don't delete users in the Remnawave panel directly — Meridian recreates any client still in the topology on the next apply.

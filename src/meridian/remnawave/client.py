@@ -256,7 +256,17 @@ class MeridianPanel(ControlPlaneMixin):
         """Disable a user."""
         self._post(f"/api/users/{_segment(user_id)}/actions/disable")
 
-    # --- Nodes ---
+    def revoke_user_subscription(self, user_id: str) -> User:
+        """Issue a new short UUID, VLESS UUID, and passwords; the user and its settings stay.
+
+        Remnawave pushes an active user's new credentials to connected nodes
+        itself, replacing the old VLESS UUID (``prevVlessUuid``).
+        """
+        data = self._post(
+            f"/api/users/{_segment(user_id)}/actions/revoke",
+            json={"revokeOnlyPasswords": False},
+        )
+        return parse_user(data)
 
     def create_node(
         self,

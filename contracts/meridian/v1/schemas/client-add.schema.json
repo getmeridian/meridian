@@ -2,7 +2,7 @@
   "$defs": {
     "ClientCreated": {
       "additionalProperties": false,
-      "description": "Client metadata returned after creation, with their handoff links.",
+      "description": "Client metadata returned after creation or reissue, with their handoff links.",
       "properties": {
         "id": {
           "title": "Id",

@@ -60,6 +60,10 @@ def run_deploy(
         sni=sni,
         ssh_port=target.port,
     )
+    if request.sni:
+        from meridian.commands.sni import refuse_unusable_camouflage
+
+        refuse_unusable_camouflage(request.sni)
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
@@ -127,13 +131,18 @@ def run_deploy(
             listen_port=request.listen_port,
             reality_sni=request.sni,
         )
-    elif (existing.exit_ref, existing.listen_port) != (exit_ref, request.listen_port) or (
-        request.sni and request.sni != existing.reality_sni
-    ):
+    elif (existing.exit_ref, existing.listen_port) != (exit_ref, request.listen_port):
         fail(
             f"{request.relay_name or request.relay_ip} already relays to {existing.exit_ref} "
             f"on port {existing.listen_port}.",
             hint=f"Remove it first with `meridian relay remove {existing.id}`, then add it again.",
+            hint_type="user",
+        )
+    elif request.sni and request.sni != existing.reality_sni:
+        current = f"SNI {existing.reality_sni}" if existing.reality_sni else "its exit's SNI"
+        fail(
+            f"{request.relay_name or request.relay_ip} already relays to {existing.exit_ref} with {current}.",
+            hint=f"Change its SNI with `meridian relay sni {existing.id} {request.sni}`.",
             hint_type="user",
         )
     else:

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import shutil
 import socket
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -170,6 +172,88 @@ class TestServerConnectionRun:
         write_index = next(i for i, call in enumerate(mock_run.call_args_list) if call[1].get("input"))
         create_index = next(i for i, command in enumerate(commands) if "install -m 600 /dev/null" in command)
         assert create_index < write_index
+
+
+class TestStalledConnection:
+    """A stalled control connection is dropped so the next command dials a fresh one (no real ssh)."""
+
+    @pytest.fixture
+    def socket_path(self, monkeypatch: pytest.MonkeyPatch) -> Any:
+        home = Path(tempfile.mkdtemp(prefix="mh", dir="/tmp"))  # short enough for a control socket
+        monkeypatch.setattr(ssh, "MERIDIAN_HOME", home)
+        path = ssh.control_path("root", "198.51.100.10", 22)
+        assert path is not None
+        path.parent.mkdir(parents=True)
+        path.touch()  # stands in for the master's socket
+        yield path
+        shutil.rmtree(home, ignore_errors=True)
+
+    @staticmethod
+    def _exits(mock_run: MagicMock) -> list[list[str]]:
+        return [call[0][0] for call in mock_run.call_args_list if "-O" in call[0][0]]
+
+    @pytest.mark.parametrize("identity_file", ["", "/tmp/meridian_ed25519"], ids=["multiplexed", "pinned-key"])
+    def test_every_ssh_command_sends_keepalives(self, identity_file: str) -> None:
+        cmd, _ = _spawned(ServerConnection(ip="198.51.100.10", identity_file=identity_file), "whoami")
+        assert "ServerAliveInterval=5" in cmd and "ServerAliveCountMax=3" in cmd
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [subprocess.TimeoutExpired(cmd="ssh", timeout=1), _done(255, stderr="Broken pipe")],
+        ids=["timeout", "transport-255"],
+    )
+    def test_transport_failure_asks_the_master_to_exit_and_frees_its_socket(
+        self, socket_path: Path, outcome: Any
+    ) -> None:
+        conn = ServerConnection(ip="198.51.100.10")
+        with patch("meridian.ssh.subprocess.run", side_effect=[outcome, _done()]) as mock_run:
+            result = conn.run("cat /etc/hostname", timeout=1)
+
+        assert result.returncode in {124, 255}
+        [exit_cmd] = self._exits(mock_run)
+        assert exit_cmd[:2] == ["ssh", "-o"] and exit_cmd[2] == f"ControlPath={socket_path}"
+        assert exit_cmd[3:] == ["-O", "exit", "root@198.51.100.10"]
+        assert not socket_path.exists()
+
+    def test_wedged_master_that_ignores_exit_still_loses_its_socket(self, socket_path: Path) -> None:
+        conn = ServerConnection(ip="198.51.100.10")
+        stall = subprocess.TimeoutExpired(cmd="ssh", timeout=1)
+        with patch("meridian.ssh.subprocess.run", side_effect=[stall, stall]):
+            conn.run("cat /etc/hostname", timeout=1)
+
+        assert not socket_path.exists()
+
+    def test_retry_after_a_dropped_master_reconnects(self, socket_path: Path) -> None:
+        conn = ServerConnection(ip="198.51.100.10")
+        replies = [_done(255, stderr="mux_client_request_session: read from master failed"), _done(), _done(0, "ok")]
+        with patch("meridian.ssh.subprocess.run", side_effect=replies) as mock_run:
+            result = conn.run("echo ok", retries=2)
+
+        assert result.ok and result.attempts == 2
+        assert [call[0][0][-1] for call in mock_run.call_args_list] == ["echo ok", "root@198.51.100.10", "echo ok"]
+
+    @pytest.mark.parametrize("returncode", [0, 1, 127])
+    def test_command_failures_keep_the_master(self, socket_path: Path, returncode: int) -> None:
+        conn = ServerConnection(ip="198.51.100.10")
+        with patch("meridian.ssh.subprocess.run", return_value=_done(returncode)) as mock_run:
+            conn.run("false")
+
+        assert self._exits(mock_run) == [] and socket_path.exists()
+
+    def test_local_mode_has_no_master_to_drop(self, socket_path: Path) -> None:
+        conn = ServerConnection(ip="198.51.100.10", local_mode=True)
+        with patch("meridian.ssh.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="bash", timeout=1)) as run:
+            conn.run("sleep 10", timeout=1)
+
+        assert run.call_count == 1 and socket_path.exists()
+
+    def test_file_write_that_loses_the_connection_drops_the_master(self, socket_path: Path) -> None:
+        conn = ServerConnection(ip="198.51.100.10")
+        with patch("meridian.ssh.subprocess.run", side_effect=[_done(255), _done()]) as mock_run:
+            result = conn.put_text("/etc/hostname", "exit\n", atomic=False)
+
+        assert result.returncode == 255
+        assert len(self._exits(mock_run)) == 1 and not socket_path.exists()
 
 
 class TestTcpConnect:

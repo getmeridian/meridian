@@ -11,10 +11,14 @@ import typer
 
 from meridian.cli_options import Json, NewServer, SshPort, Target, User, Yes, enable_json_output
 
-client_app = typer.Typer(help="Manage who can connect: add, show, list, enable, disable, remove", no_args_is_help=True)
+client_app = typer.Typer(
+    help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
+)
 server_app = typer.Typer(help="Save and name servers you reach over SSH", no_args_is_help=True)
-node_app = typer.Typer(help="Add, list, replace, or remove exit servers", no_args_is_help=True)
-relay_app = typer.Typer(help="Add, list, or remove relays that forward traffic to an exit", no_args_is_help=True)
+node_app = typer.Typer(help="Add, list, replace, or remove exit servers, or change their SNI", no_args_is_help=True)
+relay_app = typer.Typer(
+    help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
+)
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
 fleet_app = typer.Typer(help="Fleet status, inventory, and image upgrades", no_args_is_help=True)
 api_app = typer.Typer(help="Machine-readable contracts for scripts and UIs", no_args_is_help=True)
@@ -77,6 +81,24 @@ def client_remove(
     from meridian.commands.client import run_remove
 
     run_remove(name, yes=yes)
+
+
+@client_app.command("reissue")
+def client_reissue_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    yes: Yes = False,
+    _json: Json = False,
+) -> None:
+    """Replace a client's links after a leak; the old page and subscription stop working
+
+    Keeps the client and their panel settings (limits, expiry, HWID devices).
+
+    [dim]Examples:[/dim]
+      [cyan]meridian client reissue alice[/cyan]
+    """
+    from meridian.commands.client import run_reissue
+
+    run_reissue(name, yes=yes)
 
 
 @client_app.command("enable")
@@ -191,6 +213,29 @@ def relay_remove_cmd(
     from meridian.commands.relay import run_remove
 
     run_remove(relay_ip, exit, yes)
+
+
+@relay_app.command("sni")
+def relay_sni_cmd(
+    relay: str = typer.Argument(..., metavar="RELAY", help="Relay server IP, saved name, or relay chain ID"),
+    sni: str = typer.Argument(..., metavar="NEW_SNI", help="New Reality camouflage site"),
+    exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
+    yes: Yes = False,
+) -> None:
+    """Change the camouflage SNI a relay announces
+
+    Checks that the exit reaches the site over TLS 1.3 with HTTP/2, shows the
+    review, confirms, and applies it. Apps switch at their next subscription
+    refresh; the old SNI stops working once the change applies. Give the
+    exit's own SNI to make the relay follow the exit again.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian relay sni 203.0.113.10 dl.google.com[/cyan]
+      [cyan]meridian relay sni ru-moscow www.cloudflare.com --yes[/cyan]
+    """
+    from meridian.commands.sni import run_relay_sni
+
+    run_relay_sni(relay, sni, exit_arg=exit, yes=yes)
 
 
 @route_app.command("add")
@@ -308,6 +353,28 @@ def node_replace_cmd(
     from meridian.commands.node_replace import run_replace
 
     run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes)
+
+
+@node_app.command("sni")
+def node_sni_cmd(
+    exit: Annotated[str, typer.Argument(metavar="EXIT", help="Exit ID, or the saved name/IP of the exit's server")],
+    sni: Annotated[str, typer.Argument(metavar="NEW_SNI", help="New Reality camouflage site")],
+    yes: Yes = False,
+) -> None:
+    """Change an exit's camouflage SNI
+
+    Checks that the exit reaches the site over TLS 1.3 with HTTP/2, shows the
+    review, confirms, and applies it. Relays without their own SNI change with
+    the exit. Apps switch at their next subscription refresh; the old SNI
+    stops working once the change applies.
+
+    [dim]Examples:[/dim]
+      [cyan]meridian node sni finland dl.google.com[/cyan]
+      [cyan]meridian node sni 198.51.100.10 www.cloudflare.com --yes[/cyan]
+    """
+    from meridian.commands.sni import run_exit_sni
+
+    run_exit_sni(exit, sni, yes=yes)
 
 
 @node_app.command("remove")

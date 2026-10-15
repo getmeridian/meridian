@@ -52,6 +52,12 @@ def _isolated_legacy_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 @pytest.fixture(autouse=True)
+def _instant_stall_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stalled-connection retries keep their count but never pause the suite."""
+    monkeypatch.setattr("meridian.reconciler.stall_retry.STALL_DELAYS", (0.0, 0.0, 0.0, 0.0))
+
+
+@pytest.fixture(autouse=True)
 def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exit-country lookups never leave the test process; tests that need one inject a transport."""
     import httpx

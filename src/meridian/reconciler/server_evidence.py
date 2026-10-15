@@ -23,6 +23,9 @@ class CommandEvidence(Protocol):
     stderr: str
 
 
+_TIMED_OUT = "inspection timed out"
+_TRANSPORT_FAILED = "the SSH transport failed"
+_TRANSPORT_FAILURES = frozenset({_TIMED_OUT, _TRANSPORT_FAILED})
 _PERMISSION_FAILURES = (
     "permission denied",
     "operation not permitted",
@@ -184,7 +187,7 @@ def require_available_evidence(
     """Raise when a result says the requested observation did not complete."""
     reason = _unavailable_reason(result, missing_managed_binary=missing_managed_binary)
     if reason:
-        _raise_unavailable(logical_id, description, reason)
+        _raise_unavailable(logical_id, description, reason, retryable=reason in _TRANSPORT_FAILURES)
 
 
 def port_is_listening(output: str, port: int) -> bool:
@@ -222,9 +225,9 @@ def _unavailable_reason(
     missing_managed_binary: bool,
 ) -> str:
     if getattr(result, "timed_out", False) is True or result.returncode == 124:
-        return "inspection timed out"
+        return _TIMED_OUT
     if result.returncode == 255:
-        return "the SSH transport failed"
+        return _TRANSPORT_FAILED
     if result.returncode == 127 and missing_managed_binary:
         return ""
     if command_evidence_unavailable(result.returncode):
@@ -245,11 +248,12 @@ def _output(result: CommandEvidence) -> str:
     return f"{getattr(result, 'stdout', '')}\n{getattr(result, 'stderr', '')}".casefold()
 
 
-def _raise_unavailable(logical_id: str, description: str, reason: str) -> NoReturn:
+def _raise_unavailable(logical_id: str, description: str, reason: str, *, retryable: bool = False) -> NoReturn:
+    """Only a stalled or dropped connection is retryable; a missing tool or denial stays the same on retry."""
     raise ResourceReconcileError(
         f"Could not observe {logical_id}: {description} evidence is unavailable ({reason}).",
         hint="Restore SSH access and the required server inspection tools, then retry.",
-        retryable=True,
+        retryable=retryable,
     )
 
 

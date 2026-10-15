@@ -12,7 +12,7 @@ _RENDERER_MANIFEST = {
     "nginx": "upload-size-v9",
     "node-compose": "neutral-names-v4",
     "panel-compose": "neutral-names-v3",
-    "realm": "neutral-systemd-v2",
+    "realm": "neutral-systemd-musl-v3",
     "server-baseline": "fail2ban-journal-v3",
     "xray-workload": "sniffing-v7",
 }

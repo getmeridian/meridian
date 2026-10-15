@@ -178,6 +178,38 @@ def remove_relays_from_intent(intent: SetupIntent, relay_ids: set[str]) -> Setup
     return _validated(payload)
 
 
+def set_exit_reality_sni(intent: SetupIntent, exit_id: str, sni: str) -> SetupIntent:
+    """Return validated intent with a new camouflage SNI on one exit's Reality path.
+
+    Relays without their own SNI and routing gateways built on the path follow it.
+    """
+    _exit(intent, exit_id)
+    payload = intent.model_dump(mode="json")
+    for exit_ in payload["exits"]:
+        if exit_["id"] == exit_id:
+            for path in exit_["paths"]:
+                if path["protocol"] == "reality":
+                    path["reality_sni"] = sni
+    return _validated(payload)
+
+
+def set_relay_reality_sni(intent: SetupIntent, relay_ids: set[str], sni: str) -> SetupIntent:
+    """Return validated intent with a new camouflage SNI on the named relay chains.
+
+    A chain whose new SNI equals its exit path's stores none, so it follows that path again.
+    """
+    missing = sorted(relay_ids - {relay.id for relay in intent.transparent_relays})
+    if missing:
+        raise ValueError("Relay chains are not in the topology: " + ", ".join(missing))
+    path_snis = {(exit_.id, path.id): path.reality_sni for exit_ in intent.exits for path in exit_.paths}
+    payload = intent.model_dump(mode="json")
+    for relay in payload["transparent_relays"]:
+        if relay["id"] in relay_ids:
+            inherited = path_snis.get((relay["exit_ref"], relay["protocol_path_ref"]), "")
+            relay["reality_sni"] = "" if sni == inherited else sni
+    return _validated(payload)
+
+
 def add_egress_override_to_intent(
     intent: SetupIntent,
     exit_id: str,

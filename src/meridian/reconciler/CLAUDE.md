@@ -8,7 +8,8 @@
 - **Neutral host names** — `server_render.py` names Realm units `netfwd-<token>`, UFW comments `fw-<token>`, and baseline attestations under `/var/lib/host-baseline/`.
 - **One progress stream** — `execute_resource_plan(reporter=, operation=)` emits `plan.action.started` then exactly one completed/failed/skipped per action, and `SetupRuntime` shares it with provisioner steps.
 - **Cooperative cancellation** — the executor polls between actions, before an unknown-outcome retry, and before retirement; the generation stays pending so re-running the plan resumes from checkpoints.
-- **Fenced applies** — `fence.py` decides and `state_fence.py` stores the control server's `fence.json` (fleet ID, committed generation and plan hash, 30-minute lease) by compare-and-swap and holds it for the whole apply. A copy behind refuses, one ahead heals a lost commit, and only a fresh copy replaces a foreign fleet's fence.
+- **Fenced applies** — `fence.py` decides and `state_fence.py` stores the control server's `fence.json` (fleet ID, committed generation and plan hash, 30-minute lease) by compare-and-swap and holds it for the whole apply. A copy behind refuses, one ahead heals a lost commit, and only a fresh copy replaces a foreign fleet's fence; a swap that lost its connection re-reads before swapping again.
+- **Stalled connections retry read-only work** — `stall_retry.py` re-runs observations and fence reads/swaps on retryable system errors after 2/5/10/20s pauses, reported as `warning` events with `code: connection_stalled`; one outage that outlasts it ends retries for the run.
 - **Graph-owned preparation** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; only compiled rules open public ports.
 
 ## What's done well
@@ -20,7 +21,7 @@
 
 ## Pitfalls
 
-- **Raise `UnknownResourceOutcome` for an uncertain mutation** — never catch it as an ordinary failure; the executor observes before any retry.
+- **Raise `UnknownResourceOutcome` for an uncertain mutation** (a timeout or SSH exit 255) — never catch it as an ordinary failure or retry it through `StallRetry`; the executor observes before any retry. Only transport loss marks evidence retryable.
 - **Unavailable evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Access users are partly operator-owned** — manage only username and squads; status, description, limits, and quotas are the operator's (rewriting them undid `client disable`).
 - **Server inbounds sniff route-only** — the panel's Torrent Blocker plugin sees BitTorrent only through sniffing; keep `routeOnly` so destinations are never rewritten.

@@ -105,6 +105,7 @@ meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
+meridian client reissue NAME [--yes] [--json]
 meridian client remove NAME [--yes] [--json]
 ```
 
@@ -112,7 +113,7 @@ meridian client remove NAME [--yes] [--json]
 |------|---------|-------------|
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (all client commands) |
 | `--repair-page` | | Republish the client's connection page (`client show`) |
-| `--yes`, `-y` | | Confirm `client remove`; required with `--json` |
+| `--yes`, `-y` | | Confirm `client reissue` or `client remove`; required with `--json` |
 
 **`client add`** — adds one or more people to the topology, applies it, and prints each person's connection page and subscription URL. The page is built from their real subscription, so relays and Hysteria2 appear when present. Names already in the topology or already present in the panel are refused. Names can be in any script (`client add Биба 王小明`): pages and output show them as typed, while the panel, which accepts only Latin letters, digits, `-`, and `_`, gets a transliterated username (`biba`, `wangxiaoming`). Other client commands accept either form. If a client's subscription link can't be built, the client is still added and the command exits `3`; a missing connection page alone is a warning (repair it with `client show --repair-page`).
 
@@ -121,6 +122,8 @@ meridian client remove NAME [--yes] [--json]
 **`client list`** — lists clients with status, traffic, creation time, and last seen. With `--json`, returns `data.summary` counts and `data.clients[]`.
 
 **`client enable` / `client disable`** — resume or suspend a client immediately. A disable lasts until you run `client enable`; applies (including redeploys and `client add`, `node add`, `relay add`) leave a client's status alone.
+
+**`client reissue`** — replaces a client's links after a leak. Remnawave issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, expiry, and the HWID device limit stay as set in the panel; delete devices you don't recognize there. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
 
 **`client remove`** — removes the client from the topology, deletes the panel user and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. Don't delete users in the panel directly; Meridian recreates any client still in the topology on the next apply.
 
@@ -152,6 +155,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node sni EXIT NEW_SNI [--yes]
 ```
 
 | Flag | Default | Description |
@@ -175,6 +179,8 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 
 **`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (node container, image, and directory; its nginx files, firewall rules, and certificates); Docker and the saved server stay. It refuses for the control server (moving the panel would change every subscription URL) and for a new server that already has a role.
 
+**`node sni`** — gives an exit's Reality path a new camouflage SNI. `EXIT` is the exit ID or its server's saved name or IP. It refuses `apple.com` and `icloud.com` names and `www.microsoft.com`, checks over SSH that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review (relays that follow the exit's SNI, relays that keep their own, routing gateways built on the path, and what gets cleaned up), confirms, and applies it. The old name is replaced, not kept alongside: apps switch at their next subscription refresh (every 6 hours) or a manual refresh, and until then they cannot connect over Reality. XHTTP, WSS, and Hysteria2 don't change. Use it when `meridian test --probe` reports the camouflage SNI blocked.
+
 ### meridian relay
 
 Manage relays — Realm TCP forwarders that give users a domestic entry point to an exit abroad. Relays carry Reality traffic.
@@ -183,6 +189,7 @@ Manage relays — Realm TCP forwarders that give users a domestic entry point to
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
 | Flag | Default | Description |
@@ -199,6 +206,8 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 **`relay add`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.
 
 **`relay remove`** — `RELAY` is a relay server's IP or saved name, or a relay chain ID. It drops every chain through that server (narrow it with `--exit`), lists what will be deleted (Realm units, firewall rules, the exit-side listener, published Hosts), confirms, and applies the reviewed removal. The servers stay in your saved servers.
+
+**`relay sni`** — gives the relay chains through a server (or one chain by ID; narrow it with `--exit`) a new camouflage SNI. It refuses the same names as `node sni`, checks that the exit reaches the site (a Reality listener on the exit serves the relay's own name), reviews, confirms, and applies. Passing the exit's own SNI makes the relay follow the exit again. Apps switch at their next subscription refresh.
 
 To check a relay's hops, run `meridian check RELAY`.
 
