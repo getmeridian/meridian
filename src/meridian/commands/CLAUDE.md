@@ -14,7 +14,7 @@
 
 ## What's done well
 
-- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
+- **`fleet upgrade` never mutates beside the plan** — it reads images (`diagnostics/images.py`) and each relay's running Realm (never the saved pin, which a failed upgrade leaves ahead), applies the unchanged intent (new pins ride the render contract), then runs the fleet `check`.
 
 ## Pitfalls
 - `console.fail()` always exits (user=2, system=3, bug=1); entry points convert library `MeridianError`s with `fail(exc)`, or the user sees a traceback.

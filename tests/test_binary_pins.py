@@ -157,6 +157,10 @@ def test_tested_upgrade_skips_github_and_keeps_a_saved_realm() -> None:
     latest.assert_not_called()
 
 
+def _relay(running: str) -> fleet_upgrade.RelayRealm:
+    return fleet_upgrade.RelayRealm("srv-r", "relay", running)
+
+
 def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
     cluster = ClusterConfig(topology_intent=single_server_intent(None, server_ref="srv-a"))
     default = UPGRADABLE_BINARIES["realm"]
@@ -165,6 +169,11 @@ def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
         patch.object(fleet_upgrade, "_target_pins", return_value=dict(UPGRADABLE_PINS)),
         patch.object(fleet_upgrade, "_binary_targets", return_value={"realm": (default, _NEWER)}),
         patch.object(fleet_upgrade, "_observe", return_value=[]),
+        patch.object(
+            fleet_upgrade,
+            "_observe_relays",
+            side_effect=[[_relay(default.version)], [_relay(default.version)], [_relay(_NEWER.version)]],
+        ),
         patch.object(fleet_upgrade, "_save_pins") as save,
         patch.object(fleet_upgrade, "_apply") as apply,
         patch("meridian.commands.health.run"),
@@ -179,6 +188,31 @@ def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
 
     save.assert_called_once_with(cluster, {}, {"realm": _NEWER})
     apply.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("running", "applies"),
+    [(_NEWER.version, False), (REALM_VERSION, True), ("", True)],
+    ids=["current", "behind-its-saved-pin", "missing-or-broken"],
+)
+def test_a_saved_realm_pin_is_compared_with_what_the_relay_runs(running: str, applies: bool) -> None:
+    """A failed upgrade saves the pin first; rerunning must still finish the relay."""
+    cluster = ClusterConfig(
+        topology_intent=single_server_intent(None, server_ref="srv-a"), binary_pins={"realm": _NEWER}
+    )
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_target_pins", return_value=dict(UPGRADABLE_PINS)),
+        patch.object(fleet_upgrade, "_binary_targets", return_value={"realm": (_NEWER, _NEWER)}),
+        patch.object(fleet_upgrade, "_observe", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", side_effect=[[_relay(running)], [_relay(_NEWER.version)]]),
+        patch.object(fleet_upgrade, "_save_pins"),
+        patch.object(fleet_upgrade, "_apply") as apply,
+        patch("meridian.commands.health.run"),
+    ):
+        fleet_upgrade.run_upgrade(yes=True)
+
+    assert apply.called is applies
 
 
 def test_bump_script_rewrites_each_pin_once_and_reports_unchecked_sources(tmp_path: Path) -> None:
