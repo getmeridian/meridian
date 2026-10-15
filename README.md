@@ -19,6 +19,11 @@
 
 A proxy that works can still give itself away: an open admin port, a self-signed certificate, a container that skips the firewall. Meridian sets up every layer correctly, tests the server with real traffic, and hands each person a connection page with a QR code. When an address gets blocked, add or move a server; apps pick up the change on their next refresh.
 
+<p align="center">
+  <a href="https://getmeridian.org/#video"><img src="https://raw.githubusercontent.com/getmeridian/meridian/main/website/public/video/meridian-setup-thumbnail.jpg" width="640" alt="Video: a full meridian setup, start to finish"></a>
+  <br><sub><a href="https://getmeridian.org/#video">Watch a full <code>meridian setup</code></a>, start to finish (3½ min) · <a href="https://getmeridian.org/video/meridian-setup.mp4">download the MP4</a> · <a href="https://getmeridian.org/ru/#video">по-русски</a></sub>
+</p>
+
 ## Install
 
 macOS or Linux (on Windows, use WSL):

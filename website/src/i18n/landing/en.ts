@@ -33,6 +33,9 @@ export const en = {
   'setup.hint':
     'The wizard asks a few plain questions, shows a review, then sets up your server. For one server with no questions, run <code>meridian deploy IP</code> — see the <a href="{base}/cli-reference/">CLI reference</a>.',
   'setup.terminalAlt': 'Meridian deploy output in a terminal',
+  'setup.video':
+    'A full <code>meridian setup</code>, start to finish: 3½ minutes. <a href="/video/meridian-setup.mp4" download>Download the video</a>',
+  'setup.videoLabel': 'Video: setting up a personal VPN with Meridian',
   'setup.details': 'What happens behind the scenes',
   'setup.idempotent':
     'Safe to re-run. A second run keeps credentials and keys, and resumes or updates the deployment in place.',

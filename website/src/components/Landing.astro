@@ -36,6 +36,8 @@ const alternates = [
   ...LOCALES.map((l) => ({ hreflang: LOCALE_INFO[l].hreflang, href: new URL(homeOf(l), site).href })),
   { hreflang: 'x-default', href: new URL('/', site).href },
 ];
+// The walkthrough video has an English and a Russian cut (video/scripts/export.mjs); other locales get English.
+const videoCut = locale === 'ru' ? '.ru' : '';
 const plain = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
 const faq = {
   '@context': 'https://schema.org',
@@ -85,6 +87,12 @@ const organization = {
     <section id="setup" class="section">
       <div class="container">
         <SectionHead eyebrow={t('setup.label')} title={t('setup.title')} desc={t('setup.desc')} />
+        <figure id="video" class="setup-video">
+          <video controls preload="none" playsinline poster={`/video/meridian-setup${videoCut}-poster.jpg`} width="1280" height="720" aria-label={t('setup.videoLabel')}>
+            <source src={`/video/meridian-setup${videoCut}.mp4`} type="video/mp4" />
+          </video>
+          <figcaption set:html={t('setup.video')} />
+        </figure>
         <div class="setup-grid">
           <div>
             <CodeBlock code="curl -sSf https://getmeridian.org/install.sh | bash" label={t('setup.step1.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
@@ -200,6 +208,25 @@ const organization = {
     flex: 1;
     height: 1px;
     background: var(--b1);
+  }
+  .setup-video {
+    max-width: 960px;
+    margin: 0 auto 56px;
+    scroll-margin-top: 88px;
+  }
+  .setup-video video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--r2);
+    box-shadow: var(--shadow-md);
+    background: #1c1e28; /* the video's own background while the poster loads */
+  }
+  .setup-video figcaption {
+    margin-top: 12px;
+    font-size: 0.94rem;
+    color: var(--t2);
+    text-align: center;
   }
   .setup-hint {
     margin: 16px 0 28px;

@@ -28,6 +28,9 @@ export const fa: LandingStrings = {
   'setup.hint':
     'ویزارد چند سؤال ساده می‌پرسد، یک خلاصه برای بازبینی نشان می‌دهد و سپس سرور شما را راه‌اندازی می‌کند. برای یک سرور بدون هیچ سؤالی، <code>meridian deploy IP</code> را اجرا کنید — <a href="{base}/cli-reference/">مرجع CLI</a> را ببینید.',
   'setup.terminalAlt': 'خروجی meridian deploy در ترمینال',
+  'setup.video':
+    'کل راه‌اندازی با <code>meridian setup</code> از ابتدا تا انتها: ۳٫۵ دقیقه، به انگلیسی با زیرنویس. <a href="/video/meridian-setup.mp4" download>دانلود ویدیو</a>',
+  'setup.videoLabel': 'ویدیو: راه‌اندازی VPN شخصی با Meridian',
   'setup.details': 'پشت صحنه چه اتفاقی می‌افتد',
   'setup.idempotent':
     'اجرای دوباره بی‌خطر است. اجرای دوم اعتبارنامه‌ها و کلیدها را نگه می‌دارد و استقرار را ادامه می‌دهد یا در همان‌جا به‌روز می‌کند.',

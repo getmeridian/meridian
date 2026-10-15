@@ -28,6 +28,9 @@ export const zh: LandingStrings = {
   'setup.hint':
     '向导会问几个简单的问题，展示一份摘要供你确认，然后设置你的服务器。若只有一台服务器且不想回答问题，运行 <code>meridian deploy IP</code> 即可，详见 <a href="{base}/cli-reference/">CLI 参考</a>。',
   'setup.terminalAlt': '终端中的 Meridian 部署输出',
+  'setup.video':
+    '用 <code>meridian setup</code> 完成设置的全过程：3.5 分钟，英文讲解并附字幕。<a href="/video/meridian-setup.mp4" download>下载视频</a>',
+  'setup.videoLabel': '视频：用 Meridian 搭建个人 VPN',
   'setup.details': '幕后发生了什么',
   'setup.idempotent':
     '可放心重复运行。再次运行会保留凭证和密钥，并就地继续或更新部署。',

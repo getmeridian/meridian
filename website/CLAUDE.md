@@ -39,4 +39,5 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 - **Prefetch on hover only** — `defaultStrategy: 'viewport'` with `prefetchAll` downloaded every visible sidebar page (~20) on each visit.
 - **The build only checks diagrams** — CI has no Chromium or network for Mermaid; a changed block fails `node scripts/diagrams.mjs` until its SVG is rendered and committed. Bump `RENDER_VERSION` when the renderer's output changes.
 - **Diagram figures are always LTR** — an RTL page reorders the punctuation in labels like `(Realm)`.
+- **The landing video is a file, not an embed** — `public/video/` comes from `video/scripts/export.mjs`; keep `preload="none"` so only the poster loads, and never embed a player from another origin.
 - **Sharp is direct** — Astro image optimization must keep `sharp` as an explicit dependency.

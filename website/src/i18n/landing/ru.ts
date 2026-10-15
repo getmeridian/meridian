@@ -28,6 +28,9 @@ export const ru: LandingStrings = {
   'setup.hint':
     'Мастер задаст несколько простых вопросов, покажет сводку и настроит ваш сервер. Для одного сервера без вопросов выполните <code>meridian deploy IP</code> — см. <a href="{base}/cli-reference/">справочник CLI</a>.',
   'setup.terminalAlt': 'Вывод Meridian в терминале',
+  'setup.video':
+    'Вся настройка через <code>meridian setup</code> от начала до конца: 4 минуты. <a href="/video/meridian-setup.ru.mp4" download>Скачать видео</a>',
+  'setup.videoLabel': 'Видео: как настроить личный VPN с Meridian',
   'setup.details': 'Что происходит за кулисами',
   'setup.idempotent':
     'Команду можно спокойно запускать повторно: учётные данные и ключи сохранятся, прерванное развёртывание продолжится, а готовое обновится на месте.',
