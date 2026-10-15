@@ -20,6 +20,7 @@ var T = {
     'import.add': 'Добавить в {name}',
     'import.manual': 'Скопировать URL подписки',
     'install.offline': 'Доступ к подключению офлайн',
+    'apps.all': 'Все платформы',
     'apps.more': 'Другие платформы',
     'apps.other': 'Другие приложения',
     'apps.update': 'Обновляйте приложение',
@@ -71,6 +72,7 @@ var T = {
     'import.add': 'افزودن به {name}',
     'import.manual': 'کپی URL اشتراک',
     'install.offline': 'دسترسی آفلاین به اتصال',
+    'apps.all': 'همهٔ پلتفرم\u200Cها',
     'apps.more': 'پلتفرم\u200Cهای دیگر',
     'apps.other': 'برنامه‌های دیگر',
     'apps.update': 'برنامه را به‌روز نگه دارید',
@@ -122,6 +124,7 @@ var T = {
     'import.add': '添加到 {name}',
     'import.manual': '复制订阅链接',
     'install.offline': '离线访问连接',
+    'apps.all': '全平台',
     'apps.more': '其他平台',
     'apps.other': '更多应用',
     'apps.update': '保持应用为最新版本',
@@ -545,7 +548,9 @@ function renderAppRow(a, key) {
   var html = '<a class="app-row" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
   html += renderAppMark(a, 40);
   html += '<span class="app-row-text"><strong>' + escapeHtml(a.name) + '</strong>';
-  html += '<span>' + escapeHtml(a.platform) + '</span></span>';
+  html += a.platform === 'All platforms'
+    ? '<span data-t="apps.all">All platforms</span></span>'
+    : '<span>' + escapeHtml(a.platform) + '</span></span>';
   html += '<span class="app-row-get" data-t="app.get">Get</span>';
   return html + '</a>';
 }
