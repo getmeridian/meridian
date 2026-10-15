@@ -86,6 +86,30 @@ const en = {
     connected: "connected",
   },
   outro: { footer: "Free and open source · Narration voice: elevenlabs.io" },
+  short: {
+    hook: { line1: "Your own VPN", before: "in ", accent: "10 minutes", sub: "No subscription. No VPN company." },
+    needs: {
+      kicker: "What you need",
+      server: "A $5 server",
+      serverLine: "Debian or Ubuntu, any provider",
+      laptop: "A laptop",
+      laptopLine: "macOS, Linux, or Windows with WSL",
+    },
+    install: { kicker: "Install", title: "One line" },
+    wizard: { kicker: "meridian setup", title: "A few plain questions" },
+    camouflage: { kicker: "Camouflage", title: "Hides in plain sight" },
+    apply: {
+      kicker: "Setting up",
+      title: "Hardened for you",
+      items: ["Firewall", "SSH lockdown", "TLS certificates", "Every link tested"],
+    },
+    phone: { kicker: "On their phone", title: "Scan, tap, connected" },
+    why: { kicker: "Three methods", title: "Hard to block" },
+    cta: {
+      more: "Full walkthrough on getmeridian.org",
+      footer: "Free and open source · Voice: elevenlabs.io · Music: ACE-Step",
+    },
+  },
   thumbnail: { kicker: "Meridian · full walkthrough", after: ", start to finish" },
   chapters: {
     intro: "What Meridian does",
@@ -182,6 +206,30 @@ const ru: Copy = {
     connected: "подключено",
   },
   outro: { footer: "Бесплатно и с открытым кодом · Озвучка: Qwen3-TTS" },
+  short: {
+    hook: { line1: "Свой VPN", before: "за ", accent: "10 минут", sub: "Без подписки. Без VPN-компании." },
+    needs: {
+      kicker: "Что понадобится",
+      server: "Сервер за $5",
+      serverLine: "Debian или Ubuntu, любой хостинг",
+      laptop: "Ноутбук",
+      laptopLine: "macOS, Linux или Windows с WSL",
+    },
+    install: { kicker: "Установка", title: "Одна команда" },
+    wizard: { kicker: "meridian setup", title: "Пара простых вопросов" },
+    camouflage: { kicker: "Маскировка", title: "Не выделяется" },
+    apply: {
+      kicker: "Установка",
+      title: "Защита под ключ",
+      items: ["Файрвол", "Защита SSH", "TLS-сертификаты", "Проверка ссылок"],
+    },
+    phone: { kicker: "На телефоне", title: "QR, нажатие, готово" },
+    why: { kicker: "Три способа", title: "Сложно заблокировать" },
+    cta: {
+      more: "Полное видео — на getmeridian.org",
+      footer: "Бесплатно и с открытым кодом · Озвучка: Qwen3-TTS · Музыка: ACE-Step",
+    },
+  },
   thumbnail: { kicker: "Meridian · полный разбор", after: " от начала до конца" },
   chapters: {
     intro: "Что делает Meridian",

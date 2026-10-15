@@ -1,0 +1,75 @@
+{
+  "language": "ru",
+  "engine": "qwen3",
+  "qwen3": {
+    "design": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+    "clone": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+    "language": "Russian",
+    "seed": 7,
+    "instruct": "A calm, warm adult male narrator, native Russian speaker with a clear Moscow accent, friendly and confident, measured pace, like a tech tutorial voice-over.",
+    "reference": "ru/intro"
+  },
+  "pronounce": {
+    "getmeridian.org": "гет меридиан точка орг",
+    "uv tool install meridian-vpn": "ю-ви тул инстолл меридиан ви-пи-эн",
+    "meridian setup": "меридиан сетап",
+    "meridian client add": "меридиан клайент эдд",
+    "client remove": "клайент ремув",
+    "meridian check": "меридиан чек",
+    "meridian test": "меридиан тест",
+    "setup": "сетап",
+    "Meridian": "Меридиан",
+    "VPN": "ви-пи-эн",
+    "VPS": "ви-пи-эс",
+    "SSH": "эс-эс-эйч",
+    "IP": "ай-пи",
+    "QR": "кью-ар",
+    "uv": "ю-ви",
+    "Debian": "Дебиан",
+    "Ubuntu": "Убунту",
+    "Enter": "Энтер",
+    "Escape": "Эскейп",
+    "Happ": "Хапп",
+    "Reality": "Риалити",
+    "XHTTP": "икс-эйч-ти-ти-пи",
+    "Hysteria2": "Истерия два"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "text": "Свой VPN за десять минут. Без подписки и без VPN-компании посередине."
+    },
+    {
+      "id": "needs",
+      "text": "Нужны только сервер за пять долларов и ноутбук."
+    },
+    {
+      "id": "install",
+      "text": "Установите Meridian одной командой и запустите meridian setup."
+    },
+    {
+      "id": "wizard",
+      "text": "Вставьте адрес сервера. Настройки по умолчанию разумные, так что почти везде просто нажимайте Enter."
+    },
+    {
+      "id": "camouflage",
+      "text": "А теперь хитрость: сервер выдаёт себя за настоящий сайт из своей же сети и ничем не выделяется."
+    },
+    {
+      "id": "apply",
+      "text": "Meridian защитит сервер, настроит файрвол и сертификаты, а потом проверит каждую ссылку."
+    },
+    {
+      "id": "phone",
+      "text": "Отправьте каждому его страницу: QR-код, одно нажатие, и подключение готово."
+    },
+    {
+      "id": "why",
+      "text": "У каждого сервера три способа подключения. Если один заблокируют, приложение незаметно переключится."
+    },
+    {
+      "id": "cta",
+      "text": "Бесплатно и с открытым кодом. Полное видео — на getmeridian.org."
+    }
+  ]
+}

@@ -53,3 +53,4 @@ references/
 # Video: rendered output and Remotion caches (narration audio and sanitized terminal JSON are tracked)
 video/out/
 video/.remotion/
+video/.cache/

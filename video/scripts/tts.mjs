@@ -4,6 +4,7 @@
 //   pnpm tts --spend     # call the API for changed scenes only
 //   pnpm tts --spend --only intro,outro
 //   pnpm tts --lang ru   # narration/ru.json -> public/audio/ru/
+//   pnpm tts --narration short-en --spend   # narration/short-en.json -> public/audio/short-en/
 //
 // Credits are scarce: a scene is regenerated only when its text, voice, model,
 // or settings change. The key comes from ELEVENLABS_API_KEY or
@@ -23,16 +24,17 @@ const option = (name, fallback) => {
   return index >= 0 ? args[index + 1] : fallback;
 };
 
-const lang = option("--lang", "en");
+const name = option("--narration", option("--lang", "en"));
 const only = option("--only", "")?.split(",").filter(Boolean) ?? [];
-const narration = JSON.parse(readFileSync(join(root, "narration", `${lang}.json`), "utf8"));
+const narration = JSON.parse(readFileSync(join(root, "narration", `${name}.json`), "utf8"));
+const lang = narration.language ?? name;
 if (narration.engine === "qwen3") {
   console.log(
-    `narration/${lang}.json is voiced locally: uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ${lang}`,
+    `narration/${name}.json is voiced locally: uv run --python 3.12 --with mlx-audio --with soundfile python scripts/tts_local.py ${name}`,
   );
   process.exit(0);
 }
-const outDir = join(root, "public", "audio", lang);
+const outDir = join(root, "public", "audio", name);
 const manifestPath = join(outDir, "manifest.json");
 const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};
 const settings = narration.voiceSettings ?? null;

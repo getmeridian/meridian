@@ -9,6 +9,10 @@
     "still": "remotion still src/index.ts Setup out/still.png",
     "render": "remotion render src/index.ts Setup out/meridian-setup.mp4",
     "render:ru": "remotion render src/index.ts SetupRu out/meridian-setup.ru.mp4",
+    "render:short": "remotion render src/index.ts Short out/meridian-short.en.mp4",
+    "render:short:ru": "remotion render src/index.ts ShortRu out/meridian-short.ru.mp4",
+    "export:short": "node scripts/export-short.mjs",
+    "music": "uv run --project ~/.cache/ace-step/ACE-Step-1.5 python scripts/music.py",
     "export": "node scripts/export.mjs",
     "typecheck": "tsc --noEmit"
   },

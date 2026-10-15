@@ -67,11 +67,8 @@ export function TerminalPlayback({
   title?: string;
 }) {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
-  const available = Math.max(durationInFrames / fps - 1.0, 1); // leave a beat to read the result
-  const speed = Math.max(1, (to - from) / available);
-  const lead = Math.max(0, available * 0.75 - (to - from));
-  const t = Math.min(from + Math.max(0, frame / fps - lead) * speed, to);
+  const { fps } = useVideoConfig();
+  const { t, speed } = usePlayback(from, to);
   const shown = frameAt(recording.frames, t);
   const lineHeight = Math.round(fontSize * 1.42);
   const [cx, cy, cursorOn] = shown.cursor;
@@ -110,6 +107,80 @@ export function TerminalPlayback({
             }}
           />
         ) : null}
+      </div>
+    </TerminalWindow>
+  );
+}
+
+/**
+ * Recording time for the current frame when [from, to) plays inside the current sequence:
+ * faster when it would not fit, and starting late when it is short, so it ends near where
+ * the narration explains it.
+ */
+function usePlayback(from: number, to: number, rest = 1.0) {
+  const frame = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
+  const available = Math.max(durationInFrames / fps - rest, 1); // leave a beat to read the result
+  const speed = Math.max(1, (to - from) / available);
+  const lead = Math.max(0, available * 0.75 - (to - from));
+  return { t: Math.min(from + Math.max(0, frame / fps - lead) * speed, to), speed };
+}
+
+/**
+ * The vertical cut's terminal: the newest `rows` lines down to the cursor, `cols` wide, at a size a
+ * phone can read. Lines longer than the crop fade out at the right edge instead of wrapping.
+ */
+export function TerminalCrop({
+  recording,
+  from,
+  to,
+  cols = 54,
+  rows = 14,
+  fontSize = 28,
+  title = "meridian setup",
+}: {
+  recording: Recording;
+  from: number;
+  to: number;
+  cols?: number;
+  rows?: number;
+  fontSize?: number;
+  title?: string;
+}) {
+  const { t, speed } = usePlayback(from, to, 0.6);
+  const shown = frameAt(recording.frames, t);
+  const lineHeight = Math.round(fontSize * 1.42);
+  const filled = (y: number) => (recording.rows[shown.lines[y]] ?? []).some(([text]) => text.trim() !== "");
+  let last = shown.cursor[2] ? shown.cursor[1] : -1;
+  for (let y = recording.height - 1; y > last; y--) {
+    if (filled(y)) {
+      last = y;
+      break;
+    }
+  }
+  const first = Math.max(0, last - rows + 1);
+  return (
+    <TerminalWindow title={title} speed={speed}>
+      <div
+        style={{
+          width: `${cols * 0.6}em`,
+          height: rows * lineHeight,
+          overflow: "hidden",
+          fontFamily: font.mono,
+          fontSize,
+          lineHeight: `${lineHeight}px`,
+          maskImage: "linear-gradient(to right, black 88%, transparent)",
+        }}
+      >
+        {Array.from({ length: last - first + 1 }, (_, i) => (
+          <div key={i} style={{ height: lineHeight, whiteSpace: "pre" }}>
+            {(recording.rows[shown.lines[first + i]] ?? []).map(([text, index], j) => (
+              <span key={j} style={runStyle(recording.styles[index])}>
+                {text}
+              </span>
+            ))}
+          </div>
+        ))}
       </div>
     </TerminalWindow>
   );

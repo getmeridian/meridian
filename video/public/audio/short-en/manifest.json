@@ -1,0 +1,38 @@
+{
+  "hook": {
+    "hash": "8b04ddf8b21e",
+    "seconds": 5.76
+  },
+  "needs": {
+    "hash": "956db48331ed",
+    "seconds": 3.28
+  },
+  "install": {
+    "hash": "e22a91837037",
+    "seconds": 4
+  },
+  "wizard": {
+    "hash": "e7185f4f4472",
+    "seconds": 5.6
+  },
+  "camouflage": {
+    "hash": "003839ceb98e",
+    "seconds": 7.04
+  },
+  "apply": {
+    "hash": "f52fbb0f3abc",
+    "seconds": 6.08
+  },
+  "phone": {
+    "hash": "ebd4ce0fe832",
+    "seconds": 5.68
+  },
+  "why": {
+    "hash": "d4cf08571093",
+    "seconds": 5.44
+  },
+  "cta": {
+    "hash": "f33b1f1acf51",
+    "seconds": 4.88
+  }
+}

@@ -1,7 +1,8 @@
 import { Composition, Still } from "remotion";
 import { FPS, HEIGHT, WIDTH } from "./theme";
+import { Short, SHORT_HEIGHT, SHORT_WIDTH } from "./Short";
 import { Thumbnail } from "./Thumbnail";
-import { totalFrames } from "./timeline";
+import { shortFrames, totalFrames } from "./timeline";
 import { Video } from "./Video";
 
 export function Root() {
@@ -24,6 +25,24 @@ export function Root() {
         fps={FPS}
         width={WIDTH}
         height={HEIGHT}
+      />
+      <Composition
+        id="Short"
+        component={Short}
+        defaultProps={{ lang: "en" as const }}
+        durationInFrames={shortFrames("en")}
+        fps={FPS}
+        width={SHORT_WIDTH}
+        height={SHORT_HEIGHT}
+      />
+      <Composition
+        id="ShortRu"
+        component={Short}
+        defaultProps={{ lang: "ru" as const }}
+        durationInFrames={shortFrames("ru")}
+        fps={FPS}
+        width={SHORT_WIDTH}
+        height={SHORT_HEIGHT}
       />
       <Still
         id="Thumbnail"

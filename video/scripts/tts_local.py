@@ -5,8 +5,10 @@
 For narration files with "engine": "qwen3". No credits and no network after the
 first model download. The first scene is voiced from the `instruct` description
 (VoiceDesign) and becomes the reference that the Base model clones for every
-other scene, so the whole video keeps one voice. Writes the same
-public/audio/<lang>/<id>.mp3 and manifest.json as scripts/tts.mjs.
+other scene, so the whole video keeps one voice. With `"reference": "ru/intro"`
+in the qwen3 block, every scene clones that existing clip instead, so a short
+cut speaks with the full video's voice. Writes the same
+public/audio/<name>/<id>.mp3 and manifest.json as scripts/tts.mjs.
 """
 
 from __future__ import annotations
@@ -48,21 +50,31 @@ def save_mp3(audio: np.ndarray, rate: int, path: Path) -> float:
     return round(float(subprocess.run(probe, capture_output=True, text=True, check=True).stdout), 3)
 
 
-def main(lang: str) -> int:
-    narration = json.loads((ROOT / "narration" / f"{lang}.json").read_text())
+def main(name: str) -> int:
+    narration = json.loads((ROOT / "narration" / f"{name}.json").read_text())
     if narration.get("engine") != "qwen3":
-        raise SystemExit(f"narration/{lang}.json is not a qwen3 narration; use scripts/tts.mjs")
+        raise SystemExit(f"narration/{name}.json is not a qwen3 narration; use scripts/tts.mjs")
     qwen = narration["qwen3"]
     pronounce = narration.get("pronounce", {})
-    out = ROOT / "public" / "audio" / lang
+    out = ROOT / "public" / "audio" / name
     out.mkdir(parents=True, exist_ok=True)
     manifest_path = out / "manifest.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
 
-    reference, *rest = narration["scenes"]
-    reference_text = spoken(reference["text"], pronounce)
-    reference_hash = fingerprint(reference_text, qwen["design"], qwen["instruct"], qwen["seed"])
-    if manifest.get(reference["id"], {}).get("hash") != reference_hash:
+    if "reference" in qwen:  # clone another narration's clip, e.g. "ru/intro"
+        source, scene_id = qwen["reference"].split("/")
+        source_narration = json.loads((ROOT / "narration" / f"{source}.json").read_text())
+        source_scene = next(scene for scene in source_narration["scenes"] if scene["id"] == scene_id)
+        reference_text = spoken(source_scene["text"], source_narration.get("pronounce", {}))
+        reference_clip = ROOT / "public" / "audio" / source / f"{scene_id}.mp3"
+        reference_hash = json.loads((reference_clip.parent / "manifest.json").read_text())[scene_id]["hash"]
+        rest = narration["scenes"]
+    else:
+        reference, *rest = narration["scenes"]
+        reference_text = spoken(reference["text"], pronounce)
+        reference_clip = out / f"{reference['id']}.mp3"
+        reference_hash = fingerprint(reference_text, qwen["design"], qwen["instruct"], qwen["seed"])
+    if "reference" not in qwen and manifest.get(reference["id"], {}).get("hash") != reference_hash:
         mx.random.seed(qwen["seed"])
         model = load_model(qwen["design"])
         results = model.generate_voice_design(text=reference_text, language=qwen["language"], instruct=qwen["instruct"])
@@ -84,7 +96,7 @@ def main(lang: str) -> int:
     model = load_model(qwen["clone"])
     with tempfile.NamedTemporaryFile(suffix=".wav") as ref:
         subprocess.run(
-            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(out / f"{reference['id']}.mp3"), "-ar", "24000", ref.name],
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", str(reference_clip), "-ar", "24000", ref.name],
             check=True,
         )
         for scene in stale:

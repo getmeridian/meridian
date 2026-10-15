@@ -1,0 +1,16 @@
+{
+  "language": "en",
+  "voice": "cjVigY5qzO86Huf0OWal",
+  "model": "eleven_v4",
+  "scenes": [
+    { "id": "hook", "text": "Your own VPN in ten minutes. No subscription, no VPN company in the middle." },
+    { "id": "needs", "text": "All you need is a five-dollar server and a laptop." },
+    { "id": "install", "text": "Install Meridian with one line, then run meridian setup." },
+    { "id": "wizard", "text": "Paste your server's address. The defaults are sensible, so mostly you just press Enter." },
+    { "id": "camouflage", "text": "Now the clever part: your server poses as a real website from its own network, so it looks like nothing special." },
+    { "id": "apply", "text": "Meridian locks down the server, sets up the firewall and certificates, then tests every link." },
+    { "id": "phone", "text": "Send each person their page. They scan the QR code, tap once, and they're connected." },
+    { "id": "why", "text": "Every server offers three methods. If one gets blocked, the app quietly switches." },
+    { "id": "cta", "text": "Free and open source. The full walkthrough is on getmeridian.org." }
+  ]
+}
