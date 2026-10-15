@@ -358,16 +358,20 @@ def fleet_inventory_cmd(
 def fleet_upgrade_cmd(
     yes: Yes = False,
     tested: bool = typer.Option(
-        False, "--tested", help="Use only the Remnawave versions this Meridian release was tested with"
+        False,
+        "--tested",
+        help="Ask neither Docker Hub nor GitHub: Remnawave returns to the tested versions, an upgraded Realm stays",
     ),
 ) -> None:
-    """Upgrade Remnawave on every server to its newest release in the tested major
+    """Upgrade Remnawave and Realm to their newest releases in the tested major
 
     Finds the newest backend, node, and subscription page releases on Docker
     Hub within the major this Meridian release supports (no Meridian update
-    needed), shows what each server runs, applies the reviewed plan, then runs
-    `meridian check`. Newer or floating tags you chose are kept; PostgreSQL
-    and Valkey stay on Meridian's pins, and a PostgreSQL major is never moved.
+    needed), and with relays the newest Realm on GitHub, pinned by the sha256
+    GitHub publishes. Shows what each server runs, applies the reviewed plan,
+    then runs `meridian check`. Newer or floating tags you chose are kept;
+    PostgreSQL and Valkey stay on Meridian's pins, and a PostgreSQL major is
+    never moved.
 
     [dim]Examples:[/dim]
       [cyan]meridian fleet upgrade[/cyan]

@@ -17,6 +17,15 @@ def runtime_pin(plan: ResourcePlan, name: str, fallback: str) -> str:
     return plan.deployment_contract.runtime_pins.get(name, fallback)
 
 
+def runtime_pin_group(plan: ResourcePlan, prefix: str) -> dict[str, str]:
+    """Runtime pins sharing *prefix*, keyed by the rest of their name (asset digests)."""
+    return {
+        name.removeprefix(prefix): value
+        for name, value in plan.deployment_contract.runtime_pins.items()
+        if name.startswith(prefix)
+    }
+
+
 def raise_if_timeout(action: ResourceAction, result: object | None) -> None:
     if result is not None and getattr(result, "returncode", None) == 124:
         raise UnknownResourceOutcome(f"Timed out while mutating {action.resource.logical_id}; observation is required.")

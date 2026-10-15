@@ -18,7 +18,6 @@ from meridian.health import ReadinessTimeout
 from meridian.xray_client import (
     XrayConfigError,
     XrayStartupError,
-    _parse_dgst,
     _resolve_asset_name,
     _validate_xray_config,
     ensure_xray_binary,
@@ -33,31 +32,6 @@ from meridian.xray_client import (
 from meridian.xray_client import (
     test_connection as run_connection_test,
 )
-
-
-class TestParseDgst:
-    def test_valid_dgst_extracts_hash(self) -> None:
-        digest = "a" * 64
-        content = f"SHA2-256={digest}"
-        assert _parse_dgst(content) == digest
-
-    def test_empty_content_returns_empty(self) -> None:
-        assert _parse_dgst("") == ""
-
-    def test_malformed_content_returns_empty(self) -> None:
-        assert _parse_dgst("not a dgst file") == ""
-        assert _parse_dgst("MD5=abc123") == ""
-        assert _parse_dgst("SHA2-256") == ""
-
-    def test_multiple_lines_extracts_correct_hash(self) -> None:
-        digest = "b" * 64
-        content = f"MD5=somethingelse\nSHA1=anotherhash\nSHA2-256={digest}\nSHA2-512=longhash\n"
-        assert _parse_dgst(content) == digest
-
-    def test_hash_with_whitespace_is_stripped(self) -> None:
-        digest = "c" * 64
-        content = f"SHA2-256=  {digest}  \n"
-        assert _parse_dgst(content) == digest
 
 
 @pytest.mark.parametrize(
@@ -211,8 +185,6 @@ def test_xray_download_extracts_the_runtime_asset_set(tmp_path: Path) -> None:
     archive_digest = hashlib.sha256(archive_bytes).hexdigest()
 
     def curl_result(args: list[str], **_kwargs: object) -> SimpleNamespace:
-        if "-o" not in args:
-            return SimpleNamespace(returncode=0, stdout=f"SHA2-256={archive_digest}\n", stderr="")
         archive_path = Path(args[args.index("-o") + 1])
         archive_path.write_bytes(archive_bytes)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -220,30 +192,42 @@ def test_xray_download_extracts_the_runtime_asset_set(tmp_path: Path) -> None:
     with (
         patch("meridian.xray_client._xray_bin_path", return_value=bin_path),
         patch("meridian.xray_client._resolve_asset_name", return_value="Xray-linux-64.zip"),
+        patch.dict("meridian.xray_client.XRAY_SHA256", {"Xray-linux-64.zip": archive_digest}),
         patch("meridian.xray_client.subprocess.run", side_effect=curl_result) as download,
-        patch("meridian.xray_client.time.monotonic", side_effect=[100.0, 100.0, 104.0]),
+        patch("meridian.xray_client.time.monotonic", side_effect=[100.0, 101.0]),
     ):
         assert ensure_xray_binary(timeout=5) == bin_path
 
-    assert [call.kwargs["timeout"] for call in download.call_args_list] == [5.0, 1.0]
+    assert [call.kwargs["timeout"] for call in download.call_args_list] == [4.0]
     assert bin_path.read_bytes() == b"current executable"
     assert (tmp_path / "geoip.dat").read_bytes() == b"geoip"
     assert (tmp_path / "geosite.dat").read_bytes() == b"geosite"
     assert (tmp_path / ".xray-assets-version").read_text(encoding="utf-8").strip() == XRAY_VERSION
 
 
-def test_xray_download_refuses_missing_release_digest(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("pinned", "downloads"),
+    [({}, 0), ({"Xray-linux-64.zip": "0" * 64}, 1)],
+    ids=["no-pinned-digest", "digest-mismatch"],
+)
+def test_xray_download_refuses_an_archive_without_its_pinned_digest(
+    tmp_path: Path, pinned: dict[str, str], downloads: int
+) -> None:
     bin_path = tmp_path / "xray-test"
-    download = MagicMock(return_value=SimpleNamespace(returncode=1, stdout="", stderr="offline"))
+
+    def curl_result(args: list[str], **_kwargs: object) -> SimpleNamespace:
+        Path(args[args.index("-o") + 1]).write_bytes(b"tampered archive")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     with (
         patch("meridian.xray_client._xray_bin_path", return_value=bin_path),
         patch("meridian.xray_client._resolve_asset_name", return_value="Xray-linux-64.zip"),
-        patch("meridian.xray_client.subprocess.run", download),
+        patch.dict("meridian.xray_client.XRAY_SHA256", pinned, clear=True),
+        patch("meridian.xray_client.subprocess.run", side_effect=curl_result) as download,
     ):
         assert ensure_xray_binary() is None
 
-    assert download.call_count == 1
+    assert download.call_count == downloads
     assert not bin_path.exists()
 
 
@@ -264,8 +248,6 @@ def test_xray_cache_does_not_publish_a_partially_replaced_asset_set(tmp_path: Pa
     archive_digest = hashlib.sha256(archive_bytes).hexdigest()
 
     def curl_result(args: list[str], **_kwargs: object) -> SimpleNamespace:
-        if "-o" not in args:
-            return SimpleNamespace(returncode=0, stdout=f"SHA2-256={archive_digest}\n", stderr="")
         archive_path = Path(args[args.index("-o") + 1])
         archive_path.write_bytes(archive_bytes)
         return SimpleNamespace(returncode=0, stdout="", stderr="")
@@ -280,6 +262,7 @@ def test_xray_cache_does_not_publish_a_partially_replaced_asset_set(tmp_path: Pa
     with (
         patch("meridian.xray_client._xray_bin_path", return_value=bin_path),
         patch("meridian.xray_client._resolve_asset_name", return_value="Xray-linux-64.zip"),
+        patch.dict("meridian.xray_client.XRAY_SHA256", {"Xray-linux-64.zip": archive_digest}),
         patch("meridian.xray_client.subprocess.run", side_effect=curl_result),
         patch("meridian.xray_client.os.replace", side_effect=fail_mid_publish),
     ):
@@ -592,3 +575,9 @@ def test_missing_curl_is_a_hard_test_failure(tmp_path: Path) -> None:
             "canonical endpoint",
             expect_ip_match=False,
         )
+
+
+def test_every_platform_archive_has_a_pinned_digest() -> None:
+    from meridian.config import XRAY_ASSET_MAP, XRAY_SHA256
+
+    assert set(XRAY_SHA256) == set(XRAY_ASSET_MAP.values())

@@ -10,6 +10,7 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 from meridian import __version__
+from meridian.binary_pins import REALM_SHA256_PIN_PREFIX, effective_binary_pins
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler import (
     DeploymentContract,
@@ -28,8 +29,6 @@ from meridian.compiler.models import (
 )
 from meridian.config import (
     ACME_SERVER,
-    REALM_SHA256,
-    REALM_VERSION,
     REMNAWAVE_BACKEND_IMAGE,
     REMNAWAVE_NODE_API_PORT,
     REMNAWAVE_PANEL_PORT,
@@ -215,13 +214,14 @@ class SetupRuntime:
         entries = self._entries(sorted(deployment_server_refs(intent)))
         cluster = cluster if cluster is not None else self._cluster_loader()
         images = effective_pins(cluster.image_pins)
+        realm = effective_binary_pins(cluster.binary_pins)["realm"]
         contract = DeploymentContract(
             server_targets={server_ref: _deployment_target(entry) for server_ref, entry in entries.items()},
             runtime_pins={
                 "acme_server": ACME_SERVER,
                 "meridian_version": __version__,
-                "realm_sha256_manifest": canonical_hash(REALM_SHA256),
-                "realm_version": REALM_VERSION,
+                **{f"{REALM_SHA256_PIN_PREFIX}{target}": digest for target, digest in sorted(realm.sha256.items())},
+                "realm_version": realm.version,
                 "remnawave_backend_image": images["remnawave_backend_image"],
                 "remnawave_node_image": images["remnawave_node_image"],
                 "remnawave_node_api_port": str(REMNAWAVE_NODE_API_PORT),

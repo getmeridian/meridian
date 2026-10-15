@@ -5,9 +5,10 @@ from __future__ import annotations
 import shlex
 from typing import TYPE_CHECKING
 
+from meridian.binary_pins import REALM_SHA256_PIN_PREFIX
 from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import RealmHopPayload
-from meridian.config import LEGACY_REALM_BINARY_PATH, REALM_VERSION, RELAY_BINARY_PATH
+from meridian.config import LEGACY_REALM_BINARY_PATH, REALM_SHA256, REALM_VERSION, RELAY_BINARY_PATH
 from meridian.provision.ensure import ensure_file_content
 from meridian.provision.relay import InstallRealm, RelayContext, parse_realm_version
 from meridian.reconciler import server_retirement as retirement
@@ -40,6 +41,7 @@ from meridian.reconciler.server_support import (
     raise_if_timeout,
     restore_file,
     runtime_pin,
+    runtime_pin_group,
 )
 
 if TYPE_CHECKING:
@@ -135,6 +137,7 @@ class RealmHopDriver(retirement.RealmHopRetirement):
             exit_port=payload.target_port,
             listen_port=payload.listen_port,
             realm_version=runtime_pin(self.context.plan, "realm_version", REALM_VERSION),
+            realm_sha256=runtime_pin_group(self.context.plan, REALM_SHA256_PIN_PREFIX) or dict(REALM_SHA256),
         )
         installed = InstallRealm().run(conn, relay_context)
         if installed.status == "failed":

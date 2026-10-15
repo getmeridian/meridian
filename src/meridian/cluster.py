@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, Self
 from urllib.parse import quote, urlsplit
 
+from meridian.binary_pins import BinaryPin
 from meridian.core.inputs import is_ip, validate_optional_transport_path_value
 from meridian.core.topology import SetupIntent
 
@@ -233,6 +234,8 @@ class ClusterConfig:
     # Newer Remnawave releases `fleet upgrade` moved past this CLI's pins
     # (runtime pin name -> tag@sha256 image); see remnawave.versions.effective_pins.
     image_pins: dict[str, str] = field(default_factory=dict)
+    # Newer server binaries (Realm) `fleet upgrade` recorded; see binary_pins.effective_binary_pins.
+    binary_pins: dict[str, BinaryPin] = field(default_factory=dict)
     # Random ID shared by every copy of this fleet's state; the control server's
     # apply fence refuses copies with another ID (see state_fence.py).
     fleet_id: str = ""

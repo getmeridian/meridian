@@ -16,6 +16,8 @@
 
 **Verifiable installer** — stable and pre-release jobs attach `install.sh` and `SHA256SUMS` to the GitHub release (a second origin beside Pages); `install.sh` pins uv's installer by version and SHA-256, bumped together. While main's VERSION is a pre-release, deploy-pages sets `MERIDIAN_DEFAULT_VERSION` in the site's copy so it installs the beta it documents.
 
+**Weekly pin bump** — `bump-pins.yml` runs `scripts/bump_pins.py` on Mondays, force-pushes `bot/bump-pins`, opens or updates its PR, and dispatches CI on the branch (a `GITHUB_TOKEN` push triggers no `pull_request` run; `workflow_dispatch` is exempt). Opening the PR needs "Allow GitHub Actions to create pull requests"; without it the run warns with a compare link. A source it could not check fails the run after the PR step.
+
 **OIDC publishing** — Pages deploy uses trusted publisher (no token). PyPI requires `environment: pypi` approval gate + OIDC. No long-lived secrets.
 
 ## What's done well

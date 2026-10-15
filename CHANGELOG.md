@@ -101,6 +101,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
   Newer or floating tags you chose are kept, and PostgreSQL never moves to a new
   major version in place. `meridian update` points to it when a fleet exists.
+  With relays it also moves Realm to GitHub's newest release in the tested
+  major, pinned by the sha256 GitHub publishes, so relay fixes need no Meridian
+  release either.
+- **Pins stay current between releases** — a weekly job opens a pull request
+  raising the Realm, RealiTLScanner, acme.sh, and Remnawave defaults; the local
+  Xray test client is now pinned by checksum too, and a Realm tarball without a
+  pinned checksum is refused instead of installed unverified.
 - **One health command: `meridian check`** — checks whatever the server is in
   your fleet: pre-flight readiness for a new server; panel connection,
   containers (including Docker health, so a crash-looping service is flagged),

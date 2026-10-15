@@ -240,14 +240,14 @@ meridian fleet upgrade [--tested] [--yes]
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`） |
-| `--tested` | | `fleet upgrade`：仅使用此 Meridian 版本测试过的 Remnawave 版本，不查询 Docker Hub |
+| `--tested` | | `fleet upgrade`：既不查询 Docker Hub 也不查询 GitHub；Remnawave 回到此 Meridian 版本测试过的版本，已升级的 Realm 保持不变 |
 | `--yes`, `-y` | | `fleet upgrade`：跳过确认 |
 
 **`fleet status`** — 面板健康、节点心跳、中继监听器和客户端计数。缺失声明的客户端降低健康；禁用、限制或过期的客户端被计数但是您的选择，不是错误。可达的中继监听器仅证明 TCP，所以未验证的中继路由保持健康 `unknown`；用 `meridian test` 检查完整路径。退出 `0` 意味着健康，`4` 是降级，`3` 是未知。
 
 **`fleet inventory`** — 你的已配置服务器、角色、节点和中继，可达时带实时面板状态。它永不打印面板 API 令牌或秘密路径。如果实时状态不可用，已配置库存仍显示，带警告，命令退出 `3`。使用 `plan --json` 决定应用是否有工作要做。
 
-**`fleet upgrade`** — 无需等待 Meridian 更新，就把 Remnawave 升级到最新版本。它向 Docker Hub 查询此 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每一个，并把选择保存到 `cluster.yml`，让之后的应用保持这一选择；之后 Meridian 的版本若带有更新的固定版本，则以它为准。`--tested` 只使用此版本测试过的版本。PostgreSQL 和 Valkey 始终使用 Meridian 的固定版本。随后它读取每个服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像（通过 SSH 只读执行 `docker inspect`），并把每个显示为 `current`、`upgrade`、`install` 或保留。版本政策是设置使用的：更新的版本标签或您选择的浮动标签（`latest`、`3`）被保留并报告，永远不降级。PostgreSQL 主版本永远不在原地移动 — 旧主版本保持运行，命令解释需要的 dump-and-restore。在您确认后，它应用已审查的计划并在每个服务器上运行 `meridian check`。一个其镜像无法读取的服务器在任何改变前用退出 `3` 停止命令；如果应用收敛但服务器仍运行旧镜像，它也退出 `3`。
+**`fleet upgrade`** — 无需等待 Meridian 更新，就把 Remnawave 升级到最新版本。它向 Docker Hub 查询此 Meridian 版本所支持主版本内最新的后端、节点和订阅页面版本（跳过预发布版和其他主版本），按多架构摘要固定每一个，并把选择保存到 `cluster.yml`，让之后的应用保持这一选择；之后 Meridian 的版本若带有更新的固定版本，则以它为准。`--tested` 只使用此版本测试过的版本。PostgreSQL 和 Valkey 始终使用 Meridian 的固定版本。如果车队中有中继，它对 Realm 也这样做：选用 GitHub 上已测试主版本内的最新版本，并记录 GitHub 为每个压缩包发布的 sha256，每个中继在安装前都会校验它。随后它读取每个服务器上运行的后端、订阅页面、PostgreSQL、Valkey 和节点镜像（通过 SSH 只读执行 `docker inspect`），并把每个显示为 `current`、`upgrade`、`install` 或保留。版本政策是设置使用的：更新的版本标签或您选择的浮动标签（`latest`、`3`）被保留并报告，永远不降级。PostgreSQL 主版本永远不在原地移动 — 旧主版本保持运行，命令解释需要的 dump-and-restore。在您确认后，它应用已审查的计划并在每个服务器上运行 `meridian check`。一个其镜像无法读取的服务器在任何改变前用退出 `3` 停止命令；如果应用收敛但服务器仍运行旧镜像，它也退出 `3`。
 
 ### meridian check
 
