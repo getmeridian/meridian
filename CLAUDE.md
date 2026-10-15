@@ -126,8 +126,7 @@ make real-lab    # optional real-VM on Hetzner (local-only, ~€0.01)
 
 ## Where things live
 
-- Concrete tracked work → **[GitHub issues](https://github.com/getmeridian/meridian/issues)**
-- High-level direction → **[ROADMAP.md](ROADMAP.md)**
+- Planned work and direction → **[GitHub issues](https://github.com/getmeridian/meridian/issues)**, the only inbox (no roadmap file; long-horizon ideas live in umbrella issues)
 - Shipped history → **[CHANGELOG.md](CHANGELOG.md)**
 - Cross-tool agent rules → **[AGENTS.md](AGENTS.md)**
 - Public landing and policies → **[README.md](README.md)**, **[SECURITY.md](SECURITY.md)**, **[CONTRIBUTING.md](CONTRIBUTING.md)**
