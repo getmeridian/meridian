@@ -350,12 +350,20 @@ def test_realm_rejects_failed_listener_inspection() -> None:
         driver.observe(action, None)
 
 
-def test_realm_missing_managed_binary_is_drift() -> None:
+@pytest.mark.parametrize(
+    ("returncode", "stderr"),
+    [
+        (127, "realm: command not found"),
+        (1, "/lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.38' not found"),
+    ],
+    ids=["missing", "does-not-start"],
+)
+def test_realm_missing_or_broken_managed_binary_is_drift(returncode: int, stderr: str) -> None:
     driver, action, conn = _realm_observation_case()
     conn.run.side_effect = [
         _result(stdout="active\n"),
         _result(stdout="LISTEN 0 1024 0.0.0.0:443 0.0.0.0:*\n"),
-        _result(returncode=127, stderr="realm: command not found"),
+        _result(returncode=returncode, stderr=stderr),
     ]
 
     assert not observation_converges(action, driver.observe(action, None))

@@ -30,6 +30,7 @@
 - **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
+- **Realm is the static musl build, run before it replaces anything** — upstream's 2.9.6 gnu build needs glibc 2.38, so `fleet upgrade` on Ubuntu 22.04 overwrote a working binary with one that could not start. A binary that runs and fails observes as drift (reinstall), not unavailable evidence.
 - **Firewall follows the effective sshd port** — never assume `22/tcp`.
 - **Recipes never own public ports** — compiled, tagged rules open them; `ConfigureFirewall` deletes only the bare, comment-less `443/udp` an old bootstrap added.
 - **Baseline checks exit 1 for absence** — a bare `docker` or `ufw` exits 127 (stock Debian has no ufw), which observation treats as unavailable evidence.

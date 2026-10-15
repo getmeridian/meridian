@@ -90,9 +90,9 @@ class InstallRealm:
 
         arch = arch_result.stdout.strip()
         if arch == "x86_64":
-            target = "x86_64-unknown-linux-gnu"
+            target = "x86_64-unknown-linux-musl"
         elif arch in ("aarch64", "arm64"):
-            target = "aarch64-unknown-linux-gnu"
+            target = "aarch64-unknown-linux-musl"
         else:
             return StepResult(name=self.name, status="failed", detail=f"unsupported arch: {arch}")
 
@@ -124,22 +124,39 @@ class InstallRealm:
             )
             return StepResult(name=self.name, status="failed", detail=detail)
 
-        # Extract and install
-        # Extract into a private directory so the upstream file name never lands in a shared path.
-        extract = conn.run(
-            'd=$(mktemp -d) && tar xzf /tmp/fwd.tar.gz -C "$d" && '
-            f'install -m 755 "$d/realm" {binary} && '
-            'rm -rf "$d" /tmp/fwd.tar.gz',
-            timeout=30,
-        )
-        if extract.returncode != 0:
+        # Extract into a private directory so the upstream file name never lands in a shared path,
+        # and run the new binary there: the running one is replaced only once it starts.
+        extract = conn.run('d=$(mktemp -d) && tar xzf /tmp/fwd.tar.gz -C "$d" && echo "$d"', timeout=30)
+        stage = extract.stdout.strip().splitlines()[-1] if extract.stdout.strip() else ""
+        if extract.returncode != 0 or not stage.startswith("/"):
+            conn.run("rm -f /tmp/fwd.tar.gz", timeout=15)
             return StepResult(
                 name=self.name,
                 status="failed",
-                detail=f"extract/install failed: {extract.stderr.strip()[:200]}",
+                detail=f"extract failed: {extract.stderr.strip()[:200]}",
+            )
+        q_stage = shlex.quote(stage)
+        staged = conn.run(f"{q_stage}/realm --version", timeout=15)
+        if staged.returncode != 0 or parse_realm_version(staged.stdout) != ctx.realm_version:
+            conn.run(f"rm -rf {q_stage} /tmp/fwd.tar.gz", timeout=15)
+            reason = (staged.stderr or staged.stdout).strip()[:200]
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=f"v{ctx.realm_version} for {target} does not run on this server: {reason}",
+            )
+        installed = conn.run(
+            f"install -m 755 {q_stage}/realm {binary}.new && mv -f {binary}.new {binary} && "
+            f"rm -rf {q_stage} /tmp/fwd.tar.gz",
+            timeout=30,
+        )
+        if installed.returncode != 0:
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=f"install failed: {installed.stderr.strip()[:200]}",
             )
 
-        # Verify
         verify = conn.run(f"{binary} --version", timeout=15)
         if verify.returncode != 0 or parse_realm_version(verify.stdout) != ctx.realm_version:
             return StepResult(name=self.name, status="failed", detail="forwarder version mismatch after install")

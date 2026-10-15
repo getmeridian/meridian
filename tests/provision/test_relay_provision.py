@@ -71,11 +71,25 @@ class TestInstallRealm:
         conn.when("netfwd --version", stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]")
         conn.when("uname -m", stdout="x86_64")
         conn.when("curl", stdout="")
-        conn.when("sha256sum", stdout=REALM_SHA256["x86_64-unknown-linux-gnu"])
-        conn.when("tar xzf", stdout="")
+        conn.when("sha256sum", stdout=REALM_SHA256["x86_64-unknown-linux-musl"])
+        conn.when("tar xzf", stdout="/tmp/tmp.stage\n")
+        conn.when("/tmp/tmp.stage/realm --version", stdout=f"Realm {REALM_VERSION} [brutal][multi-thread]")
         result = InstallRealm().run(conn, _make_ctx())
         assert result.status == "changed"
-        conn.assert_called_with_pattern("curl")
+        conn.assert_called_with_pattern("realm-x86_64-unknown-linux-musl.tar.gz")
+        conn.assert_called_with_pattern("mv -f")
+
+    def test_binary_that_does_not_run_here_never_replaces_the_installed_one(self):
+        conn = MockConnection()
+        conn.when("netfwd --version", stdout="Realm 2.9.2 [brutal][multi-thread]")
+        conn.when("uname -m", stdout="x86_64")
+        conn.when("sha256sum", stdout=REALM_SHA256["x86_64-unknown-linux-musl"])
+        conn.when("tar xzf", stdout="/tmp/tmp.stage\n")
+        conn.when("/tmp/tmp.stage/realm --version", rc=1, stderr="version `GLIBC_2.38' not found")
+        result = InstallRealm().run(conn, _make_ctx())
+        assert result.status == "failed"
+        assert "GLIBC_2.38" in result.detail
+        assert not any("install -m" in cmd or "mv -f" in cmd for cmd in conn.calls)
 
     @pytest.mark.parametrize(
         ("output", "expected"),

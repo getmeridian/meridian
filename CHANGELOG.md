@@ -110,7 +110,8 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   major version in place. `meridian update` points to it when a fleet exists.
   With relays it also moves Realm to GitHub's newest release in the tested
   major, pinned by the sha256 GitHub publishes, so relay fixes need no Meridian
-  release either.
+  release either. Relays get Realm's static build, which runs on any glibc, and
+  a new binary replaces the running one only after it starts on that server.
 - **Pins stay current between releases** — a weekly job opens a pull request
   raising the Realm, RealiTLScanner, acme.sh, and Remnawave defaults; the local
   Xray test client is now pinned by checksum too, and a Realm tarball without a
