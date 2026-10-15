@@ -72,6 +72,10 @@ def run_add(
         harden=harden,
         yes=yes,
     )
+    if request.sni:
+        from meridian.commands.sni import refuse_unusable_camouflage
+
+        refuse_unusable_camouflage(request.sni)
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
@@ -128,7 +132,7 @@ def run_add(
         if (request.sni and request.sni not in saved_snis) or (request.domain and request.domain not in saved_domains):
             fail(
                 f"{resolved.ip} is already exit {existing.id} with different settings",
-                hint="Change an existing exit's SNI or domain with `meridian setup`.",
+                hint="Change an existing exit's SNI with `meridian node sni`, or its domain with `meridian setup`.",
                 hint_type="user",
             )
         updated = intent

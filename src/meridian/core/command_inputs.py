@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from meridian.core.inputs import (
+    HostnameValue,
     IPAddressValue,
     NameValue,
     OptionalCountryCodeValue,
@@ -78,4 +79,13 @@ class RelayTargetRequest(CoreModel):
     relay_ip: SelectorValue
     exit_arg: OptionalSelectorValue = ""
     user: OptionalSshUserValue = ""
+    yes: bool = False
+
+
+class CamouflageChangeRequest(CoreModel):
+    """Request to give an existing exit or relay a new Reality camouflage SNI."""
+
+    target: SelectorValue
+    sni: HostnameValue
+    exit_arg: OptionalSelectorValue = ""
     yes: bool = False

@@ -94,8 +94,9 @@ def check_block_differential(
             "failed",
             f"Camouflage SNI looks blocked: {camouflage_sni} is cut off ({camouflage.describe()}) but a "
             f"connection without it gets through, {where}. {VANTAGE_NOTE}",
-            "Choose another camouflage SNI (one that plausibly lives in your hosting provider's network), "
-            "then re-run setup.",
+            "Choose another camouflage SNI (one that plausibly lives in your hosting provider's network; "
+            "`meridian scan SERVER` lists sites next to it) and switch with `meridian node sni EXIT NEW_SNI`, "
+            "or `meridian relay sni RELAY NEW_SNI` for a relay.",
         )
 
     control = _real_site_flow(camouflage_sni, port=port, timeout=timeout, prober=prober, resolver=resolver)

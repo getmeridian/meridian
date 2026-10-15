@@ -181,6 +181,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "node.replace": None,
+    "node.sni": None,
     "node.remove": None,
     "relay.add": None,
     "relay.list": CommandOutput(
@@ -194,6 +195,7 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         stability="stable",
     ),
     "relay.remove": None,
+    "relay.sni": None,
     "route.add": CommandOutput(
         data_schema="route-mutation",
         outcomes=_route_mutation("the override was added and applied"),

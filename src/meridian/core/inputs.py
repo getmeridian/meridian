@@ -411,6 +411,11 @@ OptionalPaletteValue = Annotated[
     WithJsonSchema({"type": "string", "enum": ["", *PAGE_PALETTES]}),
     AfterValidator(validate_optional_palette_value),
 ]
+HostnameValue = Annotated[
+    str,
+    WithJsonSchema(_HOSTNAME_SCHEMA),
+    AfterValidator(validate_hostname_value),
+]
 OptionalHostnameValue = Annotated[
     str,
     WithJsonSchema(_OPTIONAL_HOSTNAME_SCHEMA),

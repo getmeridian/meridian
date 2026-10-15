@@ -81,6 +81,14 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 
 要手动检查一个目标，运行 `meridian check 198.51.100.10 --sni HOST`。避免 `apple.com` 和 `icloud.com` — 它们的网络与 VPS 提供商不匹配。
 
+### 以后更换目标
+
+当 `meridian test --probe` 报告伪装 SNI 被封锁时，无需重新部署即可把出口切换到另一个目标。Meridian 会拒绝 `apple.com`、`icloud.com` 和 `www.microsoft.com`（其证书对 Reality 来说太大），检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查并应用。旧名称会立即被替换而不是并存，因为一个 Reality 侦听器只模仿一个站点。应用在下次订阅刷新（每 6 小时）或用户手动刷新订阅时切换。中继请使用 `meridian relay sni RELAY NEW_SNI`。
+
+```
+meridian node sni 198.51.100.10 www.cloudflare.com
+```
+
 ### 伪装目标 vs 域名
 
 - **伪装目标** (`--sni`) — 你**不**拥有的真实网站。Reality 模仿它。

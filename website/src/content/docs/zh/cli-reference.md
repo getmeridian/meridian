@@ -155,6 +155,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node sni EXIT NEW_SNI [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -178,6 +179,8 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 
 **`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（节点容器、镜像和目录；其 nginx 文件、防火墙规则和证书）；Docker 和保存的服务器保留。对于控制服务器拒绝（移动面板会改变每个订阅 URL），以及对于已经有角色的新服务器拒绝。
 
+**`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。
+
 ### meridian relay
 
 管理中继 — Realm TCP 转发器，给用户一个到国外出口的国内入口点。中继承载 Reality 流量。
@@ -186,6 +189,7 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -202,6 +206,8 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 **`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。
 
 **`relay remove`** — `RELAY` 是中继服务器的 IP 或保存的名称，或中继链 ID。删除通过该服务器的每条链（用 `--exit` 缩小范围），列出将删除的内容（Realm 单元、防火墙规则、出口端侦听器、已发布的主机），确认，并应用审查的删除。服务器留在保存的服务器中。
+
+**`relay sni`** — 为通过某服务器的中继链（或按 ID 指定的一条链；用 `--exit` 缩小范围）设置新的伪装 SNI。它拒绝与 `node sni` 相同的名称，检查出口能否访问该站点（中继自己的名称由出口上的 Reality 侦听器提供），审查、确认并应用。传入出口自己的 SNI 会让中继重新跟随出口。应用在下次订阅刷新时切换。
 
 要检查中继的跳跃，运行 `meridian check RELAY`。
 

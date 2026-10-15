@@ -81,6 +81,14 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 
 To check one target by hand, run `meridian check 198.51.100.10 --sni HOST`. Avoid `apple.com` and `icloud.com` — their networks don't match VPS providers.
 
+### Changing the target later
+
+When `meridian test --probe` reports the camouflage SNI blocked, switch the exit to another target without redeploying. Meridian refuses `apple.com`, `icloud.com`, and `www.microsoft.com` (its certificate is too large for Reality), checks that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review, and applies it. The old name is replaced at once rather than kept alongside, because a Reality listener imitates exactly one site. Apps switch at their next subscription refresh (every 6 hours) or when the user refreshes the subscription. For a relay, use `meridian relay sni RELAY NEW_SNI`.
+
+```
+meridian node sni 198.51.100.10 www.cloudflare.com
+```
+
 ### Camouflage target vs. domain
 
 - **Camouflage target** (`--sni`) — a popular website you **don't** own. Reality impersonates it.

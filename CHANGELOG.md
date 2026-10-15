@@ -97,6 +97,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
   settings, and relays, so clients keep working, then cleans up the old server
   through the reviewed apply. The control server can't be moved yet.
+- **Change a camouflage SNI in one command** — `meridian node sni EXIT NEW_SNI`
+  and `meridian relay sni RELAY NEW_SNI` switch an exit or relay to another
+  site when `meridian test --probe` says the SNI is blocked. They check that
+  the exit reaches the site over TLS 1.3 with HTTP/2, show the review, and
+  apply it. The old name is replaced, not kept alongside; apps switch at their
+  next subscription refresh (every 6 hours) or a manual refresh. They, `node
+  add --sni`, and `relay add --sni` refuse Apple names and `www.microsoft.com`.
 - **`meridian fleet upgrade`** — compares the Remnawave images each server runs
   with this CLI's pins, applies the reviewed plan, then runs `meridian check`.
   Newer or floating tags you chose are kept, and PostgreSQL never moves to a new

@@ -6,13 +6,12 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent
+from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, resolve_exit
 from meridian.console import confirm, err_console, error_context, fail, is_json_mode, ok
-from meridian.core.errors import LocalStateError
 from meridian.core.models import Summary
 from meridian.core.output import OperationContext, command_envelope
 from meridian.core.routes import RouteMutationResult, build_route_list_result
-from meridian.core.topology import EgressOverrideAction, EgressOverrideIntent, ExitIntent, SetupIntent
+from meridian.core.topology import EgressOverrideAction, EgressOverrideIntent, SetupIntent
 from meridian.renderers import emit_json
 
 _VIA: dict[str, EgressOverrideAction] = {"warp": "warp", "direct": "direct", "block": "block"}
@@ -28,7 +27,7 @@ def run_add(exit_arg: str, values: list[str], via: str, name: str = "") -> None:
         if action is None:
             fail(f"Unknown --via {via!r}", hint="Use --via warp, --via direct, or --via block.", hint_type="user")
         cluster, intent = _load()
-        exit_ = _resolve_exit(intent, exit_arg)
+        exit_ = resolve_exit(intent, exit_arg)
         try:
             updated, override = add_egress_override_to_intent(
                 intent, exit_.id, action=action, values=values, override_id=name
@@ -49,7 +48,7 @@ def run_list(exit_arg: str = "") -> None:
     operation = OperationContext()
     with error_context("route.list", timer=operation.timer):
         _cluster, intent = _load()
-        exits = [_resolve_exit(intent, exit_arg)] if exit_arg else list(intent.exits)
+        exits = [resolve_exit(intent, exit_arg)] if exit_arg else list(intent.exits)
         result = build_route_list_result(exits)
         if is_json_mode():
             count = sum(len(entry.overrides) for entry in result.exits)
@@ -88,7 +87,7 @@ def run_remove(exit_arg: str, override_id: str, yes: bool = False) -> None:
                 hint_type="user",
             )
         cluster, intent = _load()
-        exit_ = _resolve_exit(intent, exit_arg)
+        exit_ = resolve_exit(intent, exit_arg)
         try:
             updated, removed = remove_egress_override_from_intent(intent, exit_.id, override_id)
         except ValueError as exc:
@@ -106,22 +105,6 @@ def run_remove(exit_arg: str, override_id: str, yes: bool = False) -> None:
 def _load() -> tuple[ClusterConfig, SetupIntent]:
     cluster = load_topology_cluster()
     return cluster, require_intent(cluster)
-
-
-def _resolve_exit(intent: SetupIntent, query: str) -> ExitIntent:
-    """Match an exit by ID, saved server ID, saved name, or address."""
-    from meridian.config import SERVER_PROFILES_FILE
-    from meridian.servers import ServerRegistry
-
-    try:
-        entry = ServerRegistry(SERVER_PROFILES_FILE).find(query)
-    except LocalStateError as exc:
-        fail(exc)
-    server_ref = entry.id if entry is not None else query
-    for exit_ in intent.exits:
-        if query == exit_.id or server_ref == exit_.server_ref:
-            return exit_
-    fail(f"Exit {query} not found in the topology", hint="Check: meridian node list", hint_type="user")
 
 
 def _apply(cluster: ClusterConfig, updated: SetupIntent, operation: str) -> None:

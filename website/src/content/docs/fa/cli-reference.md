@@ -155,6 +155,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node sni EXIT NEW_SNI [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -178,6 +179,8 @@ meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
 
 **`node replace`** — یک exit را به سرور دیگر منتقل می‌کند. `EXIT` ID exit یا نام ذخیره‌شده سرور یا IP است؛ سرور جدید syntax هم‌انندی `node add` (نام ذخیره‌شده یا `local` هم‌چنین کار می‌کند) استفاده می‌کند و مانند `server add` ذخیره می‌شود. exit ID خود را، کلیدهای Reality، مسیرهای پروتکل، SNI، WARP و تنظیمات geo خود را نگاه می‌دارد، و هر relay که به آن اشاره می‌کند، بنابراین relay کاربران کار می‌کند و کاربران مستقیم آدرس جدید را در تازه‌سازی اشتراک بعدی خود دریافت می‌کنند. بررسی آنچه روی سرور جدید مستقر خواهد شد فهرست می‌کند و هر منابع تمیز شدهٔ سرور قدیم (node container، image و directory؛ فایل‌های nginx، قوانین firewall و گواهینامه‌ها)؛ Docker و سرور ذخیره‌شده باقی می‌مانند. برای سرور کنترل (منتقل کردن پنل هر URL اشتراک را تغییر می‌دهد) و برای سرور جدید که قبلاً نقش دارد رد می‌شود.
 
+**`node sni`** — برای مسیر Reality یک exit، SNI استتار جدیدی تنظیم می‌کند. `EXIT` ID exit یا نام ذخیره‌شده یا IP سرور آن است. نام‌های `apple.com` و `icloud.com` و `www.microsoft.com` را رد می‌کند، از طریق SSH بررسی می‌کند که exit با TLS 1.3 و HTTP/2 به سایت جدید می‌رسد، بررسی را نشان می‌دهد (relayهایی که از SNI exit پیروی می‌کنند، relayهایی که SNI خود را نگه می‌دارند، دروازه‌های مسیریابی ساخته‌شده بر این مسیر، و آنچه پاک می‌شود)، تأیید می‌گیرد و اعمال می‌کند. نام قدیمی جایگزین می‌شود، نه اینکه کنار نام جدید بماند: برنامه‌ها در تازه‌سازی بعدی اشتراک (هر ۶ ساعت) یا تازه‌سازی دستی جابه‌جا می‌شوند و تا آن زمان نمی‌توانند از طریق Reality وصل شوند. XHTTP، WSS و Hysteria2 تغییر نمی‌کنند. وقتی `meridian test --probe` گزارش می‌دهد SNI استتار مسدود است از آن استفاده کنید.
+
 ### meridian relay
 
 relay را مدیریت کنید — Realm TCP forwarders که به کاربران نقطه ورود داخلی برای exit خارج دهند. Relay ترافیق Reality را حمل می‌کند.
@@ -186,6 +189,7 @@ relay را مدیریت کنید — Realm TCP forwarders که به کاربرا
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
 meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
@@ -202,6 +206,8 @@ meridian relay remove RELAY [--exit EXIT] [--yes]
 **`relay add`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.
 
 **`relay remove`** — `RELAY` یک IP سرور relay یا نام ذخیره‌شده یا ID زنجیره relay است. هر زنجیره‌ای را از طریق آن سرور می‌اندازد (آن را با `--exit` محدود کنید)، فهرست می‌کند که چه چیزی حذف خواهد شد (واحدهای Realm، قوانین firewall، شنونده سمت exit، منتشر شده Hosts)، تأیید می‌کند و حذف بررسی‌شده را اعمال می‌کند. سرورها در سرورهای ذخیره‌شده باقی می‌مانند.
+
+**`relay sni`** — برای زنجیره‌های relay از طریق یک سرور (یا یک زنجیره با ID؛ با `--exit` محدود کنید) SNI استتار جدیدی تنظیم می‌کند. همان نام‌های `node sni` را رد می‌کند، بررسی می‌کند که exit به سایت می‌رسد (نام خود relay را یک شنوندهٔ Reality روی exit سرو می‌کند)، بررسی را نشان می‌دهد، تأیید می‌گیرد و اعمال می‌کند. دادن SNI خود exit باعث می‌شود relay دوباره از exit پیروی کند. برنامه‌ها در تازه‌سازی بعدی اشتراک جابه‌جا می‌شوند.
 
 برای بررسی hopهای relay، از `meridian check RELAY` استفاده کنید.
 

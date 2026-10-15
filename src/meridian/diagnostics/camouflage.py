@@ -12,6 +12,7 @@ import io
 import ipaddress
 import shlex
 from dataclasses import dataclass
+from typing import Literal
 
 from meridian.config import REALITL_SCANNER_ASSETS, REALITL_SCANNER_GITHUB_URL, REALITL_SCANNER_VERSION
 from meridian.core.errors import MeridianError
@@ -24,6 +25,21 @@ from meridian.diagnostics.preflight import reachable_reality_targets
 _BAD_NAME_PARTS = ("apple.com", "icloud.com", "fake", "kubernetes", "ingress", "localhost", "invalid", "example")
 # Bounds the DNS and TLS checks; a /24 rarely yields more usable names than this.
 _MAX_CHECKED = 8
+
+
+def camouflage_refusal(sni: str) -> Literal["", "network", "certificate"]:
+    """Why a name can never be a Reality camouflage target, or "" when nothing rules it out.
+
+    ``network``: Apple's sites live in Apple's own network, which no hosting provider's
+    address matches. ``certificate``: www.microsoft.com sends a certificate larger than
+    Reality's 8192-byte limit, so no traffic passes.
+    """
+    name = sni.strip().lower().rstrip(".")
+    if any(name == domain or name.endswith(f".{domain}") for domain in ("apple.com", "icloud.com")):
+        return "network"
+    if name in {"microsoft.com", "www.microsoft.com"}:
+        return "certificate"
+    return ""
 
 
 class ScanUnavailableError(MeridianError):

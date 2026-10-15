@@ -10,7 +10,7 @@ from meridian.commands.apply_progress import apply_progress
 from meridian.config import HOME_DISPLAY
 from meridian.console import fail
 from meridian.core.errors import LocalStateError, MeridianError
-from meridian.core.topology import SetupIntent
+from meridian.core.topology import ExitIntent, SetupIntent
 from meridian.remnawave import MeridianPanel
 
 if TYPE_CHECKING:
@@ -83,6 +83,22 @@ def require_intent(cluster: ClusterConfig) -> SetupIntent:
     if cluster.topology_intent is None:
         raise RuntimeError("Topology intent is missing")
     return cluster.topology_intent
+
+
+def resolve_exit(intent: SetupIntent, query: str) -> ExitIntent:
+    """Match an exit by ID, saved server ID, saved name, or address."""
+    from meridian.config import SERVER_PROFILES_FILE
+    from meridian.servers import ServerRegistry
+
+    try:
+        entry = ServerRegistry(SERVER_PROFILES_FILE).find(query)
+    except LocalStateError as exc:
+        fail(exc)
+    server_ref = entry.id if entry is not None else query
+    for exit_ in intent.exits:
+        if query == exit_.id or server_ref == exit_.server_ref:
+            return exit_
+    fail(f"Exit {query} not found in the topology", hint="Check: meridian node list", hint_type="user")
 
 
 def load_cluster() -> ClusterConfig:

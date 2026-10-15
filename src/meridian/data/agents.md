@@ -66,6 +66,10 @@ meridian relay add 203.0.113.10 --exit nl --yes
 meridian check --json
 meridian test --json
 
+# `meridian test --probe` says the camouflage SNI is blocked: switch to another site
+meridian node sni nl www.cloudflare.com --yes
+meridian relay sni 203.0.113.10 dl.google.com --yes
+
 # What would change, then apply it
 meridian plan --json
 meridian apply --yes --json
