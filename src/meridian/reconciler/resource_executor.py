@@ -46,10 +46,12 @@ from meridian.reconciler.resources import (
     observation_converges,
 )
 from meridian.reconciler.retirement import retire, retired_bindings, unretirable
+from meridian.reconciler.stall_retry import StallNotice, StallRetry, stall_event_notice
 
 PersistCluster = Callable[[ClusterConfig], None]
 Clock = Callable[[], datetime]
 AfterApply = Callable[[ResourceAction], None]
+Observe = Callable[[ResourceAction, ManagedResourceBinding | None], ResourceObservation]
 
 
 def environment_after_apply_barrier(action: ResourceAction) -> None:
@@ -94,12 +96,17 @@ def execute_resource_plan(
 
     *reporter* receives ``plan.action.*`` events (with *operation* sequencing
     them) so CLI, JSONL, and Engine clients can render progress.
+
+    Observations that lose their SSH connection run again (``StallRetry``),
+    reported as ``connection_stalled`` warnings; mutations never do (an
+    uncertain one is observed first).
     """
     if max_unknown_attempts < 1:
         raise ValueError("max_unknown_attempts must be at least 1")
     validate_resource_plan_transition(plan, cluster)
     save = persist or (lambda state: state.save())
     now = clock or (lambda: datetime.now(UTC))
+    stall = StallRetry(stop=cancellation.is_cancelled if cancellation is not None else None)
     if fence is not None:
         cluster.fleet_id = fence.acquire(local_fence_view(cluster))
     try:
@@ -115,6 +122,7 @@ def execute_resource_plan(
             reporter=reporter,
             operation=operation,
             fence=fence,
+            stall=stall,
         )
     finally:
         if fence is not None:
@@ -134,6 +142,7 @@ def _execute_fenced(
     reporter: Reporter | None,
     operation: OperationContext | None,
     fence: ApplyFence | None,
+    stall: StallRetry,
 ) -> ResourceExecutionResult:
     generation = _begin_apply(plan, cluster, save)
     actions = build_resource_actions(plan, generation)
@@ -171,6 +180,7 @@ def _execute_fenced(
                         max_unknown_attempts=max_unknown_attempts,
                         after_apply=after_apply,
                         cancellation=cancellation,
+                        observe=_retrying_observe(driver, stall, report.stall_notice(action)),
                     )
                 except OperationCancelledError as exc:
                     raise _apply_cancelled(
@@ -214,6 +224,11 @@ class _ActionReporter:
     def started(self, action: ResourceAction, index: int) -> None:
         self._emit(PLAN_ACTION_STARTED, action, index)
 
+    def stall_notice(self, action: ResourceAction) -> StallNotice | None:
+        if self._reporter is None:
+            return None
+        return stall_event_notice(self._reporter, self._operation, _resource_ref(action))
+
     def finished(self, result: ResourceActionResult, index: int) -> None:
         if result.succeeded:
             self._emit(PLAN_ACTION_COMPLETED, result.action, index, result=result)
@@ -233,7 +248,6 @@ class _ActionReporter:
     ) -> None:
         if self._reporter is None:
             return
-        payload = action.resource.payload
         data: dict[str, object] = {"index": index, "total": self._total}
         if result is not None:
             data.update({"status": result.status, "changed": result.changed})
@@ -243,14 +257,24 @@ class _ActionReporter:
             event_type,
             level=level,
             phase="apply",
-            resource=ResourceRef(
-                kind=payload.kind,
-                id=action.resource.logical_id,
-                name=getattr(payload, "server_ref", ""),
-            ),
+            resource=_resource_ref(action),
             message=result.error if result is not None else "",
             data=data,
         )
+
+
+def _resource_ref(action: ResourceAction) -> ResourceRef:
+    payload = action.resource.payload
+    return ResourceRef(kind=payload.kind, id=action.resource.logical_id, name=getattr(payload, "server_ref", ""))
+
+
+def _retrying_observe(driver: ResourceDriver, stall: StallRetry, notice: StallNotice | None) -> Observe:
+    """Observe through *stall*, so a dropped connection is redialed and read again."""
+
+    def observe(action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
+        return stall.call(lambda: driver.observe(action, binding), notice)
+
+    return observe
 
 
 def validate_resource_plan_transition(
@@ -286,6 +310,7 @@ def inspect_resource_plan(
     drivers: ResourceDrivers,
 ) -> ResourceInspectionResult:
     """Observe every reviewed resource without writing state or mutating it."""
+    stall = StallRetry()
     generation = _inspection_generation(plan, cluster)
     inspections: list[ResourceInspection] = []
     for action in build_resource_actions(plan, generation):
@@ -299,10 +324,7 @@ def inspect_resource_plan(
             )
             continue
         try:
-            observation = driver.observe(
-                action,
-                _binding(action, cluster),
-            )
+            observation = _retrying_observe(driver, stall, None)(action, _binding(action, cluster))
         except UnboundDependencyError as exc:
             # Apply binds these dependencies first; until then this resource is a pending change.
             inspections.append(ResourceInspection(action=action, waiting_on=sorted(exc.logical_ids)))
@@ -359,11 +381,13 @@ def _execute_action(
     max_unknown_attempts: int,
     after_apply: AfterApply | None,
     cancellation: CancellationToken | None = None,
+    observe: Observe | None = None,
 ) -> ResourceActionResult:
+    observe = observe or driver.observe
     checkpoint = _checkpoint(action, cluster)
     binding = _binding(action, cluster)
     try:
-        observation = driver.observe(action, binding)
+        observation = observe(action, binding)
     except Exception as exc:
         return _record_failure(action, cluster, persist, clock, f"observation failed before apply: {exc}")
     if observation_converges(action, observation):
@@ -395,7 +419,7 @@ def _execute_action(
             checkpoint.last_error = str(exc)
             checkpoint.updated_at = _timestamp(clock)
             persist(cluster)
-            observed = _observe_unknown(action, driver, binding, cluster, persist, clock)
+            observed = _observe_unknown(action, observe, binding, cluster, persist, clock)
             if isinstance(observed, ResourceActionResult):
                 return observed
             if observation_converges(action, observed):
@@ -426,7 +450,7 @@ def _execute_action(
             after_apply(action)
         observed_binding = _binding_from_receipt(action, binding, receipt)
         try:
-            observation = driver.observe(action, observed_binding)
+            observation = observe(action, observed_binding)
         except Exception as exc:
             checkpoint.status = "unknown"
             checkpoint.last_error = f"post-apply observation failed: {exc}"
@@ -454,14 +478,14 @@ def _execute_action(
 
 def _observe_unknown(
     action: ResourceAction,
-    driver: ResourceDriver,
+    observe: Observe,
     binding: ManagedResourceBinding | None,
     cluster: ClusterConfig,
     persist: PersistCluster,
     clock: Clock,
 ) -> ResourceObservation | ResourceActionResult:
     try:
-        return driver.observe(action, binding)
+        return observe(action, binding)
     except Exception as exc:
         checkpoint = _checkpoint(action, cluster)
         checkpoint.status = "unknown"

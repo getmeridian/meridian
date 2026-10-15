@@ -2,7 +2,9 @@
 
 Writes are compare-and-swap: the new record is uploaded beside the old one and
 moved into place under ``flock`` only if the old file's SHA-256 still matches
-what this process read. Decisions live in ``meridian.reconciler.fence``.
+what this process read. A read or swap that loses its SSH connection runs again
+after a pause; before swapping again, the fence is re-read, because the lost
+attempt may already have landed. Decisions live in ``meridian.reconciler.fence``.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from meridian.reconciler.fence import (
     released,
     renewed,
 )
+from meridian.reconciler.stall_retry import StallNotice, StallRetry
 from meridian.ssh import ServerConnection
 
 FENCE_DIR = "/var/lib/meridian"
@@ -69,10 +72,13 @@ class SSHApplyFence:
         *,
         holder: str | None = None,
         clock: Callable[[], datetime] | None = None,
+        on_stall: StallNotice | None = None,
     ) -> None:
         self._conn = conn
         self._holder = holder or apply_holder()
         self._now = clock or (lambda: datetime.now(UTC))
+        self._stall = StallRetry()
+        self._on_stall = on_stall
         self._record: FenceRecord | None = None
         self._digest = _ABSENT
         self._renewed_at: datetime | None = None
@@ -138,12 +144,16 @@ class SSHApplyFence:
         if self._record is None:
             return
         try:
-            self._write(released(self._record), self._digest)
+            # No retry: a dead server should not hold up the exit.
+            self._write(released(self._record), self._digest, patient=False)
         except FleetFenceError:
             pass  # An unreleased lease simply expires.
         self._record = None
 
     def _read(self) -> tuple[FenceRecord | None, str]:
+        return self._stall.call(self._read_once, self._on_stall)
+
+    def _read_once(self) -> tuple[FenceRecord | None, str]:
         path, directory = shlex.quote(FENCE_FILE), shlex.quote(FENCE_DIR)
         result = self._conn.run(
             f"mkdir -p {directory} && chmod 700 {directory} && "
@@ -179,9 +189,32 @@ class SSHApplyFence:
             ) from exc
         return record, digest
 
-    def _write(self, record: FenceRecord, expected_digest: str) -> None:
+    def _write(self, record: FenceRecord, expected_digest: str, *, patient: bool = True) -> None:
         text = json.dumps(asdict(record), indent=2, sort_keys=True) + "\n"
-        staged = f"{FENCE_FILE}.{secrets.token_hex(4)}"
+        written = _sha256(text)
+        staged = f"{FENCE_FILE}.{secrets.token_hex(4)}"  # one name, so a retry overwrites what a lost try left
+        tried = False
+
+        def attempt() -> None:
+            nonlocal tried
+            if tried:
+                # The lost attempt may have swapped before the connection dropped.
+                _remote, current = self._read_once()
+                if current == written:
+                    return
+                if current != expected_digest:
+                    raise _swap_conflict()
+            tried = True
+            self._swap(staged, text, expected_digest)
+
+        if patient:
+            self._stall.call(attempt, self._on_stall)
+        else:
+            attempt()
+        self._record = record
+        self._digest = written
+
+    def _swap(self, staged: str, text: str, expected_digest: str) -> None:
         upload = self._conn.put_text(staged, text, mode="600", sensitive=True, operation_name="stage apply fence")
         if upload.returncode != 0:
             raise FleetFenceError(
@@ -201,11 +234,7 @@ class SSHApplyFence:
             timeout=30,
         )
         if result.returncode == _CONFLICT_RC:
-            raise FleetFenceError(
-                "Another machine changed this fleet's apply fence at the same moment.",
-                hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
-                category="user",
-            )
+            raise _swap_conflict()
         if result.returncode != 0:
             raise FleetFenceError(
                 "Could not update the apply fence on the control server.",
@@ -213,8 +242,14 @@ class SSHApplyFence:
                 category="system",
                 retryable=True,
             )
-        self._record = record
-        self._digest = _sha256(text)
+
+
+def _swap_conflict() -> FleetFenceError:
+    return FleetFenceError(
+        "Another machine changed this fleet's apply fence at the same moment.",
+        hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
+        category="user",
+    )
 
 
 def _sha256(text: str) -> str:

@@ -2,7 +2,7 @@
 ## Design decisions
 **Cluster config** — one hidden Schema V3 `cluster.yml` holds topology intent, bindings, allocations, and checkpoints (`cluster.py` model, `cluster_persistence.py` YAML); users live in Remnawave.
 **Panel access** — `remnawave/` speaks HTTPS from the deployer's machine to nginx's secret path on 443 with an API token; no SSH tunnel.
-**SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport.
+**SSH abstraction** — `ServerConnection` runs locally or over SSH (non-root adds `sudo -n`); `conn.run()` returns `CommandResult`, `ssh_transfer.py` moves files, and the `SSHUI` callbacks (`ssh_auth.py`) keep Rich out of transport. Keepalives end a silent connection in ~15s, and a timeout or exit 255 drops the ControlMaster (`reset_multiplex()`) so the next command redials.
 **One key bootstrap** — `ssh_keys.py` owns Meridian's key pair, the `authorized_keys` install, and the key-login check for Engine and CLI alike; `resolve.install_meridian_key()` is the CLI's one-time-password path.
 **Server facts** — `facts.py` caches OS, kernel, Docker, UFW, containers, sshd ports, disk, and sysctl; use it before adding one-off probe parsing.
 **Errors over exits** — library modules raise `MeridianError` subclasses (`core/errors.py`) carrying a `category`; only command entry points call `console.fail()`, whose `hint_type` picks the footer and exit code (tested). Every error must be actionable.

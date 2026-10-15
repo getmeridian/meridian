@@ -190,6 +190,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   VLESS path "VLESS".
 - With several exits, subscriptions list the first server's entries ahead of
   later ones within each method instead of sorting them by exit name.
+- **A brief network stall no longer fails the apply** — every command shared one
+  SSH connection, so a stall made each later command hang until its own timeout
+  and the apply stopped. Now SSH notices a silent server within about 15 seconds,
+  drops the stuck connection, and reconnects. Read-only checks and the control
+  server's apply record retry for about a minute, and the progress shows
+  "connection stalled, retrying…". A change whose outcome is unknown is checked
+  on the server first and is never repeated blindly.
 
 ### Sharing
 - **Happ, v2rayNG, and other JSON-capable apps get the Xray JSON** — with it

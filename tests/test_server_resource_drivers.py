@@ -149,8 +149,8 @@ def test_server_baseline_rejects_unavailable_check_evidence(returncode: int, std
     with pytest.raises(ResourceReconcileError, match=match) as exc_info:
         driver.observe(action, None)
 
-    if returncode != 1:
-        assert exc_info.value.retryable is True
+    # Only a stalled or dropped connection is worth retrying; a missing tool stays missing.
+    assert exc_info.value.retryable is (returncode in {124, 255})
 
 
 def test_server_baseline_missing_attestation_is_confirmed_absent() -> None:

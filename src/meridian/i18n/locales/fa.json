@@ -155,6 +155,7 @@
   "ssh.server_added": "سرور اضافه شد: {name}",
   "progress.on": "{label} روی {server}",
   "progress.waits": "{label} (منتظر مرحله‌ای است که ناموفق بود)",
+  "progress.stalled": "اتصال متوقف شد، دوباره تلاش می‌کنیم…",
   "progress.kind.server_baseline": "آماده‌سازی سرور",
   "progress.kind.control_plane_runtime": "نصب پنل کنترل",
   "progress.kind.config_profile": "پروفایل پراکسی",

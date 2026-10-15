@@ -155,6 +155,7 @@
   "ssh.server_added": "已添加服务器：{name}",
   "progress.on": "{label}（{server}）",
   "progress.waits": "{label}（等待失败的步骤）",
+  "progress.stalled": "连接停滞，正在重试…",
   "progress.kind.server_baseline": "准备服务器",
   "progress.kind.control_plane_runtime": "安装控制面板",
   "progress.kind.config_profile": "代理配置",

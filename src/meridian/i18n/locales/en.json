@@ -155,6 +155,7 @@
   "ssh.server_added": "Server added: {name}",
   "progress.on": "{label} on {server}",
   "progress.waits": "{label} (waits for a failed step)",
+  "progress.stalled": "connection stalled, retrying…",
   "progress.kind.server_baseline": "Prepare server",
   "progress.kind.control_plane_runtime": "Install the control panel",
   "progress.kind.config_profile": "Proxy profile",

@@ -26,7 +26,7 @@ class _FileTransferMixin:
 
     Depends on attributes provided by ServerConnection: ``run``, ``user``,
     ``ip``, ``local_mode``, ``needs_sudo``, ``_ssh_opts``,
-    ``_completed_to_result``, ``_synthetic_result``.
+    ``_completed_to_result``, ``_after_transport``, ``_synthetic_result``.
     """
 
     # Declared for type-checker visibility; provided by ServerConnection.
@@ -36,6 +36,7 @@ class _FileTransferMixin:
     local_mode: bool
     needs_sudo: bool
     _completed_to_result: Any
+    _after_transport: Any
 
     @property
     def _ssh_opts(self) -> list[str]:
@@ -159,25 +160,29 @@ class _FileTransferMixin:
                 capture_output=True,
                 timeout=timeout,
             )
-            return self._completed_to_result(
-                completed,
-                duration_ms=int((time.monotonic() - started) * 1000),
-                attempts=1,
-                timed_out=False,
-                sudo=bool(sudo or self.user != "root"),
-                redacted_command=redacted,
-                operation_name=operation_name,
+            return self._after_transport(
+                self._completed_to_result(
+                    completed,
+                    duration_ms=int((time.monotonic() - started) * 1000),
+                    attempts=1,
+                    timed_out=False,
+                    sudo=bool(sudo or self.user != "root"),
+                    redacted_command=redacted,
+                    operation_name=operation_name,
+                )
             )
         except subprocess.TimeoutExpired:
-            return self._synthetic_result(
-                args=cmd,
-                returncode=124,
-                stderr=f"Command timed out after {timeout}s",
-                started=started,
-                timed_out=True,
-                sudo=bool(sudo or self.user != "root"),
-                redacted_command=redacted,
-                operation_name=operation_name,
+            return self._after_transport(
+                self._synthetic_result(
+                    args=cmd,
+                    returncode=124,
+                    stderr=f"Command timed out after {timeout}s",
+                    started=started,
+                    timed_out=True,
+                    sudo=bool(sudo or self.user != "root"),
+                    redacted_command=redacted,
+                    operation_name=operation_name,
+                )
             )
         except OSError as e:
             return self._synthetic_result(

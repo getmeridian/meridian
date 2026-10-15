@@ -155,6 +155,7 @@
   "ssh.server_added": "Сервер добавлен: {name}",
   "progress.on": "{label}: {server}",
   "progress.waits": "{label} (ждёт шага, который не удался)",
+  "progress.stalled": "соединение зависло, повторяем…",
   "progress.kind.server_baseline": "Подготовка сервера",
   "progress.kind.control_plane_runtime": "Установка панели управления",
   "progress.kind.config_profile": "Профиль прокси",

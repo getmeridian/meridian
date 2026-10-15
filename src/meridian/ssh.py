@@ -16,6 +16,7 @@ import shlex
 import subprocess
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable
 
 from meridian.config import MERIDIAN_HOME
@@ -91,15 +92,27 @@ def _stringify_output(value: str | bytes | None) -> str:
 # that is still too deep turns multiplexing off instead of breaking SSH.
 _MAX_CONTROL_PATH = 103 - 17
 
+# Keepalives end a connection whose server stopped answering after about 15s,
+# instead of letting every command on it hang until its own timeout.
+_KEEPALIVE_OPTS = ["-o", "ServerAliveInterval=5", "-o", "ServerAliveCountMax=3"]
 
-def multiplex_opts(user: str, host: str, port: int) -> list[str]:
-    """Return ControlMaster options for one target, or none if the socket path cannot fit."""
+
+def control_path(user: str, host: str, port: int) -> Path | None:
+    """The ControlMaster socket for one target, or None if the path cannot fit."""
     digest = hashlib.sha256(f"{user}@{host}:{port}".encode()).hexdigest()[:12]
     path = MERIDIAN_HOME / "ssh" / digest
     if len(os.fsencode(path)) > _MAX_CONTROL_PATH:
+        return None
+    return path
+
+
+def multiplex_opts(user: str, host: str, port: int) -> list[str]:
+    """Return ControlMaster options for one target, or none if the socket path cannot fit."""
+    path = control_path(user, host, port)
+    if path is None:
         return []
-    control_path = str(path).replace("%", "%%")
-    return ["-o", "ControlMaster=auto", "-o", f"ControlPath={control_path}", "-o", "ControlPersist=300"]
+    escaped = str(path).replace("%", "%%")
+    return ["-o", "ControlMaster=auto", "-o", f"ControlPath={escaped}", "-o", "ControlPersist=300"]
 
 
 _AUTH_METHODS_RE = re.compile(r"Permission denied \(([^)]*)\)")
@@ -181,6 +194,7 @@ class ServerConnection(_FileTransferMixin):
             "ConnectTimeout=10",
             "-o",
             "StrictHostKeyChecking=yes",
+            *_KEEPALIVE_OPTS,
         ]
         if self.multiplex and not self.local_mode:
             opts.extend(multiplex_opts(self.user, self.ip, self.port))
@@ -189,6 +203,41 @@ class ServerConnection(_FileTransferMixin):
         if self.port != 22:
             opts.extend(["-p", str(self.port)])
         return opts
+
+    def reset_multiplex(self) -> None:
+        """Drop the shared control connection so the next command dials a fresh one.
+
+        A stalled master would otherwise hang every later command on this target
+        until ControlPersist expires. ``ssh -O exit`` asks it to leave; a master too
+        wedged to answer loses its socket instead, which frees the path.
+        """
+        if not self.multiplex or self.local_mode:
+            return
+        path = control_path(self.user, self.ip, self.port)
+        if path is None:
+            return
+        escaped = str(path).replace("%", "%%")
+        try:
+            subprocess.run(
+                ["ssh", "-o", f"ControlPath={escaped}", "-O", "exit", f"{self.user}@{self.ip}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                stdin=subprocess.DEVNULL,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        logger.debug("SSH %s@%s: dropped the control connection after a transport failure", self.user, self.ip)
+
+    def _after_transport(self, result: CommandResult) -> CommandResult:
+        """Reset the control connection when SSH itself failed or the command timed out."""
+        if not self.local_mode and (result.timed_out or result.returncode in {124, 255}):
+            self.reset_multiplex()
+        return result
 
     def _prepare_command(
         self,
@@ -357,7 +406,7 @@ class ServerConnection(_FileTransferMixin):
                 operation_name=operation_name,
             )
             logger.debug("SSH rc=%d attempt=%d/%d", result.returncode, attempt, retries)
-            last = result
+            last = self._after_transport(result)
             if result.returncode in ok_code_set:
                 return result
             if attempt < retries and retry_delay > 0:

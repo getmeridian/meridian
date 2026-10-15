@@ -138,12 +138,31 @@ class FenceHost:
     def __init__(self) -> None:
         self.files: dict[str, str] = {}
         self.swaps = 0
+        self.swap_calls = 0
         self.before_swap: Any = None
+        # Connection drops: the next N reads fail, and swaps fail before (lost) or after (landed) moving.
+        self.dropped_reads = 0
+        self.lost_swaps = 0
+        self.landed_swaps = 0
+        self.on_lost_swap: Any = None
 
     def run(self, command: str, timeout: int = 30, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         if command.startswith("flock"):
-            return self._swap(command)
+            self.swap_calls += 1
+            if self.lost_swaps:
+                self.lost_swaps -= 1
+                if self.on_lost_swap is not None:
+                    self.on_lost_swap()
+                return subprocess.CompletedProcess([], 255, "", "Connection reset by peer")
+            result = self._swap(command)
+            if self.landed_swaps and result.returncode == 0:
+                self.landed_swaps -= 1
+                return subprocess.CompletedProcess([], 124, "", f"Command timed out after {timeout}s")
+            return result
         if "sha256sum" in command:
+            if self.dropped_reads:
+                self.dropped_reads -= 1
+                return subprocess.CompletedProcess([], 255, "", "Connection timed out during banner exchange")
             body = self.files.get(FENCE_FILE)
             out = "absent\n" if body is None else f"{_digest(body)}\n{body}"
             return subprocess.CompletedProcess([], 0, out, "")
@@ -180,8 +199,8 @@ def _digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def _fence(host: FenceHost, holder: str = "laptop:1", clock: Any = None) -> SSHApplyFence:
-    return SSHApplyFence(host, holder=holder, clock=clock or (lambda: _NOW))  # type: ignore[arg-type]
+def _fence(host: FenceHost, holder: str = "laptop:1", clock: Any = None, **kwargs: Any) -> SSHApplyFence:
+    return SSHApplyFence(host, holder=holder, clock=clock or (lambda: _NOW), **kwargs)  # type: ignore[arg-type]
 
 
 def test_ssh_fence_acquires_commits_and_leaves_no_lease() -> None:
@@ -283,6 +302,72 @@ def test_lost_commit_tells_the_operator_to_rerun() -> None:
     with pytest.raises(FleetFenceError, match="Applied and saved locally") as exc_info:
         fence.commit(1, "a" * 64)
     assert exc_info.value.retryable
+
+
+# --- stalled connections ----------------------------------------------------
+
+
+def _acquired(host: FenceHost, **kwargs: Any) -> SSHApplyFence:
+    fence = _fence(host, **kwargs)
+    fence.acquire(_local(fleet_id="", fresh=True))
+    return fence
+
+
+def test_fence_write_that_timed_out_after_landing_is_re_read_not_repeated() -> None:
+    host = FenceHost()
+    stalls: list[int] = []
+    fence = _acquired(host, on_stall=lambda attempt, _delay, _exc: stalls.append(attempt))
+    host.landed_swaps = 1
+    fence.commit(1, "a" * 64)
+
+    assert host.swap_calls == 2 and host.swaps == 2  # acquire plus one commit swap, never a second
+    assert host.record()["generation"] == 1 and host.record()["lease_holder"] == ""
+    assert stalls == [1]
+
+
+def test_fence_write_lost_before_landing_swaps_again_after_re_reading() -> None:
+    host = FenceHost()
+    fence = _acquired(host)
+    host.lost_swaps, host.dropped_reads = 1, 1  # the commit's swap drops, and so does the first re-read
+    fence.commit(1, "a" * 64)
+
+    assert host.swaps == 2 and host.record()["generation"] == 1
+    assert [path for path in host.files if path != FENCE_FILE] == []
+
+
+def test_fence_read_rides_out_a_stalled_connection() -> None:
+    host = FenceHost()
+    host.dropped_reads = 2
+    _acquired(host)
+    assert host.record()["lease_holder"] == "laptop:1"
+
+
+def test_fence_another_machine_moved_during_the_stall_is_a_conflict_not_a_retry() -> None:
+    host = FenceHost()
+    fence = _acquired(host)
+    host.lost_swaps = 1
+    host.on_lost_swap = lambda: host.files.__setitem__(FENCE_FILE, json.dumps({"fleet_id": "raced"}))
+    with pytest.raises(FleetFenceError, match="at the same moment"):
+        fence.commit(1, "a" * 64)
+    assert host.swap_calls == 2 and json.loads(host.files[FENCE_FILE]) == {"fleet_id": "raced"}
+
+
+def test_fence_outage_that_outlasts_every_retry_fails_without_swapping_blind() -> None:
+    host = FenceHost()
+    fence = _acquired(host)
+    host.lost_swaps, host.dropped_reads = 100, 100
+    with pytest.raises(FleetFenceError, match="Applied and saved locally") as exc_info:
+        fence.commit(1, "a" * 64)
+    assert exc_info.value.retryable
+    assert host.swap_calls == 2  # every later attempt failed to re-read, so none swapped again
+
+
+def test_fence_release_makes_one_attempt() -> None:
+    host = FenceHost()
+    fence = _acquired(host)
+    host.lost_swaps = 100
+    fence.release()
+    assert host.swap_calls == 2
 
 
 # --- executor lifecycle -----------------------------------------------------
