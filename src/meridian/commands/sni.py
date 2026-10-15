@@ -101,7 +101,11 @@ def run_relay_sni(relay_arg: str, sni: str, *, exit_arg: str = "", yes: bool = F
     ids = sorted(relay.id for relay in chains)
     subject = t("sni.relay_subject", relays=", ".join(ids))
     if label not in ids:
-        subject = t("sni.relay_through", subject=subject, server=label)
+        # One chain through a named server reads best as that server's name.
+        if len(ids) == 1:
+            subject = t("sni.relay_subject", relays=label)
+        else:
+            subject = t("sni.relay_through", subject=subject, server=label)
     current = sorted({_effective_sni(intent, relay) for relay in chains})
     if current == [request.sni]:
         ok(t("sni.unchanged", subject=subject, sni=request.sni))

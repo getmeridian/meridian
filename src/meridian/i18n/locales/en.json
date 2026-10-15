@@ -214,7 +214,7 @@
   "sni.own_sni": "Relays with their own SNI keep it: {relays}",
   "sni.gateways": "Routing gateways built on this exit's Reality path change too: {gateways}",
   "sni.refresh": "Apps switch at their next subscription refresh (every {hours} hours) or when the user refreshes the subscription; until then the old SNI no longer connects.",
-  "sni.retiring": "Then removes {count} resources the old SNI used:",
+  "sni.retiring": "Then removes what the old SNI used ({count}):",
   "sni.confirm": "Change the camouflage SNI of {subject} to {sni}?",
   "sni.failed": "The camouflage SNI change of {subject} did not converge",
   "sni.failed_hint": "The topology already uses {sni}; fix the cause and rerun `meridian apply`.",
