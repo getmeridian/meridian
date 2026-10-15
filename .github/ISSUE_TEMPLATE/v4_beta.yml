@@ -15,7 +15,7 @@ body:
     attributes:
       label: Meridian version / Версия Meridian
       description: "`meridian4 --version`"
-      placeholder: "4.0.0b4"
+      placeholder: "4.0.0b5"
     validations:
       required: true
 
