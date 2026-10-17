@@ -27,6 +27,8 @@ Costs real money (~€0.01 per full single-topology run).
 - **Keep the default SNI** — a bad camouflage target (see `src/meridian/CLAUDE.md`) converges but passes no traffic.
 - **Check the managed certificate without SNI** — `openssl -servername <IP>` routes to the camouflage fallback; use `-noservername`.
 - **Labs live outside the checkout** — some synced folders refuse Unix-socket connects, so Meridian's SSH ControlPath under a repo-local `MERIDIAN_HOME` failed with "Operation not permitted".
+- **`fleet upgrade` on a lab needs `GITHUB_TOKEN`** — the release check exhausts GitHub's unauthenticated limit; export `gh auth token`.
+- **Lab profiles pin a key file, so SSH never multiplexes** — keepalives and stall retries still run, but the control-socket reset needs a key-less profile to exercise.
 - **One Hetzner project rejects a duplicate SSH public key** — concurrent runs need distinct keys; set `REALVM_KNOWN_HOSTS` to keep throwaway host keys out of `~/.ssh/known_hosts`.
 
 ## Links
