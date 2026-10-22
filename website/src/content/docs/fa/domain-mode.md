@@ -30,7 +30,7 @@ Hysteria2 روی UDP/443 هم به certificate دامنه می‌رود (ببی�
 
 Deploy این مراحل را دوباره زمانی که تمام می‌شود چاپ می‌کند.
 
-> **مهم:** certificate با یک HTTP challenge روی درگاه 80 صادر می‌شود. "Always Use HTTPS" Cloudflare این challenge را خراب می‌کند — آن را خاموش کنید یا `/.well-known/acme-challenge/*` را معاف کنید.
+> **مهم:** certificate با یک HTTP challenge روی پورت 80 صادر می‌شود. "Always Use HTTPS" Cloudflare این challenge را خراب می‌کند — آن را خاموش کنید یا `/.well-known/acme-challenge/*` را معاف کنید.
 
 ## لینک‌های اتصال
 

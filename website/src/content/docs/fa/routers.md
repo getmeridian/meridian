@@ -48,7 +48,7 @@ sh <(wget -O - https://raw.githubusercontent.com/itdoginfo/podkop/refs/heads/mai
 1. در بخش `Main`، **Connection Type** را روی `Proxy` تنظیم کنید.
 2. **Configuration Type** را روی `Connection URL` تنظیم کنید و لینک `vless://` Reality را paste کنید.
 3. لیست‌های جامعه‌ای را که می‌خواهید از طریق مریدیان ارسال شوند انتخاب کنید یا دامنه‌های خود را اضافه کنید.
-4. **Save & Apply**، سپس تب Diagnostics را باز کنید. آن را از LAN اجرا کنید، نه از طریق بازگردان‌دهیٔ درگاه راه دور.
+4. **Save & Apply**، سپس تب Diagnostics را باز کنید. آن را از LAN اجرا کنید، نه از طریق پورت‌فورواردینگ از راه دور.
 
 برای failover بین لینک Reality مستقیم و لینک relay، **URLTest** را انتخاب کنید و هر دو لینک را اضافه کنید. سپس sing-box آن‌ها را probe می‌کند و یکی را که کار می‌کند استفاده می‌کند.
 
@@ -95,7 +95,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/jameszeroX/XKeen/main/insta
 }
 ```
 
-لینک هر مقدار را حمل می‌کند: بخش قبل از `@` UUID است، سپس آدرس و درگاه. در query، `pbk` است `publicKey`، `sid` است `shortId`، `sni` است `serverName`، و `fp` است `fingerprint`. `flow` را به عنوان `xtls-rprx-vision` نگه دارید وقتی لینک آن را دارد.
+لینک هر مقدار را حمل می‌کند: بخش قبل از `@` UUID است، سپس آدرس و پورت. در query، `pbk` است `publicKey`، `sid` است `shortId`، `sni` است `serverName`، و `fp` است `fingerprint`. `flow` را به عنوان `xtls-rprx-vision` نگه دارید وقتی لینک آن را دارد.
 
 مسیریابی را در `05_routing.json` تنظیم کنید. راهنمای XKeen دو راه را توصیف می‌کند: تنها دامنه‌ها و لیست‌های IP انتخاب‌شده را از طریق proxy ارسال کنید، یا `.ru`، `.su` و `.рф` مستقیم ارسال کنید و همه چیز دیگر را از طریق آن. سپس بررسی و شروع کنید:
 
