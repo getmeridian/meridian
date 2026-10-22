@@ -300,6 +300,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   sing-box has no XHTTP, so those entries are left out.
 
 ### Docs and agents
+- **Reviewed translations** — the Russian, Persian, and Chinese CLI, docs, and
+  connection pages were reviewed against the English source: mistranslations,
+  machine-translation leftovers, and stray tokens fixed, one term per concept
+  in each language, and docs claims checked against the code.
 - **An agent guide** — `meridian help agents` prints a Markdown guide that
   explains how Meridian works and how to drive it safely: non-interactive
   flags, JSON envelopes, plan before apply, exit codes, and which outputs are
@@ -324,6 +328,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   command builder only offers commands and flags the CLI actually has.
 
 ### Security and correctness
+- **`meridian test` trusts valid certificates on macOS** — uv's bundled Python
+  looked for root certificates at a Linux path, so every Let's Encrypt
+  certificate was reported untrusted; certificate checks now use certifi.
 - **A smaller download** — the package carries only Studio's own page, scripts,
   and fonts instead of the whole website: about 1 MB instead of 7.5 MB, which
   matters on slow or filtered connections.
