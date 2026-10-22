@@ -145,7 +145,7 @@ meridian server remove NAME_OR_IP [--yes]
 | `--ssh-port PORT` | 22 | SSH 端口 |
 | `--yes`, `-y` | | 跳过删除确认（`server remove`） |
 
-名称和地址必须唯一；`server add` 拒绝碰撞而不是重新定向现有服务器。`server remove` 仅删除保存的配置并在服务器仍在拓扑中有角色时拒绝。
+`server add local` 会保存当前这台机器；之后的命令会直接在本机上运行，而不通过 SSH。名称和地址必须唯一；`server add` 遇到冲突时会报错拒绝，而不会改写已有服务器。`server remove` 仅删除已保存的连接配置，只要该服务器仍在拓扑中承担角色就会拒绝删除。
 
 ### meridian node
 
@@ -293,9 +293,11 @@ RealiTLScanner 扫描 IPv4 范围；仅 IPv6 的服务器退出 `3`。选择结�
 
 从你的设备测试交付的代理流量。不需要 SSH。
 
-完整测试选择活跃客户端，获取 Remnawave 交付给他们的确切 Xray JSON，并通过自动回退和目标服务器的每个路径推送真实流量。第一次运行可能花费多达 120 秒下载和验证固定 Xray 运行时。流量检查轮转独立 IP 观察者并与直接请求比较，所以观察者停机是不确定的而不是假失败。`MERIDIAN_CONNECT_TEST_URL` 为受控环境覆盖观察者。
+完整测试会选择一个活跃客户端，获取 Remnawave 下发给该客户端的完整 Xray JSON，并通过自动回退组以及目标服务器的每条路径发送真实流量。首次运行可能需要最多 120 秒下载并校验固定版本的 Xray 运行时。流量检查会轮换多个独立的公网 IP 观测服务并与直连请求比对，因此观测服务本身故障会判定为“不确定”（inconclusive），而不会误报为连接失败。在受控环境中可通过 `MERIDIAN_CONNECT_TEST_URL` 指定观测服务地址。
 
-面板停机、HTTP `429` 或 HTTP `5xx` 使订阅不可用，所以运行退出 `3`。任何其他订阅拒绝如 `400` 或 `422` 是完成的失败并退出 `4`。
+每条路径都会报告首字节时间（TTFB）。当某条路径失败时，Meridian 会向其端点发起普通 TCP 连接，以区分是**能连上但无流量通过**（服务器有响应，但代理会话无法传输数据：凭据不匹配或连接被阻断）还是**无法连接**（该端口没有任何响应）。使用 `--json` 时，`data.transports` 会列出每条路径的结果（`ok`、`no_traffic`、`unreachable`、`failed`、`egress_mismatch`、`inconclusive`、`invalid`）及 `first_byte_ms`。
+
+如果面板宕机、返回 HTTP `429` 或 `5xx` 导致无法获取订阅，命令以退出码 `3` 结束。其他订阅被拒情况（如 `400` 或 `422`）视为测试失败，退出码为 `4`。
 
 ```
 meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
@@ -304,11 +306,9 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 未指定目标时，`test` 会测试其所在的已保存服务器，或你唯一已保存的服务器。有多台时，它会依次测试你的舰队的每个公共入口（每个出口，然后是每个中继的入口），并以最差的结果退出；此时 `--json` 会在 `data.results` 中为每台服务器返回一个结果。
 
-`--client` 测试特定活跃客户端。`--basic` 仅运行网络和 TLS 检查，无下载 Xray，无法验证纯 UDP 路径；不能与 `--client` 组合（退出 `2`）。`--timeout`（默认 `5`，范围 `1`–`30`）限制每个网络操作，与第一运行 Xray 下载分开。
+`--client` 指定要测试的活跃客户端。`--basic` 仅运行网络和 TLS 检查，不下载 Xray，且无法验证纯 UDP 路径；不能与 `--client` 同时使用（退出码 `2`）。`--timeout`（默认 `5`，范围 `1`–`30`）限制单次网络操作的超时时间，不计入首次下载 Xray 的时间。
 
-退出 `0` 意味着每个检查通过，`4` 意味着测试发现问题，`3` 意味着需要的证据不可用。`--json` 发出 `meridian.output/v1` 信封与每个检查和发现。
-
-每条路径报告其首字节的时间。当路径失败时，Meridian 会打开与其端点的普通 TCP 连接，以说明它是否**连接，但没有流量通过**（服务器应答但代理会话不传输任何内容：凭证错误或会话被切断）或**无法访问**（该端口没有任何应答）。使用 `--json` 时，`data.transports` 列出每条路径的结果（`ok`、`no_traffic`、`unreachable`、`failed`、`egress_mismatch`、`inconclusive`、`invalid`）和 `first_byte_ms`。
+退出码 `0` 表示所有检查均通过，`4` 表示发现问题，`3` 表示缺少必要证据。`--json` 会输出包含所有检查项与发现的 `meridian.output/v1` 信封。
 
 #### 审查者的视角：`meridian test --probe`
 
@@ -322,15 +322,15 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 ### meridian doctor
 
-为错误报告收集系统诊断。
+收集用于提交错误报告的系统诊断信息。
 
 ```
 meridian doctor [SERVER] [--sni HOST] [--user USER] [--ssh-port PORT] [--ai]
 ```
 
-`--sni` 选择诊断的伪装目标，`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口，`--ai` 复制重新编辑、AI 就绪报告到剪贴板而不是打印问题模板。
+`--sni` 指定要诊断的伪装目标，`--user` 和 `--ssh-port` 覆盖已保存的 SSH 用户和端口，`--ai` 将脱敏后的 AI 诊断提示词复制到剪贴板，而不是打印 issue 模板。
 
-医生遵循服务器的角色：纯中继服务器不诊断为出口，路由网关单独标记。缺失工具或失去 SSH 连接使报告不确定（退出 `3`）；已收集的部分仍显示。
+`doctor` 会根据服务器承担的角色进行检查：纯中继服务器不会按出口检查，路由网关也会单独标注。若缺少系统工具或 SSH 连接中断，报告会标记为不确定（退出码 `3`），已收集到的部分仍会正常显示。
 
 ### meridian logs
 
@@ -456,7 +456,7 @@ meridian help [agents | COMMAND...]
 | `--install-completion` | 为当前 shell 安装补全 |
 | `--show-completion` | 为当前 shell 打印补全脚本 |
 
-JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。每个列出 `--json` 的命令都支持它：deploy、plan、apply、check、test、probe、所有客户端和 route 命令、舰队状态/库存、节点/中继列表和 api 命令。全局 `--json` 与命令自己的 `--json` 可互换使用。在 JSON 离开进程前秘密被编辑。运行 `meridian api commands --json` 发现契约。
+JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operation_id`、`status`、`summary`、`data`、`warnings`、`errors`）。所有列出了 `--json` 的命令都支持该格式：`deploy`、`plan`、`apply`、`check`、`test`、`probe`、所有 `client` 和 `route` 命令、`fleet status`/`inventory`、`node`/`relay list` 以及 `api` 命令。全局 `--json` 与子命令自身的 `--json` 等效。所有敏感信息在输出为 JSON 前都会自动脱敏。运行 `meridian api commands --json` 可查看完整契约列表。
 
 ## 常见服务器选项
 

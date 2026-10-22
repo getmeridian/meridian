@@ -53,7 +53,7 @@ meridian node replace exit-1 198.51.100.20
 meridian node add 198.51.100.20 --domain vpn.example.com
 ```
 
-见 [Domain mode](/en/domain-mode/) 的 Cloudflare 步骤。
+Cloudflare 配置步骤见[域名模式](/zh/domain-mode/)。
 
 ### 添加中继
 
@@ -71,27 +71,27 @@ meridian relay add 203.0.113.10 --exit 198.51.100.20
 
 ## 从多台机器管理
 
-您 Meridian 了解的关于集群的所有内容都位于您部署的机器上的 `~/.config/meridian/` 中。要从第二台机器管理集群，将整个目录复制到该机器，并在您在其他地方进行每次更改后再复制一次。
+Meridian 了解的关于集群的所有内容都保存在部署时所用机器的 `~/.config/meridian/` 中。要从第二台机器管理集群，请将整个目录复制过去，并在其他机器上每次做出更改后同步更新该目录。
 
-您无法意外撤销另一台机器的工作。控制服务器保留最后应用变更的小记录（`/var/lib/meridian/fence.json`）。在改变任何事情之前，Meridian 比较您的副本与该记录，`meridian plan` 提前警告如果应用会被拒绝：
+您不会意外覆盖另一台机器所做的更改。控制服务器会记录最近一次应用的变更（`/var/lib/meridian/fence.json`）。在修改任何内容前，Meridian 会将本地副本与该记录比对；如果 `apply` 会被拒绝，`meridian plan` 会提前给出警告：
 
-- **"另一台机器改变了这个集群"**：您的副本过期了。从最后应用的机器复制 `~/.config/meridian/`，然后再次运行命令。
-- **"另一个应用正在运行"**：有人现在正在改变集群。等他们完成。如果该运行崩溃，其声明在 30 分钟内过期；您自己机器上的崩溃运行根本不会阻止您。
-- **"此控制服务器属于集群的不同副本"**：这个 `~/.config/meridian/` 从未从管理集群的机器复制过。
+- **"Another machine changed this fleet"（另一台机器修改了此集群）**：您的本地副本已过期。请从最后执行 `apply` 的机器复制 `~/.config/meridian/`，然后重新运行命令。
+- **"Another apply is running"（另一个 apply 正在运行）**：当前有人正在修改集群。请等待其完成。如果那次运行意外中断，锁会在 30 分钟内自动过期；本机自己中断的运行不会阻塞您。
+- **"This control server belongs to a different copy of the fleet"（此控制服务器属于另一份集群配置）**：当前机器上的 `~/.config/meridian/` 不是从管理该集群的机器复制过来的。
 
-## 块前准备
+## 封锁前的准备
 
-1. **添加中继**在国内服务器上：`meridian relay add RELAY_IP --exit EXIT_IP`
-2. **使用域名** CDN 回退：用 `--domain vpn.example.com` 部署
-3. **两者** — 客户端然后有三个进入方式：中继（国内）、CDN（Cloudflare）和直接
-4. **备份 `~/.config/meridian/`** — 它是让您从另一台机器管理集群的方式
+1. **在境内服务器上添加中继**：`meridian relay add RELAY_IP --exit EXIT_IP`
+2. **使用域名**配置 CDN 备用线路：带 `--domain vpn.example.com` 部署
+3. **两者兼备** — 这样客户端就有三条入口：中继（境内）、CDN（Cloudflare）和直连
+4. **备份 `~/.config/meridian/`** — 有了它才能从另一台电脑接管集群
 
 ## 保留旧服务器
 
-不要立即拆卸被阻止的服务器 — 块有时在天数或数周后被解除。检查不时：
+不要立即销毁被封锁的服务器——有些封锁会在几天或几周后解除。可以不时检查一下：
 
 ```bash
 meridian test 198.51.100.10
 ```
 
-当您不再需要它时，使用 `meridian node remove` 删除它。
+当确认不再需要时，再用 `meridian node remove` 将其移除。

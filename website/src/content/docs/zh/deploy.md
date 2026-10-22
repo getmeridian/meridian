@@ -183,7 +183,7 @@ Meridian 在代理模式下安装 `cloudflare-warp` 客户端（SOCKS5 在 `127.
 
 ### 仅对某些网站使用 WARP
 
-要仅发送选定的网站通过 WARP 并保持其他所有内容直接，改为在出口上添加路由而不是为所有流量打开 WARP。Meridian 在第一次路由需要时在出口上设置 WARP：
+要仅让选定的网站走 WARP、其余流量保持直连，可以在出口上添加分流路由，而不必为全部流量开启 WARP。当某条路由第一次用到 WARP 时，Meridian 会自动在出口上配置 WARP：
 
 ```
 meridian route add exit-1 --via warp chatgpt.com netflix.com
@@ -192,7 +192,7 @@ meridian route list
 meridian route remove exit-1 warp
 ```
 
-值是域名（包括子域名）、`geosite:NAME` 列表或来自库存 v2fly 数据文件的 `geoip:NAME` 列表；一个路由包含一种。`--via direct` 在 WARP 出口上反向做：这些目标跳过 WARP。路由按您添加它们的顺序应用，在出口的默认出站之前，在地理封锁之前。这些路由位于服务器上；它们与在用户设备上发送俄罗斯网站直接的客户端侧规则分开。
+匹配值可以是域名（包含子域名）、内置 v2fly 数据文件中的 `geosite:NAME` 列表或 `geoip:NAME` 列表；同一条路由只能包含同一种类型。在启用了全局 WARP 的出口上，`--via direct` 作用相反：让匹配的目标绕过 WARP 直接出站。路由按添加顺序生效，优先级高于出口默认出站和地理封锁。这些路由运行在服务器端，与用户设备上将俄罗斯网站直连的客户端分流规则相互独立。
 
 ## 地理封锁
 

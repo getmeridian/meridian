@@ -133,30 +133,30 @@ meridian test
 
 `meridian deploy` 和 `meridian node add` 上的 `--sni` 为出口的直接 Reality 路径设置伪装目标。目标必须是出口可用 TLS 1.3 到达的网站，部署检查真实流量通过它并在没有通过停止。在部署前用 `meridian check IP --sni HOST` 检查候选者。在仅检查名称的网络上，允许的名称可能让直接路径通过，但是名称是否有效取决于运营商，所以测试每个。
 
-### Meridian 不做的
+### Meridian 不做的事
 
-- 它不告诉您中继的 IP 是否在任何运营商列表上，或限制是否有效。
-- 它不通过国内 CDN 设置前置。域名模式为 Cloudflare 构建和测试。
-- 中继仅承载 Reality。XHTTP、WSS 和 Hysteria2 停留在出口上。
-- 它不通过第三方呼叫或消息传递服务隧道。
+- 不会判断中继 IP 是否在某个运营商的白名单内，也不会检测当前是否处于白名单限制期间。
+- 不支持通过境内 CDN 配置域名前置（Domain Fronting）。域名模式仅针对 Cloudflare 构建和测试。
+- 中继只承载 Reality 流量；XHTTP、WSS 和 Hysteria2 仍直接连接出口。
+- 不会通过第三方通话或即时通讯软件建立隧道。
 
 ## 故障排查
 
 ### 端口冲突
 
-另一服务正在中继上使用监听端口。用 `ss -tlnp sport = :443` 检查并停止它，或用 `--port 8443` 选择另一端口。
+中继服务器上的监听端口已被其他服务占用。可用 `ss -tlnp sport = :443` 查看并停止占用进程，或用 `--port 8443` 换用其他端口。
 
-### 防火墙阻止
+### 防火墙拦截
 
-确保中继端口在您的云提供商防火墙或安全组上打开，不仅仅在 UFW。
+请确保中继端口不仅在服务器本机 UFW 中开放，也已在云厂商的安全组或云防火墙中放行。
 
-### 出口无法到达
+### 无法连接出口
 
-中继必须到达出口的 Reality 端口。运行 `meridian test` 以检查端到端的路由，并运行 `meridian check EXIT` 以检查出口本身。
+中继必须能够访问出口的 Reality 端口。运行 `meridian test` 进行端到端测试，并运行 `meridian check EXIT` 检查出口本身的状态。
 
-### 中继服务不运行
+### 中继服务未运行
 
-在中继服务器上，列出转发器服务并阅读其日志。中继主机使用中立名称（`netfwd-*` 单位、`/etc/netfwd/` 配置），所以其上没有命名 Meridian、Realm 或中继：
+在中继服务器上列出转发服务并查看日志。中继主机使用中性名称（`netfwd-*` 服务单元与 `/etc/netfwd/` 配置文件），因此主机上不会出现 Meridian、Realm 或 relay 等字样：
 
 ```bash
 systemctl list-units 'netfwd-*'

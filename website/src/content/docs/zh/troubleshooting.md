@@ -144,62 +144,62 @@ description: 常见问题、解决方案和诊断工具。
 
 **不要**在同一服务器上运行其他协议（OpenVPN、WireGuard）— 它会标记 IP。
 
-## AI 供电的帮助
+## AI 辅助诊断
 
 ```
 meridian doctor --ai
 ```
 
-复制诊断提示到您的剪贴板用于任何 AI 助手。
+将诊断提示词复制到剪贴板，可直接粘贴给任何 AI 助手。
 
-或为 [GitHub issue](https://github.com/getmeridian/meridian/issues) 收集诊断：
+或者收集诊断信息用于提交 [GitHub issue](https://github.com/getmeridian/meridian/issues)：
 
 ```
 meridian doctor
 ```
 
-## 中继不工作
+## 中继无法工作
 
-见 [Relay 指南 — 故障排除](/zh/relay/#故障排查) 部分了解中继特定的问题（端口冲突、防火墙、出口无法到达、服务未启动）。
+中继相关问题（端口冲突、防火墙、无法连接出口、服务未启动）请参见[中继节点 — 故障排查](/zh/relay/#故障排查)。
 
-## 解释预检输出
+## 解读预检输出
 
-| 检查 | 它测试什么 | 如果失败 |
+| 检查项 | 检查内容 | 失败时如何处理 |
 |-------|--------------|-------------|
-| SNI 目标可达性 | 服务器是否能到达伪装网站？ | 服务器出站受限。用 `--sni` 尝试不同的 SNI |
-| 端口 443 可用性 | 端口 443 是空闲的还是被 Meridian 使用？ | 另一服务在 443 上。停止它或使用干净的服务器 |
-| 端口 443 外部可达性 | 外部世界是否能到达端口 443？ | 云防火墙阻止它。打开端口 443/TCP 入站 |
-| 域 DNS | 域是否解析到服务器 IP？ | 更新 DNS A 记录 |
-| 服务器 OS | 是 Ubuntu/Debian 吗？ | 没有 apt 的系统（CentOS、Fedora、Alpine）会失败；请重装 Ubuntu 或 Debian |
-| 磁盘空间 | 至少 2GB 空闲？ | 释放空间 |
-| 时钟同步 | 客户端/服务器漂移是否小于一分钟？ | 有一方没有同步时间。在两个设备上启用 NTP 和自动时间 |
+| SNI target reachability | 服务器能否访问伪装网站？ | 服务器出站受限。用 `--sni` 换一个 SNI |
+| Port 443 availability | 端口 443 是否空闲或由 Meridian 占用？ | 其他服务占用了 443。停止该服务或使用干净的服务器 |
+| Port 443 external reachability | 外部网络能否连上端口 443？ | 云防火墙拦截了入站连接。放行 TCP 443 入站 |
+| Domain DNS | 域名是否解析到服务器 IP？ | 更新 DNS A 记录 |
+| Server OS | 是否为 Ubuntu/Debian？ | 无 apt 的系统（CentOS、Fedora、Alpine）会失败；请重装为 Ubuntu 或 Debian |
+| Disk space | 是否有至少 2GB 可用空间？ | 清理磁盘空间 |
+| Clock sync | 客户端与服务器时间差是否小于 1 分钟？ | 有一方未同步时间。在两端开启 NTP 和自动设置时间 |
 
-## 解释医生输出
+## 解读 doctor 输出
 
-| 部分 | 要查找什么 |
+| 部分 | 关注重点 |
 |---------|-----------------|
-| 本地机器 | OS 兼容性 |
-| 服务器 | OS 版本、正常运行时间（最近重启？）、磁盘/内存使用 |
-| Docker | `ctlsvc-api` 和 `netagent` 容器是否运行？ 状态应该是"Up" |
-| Remnawave 节点日志 | 节点启动错误、"failed to start" 条目、证书问题 |
-| 监听端口 | 端口 443 应该显示 nginx。如果缺失，代理未运行 |
-| 防火墙 (UFW) | 端口 443/tcp 应该 ALLOW。如果未列出，它被阻止 |
-| SNI 目标 | 应该显示 CONNECTED，带证书链 |
-| 域 DNS | 应该解析到服务器 IP |
+| Local Machine | 本地系统兼容性 |
+| Server | 系统版本、运行时长（是否刚重启？）、磁盘与内存占用 |
+| Docker | `ctlsvc-api`（面板）和 `netagent`（节点）容器是否在运行？状态应为 "Up" |
+| Remnawave Node Logs | 节点启动报错、"failed to start" 记录、证书问题 |
+| Listening Ports | 端口 443 应显示 nginx。若缺失，说明代理未运行 |
+| Firewall (UFW) | 端口 443/tcp 应为 ALLOW。若未列出，说明被防火墙拦截 |
+| SNI Target | 应显示 CONNECTED 及证书链 |
+| Domain DNS | 应解析为服务器 IP |
 
-## 解释测试输出
+## 解读 test 输出
 
-| 检查 | 通过 | 失败或跳过 |
+| 检查项 | 通过 | 失败或跳过 |
 |-------|------|-----------------|
-| TCP 可达性 | 每个已配置的公开 TCP 监听器可达 | 防火墙、ISP 阻止、服务器宕机或拓扑错误 |
-| TLS/SNI 伪装 | 目标呈现预期的伪装身份 | TLS 路由、证书、DNS 或 SNI 不匹配 |
-| 域根 | 加固的 `403`/`404` 响应可达 | DNS/nginx 失败或意外公开内容 |
-| 订阅 | Remnawave 为活跃客户端交付有效 Xray JSON | 缺失/无效客户端、面板失败或损坏模板 |
-| 自动回退 | 交付的策略承载真实流量 | 平衡器、路由、凭证或端点失败 |
-| 协议检查 | 每个目标出站承载真实流量 | 协议特定监听器、防火墙或交付配置失败 |
+| TCP reachability | 所有已配置的公开 TCP 监听端口均可连接 | 防火墙、ISP 封锁、服务器宕机或拓扑有误 |
+| TLS/SNI camouflage | 目标返回预期的伪装站点证书与身份 | TLS 路由、证书、DNS 或 SNI 不匹配 |
+| Domain root | 访问根路径返回加固后的 `403`/`404` | DNS/nginx 故障或暴露了非预期的公开内容 |
+| Subscription | Remnawave 为活跃客户端返回了有效的 Xray JSON | 客户端缺失/未启用、面板故障或订阅模板损坏 |
+| Automatic fallback | 下发的自动回退策略成功承载真实流量 | 负载均衡、路由、凭据或节点端点故障 |
+| Protocol checks | 每个目标出站均成功承载真实流量 | 特定协议的监听端口、防火墙或下发配置故障 |
 
-完整测试轮转独立公开 IP 观察者并直接检查相同观察者。如果代理和控制路径都无法获得 IP，结果是不确定的而不是假协议失败。仅在您运营已知观察者端点时设置 `MERIDIAN_CONNECT_TEST_URL`。
+完整测试会轮换多个独立的公网 IP 观测服务，同时进行直连比对。如果代理通道和直连通道都无法获取 IP，结果会判定为“不确定”（inconclusive），而不会误报为协议故障。仅在你自己运行已知观测服务时才需设置 `MERIDIAN_CONNECT_TEST_URL`。
 
-第一个完整测试可能花费最多 120 秒从 GitHub 下载和验证固定 Xray 版本。引导后，`--timeout`（默认 `5`、范围 `1`-`30`）应用于个别网络操作。退出 `0` 通过，`4` 完成有负面发现，`3` 不确定因为必需证据被跳过。基本模式无法证实 UDP 只的 Hysteria 流量。
+首次运行完整测试时，可能需要最多 120 秒从 GitHub 下载并校验固定版本的 Xray。初始化完成后，`--timeout`（默认 `5`，范围 `1`–`30`）会限制单次网络操作的超时时间。退出码 `0` 表示全部通过，`4` 表示测试完成但发现问题，`3` 表示缺少必要证据而无法得出结论。`--basic` 模式无法验证仅使用 UDP 的 Hysteria2 流量。
 
-如果所有检查通过但 VPN 客户端仍无法连接：重新扫描 QR 码、检查设备是否自动设置日期和时间或尝试不同的应用（v2rayNG、Hiddify）。
+如果所有检查均通过但 VPN 客户端仍无法连接：请重新扫描二维码、确认设备已开启自动设置日期和时间，或换用其他推荐应用（Happ、FlClashX、Clash Mi，或桌面端的 Throne）。

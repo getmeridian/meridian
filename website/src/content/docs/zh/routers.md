@@ -19,9 +19,9 @@ meridian client show home-router
 粘贴哪一个：
 
 - **优先使用 Reality。** 它是主路径，也是下面每个路由器客户端都能运行的。
-- **XHTTP** 需要一个基于 Xray 的客户端，并且该客户端的版本要最新且接近服务器的 Xray 版本。库存 sing-box 以及 podkop 没有 XHTTP 传输；XKeen 运行 Xray 并可以使用它。
-- **中继条目**也是 Reality 链接。如果您的路由器在俄罗斯，出口的 IP 被阻止了，粘贴中继的链接。
-- **Hysteria2** 是 UDP，不通过中继。仅在您的路由器客户端支持它时才使用。
+- **XHTTP** 需要基于 Xray 的客户端，且客户端版本较新、与服务器端的 Xray 版本相近。原版 sing-box（以及 podkop）不支持 XHTTP 传输；XKeen 运行 Xray，因此可以使用。
+- **中继条目**也是 Reality 链接。如果您的路由器在俄罗斯，且出口 IP 被封锁，请粘贴中继的链接。
+- **Hysteria2** 基于 UDP，不经过中继。仅当您的路由器客户端支持时才使用。
 
 粘贴的链接是一个快照。订阅 URL 会自动更新，但 podkop 的常见问题说它没有内置订阅支持，所以当您稍后添加出口或中继时，粘贴新链接。
 

@@ -5,12 +5,12 @@ description: 开发设置、PR 指南和测试方法。
 
 ## 报告问题
 
-- **有 Bug？** 使用 [Bug 报告模板](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml)——先运行 `meridian doctor`
-- **连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——先运行 `meridian test` 和 `meridian check`
-- **有功能想法？** 使用 [功能请求模板](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
-- **安全漏洞？** 见 [安全](/zh/security/)——不要开放公开问题
+- **发现 Bug？** 使用 [Bug 报告模板](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml)——提交前请先运行 `meridian doctor`
+- **遇到连接问题？** 使用 [连接问题模板](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml)——提交前请先运行 `meridian test` 和 `meridian check`
+- **有新功能建议？** 使用 [功能请求模板](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml)
+- **发现安全漏洞？** 参见[安全](/zh/security/)——请勿提交公开 issue
 
-## 开发设置
+## 开发环境设置
 
 ```bash
 git clone https://github.com/getmeridian/meridian.git && cd meridian
@@ -18,13 +18,13 @@ git clone https://github.com/getmeridian/meridian.git && cd meridian
 # 在可编辑模式下安装 CLI 和开发依赖
 make install
 
-# 安装 pre-push 钩子（每次推送前进行 11 个快速检查）
+# 安装 pre-push 钩子（每次推送前运行快速检查）
 make hooks
 
 # 在本地运行完整 CI
 make ci
 
-# 单独检查：
+# 单独运行各项检查：
 make test              # pytest
 make lint              # ruff check
 make format-check      # ruff format --check
@@ -56,10 +56,10 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 
 ## 关键约定
 
-- **Shell 值使用 `shlex.quote()`** — 永不插入未消毒的值
-- **PWA 资产必须保持同步**（`templates/pwa/` 和应用目录）
-- **nginx 配置**作为每个资源的 `meridian-v4-*.conf` 文件写在 `/etc/nginx/stream.d/` 和 `/etc/nginx/sites-available/` 下
-- **配置程序步骤**返回 `StepResult`（ok/changed/skipped/failed）
+- **Shell 参数必须使用 `shlex.quote()`** — 绝不能将未转义的值直接拼接到 shell 命令中
+- **PWA 资源必须保持同步**（`templates/pwa/` 与应用目录）
+- **nginx 配置**按资源拆分为独立的 `meridian-v4-*.conf` 文件，位于 `/etc/nginx/stream.d/` 和 `/etc/nginx/sites-available/`
+- **Provisioner 步骤**返回 `StepResult`（`ok`/`changed`/`skipped`/`failed`）
 
 ## 测试
 
