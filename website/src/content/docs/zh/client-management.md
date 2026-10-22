@@ -9,7 +9,7 @@ description: 添加用户、分享连接信息和管理访问密钥。
 meridian client add alice
 ```
 
-这给 "alice" 她自己的密钥并打印两样东西来分享：
+这会为“alice”生成专属密钥，并打印两项可供分享的内容：
 
 - **一个带 QR 码的连接页面链接** — 最容易发送的
 - **一个订阅 URL** 用于直接导入到 Xray/V2Ray 应用中

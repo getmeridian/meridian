@@ -59,7 +59,7 @@ Send the connection page link through any messenger. The page:
 
 In the app, entries are named by country and method, such as "DE · Reality · Chrome". Apps refresh the subscription on their own, so servers you add later appear without a new link.
 
-Treat each link like a key: anyone who has it can connect. If one leaks, run `meridian client reissue alice` to replace her link and page without deleting her account.
+Treat each link like a key: anyone who has it can connect. If one leaks, run `meridian client reissue alice` to replace their link and page without deleting their account.
 
 ## When the phone rings
 

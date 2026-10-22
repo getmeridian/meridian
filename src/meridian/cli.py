@@ -586,7 +586,7 @@ def test_cmd(
     ip: str = typer.Argument("", metavar="TARGET", help="Server IP, domain, or saved name", show_default=False),
     domain: str = typer.Option("", "--domain", "-d", help="Domain to test"),
     sni: str = typer.Option("", "--sni", "-s", help="SNI target to test"),
-    client: str = typer.Option("", "--client", help="Active client used for canonical end-to-end traffic"),
+    client: str = typer.Option("", "--client", help="Active client whose connection to test"),
     basic: bool = typer.Option(False, "--basic", help="Run reachability checks without downloading or running Xray"),
     probe: bool = typer.Option(False, "--probe", help="Look at the server the way a censor's scanner would"),
     timeout: Timeout = "5",
@@ -640,7 +640,7 @@ def doctor_cmd(
     ip: Target = "",
     sni: str = typer.Option("", "--sni", "-s", help="SNI target"),
     user: User = "",
-    ai: bool = typer.Option(False, "--ai", help="Copy diagnostic prompt to clipboard"),
+    ai: bool = typer.Option(False, "--ai", help="Copy an AI-ready diagnostic prompt to the clipboard"),
     ssh_port: SshPort = 0,
 ) -> None:
     """Collect a redacted diagnostic report for bug reports

@@ -9,7 +9,7 @@ description: Add users, share connection details, and manage access keys.
 meridian client add alice
 ```
 
-This gives "alice" her own key and prints two things to share:
+This gives "alice" their own key and prints two things to share:
 
 - **A connection page link** with a QR code — the easiest thing to send
 - **A subscription URL** for importing directly into an Xray/V2Ray app

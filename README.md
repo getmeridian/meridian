@@ -42,11 +42,11 @@ You need a fresh Debian or Ubuntu VPS you can reach over SSH with a key, as root
 meridian deploy 198.51.100.10 --client-name alice
 ```
 
-When it prints "Done", send Alice her connection page link. She opens it, installs the recommended app, and taps once to connect. Then:
+When it prints "Done", send Alice the connection page link. They open it, install the recommended app, and tap once to connect. Then:
 
 ```bash
 meridian client add bob carol      # one client per person
-meridian client show bob           # print his link again
+meridian client show bob           # print their link again
 meridian test                      # real traffic through the delivered subscription
 ```
 

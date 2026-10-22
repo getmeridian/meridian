@@ -130,7 +130,7 @@ def server_add_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
 ) -> None:
-    """Add a known server"""
+    """Save a server you reach over SSH"""
     from meridian.commands.server import run_add
 
     run_add(ip, name, user, ssh_port=ssh_port)
@@ -138,7 +138,7 @@ def server_add_cmd(
 
 @server_app.command("list")
 def server_list_cmd() -> None:
-    """List known servers"""
+    """List saved servers"""
     from meridian.commands.server import run_list
 
     run_list()
@@ -149,7 +149,7 @@ def server_remove_cmd(
     server: str = typer.Argument(..., help="Server name or IP"),
     yes: Yes = False,
 ) -> None:
-    """Remove a known server"""
+    """Remove a saved server"""
     from meridian.commands.server import run_remove
 
     run_remove(server, yes=yes)
