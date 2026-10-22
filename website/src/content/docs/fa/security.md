@@ -26,6 +26,8 @@ description: طراحی امنیت، گزارش آسیب‌پذیری و محد�
 
 Meridian سرورهای proxy را پیکربندی می‌کند — پروتکل‌های رمزنگاری را **پیاده‌سازی نمی‌کند**. امنیت زیربنایی به موارد زیر بستگی دارد:
 
-- [Xray-core](https://github.com/XTLS/Xray-core) — پروتکل VLESS+Reality
-- [Remnawave](https://remna.st/) — پنل + stack مدیریت گره
-- [nginx](https://nginx.org/) — SNI routing و TLS termination
+- [Xray-core](https://github.com/XTLS/Xray-core) — پروتکل‌های VLESS+Reality، XHTTP، WSS و Hysteria2
+- [Remnawave](https://remna.st/) — پنل و پشتهٔ مدیریت گره‌ها
+- [nginx](https://nginx.org/) — مسیریابی SNI و خاتمهٔ TLS
+- [acme.sh](https://github.com/acmesh-official/acme.sh) — صدور و تمدید گواهی‌های Let's Encrypt
+- [Realm](https://github.com/zhboner/realm) — فورواردینگ TCP روی سرورهای relay

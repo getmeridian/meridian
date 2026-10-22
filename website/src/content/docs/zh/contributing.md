@@ -63,4 +63,4 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 
 ## 测试
 
-CI 验证：Python 测试、ruff lint、mypy 类型、模板渲染和 shell 脚本语法。完整部署测试需要真实的 VPS。
+CI 会验证：Python 测试、ruff 代码检查、mypy 类型检查、模板渲染以及 shell 脚本语法。如需完整测试部署流程，可运行 `make system-lab`（在 Docker 容器中部署多节点集群并验证真实流量）或在真实 VPS 上测试（`make real-lab`）。

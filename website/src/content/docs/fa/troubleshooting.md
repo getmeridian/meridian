@@ -97,7 +97,7 @@ Deploys و applies checkpoint شده‌اند. علت گزارش‌شده را �
 
 ### تضاد درگاه 443
 
-سرویس دیگر (Apache، Nginx) درگاه 443 را استفاده می‌کند. آن را متوقف کنید یا سرور تمیز استفاده کنید. `meridian check IP` به شما می‌گوید درگاه را کیست.
+سرویس دیگر (Apache، nginx) درگاه 443 را استفاده می‌کند. آن را متوقف کنید یا سرور تمیز استفاده کنید. `meridian check IP` به شما می‌گوید درگاه را کیست.
 
 ### نصب Docker ناموفق
 
@@ -184,7 +184,7 @@ meridian doctor
 | لاگ‌های گره Remnawave | خطاهای شروع گره، "failed to start" ورودی‌ها، مسائل certificate |
 | درگاه‌های گوش‌دهنده | درگاه 443 باید nginx را نشان دهد. اگر گمشده، proxy اجرا نمی‌شود |
 | firewall (UFW) | درگاه 443/tcp باید ALLOW باشد. اگر فهرست‌نشده، مسدود است |
-| هدف SNI | باید CONNECTED را با یک زنجیره certificate نشان دهد |
+| Camouflage Target | باید CONNECTED را با یک زنجیره certificate نشان دهد |
 | DNS دامنه | باید به IP سرور resolve شود |
 
 ## تفسیر خروجی test

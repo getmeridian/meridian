@@ -37,7 +37,7 @@ meridian deploy [SERVER] [flags]
 | `--request FILE` | | 从文件读取 `deploy-request` JSON 有效负载；用 `-` 表示 stdin |
 | `--dry-run` | | 编译和预览部署无需 SSH 或本地变更 |
 
-不指定 IP，部署会提示输入。`local` 在运行所在的机器上部署。部署仅重新部署已经是舰队中出口的服务器；用 `meridian node add` 添加其他服务器。变更目前是增量的：删除已部署的东西（如去掉 `--domain`）被拒绝。
+不指定 IP 时，`deploy` 会提示输入。`local` 在当前运行的机器上直接部署。`deploy` 仅重新部署已经是集群中出口的服务器；其他服务器请用 `meridian node add` 添加。使用不同标志重新运行会更新该出口以匹配新设置（例如添加或移除 `--domain` 或 `--no-hysteria2`），同时保留其他出口、中继、网关和客户端。
 
 **机器/UI 流程**：`meridian api workflow deploy --json` 返回可渲染的向导契约。UI 收集这些字段，针对 `deploy-request` 验证它们，然后运行 `meridian deploy --request deploy.json --json --events=jsonl`。机器部署非交互式：请求必须在用户确认后包含 `yes: true`。`--dry-run --json` 返回 `data` 下的 `deploy-plan`，所以 UI 可以在打开 SSH 之前预览模式、端口和生成的路径。
 
@@ -164,7 +164,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--name NAME` | (自动) | 节点的友好名称 |
 | `--user USER` | 已保存或 root | 节点上的 SSH 用户 |
 | `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`、`node replace`） |
-| `--sni HOST` | www.google.com | 此节点的 Reality 伪装目标 |
+| `--sni HOST` | (自动) | 此节点的 Reality 伪装目标（不指定时优先选择节点同子网内的网站，否则为 `www.google.com`） |
 | `--domain DOMAIN` | (无) | 节点域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN；Hysteria2 使用其证书 |
 | `--self-steal` | 关 | `node add`：用指向该节点的你自己的域名（`--sni`，否则 `--domain`）伪装。`node sni`：`NEW_SNI` 是你自己的域名 |
 | `--country CC` | 地址注册机构 | 显示在连接名称中的国家；注册机构信息有误时（任播或租用地址段）请手动指定 |

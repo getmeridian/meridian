@@ -26,6 +26,8 @@ We aim to respond within 48 hours and will credit reporters in the fix.
 
 Meridian configures proxy servers — it does **not** implement cryptographic protocols. The underlying security depends on:
 
-- [Xray-core](https://github.com/XTLS/Xray-core) — VLESS+Reality protocol
-- [Remnawave](https://remna.st/) — panel + node management stack
+- [Xray-core](https://github.com/XTLS/Xray-core) — VLESS+Reality, XHTTP, WSS, and Hysteria2 protocols
+- [Remnawave](https://remna.st/) — panel and node management stack
 - [nginx](https://nginx.org/) — SNI routing and TLS termination
+- [acme.sh](https://github.com/acmesh-official/acme.sh) — Let's Encrypt certificate issuance and renewal
+- [Realm](https://github.com/zhboner/realm) — TCP forwarding on relays

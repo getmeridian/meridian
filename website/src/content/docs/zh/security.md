@@ -26,6 +26,8 @@ description: 安全设计、漏洞报告和范围。
 
 Meridian 配置代理服务器 — 它**不**实现加密协议。底层安全取决于：
 
-- [Xray-core](https://github.com/XTLS/Xray-core) — VLESS+Reality 协议
-- [Remnawave](https://remna.st/) — 面板 + 节点管理栈
+- [Xray-core](https://github.com/XTLS/Xray-core) — VLESS+Reality、XHTTP、WSS 和 Hysteria2 协议
+- [Remnawave](https://remna.st/) — 面板与节点管理栈
 - [nginx](https://nginx.org/) — SNI 路由和 TLS 终止
+- [acme.sh](https://github.com/acmesh-official/acme.sh) — Let's Encrypt 证书签发与续期
+- [Realm](https://github.com/zhboner/realm) — 中继服务器上的 TCP 转发

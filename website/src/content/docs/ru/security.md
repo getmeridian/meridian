@@ -26,6 +26,8 @@ description: Архитектура безопасности, сообщение
 
 Meridian настраивает VPN-серверы и **не** реализует собственные криптографические протоколы. Безопасность соединений опирается на:
 
-- [Xray-core](https://github.com/XTLS/Xray-core) — протокол VLESS+Reality
+- [Xray-core](https://github.com/XTLS/Xray-core) — протоколы VLESS+Reality, XHTTP, WSS и Hysteria2
 - [Remnawave](https://remna.st/) — панель управления и стек узлов
 - [nginx](https://nginx.org/) — маршрутизация по SNI и завершение TLS
+- [acme.sh](https://github.com/acmesh-official/acme.sh) — выпуск и продление сертификатов Let's Encrypt
+- [Realm](https://github.com/zhboner/realm) — перенаправление TCP на промежуточных серверах

@@ -97,7 +97,7 @@ description: 常见问题、解决方案和诊断工具。
 
 ### 端口 443 冲突
 
-另一服务（Apache、Nginx）正在使用端口 443。停止它或使用干净的服务器。`meridian check IP` 会告诉您什么在使用该端口。
+另一服务（Apache、nginx）正在使用端口 443。停止它或使用干净的服务器。`meridian check IP` 会告诉您什么在使用该端口。
 
 ### Docker 安装失败
 
@@ -184,7 +184,7 @@ meridian doctor
 | Remnawave Node Logs | 节点启动报错、"failed to start" 记录、证书问题 |
 | Listening Ports | 端口 443 应显示 nginx。若缺失，说明代理未运行 |
 | Firewall (UFW) | 端口 443/tcp 应为 ALLOW。若未列出，说明被防火墙拦截 |
-| SNI Target | 应显示 CONNECTED 及证书链 |
+| Camouflage Target | 应显示 CONNECTED 及证书链 |
 | Domain DNS | 应解析为服务器 IP |
 
 ## 解读 test 输出

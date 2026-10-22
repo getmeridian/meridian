@@ -37,7 +37,7 @@ meridian deploy [SERVER] [flags]
 | `--request FILE` | | Read a `deploy-request` JSON payload from a file; use `-` for stdin |
 | `--dry-run` | | Compile and preview the deploy without SSH or local changes |
 
-Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. Changes are additive: removing something already deployed (such as dropping `--domain`) is refused.
+Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. Running it again with different flags updates that exit to match (for example, adding or dropping `--domain` or `--no-hysteria2`) while keeping your other exits, relays, gateways, and clients.
 
 **Machine/UI flow**: `meridian api workflow deploy --json` returns a renderable wizard contract. A UI collects those fields, validates them against `deploy-request`, then runs `meridian deploy --request deploy.json --json --events=jsonl`. Machine deploys are non-interactive: the request must contain `yes: true` after the user confirms. `--dry-run --json` returns `deploy-plan` under `data`, so a UI can preview the mode, ports, and generated paths before opening SSH.
 
@@ -164,7 +164,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--name NAME` | (auto) | Friendly name for the node |
 | `--user USER` | saved, else root | SSH user on the node |
 | `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`, `node replace`) |
-| `--sni HOST` | www.google.com | Reality camouflage target for this node |
+| `--sni HOST` | (auto) | Reality camouflage target for this node (without it, prefers a site in the node's own subnet, else `www.google.com`) |
 | `--domain DOMAIN` | (none) | Exit's domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN; Hysteria2 uses its certificate |
 | `--self-steal` | off | `node add`: camouflage with your own domain (`--sni`, else `--domain`) pointed at the node. `node sni`: `NEW_SNI` is your own domain |
 | `--country CC` | address registry | Country shown in connection names; set it when the registry is wrong (anycast or leased ranges) |
