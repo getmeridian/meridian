@@ -9,10 +9,11 @@ from typing import cast
 import pytest
 
 from meridian.cluster import ManagedResourceBinding
-from meridian.commands.setup_wizard import CamouflageSites, SetupWizard
+from meridian.commands.setup_wizard import OWN_DOMAIN, CamouflageSites, SetupWizard, _own_hostname_value
 from meridian.compiler import compile_topology
 from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.setup import SetupDraft
+from meridian.diagnostics.camouflage import OwnHostname
 from meridian.handoff import HandoffLinks
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.persistence import SetupDraftStore
@@ -569,12 +570,68 @@ def test_terminal_pickers_check_servers_and_offer_probed_and_typed_camouflage_si
     assert io.calls[0] == ("multiselect", ["srv-control", "srv-exit"], "srv-control,srv-exit")
     assert io.calls[-1] == (
         "select",
-        ["shop.example.net", "dl.google.com", *(sni for sni in REALITY_SNI_CANDIDATES if sni != "dl.google.com")],
+        [
+            "shop.example.net",
+            "dl.google.com",
+            *(sni for sni in REALITY_SNI_CANDIDATES if sni != "dl.google.com"),
+            OWN_DOMAIN,
+        ],
         "shop.example.net",
     )
     draft = store.load()
     assert draft is not None and draft.paths is not None
     assert draft.paths.exits[0].paths[0].reality_sni == "www.example.org"
+
+
+def test_own_domain_choice_asks_for_it_and_marks_the_path_self_steal(tmp_path) -> None:
+    store, shelf, service = _services(tmp_path)
+    io = _PickerIO(
+        [
+            ("Country code", ""),
+            ("WARP", ""),
+            ("Refuse Russian sites", ""),
+            ("Domain for the control panel", ""),
+            ("Name of this VPN", ""),
+            ("Your domain pointed at", "www.example.org"),
+            ("Domain pointed at", ""),
+            ("Names of the people", "save"),
+        ],
+        [
+            ("Which servers", ["srv-control", "srv-exit"]),
+            ("control panel", "srv-control"),
+            ("Job for control", "control"),
+            ("Job for exit", ""),
+            ("Camouflage site", OWN_DOMAIN),
+        ],
+    )
+    checked: list[tuple[str, str]] = []
+
+    def check(server_ref: str, hostname: str) -> OwnHostname:
+        checked.append((server_ref, hostname))
+        return OwnHostname("elsewhere", ("203.0.113.5",))
+
+    wizard = SetupWizard(
+        service=service,
+        shelf=shelf,
+        runtime=cast(SetupRuntime, _Runtime()),
+        register_server=lambda *_args: None,
+        io=io,
+        check_own_domain=check,
+    )
+
+    assert wizard.run() == "saved"
+
+    assert checked == [("srv-exit", "www.example.org")]
+    assert any("203.0.113.5" in line for line in io.output)
+    draft = store.load()
+    assert draft is not None and draft.paths is not None
+    reality = draft.paths.exits[0].paths[0]
+    assert (reality.reality_sni, reality.self_steal) == ("www.example.org", True)
+
+
+def test_own_domain_refuses_an_ip_address() -> None:
+    with pytest.raises(ValueError, match="not an IP"):
+        _own_hostname_value("198.51.100.11")
 
 
 class _FailingReview(_Runtime):
