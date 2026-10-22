@@ -127,6 +127,18 @@ def test_tls_handshake_timeout_is_killable() -> None:
         assert probe_tls_version(_IP, "www.example.com", "TLSv1", timeout=0.1) == "unavailable"
 
 
+def test_certificate_validation_trusts_certifi_not_the_interpreter_default() -> None:
+    """uv's standalone Pythons look for roots at a Linux path, so every valid chain failed on macOS."""
+    import certifi
+
+    from meridian.diagnostics.network import certificate_validation_error
+
+    completed = SimpleNamespace(returncode=0, stdout=json.dumps({"status": "ok"}))
+    with patch("meridian.diagnostics.network.subprocess.run", return_value=completed) as run:
+        assert certificate_validation_error(_IP, "www.example.com", timeout=0.1) == ""
+    assert json.loads(run.call_args.kwargs["input"])["cafile"] == certifi.where()
+
+
 def _check(status: VerificationStatus) -> VerificationCheck:
     return VerificationCheck(
         id="sample",

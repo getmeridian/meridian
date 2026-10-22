@@ -9,6 +9,8 @@ import json
 import subprocess
 import sys
 
+import certifi
+
 _HTTPS_HELPER = r"""
 import base64, http.client, json, socket, ssl, sys
 request = json.loads(sys.stdin.read())
@@ -55,7 +57,7 @@ tls_sock = None
 try:
     timeout = float(request["timeout"])
     if request["verify"]:
-        context = ssl.create_default_context()
+        context = ssl.create_default_context(cafile=request["cafile"] or None)
     else:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         context.check_hostname = False
@@ -292,6 +294,9 @@ def _tls_probe(
         "certificate": certificate,
         "alpn": alpn or [],
         "tls_version": tls_version,
+        # uv's standalone Pythons look for system roots at a Linux path that macOS lacks,
+        # so every certificate failed to verify; certifi is the bundle httpx trusts too.
+        "cafile": certifi.where() if verify else "",
     }
     return run_json_helper(_TLS_HELPER, request, timeout=deadline)
 

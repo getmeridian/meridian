@@ -18,6 +18,7 @@
 - **Execution failure is not negative evidence** — a command timeout, SSH drop, or missing inspection tool returns skipped, never failed.
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint; full canonical traffic is the UDP authority.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but a pass needs separate trust, lifetime, and hostname validation.
+- **Trust comes from certifi** — uv's standalone Pythons look for roots at `/etc/pki/tls/cert.pem`, so on macOS every valid Let's Encrypt chain failed `test`; pass `certifi.where()` to the verifying helper.
 - **A neighbor target must resolve into the scanned subnet** — CDN-fronted names point elsewhere; check `getent ahostsv4` before the TLS 1.3 + HTTP/2 probe.
 - **Neighbor scans cover at least a /24** — cloud VPSes get a `/32` point-to-point address; scanning only that found nothing, so every deploy fell back to a well-known site.
 - **Relay legs run curl on the hop, never Python** — `relay.check_relay_leg` sends the chain's client SNI through `--connect-to` with the blocking stall thresholds; unreachable next hops defer to the TCP check, and a small camouflage page stays inconclusive.

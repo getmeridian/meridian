@@ -446,6 +446,7 @@ name = "meridian-vpn"
 source = { editable = "." }
 dependencies = [
     { name = "anyascii" },
+    { name = "certifi" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "packaging" },
@@ -481,6 +482,7 @@ realvm = [
 [package.metadata]
 requires-dist = [
     { name = "anyascii", specifier = ">=0.3.2" },
+    { name = "certifi", specifier = ">=2024.2.2" },
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.128" },
     { name = "fastapi", marker = "extra == 'studio'", specifier = ">=0.128" },
     { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.31.0" },
