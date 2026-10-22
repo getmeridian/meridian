@@ -57,7 +57,7 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 ## 关键约定
 
 - **Shell 参数必须使用 `shlex.quote()`** — 绝不能将未转义的值直接拼接到 shell 命令中
-- **PWA 资源必须保持同步**（`templates/pwa/` 与应用目录）
+- **PWA 资源必须保持同步**（`templates/pwa/` 与应用清单）
 - **nginx 配置**按资源拆分为独立的 `meridian-v4-*.conf` 文件，位于 `/etc/nginx/stream.d/` 和 `/etc/nginx/sites-available/`
 - **Provisioner 步骤**返回 `StepResult`（`ok`/`changed`/`skipped`/`failed`）
 

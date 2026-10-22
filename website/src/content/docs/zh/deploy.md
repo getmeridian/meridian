@@ -21,21 +21,21 @@ meridian deploy 198.51.100.10 --client-name alice --yes
 
 ## 仅密码登录的服务器
 
-Meridian 使用 SSH 密钥登录。许多 VPS 提供商只给您一个 root 密码，所以当服务器拒绝您的密钥但接受密码时，交互式的 `meridian deploy` 会询问：
+Meridian 使用 SSH 密钥登录。许多 VPS 提供商只给你一个 root 密码，所以当服务器拒绝你的密钥但接受密码时，交互式的 `meridian deploy` 会询问：
 
 ```
 → This server accepts only a password. Create a key for Meridian and install it now? [y/N]
 ```
 
-回答 `y` 并输入密码（输入内容不可见）。Meridian 会在 `~/.config/meridian/ssh/meridian_ed25519` 创建自己的密钥，将其加入服务器的 `authorized_keys`，检查它能否登录，把它保存到服务器配置中，然后继续。密码只用于这一条命令，从不保存或记录。主机密钥会先被验证，因此密码只会发送给您已接受其指纹的服务器。`meridian setup` 在您添加服务器时提供同样的功能。
+回答 `y` 并输入密码（输入内容不可见）。Meridian 会在 `~/.config/meridian/ssh/meridian_ed25519` 创建专用密钥，将其加入服务器的 `authorized_keys`，检查能否登录，保存到服务器配置中，然后继续部署。密码只用于这一条命令，从不保存或记录。主机的指纹会先经过验证，因此密码只会发送给你已确认指纹的服务器。`meridian setup` 在添加服务器时也提供同样的功能。
 
-没有终端、使用 `--yes` 或使用 `--json` 时，Meridian 从不提示：它会停止并给出手动命令。先安装一次您自己的密钥，然后重新运行：
+没有终端、使用 `--yes` 或使用 `--json` 时，Meridian 不会交互提示，而是停止并给出手动命令。请先手动安装一次你自己的密钥，然后重新运行：
 
 ```
 ssh-copy-id root@198.51.100.10
 ```
 
-加固会在部署后关闭密码登录，所以请保留密钥：之后的命令会自动使用它。
+加固步骤会在部署后关闭密码登录，因此请妥善保管密钥，之后的命令会自动使用它。
 
 ## 所有标志
 
@@ -53,7 +53,7 @@ ssh-copy-id root@198.51.100.10
 | `--ssh-port PORT` | 22 | SSH 端口（如果不是 22） |
 | `--harden / --no-harden` | 启 | 仅 SSH 密钥登录、fail2ban 和 UFW 防火墙。`--no-harden` 用于与其他服务共享的服务器 |
 | `--warp / --no-warp` | 关 | 通过 Cloudflare WARP 发送出站流量 |
-| `--geo-block / --no-geo-block` | 启 | 通过代理阻止俄罗斯域名和 IP |
+| `--geo-block / --no-geo-block` | 启 | 在服务器上屏蔽俄罗斯域名和 IP |
 | `--client-ips / --no-client-ips` | 关 | 让面板看到每个客户端的真实 IP（见[客户端 IP](#客户端-ip)） |
 | `--country CC` | 自动查询 | 显示在连接名称中的国家，例如 `DE`。Meridian 根据地址注册机构信息查询；如果不对，请手动指定 |
 | `--yes` | | 跳过确认提示 |
@@ -74,13 +74,13 @@ ssh-copy-id root@198.51.100.10
 meridian scan 198.51.100.10
 ```
 
-扫描在服务器上运行固定的、校验和验证的 RealiTLScanner 构建，列出它找到的附近的证书域。然后用你的选择部署：
+扫描会在服务器上运行版本固定且经过校验和验证的 RealiTLScanner，并列出它在同网段内找到的证书域名。然后用你选定的域名部署：
 
 ```
 meridian deploy 198.51.100.10 --sni dl.google.com
 ```
 
-要手动检查一个目标，运行 `meridian check 198.51.100.10 --sni HOST`。避免 `apple.com` 和 `icloud.com` — 它们的网络与 VPS 提供商不匹配。
+要手动检查单个目标，可运行 `meridian check 198.51.100.10 --sni HOST`。请避免使用 `apple.com` 和 `icloud.com`——它们的自有网络与 VPS 主机商不匹配。
 
 ### 以后更换目标
 
@@ -115,71 +115,71 @@ Meridian 会为该域名签发 Let's Encrypt 证书，并由服务器自己提�
 meridian deploy 198.51.100.10 --no-hysteria2
 ```
 
-每次部署都在 UDP/443 上提供 Hysteria2，使用你域名的证书或没有域名时的服务器 IP 证书。其流量用 salamander 混淆包装，所以审查者看到随机 UDP 而不是 QUIC。它可以在有损或高延迟网络上有帮助；当 UDP 被阻止时，应用回退到其前面列出的 TCP 方法。`--no-hysteria2` 关闭它。Hysteria2 不通过中继。
+每次部署都会在 UDP/443 上提供 Hysteria2，使用你的域名证书（未配置域名时则使用服务器 IP 证书）。其流量经过 salamander 混淆封装，因此审查方看到的是随机 UDP 数据包而非 QUIC。它在丢包或高延迟网络下很有帮助；如果所在网络封锁了 UDP，应用会自动回退到排在它前面的 TCP 连接方式。`--no-hysteria2` 可将其关闭。Hysteria2 不经过中继服务器。
 
 ## 品牌定制
 
-个性化连接页面，让接收者知道谁设置了他们的 VPN：
+自定义连接页面外观，让收到链接的人一看就知道是谁搭建的 VPN：
 
 ```
 meridian deploy 198.51.100.10 --display-name "Alice 的 VPN" --icon 🚀 --color sunset
 ```
 
-- **`--display-name`** — 显示在页面标题和标题中
+- **`--display-name`** — 显示在页面顶部标题和浏览器标题栏中
 - **`--icon`** — 显示在页面顶部的表情符号或图片 URL
-- **`--color`** — 强调色盘：`ocean`（默认）、`sunset`、`forest`、`lavender`、`rose`、`slate`
+- **`--color`** — 主题配色：`ocean`（默认）、`sunset`、`forest`、`lavender`、`rose`、`slate`
 
-品牌定制保存在 `cluster.yml` 中，应用于每个客户端的连接页面。
+品牌定制保存在 `cluster.yml` 中，对所有客户端的连接页面生效。
 
 ## 重新部署
 
-要重新部署，运行相同的命令。Meridian 保持保存的路径、密钥和用户，所以现有链接继续工作。不指定 `--sni` 的重新部署保持保存的伪装目标。
+要重新部署，直接再次运行同一条命令即可。Meridian 会保留已保存的路径、密钥和用户，因此现有链接会继续有效。不带 `--sni` 重新部署会沿用已保存的伪装目标。
 
-在每次部署的末尾，Meridian 打印确切的重新部署命令及你的当前设置。用不同标志再次运行它改变服务器以匹配：添加或删除 `--domain` 或 `--no-hysteria2` 添加或删除这些路径。
+每次部署结束时，Meridian 都会打印包含当前设置的完整重新部署命令。修改标志后再次运行即可按新设置更新服务器：添加或去掉 `--domain` 或 `--no-hysteria2` 会相应地新增或移除这些连接路径。
 
-`meridian deploy` 仅重新部署已经是你舰队中出口的服务器。要添加另一个服务器，使用 `meridian node add NEW_IP`。
+`meridian deploy` 只会重新部署已经在你的集群中作为出口的服务器。要添加更多服务器，请使用 `meridian node add NEW_IP`。
 
 ## 部署前检查
 
-不确定服务器是否合适？
+不确定某台服务器是否可用？
 
 ```
 meridian check 198.51.100.10
 ```
 
-检查伪装目标、端口 443 是否空闲且可从外部访问、可选的域名 DNS、OS、磁盘空间和时钟偏差，无需安装任何东西。
+无需安装任何软件，即可检查伪装目标、端口 443 是否空闲且可从外部访问、可选域名的 DNS、操作系统、磁盘空间以及时钟偏差。
 
-## 非 root 部署
+## 非 root 用户部署
 
 ```
 meridian deploy 198.51.100.10 --user ubuntu
 ```
 
-命令通过 `sudo` 运行，所以用户需要无密码 sudo。
+命令会通过 `sudo` 执行，因此该用户需要免密 `sudo` 权限。
 
-## 本地部署
+## 本机部署
 
-如果你以 root 身份登录到服务器：
+如果你已经以 `root` 身份登录在服务器本机上：
 
 ```
 meridian deploy local
 ```
 
-这跳过 SSH。`check local`、`scan local` 和 `doctor local` 工作方式相同，部署后，服务器上的后续命令也可本地运行。仍然建议从你自己的机器运行 Meridian，因为 `meridian test` 需要外部角度。
+这会跳过 SSH。`check local`、`scan local` 和 `doctor local` 的用法相同；部署完成后，在该服务器上运行后续命令也会直接在本机执行。不过仍建议从你自己的电脑上运行 Meridian，因为 `meridian test` 需要从外部网络视角进行测试。
 
 ## Cloudflare WARP
 
-WARP 通过 Cloudflare 发送你的服务器的出站流量，所以网站看到 Cloudflare 地址而不是你的 VPS IP。
+WARP 会将服务器的出站流量通过 Cloudflare 转发，使目标网站看到的是 Cloudflare 地址，而不是你的 VPS IP。
 
 ```
 meridian deploy 198.51.100.10 --warp
 ```
 
-**WARP 有帮助时：** 网站阻止数据中心 IP 范围，或当你想隐藏 VPS 地址不被目标网站看到。
+**适用场景：** 目标网站封锁了数据中心 IP 段，或者你希望向目标网站隐藏 VPS 的真实地址。
 
-**你不需要它时：** 大多数网站无需它也能正常工作，它添加一个跳跃（VPS → Cloudflare → 目标）。
+**无需开启的场景：** 大多数网站不开启也能正常访问，而且开启后会多经过一跳（VPS → Cloudflare → 目标网站）。
 
-Meridian 在代理模式下安装 `cloudflare-warp` 客户端（SOCKS5 在 `127.0.0.1:40000`），使其成为 Xray 的出站。传入连接不受影响。WARP 免费且不需要 Cloudflare 账户。
+Meridian 会以代理模式安装 `cloudflare-warp` 客户端（在 `127.0.0.1:40000` 上监听 SOCKS5），并将其设为 Xray 的出站。入站连接不受影响。WARP 免费且无需 Cloudflare 账号。
 
 ### 仅对某些网站使用 WARP
 
@@ -196,15 +196,15 @@ meridian route remove exit-1 warp
 
 ## 地理封锁
 
-默认情况下，服务器通过代理阻止俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 范围（`geoip:ru`）。这让你的 VPS IP 远离俄罗斯服务日志，降低被发现和阻止的机会。
+默认情况下，服务器会拒绝通过代理访问俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 段（`geoip:ru`）。这样可以避免你的 VPS IP 出现在俄罗斯服务的日志中，降低被发现和封锁的风险。
 
-如果你的用户需要通过 Meridian 访问这些网站，关闭它：
+如果你的用户需要通过 Meridian 访问这些网站，可以将其关闭：
 
 ```
 meridian deploy 198.51.100.10 --no-geo-block
 ```
 
-要在保持阻止的同时打开俄罗斯网站直接访问，详见[分流路由](/zh/split-routing/)。
+如果想在保留服务器端封锁的同时让用户的设备直连打开俄罗斯网站，详见[分流路由](/zh/split-routing/)。
 
 ## 客户端 IP
 
@@ -216,11 +216,11 @@ Remnawave 的按用户 IP 限制和连接日志需要真实地址。用下面的
 meridian deploy 198.51.100.10 --client-ips
 ```
 
-nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是直接的 UDP 连接，始终显示真实地址。经由中继的连接显示中继的地址，经由 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的地址。该设置对整个舰队生效；要关闭，不带该标志重新部署即可。
+nginx 随后会把每个客户端的地址传给 Xray 和面板。Hysteria2 是直接的 UDP 连接，始终显示真实地址。经由中继的连接显示中继的地址，经由 Cloudflare CDN 的 WebSocket 或 XHTTP 显示 Cloudflare 的地址。该设置对整个集群生效；要关闭，不带该标志重新部署即可。
 
 ## 添加中继
 
-出口运行后，在国内服务器上添加中继，这样如果出口 IP 被阻止，用户保持有访问方式。详见[中继指南](/zh/relay/)。
+出口运行后，可以在境内服务器上添加一台 TCP 中继，这样即使出口 IP 被封锁，用户仍然有可用的连接入口。详见[中继节点](/zh/relay/)。
 
 ```
 meridian relay add 203.0.113.10 --exit 198.51.100.10
@@ -228,8 +228,8 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 ## 管理面板
 
-Meridian 安装 [Remnawave](https://remna.st/) 作为其面板。面板由 nginx 在随机秘密路径上反向代理，与连接页面路径分开，所以你分享的链接永不显示它。`meridian panel` 打印 URL 和管理员登录（`--show-password` 用于密码）。
+Meridian 安装 [Remnawave](https://remna.st/) 作为管理面板。面板由 nginx 在随机生成的秘密路径上反向代理，与连接页面路径相互独立，因此你分享给用户的链接绝不会暴露面板地址。`meridian panel` 会打印面板 URL 和管理员用户名（加 `--show-password` 可显示密码）。
 
-像对待密码一样对待面板路径。CLI 使用相同的面板 API，所以 CLI 变更显示在面板中。Meridian 拥有它创建的主机、配置和模板：如果你在面板中编辑那些，`meridian plan` 报告差异，下次应用恢复 Meridian 的版本。客户端状态、限制、过期和您自己添加的用户是您的；详见 [Web 面板](/zh/client-management/#web-面板)。
+请像保护密码一样保护面板路径。CLI 调用同一个面板 API，因此 CLI 所做的更改会同步显示在面板中。Meridian 负责管理它创建的节点、配置和模板：如果你在面板中手动修改了这些内容，`meridian plan` 会报告差异，下次 `apply` 时会恢复为 Meridian 的版本。客户端状态、流量限额、到期时间以及你在面板中自己创建的用户则完全归你控制；详见 [Web 面板](/zh/client-management/#web-面板)。
 
 Meridian 固定了它已测试的 Remnawave 版本。`meridian fleet upgrade` 会把你的服务器升级到同一主版本内最新的 Remnawave，无需等待 Meridian 更新。如果你自己升级 Remnawave，Meridian 不会降级它。

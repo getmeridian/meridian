@@ -7,7 +7,7 @@ description: 系统架构、流量流向和服务拓扑。
 
 - **VLESS+Reality**（Xray-core）— 主要协议。它伪装成真实的 TLS 网站：任何探测服务器的人都会看到该网站的真实证书（最好是与你的服务器托管在同一网络的网站）。只有拥有正确密钥的客户端才能到达代理。
 - **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
-- **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被阻止也仍然可用。
+- **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被封锁也仍然可用。
 - **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
 - **Remnawave** — 面板组件栈：`remnawave/backend`（API 和管理 UI，带 PostgreSQL 和 Valkey）运行在控制服务器上，`remnawave/node`（运行 Xray）运行在每个出口上，以及 `remnawave/subscription-page`。Meridian 固定已测试版本并通过 REST API 与面板通信。
 - **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为面板、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
@@ -72,17 +72,17 @@ flowchart LR
 
 ## 状态模型
 
-- **拓扑** — `~/.config/meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制服务器、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
+- **拓扑** — `~/.config/meridian/cluster.yml` 在你的机器上保存已审核的拓扑（控制服务器、出口、中继、网关、协议路径和用户列表）、面板访问凭据以及 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 会修改它；请勿手动编辑。
 - **客户端** — 账户、密钥、状态和流量位于控制服务器上的 Remnawave 数据库中。
-- **保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接详情。
+- **已保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接信息。
 
-## 计划和应用
+## 计划与应用
 
-Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容器、Remnawave 配置文件、主机、用户和模板。`meridian plan` 在实时服务器和面板上观察每一个并报告需要修复的内容。`meridian apply` 应用它显示的确切计划，在每一步设置检查点，以便中断的应用可以安全地恢复。结果不确定的资源在任何重试之前会被重新观察。
+Meridian 会将拓扑编译为资源列表：防火墙规则、nginx 路由、容器、Remnawave 配置文件、主机、用户和模板。`meridian plan` 在运行中的服务器和面板上检查每项资源，并报告需要修复的内容。`meridian apply` 会原样应用其展示的计划，在每一步保存检查点，以便中断后安全恢复。结果不确定的资源在重试前会先重新检查状态。
 
-拓扑中的任何内容都可以添加和删除：用户、协议路径、出口、中继和路由网关。在新计划收敛后，应用会删除离开拓扑的内容（面板用户、主机和节点、nginx 文件、Realm 服务、证书、防火墙规则）。控制服务器是例外：它的地址是每个订阅 URL 的一部分，因此只能通过 `meridian teardown` 删除。
+拓扑中的任何内容都可以添加和移除：用户、协议路径、出口、中继和路由网关。在新计划收敛后，`apply` 会清理已移出拓扑的资源（面板用户、主机和节点、nginx 配置文件、Realm 服务、证书、防火墙规则）。控制服务器是例外：它的地址包含在每个订阅 URL 中，因此只能通过 `meridian teardown` 卸载。
 
-对面板拥有资源的编辑会在 `meridian plan` 中显示，并由下一次应用恢复。Meridian 不管理的 Remnawave 设置被保留。
+在面板中对受 Meridian 管理的资源所做的修改会在 `meridian plan` 中显示出来，并在下次 `apply` 时恢复原状。Meridian 不管理的 Remnawave 设置则保持不变。
 
 ## 端口分配
 
@@ -90,17 +90,17 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 |------|---------|-------|
 | 443/TCP | nginx stream（SNI 路由器） | 公开 |
 | 443/UDP | Xray Hysteria2（默认开启） | 公开 |
-| 80/TCP | nginx（ACME 挑战） | 公开 |
-| 8443 | nginx http（面板、页面、订阅） | 内部 |
-| 8444 | nginx http，PROXY 协议监听器（与 `--client-ips` 配合使用） | 内部 |
+| 80/TCP | nginx（ACME 验证） | 公开 |
+| 8443 | nginx http（面板、连接页面、订阅） | 内部 |
+| 8444 | nginx http，PROXY 协议监听端口（配合 `--client-ips` 使用） | 内部 |
 | 3000 | Remnawave 后端（管理 UI + API） | localhost |
 | 3010 | Remnawave 节点 API | host network |
 | 3020 | Remnawave 订阅页面 | localhost |
-| 10000+ | Xray Reality（每个出口） | host network，被防火墙阻止 |
-| 20000+ | Xray WSS（域名模式，每个出口） | host network，被防火墙阻止 |
-| 30000+ | Xray XHTTP（每个出口） | host network，被防火墙阻止 |
+| 10000+ | Xray Reality（每个出口） | host network，由防火墙拦截外部访问 |
+| 20000+ | Xray WSS（域名模式，每个出口） | host network，由防火墙拦截外部访问 |
+| 30000+ | Xray XHTTP（每个出口） | host network，由防火墙拦截外部访问 |
 
-后端 Xray 端口通过 nginx 到达；UFW 从互联网阻止它们。中继服务器仅打开 SSH 和其监听端口。
+后端 Xray 端口仅通过 nginx 访问；UFW 防火墙会拦截来自互联网的直接连接。中继服务器仅开放 SSH 和其监听端口。
 
 ## Docker 容器
 
@@ -136,7 +136,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 ### 在每个中继上
 - `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）。
 
-### 在您的机器上
+### 在你的机器上
 - `~/.config/meridian/cluster.yml` — 拓扑、面板访问、密钥
 - `~/.config/meridian/cluster.yml.bak` — 破坏性操作前的备份
 - `~/.config/meridian/servers.json` — 保存的 SSH 服务器

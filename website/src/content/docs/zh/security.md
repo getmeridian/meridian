@@ -5,7 +5,7 @@ description: 安全设计、漏洞报告和范围。
 
 ## 报告漏洞
 
-如果您在 Meridian 中发现安全漏洞：
+如果你在 Meridian 中发现安全漏洞：
 
 1. **请勿提交公开 issue**
 2. 请通过 [GitHub 私密漏洞报告](https://github.com/getmeridian/meridian/security/advisories/new)私下提交
