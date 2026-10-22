@@ -17,6 +17,7 @@ meridian deploy [SERVER] [flags]
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，首次部署会先尝试服务器所在子网内的网站，再尝试 `www.google.com`、`dl.google.com`、`www.cloudflare.com`，并使用第一个能承载流量的；重新部署保持保存的目标。显式 `--sni` 永远不会被替换 |
 | `--domain DOMAIN` | (无) | 你的域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN（没有域名时 XHTTP 也能在 IP 上工作）。面板和连接页面保持在 IP 证书上 |
+| `--self-steal` | 关 | 用你自己的域名（`--sni`，否则 `--domain`）伪装，该域名通过仅 DNS 的记录指向服务器：Meridian 为它签发 Let's Encrypt 证书，服务器自己用 nginx 自带的 404 页面回应探测。部署会先检查域名解析到哪里：无法解析时停止，指向别处时警告。重新部署会保留该设置；不带此标志的新 `--sni` 会恢复借用的网站 |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2，用 salamander 伪装，作为最后的回退。使用域名的证书或没有域名的 IP 证书 |
 | `--fingerprint NAME` | chrome | 客户端在 Reality、XHTTP 和 WSS 上呈现的 TLS 指纹（`chrome`、`firefox`、`safari`、`ios`、`android`、`edge`、`random`、`randomized`）。如果你的地区开始标记当前指纹，请更改它；重新部署保留已保存的值 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
@@ -155,7 +156,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
-meridian node sni EXIT NEW_SNI [--yes]
+meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
 | 标志 | 默认值 | 说明 |
@@ -165,6 +166,7 @@ meridian node sni EXIT NEW_SNI [--yes]
 | `--ssh-port PORT` | 已保存或 22 | 节点的 SSH 端口（`node add`、`node replace`） |
 | `--sni HOST` | www.google.com | 此节点的 Reality 伪装目标 |
 | `--domain DOMAIN` | (无) | 节点域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN；Hysteria2 使用其证书 |
+| `--self-steal` | 关 | `node add`：用指向该节点的你自己的域名（`--sni`，否则 `--domain`）伪装。`node sni`：`NEW_SNI` 是你自己的域名 |
 | `--country CC` | 地址注册机构 | 显示在连接名称中的国家；注册机构信息有误时（任播或租用地址段）请手动指定 |
 | `--harden / --no-harden` | 启 | OS、SSH 和防火墙加固。舰队服务器总是保持它；`--no-harden` 被拒绝 |
 | `--yes` | | 跳过确认提示 |
@@ -179,7 +181,7 @@ meridian node sni EXIT NEW_SNI [--yes]
 
 **`node replace`** — 将一个出口移到另一个服务器。`EXIT` 是出口 ID 或其服务器的保存名称或 IP；新服务器使用与 `node add` 相同的目标语法（保存的名称或 `local` 也可用）并像 `server add` 一样被保存。出口保留其 ID、Reality 密钥、协议路径、SNI、WARP 和地理设置以及指向它的每个中继，所以中继用户保持工作，直接用户在下一次订阅刷新时获得新地址。审查列出将部署在新服务器上的内容以及在旧服务器上清理的每个资源（节点容器、镜像和目录；其 nginx 文件、防火墙规则和证书）；Docker 和保存的服务器保留。对于控制服务器拒绝（移动面板会改变每个订阅 URL），以及对于已经有角色的新服务器拒绝。
 
-**`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。
+**`node sni`** — 为出口的 Reality 路径设置新的伪装 SNI。`EXIT` 是出口 ID 或其服务器的保存名称或 IP。它拒绝 `apple.com`、`icloud.com` 名称和 `www.microsoft.com`，通过 SSH 检查出口能否以 TLS 1.3 和 HTTP/2 访问新站点，显示审查（跟随出口 SNI 的中继、保留自己 SNI 的中继、基于该路径的路由网关以及将清理的内容），确认后应用。旧名称会被替换而不是并存：应用在下次订阅刷新（每 6 小时）或手动刷新时切换，在此之前无法通过 Reality 连接。XHTTP、WSS 和 Hysteria2 不变。当 `meridian test --probe` 报告伪装 SNI 被封锁时使用。使用 `--self-steal` 时，`NEW_SNI` 是你拥有的域名：它不做可达性检查，而是检查该域名是否解析到出口（无法解析时停止，指向别处时警告），出口会为它申请 Let's Encrypt 证书并自己回应探测。
 
 ### meridian relay
 
@@ -314,7 +316,7 @@ meridian test [SERVER|DOMAIN] [--domain NAME] [--sni NAME]
 
 检查遵循真实部署：公共和内部端口暴露、HTTP/TLS 行为、SNI 一致性和伪装、常见代理和面板路径、WebSocket 升级、反向 DNS、HTTP/2、遗留 TLS 版本和已配置域名。`--sni` 覆盖通用 TLS 探测的 SNI。纯 UDP 监听器报告为需要完整 `meridian test` 而不是被猜测。
 
-`--probe` 还回答「什么被阻止了？」。它使用其伪装 SNI 打开到服务器的 TLS；如果失败，它将重试而不使用 SNI 并直接打开真实的伪装站点，然后报告**服务器 IP** 或**伪装 SNI** 是否看起来被阻止。如果也无法连接到真实站点，结果是不确定的而不是一个发现。在控制服务器上，它还下载连接页面的脚本（约 50 KB）并监视传输在约 16-24 KB 后冻结的情况，这是受限外部 IP 的行为方式。当 WSS 路径通过 CDN 时，相同的下载通过 CDN 运行。这些结果仅在从审查网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 结合使用。退出码与 `test` 相同；跳过的检查从不报告为通过。
+`--probe` 还回答「什么被阻止了？」。它使用其伪装 SNI 打开到服务器的 TLS；如果失败，它将重试而不使用 SNI 并直接打开真实的伪装站点，然后报告**服务器 IP** 或**伪装 SNI** 是否看起来被阻止。如果也无法连接到真实站点，结果是不确定的而不是一个发现。使用 self-steal 伪装时，真实站点就是服务器本身，无法独立比较：当所有连接都不通时，结果是不确定的。在控制服务器上，它还下载连接页面的脚本（约 50 KB）并监视传输在约 16-24 KB 后冻结的情况，这是受限外部 IP 的行为方式。当 WSS 路径通过 CDN 时，相同的下载通过 CDN 运行。这些结果仅在从审查网络内部运行时才有意义。`--probe` 不能与 `--basic`、`--client` 或 `--domain` 结合使用。退出码与 `test` 相同；跳过的检查从不报告为通过。
 
 `meridian probe [SERVER|DOMAIN] [--sni NAME] [--timeout SECONDS] [--json]` 等同于 `meridian test IP --probe`。
 
@@ -467,6 +469,7 @@ JSON 输出使用 `meridian.output/v1` 信封（`schema`、`command`、`operatio
 | `--ssh-port PORT` | deploy、check、node add、relay add、server add、scan、doctor、logs、teardown |
 | `--sni HOST` | deploy、check、node add、relay add、test、doctor |
 | `--domain DOMAIN` | deploy、check、node add、test |
+| `--self-steal` | deploy、node add、node sni |
 
 客户端命令直接使用面板 API 并不取服务器。`test` 从你的设备运行并不使用 SSH。
 

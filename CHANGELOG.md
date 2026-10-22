@@ -79,6 +79,19 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   there and that passes Reality's TLS 1.3 + HTTP/2 check, so the SNI and the
   server's IP look like they belong together. Well-known targets remain the
   fallback, and real traffic still decides.
+- **Your own domain as camouflage (self-steal)** — `--self-steal` on `deploy`,
+  `node add`, and `node sni` makes Reality imitate a domain you own, pointed
+  at the server with a DNS-only record, instead of someone else's site. The
+  exit gets a Let's Encrypt certificate for the name and answers probes and
+  unknown SNIs itself with nginx's stock 404, so the name, the certificate,
+  and the address all match, and no outside site can go down or change under
+  you. With `--domain` alone the one domain also keeps XHTTP and WSS working
+  behind it. Meridian first checks where the name resolves from the server:
+  it stops when it doesn't resolve and warns when it points elsewhere (a
+  Cloudflare-proxied record). The wizard offers it as "My own domain", and
+  `test --probe` no longer treats a self-steal name as an independent site to
+  compare against. `meridian scan` stopped promising that `--domain` alone did
+  this.
 - **Client IPs stay private unless you ask** — by default the panel records
   the server's own address for every TCP connection, so it never stores where
   users connect from. `--client-ips` (or `forward_client_ips` in the topology)

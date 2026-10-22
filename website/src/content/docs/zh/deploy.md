@@ -43,6 +43,7 @@ ssh-copy-id root@198.51.100.10
 |------|---------|-------------|
 | `--sni HOST` | (自动) | 伪装目标。不指定时，部署会优先选择服务器所在子网内的网站，然后是 `www.google.com`、`dl.google.com`、`www.cloudflare.com` |
 | `--domain DOMAIN` | (无) | 你的域名：XHTTP 迁移到该域名上并新增 WSS，二者都经由 Cloudflare CDN |
+| `--self-steal` | 关 | 用你自己的域名（`--sni`，否则 `--domain`）伪装，而不是别人的网站（见[使用自己的域名](#使用自己的域名-self-steal)） |
 | `--hysteria2/--no-hysteria2` | 启 | 在 UDP/443 上提供 Hysteria2 作为最后的回退 |
 | `--client-name NAME` | default | 第一个客户端的名称 |
 | `--display-name NAME` | (无) | 连接页面的标签 |
@@ -61,7 +62,7 @@ ssh-copy-id root@198.51.100.10
 
 ## 选择伪装目标
 
-伪装目标（SNI）是你的服务器所模仿的网站。它**不是**你拥有的域名 — 它是一个支持 TLS 1.3 的真实网站。任何探测你的服务器的人都会看到该网站的真实证书。
+伪装目标（SNI）是你的服务器所模仿的网站。它通常**不是**你拥有的域名，而是一个支持 TLS 1.3 的真实网站，任何探测你的服务器的人都会看到该网站的真实证书。如果想改用自己的域名，见[使用自己的域名](#使用自己的域名-self-steal)。
 
 最好的目标就在你的服务器旁边。审查者看到的是 SNI 和你服务器 IP 的组合；当该网站的 DNS 确实指向同一网络时，这个组合看起来就是普通流量，而 VPS 地址上出现一个知名的国外网站则会很显眼。
 
@@ -89,9 +90,23 @@ meridian deploy 198.51.100.10 --sni dl.google.com
 meridian node sni 198.51.100.10 www.cloudflare.com
 ```
 
+### 使用自己的域名 (self-steal)
+
+服务器也可以模仿你自己拥有的域名，而不是借用别人的网站。先添加一条指向服务器的仅 DNS 的 A 记录（Cloudflare 中为灰色云朵，不经代理），然后用 `--self-steal` 部署：
+
+```
+meridian deploy 198.51.100.10 --sni www.example.com --self-steal
+```
+
+Meridian 会为该域名签发 Let's Encrypt 证书，并由服务器自己提供。没有 Reality 密钥的探测，或使用任何未知 SNI 的探测，都会得到这张证书和 nginx 自带的 404 页面，就像任何尚未发布内容的 nginx 服务器一样。域名解析到这台服务器，证书也是真实的，因此看不出任何不一致；也不存在可能宕机、更换证书或被单独封锁的外部网站。
+
+在做任何改动之前，Meridian 会从服务器上检查该域名指向哪里。如果域名无法解析（Let's Encrypt 无法签发证书），它会停止；如果指向别处（例如 Cloudflare 代理），它会给出警告。
+
+如果使用 `--domain` 而不带 `--sni`，该域名会同时承担两项工作：Reality 模仿它，XHTTP 和 WSS 继续在它后面工作。但经 Cloudflare 代理的域名会解析到 Cloudflare，因此若要同时使用 self-steal 和 CDN，请使用两个域名：一个仅 DNS 的用于 `--sni`，一个经代理的用于 `--domain`。`meridian node add` 和 `meridian node sni` 也支持 `--self-steal`。拥有自己 SNI 的中继仍然借用它们各自的网站。
+
 ### 伪装目标 vs 域名
 
-- **伪装目标** (`--sni`) — 你**不**拥有的真实网站。Reality 模仿它。
+- **伪装目标** (`--sni`) — 你**不**拥有的热门网站，Reality 模仿它；或者在使用 `--self-steal` 时，是你拥有并指向本服务器的域名。
 - **域名** (`--domain`) — 你**确实**拥有的域名，指向你的服务器。XHTTP 和 Hysteria2 移到它，它还添加通过 Cloudflare CDN 的 WSS 路径。详见[域名模式](/zh/domain-mode/)。
 
 ## Hysteria2

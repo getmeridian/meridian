@@ -43,6 +43,7 @@ Hardening turns password login off after deploy, so keep the key: later commands
 |------|---------|-------------|
 | `--sni HOST` | (auto) | Camouflage target. Without it, deploy prefers a site in the server's own subnet, then `www.google.com`, `dl.google.com`, `www.cloudflare.com` |
 | `--domain DOMAIN` | (none) | Your domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN |
+| `--self-steal` | off | Camouflage with your own domain (`--sni`, else `--domain`) instead of someone else's site (see [Your own domain](#your-own-domain-self-steal)) |
 | `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443 as the last fallback |
 | `--client-name NAME` | default | Name of the first client |
 | `--display-name NAME` | (none) | Label for connection pages (e.g. "Alice's VPN") |
@@ -61,7 +62,7 @@ Flags for scripts and UIs (`--json`, `--events`, `--request`, `--dry-run`) are d
 
 ## Choosing a camouflage target
 
-The camouflage target (SNI) is the website your server impersonates. It is **not** a domain you own — it is a real site with TLS 1.3. Anyone who probes your server sees that site's real certificate.
+The camouflage target (SNI) is the website your server impersonates. Usually it is **not** a domain you own — it is a real site with TLS 1.3, and anyone who probes your server sees that site's real certificate. To use a domain you own instead, see [Your own domain](#your-own-domain-self-steal).
 
 The best target lives next to your server. A censor sees the SNI together with your server's IP; when the site's DNS really points into the same network, the pair looks like ordinary traffic, while a famous foreign site on a VPS address stands out.
 
@@ -89,9 +90,23 @@ When `meridian test --probe` reports the camouflage SNI blocked, switch the exit
 meridian node sni 198.51.100.10 www.cloudflare.com
 ```
 
+### Your own domain (self-steal)
+
+Instead of borrowing someone else's site, the server can imitate a domain you own. Point a DNS-only A record (grey cloud in Cloudflare, not proxied) at the server, then deploy with `--self-steal`:
+
+```
+meridian deploy 198.51.100.10 --sni www.example.com --self-steal
+```
+
+Meridian issues a Let's Encrypt certificate for the name and serves it from the server itself. A probe without the Reality key, or with any unknown SNI, gets that certificate and nginx's stock 404 page, the same as any nginx server with nothing published yet. The name resolves to this server and its certificate is genuine, so there's no mismatch to spot, and no outside site that can go down, change its certificate, or get blocked on its own.
+
+Before changing anything, Meridian checks where the name points from the server. It stops when the name doesn't resolve (Let's Encrypt couldn't issue the certificate), and warns when it points somewhere else, such as Cloudflare's proxy.
+
+With `--domain` and no `--sni`, the domain does both jobs: Reality imitates it, and XHTTP and WSS keep working behind it. A domain proxied through Cloudflare resolves to Cloudflare, though, so for self-steal plus the CDN use two names: a DNS-only one for `--sni` and a proxied one for `--domain`. `meridian node add` and `meridian node sni` take `--self-steal` too. Relays with their own SNI keep borrowing theirs.
+
 ### Camouflage target vs. domain
 
-- **Camouflage target** (`--sni`) — a popular website you **don't** own. Reality impersonates it.
+- **Camouflage target** (`--sni`) — a popular website you **don't** own, which Reality impersonates; or, with `--self-steal`, a name you do own that points at this server.
 - **Domain** (`--domain`) — a domain you **do** own, pointed at your server. XHTTP and Hysteria2 move to it, and it adds a WSS path through Cloudflare's CDN. See [Domain mode](/en/domain-mode/).
 
 ## Hysteria2
