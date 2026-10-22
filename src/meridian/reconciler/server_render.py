@@ -164,7 +164,8 @@ def _render_stream(
 
     fallback_name = f"meridian_fallback_{token}"
     reject_name = f"meridian_reject_{token}"
-    map_lines.append(f"    default {fallback_name if payload.fallback_server_name else reject_name};")
+    has_fallback = bool(payload.fallback_server_name or payload.fallback_port)
+    map_lines.append(f"    default {fallback_name if has_fallback else reject_name};")
     upstreams = [
         _render_stream_upstream(
             name,
@@ -174,7 +175,10 @@ def _render_stream(
         for (server_ref, port), name in target_names.items()
     ]
     strip_server = ""
-    if payload.fallback_server_name and payload.fallback_strip_port:
+    if payload.fallback_port:
+        # Self-steal: the exit's own TLS server, which reads the PROXY header when one is sent.
+        upstreams.append(_render_stream_upstream(fallback_name, "127.0.0.1", payload.fallback_port))
+    elif payload.fallback_server_name and payload.fallback_strip_port:
         # The camouflage site must never see a PROXY header: a local hop reads and drops it.
         upstreams.append(_render_stream_upstream(fallback_name, "127.0.0.1", payload.fallback_strip_port))
         strip_server = (

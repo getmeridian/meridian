@@ -6,6 +6,7 @@
 **Aggregate workload profiles** — each exit Profile owns its complete Inbound set; derived Inbound resources expose the profile-scoped identities bindings, Hosts, and squads need.
 **One client routing list** — `delivery.py::DEFAULT_CLIENT_ROUTES` renders into Xray JSON rules, Mihomo rule lines, and inline sing-box rules (sing-box never downloads geo lists: an unfetchable rule set stops it starting). Add a rule there, never in one template.
 **Exit egress overrides are server-side** — `ExitIntent.egress_overrides` compile into the exit Profile's `routing_rules` in operator order, ahead of the default egress (`routing.exit_override_routes`); an override-only `warp` adds WARP after `direct` and sets `NodeRuntimePayload.warp`.
+**Self-steal camouflage** — `self_steal.py`: a `self_steal` Reality path falls back to a loopback nginx TLS server holding the operator's own certificate (Reality `dest`, unknown-SNI stream fallback, relays inheriting the name, gateway bridges). XHTTP/WSS on the same name use that server, and the 443 route for the name belongs to Reality.
 **Capability-specific fallback** — Xray JSON, Mihomo, and sing-box (urltest; Remnawave omits XHTTP) get managed health-checked templates; Base64 gets ordered alternatives without a failover claim.
 ## What's done well
 - Ports, tags, listener routes, and dependency order are deterministic; Realm hops are emitted downstream-first.
@@ -17,6 +18,7 @@
 ## Pitfalls
 - **The control bootstrap depends on its public 80/443 rules** — ACME HTTP-01 runs inside it.
 - **Certificates depend on their TCP/80 ACME rule, never on the node runtime** — Hysteria2 makes Xray load the certificate at startup, so the runtime waits for the certificate.
+- New optional payload or intent fields use `Field(exclude_if=...)` at their default, or every existing fleet's plan hash changes and re-applies.
 - Raise `TopologyCompileError` for unsupported intent; deployment contracts are empty (pure use) or cover every topology server ref exactly.
 - Build every Remnawave-facing name through `names.py`: short resources ≤ 30 characters, users ≤ 36, Host remarks ≤ 100 (`host_remark()`: flag plus `ExitIntent.region` from `exit_places()`, the exit ID when a country repeats or is unknown, then method and fingerprint or transport).
 - A Host is published only after its listener and node runtime, with a `view_position` in `PROTOCOL_PRIORITY` order and the control server's exit first (the entry clients pick by default).

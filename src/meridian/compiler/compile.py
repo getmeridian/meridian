@@ -10,6 +10,7 @@ from meridian.compiler.baselines import (
     compile_server_baselines,
 )
 from meridian.compiler.builder import PlanBuilder
+from meridian.compiler.certificates import ensure_certificate
 from meridian.compiler.client_delivery import (
     assign_host_positions,
     compile_delivery_templates,
@@ -26,7 +27,6 @@ from meridian.compiler.gateway_compile import compile_routing_gateways
 from meridian.compiler.models import (
     COMPILER_VERSION,
     AccessUserPayload,
-    CertificatePayload,
     ConfigProfilePayload,
     ControlPlaneRuntimePayload,
     DeploymentContract,
@@ -61,6 +61,7 @@ from meridian.compiler.routing import (
     exit_outbound_tags,
     exit_override_routes,
 )
+from meridian.compiler.self_steal import SelfStealDecoy, add_decoy_server, decoy_http_id, plan_self_steal
 from meridian.core.defaults import CONTROL_TLS_PORT
 from meridian.core.inputs import is_ip
 from meridian.core.topology import ExitIntent, ProtocolPathIntent, SetupIntent, path_fingerprints
@@ -102,6 +103,7 @@ def compile_topology(
     stream_dependencies: dict[tuple[str, int], set[str]] = defaultdict(set)
     stream_targets: dict[tuple[str, int, str], tuple[str, int]] = {}
     stream_fallbacks: dict[tuple[str, int], str] = {}
+    local_fallbacks: dict[tuple[str, int], int] = {}
     control_names = [""]
     if intent.control.public_hostname:
         control_names.append(intent.control.public_hostname)
@@ -124,6 +126,7 @@ def compile_topology(
     )
     stream_dependencies[control_stream_key].add(control_id)
     direct_host_ids: list[str] = []
+    self_steal = plan_self_steal(intent, ports)
     gateway_plans = {
         gateway.id: compile_gateway_routing(intent, gateway)
         for gateway in sorted(intent.routing_gateways, key=lambda item: item.id)
@@ -163,6 +166,7 @@ def compile_topology(
                         public_port=port,
                         reality_sni=reality_path.reality_sni,
                         reality_server_names=[reality_path.reality_sni],
+                        reality_dest_port=_decoy_port(self_steal.get(target_exit_ref)),
                     ),
                     firewall_id,
                 )
@@ -207,6 +211,7 @@ def compile_topology(
                     public_port=path.public_port,
                     reality_sni=path.reality_sni,
                     reality_server_names=[path.reality_sni] if path.protocol == "reality" else [],
+                    reality_dest_port=_decoy_port(self_steal.get(exit_.id)) if path.protocol == "reality" else 0,
                     tls_sni=path.tls_sni,
                     host=path.host,
                     path=path.path,
@@ -301,6 +306,8 @@ def compile_topology(
             stream_dependencies=stream_dependencies,
             stream_targets=stream_targets,
             stream_fallbacks=stream_fallbacks,
+            local_fallbacks=local_fallbacks,
+            decoy=self_steal.get(exit_.id),
             direct_host_ids=direct_host_ids,
         )
 
@@ -330,13 +337,16 @@ def compile_topology(
         stream_routes=stream_routes,
         stream_dependencies=stream_dependencies,
         stream_fallbacks=stream_fallbacks,
+        local_fallbacks=local_fallbacks,
         camouflage=camouflage,
+        self_steal=self_steal,
     )
     stream_ids = _compile_stream_artifacts(
         builder,
         stream_routes,
         stream_dependencies,
         stream_fallbacks,
+        local_fallbacks,
     )
     _attach_stream_dependencies(builder, direct_host_ids, stream_ids)
 
@@ -434,6 +444,8 @@ def _compile_exit_endpoints(
     stream_dependencies: dict[tuple[str, int], set[str]],
     stream_targets: dict[tuple[str, int, str], tuple[str, int]],
     stream_fallbacks: dict[tuple[str, int], str],
+    local_fallbacks: dict[tuple[str, int], int],
+    decoy: SelfStealDecoy | None,
     direct_host_ids: list[str],
 ) -> None:
     tls_groups: dict[tuple[str, int], list[ProtocolPathIntent]] = defaultdict(list)
@@ -443,7 +455,7 @@ def _compile_exit_endpoints(
         backend_port = allocated_path_ports[(exit_.id, path.id)]
         if path.protocol == "hysteria2":
             firewall_id = add_firewall(builder, exit_.server_ref, "udp", path.public_port)
-            certificate_id = _ensure_certificate(
+            certificate_id = ensure_certificate(
                 builder,
                 exit_id=exit_.id,
                 server_ref=exit_.server_ref,
@@ -462,7 +474,10 @@ def _compile_exit_endpoints(
             direct_dependencies[path.id].extend([certificate_id, firewall_id])
         elif path.protocol == "reality":
             stream_key = (exit_.server_ref, path.public_port)
-            stream_fallbacks[stream_key] = path.reality_sni
+            if decoy is not None:
+                local_fallbacks[stream_key] = decoy.port
+            else:
+                stream_fallbacks[stream_key] = path.reality_sni
             inbound = builder.resources[inbound_id].payload
             assert isinstance(inbound, InboundPayload)
             for server_name in inbound.reality_server_names or [path.reality_sni]:
@@ -521,20 +536,25 @@ def _compile_exit_endpoints(
             for path in paths:
                 direct_dependencies[path.id].append(location_id)
             continue
-        certificate_id = _ensure_certificate(
+        certificate_id = ensure_certificate(
             builder,
             exit_id=exit_.id,
             server_ref=exit_.server_ref,
             hostname=tls_sni,
             runtime_id=runtime_id,
         )
-        tls_port = ports.auxiliary_tcp(
-            exit_.server_ref,
-            f"tls:{exit_.id}:{tls_sni}:{public_port}",
-            base=18000,
-            size=1000,
+        serves_decoy = decoy is not None and decoy.hostname == tls_sni
+        tls_port = (
+            decoy.port
+            if decoy is not None and serves_decoy
+            else ports.auxiliary_tcp(
+                exit_.server_ref,
+                f"tls:{exit_.id}:{tls_sni}:{public_port}",
+                base=18000,
+                size=1000,
+            )
         )
-        http_id = f"nginx:{exit_.id}:{stable_token(tls_sni)}:http"
+        http_id = decoy_http_id(exit_.id, tls_sni)
         builder.add(
             http_id,
             NginxArtifactPayload(
@@ -551,6 +571,11 @@ def _compile_exit_endpoints(
             ],
         )
         stream_key = (exit_.server_ref, public_port)
+        if decoy is not None and serves_decoy:
+            stream_dependencies[decoy.stream_key].add(http_id)
+            if stream_key == decoy.stream_key:
+                # Reality owns the name here and passes non-Reality TLS (XHTTP, WSS, CDN) on to http_id.
+                continue
         stream_name = "" if bare_ip else tls_sni
         _reserve_stream_name(
             stream_targets,
@@ -569,6 +594,9 @@ def _compile_exit_endpoints(
         )
         stream_dependencies[stream_key].add(http_id)
         add_firewall(builder, exit_.server_ref, "tcp", public_port)
+
+    if decoy is not None and decoy.http_id not in builder.resources:
+        stream_dependencies[decoy.stream_key].add(add_decoy_server(builder, decoy, runtime_id=runtime_id))
 
     for path in sorted(exit_.paths, key=lambda item: item.id):
         inbound_id = inbound_by_path[(exit_.id, path.id)]
@@ -613,6 +641,7 @@ def _compile_stream_artifacts(
     routes: dict[tuple[str, int], list[NginxRouteSpec]],
     dependencies: dict[tuple[str, int], set[str]],
     fallbacks: dict[tuple[str, int], str],
+    local_fallbacks: dict[tuple[str, int], int],
 ) -> dict[tuple[str, int], str]:
     stream_ids: dict[tuple[str, int], str] = {}
     for (server_ref, port), route_specs in sorted(routes.items()):
@@ -623,7 +652,10 @@ def _compile_stream_artifacts(
                 server_ref=server_ref,
                 listener_port=port,
                 layer="stream",
-                fallback_server_name=fallbacks.get((server_ref, port), ""),
+                fallback_server_name=""
+                if (server_ref, port) in local_fallbacks
+                else fallbacks.get((server_ref, port), ""),
+                fallback_port=local_fallbacks.get((server_ref, port), 0),
                 routes=sorted(
                     route_specs,
                     key=lambda route: (route.server_names, route.backend_server_ref, route.backend_port),
@@ -704,25 +736,8 @@ def _compile_probes(
         )
 
 
-def _ensure_certificate(
-    builder: PlanBuilder,
-    *,
-    exit_id: str,
-    server_ref: str,
-    hostname: str,
-    runtime_id: str,
-) -> str:
-    logical_id = f"certificate:{exit_id}:{stable_token(hostname)}"
-    if logical_id in builder.resources:
-        return logical_id
-    challenge_firewall_id = add_firewall(builder, server_ref, "tcp", 80)
-    # Issue after what the runtime waits for (its binding, hence the control plane), not after
-    # the runtime itself: a Hysteria2 runtime needs the certificate before Xray can start.
-    return builder.add(
-        logical_id,
-        CertificatePayload(server_ref=server_ref, hostname=hostname),
-        dependencies=[*builder.resources[runtime_id].dependencies, challenge_firewall_id],
-    )
+def _decoy_port(decoy: SelfStealDecoy | None) -> int:
+    return decoy.port if decoy is not None else 0
 
 
 def _reserve_stream_name(

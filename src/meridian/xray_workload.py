@@ -166,6 +166,21 @@ def _render_inbound_body(
     listen_address = inbound.listen_address or ("0.0.0.0" if inbound.protocol == "hysteria2" else "127.0.0.1")
     if inbound.protocol == "reality":
         keys = _require_complete_reality_keys(reality_keys, inbound)
+        reality: dict[str, Any] = {
+            # Self-steal falls back to the exit's own nginx; otherwise to the borrowed site.
+            "dest": (
+                f"127.0.0.1:{inbound.reality_dest_port}" if inbound.reality_dest_port else f"{inbound.reality_sni}:443"
+            ),
+            "serverNames": inbound.reality_server_names or [inbound.reality_sni],
+            "privateKey": keys.private_key,
+            "shortIds": [keys.short_id],
+            "fingerprint": "chrome",
+            # Xray 26.7.11+ defaults this to 26.3.27, which rejects Mihomo and
+            # sing-box clients (they announce 1.8.x); REALITY began in 1.8.0.
+            "minClientVer": REALITY_MIN_CLIENT_VERSION,
+        }
+        if inbound.reality_dest_proxy:
+            reality["xver"] = 1
         return {
             "tag": inbound.tag,
             "protocol": "vless",
@@ -175,16 +190,7 @@ def _render_inbound_body(
             "streamSettings": {
                 "network": "tcp",
                 "security": "reality",
-                "realitySettings": {
-                    "dest": f"{inbound.reality_sni}:443",
-                    "serverNames": inbound.reality_server_names or [inbound.reality_sni],
-                    "privateKey": keys.private_key,
-                    "shortIds": [keys.short_id],
-                    "fingerprint": "chrome",
-                    # Xray 26.7.11+ defaults this to 26.3.27, which rejects Mihomo and
-                    # sing-box clients (they announce 1.8.x); REALITY began in 1.8.0.
-                    "minClientVer": REALITY_MIN_CLIENT_VERSION,
-                },
+                "realitySettings": reality,
             },
         }
     if inbound.protocol == "xhttp":

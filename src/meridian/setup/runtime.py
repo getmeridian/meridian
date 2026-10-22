@@ -774,7 +774,9 @@ def _bootstrap_profile_values(
         for inbound in payload.inbounds:
             if inbound.protocol in ports:
                 ports[inbound.protocol] = inbound.listen_port
-            if inbound.protocol == "reality":
+            # A self-steal name would point the bootstrap's interim 443 fallback at this very
+            # server; the reviewed stream replaces it with the local fallback anyway.
+            if inbound.protocol == "reality" and not inbound.reality_dest_port:
                 reality_sni = inbound.reality_sni
         break
     return ports, reality_sni

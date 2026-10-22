@@ -134,13 +134,21 @@ class InboundPayload(CoreModel):
     path: str = ""
     # nginx in front passes the client's address (PROXY protocol or X-Forwarded-For).
     trust_forwarded_ip: bool = False
+    # Self-steal: probes fall back to this loopback nginx TLS server instead of reality_sni:443.
+    reality_dest_port: int = Field(default=0, ge=0, le=65535, exclude_if=lambda port: not port)
+    # That server reads a PROXY header (the fleet forwards client IPs), so Reality sends one.
+    reality_dest_proxy: bool = Field(default=False, exclude_if=lambda enabled: not enabled)
 
     @model_validator(mode="after")
     def validate_reality_names(self) -> InboundPayload:
         if self.protocol != "reality":
             if self.reality_server_names:
                 raise ValueError("Only Reality Inbounds can declare accepted Reality server names.")
+            if self.reality_dest_port or self.reality_dest_proxy:
+                raise ValueError("Only Reality Inbounds have a camouflage fallback.")
             return self
+        if self.reality_dest_proxy and not self.reality_dest_port:
+            raise ValueError("A PROXY header needs a local self-steal fallback.")
         if self.reality_server_names:
             expected = [
                 self.reality_sni,
@@ -337,6 +345,14 @@ class NginxArtifactPayload(CoreModel):
     forward_client_ip: bool = False
     # Local listener that strips the header before the external camouflage fallback.
     fallback_strip_port: int = 0
+    # Self-steal: unknown SNIs reach this loopback nginx TLS server instead of an outside site.
+    fallback_port: int = Field(default=0, ge=0, le=65535, exclude_if=lambda port: not port)
+
+    @model_validator(mode="after")
+    def validate_fallback(self) -> NginxArtifactPayload:
+        if self.fallback_port and (self.layer != "stream" or self.fallback_server_name):
+            raise ValueError("A stream falls back to one camouflage: an outside site or a local server.")
+        return self
 
 
 class RealmHopPayload(CoreModel):

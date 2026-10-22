@@ -12,6 +12,7 @@ import pytest
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlPlaneRuntimePayload, RealmHopPayload, ResourceKind, ResourcePlan
 from meridian.core.cancellation import OperationCancelledError
+from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import LocalStateError, ProvisioningError
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import (
@@ -732,3 +733,14 @@ def test_surviving_pre_rename_panel_directory_makes_the_control_runtime_drift() 
     assert ready is False
     assert connection.run.call_args.args[0] == "test ! -e /opt/remnawave"
     connection.get_text.assert_not_called()
+
+
+def test_self_steal_exit_on_the_control_server_bootstraps_with_a_borrowed_target() -> None:
+    """The interim legacy 443 fallback dials the bootstrap SNI; the operator's own name would loop to itself."""
+    from meridian.compiler import compile_topology
+    from meridian.setup.runtime import _bootstrap_profile_values
+
+    own = ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.org", self_steal=True)
+    plan = compile_topology(single_exit_intent(exit_ref="srv-control", paths=[own]))
+
+    assert _bootstrap_profile_values(plan)[1] == DEFAULT_SNI
