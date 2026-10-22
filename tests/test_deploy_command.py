@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from rich.console import Console
 from typer.testing import CliRunner
 
 import meridian.cli as cli
 from meridian.cli import app
+from meridian.commands.deploy import _print_success
 from meridian.console import set_json_mode, set_quiet_mode
+from meridian.core.deploy import DeployRequest
 from meridian.handoff import HandoffLinks
 from meridian.servers import ServerRegistry
 from tests.support.text import unstyle
@@ -254,3 +258,22 @@ def test_deploy_offers_key_setup_only_without_yes_and_saves_the_key(
     assert connect.call_args.kwargs == {"offer_key_setup": offer}
     entry = ServerRegistry(tmp_home / "servers.json").find("198.51.100.10")
     assert entry is not None and entry.key_path == key_path
+
+
+@pytest.mark.parametrize(
+    ("extra", "advice"),
+    [
+        ({}, "Proxied (orange)"),
+        ({"self_steal": True}, "Keep it DNS only"),
+        ({"self_steal": True, "sni": "www.example.org"}, "Proxied (orange)"),
+    ],
+    ids=["domain", "self-steal-on-domain", "self-steal-elsewhere"],
+)
+def test_cloudflare_advice_never_proxies_a_self_steal_domain(extra: dict[str, object], advice: str) -> None:
+    request = DeployRequest(ip="198.51.100.10", domain="vpn.example.com", **extra)
+    out = Console(file=StringIO(), width=200)
+    with patch("meridian.commands.deploy.err_console", out):
+        _print_success("198.51.100.10", MagicMock(), request, HandoffLinks("alice"))
+    text = out.file.getvalue()
+    assert advice in text
+    assert ("Proxied (orange)" in text) != ("Keep it DNS only" in text)

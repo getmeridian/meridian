@@ -563,7 +563,11 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
         err_console.print(
             f"    [dim]A record {request.domain} -> {server_ip}; DNS only (grey cloud) while deploying.[/dim]"
         )
-        err_console.print("    [dim]Afterwards: Proxied (orange), SSL/TLS Full (Strict), WebSockets on.[/dim]")
+        if request.self_steal and request.reality_sni == request.domain:
+            # Reality answers on this name itself; behind Cloudflare it would reach Cloudflare instead.
+            err_console.print("    [dim]Keep it DNS only: your own-domain camouflage must reach this server.[/dim]")
+        else:
+            err_console.print("    [dim]Afterwards: Proxied (orange), SSL/TLS Full (Strict), WebSockets on.[/dim]")
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
