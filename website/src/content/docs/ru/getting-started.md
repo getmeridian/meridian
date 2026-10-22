@@ -94,7 +94,7 @@ meridian client add alice
 meridian setup
 ```
 
-Добавлять серверы можно и по одному с помощью `meridian node add` и `meridian relay add`. Каждое изменение проходит через ту же проверяемую топологию: `meridian plan` показывает, что изменится, а `meridian apply` применяет план.
+Добавлять серверы можно и по одному с помощью `meridian node add` и `meridian relay add`. Каждое изменение проходит через ту же одобренную топологию: `meridian plan` показывает, что изменится, а `meridian apply` применяет план.
 
 ## Дальнейшие шаги
 

@@ -166,9 +166,10 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 
 | Check | What it tests | If it fails |
 |-------|--------------|-------------|
-| SNI target reachability | Can the server reach the camouflage site? | Server's outbound is restricted. Try a different SNI with `--sni` |
-| Port 443 availability | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
-| Port 443 external reachability | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
+| Camouflage target | Can the server reach the camouflage site? | Server's outbound is restricted. Try a different SNI with `--sni` |
+| Camouflage target DNS | Does the camouflage site resolve through the server's DNS? | Fix the server's DNS resolver or pick another camouflage target |
+| Port 443 | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
+| Port 443 from outside | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
 | Domain DNS | Does the domain resolve to server IP? | Update DNS A record |
 | Server OS | Is it Ubuntu/Debian? | Fails without apt (CentOS, Fedora, Alpine); reinstall with Ubuntu or Debian |
 | Disk space | At least 2GB free? | Free up space |
@@ -181,7 +182,7 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
 | Docker | Are the `ctlsvc-api` (panel) and `netagent` (node) containers running? Status should be "Up" |
-| Remnawave Node Logs | Node startup errors, "failed to start" entries, certificate issues |
+| Exit node Logs | Node startup errors, "failed to start" entries, certificate issues |
 | Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |
 | Camouflage Target | Should show CONNECTED with a certificate chain |
