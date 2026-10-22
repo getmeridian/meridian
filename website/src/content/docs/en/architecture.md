@@ -9,7 +9,7 @@ description: System architecture, traffic flow, and service topology.
 - **XHTTP** (Xray-core) — a TLS path on your domain, or on the server's IP with a Let's Encrypt IP certificate when there is no domain.
 - **WSS** (Xray-core) — a TLS path on your own domain, added in domain mode. With Cloudflare proxying the domain, it and XHTTP travel through the CDN and survive an IP block.
 - **Hysteria2** (Xray-core) — the UDP/443 last resort for lossy networks, wrapped in salamander obfuscation so it doesn't look like QUIC. On by default (`--no-hysteria2` turns it off).
-- **Remnawave** — the panel stack: `remnawave/backend` (API and admin UI, with PostgreSQL and Valkey) on the control-plane server, `remnawave/node` (runs Xray) on every exit, and `remnawave/subscription-page`. Meridian pins tested versions and talks to the panel over its REST API.
+- **Remnawave** — the panel stack: `remnawave/backend` (API and admin UI, with PostgreSQL and Valkey) on the control server, `remnawave/node` (runs Xray) on every exit, and `remnawave/subscription-page`. Meridian pins tested versions and talks to the panel over its REST API.
 - **nginx** — owns public TCP/443. Its stream module routes connections by SNI without terminating TLS; its http module terminates TLS for the panel, connection pages, subscriptions, and domain paths. Certificates come from Let's Encrypt via [acme.sh](https://github.com/acmesh-official/acme.sh).
 - **Realm** — the TCP forwarder on relay servers.
 - **uTLS** — client connections copy a browser's TLS Client Hello (Chrome, with Firefox copies as backup entries), so they look like ordinary browser traffic.
@@ -72,8 +72,8 @@ A relay forwards raw TCP from a domestic IP to the exit's Reality listener. Encr
 
 ## State model
 
-- **Topology** — `~/.config/meridian/cluster.yml` on your machine holds the reviewed topology (control plane, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay add` change it; don't edit it by hand.
-- **Clients** — accounts, keys, status, and traffic live in the Remnawave database on the control-plane server.
+- **Topology** — `~/.config/meridian/cluster.yml` on your machine holds the reviewed topology (control server, exits, relays, gateways, protocol paths, and the list of users), panel access, and the keys Meridian generated. `meridian setup`, `deploy`, `client add`, `node add`, and `relay add` change it; don't edit it by hand.
+- **Clients** — accounts, keys, status, and traffic live in the Remnawave database on the control server.
 - **Saved servers** — `~/.config/meridian/servers.json` holds SSH connection details.
 
 ## Plan and apply
@@ -106,7 +106,7 @@ Backend Xray ports are reached through nginx; UFW blocks them from the internet.
 
 Container and directory names are neutral, so a host reading `docker ps` or `/opt` sees nothing that names proxy software (images keep their upstream tags). `meridian check` and `meridian doctor` show the role behind each name.
 
-**On the control-plane server:**
+**On the control server:**
 - `ctlsvc-api` — Remnawave backend API and admin UI on `127.0.0.1:3000`
 - `ctlsvc-db` — PostgreSQL (users, hosts, profiles)
 - `ctlsvc-cache` — Valkey cache
@@ -124,7 +124,7 @@ Servers deployed by a 4.0 beta ran these as `remnawave*` from `/opt/remnawave` a
 
 ## File locations
 
-### On the control-plane server
+### On the control server
 - `/opt/ctlsvc/` — panel compose file, `.env`, and PostgreSQL `data/`
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI routing
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS sites and reverse proxy

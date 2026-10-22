@@ -7,7 +7,7 @@ description: Complete reference for all Meridian CLI commands and flags.
 
 ### meridian deploy
 
-Deploy one server and get a shareable connection link. The server becomes both the control plane (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
+Deploy one server and get a shareable connection link. The server becomes both the control server (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
 
 ```
 meridian deploy [SERVER] [flags]

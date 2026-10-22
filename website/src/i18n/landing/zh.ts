@@ -166,7 +166,7 @@ export const zh: LandingStrings = {
   'connect.apps.more':
     '连接页面会优先列出这些应用，并为每个平台提供其他应用的链接。<a href="/demo/">查看演示</a>。',
   'connect.clock':
-    '请在每台设备上开启自动设置日期和时间。设备时钟不准时，连接会失败。',
+    '请在每台设备上开启自动设置日期和时间。设备时钟不准时，连接可能会失败。',
 
   // Architecture
   'arch.label': '架构',

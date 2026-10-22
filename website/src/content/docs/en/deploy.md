@@ -11,7 +11,7 @@ This guide covers every option of `meridian deploy`. If this is your first deplo
 meridian deploy 198.51.100.10
 ```
 
-One server becomes both the control plane (the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
+One server becomes both the control server (running the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
 
 Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip confirmations:
 

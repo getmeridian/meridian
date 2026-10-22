@@ -50,7 +50,7 @@ The host's network also shapes your camouflage. Reality impersonates a real TLS 
 - **Get a public IPv4 address.** Some hosts charge extra for it. Many client networks still have no IPv6, and `meridian scan` works on IPv4 only.
 - **Port 443 must be free and reachable.** Meridian serves Reality, XHTTP, and the panel on TCP 443, and Hysteria2 on UDP 443. Open both in the provider's cloud firewall or security group, not only on the server.
 - **Start from a fresh Debian or Ubuntu LTS image** with SSH key login, as root or a user with passwordless sudo. Avoid hosts that preinstall control panels, web servers, or firewalls you don't control.
-- **The clock must be within 30 seconds** of the device you deploy from. Reality depends on it.
+- **The clock must be within a minute** of the device you deploy from. Certificate checks depend on it.
 
 ## Bandwidth: read the fair-use clause
 

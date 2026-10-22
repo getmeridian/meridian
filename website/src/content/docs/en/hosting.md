@@ -54,4 +54,4 @@ Every client's subscription lists all of them, and apps that use the Xray JSON o
 
 ## Camouflage target
 
-The host's network also shapes the best camouflage target. Pick a popular site with TLS 1.3 that sits on a network that looks natural next to your server: `meridian scan` finds candidates in the server's own neighborhood. Don't choose `apple.com` or `icloud.com` (their networks don't match hosting providers), and don't choose `www.microsoft.com`: its certificate chain is too large for REALITY, so the deploy converges but no traffic passes. See [Choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).
+The host's network also shapes the best camouflage target. Pick a popular site with TLS 1.3 that sits on a network that looks natural next to your server: `meridian scan` finds candidates in the server's own neighborhood. Don't choose `apple.com` or `icloud.com` (their networks don't match hosting providers), and don't choose `www.microsoft.com`: its certificate chain is too large for Reality, so the deploy converges but no traffic passes. See [Choosing a camouflage target](/en/deploy/#choosing-a-camouflage-target).

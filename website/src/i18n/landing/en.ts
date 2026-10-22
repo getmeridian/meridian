@@ -171,7 +171,7 @@ export const en = {
   'connect.apps.more':
     'Connection pages list these apps first and link others for each platform. <a href="/demo/">See the demo</a>.',
   'connect.clock':
-    'Turn on automatic date and time on every device. Connections fail when the device clock is wrong.',
+    'Turn on automatic date and time on every device. Connections can fail when the device clock is wrong.',
 
   // Architecture
   'arch.label': 'Architecture',

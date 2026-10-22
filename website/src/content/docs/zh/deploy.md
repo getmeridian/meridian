@@ -11,7 +11,7 @@ description: 完整的部署演练，包括所有配置选项。
 meridian deploy 198.51.100.10
 ```
 
-一个服务器既是控制平面（Remnawave 面板）又是出口。Meridian 构建 [`meridian setup`](/zh/cli-reference/#meridian-setup) 生成的同样已审核拓扑，并用检查点应用它。在打印"完成"之前，它会通过交付的订阅推送真实流量。
+一台服务器既是控制服务器（运行 Remnawave 面板）又是承载流量的出口。Meridian 构建与 [`meridian setup`](/zh/cli-reference/#meridian-setup) 相同的已审核拓扑，并用检查点应用它。在打印“Done”之前，它会通过交付的订阅发送真实流量。
 
 不指定 IP 直接运行 `meridian deploy`，它会提示。添加 `--yes` 跳过确认：
 

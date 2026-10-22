@@ -9,7 +9,7 @@ description: 系统架构、流量流向和服务拓扑。
 - **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
 - **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被阻止也仍然可用。
 - **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
-- **Remnawave** — 面板堆栈：`remnawave/backend`（API 和管理 UI，带 PostgreSQL 和 Valkey）在控制平面服务器上，`remnawave/node`（运行 Xray）在每个出口上，以及 `remnawave/subscription-page`。Meridian 固定测试版本并通过 REST API 与面板通信。
+- **Remnawave** — 面板组件栈：`remnawave/backend`（API 和管理 UI，带 PostgreSQL 和 Valkey）运行在控制服务器上，`remnawave/node`（运行 Xray）运行在每个出口上，以及 `remnawave/subscription-page`。Meridian 固定已测试版本并通过 REST API 与面板通信。
 - **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为面板、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
 - **Realm** — 中继服务器上的 TCP 转发器。
 - **uTLS** — 客户端连接复制浏览器的 TLS Client Hello（以 Chrome 为主，另有 Firefox 副本作为备用条目），所以看起来像普通浏览器流量。
@@ -72,8 +72,8 @@ flowchart LR
 
 ## 状态模型
 
-- **拓扑** — `~/.config/meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制平面、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
-- **客户端** — 账户、密钥、状态和流量位于控制平面服务器上的 Remnawave 数据库中。
+- **拓扑** — `~/.config/meridian/cluster.yml` 在您的机器上保存已审核的拓扑（控制服务器、出口、中继、网关、协议路径和用户列表）、面板访问和 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 改变它；不要手工编辑它。
+- **客户端** — 账户、密钥、状态和流量位于控制服务器上的 Remnawave 数据库中。
 - **保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接详情。
 
 ## 计划和应用
@@ -106,7 +106,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 
 容器和目录的名称是中性的，因此主机上查看 `docker ps` 或 `/opt` 的人看不到任何点明代理软件的名字（镜像保留其上游标签）。`meridian check` 和 `meridian doctor` 会显示每个名称背后的角色。
 
-**在控制平面服务器上：**
+**在控制服务器上：**
 - `ctlsvc-api` — Remnawave 后端 API 和管理 UI 在 `127.0.0.1:3000`
 - `ctlsvc-db` — PostgreSQL（用户、主机、配置文件）
 - `ctlsvc-cache` — Valkey 缓存
@@ -124,7 +124,7 @@ Meridian 将拓扑转换为资源列表：防火墙规则、nginx 路由、容�
 
 ## 文件位置
 
-### 在控制平面服务器上
+### 在控制服务器上
 - `/opt/ctlsvc/` — 面板 compose 文件、`.env` 和 PostgreSQL `data/`
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI 路由
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS 网站和反向代理
