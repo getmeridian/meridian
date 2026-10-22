@@ -243,7 +243,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   individual connection with Open, Copy, and QR, "Not connecting?" tips with
   the self-check, and the router guide. Russian pages no longer rename the
   first connection "Основной", and `meridian dev preview` shows a realistic
-  page. Without a `--server-name`, the header names the exit countries
+  page. Without `--display-name`, the header names the exit countries
   ("🇩🇪 Germany · 🇳🇱 Netherlands") in the page's language.
 - **A WebRTC leak tip on the connection page** — "Not connecting?" now says that
   an app running as a proxy only can let websites in a browser see the real IP

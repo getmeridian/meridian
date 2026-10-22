@@ -95,11 +95,11 @@ IP blocked? Follow the [recovery guide](https://getmeridian.org/en/recovery/). U
 | | |
 |---|---|
 | `deploy`, `setup` | Set up one server, or any fleet with the wizard |
-| `client add\|show\|list\|enable\|disable\|remove` | The people who connect |
-| `node add\|list\|replace\|remove`, `relay add\|list\|remove` | Exits and relays |
+| `client add\|show\|list\|reissue\|enable\|disable\|remove` | The people who connect |
+| `node add\|list\|replace\|sni\|remove`, `relay add\|list\|sni\|remove` | Exits and relays |
 | `route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
 | `plan`, `apply` | Review and apply the topology |
-| `test`, `check`, `scan`, `doctor` | Verify, inspect, find camouflage targets, report |
+| `test`, `check`, `scan`, `doctor`, `logs` | Verify, inspect, find camouflage targets, report |
 | `fleet status\|inventory\|upgrade`, `panel` | Fleet overview, Remnawave upgrades, panel access |
 | `teardown`, `update` | Remove Meridian from a server; update the CLI |
 | `help agents` | Explain Meridian to an AI agent |

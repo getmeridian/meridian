@@ -59,7 +59,7 @@ Send the connection page link through any messenger. The page:
 
 In the app, entries are named by country and method, such as "DE · Reality · Chrome". Apps refresh the subscription on their own, so servers you add later appear without a new link.
 
-Treat each link like a key: anyone who has it can connect. If one leaks, remove that client and add a new one.
+Treat each link like a key: anyone who has it can connect. If one leaks, run `meridian client reissue alice` to replace her link and page without deleting her account.
 
 ## When the phone rings
 
@@ -78,6 +78,7 @@ If `meridian test` fails from your network but works from another network, the s
 
 ```bash
 meridian client list            # everyone, with status, traffic, last seen
+meridian client reissue bob     # leaked link: issue a new one, old one stops working
 meridian client disable bob     # cut off now, same link later
 meridian client enable bob
 meridian client remove bob      # link and page are gone for good
