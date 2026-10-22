@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 from meridian.core.verification import (
@@ -80,12 +81,15 @@ def check_block_differential(
                 f"result is unstable. {VANTAGE_NOTE}",
                 "Retry in a minute.",
             )
-        control = _real_site_flow(camouflage_sni, port=port, timeout=timeout, prober=prober, resolver=resolver)
-        where = (
-            "while the real site opens directly, so the SNI is being filtered on this server's address"
-            if control is not None and control.server_answered_tls
-            else "and the real site does not open either, so the SNI itself looks filtered"
+        control = _real_site_flow(
+            camouflage_sni, server_ip=ip, port=port, timeout=timeout, prober=prober, resolver=resolver
         )
+        if control.own:
+            where = "and that name is your own domain on this server, so the name itself looks filtered"
+        elif control.flow is not None and control.flow.server_answered_tls:
+            where = "while the real site opens directly, so the SNI is being filtered on this server's address"
+        else:
+            where = "and the real site does not open either, so the SNI itself looks filtered"
         return _check(
             check_id,
             name,
@@ -96,11 +100,26 @@ def check_block_differential(
             f"connection without it gets through, {where}. {VANTAGE_NOTE}",
             "Choose another camouflage SNI (one that plausibly lives in your hosting provider's network; "
             "`meridian scan SERVER` lists sites next to it) and switch with `meridian node sni EXIT NEW_SNI`, "
-            "or `meridian relay sni RELAY NEW_SNI` for a relay.",
+            "or `meridian relay sni RELAY NEW_SNI` for a relay. With your own domain, switch to another name "
+            "you own with `meridian node sni EXIT NEW_SNI --self-steal`.",
         )
 
-    control = _real_site_flow(camouflage_sni, port=port, timeout=timeout, prober=prober, resolver=resolver)
-    if control is None or not control.server_answered_tls:
+    control = _real_site_flow(
+        camouflage_sni, server_ip=ip, port=port, timeout=timeout, prober=prober, resolver=resolver
+    )
+    if control.own:
+        return _check(
+            check_id,
+            name,
+            started,
+            "BLOCK_DIFFERENTIAL_INCONCLUSIVE",
+            "skipped",
+            f"The server did not answer ({camouflage.describe()}), and {camouflage_sni} is your own domain on this "
+            "same server, so no independent site can tell an IP block from a network that filters everything. "
+            f"{VANTAGE_NOTE}",
+            "Confirm the server is up with `meridian check`, then retry from a network that opens ordinary websites.",
+        )
+    if control.flow is None or not control.flow.server_answered_tls:
         return _check(
             check_id,
             name,
@@ -202,18 +221,30 @@ def check_data_stall(
     )
 
 
+@dataclass(frozen=True)
+class _Control:
+    """The real camouflage site, dialed directly; ``own`` when the name lives on the server itself."""
+
+    flow: TlsFlowResult | None
+    own: bool = False
+
+
 def _real_site_flow(
     host: str,
     *,
+    server_ip: str,
     port: int,
     timeout: float,
     prober: FlowProber,
     resolver: Resolver,
-) -> TlsFlowResult | None:
+) -> _Control:
     address = resolver(host, timeout=timeout)
     if not address:
-        return None
-    return prober(address, host, port=port, timeout=timeout)
+        return _Control(None)
+    # Self-steal: the "real site" is this server, which proves nothing about it.
+    if address == server_ip:
+        return _Control(None, own=True)
+    return _Control(prober(address, host, port=port, timeout=timeout))
 
 
 def _check(
