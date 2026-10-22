@@ -21,6 +21,7 @@ from meridian.core.inputs import (
     ServerTitleValue,
     TopologyIdValue,
     access_username_for,
+    is_ip,
     validate_access_username_value,
     validate_country_code_value,
     validate_hostname_value,
@@ -81,14 +82,21 @@ class ProtocolPathIntent(CoreModel):
     host: OptionalHostnameValue = ""
     path: OptionalTransportPathValue = ""
     fingerprint: TlsFingerprint = DEFAULT_TLS_FINGERPRINT
+    # Self-steal: reality_sni is the operator's own hostname, pointed at this exit, and
+    # probes reach the exit's own nginx and certificate instead of someone else's site.
+    self_steal: bool = Field(default=False, exclude_if=lambda enabled: not enabled)
 
     @model_validator(mode="after")
     def validate_protocol_fields(self) -> Self:
         if self.protocol == "hysteria2" and self.fingerprint != DEFAULT_TLS_FINGERPRINT:
             raise ValueError("Hysteria2 runs over QUIC; a TLS fingerprint does not apply.")
+        if self.self_steal and self.protocol != "reality":
+            raise ValueError("Only Reality paths can use self-steal camouflage.")
         if self.protocol == "reality":
             if not self.reality_sni:
                 raise ValueError("Reality paths require a camouflage SNI.")
+            if self.self_steal and is_ip(self.reality_sni):
+                raise ValueError("Self-steal needs a domain name pointed at the server, not an IP address.")
             if self.tls_sni or self.host or self.path:
                 raise ValueError("Reality camouflage SNI is separate from TLS Host and path fields.")
             return self

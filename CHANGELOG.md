@@ -79,6 +79,19 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   there and that passes Reality's TLS 1.3 + HTTP/2 check, so the SNI and the
   server's IP look like they belong together. Well-known targets remain the
   fallback, and real traffic still decides.
+- **Your own domain as camouflage (self-steal)** — `--self-steal` on `deploy`,
+  `node add`, and `node sni` makes Reality imitate a domain you own, pointed
+  at the server with a DNS-only record, instead of someone else's site. The
+  exit gets a Let's Encrypt certificate for the name and answers probes and
+  unknown SNIs itself with nginx's stock 404, so the name, the certificate,
+  and the address all match, and no outside site can go down or change under
+  you. With `--domain` alone the one domain also keeps XHTTP and WSS working
+  behind it. Meridian first checks where the name resolves from the server:
+  it stops when it doesn't resolve and warns when it points elsewhere (a
+  Cloudflare-proxied record). The wizard offers it as "My own domain", and
+  `test --probe` no longer treats a self-steal name as an independent site to
+  compare against. `meridian scan` stopped promising that `--domain` alone did
+  this.
 - **Client IPs stay private unless you ask** — by default the panel records
   the server's own address for every TCP connection, so it never stores where
   users connect from. `--client-ips` (or `forward_client_ips` in the topology)
@@ -230,7 +243,7 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   individual connection with Open, Copy, and QR, "Not connecting?" tips with
   the self-check, and the router guide. Russian pages no longer rename the
   first connection "Основной", and `meridian dev preview` shows a realistic
-  page. Without a `--server-name`, the header names the exit countries
+  page. Without `--display-name`, the header names the exit countries
   ("🇩🇪 Germany · 🇳🇱 Netherlands") in the page's language.
 - **A WebRTC leak tip on the connection page** — "Not connecting?" now says that
   an app running as a proxy only can let websites in a browser see the real IP
@@ -287,6 +300,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   sing-box has no XHTTP, so those entries are left out.
 
 ### Docs and agents
+- **Reviewed translations** — the Russian, Persian, and Chinese CLI, docs, and
+  connection pages were reviewed against the English source: mistranslations,
+  machine-translation leftovers, and stray tokens fixed, one term per concept
+  in each language, and docs claims checked against the code.
 - **An agent guide** — `meridian help agents` prints a Markdown guide that
   explains how Meridian works and how to drive it safely: non-interactive
   flags, JSON envelopes, plan before apply, exit codes, and which outputs are
@@ -311,6 +328,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   command builder only offers commands and flags the CLI actually has.
 
 ### Security and correctness
+- **`meridian test` trusts valid certificates on macOS** — uv's bundled Python
+  looked for root certificates at a Linux path, so every Let's Encrypt
+  certificate was reported untrusted; certificate checks now use certifi.
 - **A smaller download** — the package carries only Studio's own page, scripts,
   and fonts instead of the whole website: about 1 MB instead of 7.5 MB, which
   matters on slow or filtered connections.

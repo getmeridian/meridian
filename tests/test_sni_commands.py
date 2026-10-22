@@ -14,7 +14,7 @@ from meridian.commands.sni import run_exit_sni, run_relay_sni
 from meridian.compiler.compile import compile_topology
 from meridian.compiler.models import InboundPayload
 from meridian.core.topology import SetupIntent
-from meridian.diagnostics.camouflage import camouflage_refusal
+from meridian.diagnostics.camouflage import OwnHostname, camouflage_refusal
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.editor import set_exit_reality_sni, set_relay_reality_sni
@@ -62,6 +62,8 @@ def _run(
     reachable: bool = True,
     yes: bool = True,
     confirmed: bool = True,
+    self_steal: bool = False,
+    dns: OwnHostname | None = None,
 ) -> tuple[int, _Runtime, list[str]]:
     """Run a command; returns its exit code, the runtime, and the hosts asked to reach the SNI."""
     runtime = _Runtime()
@@ -85,10 +87,14 @@ def _run(
         patch("meridian.diagnostics.preflight.reachable_reality_targets", side_effect=reach),
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
         patch("meridian.commands.sni.confirm", return_value=confirmed),
+        patch(
+            "meridian.diagnostics.camouflage.own_hostname",
+            return_value=dns or OwnHostname("here", ("198.51.100.11",)),
+        ),
     ):
         try:
             if command == "node":
-                run_exit_sni(target, sni, yes=yes)
+                run_exit_sni(target, sni, self_steal=self_steal, yes=yes)
             else:
                 run_relay_sni(target, sni, yes=yes)
         except typer.Exit as exc:
@@ -256,3 +262,37 @@ def test_declining_the_review_changes_nothing(registry: ServerRegistry) -> None:
 )
 def test_camouflage_refusal_names_why(sni: str, reason: str) -> None:
     assert camouflage_refusal(sni) == reason
+
+
+def test_self_steal_sni_checks_dns_instead_of_reaching_a_site(registry: ServerRegistry) -> None:
+    """The exit serves its own name only after the apply, so the TLS reachability check cannot pass yet."""
+    code, runtime, probed = _run("node", "exit-b", "www.example.net", self_steal=True)
+
+    assert (code, probed) == (0, [])
+    assert runtime.applied is not None
+    [path] = [path for exit_ in runtime.applied[0].exits if exit_.id == "exit-b" for path in exit_.paths]
+    assert (path.reality_sni, path.self_steal) == ("www.example.net", True)
+
+
+def test_self_steal_sni_refuses_a_name_that_does_not_resolve(registry: ServerRegistry) -> None:
+    code, runtime, _ = _run("node", "exit-b", "www.example.net", self_steal=True, dns=OwnHostname("unresolved"))
+
+    assert code == 2
+    assert runtime.applied is None
+
+
+def test_self_steal_sni_pointing_elsewhere_still_applies(registry: ServerRegistry) -> None:
+    """A proxied record still gets a certificate through the CDN; it only loses the matching address."""
+    code, runtime, _ = _run(
+        "node", "exit-b", "www.example.net", self_steal=True, dns=OwnHostname("elsewhere", ("203.0.113.5",))
+    )
+
+    assert code == 0
+    assert runtime.applied is not None
+
+
+def test_turning_self_steal_on_for_the_same_name_is_a_change(registry: ServerRegistry) -> None:
+    code, runtime, _ = _run("node", "exit-b", "www.example.org", self_steal=True)
+
+    assert code == 0
+    assert runtime.applied is not None

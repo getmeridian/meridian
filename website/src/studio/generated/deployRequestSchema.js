@@ -119,6 +119,11 @@ export const deployRequestSchema = {
       "title": "Requested Server",
       "type": "string"
     },
+    "self_steal": {
+      "default": false,
+      "title": "Self Steal",
+      "type": "boolean"
+    },
     "server_name": {
       "default": "",
       "title": "Server Name",

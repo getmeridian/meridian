@@ -4,6 +4,7 @@ Every TCP connection reaches Xray and the panel through nginx, so without this
 they all appear to come from 127.0.0.1. When ``forward_client_ips`` is on, the
 443 streams send the PROXY protocol header, TLS servers read it and set
 X-Forwarded-For, and every nginx-fronted inbound trusts what it receives.
+Reality passes the header on to a self-steal fallback server (``xver``).
 Hysteria2 is direct UDP and always sees the real address.
 """
 
@@ -61,7 +62,11 @@ def _forwarding_artifact(logical_id: str, payload: NginxArtifactPayload, ports: 
 
 
 def _trusting_inbound(inbound: InboundPayload) -> InboundPayload:
+    update: dict[str, object] = {}
+    # A self-steal fallback is an nginx TLS server, which now reads a PROXY header.
+    if inbound.reality_dest_port:
+        update["reality_dest_proxy"] = True
     # Inbounds with an explicit listen address (gateway bridges) are dialed directly, not through nginx.
-    if inbound.protocol not in _FORWARDED_PROTOCOLS or inbound.listen_address:
-        return inbound
-    return inbound.model_copy(update={"trust_forwarded_ip": True})
+    if inbound.protocol in _FORWARDED_PROTOCOLS and not inbound.listen_address:
+        update["trust_forwarded_ip"] = True
+    return inbound.model_copy(update=update) if update else inbound

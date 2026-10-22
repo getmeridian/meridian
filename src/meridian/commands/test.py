@@ -255,7 +255,7 @@ def _render_result(result: TestResult) -> None:
     target = result.target.requested
     if result.target.resolved_ip and result.target.resolved_ip not in target:
         target = f"{target} ({result.target.resolved_ip})"
-    scope = "basic reachability" if result.scope == "basic" else "canonical end-to-end traffic"
+    scope = "basic reachability" if result.scope == "basic" else "end-to-end traffic"
     client = f" using client {result.client}" if result.client else ""
     render_verification(
         "Connection test",

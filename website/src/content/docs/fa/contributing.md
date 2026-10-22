@@ -3,25 +3,25 @@ title: مشارکت
 description: راه‌اندازی توسعه، دستورالعمل PR و رویکرد تست.
 ---
 
-## گزارش مسائل
+## گزارش مشکلات
 
-- **باگ؟** از [الگوی گزارش باگ](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) استفاده کنید — ابتدا `meridian doctor` را اجرا کنید
-- **مسئله اتصال؟** از [الگوی مسئله اتصال](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) استفاده کنید — ابتدا `meridian test` و `meridian check` را اجرا کنید
-- **ایده ویژگی؟** از [الگوی درخواست ویژگی](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml) استفاده کنید
-- **آسیب‌پذیری امنیتی؟** ببینید [Security](/fa/security/) — issue عمومی نباز نکنید
+- **باگ پیدا کردید؟** از [قالب گزارش باگ](https://github.com/getmeridian/meridian/issues/new?template=bug_report.yml) استفاده کنید — ابتدا `meridian doctor` را اجرا کنید
+- **مشکل اتصال دارید؟** از [قالب مشکل اتصال](https://github.com/getmeridian/meridian/issues/new?template=connection_issue.yml) استفاده کنید — ابتدا `meridian test` و `meridian check` را اجرا کنید
+- **پیشنهاد قابلیت جدید دارید؟** از [قالب درخواست قابلیت](https://github.com/getmeridian/meridian/issues/new?template=feature_request.yml) استفاده کنید
+- **آسیب‌پذیری امنیتی؟** [امنیت](/fa/security/) را ببینید — issue عمومی باز نکنید
 
-## راه‌اندازی توسعه
+## راه‌اندازی محیط توسعه
 
 ```bash
 git clone https://github.com/getmeridian/meridian.git && cd meridian
 
-# نصب CLI در حالت قابل ویرایش با وابستگی‌های توسعه
+# نصب CLI در حالت قابل ویرایش همراه با وابستگی‌های توسعه
 make install
 
-# نصب hook پیش‌فشار (بررسی‌های سریع پیش از هر فشار)
+# نصب هوک pre-push (بررسی‌های سریع پیش از هر git push)
 make hooks
 
-# اجرای CI کامل محلی
+# اجرای کامل CI روی سیستم محلی
 make ci
 
 # بررسی‌های جداگانه:
@@ -54,13 +54,13 @@ CLI یک package Python است (`src/meridian/`) که از طریق PyPI به‌
 4. در صورت امکان روی سرور واقعی تست کنید
 5. یک PR را با توضیح واضح باز کنید
 
-## کنوانسیون‌های کلیدی
+## قراردادهای کلیدی
 
-- **مقادیر شل از `shlex.quote()` استفاده می‌کنند** — هیچ‌گاه مقادیر غیرتمیز را تقسیم نکنید
-- **PWA assets باید همگام بمانند** (`templates/pwa/` و کاتالوگ برنامه)
-- **پیکربندی nginx** به‌عنوان منبع per-resource به‌عنوان فایل‌های `meridian-v4-*.conf` در `/etc/nginx/stream.d/` و `/etc/nginx/sites-available/` نوشته می‌شود
-- **مراحل provisioner** `StepResult` را بازمی‌گردانند (ok/changed/skipped/failed)
+- **مقادیر شل با `shlex.quote()` ایمن می‌شوند** — هرگز مقادیر پاک‌سازی‌نشده را مستقیم در دستورات شل قرار ندهید
+- **فایل‌های PWA باید همگام بمانند** (`templates/pwa/` و کاتالوگ برنامه‌ها)
+- **پیکربندی nginx** به ازای هر منبع در فایل‌های `meridian-v4-*.conf` در مسیرهای `/etc/nginx/stream.d/` و `/etc/nginx/sites-available/` نوشته می‌شود
+- **مراحل provisioner** خروجی `StepResult` برمی‌گردانند (`ok`/`changed`/`skipped`/`failed`)
 
 ## تست
 
-CI اعتبارسنجی می‌کند: تست Python، lint ruff، نوع mypy، رندر template و syntax اسکریپت شل. تست deployment کامل نیاز به VPS واقعی دارد.
+CI این موارد را اعتبارسنجی می‌کند: تست‌های Python، لینتر `ruff`، بررسی نوع با `mypy`، رندر قالب‌ها و نحو اسکریپت‌های شل. برای تست کامل استقرار، `make system-lab` (استقرار چندنودی در کانتینرهای Docker همراه با تست ترافیک واقعی) را اجرا کنید یا روی یک VPS واقعی (`make real-lab`) آزمایش کنید.

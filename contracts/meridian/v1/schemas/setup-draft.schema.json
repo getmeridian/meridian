@@ -381,6 +381,11 @@
           "default": "",
           "title": "Reality Sni"
         },
+        "self_steal": {
+          "default": false,
+          "title": "Self Steal",
+          "type": "boolean"
+        },
         "tls_sni": {
           "anyOf": [
             {

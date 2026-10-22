@@ -17,6 +17,7 @@ from meridian.compiler.models import (
     ResourcePostcondition,
 )
 from meridian.compiler.names import exit_places, host_remark
+from meridian.compiler.self_steal import SelfStealDecoy
 from meridian.core.topology import SetupIntent, path_fingerprints
 
 
@@ -79,7 +80,9 @@ def register_relay_ingress(
     stream_routes: dict[tuple[str, int], list[NginxRouteSpec]],
     stream_dependencies: dict[tuple[str, int], set[str]],
     stream_fallbacks: dict[tuple[str, int], str],
+    local_fallbacks: dict[tuple[str, int], int],
     camouflage: dict[str, RelayCamouflage],
+    self_steal: dict[str, SelfStealDecoy],
 ) -> dict[str, int]:
     """Give each relay its own SNI listener on the exit, reachable only from its last hop.
 
@@ -109,7 +112,12 @@ def register_relay_ingress(
             )
         )
         # Anything else through the relay reaches the site its name imitates.
-        stream_fallbacks[key] = sni
+        decoy = None if own else self_steal.get(exit_.id)
+        if decoy is not None:
+            local_fallbacks[key] = decoy.port
+            stream_dependencies[key].add(decoy.http_id)
+        else:
+            stream_fallbacks[key] = sni
         stream_dependencies[key].update(
             {runtime_by_exit[exit_.id], own.inbound_id if own else inbound_by_path[(exit_.id, path.id)]}
         )

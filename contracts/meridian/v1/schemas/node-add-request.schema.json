@@ -49,6 +49,11 @@
       "title": "Name",
       "type": "string"
     },
+    "self_steal": {
+      "default": false,
+      "title": "Self Steal",
+      "type": "boolean"
+    },
     "sni": {
       "anyOf": [
         {

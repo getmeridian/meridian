@@ -26,18 +26,24 @@ def default_exit_paths(
     domain: str = "",
     fingerprint: TlsFingerprint | None = None,
     hysteria2: bool = True,
+    self_steal: bool = False,
     previous: Sequence[ProtocolPathIntent] = (),
 ) -> list[ProtocolPathIntent]:
-    """Return the exit's paths; a redeploy keeps its saved SNI, fingerprint, and transport paths."""
+    """Return the exit's paths; a redeploy keeps its saved SNI, fingerprint, and transport paths.
+
+    A new ``reality_sni`` replaces the saved camouflage outright, borrowed unless ``self_steal``.
+    """
     prior = {path.protocol: path for path in previous}
     saved_reality = prior.get("reality")
     tls_fingerprint = fingerprint or (saved_reality.fingerprint if saved_reality else DEFAULT_TLS_FINGERPRINT)
+    keep_saved = not reality_sni and saved_reality is not None
     paths = [
         ProtocolPathIntent(
             id=f"{exit_id}-reality",
             protocol="reality",
             reality_sni=reality_sni or (saved_reality.reality_sni if saved_reality else DEFAULT_SNI),
             fingerprint=tls_fingerprint,
+            self_steal=saved_reality.self_steal if keep_saved and saved_reality else self_steal,
         )
     ]
     tls_host = domain or (address if _is_ipv4(address) else "")

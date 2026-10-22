@@ -89,6 +89,7 @@ def run(
     country: str = "",
     ssh_port: int = 0,
     fingerprint: str = "",
+    self_steal: bool = False,
     request_path: str = "",
     json_output: bool = False,
     events: str = "",
@@ -131,6 +132,7 @@ def run(
                 client_ips=client_ips,
                 country=country,
                 ssh_port=ssh_port,
+                self_steal=self_steal,
                 fingerprint=fingerprint,
             )
         )
@@ -242,9 +244,13 @@ def _execute(
         )
     # Without --sni, a fresh deploy tries sites next to the server first, then known-good
     # camouflage targets, keeping the first that carries traffic; redeploys keep the saved
-    # target unless --sni changes it.
-    if request.sni or not first_deploy:
-        sni_candidates = [request.sni]
+    # target unless --sni changes it. Self-steal has exactly one candidate: the operator's name.
+    if request.self_steal:
+        from meridian.commands.sni import check_own_hostname
+
+        check_own_hostname(resolved.conn, request.reality_sni, server_ip=resolved.ip, label=resolved.ip)
+    if request.reality_sni or not first_deploy:
+        sni_candidates = [request.reality_sni]
     else:
         sni_candidates = _camouflage_candidates(resolved.conn, resolved.ip)
     request = _with_country(request, cluster.topology_intent, entry.id, resolved.ip)
@@ -557,7 +563,11 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
         err_console.print(
             f"    [dim]A record {request.domain} -> {server_ip}; DNS only (grey cloud) while deploying.[/dim]"
         )
-        err_console.print("    [dim]Afterwards: Proxied (orange), SSL/TLS Full (Strict), WebSockets on.[/dim]")
+        if request.self_steal and request.reality_sni == request.domain:
+            # Reality answers on this name itself; behind Cloudflare it would reach Cloudflare instead.
+            err_console.print("    [dim]Keep it DNS only: your own-domain camouflage must reach this server.[/dim]")
+        else:
+            err_console.print("    [dim]Afterwards: Proxied (orange), SSL/TLS Full (Strict), WebSockets on.[/dim]")
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
@@ -576,6 +586,8 @@ def _redeploy_command(server_ip: str, request: DeployRequest) -> str:
         parts.append(f"--sni {shlex.quote(request.sni)}")
     if request.domain:
         parts.append(f"--domain {shlex.quote(request.domain)}")
+    if request.self_steal:
+        parts.append("--self-steal")
     if not request.hysteria2:
         parts.append("--no-hysteria2")
     if request.client_ips:

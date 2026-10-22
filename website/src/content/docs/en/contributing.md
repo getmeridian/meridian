@@ -63,4 +63,4 @@ Key modules:
 
 ## Testing
 
-CI validates: Python tests, ruff lint, mypy types, template rendering, and shell script syntax. Full deployment testing requires a real VPS.
+CI validates: Python tests, ruff lint, mypy types, template rendering, and shell script syntax. For full deployment testing, run `make system-lab` (deploys a multi-node fleet in Docker containers and checks real traffic) or test on a real VPS (`make real-lab`).

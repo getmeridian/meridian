@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Self
+
+from pydantic import model_validator
+
 from meridian.core.inputs import (
     HostnameValue,
     IPAddressValue,
@@ -51,6 +55,19 @@ class NodeAddRequest(CoreModel):
     country: OptionalCountryCodeValue = ""
     harden: bool = True
     yes: bool = False
+    # Camouflage with the operator's own hostname (sni, else domain) instead of a borrowed site.
+    self_steal: bool = False
+
+    @model_validator(mode="after")
+    def self_steal_needs_a_hostname(self) -> Self:
+        if self.self_steal and not (self.sni or self.domain):
+            raise ValueError("Self-steal needs your own domain: pass it with --sni or --domain.")
+        return self
+
+    @property
+    def reality_sni(self) -> str:
+        """The camouflage hostname asked for; empty lets Meridian pick a borrowed one."""
+        return self.sni or (self.domain if self.self_steal else "")
 
 
 class NodeTargetRequest(CoreModel):
@@ -89,3 +106,4 @@ class CamouflageChangeRequest(CoreModel):
     sni: HostnameValue
     exit_arg: OptionalSelectorValue = ""
     yes: bool = False
+    self_steal: bool = False

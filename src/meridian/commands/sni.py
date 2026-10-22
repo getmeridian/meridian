@@ -23,7 +23,7 @@ from meridian.commands._helpers import (
 from meridian.commands._validation import validate_command_input
 from meridian.commands.relay import select_relay_chains
 from meridian.compiler.models import SUBSCRIPTION_UPDATE_INTERVAL_HOURS
-from meridian.console import confirm, err_console, fail, info, ok
+from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.command_inputs import CamouflageChangeRequest
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import ProtocolPathIntent, SetupIntent, TransparentRelayIntent
@@ -32,29 +32,36 @@ from meridian.ssh import SSHError
 from meridian.ssh_ui import RichSSHUI
 
 if TYPE_CHECKING:
+    from meridian.core.execution import ServerConnection
     from meridian.servers import ServerRegistry
 
 
-def run_exit_sni(exit_arg: str, sni: str, *, yes: bool = False) -> None:
+def run_exit_sni(exit_arg: str, sni: str, *, self_steal: bool = False, yes: bool = False) -> None:
     """Point an exit's Reality path at a new camouflage site, then apply the reviewed change."""
     from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
     from meridian.setup.editor import set_exit_reality_sni
 
     request = validate_command_input(
-        CamouflageChangeRequest, "Invalid node sni request", target=exit_arg, sni=sni, yes=yes
+        CamouflageChangeRequest,
+        "Invalid node sni request",
+        target=exit_arg,
+        sni=sni,
+        self_steal=self_steal,
+        yes=yes,
     )
-    refuse_unusable_camouflage(request.sni)
+    if not request.self_steal:
+        refuse_unusable_camouflage(request.sni)
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
     exit_ = resolve_exit(intent, request.target)
     path = _reality_path(intent, exit_.id)
     subject = t("sni.exit_subject", exit=exit_.id)
-    if path.reality_sni == request.sni:
+    if (path.reality_sni, path.self_steal) == (request.sni, request.self_steal):
         ok(t("sni.unchanged", subject=subject, sni=request.sni))
         return
     try:
-        updated = set_exit_reality_sni(intent, exit_.id, request.sni)
+        updated = set_exit_reality_sni(intent, exit_.id, request.sni, self_steal=request.self_steal)
     except ValueError as exc:
         fail(str(exc), hint="Check: meridian node list", hint_type="user")
 
@@ -66,10 +73,15 @@ def run_exit_sni(exit_arg: str, sni: str, *, yes: bool = False) -> None:
     keeping = sorted(relay.id for relay in relays if relay.reality_sni)
     built_on = [gateway for gateway in intent.routing_gateways if gateway.bridge_path_ref == path.id]
     gateways = sorted(gateway.id for gateway in built_on)
-    # A gateway built on the path imitates the same site from its own server.
-    for server_ref in dict.fromkeys([exit_.server_ref, *(gateway.server_ref for gateway in built_on)]):
-        require_reachable_camouflage(registry, server_ref, request.sni)
+    if request.self_steal:
+        # The exit serves the name itself once applied, so only its DNS can be checked now.
+        require_own_hostname(registry, exit_.server_ref, request.sni)
+    else:
+        # A gateway built on the path imitates the same site from its own server.
+        for server_ref in dict.fromkeys([exit_.server_ref, *(gateway.server_ref for gateway in built_on)]):
+            require_reachable_camouflage(registry, server_ref, request.sni)
     lines = [
+        *([t("sni.self_steal_line", sni=request.sni)] if request.self_steal else []),
         *([t("sni.followers", relays=", ".join(following))] if following else []),
         *([t("sni.own_sni", relays=", ".join(keeping))] if keeping else []),
         *([t("sni.gateways", gateways=", ".join(gateways))] if gateways else []),
@@ -139,20 +151,8 @@ def refuse_unusable_camouflage(sni: str) -> None:
 def require_reachable_camouflage(registry: ServerRegistry, server_ref: str, sni: str) -> None:
     """Fail unless the server reaches ``sni`` over TLS 1.3 with HTTP/2, the check Reality targets pass."""
     from meridian.diagnostics.preflight import reachable_reality_targets
-    from meridian.resolve import connection_for_entry
 
-    try:
-        entry = registry.find(server_ref)
-    except LocalStateError as exc:
-        fail(exc)
-    if entry is None:
-        fail(t("sni.server_missing", server=server_ref), hint="Check: meridian server list", hint_type="user")
-    label = entry.name or entry.host
-    conn = connection_for_entry(entry)
-    try:
-        conn.check_ssh(ui=RichSSHUI())
-    except SSHError as exc:
-        fail(exc)
+    conn, label, _ = _saved_server(registry, server_ref)
     info(t("sni.checking", server=label, sni=sni))
     if not reachable_reality_targets(conn, (sni,)):
         fail(
@@ -219,3 +219,49 @@ def _effective_sni(intent: SetupIntent, relay: TransparentRelayIntent) -> str:
         return relay.reality_sni
     exit_ = next(item for item in intent.exits if item.id == relay.exit_ref)
     return next(path.reality_sni for path in exit_.paths if path.id == relay.protocol_path_ref)
+
+
+def require_own_hostname(registry: ServerRegistry, server_ref: str, hostname: str) -> None:
+    """Check a self-steal hostname's DNS from the saved server it must point at."""
+    conn, label, address = _saved_server(registry, server_ref)
+    check_own_hostname(conn, hostname, server_ip=address, label=label)
+
+
+def check_own_hostname(conn: ServerConnection, hostname: str, *, server_ip: str, label: str) -> None:
+    """Fail when a self-steal hostname does not resolve; warn when it points somewhere else.
+
+    Let's Encrypt must reach the exit through the name, and the camouflage only looks
+    natural when the name really lives on the exit's address.
+    """
+    from meridian.diagnostics.camouflage import own_hostname
+
+    info(t("sni.own_checking", server=label, sni=hostname))
+    found = own_hostname(conn, hostname, server_ip)
+    if found.state == "unresolved":
+        fail(
+            t("sni.own_unresolved", sni=hostname),
+            hint=t("sni.own_unresolved_hint", sni=hostname, ip=server_ip),
+            hint_type="user",
+        )
+    if found.state == "elsewhere":
+        warn(t("sni.own_elsewhere", sni=hostname, addresses=", ".join(found.addresses), ip=server_ip))
+    elif found.state == "unknown":
+        warn(t("sni.own_unknown", server=label, sni=hostname))
+
+
+def _saved_server(registry: ServerRegistry, server_ref: str) -> tuple[ServerConnection, str, str]:
+    """An SSH-checked connection to a topology server, its label, and its address."""
+    from meridian.resolve import connection_for_entry
+
+    try:
+        entry = registry.find(server_ref)
+    except LocalStateError as exc:
+        fail(exc)
+    if entry is None:
+        fail(t("sni.server_missing", server=server_ref), hint="Check: meridian server list", hint_type="user")
+    conn = connection_for_entry(entry)
+    try:
+        conn.check_ssh(ui=RichSSHUI())
+    except SSHError as exc:
+        fail(exc)
+    return conn, entry.name or entry.host, entry.host

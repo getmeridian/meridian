@@ -96,6 +96,27 @@ def test_camouflage_dns_failure_is_inconclusive() -> None:
     assert check.status == "skipped"
 
 
+def test_self_steal_name_on_the_server_is_no_control_for_an_ip_block() -> None:
+    """The camouflage name resolves to the server itself, so dialing it proves nothing."""
+    check, prober = _differential(
+        {(SERVER, SNI): _silenced(SERVER, SNI, stage="connect"), (SERVER, ""): _silenced(SERVER, "", stage="connect")},
+        resolver=lambda _host, *, timeout: SERVER,
+    )
+    assert (check.status, check.findings[0].code) == ("skipped", "BLOCK_DIFFERENTIAL_INCONCLUSIVE")
+    assert "your own domain" in check.findings[0].message
+    assert prober.calls == [(SERVER, SNI), (SERVER, "")]
+
+
+def test_self_steal_name_cut_off_alone_is_a_blocked_name() -> None:
+    check, _ = _differential(
+        {(SERVER, SNI): _silenced(SERVER, SNI), (SERVER, ""): _ok(SERVER, "")},
+        resolver=lambda _host, *, timeout: SERVER,
+    )
+    assert check.findings[0].code == "CAMOUFLAGE_SNI_BLOCKED"
+    assert "your own domain" in check.findings[0].message
+    assert "--self-steal" in check.findings[0].remediation
+
+
 def test_refused_port_is_not_reported_as_censorship() -> None:
     check, prober = _differential({(SERVER, SNI): _silenced(SERVER, SNI, stage="connect", kind="refused")})
     assert check.status == "skipped"

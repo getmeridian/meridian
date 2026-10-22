@@ -23,6 +23,7 @@
 
 ## Pitfalls
 - **Control bootstrap values come from the exit on the control server** — taking the first exit in plan order re-ran the bootstrap whenever an exit that sorts earlier was added, and fed another server's ports to the control nginx.
+- **A self-steal exit bootstraps with the default SNI** — the interim legacy 443 fallback dials the bootstrap SNI, and the operator's own name would point the server at itself.
 - Never add credential-shaped fields to `SetupDraft`.
 - Preserve relay `listen_port` and exit `egress_overrides` in both `SetupDraft.from_intent()` and `to_intent()` (and when the wizard re-asks roles); otherwise review silently drops them.
 - Do not skip stages; presentation adapters must call `SetupDraftService`.

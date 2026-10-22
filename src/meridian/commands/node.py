@@ -47,6 +47,7 @@ def run_add(
     country: str = "",
     harden: bool = True,
     yes: bool = False,
+    self_steal: bool = False,
 ) -> None:
     """Provision and add a new node to the fleet."""
     from meridian.commands.resolve import (
@@ -71,8 +72,9 @@ def run_add(
         country=country,
         harden=harden,
         yes=yes,
+        self_steal=self_steal,
     )
-    if request.sni:
+    if request.sni and not request.self_steal:
         from meridian.commands.sni import refuse_unusable_camouflage
 
         refuse_unusable_camouflage(request.sni)
@@ -115,21 +117,31 @@ def run_add(
     if entry is None:
         raise RuntimeError("Validated server was not saved")
     existing = next((exit_ for exit_ in intent.exits if exit_.server_ref == entry.id), None)
+    if request.self_steal:
+        from meridian.commands.sni import check_own_hostname
+
+        check_own_hostname(resolved.conn, request.reality_sni, server_ip=resolved.ip, label=request.name or resolved.ip)
     if existing is None:
         updated = add_exit_to_intent(
             intent,
             server_ref=entry.id,
             title=request.name or f"exit-{len(intent.exits) + 1}",
-            reality_sni=request.sni or _neighbor_sni(resolved) or DEFAULT_SNI,
+            reality_sni=request.reality_sni or _neighbor_sni(resolved) or DEFAULT_SNI,
             tls_hostname=request.domain,
             address=resolved.ip,
             region=request.country or registry_country(resolved.ip),
+            self_steal=request.self_steal,
         )
     else:
         # A failed or interrupted add leaves its exit in the intent; re-running resumes it.
         saved_snis = {path.reality_sni for path in existing.paths if path.reality_sni}
         saved_domains = {path.tls_sni for path in existing.paths if path.tls_sni}
-        if (request.sni and request.sni not in saved_snis) or (request.domain and request.domain not in saved_domains):
+        saved_self_steal = any(path.self_steal for path in existing.paths)
+        if (
+            (request.reality_sni and request.reality_sni not in saved_snis)
+            or (request.domain and request.domain not in saved_domains)
+            or (request.self_steal and not saved_self_steal)
+        ):
             fail(
                 f"{resolved.ip} is already exit {existing.id} with different settings",
                 hint="Change an existing exit's SNI with `meridian node sni`, or its domain with `meridian setup`.",

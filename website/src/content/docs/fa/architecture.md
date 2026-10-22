@@ -9,7 +9,7 @@ description: معماری سیستم، جریان ترافیک و توپولوژ
 - **XHTTP** (Xray-core) — یک مسیر TLS روی دامنه شما، یا وقتی دامنه ندارید، روی IP سرور با گواهینامه IP از Let's Encrypt.
 - **WSS** (Xray-core) — یک مسیر TLS روی دامنه خودتان که در حالت domain اضافه می‌شود. وقتی Cloudflare دامنه را proxy می‌کند، این مسیر و XHTTP از CDN عبور می‌کنند و از IP block جان سالم به‌در می‌برند.
 - **Hysteria2** (Xray-core) — آخرین راه‌حل روی UDP/443 برای شبکه‌های lossy که در obfuscation salamander پیچیده شده تا شبیه QUIC نباشد. به‌طور پیش‌فرض روشن است (`--no-hysteria2` آن را خاموش می‌کند).
-- **Remnawave** — پشته پنل: `remnawave/backend` (API و رابط مدیر، با PostgreSQL و Valkey) روی سرور control-plane، `remnawave/node` (Xray را اجرا می‌کند) روی هر exit، و `remnawave/subscription-page`. Meridian نسخه‌های تست‌شده را pin می‌کند و با پنل از طریق REST API صحبت می‌کند.
+- **Remnawave** — پشتهٔ پنل: `remnawave/backend` (API و رابط مدیر، با PostgreSQL و Valkey) روی سرور کنترل، `remnawave/node` (Xray را اجرا می‌کند) روی هر exit، و `remnawave/subscription-page`. Meridian نسخه‌های تست‌شده را pin می‌کند و با پنل از طریق REST API صحبت می‌کند.
 - **nginx** — TCP/443 عمومی را در اختیار دارد. ماژول stream بدون خاتمه TLS اتصالات را بر اساس SNI مسیریابی می‌کند؛ ماژول http برای پنل، صفحات اتصال، اشتراک و مسیرهای domain TLS را خاتمه می‌دهد. گواهینامه‌ها از Let's Encrypt از طریق [acme.sh](https://github.com/acmesh-official/acme.sh) می‌آیند.
 - **Realm** — TCP forwarder روی سرورهای relay.
 - **uTLS** — اتصالات کلاینت Client Hello TLS یک مرورگر را کپی می‌کنند (Chrome، با نسخه‌های Firefox به‌عنوان ورودی‌های پشتیبان)، بنابراین مثل ترافیک معمولی مرورگر به نظر می‌رسند.
@@ -31,7 +31,7 @@ flowchart TD
 
 nginx stream TLS را خاتمه **نمی‌دهد**. SNI را از Client Hello می‌خواند و جریان TCP خام را forward می‌کند. پنل، صفحات اتصال و اشتراک با گواهینامه Let's Encrypt برای IP سرور (کوتاه‌مدت، تجدید خودکار) ارائه می‌شوند.
 
-پیوندهای به‌اشتراک‌گذاری شده زیر مسیر صفحه اتصال زندگی می‌کنند: صفحات در `/<page-path>/<id>/`، اشتراک در `/<page-path>/sub/<id>`. پنل مدیریت روی مسیر مخفی جداگانه قرار دارد که پیوندهای به‌اشتراک‌گذاری شده هیچ‌گاه آن را افشا نمی‌کنند.
+پیوندهای به‌اشتراک‌گذاری شده زیر مسیر صفحهٔ اتصال قرار دارند: صفحات در `/<page-path>/<id>/`، اشتراک در `/<page-path>/sub/<id>`. پنل مدیریت روی مسیر مخفی جداگانه قرار دارد که پیوندهای به‌اشتراک‌گذاری شده هیچ‌گاه آن را افشا نمی‌کنند.
 
 ### حالت Domain
 
@@ -59,7 +59,7 @@ flowchart LR
     Exit --> Internet((Internet))
 ```
 
-relay ترافیک TCP خام را از IP داخلی به listener Reality exit منتقل می‌کند. رمزنگاری از انتها تا انتها بین کلاینت و exit است؛ relay هرگز plaintext را نمی‌بیند. Relays تنها Reality را حمل می‌کنند. `meridian setup` می‌تواند زنجیرهای relay چند‌hop و درب‌های routing را بسازد که exit (یا풀 سلامت‌بررسی‌شده) را توسط قانون انتخاب می‌کند.
+relay ترافیک TCP خام را از IP داخلی به شنوندهٔ Reality روی سرور خروجی منتقل می‌کند. رمزنگاری سرتاسری بین کلاینت و خروجی برقرار است و relay هرگز متن آشکار را نمی‌بیند. سرورهای relay فقط Reality را حمل می‌کنند. `meridian setup` همچنین می‌تواند زنجیره‌های relay چندگامی و دروازه‌های مسیریابی بسازد که سرور خروجی (یا مجموعه‌ای از خروجی‌ها با بررسی سلامت) را بر اساس قانون انتخاب می‌کنند.
 
 ## نحوه کار Reality
 
@@ -72,13 +72,13 @@ relay ترافیک TCP خام را از IP داخلی به listener Reality exit
 
 ## مدل State
 
-- **Topology** — `~/.config/meridian/cluster.yml` روی ماشین شما تدوین شده topology (control plane، exits، relays، gateways، مسیرهای پروتکل و لیست کاربران)، دسترسی پنل و کلیدهایی که Meridian تولید کرد را شامل می‌شود. `meridian setup`، `deploy`، `client add`، `node add` و `relay add` آن را تغییر می‌دهند؛ دستی ویرایش نکنید.
-- **Clients** — حساب‌ها، کلیدها، وضعیت و ترافیق در دیتابیس Remnawave روی سرور control-plane زندگی می‌کنند.
+- **Topology** — `~/.config/meridian/cluster.yml` روی ماشین شما توپولوژی بازبینی‌شده (سرور کنترل، خروجی‌ها، relayها، دروازه‌ها، مسیرهای پروتکل و فهرست کاربران)، دسترسی پنل و کلیدهایی را که Meridian تولید کرده نگهداری می‌کند. `meridian setup`، `deploy`، `client add`، `node add` و `relay add` آن را تغییر می‌دهند؛ دستی ویرایش نکنید.
+- **Clients** — حساب‌ها، کلیدها، وضعیت و ترافیک در دیتابیس Remnawave روی سرور کنترل نگهداری می‌شوند.
 - **Saved servers** — `~/.config/meridian/servers.json` جزئیات اتصال SSH را شامل می‌شود.
 
 ## Plan و apply
 
-Meridian topology را به لیست منابع تبدیل می‌کند: قوانین firewall، مسیرهای nginx، containers، پروفایل‌های Remnawave، میزبان‌ها، کاربران و templates. `meridian plan` هر کدام را روی سرورها و پنل زندگی مشاهده می‌کند و گزارش می‌کند چه نیاز به تعمیر دارد. `meridian apply` دقیقاً plan را اعمال می‌کند که نشان داد، هر مرحله را checkpoint می‌کند تا interrupted apply امن از سر شروع شود. منابعی که نتیجه آن‌ها نامشخص است مجدداً مشاهده می‌شوند پیش از هر تلاش.
+Meridian توپولوژی را به فهرستی از منابع تبدیل می‌کند: قوانین firewall، مسیرهای nginx، کانتینرها، پروفایل‌های Remnawave، میزبان‌ها، کاربران و قالب‌ها. `meridian plan` هر یک را روی سرورهای فعال و پنل بررسی می‌کند و گزارش می‌دهد چه چیزی نیاز به اصلاح دارد. `meridian apply` دقیقاً همان طرحی را که نشان داده اعمال می‌کند و در هر مرحله checkpoint ذخیره می‌کند تا در صورت قطع شدن، اجرای بعدی با اطمینان ادامه پیدا کند. منابعی که نتیجهٔ اعمال آن‌ها نامشخص باشد، پیش از تلاش مجدد دوباره بررسی می‌شوند.
 
 هر چیزی در topology را می‌توان اضافه و حذف کرد: کاربران، مسیرهای پروتکل، exitها، relayها و routing gatewayها. بعد از اینکه نقشه جدید همگرا شود، apply آن‌هایی را که آن را ترک کرده‌اند حذف می‌کند (کاربران، میزبان‌ها و node‌های پنل، فایل‌های nginx، سرویس‌های Realm، گواهینامه‌ها، قوانین firewall). سرور کنترل استثنا است: نشانی آن بخشی از هر URL اشتراک است، بنابراین فقط با `meridian teardown` حذف می‌شود.
 
@@ -106,7 +106,7 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 
 نام containerها و دایرکتوری‌ها خنثی است؛ پس میزبانی که `docker ps` یا `/opt` را نگاه می‌کند چیزی نمی‌بیند که نام نرم‌افزار proxy را بدهد (images همان tagهای upstream خود را نگه می‌دارند). `meridian check` و `meridian doctor` نقش پشت هر نام را نشان می‌دهند.
 
-**روی سرور control-plane:**
+**روی سرور کنترل:**
 - `ctlsvc-api` — backend API و admin UI مربوط به Remnawave روی `127.0.0.1:3000`
 - `ctlsvc-db` — PostgreSQL (users, hosts, profiles)
 - `ctlsvc-cache` — Valkey cache
@@ -124,7 +124,7 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 
 ## محل فایل‌ها
 
-### روی سرور control-plane
+### روی سرور کنترل
 - `/opt/ctlsvc/` — فایل compose پنل، `.env` و `data/` مربوط به PostgreSQL
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI routing
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — سایت‌های TLS و reverse proxy

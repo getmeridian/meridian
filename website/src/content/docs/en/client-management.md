@@ -9,7 +9,7 @@ description: Add users, share connection details, and manage access keys.
 meridian client add alice
 ```
 
-This gives "alice" her own key and prints two things to share:
+This gives "alice" their own key and prints two things to share:
 
 - **A connection page link** with a QR code — the easiest thing to send
 - **A subscription URL** for importing directly into an Xray/V2Ray app
@@ -109,7 +109,7 @@ Apps ship their own engine updates, so an app may run a slightly older or newer 
 
 ## Where client data lives
 
-Client accounts (keys, status, traffic) live in the Remnawave panel database on your control-plane server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the panel API and don't need SSH; publishing a connection page uses SSH to the control-plane server.
+Client accounts (keys, status, traffic) live in the Remnawave panel database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the panel API and don't need SSH; publishing a connection page uses SSH to the control server.
 
 ## Web panel
 

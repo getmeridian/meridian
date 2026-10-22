@@ -17,7 +17,7 @@ wsl --install
 
 如果系统提示，请重启，然后从 Start 菜单打开已安装的 Linux 发行版。
 
-Ubuntu 是最安全的默认选择，因为 Meridian 面向 Debian 和 Ubuntu 服务器，并且大多数示例使用 `apt` 包名。如果您已经在 WSL 中安装了 Debian，也可以使用。
+Ubuntu 是最稳妥的默认选择，因为 Meridian 面向 Debian 和 Ubuntu 服务器，而且大多数示例都使用 `apt` 包名。如果你已经在 WSL 中安装了 Debian，也同样适用。
 
 检查 WSL 是否使用版本 2：
 
@@ -25,7 +25,7 @@ Ubuntu 是最安全的默认选择，因为 Meridian 面向 Debian 和 Ubuntu �
 wsl --list --verbose
 ```
 
-如果您的发行版显示版本 1，请转换它：
+如果你的发行版显示为版本 1，请将其转换：
 
 ```powershell
 wsl --set-version Ubuntu 2
@@ -60,7 +60,7 @@ meridian --version
 
 ## 设置 SSH 密钥
 
-Meridian 从 WSL 通过 SSH 连接到您的 VPS。请在 WSL 内生成密钥：
+Meridian 从 WSL 通过 SSH 连接到你的 VPS。请在 WSL 内生成密钥：
 
 ```bash
 ssh-keygen -t ed25519 -C "meridian-wsl"
@@ -72,7 +72,7 @@ ssh-keygen -t ed25519 -C "meridian-wsl"
 cat ~/.ssh/id_ed25519.pub
 ```
 
-将该公钥添加到 VPS 提供商，或添加到服务器用户的 `~/.ssh/authorized_keys`。
+将该公钥添加到 VPS 提供商控制台，或添加到服务器用户的 `~/.ssh/authorized_keys`。
 
 运行 Meridian 前先测试 SSH：
 
@@ -80,7 +80,7 @@ cat ~/.ssh/id_ed25519.pub
 ssh root@198.51.100.10
 ```
 
-如果您的 VPS 使用非 root 用户，请测试该用户并传给 deploy：
+如果你的 VPS 使用非 root 用户，请测试该用户并在部署时传入：
 
 ```bash
 meridian deploy 198.51.100.10 --user ubuntu
@@ -156,7 +156,7 @@ ls -la ~/.ssh
 ssh -v root@198.51.100.10
 ```
 
-私钥应只允许您的 WSL 用户读取：
+私钥应只允许你的 WSL 用户读取：
 
 ```bash
 chmod 700 ~/.ssh
@@ -197,6 +197,6 @@ mkdir -p projects
 
 ## 后续步骤
 
-- [快速开始](/zh/getting-started/) — 部署您的第一台服务器
+- [快速开始](/zh/getting-started/) — 部署你的第一台服务器
 - [安装](/zh/installation/) — CLI 安装选项
 - [故障排除](/zh/troubleshooting/) — 常见部署和连接问题

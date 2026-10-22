@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from meridian.compiler import compile_topology
-from meridian.compiler.models import HostPayload
+from meridian.compiler.models import HostPayload, NginxArtifactPayload
+from meridian.core.deploy import DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import AccessIntent, ExitIntent, ProtocolPathIntent
-from meridian.setup.single_server import single_server_intent
+from meridian.setup.single_server import request_intent, single_server_intent
 
 
 def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
@@ -112,3 +114,33 @@ def test_harden_flag_reaches_every_server_baseline() -> None:
     baselines = [r.payload for r in compile_topology(intent).resources if isinstance(r.payload, ServerBaselinePayload)]
 
     assert baselines and all(not payload.harden for payload in baselines)
+
+
+def test_self_steal_on_the_domain_reuses_it_for_reality_and_one_tls_server() -> None:
+    request = DeployRequest(ip="198.51.100.10", domain="vpn.example.com", self_steal=True)
+    intent = request_intent(None, request, server_ref="srv-a", address="198.51.100.10")
+
+    reality = intent.exits[0].paths[0]
+    assert (reality.reality_sni, reality.self_steal) == ("vpn.example.com", True)
+    plan = compile_topology(intent)
+    servers = [
+        resource.payload
+        for resource in plan.resources
+        if isinstance(resource.payload, NginxArtifactPayload) and resource.payload.layer == "http"
+    ]
+    assert [server.tls_hostname for server in servers] == ["vpn.example.com"]
+
+
+def test_self_steal_survives_a_plain_redeploy_and_a_new_sni_replaces_it() -> None:
+    first = single_server_intent(None, server_ref="srv-a", sni="www.example.org", self_steal=True)
+
+    kept = single_server_intent(first, server_ref="srv-a")
+    assert (kept.exits[0].paths[0].reality_sni, kept.exits[0].paths[0].self_steal) == ("www.example.org", True)
+    borrowed = single_server_intent(first, server_ref="srv-a", sni="www.example.com")
+    assert borrowed.exits[0].paths[0].self_steal is False
+
+
+def test_self_steal_request_needs_a_hostname() -> None:
+    with pytest.raises(ValidationError, match="own domain"):
+        DeployRequest(ip="198.51.100.10", self_steal=True)
+    assert DeployRequest(ip="198.51.100.10", domain="vpn.example.com").reality_sni == ""

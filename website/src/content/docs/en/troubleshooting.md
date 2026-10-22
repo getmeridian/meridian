@@ -97,7 +97,7 @@ Deploys and applies are checkpointed. Fix the reported cause and run the same co
 
 ### Port 443 conflict
 
-Another service (Apache, Nginx) is using port 443. Stop it or use a clean server. `meridian check IP` tells you what's using the port.
+Another service (Apache, nginx) is using port 443. Stop it or use a clean server. `meridian check IP` tells you what's using the port.
 
 ### Docker installation fails
 
@@ -164,11 +164,12 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 
 ## Interpreting pre-flight checks
 
-| Check | What It Tests | If It Fails |
+| Check | What it tests | If it fails |
 |-------|--------------|-------------|
-| SNI target reachability | Can the server reach the camouflage site? | Server's outbound is restricted. Try a different SNI with `--sni` |
-| Port 443 availability | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
-| Port 443 external reachability | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
+| Camouflage target | Can the server reach the camouflage site? | Server's outbound is restricted. Try a different SNI with `--sni` |
+| Camouflage target DNS | Does the camouflage site resolve through the server's DNS? | Fix the server's DNS resolver or pick another camouflage target |
+| Port 443 | Is port 443 free or used by Meridian? | Another service is on 443. Stop it or use a clean server |
+| Port 443 from outside | Can the outside world reach port 443? | Cloud firewall blocks it. Open port 443/TCP inbound |
 | Domain DNS | Does the domain resolve to server IP? | Update DNS A record |
 | Server OS | Is it Ubuntu/Debian? | Fails without apt (CentOS, Fedora, Alpine); reinstall with Ubuntu or Debian |
 | Disk space | At least 2GB free? | Free up space |
@@ -176,15 +177,15 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 
 ## Interpreting doctor output
 
-| Section | What to Look For |
+| Section | What to look for |
 |---------|-----------------|
 | Local Machine | OS compatibility |
 | Server | OS version, uptime (recent reboot?), disk/memory usage |
 | Docker | Are the `ctlsvc-api` (panel) and `netagent` (node) containers running? Status should be "Up" |
-| Remnawave Node Logs | Node startup errors, "failed to start" entries, certificate issues |
+| Exit node Logs | Node startup errors, "failed to start" entries, certificate issues |
 | Listening Ports | Port 443 should show nginx. If missing, proxy isn't running |
 | Firewall (UFW) | Port 443/tcp should be ALLOW. If not listed, it's blocked |
-| SNI Target | Should show CONNECTED with a certificate chain |
+| Camouflage Target | Should show CONNECTED with a certificate chain |
 | Domain DNS | Should resolve to server IP |
 
 ## Interpreting test output
@@ -200,6 +201,6 @@ See the [Relay guide — Troubleshooting](/en/relay/#troubleshooting) section fo
 
 The full test rotates independent public IP observers and checks the same observers directly. If neither the proxy nor control path can obtain an IP, the result is inconclusive rather than a false protocol failure. Set `MERIDIAN_CONNECT_TEST_URL` only when you operate a known observer endpoint.
 
-The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot certify UDP-only Hysteria traffic.
+The first full test may spend up to 120 seconds downloading and verifying the pinned Xray release from GitHub. After bootstrap, `--timeout` (default `5`, range `1`-`30`) applies to individual network operations. Exit `0` passed, `4` completed with negative findings, and `3` was inconclusive because required evidence was skipped. Basic mode cannot verify UDP-only Hysteria2 traffic.
 
 If all checks pass but the VPN client still can't connect: re-scan the QR code, check that the device sets its date and time automatically, or try another recommended app (Happ, FlClashX, Clash Mi, or Throne on desktop).

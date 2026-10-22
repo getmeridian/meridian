@@ -18,6 +18,7 @@
 - **Execution failure is not negative evidence** — a command timeout, SSH drop, or missing inspection tool returns skipped, never failed.
 - **Protocol shape controls checks** — never require TCP/443 or HTTPS from a UDP-only Hysteria2 endpoint; full canonical traffic is the UDP authority.
 - **Inspection is not validation** — unverified TLS may collect a certificate, but a pass needs separate trust, lifetime, and hostname validation.
+- **Trust comes from certifi** — uv's standalone Pythons look for roots at `/etc/pki/tls/cert.pem`, so on macOS every valid Let's Encrypt chain failed `test`; pass `certifi.where()` to the verifying helper.
 - **A neighbor target must resolve into the scanned subnet** — CDN-fronted names point elsewhere; check `getent ahostsv4` before the TLS 1.3 + HTTP/2 probe.
 - **Neighbor scans cover at least a /24** — cloud VPSes get a `/32` point-to-point address; scanning only that found nothing, so every deploy fell back to a well-known site.
 - **Relay legs run curl on the hop, never Python** — `relay.check_relay_leg` sends the chain's client SNI through `--connect-to` with the blocking stall thresholds; unreachable next hops defer to the TCP check, and a small camouflage page stays inconclusive.
@@ -26,7 +27,7 @@
 - **Running is not healthy** — a crash-looping container reports `Running` between restarts; read Docker's health status and warn on `unhealthy`.
 - **Port 443 is Meridian's only with a `meridian-v4-*` stream artifact** — never trust 3.x markers.
 - **A TLS alert is an answer, a timeout or reset is not** — classify flows by `TlsFlowResult.server_answered_tls`/`silenced`; macOS reports a pre-handshake reset as EINVAL from `getpeername()`.
-- **Blocking verdicts need a control** — an unreachable camouflage site makes the differential inconclusive, never "IP blocked"; only the control server's ~50 KB `pwa/app.js` is a size-known stall target, so exit-only servers get no data-flow check.
+- **Blocking verdicts need a control** — an unreachable camouflage site, or a self-steal name resolving to the server itself, makes the differential inconclusive, never "IP blocked"; only the control server's ~50 KB `pwa/app.js` is a size-known stall target, so exit-only servers get no data-flow check.
 - **Unreadable images are unavailable, not drift** — missing Docker, SSH failure, or partial `docker inspect` output yields `ServerImages.error`, never `upgrade`.
 - **Node-plugin readiness checks the kernel only** — `node_plugins.py` warns on a pre-5.7 kernel with a fix prefixed "Only if you use node plugins"; the node container bundles its own nftables library, so never require the host `nft` binary. An unreadable `uname` is skipped.
 - **Node logs are not plain text, and the node image has no `pgrep`** — `grep -a` every log pipe (grep prints nothing for a "binary" stream) and find Xray (`rw-core`) with host-side `docker top`, not `docker exec`.

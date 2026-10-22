@@ -10,6 +10,7 @@ export type Domain = "" | string;
 export type Harden = boolean;
 export type Ip = string;
 export type Name = string;
+export type SelfSteal = boolean;
 export type Sni = "" | string;
 export type SshPort = number;
 export type User = string;
@@ -24,6 +25,7 @@ export interface NodeAddRequest {
   harden?: Harden;
   ip: Ip;
   name?: Name;
+  self_steal?: SelfSteal;
   sni?: Sni;
   ssh_port?: SshPort;
   user?: User;

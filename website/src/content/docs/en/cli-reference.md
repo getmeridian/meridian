@@ -7,7 +7,7 @@ description: Complete reference for all Meridian CLI commands and flags.
 
 ### meridian deploy
 
-Deploy one server and get a shareable connection link. The server becomes both the control plane (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
+Deploy one server and get a shareable connection link. The server becomes both the control server (Remnawave panel) and an exit. Deploy builds the same reviewed topology as `meridian setup`, applies it with checkpoints, verifies real traffic through the delivered subscription, and prints a connection page and subscription URL. Re-running the same command resumes an interrupted deploy or redeploys, keeping paths, keys, and users.
 
 ```
 meridian deploy [SERVER] [flags]
@@ -17,6 +17,7 @@ meridian deploy [SERVER] [flags]
 |------|---------|-------------|
 | `--sni HOST` | (auto) | Camouflage target. Without it, a first deploy tries sites in the server's own subnet, then `www.google.com`, `dl.google.com`, `www.cloudflare.com`, and uses the first that carries traffic; a redeploy keeps the saved target. An explicit `--sni` is never swapped |
 | `--domain DOMAIN` | (none) | Your domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN (XHTTP works without one, on the IP). The panel and connection pages stay on the IP certificate |
+| `--self-steal` | off | Camouflage with your own domain (`--sni`, else `--domain`), pointed at the server with a DNS-only record: Meridian issues its Let's Encrypt certificate and the server answers probes itself, with nginx's stock 404. Deploy first checks where the name resolves: it stops when it doesn't resolve and warns when it points elsewhere. A redeploy keeps it; a new `--sni` without the flag goes back to a borrowed site |
 | `--hysteria2/--no-hysteria2` | on | Offer Hysteria2 on UDP/443, disguised with salamander, as the last fallback. Uses the domain's certificate, or the IP certificate without one |
 | `--fingerprint NAME` | chrome | TLS fingerprint clients present on Reality, XHTTP, and WSS (`chrome`, `firefox`, `safari`, `ios`, `android`, `edge`, `random`, `randomized`). Change it if your region starts flagging the current one; a redeploy keeps the saved value |
 | `--client-name NAME` | default | Name of the first client |
@@ -36,7 +37,7 @@ meridian deploy [SERVER] [flags]
 | `--request FILE` | | Read a `deploy-request` JSON payload from a file; use `-` for stdin |
 | `--dry-run` | | Compile and preview the deploy without SSH or local changes |
 
-Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. Changes are additive: removing something already deployed (such as dropping `--domain`) is refused.
+Without an IP, deploy asks for one. `local` deploys on the machine you are running on. Deploy only redeploys a server that is already an exit in your fleet; add other servers with `meridian node add`. Running it again with different flags updates that exit to match (for example, adding or dropping `--domain` or `--no-hysteria2`) while keeping your other exits, relays, gateways, and clients.
 
 **Machine/UI flow**: `meridian api workflow deploy --json` returns a renderable wizard contract. A UI collects those fields, validates them against `deploy-request`, then runs `meridian deploy --request deploy.json --json --events=jsonl`. Machine deploys are non-interactive: the request must contain `yes: true` after the user confirms. `--dry-run --json` returns `deploy-plan` under `data`, so a UI can preview the mode, ports, and generated paths before opening SSH.
 
@@ -155,7 +156,7 @@ meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
 meridian node remove NAME_OR_IP [--yes] [--force]
 meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
-meridian node sni EXIT NEW_SNI [--yes]
+meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
 | Flag | Default | Description |
@@ -163,8 +164,9 @@ meridian node sni EXIT NEW_SNI [--yes]
 | `--name NAME` | (auto) | Friendly name for the node |
 | `--user USER` | saved, else root | SSH user on the node |
 | `--ssh-port PORT` | saved, else 22 | SSH port on the node (`node add`, `node replace`) |
-| `--sni HOST` | www.google.com | Reality camouflage target for this node |
+| `--sni HOST` | (auto) | Reality camouflage target for this node (without it, prefers a site in the node's own subnet, else `www.google.com`) |
 | `--domain DOMAIN` | (none) | Exit's domain: XHTTP moves onto it and WSS is added, both through Cloudflare's CDN; Hysteria2 uses its certificate |
+| `--self-steal` | off | `node add`: camouflage with your own domain (`--sni`, else `--domain`) pointed at the node. `node sni`: `NEW_SNI` is your own domain |
 | `--country CC` | address registry | Country shown in connection names; set it when the registry is wrong (anycast or leased ranges) |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
 | `--yes` | | Skip confirmation prompts |
@@ -179,7 +181,7 @@ meridian node sni EXIT NEW_SNI [--yes]
 
 **`node replace`** — moves one exit to another server. `EXIT` is the exit ID or its server's saved name or IP; the new server uses the same target syntax as `node add` (a saved name or `local` works too) and is saved like `server add`. The exit keeps its ID, Reality keys, protocol paths, SNI, WARP and geo settings, and every relay that points at it, so relay users keep working and direct users get the new address on their next subscription refresh. The review lists what will be deployed on the new server and every resource cleaned up on the old one (node container, image, and directory; its nginx files, firewall rules, and certificates); Docker and the saved server stay. It refuses for the control server (moving the panel would change every subscription URL) and for a new server that already has a role.
 
-**`node sni`** — gives an exit's Reality path a new camouflage SNI. `EXIT` is the exit ID or its server's saved name or IP. It refuses `apple.com` and `icloud.com` names and `www.microsoft.com`, checks over SSH that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review (relays that follow the exit's SNI, relays that keep their own, routing gateways built on the path, and what gets cleaned up), confirms, and applies it. The old name is replaced, not kept alongside: apps switch at their next subscription refresh (every 6 hours) or a manual refresh, and until then they cannot connect over Reality. XHTTP, WSS, and Hysteria2 don't change. Use it when `meridian test --probe` reports the camouflage SNI blocked.
+**`node sni`** — gives an exit's Reality path a new camouflage SNI. `EXIT` is the exit ID or its server's saved name or IP. It refuses `apple.com` and `icloud.com` names and `www.microsoft.com`, checks over SSH that the exit reaches the new site with TLS 1.3 and HTTP/2, shows the review (relays that follow the exit's SNI, relays that keep their own, routing gateways built on the path, and what gets cleaned up), confirms, and applies it. The old name is replaced, not kept alongside: apps switch at their next subscription refresh (every 6 hours) or a manual refresh, and until then they cannot connect over Reality. XHTTP, WSS, and Hysteria2 don't change. Use it when `meridian test --probe` reports the camouflage SNI blocked. With `--self-steal`, `NEW_SNI` is a domain you own: instead of the reachability check, it checks that the name resolves to the exit (stopping when it doesn't resolve, warning when it points elsewhere), and the exit gets a Let's Encrypt certificate for it and answers probes itself.
 
 ### meridian relay
 
@@ -314,7 +316,7 @@ Exit `0` means every check passed, `4` means the test found problems, and `3` me
 
 Checks follow the real deployment: public and internal port exposure, HTTP/TLS behavior, SNI consistency and camouflage, common proxy and panel paths, WebSocket upgrades, reverse DNS, HTTP/2, legacy TLS versions, and configured domains. `--sni` overrides the SNI for generic TLS probes. UDP-only listeners are reported as needing a full `meridian test` instead of being guessed.
 
-`--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes.
+`--probe` also answers "what is blocked?". It opens TLS to the server with its camouflage SNI; if that fails, it retries without the SNI and opens the real camouflage site directly, then reports whether the **server IP** or the **camouflage SNI** looks blocked. If the real site can't be reached either, the result is inconclusive rather than a finding. With a self-steal camouflage the real site is the server itself, so it is no independent comparison: when nothing gets through, the result is inconclusive. On the control server it also downloads the connection page's ~50 KB script and watches for a transfer that freezes after about 16–24 KB, which is how throttled foreign IPs behave. When a WSS path goes through a CDN, the same download runs through the CDN. These results only mean something when you run them from inside the censored network. `--probe` cannot be combined with `--basic`, `--client`, or `--domain`. Exit codes are the same as `test`; skipped checks are never reported as passes.
 
 `meridian probe [SERVER|DOMAIN] [--sni NAME] [--timeout SECONDS] [--json]` is the same as `meridian test IP --probe`.
 
@@ -467,6 +469,7 @@ These recur across commands; each command accepts only the options listed in its
 | `--ssh-port PORT` | deploy, check, node add, relay add, server add, scan, doctor, logs, teardown |
 | `--sni HOST` | deploy, check, node add, relay add, test, doctor |
 | `--domain DOMAIN` | deploy, check, node add, test |
+| `--self-steal` | deploy, node add, node sni |
 
 Client commands use the panel API directly and don't take a server. `test` runs from your device and doesn't use SSH.
 

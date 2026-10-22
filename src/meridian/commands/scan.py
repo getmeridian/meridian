@@ -89,10 +89,13 @@ def run(
             err_console.print()
             ok(f"Selected: {selected}")
             if cluster.topology_intent is not None:
-                err_console.print("  [dim]Update the reviewed Reality SNI through: meridian setup[/dim]")
+                err_console.print(f"  [dim]Switch this exit to it: meridian node sni {resolved.ip} {selected}[/dim]")
+                err_console.print("  [dim]Or update the reviewed Reality SNI through: meridian setup[/dim]")
             else:
                 err_console.print(f"  [dim]Use it: meridian deploy {resolved.ip} --sni {selected}[/dim]")
-            err_console.print("  [dim]Tip: with --domain, your own domain works as SNI too (self-steal).[/dim]\n")
+            err_console.print(
+                "  [dim]Tip: a domain of your own pointed at the server works too: add --self-steal.[/dim]\n"
+            )
             return
 
         warn(f"Enter a number from 1 to {len(domains)}, or press Enter to skip")

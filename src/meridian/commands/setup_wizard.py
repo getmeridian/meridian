@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
-from typing import Literal, NamedTuple, cast
+from typing import TYPE_CHECKING, Literal, NamedTuple, cast
 
 import typer
 from pydantic import ValidationError
@@ -21,6 +21,7 @@ from meridian.core.defaults import REALITY_SNI_CANDIDATES
 from meridian.core.errors import LocalStateError
 from meridian.core.inputs import (
     DISPLAY_NAME_MAX_LENGTH,
+    is_ip,
     validate_display_name_value,
     validate_hostname_value,
     validate_optional_country_code_value,
@@ -60,6 +61,9 @@ from meridian.setup.shelf import ServerShelf
 from .wizard_prompts import Choice, Navigation, Prompter, WizardIO, parse_numbers, primary_word
 from .wizard_terminal import wizard_io
 
+if TYPE_CHECKING:
+    from meridian.diagnostics.camouflage import OwnHostname
+
 WizardOutcome = Literal["completed", "saved"]
 RegisterServer = Callable[[str, str, str, int], None]
 
@@ -72,6 +76,10 @@ class CamouflageSites(NamedTuple):
 
 
 SuggestSni = Callable[[str], CamouflageSites]
+# Where a self-steal domain resolves, seen from the exit (server ref, hostname).
+CheckOwnDomain = Callable[[str, str], "OwnHostname"]
+# The camouflage choice for the operator's own domain; no hostname equals it (hostnames need a dot).
+OWN_DOMAIN = "own-domain"
 Role = Literal["exit", "relay", "gateway", "control"]
 
 _PROTOCOL_LABELS = {"reality": "Reality", "xhttp": "XHTTP", "wss": "WSS", "hysteria2": "Hysteria2"}
@@ -92,6 +100,7 @@ class SetupWizard:
         ask_language: bool = False,
         on_language: Callable[[str], None] | None = None,
         suggest_sni: SuggestSni | None = None,
+        check_own_domain: CheckOwnDomain | None = None,
     ) -> None:
         self.service = service
         self.shelf = shelf
@@ -103,6 +112,7 @@ class SetupWizard:
         self.ask_language = ask_language
         self.on_language = on_language
         self.suggest_sni = suggest_sni
+        self.check_own_domain = check_own_domain
         self._verification: SetupVerification | None = None
         self._reviewed_now = False
 
@@ -357,17 +367,40 @@ class SetupWizard:
             candidates = list(dict.fromkeys([*sites.nearby, *sites.reachable, *REALITY_SNI_CANDIDATES]))
             reality_sni = self.prompt.choose(
                 t("paths.sni"),
-                [Choice(sni, sni, hints.get(sni, "")) for sni in candidates],
+                [
+                    *(Choice(sni, sni, hints.get(sni, "")) for sni in candidates),
+                    Choice(OWN_DOMAIN, t("paths.sni_own"), t("paths.sni_own_hint")),
+                ],
                 default=next(iter([*sites.nearby, *sites.reachable]), DEFAULT_SNI),
                 other=t("paths.sni_custom"),
                 validate_other=validate_hostname_value,
             )
+            self_steal = reality_sni == OWN_DOMAIN
+            if self_steal:
+                reality_sni = self._own_domain(exit_.server_ref, host)
             domain = self.prompt.ask(t("paths.domain", address=host), validate=validate_optional_hostname_value)
             if domain:
                 self.prompt.explain(t("paths.wss_warning"))
-            paths = default_exit_paths(exit_.id, address=host, reality_sni=reality_sni, domain=domain)
+            paths = default_exit_paths(
+                exit_.id, address=host, reality_sni=reality_sni, domain=domain, self_steal=self_steal
+            )
             selections.append(SetupExitPaths(exit_ref=exit_.id, paths=paths))
         self.service.configure_paths(SetupPathSelection(exits=selections))
+
+    def _own_domain(self, server_ref: str, address: str) -> str:
+        """Ask for the operator's self-steal domain and say where it points from the exit."""
+        self.prompt.explain(t("paths.own_explain", address=address))
+        hostname = self.prompt.ask(t("paths.own_domain", address=address), validate=_own_hostname_value)
+        if self.check_own_domain is not None:
+            found = self.check_own_domain(server_ref, hostname)
+            if found.state == "unresolved":
+                self.prompt.say(t("paths.own_unresolved", sni=hostname, address=address), style="warn")
+            elif found.state == "elsewhere":
+                self.prompt.say(
+                    t("paths.own_elsewhere", sni=hostname, addresses=", ".join(found.addresses), address=address),
+                    style="warn",
+                )
+        return hostname
 
     # 4. routing (only routing gateways use it)
     def _routing(self, draft: SetupDraft) -> None:
@@ -506,7 +539,8 @@ class SetupWizard:
             methods = [_PROTOCOL_LABELS[path.protocol] for path in exit_.paths]
             row("", t("review.methods", methods=", ".join(methods)))
             if reality is not None:
-                row("", t("review.camouflage", sni=reality.reality_sni))
+                camouflage = "review.camouflage_own" if reality.self_steal else "review.camouflage"
+                row("", t(camouflage, sni=reality.reality_sni))
         for relay in intent.transparent_relays:
             hops = " → ".join(server(ref) for ref in relay.hop_server_refs)
             row(t("review.relay"), f"{hops} → {relay.exit_ref}")
@@ -567,6 +601,13 @@ def _required(message: str) -> Callable[[str], None]:
 
 def _split_names(value: str) -> list[str]:
     return [name.strip() for name in value.split(",") if name.strip()]
+
+
+def _own_hostname_value(value: str) -> str:
+    hostname = validate_hostname_value(value)
+    if is_ip(hostname):
+        raise ValueError(t("paths.own_not_ip"))
+    return hostname
 
 
 def _check_users(value: str) -> None:

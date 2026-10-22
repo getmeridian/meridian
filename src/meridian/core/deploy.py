@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.inputs import (
@@ -45,11 +45,24 @@ class DeployRequest(CoreModel):
     country: OptionalCountryCodeValue = ""
     ssh_port: int = Field(default=0, ge=0, le=65535)
     fingerprint: TlsFingerprint | None = None
+    # Camouflage with the operator's own hostname (sni, else domain) instead of a borrowed site.
+    self_steal: bool = False
 
     @field_validator("fingerprint", mode="before")
     @classmethod
     def blank_fingerprint_keeps_saved(cls, value: object) -> object:
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def self_steal_needs_a_hostname(self) -> Self:
+        if self.self_steal and not (self.sni or self.domain):
+            raise ValueError("Self-steal needs your own domain: pass it with --sni or --domain.")
+        return self
+
+    @property
+    def reality_sni(self) -> str:
+        """The camouflage hostname this request asks for; empty keeps the saved one or picks one."""
+        return self.sni or (self.domain if self.self_steal else "")
 
 
 class DeployPorts(CoreModel):

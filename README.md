@@ -42,11 +42,11 @@ You need a fresh Debian or Ubuntu VPS you can reach over SSH with a key, as root
 meridian deploy 198.51.100.10 --client-name alice
 ```
 
-When it prints "Done", send Alice her connection page link. She opens it, installs the recommended app, and taps once to connect. Then:
+When it prints "Done", send Alice the connection page link. They open it, install the recommended app, and tap once to connect. Then:
 
 ```bash
 meridian client add bob carol      # one client per person
-meridian client show bob           # print his link again
+meridian client show bob           # print their link again
 meridian test                      # real traffic through the delivered subscription
 ```
 
@@ -95,11 +95,11 @@ IP blocked? Follow the [recovery guide](https://getmeridian.org/en/recovery/). U
 | | |
 |---|---|
 | `deploy`, `setup` | Set up one server, or any fleet with the wizard |
-| `client add\|show\|list\|enable\|disable\|remove` | The people who connect |
-| `node add\|list\|replace\|remove`, `relay add\|list\|remove` | Exits and relays |
+| `client add\|show\|list\|reissue\|enable\|disable\|remove` | The people who connect |
+| `node add\|list\|replace\|sni\|remove`, `relay add\|list\|sni\|remove` | Exits and relays |
 | `route add\|list\|remove` | Send chosen sites through WARP, directly, or nowhere |
 | `plan`, `apply` | Review and apply the topology |
-| `test`, `check`, `scan`, `doctor` | Verify, inspect, find camouflage targets, report |
+| `test`, `check`, `scan`, `doctor`, `logs` | Verify, inspect, find camouflage targets, report |
 | `fleet status\|inventory\|upgrade`, `panel` | Fleet overview, Remnawave upgrades, panel access |
 | `teardown`, `update` | Remove Meridian from a server; update the CLI |
 | `help agents` | Explain Meridian to an AI agent |

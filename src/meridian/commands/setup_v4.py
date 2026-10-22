@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
@@ -26,6 +27,9 @@ from meridian.setup import (
     SetupDraftStore,
     SetupRuntime,
 )
+
+if TYPE_CHECKING:
+    from meridian.diagnostics.camouflage import OwnHostname
 
 
 def run(
@@ -81,6 +85,7 @@ def _run(*, intent_path: str, restart: bool, yes: bool) -> None:
                 ask_language=language is None and not yes and (draft is None or not draft.completed_stages),
                 on_language=_remember_language,
                 suggest_sni=partial(_suggest_sni, registry),
+                check_own_domain=partial(_check_own_domain, registry),
             )
             wizard.run()
 
@@ -119,6 +124,20 @@ def _suggest_sni(registry: ServerRegistry, server_ref: str) -> CamouflageSites:
         return CamouflageSites(nearby, reachable_reality_targets(conn))
     except (MeridianError, OSError):
         return CamouflageSites([], [])
+
+
+def _check_own_domain(registry: ServerRegistry, server_ref: str, hostname: str) -> OwnHostname:
+    """Where a self-steal domain resolves through the exit's own resolver; unknown when unreachable."""
+    from meridian.diagnostics.camouflage import OwnHostname, own_hostname
+    from meridian.resolve import connection_for_entry
+
+    entry = registry.find(server_ref)
+    if entry is None:
+        return OwnHostname("unknown")
+    try:
+        return own_hostname(connection_for_entry(entry), hostname, entry.host)
+    except (MeridianError, OSError):
+        return OwnHostname("unknown")
 
 
 def _remember_language(code: str) -> None:
