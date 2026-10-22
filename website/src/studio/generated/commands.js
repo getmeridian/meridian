@@ -785,6 +785,7 @@ export const commandCatalog = {
       "machine_flags": [
         "--domain",
         "--sni",
+        "--self-steal",
         "--client-name",
         "--hysteria2",
         "--no-hysteria2",

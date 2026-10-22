@@ -18,6 +18,7 @@ from meridian.config import REALITL_SCANNER_ASSETS, REALITL_SCANNER_GITHUB_URL, 
 from meridian.core.errors import MeridianError
 from meridian.core.execution import ServerConnection
 from meridian.core.inputs import validate_hostname_value
+from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.diagnostics.preflight import reachable_reality_targets
 
 # Certificates that never make a usable target: ASN-mismatched Apple names, and
@@ -40,6 +41,41 @@ def camouflage_refusal(sni: str) -> Literal["", "network", "certificate"]:
     if name in {"microsoft.com", "www.microsoft.com"}:
         return "certificate"
     return ""
+
+
+@dataclass(frozen=True)
+class OwnHostname:
+    """Where a self-steal hostname resolves, through the server's own resolver.
+
+    ``here``: it includes the server's address. ``elsewhere``: it resolves, but not to
+    the server (a proxied CDN record, or a typo). ``unresolved``: no address at all.
+    ``unknown``: the lookup itself failed, so nothing was learned.
+    """
+
+    state: Literal["here", "elsewhere", "unresolved", "unknown"]
+    addresses: tuple[str, ...] = ()
+
+
+def own_hostname(conn: ServerConnection, hostname: str, server_ip: str) -> OwnHostname:
+    """Read where the operator's own hostname points, as Let's Encrypt and probes will see it."""
+    result = conn.run(f"getent ahosts {shlex.quote(hostname)}", timeout=10)
+    if command_evidence_unavailable(result.returncode):
+        return OwnHostname("unknown")
+    addresses: list[str] = []
+    for line in result.stdout.splitlines():
+        try:
+            address = str(ipaddress.ip_address(line.split()[0]))
+        except (IndexError, ValueError):
+            continue
+        if address not in addresses:
+            addresses.append(address)
+    if not addresses:
+        return OwnHostname("unresolved")
+    try:
+        wanted = str(ipaddress.ip_address(server_ip))
+    except ValueError:
+        wanted = server_ip
+    return OwnHostname("here" if wanted in addresses else "elsewhere", tuple(addresses))
 
 
 class ScanUnavailableError(MeridianError):

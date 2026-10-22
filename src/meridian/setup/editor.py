@@ -64,6 +64,7 @@ def add_exit_to_intent(
     tls_hostname: str = "",
     address: str = "",
     region: str = "",
+    self_steal: bool = False,
 ) -> SetupIntent:
     """Return validated intent with one independent exit workload offering every default method."""
     exit_id = unique_resource_id(
@@ -77,7 +78,9 @@ def add_exit_to_intent(
             *[route.id for route in intent.routes],
         },
     )
-    paths = default_exit_paths(exit_id, address=address, reality_sni=reality_sni, domain=tls_hostname)
+    paths = default_exit_paths(
+        exit_id, address=address, reality_sni=reality_sni, domain=tls_hostname, self_steal=self_steal
+    )
     payload = intent.model_dump(mode="json")
     payload["exits"] = [
         *payload["exits"],
@@ -178,9 +181,10 @@ def remove_relays_from_intent(intent: SetupIntent, relay_ids: set[str]) -> Setup
     return _validated(payload)
 
 
-def set_exit_reality_sni(intent: SetupIntent, exit_id: str, sni: str) -> SetupIntent:
+def set_exit_reality_sni(intent: SetupIntent, exit_id: str, sni: str, *, self_steal: bool = False) -> SetupIntent:
     """Return validated intent with a new camouflage SNI on one exit's Reality path.
 
+    ``self_steal`` marks the name as the operator's own, served by the exit itself.
     Relays without their own SNI and routing gateways built on the path follow it.
     """
     _exit(intent, exit_id)
@@ -190,6 +194,7 @@ def set_exit_reality_sni(intent: SetupIntent, exit_id: str, sni: str) -> SetupIn
             for path in exit_["paths"]:
                 if path["protocol"] == "reality":
                     path["reality_sni"] = sni
+                    path["self_steal"] = self_steal
     return _validated(payload)
 
 

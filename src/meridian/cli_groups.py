@@ -9,7 +9,7 @@ from typing import Annotated
 
 import typer
 
-from meridian.cli_options import Json, NewServer, SshPort, Target, User, Yes, enable_json_output
+from meridian.cli_options import Json, NewServer, SelfSteal, SshPort, Target, User, Yes, enable_json_output
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
@@ -300,6 +300,7 @@ def node_add_cmd(
     ),
     ssh_port: SshPort = 0,
     harden: bool = typer.Option(True, help="Apply OS hardening (fleet servers require it)"),
+    self_steal: SelfSteal = False,
     yes: Yes = False,
 ) -> None:
     """Add an exit server to the fleet
@@ -311,12 +312,22 @@ def node_add_cmd(
       [cyan]meridian node add 198.51.100.10[/cyan]
       [cyan]meridian node add 198.51.100.10 --name finland --sni www.google.com[/cyan]
       [cyan]meridian node add 198.51.100.10 --domain proxy.example.com --yes[/cyan]
+      [cyan]meridian node add 198.51.100.10 --sni de.example.com --self-steal[/cyan]   Your own domain
       [cyan]meridian node add 198.51.100.10 --country NL[/cyan]   Registry says otherwise
     """
     from meridian.commands.node import run_add
 
     run_add(
-        ip, name=name, user=user, ssh_port=ssh_port, sni=sni, domain=domain, country=country, harden=harden, yes=yes
+        ip,
+        name=name,
+        user=user,
+        ssh_port=ssh_port,
+        sni=sni,
+        domain=domain,
+        country=country,
+        harden=harden,
+        yes=yes,
+        self_steal=self_steal,
     )
 
 
@@ -359,22 +370,31 @@ def node_replace_cmd(
 def node_sni_cmd(
     exit: Annotated[str, typer.Argument(metavar="EXIT", help="Exit ID, or the saved name/IP of the exit's server")],
     sni: Annotated[str, typer.Argument(metavar="NEW_SNI", help="New Reality camouflage site")],
+    self_steal: Annotated[
+        bool,
+        typer.Option(
+            "--self-steal",
+            help="NEW_SNI is your own domain, pointed at the exit: it gets the certificate and answers probes itself",
+        ),
+    ] = False,
     yes: Yes = False,
 ) -> None:
     """Change an exit's camouflage SNI
 
-    Checks that the exit reaches the site over TLS 1.3 with HTTP/2, shows the
-    review, confirms, and applies it. Relays without their own SNI change with
-    the exit. Apps switch at their next subscription refresh; the old SNI
-    stops working once the change applies.
+    Checks that the exit reaches the site over TLS 1.3 with HTTP/2 (with
+    --self-steal, that your domain points at the exit), shows the review,
+    confirms, and applies it. Relays without their own SNI change with the
+    exit. Apps switch at their next subscription refresh; the old SNI stops
+    working once the change applies.
 
     [dim]Examples:[/dim]
       [cyan]meridian node sni finland dl.google.com[/cyan]
       [cyan]meridian node sni 198.51.100.10 www.cloudflare.com --yes[/cyan]
+      [cyan]meridian node sni finland www.example.com --self-steal[/cyan]   Your own domain
     """
     from meridian.commands.sni import run_exit_sni
 
-    run_exit_sni(exit, sni, yes=yes)
+    run_exit_sni(exit, sni, self_steal=self_steal, yes=yes)
 
 
 @node_app.command("remove")

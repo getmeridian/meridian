@@ -15,6 +15,7 @@ from meridian.cli_catalog import command_path, requests_machine_output, supports
 from meridian.cli_groups import api_app, client_app, dev_app, fleet_app, node_app, relay_app, route_app, server_app
 from meridian.cli_options import (
     JSON_HELP,
+    SELF_STEAL_HELP,
     SSH_PORT_HELP,
     USER_HELP,
     YES_HELP,
@@ -394,6 +395,7 @@ def deploy_cmd(
         "-s",
         help="Camouflage site the server imitates (default: auto-picked; try 'meridian scan')",
     ),
+    self_steal: bool = typer.Option(False, "--self-steal", help=SELF_STEAL_HELP),
     client_name: str = typer.Option("", "--client-name", help="Name for the first client"),
     hysteria2: bool = typer.Option(
         True,
@@ -496,6 +498,7 @@ def deploy_cmd(
       [cyan]meridian deploy[/cyan]                          Ask for the server IP
       [cyan]meridian deploy 198.51.100.10[/cyan]            Deploy with defaults
       [cyan]meridian deploy 198.51.100.10 --domain vpn.example[/cyan]  CDN fallback via Cloudflare
+      [cyan]meridian deploy 198.51.100.10 --domain vpn.example --self-steal[/cyan]  Your domain as camouflage
       [cyan]meridian deploy ubuntu@198.51.100.10:2222[/cyan]  Non-root user, custom SSH port
       [cyan]meridian deploy local[/cyan]                    On this server, without SSH
       [cyan]meridian deploy 198.51.100.10 --no-harden[/cyan]  Skip SSH and firewall hardening
@@ -522,6 +525,7 @@ def deploy_cmd(
         country=country,
         ssh_port=ssh_port,
         fingerprint=fingerprint,
+        self_steal=self_steal,
         request_path=request_path,
         json_output=is_json_mode(),
         events=events,

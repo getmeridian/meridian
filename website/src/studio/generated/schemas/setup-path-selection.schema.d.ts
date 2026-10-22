@@ -22,6 +22,7 @@ export type Path = string;
 export type Protocol = "reality" | "xhttp" | "wss" | "hysteria2";
 export type PublicPort = number;
 export type RealitySni = "" | string;
+export type SelfSteal = boolean;
 export type TlsSni = "" | string;
 
 /**
@@ -49,5 +50,6 @@ export interface ProtocolPathIntent {
   protocol: Protocol;
   public_port?: PublicPort;
   reality_sni?: RealitySni;
+  self_steal?: SelfSteal;
   tls_sni?: TlsSni;
 }

@@ -25,6 +25,11 @@ Timeout = Annotated[
     str, typer.Option("--timeout", metavar="SECONDS", help="Per-network-operation timeout, 1-30 seconds")
 ]
 Yes = Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP)]
+SELF_STEAL_HELP = (
+    "Camouflage with your own domain (--sni, else --domain) instead of someone else's site: the server gets "
+    "its certificate and answers probes itself. Point a DNS-only A record at the server first"
+)
+SelfSteal = Annotated[bool, typer.Option("--self-steal", help=SELF_STEAL_HELP)]
 
 
 def enable_json_output(ctx: typer.Context, value: object) -> object:

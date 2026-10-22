@@ -19,6 +19,7 @@ export type Hysteria2 = boolean;
 export type Icon = string;
 export type Ip = string;
 export type RequestedServer = string;
+export type SelfSteal = boolean;
 export type ServerName = string;
 export type Sni = "" | string;
 export type SshPort = number;
@@ -42,6 +43,7 @@ export interface DeployRequest {
   icon?: Icon;
   ip?: Ip;
   requested_server?: RequestedServer;
+  self_steal?: SelfSteal;
   server_name?: ServerName;
   sni?: Sni;
   ssh_port?: SshPort;
