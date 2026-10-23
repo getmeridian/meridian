@@ -202,6 +202,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   "directly from the gateway" next to your exits and "nowhere"; in a topology
   file it is `"action": "direct"`. The setup summary lists each gateway rule
   with where it goes, and existing gateways compile unchanged.
+- **Gateway rules match zones and site lists** — a domain rule takes a bare
+  zone such as `ru`, `su`, or `рф` (every site under it), and a new site-list
+  rule takes `geosite:` names such as `category-ru`, the same lists the Xray
+  JSON and Mihomo subscriptions send directly. Both match the site name, so
+  the gateway needs no lookup. Exit routes (`meridian route add`) take zones
+  too.
 - **Relays look like nothing in particular** — nothing a hosting provider can
   list on a relay (service, binary, config path, firewall comment) names
   Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.

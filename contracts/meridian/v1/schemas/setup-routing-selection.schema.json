@@ -81,6 +81,7 @@
             "all",
             "country",
             "domain",
+            "geosite",
             "ip",
             "network"
           ],

@@ -58,7 +58,7 @@ Russian sites   → Device → Gateway (in Russia) → Internet
 Everything else → Device → Gateway → Exit (abroad) → Internet
 ```
 
-In the wizard's routing step, add a rule that matches the country `RU` (destinations in Russian IP ranges) or a few domains (subdomains included), and answer **directly from the gateway** when it asks where the traffic should go. In a topology file this is a rule with `"action": "direct"` and no `target_ref`. Rules apply in order and the first match wins; the review lists each rule with where it goes.
+In the wizard's routing step, add rules that match the zones `ru, su, рф` (every site under them), the site list `category-ru` (Russian services under other zones), and the country `RU` (Russian IP ranges, for apps that connect by address), and answer **directly from the gateway** each time it asks where the traffic should go. Zone and list rules match the site name as is; a country rule makes the gateway look the name up first. In a topology file a direct rule has `"action": "direct"` and no `target_ref`; zones go in a `"match": "domain"` rule and lists in a `"match": "geosite"` rule. Rules apply in order and the first match wins; the review lists each rule with where it goes.
 
 That traffic never reaches the exit, so the exit's geo-block stays as it is. Unlike a relay, the gateway is where this traffic leaves: Russian services see its address, and complaints about that traffic go to its host (see [Choosing hosting](/en/hosting/)).
 

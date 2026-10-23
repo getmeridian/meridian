@@ -426,7 +426,10 @@ class SetupWizard:
         while self.prompt.yes_no(t("routing.add_rule"), default=False):
             match = self.prompt.choose(
                 t("routing.match"),
-                [Choice(kind, t(f"routing.match_{kind}")) for kind in ("country", "domain", "ip", "network")],
+                [
+                    Choice(kind, t(f"routing.match_{kind}"))
+                    for kind in ("country", "domain", "geosite", "ip", "network")
+                ],
             )
             values = [value.strip() for value in self.prompt.ask(t("routing.values")).split(",") if value.strip()]
             target = self.prompt.choose(

@@ -37,10 +37,10 @@ def _render(intent: SetupIntent) -> dict:
 
 
 def test_override_values_are_canonicalized_and_geo_prefixes_dropped() -> None:
-    domains = EgressOverrideIntent(id="warp", match="domain", values=["Netflix.COM."], action="warp")
+    domains = EgressOverrideIntent(id="warp", match="domain", values=["Netflix.COM.", "рф"], action="warp")
     sites = EgressOverrideIntent(id="ads", match="geosite", values=["geosite:category-ads-all"], action="block")
 
-    assert domains.values == ["netflix.com"]
+    assert domains.values == ["netflix.com", "xn--p1ai"]
     assert sites.values == ["category-ads-all"]
 
 

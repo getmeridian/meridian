@@ -136,6 +136,26 @@ class TestOrderedRoutes:
         assert country.match_values == ["DE"]
         assert network.match_values == ["198.51.100.0/24"]
 
+    def test_domain_rules_take_bare_zones_and_geosite_rules_take_list_names(self) -> None:
+        zones = OrderedRouteIntent(
+            id="zones", priority=1, match="domain", match_values=["RU", "рф", "Example.com."], action="direct"
+        )
+        sites = OrderedRouteIntent(
+            id="sites", priority=2, match="geosite", match_values=["geosite:category-ru"], action="direct"
+        )
+
+        assert zones.match_values == ["ru", "xn--p1ai", "example.com"]
+        assert sites.match_values == ["category-ru"]
+
+    @pytest.mark.parametrize(
+        ("match", "value"),
+        [("domain", "-ru"), ("domain", "not a zone"), ("geosite", "bad name;rm")],
+        ids=["bad-label", "spaces", "shell"],
+    )
+    def test_invalid_domain_and_geosite_values_are_refused(self, match: str, value: str) -> None:
+        with pytest.raises(ValidationError, match="valid domain|list name"):
+            OrderedRouteIntent(id="rule", priority=1, match=match, match_values=[value], action="direct")  # type: ignore[arg-type]
+
     @pytest.mark.parametrize(
         ("action", "message"),
         [("block", "Blocked routes cannot have"), ("direct", "Direct routes leave from the routing gateway")],

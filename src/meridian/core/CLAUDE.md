@@ -30,3 +30,4 @@
 - Use `WithJsonSchema` for custom validators that need public schema constraints without replacing readable runtime errors.
 - Keep topology IDs lowercase and bounded, and validate access usernames against the pinned panel contract before compilation.
 - Command catalogs list only completed JSON outcomes: an interruption exits 130 without an envelope, while a cooperative cancel is a completed `cancelled` outcome with exit 5.
+- Routing domains are suffixes: gateway rules and exit overrides validate with `validate_domain_suffix_value()` (bare zones like `ru`, `рф` → `xn--p1ai`); SNI and certificate names keep `validate_hostname_value()`, which needs two labels.

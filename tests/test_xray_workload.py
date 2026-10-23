@@ -325,6 +325,8 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
     intent = single_exit_intent(
         routing_gateways=[RoutingGatewayIntent(id="gateway-a", server_ref="srv-gateway", bridge_path_ref="reality-a")],
         routes=[
+            OrderedRouteIntent(id="zones", priority=5, match="domain", match_values=["ru", "рф"], action="direct"),
+            OrderedRouteIntent(id="sites", priority=6, match="geosite", match_values=["category-ru"], action="direct"),
             OrderedRouteIntent(id="domestic", priority=10, match="country", match_values=["RU"], action="direct"),
             OrderedRouteIntent(id="ads", priority=20, match="domain", match_values=["ads.example.com"], action="block"),
         ],
@@ -352,11 +354,15 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
     rules = [(rule.get("ruleTag"), rule.get("outboundTag")) for rule in config["routing"]["rules"]]
     assert rules == [
         (None, "block"),  # private ranges first, always
+        ("zones", "direct"),
+        ("sites", "direct"),
         ("domestic", "direct"),
         ("ads", "block"),
         ("default", edge.tag),
     ]
-    assert config["routing"]["rules"][1]["ip"] == ["geoip:ru"]
+    assert config["routing"]["rules"][1]["domain"] == ["domain:ru", "domain:xn--p1ai"]
+    assert config["routing"]["rules"][2]["domain"] == ["geosite:category-ru"]
+    assert config["routing"]["rules"][3]["ip"] == ["geoip:ru"]
 
 
 def test_gateway_refuses_to_guess_missing_service_credentials() -> None:

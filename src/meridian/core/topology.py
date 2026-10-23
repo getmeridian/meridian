@@ -24,7 +24,7 @@ from meridian.core.inputs import (
     is_ip,
     validate_access_username_value,
     validate_country_code_value,
-    validate_hostname_value,
+    validate_domain_suffix_value,
 )
 from meridian.core.models import CoreModel
 
@@ -50,13 +50,21 @@ def path_fingerprints(protocol: str, primary: TlsFingerprint) -> list[TlsFingerp
     return [primary, *(fingerprint for fingerprint in FINGERPRINT_COPIES if fingerprint != primary)]
 
 
-RouteMatchKind = Literal["all", "country", "domain", "ip", "network"]
+RouteMatchKind = Literal["all", "country", "domain", "geosite", "ip", "network"]
 EgressStrategy = Literal["least_ping"]
 EgressOverrideMatch = Literal["domain", "geosite", "geoip"]
 EgressOverrideAction = Literal["warp", "direct", "block"]
 # v2fly geosite/geoip list names: "netflix", "category-ru", "geolocation-!cn", "google@cn".
 _GEO_LIST_NAME = re.compile(r"[a-z0-9][a-z0-9!@._-]{0,63}")
 DeliveryFormat = Literal["base64", "xray_json", "mihomo", "singbox"]
+
+
+def _geo_list_name(kind: str, value: str) -> str:
+    """A v2fly list name, with or without its ``geosite:``/``geoip:`` prefix."""
+    name = value.strip().lower().removeprefix(f"{kind}:")
+    if _GEO_LIST_NAME.fullmatch(name) is None:
+        raise ValueError(f"Enter a {kind} list name such as {'netflix' if kind == 'geosite' else 'ir'}.")
+    return name
 
 
 def _default_delivery_formats() -> list[DeliveryFormat]:
@@ -129,12 +137,9 @@ class EgressOverrideIntent(CoreModel):
         normalized: list[str] = []
         for value in values:
             if kind == "domain":
-                normalized.append(validate_hostname_value(value))
-                continue
-            name = value.strip().lower().removeprefix(f"{kind}:")
-            if _GEO_LIST_NAME.fullmatch(name) is None:
-                raise ValueError(f"Enter a {kind} list name such as {'netflix' if kind == 'geosite' else 'ir'}.")
-            normalized.append(name)
+                normalized.append(validate_domain_suffix_value(value))
+            else:
+                normalized.append(_geo_list_name(kind, value))
         if len(normalized) != len(set(normalized)):
             raise ValueError(f"{kind} override values must be unique.")
         return normalized
@@ -243,7 +248,9 @@ class OrderedRouteIntent(CoreModel):
             if kind == "country":
                 normalized.append(validate_country_code_value(value))
             elif kind == "domain":
-                normalized.append(validate_hostname_value(value))
+                normalized.append(validate_domain_suffix_value(value))
+            elif kind == "geosite":
+                normalized.append(_geo_list_name(kind, value))
             elif kind == "ip":
                 try:
                     normalized.append(str(ipaddress.ip_network(value, strict=False)))

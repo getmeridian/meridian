@@ -262,6 +262,15 @@ def validate_optional_country_code_value(value: str) -> str:
 
 def validate_hostname_value(value: str) -> str:
     """Validate and canonicalize a DNS hostname used for TLS or Reality SNI."""
+    return _canonical_domain(value, min_labels=2)
+
+
+def validate_domain_suffix_value(value: str) -> str:
+    """Validate a routing domain: a name or a bare zone (``ru``, ``рф``) matching itself and every subdomain."""
+    return _canonical_domain(value, min_labels=1)
+
+
+def _canonical_domain(value: str, *, min_labels: int) -> str:
     normalized = value.strip().rstrip(".")
     if not normalized:
         raise ValueError("Enter a valid domain name.")
@@ -272,7 +281,7 @@ def validate_hostname_value(value: str) -> str:
     if len(ascii_name) > 253:
         raise ValueError("Domain names must be 253 characters or fewer.")
     labels = ascii_name.split(".")
-    if len(labels) < 2:
+    if len(labels) < min_labels:
         raise ValueError("Enter a full domain name such as vpn.example.com.")
     for label in labels:
         if (
