@@ -32,4 +32,5 @@
 - **Node-plugin readiness checks the kernel only** — `node_plugins.py` warns on a pre-5.7 kernel with a fix prefixed "Only if you use node plugins"; the node container bundles its own nftables library, so never require the host `nft` binary. An unreadable `uname` is skipped.
 - **Node logs are not plain text, and the node image has no `pgrep`** — `grep -a` every log pipe (grep prints nothing for a "binary" stream) and find Xray (`rw-core`) with host-side `docker top`, not `docker exec`.
 - **Log lines are attacker-influenced** — a prober's request line lands in nginx's error log; strip control characters, search with `grep -F` on a quoted pattern, and print plain text.
+- **Encrypted DNS is judged per operator** — `exit_dns.py` curls every DoH endpoint from the node host; a single-stack host fails the other family's addresses, so only an operator with no answer warns, and none answering fails (Xray never falls back to plain DNS).
 - **External checks need an outside vantage** — on the server itself, own-address connections bypass UFW over loopback; `check_port_surface(local_vantage=True)` skips instead of calling firewalled ports public.

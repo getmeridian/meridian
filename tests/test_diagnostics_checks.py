@@ -16,7 +16,9 @@ from meridian.diagnostics.checks import (
     check_port_listening,
     check_tls_certificate,
 )
+from meridian.diagnostics.exit_dns import check_exit_dns
 from meridian.diagnostics.node_plugins import check_node_plugin_host
+from meridian.xray_workload import EXIT_DOH_RESOLVERS
 from tests.support.mock_connection import MockConnection
 
 # Timeout, missing tool, or a dropped SSH session is unavailable evidence, not a finding.
@@ -156,3 +158,56 @@ def test_node_plugin_host_readiness(conn: MockConnection, status: str, codes: li
     assert [found.code for found in warned] == codes
     # Plugins are optional: an unready host warns with a fix and never fails the check.
     assert all(found.remediation.startswith("Only if you use node plugins") for found in warned)
+
+
+_IPV4_RESOLVERS = {resolver.address for resolver in EXIT_DOH_RESOLVERS if ":" not in resolver.address}
+_IPV6_RESOLVERS = {resolver.address for resolver in EXIT_DOH_RESOLVERS} - _IPV4_RESOLVERS
+_PRIMARY = EXIT_DOH_RESOLVERS[0]
+
+
+def _dns_host(answering: set[str], *, rc: int = 0, drop: str = "") -> MockConnection:
+    lines = [
+        f"{resolver.url} {'200' if resolver.address in answering else '000'}"
+        for resolver in EXIT_DOH_RESOLVERS
+        if resolver.address != drop
+    ]
+    return MockConnection().when("dns-query", stdout="\n".join(lines) + "\n", rc=rc)
+
+
+@pytest.mark.parametrize(
+    ("conn", "status"),
+    [
+        (_dns_host(_IPV4_RESOLVERS | _IPV6_RESOLVERS), "passed"),
+        # Single-stack hosts still reach every operator over their own family.
+        (_dns_host(_IPV4_RESOLVERS), "passed"),
+        (_dns_host(_IPV6_RESOLVERS), "passed"),
+        (_dns_host(_IPV4_RESOLVERS - {_PRIMARY.address}), "warning"),
+        (_dns_host(set()), "failed"),
+        *[(_dns_host(set(), rc=rc), "skipped") for rc in _UNAVAILABLE],
+        (_dns_host(_IPV4_RESOLVERS, drop=_PRIMARY.address), "skipped"),
+    ],
+    ids=["dual-stack", "ipv4-only", "ipv6-only", "one-operator-silent", "none", *map(str, _UNAVAILABLE), "partial"],
+)
+def test_exit_dns_judges_reachability_per_operator(conn: MockConnection, status: str) -> None:
+    check = check_exit_dns(conn)
+
+    assert check.status == status
+    found = check.findings[0]
+    if status == "warning":
+        assert _PRIMARY.operator in found.message
+        assert _PRIMARY.address in found.remediation
+    if status == "failed":
+        # Say what to open, and that nothing falls back to plain DNS meanwhile.
+        assert "plain DNS" in found.message
+        assert all(resolver.address in found.remediation for resolver in EXIT_DOH_RESOLVERS)
+
+
+def test_exit_dns_asks_every_endpoint_by_address_over_https() -> None:
+    conn = _dns_host(_IPV4_RESOLVERS)
+
+    check_exit_dns(conn)
+
+    assert len(conn.calls) == 1
+    for resolver in EXIT_DOH_RESOLVERS:
+        assert f"{resolver.url}?dns=" in conn.calls[0]
+    assert "application/dns-message" in conn.calls[0]

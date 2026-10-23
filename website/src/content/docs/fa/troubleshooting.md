@@ -134,6 +134,7 @@ certificate برای دامنه شما تنها زمانی می‌تواند ص�
 علت‌های دیگر:
 - سرور reboot شد و سرویس‌ها شروع نشدند → `meridian plan` نشان می‌دهد چه چیز خاموش است و `meridian apply` تعمیر می‌کند. دستی: `docker compose up -d` در `/opt/ctlsvc` و `/opt/netagent`، سپس `systemctl restart nginx`
 - دیسک پر — `df -h /`، `docker system prune -af`
+- اتصال برقرار است اما سایت‌ها با نام باز نمی‌شوند (با نشانی IP باز می‌شوند) — سرور خروجی به هیچ‌یک از resolverهای DNS رمزگذاری‌شده‌اش نمی‌رسد. `meridian check` آن‌ها را زیر **Encrypted DNS** نام می‌برد؛ TCP 443 خروجی به آن نشانی‌ها را در فایروال ارائه‌دهنده باز کنید
 
 ## سرعت کم
 
