@@ -19,7 +19,9 @@ class ClientRoute:
     """One client-side rule, rendered into every delivery format that routes.
 
     Matchers use Xray vocabulary (``geosite:``, ``geoip:``, ``domain:``); a rule
-    matches any listed domain or IP, or exactly the network/port pair.
+    matches any listed domain or IP, exactly the network/port pair, or a sniffed
+    protocol. Protocol matchers are currently rendered only for Xray JSON;
+    Mihomo and sing-box keep their existing routing behavior.
     """
 
     action: ClientRouteAction
@@ -27,19 +29,25 @@ class ClientRoute:
     ips: tuple[str, ...] = ()
     network: Literal["", "udp"] = ""
     port: str = ""
+    protocols: tuple[str, ...] = ()
 
 
 # Russian destinations stay off the tunnel: domestic services refuse foreign
 # exits, and under mobile whitelists they are the only thing that opens.
 # Foreign QUIC is refused so apps fall back to TCP with a sniffable TLS name.
+# Recognized BitTorrent peer handshakes leave from the client's own connection.
+# This is best-effort: encrypted peers and UDP DHT/uTP may still use the tunnel.
 DEFAULT_CLIENT_ROUTES: tuple[ClientRoute, ...] = (
     ClientRoute("direct", domains=("geosite:private",), ips=("geoip:private",)),
     ClientRoute("direct", domains=("domain:ru", "domain:su", "domain:xn--p1ai", "geosite:category-ru")),
     ClientRoute("direct", ips=("geoip:ru",)),
     ClientRoute("block", network="udp", port="443"),
+    ClientRoute("direct", protocols=("bittorrent",)),
 )
 
 # Route by the sniffed name (IP-only clients and QUIC) without rewriting the destination.
+# enabled also sniffs BitTorrent; destOverride controls domain overrides, not
+# protocol detection. Xray rejects "bittorrent" as a destOverride value.
 ROUTE_ONLY_SNIFFING: dict[str, Any] = {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True}
 
 _XRAY_OUTBOUND: dict[ClientRouteAction, str] = {"direct": "DIRECT", "block": "BLOCK"}
@@ -57,6 +65,8 @@ def xray_client_rules(routes: tuple[ClientRoute, ...] = DEFAULT_CLIENT_ROUTES) -
             rules.append({"type": "field", "ip": list(route.ips), "outboundTag": outbound})
         if route.network:
             rules.append({"type": "field", "network": route.network, "port": route.port, "outboundTag": outbound})
+        if route.protocols:
+            rules.append({"type": "field", "protocol": list(route.protocols), "outboundTag": outbound})
     return rules
 
 

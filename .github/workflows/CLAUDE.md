@@ -24,6 +24,7 @@
 
 - **Validate job** — one job checks PWA rendering, `_PWA_APPS` against `apps.json`, VERSION, CHANGELOG, generated contracts, and the live CLI tree against every localized reference.
 - **System lab waits for lint and tests** — no Docker minutes spent on obvious failures.
+- **Client routing runs on real Xray** — Python 3.12 downloads the checksum-verified pinned runtime before pytest; bootstrap failure fails CI instead of silently skipping the loopback handshake tests.
 - **PWA demo validation** — the website job builds `meridian dev preview` output and checks its files, a disabled SW, and rendered client HTML.
 - **Contract drift checks** — the website build also runs `pnpm run contracts:check`.
 - **Package asset check** — website CI builds a wheel after Astro and verifies the Studio page is bundled and the rest of the website is not.

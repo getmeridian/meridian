@@ -24,6 +24,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `~/.meridian` is found there, so the release manages it without moving files.
 
 ### Working in the Remnawave panel
+- **BitTorrent DIRECT in Xray JSON subscriptions** — recognized unencrypted TCP
+  peer handshakes bypass the VPN on the client, before automatic VPN routing.
+  UDP DHT/uTP and encrypted peers are not reliably recognized and may still use
+  the tunnel. Mihomo, sing-box, and Base64 subscriptions keep their behavior.
 - **`meridian panel`** — prints the admin panel URL and login (`--show-password`
   for the password) and lists what Meridian manages versus what is yours.
 - **Your panel edits stick** — Meridian now owns only each client's existence,
