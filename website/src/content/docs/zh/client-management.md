@@ -107,13 +107,9 @@ HWID 设备数限制保存在面板中，而不是链接里。重新签发后，
 
 应用会自行发布引擎更新，因此应用运行的引擎可能比测试的版本略旧或略新。
 
-### Xray 应用中的 BitTorrent 路由
+### Xray 应用中的 BitTorrent
 
-Xray JSON 订阅（包括 Happ）会将识别到的未加密 TCP BitTorrent 对等握手通过设备上的 `DIRECT` 发送。对等方看到的是客户端的公网 IP，而不是 VPN 出口 IP。运行 `meridian apply` 后在应用中刷新订阅；应用必须保留收到的路由和 sniffing 设置。当应用把 TUN 流量交给这些 Xray 入站时，同样适用。
-
-现有规则顺序保持为：私有和俄罗斯目的地 DIRECT、国外 UDP/443 阻断、BitTorrent DIRECT，最后是自动 VPN 路由。Sniffing 仍使用 route-only：`enabled: true` 启用协议识别，`destOverride` 控制基于域名的路由。不要把 `bittorrent` 加入 `destOverride`，Xray 会拒绝该值。
-
-这只是尽力让已识别的 TCP 流量绕过 VPN，并非排除整个种子应用。UDP DHT/uTP、加密对等握手和 tracker 流量无法被可靠覆盖，仍可能进入隧道（UDP/443 仍受现有阻断规则限制）。保留 Torrent Blocker 作为服务器端的额外保护；到达它的流量仍可能触发 IP 封禁。要让全部种子流量避开 VPN，请在客户端支持时使用按应用排除或独立连接。Mihomo、sing-box 和 Base64 订阅不会新增此规则。
+Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitTorrent 对等连接直接从设备发出，因此种子流量走用户自己的网络，不会触发出口上的 Torrent Blocker。这只是尽力而为：加密的对等连接和 UDP（DHT/uTP）仍可能经过 VPN。Mihomo、sing-box 和 Base64 订阅不包含这条规则。
 
 ## 客户端数据存放在哪里
 

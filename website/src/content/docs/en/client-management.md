@@ -107,13 +107,9 @@ One subscription URL serves each app the format it reads. Every change to Meridi
 
 Apps ship their own engine updates, so an app may run a slightly older or newer engine than the one tested.
 
-### BitTorrent routing in Xray apps
+### BitTorrent in Xray apps
 
-Xray JSON subscriptions (including Happ) send recognized, unencrypted TCP BitTorrent peer handshakes through `DIRECT` on the device. Peers see the client's public IP, not the VPN exit's. Apply the configuration with `meridian apply`, then refresh the subscription in the app; it must retain the supplied routing and sniffing settings. This also applies when an app feeds TUN traffic into those Xray inbounds.
-
-Private and Russian destinations keep their existing DIRECT rules, followed by the foreign UDP/443 block, then BitTorrent DIRECT, then the automatic VPN route. Sniffing stays route-only: `enabled: true` recognizes the protocol, while `destOverride` controls domain-based routing. Do not add `bittorrent` to `destOverride`; Xray rejects it.
-
-This is a best-effort TCP bypass, not an exclusion of the entire torrent application. UDP DHT/uTP, encrypted peer handshakes, and tracker traffic are not reliably covered and may still use the tunnel (UDP/443 remains subject to the existing block). Keep Torrent Blocker as a server-side safety net; traffic that still reaches it may still trigger an IP ban. To keep all torrent traffic off the VPN, use the app's process exclusion or a separate connection if supported. Mihomo, sing-box, and Base64 subscriptions do not gain this rule.
+Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorrent peer connections directly from the device, so torrents use the person's own connection and don't trip Torrent Blocker on the exit. This is best effort: encrypted peers and UDP DHT/uTP may still go through the VPN. Mihomo, sing-box, and Base64 subscriptions don't get this rule.
 
 ## Where client data lives
 
