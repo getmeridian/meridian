@@ -22,6 +22,43 @@ from meridian.provision.warp import WARP_PROXY_PORT
 REALITY_MIN_CLIENT_VERSION = "1.8.0"
 
 
+@dataclass(frozen=True)
+class DohResolver:
+    """One encrypted resolver endpoint, addressed by IP so reaching it needs no lookup."""
+
+    operator: str
+    address: str
+
+    @property
+    def url(self) -> str:
+        """The RFC 8484 endpoint, as any HTTPS client reaches it."""
+        host = f"[{self.address}]" if ":" in self.address else self.address
+        return f"https://{host}/dns-query"
+
+    @property
+    def xray_server(self) -> str:
+        """Xray's local-mode spelling: dialed from the host, never through routing."""
+        return "https+local://" + self.url.removeprefix("https://")
+
+
+# Every name a workload resolves (routing matches and the direct outbound) goes to these, in
+# order. Privacy-audited Cloudflare first, then non-profit Quad9 (unfiltered, no ECS), then Google;
+# all IPv4 endpoints before IPv6, since a block usually hits a whole operator, and a host without
+# a family fails that endpoint at once. Each certificate carries these IPs: no bootstrap lookup.
+EXIT_DOH_RESOLVERS = (
+    DohResolver("Cloudflare", "1.1.1.1"),
+    DohResolver("Quad9", "9.9.9.10"),
+    DohResolver("Google", "8.8.8.8"),
+    DohResolver("Cloudflare", "2606:4700:4700::1111"),
+    DohResolver("Quad9", "2620:fe::10"),
+    DohResolver("Google", "2001:4860:4860::8888"),
+)
+# What a resolver that silently drops packets costs each lookup before the next one is asked.
+# Only an answering resolver caches, so routing and the direct outbound both pay it on every
+# connection until that resolver answers again (Xray's default is 4 s).
+_DOH_TIMEOUT_MS = 2000
+
+
 class WorkloadConfigError(MeridianError):
     """A reviewed workload cannot be rendered without rotating or guessing state."""
 
@@ -68,7 +105,10 @@ def render_workload_config(
         outbounds.append(warp_outbound)
     outbounds.extend(
         [
-            {"tag": "direct", "protocol": "freedom"},
+            # Resolve through the DNS module (DoH below), never the host resolver: ForceIP refuses
+            # a name no resolver answers instead of handing it to plain DNS. IPv4 first, IPv6 only
+            # for names without an A record, so an IPv4-only exit never dials an IPv6 address.
+            {"tag": "direct", "protocol": "freedom", "settings": {"domainStrategy": "ForceIPv4v6"}},
             {"tag": "block", "protocol": "blackhole"},
         ]
     )
@@ -110,15 +150,7 @@ def render_workload_config(
         # No access log: it would record every user's destinations on the server.
         # Remnawave reads only startup errors from the log; IP stats use the API.
         "log": {"loglevel": "warning", "access": "none"},
-        "dns": {
-            "servers": [
-                {
-                    "address": "https://dns.google/dns-query",
-                    "domains": ["geosite:geolocation-!cn"],
-                },
-                "8.8.8.8",
-            ]
-        },
+        "dns": _dns_config(),
         "routing": routing,
         "inbounds": inbounds,
         "outbounds": outbounds,
@@ -136,6 +168,20 @@ def render_workload_config(
             "enableConcurrency": True,
         }
     return config
+
+
+def _dns_config() -> dict[str, Any]:
+    """Return the encrypted-only resolver block every workload renders.
+
+    ``https+local`` dials each resolver from the host directly, so a lookup never rides the
+    routing rules (WARP, gateway routes, geo blocks) it is resolving for. With servers listed
+    Xray adds no implicit system resolver, so when every endpoint fails the lookup fails.
+    ``UseSystem`` asks only for the address families this host can route.
+    """
+    return {
+        "servers": [{"address": resolver.xray_server, "timeoutMs": _DOH_TIMEOUT_MS} for resolver in EXIT_DOH_RESOLVERS],
+        "queryStrategy": "UseSystem",
+    }
 
 
 def _render_inbound(

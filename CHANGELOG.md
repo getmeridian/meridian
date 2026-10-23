@@ -360,6 +360,14 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   and secrets, is renamed in place, so users, client links, and API tokens stay.
   `meridian check` and `meridian doctor` name the role behind each container,
   and `meridian teardown` removes both the old and the new names.
+- **Exits look up destinations over encrypted DNS only** — the exit's direct
+  egress used the host's resolver, so the hosting provider saw every site its
+  users opened in plain-text DNS, and a failed encrypted lookup fell back to
+  plain `8.8.8.8`. Exits and routing gateways now resolve every name over DNS
+  over HTTPS (Cloudflare, then Quad9, then Google, each reached by IP address
+  on IPv4 or IPv6) and never fall back to plain DNS: if none answers, sites by
+  name fail through that server. Servers pick this up on the next
+  `meridian apply`.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.

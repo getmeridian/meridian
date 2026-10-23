@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import ipaddress
+from urllib.parse import urlsplit
+
 import pytest
 
 from meridian.cluster import RealityKeyBinding
@@ -16,6 +19,7 @@ from meridian.compiler.models import (
 )
 from meridian.core.topology import OrderedRouteIntent, RoutingGatewayIntent
 from meridian.xray_workload import (
+    EXIT_DOH_RESOLVERS,
     ServiceRouteCredential,
     WorkloadConfigError,
     render_workload_config,
@@ -160,6 +164,36 @@ def test_access_logging_is_disabled() -> None:
     config = render_workload_config(_profile(), reality_keys=_keys())
 
     assert config["log"] == {"loglevel": "warning", "access": "none"}
+
+
+@pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
+def test_every_lookup_goes_to_ip_addressed_doh_and_never_the_host_resolver(warp: bool) -> None:
+    dns = render_workload_config(_profile(warp=warp), reality_keys=_keys())["dns"]
+
+    hosts = []
+    for server in dns["servers"]:
+        url = urlsplit(server["address"])
+        # "+local" dials from the host, so a lookup never rides the routes it resolves for;
+        # a hostname would need a plain bootstrap lookup, and "localhost" is the host resolver.
+        assert url.scheme == "https+local", server
+        hosts.append(ipaddress.ip_address(url.hostname or ""))
+    # Fallbacks exist on both families, so a single-stack exit always has one to ask.
+    assert {host.version for host in hosts} == {4, 6}
+    assert len({resolver.operator for resolver in EXIT_DOH_RESOLVERS}) >= 2
+    # Only the families this host can route: an IPv4-only exit never waits on AAAA answers.
+    assert dns["queryStrategy"] == "UseSystem"
+    assert dns.get("disableFallback") is not True
+
+
+@pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
+def test_direct_egress_resolves_through_doh_and_refuses_unresolved_names(warp: bool) -> None:
+    outbounds = render_workload_config(_profile(warp=warp), reality_keys=_keys())["outbounds"]
+    direct = next(outbound for outbound in outbounds if outbound["tag"] == "direct")
+
+    # AsIs and every UseIP* strategy hand a name the DNS module could not answer to the
+    # host's plain resolver; ForceIP* fails the connection instead. IPv4 first keeps an
+    # IPv4-only exit from dialing an AAAA answer.
+    assert direct["settings"] == {"domainStrategy": "ForceIPv4v6"}
 
 
 def test_warp_is_preferred_without_removing_direct_or_block() -> None:
