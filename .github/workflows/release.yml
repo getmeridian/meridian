@@ -119,13 +119,15 @@ jobs:
 
       - name: Check if tag already exists
         id: check_tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           # A pre-release VERSION on main is never published as the latest stable
           # release; betas ship only through their own tag (see the prerelease job).
-          if echo "${{ steps.version.outputs.version }}" | grep -qE '(a|b|rc)[0-9]+$'; then
+          if echo "$VERSION" | grep -qE '(a|b|rc)[0-9]+$'; then
             echo "VERSION is a pre-release; skipping the stable release"
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          elif git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+          elif git rev-parse "v$VERSION" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -135,8 +137,9 @@ jobs:
       - name: Determine release type from semver
         id: semver
         if: steps.check_tag.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           # Get previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 --exclude '*a*' --exclude '*b*' --exclude '*rc*' 2>/dev/null || echo "")
           if [ -z "$PREV_TAG" ]; then
@@ -158,8 +161,9 @@ jobs:
       - name: Generate release notes
         id: notes
         if: steps.check_tag.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           # Extract the changelog section for this version
           # Matches from "## [X.Y.Z]" to the next "## [" or end of file
           if grep -q "## \[$VERSION\]" CHANGELOG.md; then
@@ -179,11 +183,10 @@ jobs:
         if: steps.check_tag.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          TYPE: ${{ steps.semver.outputs.type }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          TYPE="${{ steps.semver.outputs.type }}"
-          VERSION="${{ steps.version.outputs.version }}"
-
           # Prefix based on type
           case "$TYPE" in
             major) TITLE="Meridian $VERSION" ;;
