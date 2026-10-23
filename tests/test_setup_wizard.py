@@ -330,7 +330,18 @@ def test_relay_forwards_to_the_only_exit_without_asking(tmp_path) -> None:
     assert any("Relay" in line and "control (198.51.100.10)" in line for line in io.output)
 
 
-def test_routing_is_skipped_without_a_gateway_and_asked_with_one(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("answer", "action", "target_ref", "shown"),
+    [
+        ("1", "route", "exit", "exit"),
+        ("2", "direct", "", "directly from the gateway"),
+        ("3", "block", "", "nowhere (block it)"),
+    ],
+    ids=["exit", "direct-from-gateway", "block"],
+)
+def test_gateway_rules_pick_an_exit_direct_or_block_and_review_shows_them(
+    tmp_path, answer: str, action: str, target_ref: str, shown: str
+) -> None:
     store, shelf, service = _services(tmp_path)
     io = _ScriptedIO(
         [
@@ -349,19 +360,30 @@ def test_routing_is_skipped_without_a_gateway_and_asked_with_one(tmp_path) -> No
             ("Add a rule", "yes"),
             ("Match traffic by", "domain"),
             ("Values", "example.org"),
-            ("Block this traffic", "yes"),
+            ("Where should this traffic go?", answer),
             ("Add a rule", ""),
-            ("Names of the people", "save"),
+            ("Names of the people", ""),
+            ("Set this up now?", "save"),
         ]
     )
 
     assert _wizard(service, shelf, io).run() == "saved"
 
+    rules = [line for line in io.output if "Rule:" in line]
+    assert [line.split("Rule:")[1].strip() for line in rules] == [
+        f"example.org → {shown}",
+        "everything else → exit",
+    ]
     draft = store.load()
     assert draft is not None and draft.routing is not None
     assert draft.routing.default_egress_ref == "exit"
     (route,) = draft.routing.routes
-    assert (route.match, route.match_values, route.action) == ("domain", ["example.org"], "block")
+    assert (route.match, route.match_values, route.action, route.target_ref) == (
+        "domain",
+        ["example.org"],
+        action,
+        target_ref,
+    )
 
 
 def test_typing_exit_picks_the_role_instead_of_quitting(tmp_path) -> None:

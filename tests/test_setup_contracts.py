@@ -136,9 +136,19 @@ class TestOrderedRoutes:
         assert country.match_values == ["DE"]
         assert network.match_values == ["198.51.100.0/24"]
 
-    def test_block_route_rejects_egress_target(self) -> None:
-        with pytest.raises(ValidationError, match="Blocked routes cannot have"):
-            OrderedRouteIntent(id="blocked", priority=1, action="block", target_ref="exit-a")
+    @pytest.mark.parametrize(
+        ("action", "message"),
+        [("block", "Blocked routes cannot have"), ("direct", "Direct routes leave from the routing gateway")],
+        ids=["block", "direct"],
+    )
+    def test_targetless_routes_reject_an_egress_target(self, action: str, message: str) -> None:
+        with pytest.raises(ValidationError, match=message):
+            OrderedRouteIntent(id="rule", priority=1, action=action, target_ref="exit-a")
+
+    def test_direct_route_needs_no_target(self) -> None:
+        route = OrderedRouteIntent(id="domestic", priority=1, match="country", match_values=["ru"], action="direct")
+
+        assert (route.action, route.target_ref) == ("direct", "")
 
 
 class TestSetupIntent:

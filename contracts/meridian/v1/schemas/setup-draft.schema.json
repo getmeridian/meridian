@@ -229,6 +229,7 @@
           "default": "route",
           "enum": [
             "route",
+            "direct",
             "block"
           ],
           "title": "Action",

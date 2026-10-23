@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from meridian.cluster import RealityKeyBinding
+from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     ConfigProfilePayload,
     EgressBalancerSpec,
@@ -13,11 +14,13 @@ from meridian.compiler.models import (
     WorkloadRouteSpec,
     certificate_directory,
 )
+from meridian.core.topology import OrderedRouteIntent, RoutingGatewayIntent
 from meridian.xray_workload import (
     ServiceRouteCredential,
     WorkloadConfigError,
     render_workload_config,
 )
+from tests.support.topology import single_exit_intent
 
 _EDGE_A_TAG = "meridian-edge-0dbff829e6d1bdd5"
 _EDGE_B_TAG = "meridian-edge-c123917cc6e24846"
@@ -280,6 +283,42 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
         _EDGE_B_TAG,
     ]
     assert config["observatory"]["probeUrl"] == ("https://www.apple.com/library/test/success.html")
+
+
+def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> None:
+    intent = single_exit_intent(
+        routing_gateways=[RoutingGatewayIntent(id="gateway-a", server_ref="srv-gateway", bridge_path_ref="reality-a")],
+        routes=[
+            OrderedRouteIntent(id="domestic", priority=10, match="country", match_values=["RU"], action="direct"),
+            OrderedRouteIntent(id="ads", priority=20, match="domain", match_values=["ads.example.com"], action="block"),
+        ],
+    )
+    profile = next(
+        resource.payload
+        for resource in compile_topology(intent).resources
+        if resource.logical_id == "profile:gateway-a"
+    )
+    assert isinstance(profile, ConfigProfilePayload)
+    (edge,) = profile.service_outbounds
+    credential = ServiceRouteCredential(
+        address="198.51.100.20",
+        vless_uuid="11111111-1111-4111-8111-111111111111",
+        public_key="public-a",
+        short_id="aaaaaaaaaaaaaaaa",
+    )
+
+    config = render_workload_config(profile, reality_keys=_keys(), service_credentials={edge.edge_id: credential})
+
+    outbounds = {outbound["tag"]: outbound for outbound in config["outbounds"]}
+    assert outbounds["direct"] == {"tag": "direct", "protocol": "freedom"}
+    rules = [(rule.get("ruleTag"), rule.get("outboundTag")) for rule in config["routing"]["rules"]]
+    assert rules == [
+        (None, "block"),  # private ranges first, always
+        ("domestic", "direct"),
+        ("ads", "block"),
+        ("default", edge.tag),
+    ]
+    assert config["routing"]["rules"][1]["ip"] == ["geoip:ru"]
 
 
 def test_gateway_refuses_to_guess_missing_service_credentials() -> None:

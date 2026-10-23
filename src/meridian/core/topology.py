@@ -29,7 +29,8 @@ from meridian.core.inputs import (
 from meridian.core.models import CoreModel
 
 ServerCapability = Literal["panel", "exit", "relay", "routing_gateway"]
-TrafficRouteAction = Literal["route", "block"]
+# route: through an exit or pool; direct: out of the gateway's own address; block: dropped.
+TrafficRouteAction = Literal["route", "direct", "block"]
 ProtocolKind = Literal["reality", "xhttp", "wss", "hysteria2"]
 # Subscription order: the most censorship-resistant TCP path first, the UDP fallback last.
 PROTOCOL_PRIORITY: Final[tuple[ProtocolKind, ...]] = ("reality", "xhttp", "wss", "hysteria2")
@@ -263,6 +264,8 @@ class OrderedRouteIntent(CoreModel):
             raise ValueError("Routing rules require an exit or egress-pool target.")
         if self.action == "block" and self.target_ref:
             raise ValueError("Blocked routes cannot have an egress target.")
+        if self.action == "direct" and self.target_ref:
+            raise ValueError("Direct routes leave from the routing gateway itself and cannot name an exit or pool.")
         return self
 
 
@@ -372,6 +375,13 @@ class SetupIntent(CoreModel):
     # Pass each client's real address to Xray and the panel (PROXY protocol, X-Forwarded-For).
     # Off by default: Remnawave then never stores where users connect from.
     forward_client_ips: bool = False
+
+    def gateway_routes(self, gateway_ref: str) -> list[OrderedRouteIntent]:
+        """The enabled rules one routing gateway applies, in first-match order."""
+        return sorted(
+            (route for route in self.routes if route.enabled and route.source_gateway_ref in {"", gateway_ref}),
+            key=lambda route: (route.priority, route.id),
+        )
 
     def exits_in_delivery_order(self) -> list[ExitIntent]:
         """Exits as clients see them: the control server's first, then the rest by ID."""

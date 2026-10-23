@@ -47,7 +47,9 @@ from meridian.core.topology import (
     EgressPoolIntent,
     OrderedRouteIntent,
     RouteMatchKind,
+    SetupIntent,
     TopologyServerShelfItem,
+    TrafficRouteAction,
     assign_access_usernames,
 )
 from meridian.i18n import t, words
@@ -80,6 +82,8 @@ SuggestSni = Callable[[str], CamouflageSites]
 CheckOwnDomain = Callable[[str, str], "OwnHostname"]
 # The camouflage choice for the operator's own domain; no hostname equals it (hostnames need a dot).
 OWN_DOMAIN = "own-domain"
+# Rule targets that are not an exit or pool; the colon keeps them apart from topology IDs.
+_RULE_ACTIONS: dict[str, TrafficRouteAction] = {":direct": "direct", ":block": "block"}
 Role = Literal["exit", "relay", "gateway", "control"]
 
 _PROTOCOL_LABELS = {"reality": "Reality", "xhttp": "XHTTP", "wss": "WSS", "hysteria2": "Hysteria2"}
@@ -425,8 +429,15 @@ class SetupWizard:
                 [Choice(kind, t(f"routing.match_{kind}")) for kind in ("country", "domain", "ip", "network")],
             )
             values = [value.strip() for value in self.prompt.ask(t("routing.values")).split(",") if value.strip()]
-            block = self.prompt.yes_no(t("routing.block"), default=False)
-            target = "" if block else self.prompt.choose(t("routing.target"), targets)
+            target = self.prompt.choose(
+                t("routing.target"),
+                [
+                    *targets,
+                    Choice(":direct", t("routing.target_direct"), t("routing.target_direct_hint")),
+                    Choice(":block", t("routing.target_block")),
+                ],
+            )
+            action = _RULE_ACTIONS.get(target, "route")
             source = gateway_ids[0]
             if len(gateway_ids) > 1:
                 source = self.prompt.choose(t("routing.source"), [Choice(ref, ref) for ref in gateway_ids])
@@ -436,8 +447,8 @@ class SetupWizard:
                     priority=(len(routes) + 1) * 10,
                     match=cast(RouteMatchKind, match),
                     match_values=values,
-                    action="block" if block else "route",
-                    target_ref=target,
+                    action=action,
+                    target_ref=target if action == "route" else "",
                     source_gateway_ref=source,
                 )
             )
@@ -546,6 +557,8 @@ class SetupWizard:
             row(t("review.relay"), f"{hops} → {relay.exit_ref}")
         for gateway in intent.routing_gateways:
             row(t("review.gateway"), server(gateway.server_ref))
+            for values, target in _gateway_rules(intent, gateway.id):
+                row("", t("review.rule", values=values, target=target))
         row(t("review.users"), ", ".join(intent.access.display_name(user) for user in intent.access.users))
         self.prompt.explain(t("review.ru_direct"))
         self.prompt.say(t("review.plan", hash=review.review_hash[:12], count=len(review.plan.resources)), style="dim")
@@ -576,6 +589,24 @@ def _unique_id(candidate: str, used: set[str]) -> str:
         value, suffix = f"{candidate}-{suffix}", suffix + 1
     used.add(value)
     return value
+
+
+def _gateway_rules(intent: SetupIntent, gateway_ref: str) -> list[tuple[str, str]]:
+    """A gateway's rules as (what, where) in first-match order, ending with where the rest goes."""
+    routes = intent.gateway_routes(gateway_ref)
+    everything = t("review.everything_else")
+    rules = [(", ".join(route.match_values) or everything, _rule_target(route)) for route in routes]
+    if not any(route.match == "all" for route in routes):
+        rules.append((everything, intent.default_egress_ref))
+    return rules
+
+
+def _rule_target(route: OrderedRouteIntent) -> str:
+    if route.action == "direct":
+        return t("routing.target_direct")
+    if route.action == "block":
+        return t("routing.target_block")
+    return route.target_ref
 
 
 def _validation_message(exc: Exception) -> str:

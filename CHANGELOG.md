@@ -196,6 +196,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
   exit's default egress (for example, AI services that block datacenter IPs).
   `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **Gateway rules can send traffic directly** — a routing-gateway rule can
+  send matching traffic out of the gateway itself instead of to an exit or
+  pool, so Russian sites can leave from a gateway in Russia. The wizard offers
+  "directly from the gateway" next to your exits and "nowhere"; in a topology
+  file it is `"action": "direct"`. The setup summary lists each gateway rule
+  with where it goes, and existing gateways compile unchanged.
 - **Relays look like nothing in particular** — nothing a hosting provider can
   list on a relay (service, binary, config path, firewall comment) names
   Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.

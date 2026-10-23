@@ -5,7 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
-export type Action = "route" | "block";
+export type Action = "route" | "direct" | "block";
 export type Enabled = boolean;
 export type Id = string;
 export type Match = "all" | "country" | "domain" | "ip" | "network";
