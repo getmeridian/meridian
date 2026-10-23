@@ -16,6 +16,7 @@ uv run pytest tests/ -k "test_name"    # by pattern
 | **System lab** | Real multi-node deploy via Docker: panel+node, relay, connection tests | `tests/systemlab/` |
 
 **Integration-level verification** — tests pin contracts (API returns X → we handle Y), not one test per function.
+**Xray routing runtime** — `MERIDIAN_TEST_XRAY=/path/to/xray uv run pytest tests/test_client_routes_runtime.py` runs real TCP/UDP packets against loopback outbounds. CI supplies the checksum-verified pinned binary on Python 3.12; ordinary local tests skip it unless opted in.
 **MockConnection** — `conn.when("pattern", stdout=..., rc=0)` stubs SSH commands by substring; first match wins, unmatched commands succeed, so register only what differs.
 **`tmp_home`** isolates the Meridian home (`MERIDIAN_HOME`) per test; **`servers_file`** is an isolated server-profile store.
 **Shared doubles and builders live in `tests/support/`** — `mock_connection.py`, `CaptureReporter`, `CancellationFlag`, and `topology.py` (`single_exit_intent`, `resource_plan`, `firewall_resource`, `panel_mock`). Search there before writing a local intent, plan, or panel builder.

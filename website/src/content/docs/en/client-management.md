@@ -107,6 +107,10 @@ One subscription URL serves each app the format it reads. Every change to Meridi
 
 Apps ship their own engine updates, so an app may run a slightly older or newer engine than the one tested.
 
+### BitTorrent in Xray apps
+
+Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorrent peer connections directly from the device, so torrents use the person's own connection and don't trip Torrent Blocker on the exit. This is best effort: encrypted peers and UDP DHT/uTP may still go through the VPN. Mihomo, sing-box, and Base64 subscriptions don't get this rule.
+
 ## Where client data lives
 
 Client accounts (keys, status, traffic) live in the Remnawave panel database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the panel API and don't need SSH; publishing a connection page uses SSH to the control server.

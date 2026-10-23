@@ -293,6 +293,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   send local-network, `.ru`/`.su`/`.рф`, `geosite:category-ru`, and `geoip:ru`
   traffic directly and refuse foreign QUIC, while the exit's block stays as a
   safety net. Plain Base64 imports still need the app's own routing settings.
+- **Torrents skip the VPN in Xray apps** — Xray JSON subscriptions send
+  recognized BitTorrent peer connections directly from the device, so a torrent
+  client left running doesn't trip Torrent Blocker and cut off the person's VPN.
+  Encrypted peers and UDP DHT/uTP may still use the tunnel; Mihomo, sing-box, and
+  Base64 subscriptions are unchanged.
 - **sing-box apps get a Meridian profile** — sing-box-based apps (SFA, SFI,
   Karing) pick the fastest working entry automatically, can still choose one
   by hand, and send local-network and `.ru`/`.su`/`.рф` sites directly. Nothing

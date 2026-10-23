@@ -107,6 +107,10 @@ HWID 设备数限制保存在面板中，而不是链接里。重新签发后，
 
 应用会自行发布引擎更新，因此应用运行的引擎可能比测试的版本略旧或略新。
 
+### Xray 应用中的 BitTorrent
+
+Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitTorrent 对等连接直接从设备发出，因此种子流量走用户自己的网络，不会触发出口上的 Torrent Blocker。这只是尽力而为：加密的对等连接和 UDP（DHT/uTP）仍可能经过 VPN。Mihomo、sing-box 和 Base64 订阅不包含这条规则。
+
 ## 客户端数据存放在哪里
 
 客户端账户（密钥、状态、流量）保存在控制服务器上的 Remnawave 面板数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用面板 API，不需要 SSH；发布连接页面则会通过 SSH 连接控制服务器。

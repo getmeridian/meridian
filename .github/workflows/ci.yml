@@ -35,6 +35,20 @@ jobs:
       - name: Install package with dev dependencies
         run: uv sync --extra dev
 
+      - name: Prepare pinned Xray for client routing tests
+        if: matrix.python-version == '3.12'
+        run: |
+          uv run python - <<'PY'
+          import os
+          from meridian.xray_client import ensure_xray_binary
+
+          binary = ensure_xray_binary()
+          if binary is None:
+              raise SystemExit("Could not prepare checksum-verified Xray runtime")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"MERIDIAN_TEST_XRAY={binary}\n")
+          PY
+
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
