@@ -14,7 +14,7 @@ _RENDERER_MANIFEST = {
     "panel-compose": "neutral-names-v3",
     "realm": "neutral-systemd-musl-v3",
     "server-baseline": "fail2ban-journal-v3",
-    "xray-workload": "sniffing-v7",
+    "xray-workload": "exit-doh-v8",
 }
 
 RENDERER_CONTRACT = "meridian.renderer-contract/v1@sha256:" + canonical_hash(_RENDERER_MANIFEST)

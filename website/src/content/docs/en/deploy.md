@@ -192,7 +192,7 @@ meridian route list
 meridian route remove exit-1 warp
 ```
 
-Values are domains (subdomains included), `geosite:NAME` lists, or `geoip:NAME` lists from the stock v2fly data files; one route holds one kind. `--via direct` does the opposite on a WARP exit: those destinations skip WARP. Routes apply in the order you added them, before the exit's default egress and before geo-blocking. These routes live on the server; they are separate from the client-side rules that send Russian sites direct on the user's device.
+Values are domains (subdomains included), `geosite:NAME` lists, or `geoip:NAME` lists from the stock v2fly data files; one route holds one kind. `--via direct` does the opposite on a WARP exit: those destinations skip WARP. Routes apply in the order you added them, before the exit's default egress and before geo-blocking. These routes live on the server; they are separate from the client-side rules that send Russian sites direct on the user's device, and from routing-gateway rules, which can send traffic directly from a domestic gateway ([Split routing](/en/split-routing/#through-a-routing-gateway)).
 
 ## Geo-blocking
 

@@ -19,6 +19,7 @@ description: 安全设计、漏洞报告和范围。
 - **面板访问**：Remnawave 管理 UI 由 nginx 在秘密 HTTPS 路径反向代理 — 不需要 SSH 隧道。连接页面和订阅链接使用单独的路径并永不显示面板的。URL 和管理员凭证在 `~/.config/meridian/cluster.yml` 的 `panel` 部分
 - **SSH**：默认禁用密码认证，并启用 fail2ban（`--no-harden` 跳过两者加防火墙，用于与其他服务共享的服务器）
 - **防火墙**：UFW 拒绝入站流量除了服务器的 SSH 端口和其角色需要的端口 — TCP/443 用于代理流量、TCP/80 用于证书签发、UDP/443 仅当启用 Hysteria2、以及中继上的监听端口
+- **出口 DNS**：出口服务器通过加密 DNS 解析每个目标（DNS over HTTPS，同时询问 Cloudflare、Quad9 和 Google，均按 IP 地址连接），从不使用托管商的解析器，因此任何目标域名都不会以明文离开服务器。如果三者都没有响应，经该出口按域名访问的网站会失败，而不会退回明文 DNS；`meridian check` 会报告服务器无法连接的解析器
 - **固定软件**：Remnawave 镜像固定到已测试版本；Realm、Xray（用于 `meridian test`）和 RealiTLScanner 下载是版本固定和校验和验证的
 - **TLS**：[acme.sh](https://github.com/acmesh-official/acme.sh) 通过 Let's Encrypt 处理证书，由 nginx 提供
 

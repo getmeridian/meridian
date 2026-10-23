@@ -36,10 +36,7 @@ def compile_gateway_routing(intent: SetupIntent, gateway: RoutingGatewayIntent) 
     """Expand one gateway without allocating ports or remote credentials."""
     entry_path = _entry_path(intent, gateway)
     pools = {pool.id: pool for pool in intent.egress_pools}
-    relevant_routes = sorted(
-        (route for route in intent.routes if route.enabled and route.source_gateway_ref in {"", gateway.id}),
-        key=lambda route: (route.priority, route.id),
-    )
+    relevant_routes = intent.gateway_routes(gateway.id)
     target_refs = {
         intent.default_egress_ref,
         *(route.target_ref for route in relevant_routes if route.action == "route"),
@@ -177,14 +174,15 @@ def _route_spec(
     target_ref: str,
     pools: dict[str, EgressPoolIntent],
 ) -> WorkloadRouteSpec:
-    if action == "block":
+    if action in ("block", "direct"):
+        # The gateway's own blackhole and freedom Outbounds: no exit, no bridge edge.
         return WorkloadRouteSpec(
             route_id=route_id,
             priority=priority,
             match=match,
             match_values=match_values,
             target_type="outbound",
-            target_tag="block",
+            target_tag=action,
         )
     if target_ref in pools:
         return WorkloadRouteSpec(

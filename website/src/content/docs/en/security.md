@@ -19,6 +19,7 @@ We aim to respond within 48 hours and will credit reporters in the fix.
 - **Panel access**: the Remnawave admin UI is reverse-proxied by nginx at a secret HTTPS path — no SSH tunnel required. Connection pages and subscription links use a separate path and never reveal the panel's. The URL and admin credentials are in the `panel` section of `~/.config/meridian/cluster.yml`
 - **SSH**: password authentication disabled and fail2ban enabled by default (`--no-harden` skips both, plus the firewall, for servers shared with other services)
 - **Firewall**: UFW denies inbound traffic except the server's SSH ports and the ports its role needs — TCP/443 for proxy traffic, TCP/80 where certificates are issued, UDP/443 only when Hysteria2 is enabled, and the listen port on relays
+- **Exit DNS**: exits look up every destination over encrypted DNS (DNS over HTTPS to Cloudflare, Quad9, and Google at once, reached by IP address), never through the hosting provider's resolver, so no destination name leaves the server in plain text. If none of the three answers, sites by name fail through that exit instead of falling back to plain DNS; `meridian check` reports a resolver the server cannot reach
 - **Pinned software**: Remnawave images are pinned to tested versions; Realm, Xray (for `meridian test`), and RealiTLScanner downloads are version-pinned and checksum-verified
 - **TLS**: [acme.sh](https://github.com/acmesh-official/acme.sh) handles certificates via Let's Encrypt, served by nginx
 

@@ -27,6 +27,11 @@ PLUGINS_READY = build_verification_check(
     "Node plugin readiness",
     [finding("NODE_PLUGIN_KERNEL", "passed", "Kernel 6.8.0 supports node plugins")],
 )
+DNS_REACHABLE = build_verification_check(
+    "exit_dns",
+    "Encrypted DNS",
+    [finding("EXIT_DNS", "passed", "Cloudflare, Quad9 and Google answer DNS over HTTPS")],
+)
 
 
 @pytest.fixture
@@ -74,6 +79,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         tls=MagicMock(return_value=PASSED),
         blocking=MagicMock(return_value=[]),
         plugins=MagicMock(return_value=kwargs.pop("plugins", PLUGINS_READY)),
+        exit_dns=MagicMock(return_value=DNS_REACHABLE),
     )
     with (
         patch.object(health, "topology_from_local_cluster", return_value=SimpleNamespace(nodes=[fleet.node])),
@@ -84,6 +90,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
         patch.object(health, "check_tls_certificate", mocks.tls),
         patch.object(health, "check_disk_space", return_value=PASSED),
         patch.object(health, "check_node_plugin_host", mocks.plugins),
+        patch.object(health, "check_exit_dns", mocks.exit_dns),
         patch.object(health, "deployment_verification_context", return_value=fleet.deployment),
         patch.object(health, "blocking_jobs", mocks.blocking),
         patch("meridian.commands.relay_check.collect_relay_check", return_value=SimpleNamespace(checks=[])) as relay,
@@ -113,6 +120,13 @@ def test_node_hosts_report_plugin_readiness(fleet: SimpleNamespace) -> None:
     plugins = _run(fleet, "exit-a").plugins
 
     plugins.assert_called_once_with(fleet.conn)
+
+
+def test_node_hosts_report_encrypted_dns_reachability(fleet: SimpleNamespace) -> None:
+    mocks = _run(fleet, "exit-a")
+
+    # Exits resolve only over DoH; a host that reaches no resolver must show up in `check`.
+    mocks.exit_dns.assert_called_once_with(fleet.conn)
 
 
 def test_unready_plugin_host_is_reported_with_its_fix(

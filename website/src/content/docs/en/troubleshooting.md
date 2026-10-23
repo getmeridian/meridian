@@ -134,6 +134,7 @@ See the [IP Blocked Recovery guide](/en/recovery/) for recovery options (replace
 Other causes:
 - Server rebooted and services didn't start → `meridian plan` shows what is off and `meridian apply` repairs it. By hand: `docker compose up -d` in `/opt/ctlsvc` and `/opt/netagent`, then `systemctl restart nginx`
 - Disk full → `df -h /`, `docker system prune -af`
+- Connected, but sites by name do not open (IP addresses still do) → the exit reaches none of its encrypted DNS resolvers. `meridian check` names them under **Encrypted DNS**; allow outbound TCP 443 to those addresses in the provider's firewall
 
 ## Slow speeds
 

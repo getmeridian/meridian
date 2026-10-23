@@ -22,6 +22,42 @@ from meridian.provision.warp import WARP_PROXY_PORT
 REALITY_MIN_CLIENT_VERSION = "1.8.0"
 
 
+@dataclass(frozen=True)
+class DohResolver:
+    """One encrypted resolver endpoint, addressed by IP so reaching it needs no lookup."""
+
+    operator: str
+    address: str
+
+    @property
+    def url(self) -> str:
+        """The RFC 8484 endpoint, as any HTTPS client reaches it."""
+        host = f"[{self.address}]" if ":" in self.address else self.address
+        return f"https://{host}/dns-query"
+
+    @property
+    def xray_server(self) -> str:
+        """Xray's local-mode spelling: dialed from the host, never through routing."""
+        return "https+local://" + self.url.removeprefix("https://")
+
+
+# Every name a workload resolves (routing matches and the direct outbound) goes to these:
+# privacy-audited Cloudflare, non-profit Quad9 (unfiltered, no ECS), and Google, over IPv4 and
+# IPv6, so blocking one operator or family leaves the rest. Each certificate carries these IPs,
+# so reaching them needs no bootstrap lookup.
+EXIT_DOH_RESOLVERS = (
+    DohResolver("Cloudflare", "1.1.1.1"),
+    DohResolver("Quad9", "9.9.9.10"),
+    DohResolver("Google", "8.8.8.8"),
+    DohResolver("Cloudflare", "2606:4700:4700::1111"),
+    DohResolver("Quad9", "2620:fe::10"),
+    DohResolver("Google", "2001:4860:4860::8888"),
+)
+# How long one endpoint may take before its answer is ignored (Xray's default is 4 s). Queries run
+# in parallel, so a resolver that silently drops packets never delays a lookup another answers.
+_DOH_TIMEOUT_MS = 2000
+
+
 class WorkloadConfigError(MeridianError):
     """A reviewed workload cannot be rendered without rotating or guessing state."""
 
@@ -68,7 +104,7 @@ def render_workload_config(
         outbounds.append(warp_outbound)
     outbounds.extend(
         [
-            {"tag": "direct", "protocol": "freedom"},
+            _direct_outbound(profile),
             {"tag": "block", "protocol": "blackhole"},
         ]
     )
@@ -110,15 +146,7 @@ def render_workload_config(
         # No access log: it would record every user's destinations on the server.
         # Remnawave reads only startup errors from the log; IP stats use the API.
         "log": {"loglevel": "warning", "access": "none"},
-        "dns": {
-            "servers": [
-                {
-                    "address": "https://dns.google/dns-query",
-                    "domains": ["geosite:geolocation-!cn"],
-                },
-                "8.8.8.8",
-            ]
-        },
+        "dns": _dns_config(profile),
         "routing": routing,
         "inbounds": inbounds,
         "outbounds": outbounds,
@@ -136,6 +164,39 @@ def render_workload_config(
             "enableConcurrency": True,
         }
     return config
+
+
+def _direct_outbound(profile: ConfigProfilePayload) -> dict[str, Any]:
+    """Return the freedom Outbound; an exit resolves its destinations only through DoH.
+
+    ForceIP refuses a name no resolver answers instead of handing it to plain DNS. IPv4 first,
+    IPv6 only for names without an A record, so an IPv4-only exit never dials an IPv6 address.
+    A routing gateway usually sits in the censored country, where foreign DoH can be blocked, so it
+    keeps the host resolver until split resolution there is tested from inside.
+    """
+    if profile.workload_kind == "routing_gateway":
+        return {"tag": "direct", "protocol": "freedom"}
+    return {"tag": "direct", "protocol": "freedom", "settings": {"domainStrategy": "ForceIPv4v6"}}
+
+
+def _dns_config(profile: ConfigProfilePayload) -> dict[str, Any]:
+    """Return the encrypted-only resolver block an exit renders.
+
+    ``https+local`` dials each resolver from the host directly, so a lookup never rides the
+    routing rules (WARP, gateway routes, geo blocks) it is resolving for. With servers listed
+    Xray adds no implicit system resolver, so when every endpoint fails the lookup fails.
+    ``UseSystem`` asks only for the address families this host can route. Parallel queries ask every
+    endpoint at once and take the first answer: each operator sees each lookup, but one silent
+    resolver no longer adds its timeout to every connection.
+    """
+    if profile.workload_kind == "routing_gateway":
+        google = {"address": "https://dns.google/dns-query", "domains": ["geosite:geolocation-!cn"]}
+        return {"servers": [google, "8.8.8.8"]}
+    return {
+        "servers": [{"address": resolver.xray_server, "timeoutMs": _DOH_TIMEOUT_MS} for resolver in EXIT_DOH_RESOLVERS],
+        "queryStrategy": "UseSystem",
+        "enableParallelQuery": True,
+    }
 
 
 def _render_inbound(

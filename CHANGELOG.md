@@ -196,6 +196,18 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
   exit's default egress (for example, AI services that block datacenter IPs).
   `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **Gateway rules can send traffic directly** — a routing-gateway rule can
+  send matching traffic out of the gateway itself instead of to an exit or
+  pool, so Russian sites can leave from a gateway in Russia. The wizard offers
+  "directly from the gateway" next to your exits and "nowhere"; in a topology
+  file it is `"action": "direct"`. The setup summary lists each gateway rule
+  with where it goes, and existing gateways compile unchanged.
+- **Gateway rules match zones and site lists** — a domain rule takes a bare
+  zone such as `ru`, `su`, or `рф` (every site under it), and a new site-list
+  rule takes `geosite:` names such as `category-ru`, the same lists the Xray
+  JSON and Mihomo subscriptions send directly. Both match the site name, so
+  the gateway needs no lookup. Exit routes (`meridian route add`) take zones
+  too.
 - **Relays look like nothing in particular** — nothing a hosting provider can
   list on a relay (service, binary, config path, firewall comment) names
   Meridian, Realm, a relay, or a VPN. Existing relays switch on the next apply.
@@ -354,6 +366,16 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   and secrets, is renamed in place, so users, client links, and API tokens stay.
   `meridian check` and `meridian doctor` name the role behind each container,
   and `meridian teardown` removes both the old and the new names.
+- **Exits look up destinations over encrypted DNS only** — the exit's direct
+  egress used the host's resolver, so the hosting provider saw every site its
+  users opened in plain-text DNS, and a failed encrypted lookup fell back to
+  plain `8.8.8.8`. Exits now resolve every name over DNS over HTTPS, asking
+  Cloudflare, Quad9, and Google at once (each reached by IP address on IPv4 or
+  IPv6), and never fall back to plain DNS: if none answers, sites by
+  name fail through that server, and `meridian check` reports a resolver the
+  server cannot reach. The system lab sniffs an exit during proxied traffic and
+  requires no plain DNS question on the wire. Servers pick this up on the next
+  `meridian apply`.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.

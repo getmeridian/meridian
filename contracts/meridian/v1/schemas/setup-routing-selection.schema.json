@@ -57,6 +57,7 @@
           "default": "route",
           "enum": [
             "route",
+            "direct",
             "block"
           ],
           "title": "Action",
@@ -80,6 +81,7 @@
             "all",
             "country",
             "domain",
+            "geosite",
             "ip",
             "network"
           ],

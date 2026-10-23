@@ -1046,3 +1046,102 @@ def test_mixed_case_usernames_compile_to_lowercase_logical_ids() -> None:
 def test_usernames_that_differ_only_by_case_are_refused() -> None:
     with pytest.raises(ValidationError, match="ignoring case"):
         AccessIntent(users=["biba", "Biba"])
+
+
+def _with_routes(*routes: dict[str, object]) -> SetupIntent:
+    return SetupIntent.model_validate({**_intent().model_dump(), "routes": list(routes)})
+
+
+# Desired hashes of the gateway's resources in `_intent()`, pinned before rules could go direct.
+_GATEWAY_HASHES = {
+    "profile:gateway-a": "a34539612febf3e8d93fd024c57bb7b47f283a8720cd8f019e775f417c9f5c71",
+    "egress-pool:gateway-a:primary": "c5326c066a94e7c1b60904632e08888a82a091645960e869664a419438c2a93a",
+    "route:gateway-a:regional": "30643b4ad8091e1155bb2f2bb1915d13fe5c5d95eebcb9929cb76bf80df012f5",
+    "route:gateway-a:default": "c112833434bfde60b8d45ab172a2eefd34c594249517fdf5da13b04ae6e3b9b6",
+    "gateway:gateway-a": "8bb560e430275cc565104216c873c8eca8ce638d3c5549b4d87df9f6a8a73ea7",
+}
+
+
+def test_existing_gateway_plan_compiles_byte_identically() -> None:
+    """A rule vocabulary change must not re-apply fleets that never use the new target."""
+    plan = compile_topology(_intent())
+    hashes = {resource.logical_id: resource.desired_hash for resource in plan.resources}
+
+    assert plan.intent_hash == "8044d5946f5ba0870d77847364d6fdc54ea1ff170cc086144e018ef2c287bc7c"
+    assert {logical_id: hashes[logical_id] for logical_id in _GATEWAY_HASHES} == _GATEWAY_HASHES
+
+
+def test_direct_gateway_rules_use_the_gateways_own_freedom_outbound_in_order() -> None:
+    intent = _with_routes(
+        {
+            "id": "domestic-sites",
+            "priority": 5,
+            "match": "domain",
+            "match_values": ["gosuslugi.ru"],
+            "action": "direct",
+        },
+        {"id": "regional", "priority": 10, "match": "country", "match_values": ["RU"], "target_ref": "primary"},
+        {
+            "id": "local-net",
+            "priority": 20,
+            "match": "ip",
+            "match_values": ["198.51.100.0/24"],
+            "action": "direct",
+            "source_gateway_ref": "gateway-a",
+        },
+    )
+    resources = {resource.logical_id: resource.payload for resource in compile_topology(intent).resources}
+    profile = resources["profile:gateway-a"]
+    assert isinstance(profile, ConfigProfilePayload)
+
+    assert [(rule.route_id, rule.target_type, rule.target_tag) for rule in profile.routing_rules] == [
+        ("domestic-sites", "outbound", "direct"),
+        ("regional", "balancer", "meridian-pool-gateway-a-primary"),
+        ("local-net", "outbound", "direct"),
+        ("default", "balancer", "meridian-pool-gateway-a-primary"),
+    ]
+    assert profile.outbound_tags == ["direct"]
+    # A direct rule needs no bridge: edges still go only to the pool's exits.
+    assert [edge.target_workload_ref for edge in profile.service_outbounds] == ["exit-a", "exit-b"]
+    route = resources["route:gateway-a:domestic-sites"]
+    assert isinstance(route, RouteRulePayload)
+    assert (route.action, route.target_ref, route.target_type, route.target_tag) == ("direct", "", "outbound", "direct")
+
+
+def test_direct_catch_all_replaces_the_default_route() -> None:
+    intent = _with_routes(
+        {"id": "abroad", "priority": 10, "match": "country", "match_values": ["DE"], "target_ref": "exit-a"},
+        {"id": "rest", "priority": 20, "action": "direct"},
+    )
+    profile = next(
+        resource.payload
+        for resource in compile_topology(intent).resources
+        if resource.logical_id == "profile:gateway-a"
+    )
+    assert isinstance(profile, ConfigProfilePayload)
+
+    assert [(rule.route_id, rule.target_tag) for rule in profile.routing_rules] == [
+        ("abroad", edge_outbound_tag("gateway-a", "exit-a")),
+        ("rest", "direct"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("route", "message"),
+    [
+        ({"id": "domestic", "priority": 1, "action": "direct", "target_ref": "primary"}, "cannot name an exit or pool"),
+        (
+            {"id": "domestic", "priority": 1, "action": "direct", "source_gateway_ref": "gateway-b"},
+            "unknown routing gateway",
+        ),
+    ],
+    ids=["names-a-pool", "unknown-gateway"],
+)
+def test_direct_gateway_rules_are_validated(route: dict[str, object], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        _with_routes(route)
+
+
+def test_direct_rules_need_a_routing_gateway() -> None:
+    with pytest.raises(ValidationError, match="require at least one routing gateway"):
+        single_exit_intent(routes=[OrderedRouteIntent(id="domestic", priority=1, action="direct")])

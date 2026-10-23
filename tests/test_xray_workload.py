@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import ipaddress
+from urllib.parse import urlsplit
+
 import pytest
 
 from meridian.cluster import RealityKeyBinding
+from meridian.compiler import compile_topology
 from meridian.compiler.models import (
     ConfigProfilePayload,
     EgressBalancerSpec,
@@ -13,11 +17,14 @@ from meridian.compiler.models import (
     WorkloadRouteSpec,
     certificate_directory,
 )
+from meridian.core.topology import OrderedRouteIntent, RoutingGatewayIntent
 from meridian.xray_workload import (
+    EXIT_DOH_RESOLVERS,
     ServiceRouteCredential,
     WorkloadConfigError,
     render_workload_config,
 )
+from tests.support.topology import single_exit_intent
 
 _EDGE_A_TAG = "meridian-edge-0dbff829e6d1bdd5"
 _EDGE_B_TAG = "meridian-edge-c123917cc6e24846"
@@ -159,6 +166,38 @@ def test_access_logging_is_disabled() -> None:
     assert config["log"] == {"loglevel": "warning", "access": "none"}
 
 
+@pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
+def test_every_lookup_goes_to_ip_addressed_doh_and_never_the_host_resolver(warp: bool) -> None:
+    dns = render_workload_config(_profile(warp=warp), reality_keys=_keys())["dns"]
+
+    hosts = []
+    for server in dns["servers"]:
+        url = urlsplit(server["address"])
+        # "+local" dials from the host, so a lookup never rides the routes it resolves for;
+        # a hostname would need a plain bootstrap lookup, and "localhost" is the host resolver.
+        assert url.scheme == "https+local", server
+        hosts.append(ipaddress.ip_address(url.hostname or ""))
+    # Fallbacks exist on both families, so a single-stack exit always has one to ask.
+    assert {host.version for host in hosts} == {4, 6}
+    assert len({resolver.operator for resolver in EXIT_DOH_RESOLVERS}) >= 2
+    # Only the families this host can route: an IPv4-only exit never waits on AAAA answers.
+    assert dns["queryStrategy"] == "UseSystem"
+    assert dns.get("disableFallback") is not True
+    # Asked at once: a resolver that silently drops packets never delays a lookup another answers.
+    assert dns["enableParallelQuery"] is True
+
+
+@pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
+def test_direct_egress_resolves_through_doh_and_refuses_unresolved_names(warp: bool) -> None:
+    outbounds = render_workload_config(_profile(warp=warp), reality_keys=_keys())["outbounds"]
+    direct = next(outbound for outbound in outbounds if outbound["tag"] == "direct")
+
+    # AsIs and every UseIP* strategy hand a name the DNS module could not answer to the
+    # host's plain resolver; ForceIP* fails the connection instead. IPv4 first keeps an
+    # IPv4-only exit from dialing an AAAA answer.
+    assert direct["settings"] == {"domainStrategy": "ForceIPv4v6"}
+
+
 def test_warp_is_preferred_without_removing_direct_or_block() -> None:
     config = render_workload_config(_profile(warp=True), reality_keys=_keys())
     assert [outbound["tag"] for outbound in config["outbounds"]] == [
@@ -280,6 +319,50 @@ def test_gateway_renders_ordered_service_routes_and_fail_closed_balancer() -> No
         _EDGE_B_TAG,
     ]
     assert config["observatory"]["probeUrl"] == ("https://www.apple.com/library/test/success.html")
+
+
+def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> None:
+    intent = single_exit_intent(
+        routing_gateways=[RoutingGatewayIntent(id="gateway-a", server_ref="srv-gateway", bridge_path_ref="reality-a")],
+        routes=[
+            OrderedRouteIntent(id="zones", priority=5, match="domain", match_values=["ru", "рф"], action="direct"),
+            OrderedRouteIntent(id="sites", priority=6, match="geosite", match_values=["category-ru"], action="direct"),
+            OrderedRouteIntent(id="domestic", priority=10, match="country", match_values=["RU"], action="direct"),
+            OrderedRouteIntent(id="ads", priority=20, match="domain", match_values=["ads.example.com"], action="block"),
+        ],
+    )
+    profile = next(
+        resource.payload
+        for resource in compile_topology(intent).resources
+        if resource.logical_id == "profile:gateway-a"
+    )
+    assert isinstance(profile, ConfigProfilePayload)
+    (edge,) = profile.service_outbounds
+    credential = ServiceRouteCredential(
+        address="198.51.100.20",
+        vless_uuid="11111111-1111-4111-8111-111111111111",
+        public_key="public-a",
+        short_id="aaaaaaaaaaaaaaaa",
+    )
+
+    config = render_workload_config(profile, reality_keys=_keys(), service_credentials={edge.edge_id: credential})
+
+    outbounds = {outbound["tag"]: outbound for outbound in config["outbounds"]}
+    assert outbounds["direct"] == {"tag": "direct", "protocol": "freedom"}
+    # A gateway inside the censored country keeps its pre-DoH resolver: foreign DoH can be blocked there.
+    assert config["dns"]["servers"][-1] == "8.8.8.8"
+    rules = [(rule.get("ruleTag"), rule.get("outboundTag")) for rule in config["routing"]["rules"]]
+    assert rules == [
+        (None, "block"),  # private ranges first, always
+        ("zones", "direct"),
+        ("sites", "direct"),
+        ("domestic", "direct"),
+        ("ads", "block"),
+        ("default", edge.tag),
+    ]
+    assert config["routing"]["rules"][1]["domain"] == ["domain:ru", "domain:xn--p1ai"]
+    assert config["routing"]["rules"][2]["domain"] == ["geosite:category-ru"]
+    assert config["routing"]["rules"][3]["ip"] == ["geoip:ru"]
 
 
 def test_gateway_refuses_to_guess_missing_service_credentials() -> None:

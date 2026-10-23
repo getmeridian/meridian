@@ -134,6 +134,7 @@ description: 常见问题、解决方案和诊断工具。
 其他原因：
 - 服务器重启后服务未随之启动 → `meridian plan` 会显示未运行的组件，`meridian apply` 会将其修复。也可手动恢复：在 `/opt/ctlsvc` 和 `/opt/netagent` 中运行 `docker compose up -d`，然后执行 `systemctl restart nginx`
 - 磁盘已满 → `df -h /`、`docker system prune -af`
+- 已连接，但按域名无法打开网站（按 IP 地址可以）→ 出口服务器无法连接任何加密 DNS 解析器。`meridian check` 会在 **Encrypted DNS** 下列出它们；请在服务商防火墙中放行到这些地址的出站 TCP 443
 
 ## 速度慢
 

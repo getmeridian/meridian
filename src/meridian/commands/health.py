@@ -36,6 +36,7 @@ from meridian.diagnostics.checks import (
     check_tls_certificate,
 )
 from meridian.diagnostics.evidence import check_from_result, finding, finish_check
+from meridian.diagnostics.exit_dns import check_exit_dns
 from meridian.diagnostics.network import resolve_hostname
 from meridian.diagnostics.node_plugins import check_node_plugin_host
 from meridian.diagnostics.preflight import collect_preflight
@@ -281,6 +282,8 @@ def _server_report(
         checks.append(check_from_result(f"container:{container.name}", container.label, result))
     if NODE in containers:
         checks.append(check_node_plugin_host(conn))
+    if "exit" in roles:
+        checks.append(check_exit_dns(conn))
 
     try:
         deployment = deployment_verification_context(cluster, registry, entry.host)
