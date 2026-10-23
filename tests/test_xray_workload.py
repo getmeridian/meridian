@@ -183,6 +183,8 @@ def test_every_lookup_goes_to_ip_addressed_doh_and_never_the_host_resolver(warp:
     # Only the families this host can route: an IPv4-only exit never waits on AAAA answers.
     assert dns["queryStrategy"] == "UseSystem"
     assert dns.get("disableFallback") is not True
+    # Asked at once: a resolver that silently drops packets never delays a lookup another answers.
+    assert dns["enableParallelQuery"] is True
 
 
 @pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
@@ -345,6 +347,8 @@ def test_gateway_direct_rule_leaves_through_the_gateways_freedom_outbound() -> N
 
     outbounds = {outbound["tag"]: outbound for outbound in config["outbounds"]}
     assert outbounds["direct"] == {"tag": "direct", "protocol": "freedom"}
+    # A gateway inside the censored country keeps its pre-DoH resolver: foreign DoH can be blocked there.
+    assert config["dns"]["servers"][-1] == "8.8.8.8"
     rules = [(rule.get("ruleTag"), rule.get("outboundTag")) for rule in config["routing"]["rules"]]
     assert rules == [
         (None, "block"),  # private ranges first, always

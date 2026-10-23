@@ -363,9 +363,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **Exits look up destinations over encrypted DNS only** — the exit's direct
   egress used the host's resolver, so the hosting provider saw every site its
   users opened in plain-text DNS, and a failed encrypted lookup fell back to
-  plain `8.8.8.8`. Exits and routing gateways now resolve every name over DNS
-  over HTTPS (Cloudflare, then Quad9, then Google, each reached by IP address
-  on IPv4 or IPv6) and never fall back to plain DNS: if none answers, sites by
+  plain `8.8.8.8`. Exits now resolve every name over DNS over HTTPS, asking
+  Cloudflare, Quad9, and Google at once (each reached by IP address on IPv4 or
+  IPv6), and never fall back to plain DNS: if none answers, sites by
   name fail through that server, and `meridian check` reports a resolver the
   server cannot reach. The system lab sniffs an exit during proxied traffic and
   requires no plain DNS question on the wire. Servers pick this up on the next

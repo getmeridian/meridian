@@ -1,8 +1,8 @@
 """Whether a node host reaches the encrypted resolvers its Xray resolves every name through.
 
-Exit and gateway workloads resolve only over DNS-over-HTTPS (``xray_workload.EXIT_DOH_RESOLVERS``)
-and never fall back to the host's plain resolver, so a host that reaches none of them cannot open
-sites by name. One unreachable operator only slows new lookups; this check makes either visible.
+Exit workloads resolve only over DNS-over-HTTPS (``xray_workload.EXIT_DOH_RESOLVERS``) and never
+fall back to the host's plain resolver, so a host that reaches none of them cannot open sites by
+name. One unreachable operator leaves fewer fallbacks; this check makes either visible.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _judge(returncode: int, stdout: str) -> VerificationFinding:
         "EXIT_DNS",
         "warning",
         f"{_join(silent)} {'does' if len(silent) == 1 else 'do'} not answer DNS over HTTPS; "
-        f"{_join(sorted(answering, key=operators.index))} still resolve, but new names may load slower",
+        f"{_join(sorted(answering, key=operators.index))} still resolve, with fewer fallbacks left",
         f"Allow outbound TCP 443 to {_addresses(unreachable)} in the provider's firewall.",
     )
 

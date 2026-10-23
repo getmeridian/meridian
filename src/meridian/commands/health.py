@@ -282,6 +282,7 @@ def _server_report(
         checks.append(check_from_result(f"container:{container.name}", container.label, result))
     if NODE in containers:
         checks.append(check_node_plugin_host(conn))
+    if "exit" in roles:
         checks.append(check_exit_dns(conn))
 
     try:
