@@ -367,7 +367,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   over HTTPS (Cloudflare, then Quad9, then Google, each reached by IP address
   on IPv4 or IPv6) and never fall back to plain DNS: if none answers, sites by
   name fail through that server, and `meridian check` reports a resolver the
-  server cannot reach. Servers pick this up on the next `meridian apply`.
+  server cannot reach. The system lab sniffs an exit during proxied traffic and
+  requires no plain DNS question on the wire. Servers pick this up on the next
+  `meridian apply`.
 - **Large uploads over XHTTP never hit nginx's body limit** — nginx's 1 MB
   default cut long uploads off on 3.x when a client chose a streaming XHTTP
   mode. 4.0 serves packet-up only and now also lifts the limit.

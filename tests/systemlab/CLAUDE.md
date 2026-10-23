@@ -18,6 +18,7 @@ uv run pytest tests/systemlab/ -q
 - Resilience proves both one-exit-down directions and fail-closed all-down behavior through the `leastPing` pool.
 - Plan/apply covers no-op convergence, unmanaged preservation, and SIGKILL recovery after a real Host mutation but before observation.
 - Removal checks both relays, removes the relay chain and exit B, and diffs active bindings (`assert-retired.py`) so every retired resource is proven absent.
+- Exit DNS privacy is proven on the wire: `dns_capture.py` sniffs exit A, loopback included, during a proxied fetch and requires no plain question for the observer names; a host-resolver lookup of a control name proves the capture sees DNS.
 
 ## Pitfalls
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up; rerun a stage with `docker compose exec controller bash /workspace/tests/systemlab/scripts/stages/40-removal.sh` (copy edited scripts in with `docker compose cp`).
@@ -36,4 +37,5 @@ uv run pytest tests/systemlab/ -q
 - Client startup failures must never satisfy negative proxy tests; version Xray runtime assets with the binary.
 - Lab exits egress through Docker NAT, so an exit-IP mismatch counts only as traffic evidence, never a passed egress check.
 - Qualify a Reality target only by authenticated Xray traffic, never raw TLS reachability.
+- The DNS capture matches a name and its subdomains; keep the control name outside every observer's domain, or one lookup counts as both.
 - `sing-box check` resolves no outbound tags and `mihomo -t` downloads missing geodata: keep the graph check in `subscription_client.py`, pin new rule files in the image, and move the client-management docs with any engine pin.
