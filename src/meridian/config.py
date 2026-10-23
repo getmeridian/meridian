@@ -130,14 +130,14 @@ ACME_SH_VERSION = "3.1.6"
 ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8d7"
 
 # Relay (Realm TCP relay)
-REALM_VERSION = "2.9.3"
+REALM_VERSION = "2.9.6"
 REALM_GITHUB_URL = "https://github.com/zhboner/realm/releases/download"
 
 # SHA256 digests for Realm tarball verification (keyed by target triple). The static
 # musl builds run on any glibc; upstream's gnu build for 2.9.6 needs glibc 2.38.
 REALM_SHA256: dict[str, str] = {
-    "x86_64-unknown-linux-musl": "622932d21eb74d1683dc71bf596227038ce8f72b01aa77906e899be548bb3792",
-    "aarch64-unknown-linux-musl": "1e5065ae147423647a63ed2dd27b6faee9800b7882eec8656946cbda54ee796f",
+    "x86_64-unknown-linux-musl": "b1cc335547bea8bb2a88178bef12ec7f2363e36200e7ea1d4e1e67627929bf65",
+    "aarch64-unknown-linux-musl": "f4c0318dd86854da483dcb7645b4f39cae2cc3f91c688fef969d53220b949488",
 }
 # Relay hosts expose bland names: providers scan process lists and unit names
 # for proxy software. The binary is still Realm; only its installed name changes.
