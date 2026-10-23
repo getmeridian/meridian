@@ -10,6 +10,10 @@ on:
   # branches on the fork before opening an upstream PR.
   workflow_dispatch:
 
+# CI only reads the repository; a token that can write is never needed here.
+permissions:
+  contents: read
+
 # A new push to a PR supersedes its running checks; main keeps every run so
 # each merge still reaches the Release workflow.
 concurrency:
