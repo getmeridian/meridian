@@ -59,7 +59,7 @@ flowchart LR
     Exit --> Internet((Internet))
 ```
 
-中继从国内 IP 转发原始 TCP 到出口的 Reality 监听器。端到端加密在客户端和出口之间；中继永远看不到明文。中继仅承载 Reality。`meridian setup` 还可以构建多跳中继链和路由网关，按规则选择出口（或健康检查的出口池）。
+中继从国内 IP 转发原始 TCP 到出口的 Reality 监听器。端到端加密在客户端和出口之间；中继永远看不到明文。中继仅承载 Reality。`meridian setup` 还可以构建多跳中继链和路由网关，按规则选择出口（或健康检查的出口池），或让匹配的流量直接从网关发出。
 
 ## Reality 协议如何工作
 

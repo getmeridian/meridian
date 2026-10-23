@@ -9,7 +9,7 @@ You are probably helping one of two people:
 
 ## How Meridian works
 
-- **Fleet roles.** One server is the *control server*. It runs the Remnawave panel, its database, and the connection pages. *Exits* are where traffic leaves for the internet, and the control server is usually an exit too. *Relays* are plain TCP forwarders, placed where an exit's address is blocked. *Gateways* route traffic between exits.
+- **Fleet roles.** One server is the *control server*. It runs the Remnawave panel, its database, and the connection pages. *Exits* are where traffic leaves for the internet, and the control server is usually an exit too. *Relays* are plain TCP forwarders, placed where an exit's address is blocked. *Gateways* pick an exit (or a pool of exits) for each destination by rule, or send it directly from the gateway.
 - **One reviewed topology.** The deployer's machine keeps the whole fleet description in `cluster.yml`, inside Meridian's home directory. Every change is an edit to that topology: `deploy`, `setup`, `node add`, `relay add`, `client add`, and `route add` all edit it. Meridian then compiles it into a hash-reviewed plan and applies it with checkpoints. An interrupted apply resumes where it stopped. A converged fleet plans no changes.
 - **Users live in the panel.** Client accounts, their keys, and their traffic are stored in Remnawave on the control server. `cluster.yml` lists which clients Meridian manages.
 - **Delivery.** Each client gets a connection page with QR codes and app links, plus a subscription URL. Apps refresh the subscription, so fleet changes reach devices without new links.

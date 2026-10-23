@@ -49,6 +49,19 @@ Russian traffic never reaches the server. If a device doesn't have the rules (a 
 
 If your users need Russian sites through the VPN instead, deploy with `--no-geo-block`.
 
+## Through a routing gateway
+
+A routing gateway (set up with `meridian setup`) is Xray on a server in front of your exits that picks, rule by rule, where traffic leaves. A rule sends matching traffic to an exit, to a pool of exits, **directly from the gateway**, or nowhere. On a gateway inside Russia, a direct rule opens Russian sites from the gateway's own Russian address, even in apps that get no routing rules:
+
+```
+Russian sites   → Device → Gateway (in Russia) → Internet
+Everything else → Device → Gateway → Exit (abroad) → Internet
+```
+
+In the wizard's routing step, add a rule that matches the country `RU` (destinations in Russian IP ranges) or a few domains (subdomains included), and answer **directly from the gateway** when it asks where the traffic should go. In a topology file this is a rule with `"action": "direct"` and no `target_ref`. Rules apply in order and the first match wins; the review lists each rule with where it goes.
+
+That traffic never reaches the exit, so the exit's geo-block stays as it is. Unlike a relay, the gateway is where this traffic leaves: Russian services see its address, and complaints about that traffic go to its host (see [Choosing hosting](/en/hosting/)).
+
 ## DNS considerations
 
 In Xray JSON subscriptions, names that match no rule are resolved through the proxy, so foreign lookups don't leak to the local ISP. Mihomo subscriptions match Russian IP ranges only for connections made by IP and never resolve other names locally. If your app has a separate DNS setting, enable its DNS leak protection for proxied traffic.
