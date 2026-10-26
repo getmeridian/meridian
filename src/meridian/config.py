@@ -57,11 +57,11 @@ ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "
 # Meridian-owned and always rendered as pinned. Move the three Remnawave pins
 # together, then refresh every digest with scripts/pin_image_digests.py.
 REMNAWAVE_BACKEND_IMAGE = (
-    "remnawave/backend:3.4.5@sha256:b16d724b90fd7c9fec2df04bd28938a671cafc62894105068e11550ee3449c56"
+    "remnawave/backend:3.4.7@sha256:5c26c0314be896dfac82020b693c50a73d2f18ef593da2ef97244330ac032bcf"
 )
-REMNAWAVE_NODE_IMAGE = "remnawave/node:3.4.2@sha256:1f97485b4bc7e4944f1ae95cc57d176376813b0022e9567b705f384f1a2e909d"
+REMNAWAVE_NODE_IMAGE = "remnawave/node:3.4.3@sha256:793f4ac52289f680ea2b12be8047e93f68b710c22ca93b52b9448a6fef7eaaa6"
 REMNAWAVE_SUBSCRIPTION_PAGE_IMAGE = (
-    "remnawave/subscription-page:8.0.0@sha256:04e8d479afb3598024e4018e9e15cd7fe879938250090a690ba39f1ee91b79ac"
+    "remnawave/subscription-page:8.0.1@sha256:ba8445b1e0d1c170cf314686ef638b73cabf42a0c6217d027e6cb958ca161ca6"
 )
 REMNAWAVE_POSTGRES_IMAGE = (
     "postgres:17.11-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
