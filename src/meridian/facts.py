@@ -161,6 +161,17 @@ class ServerFacts:
                     self._cache[key] = None
         return self._cache[key]
 
+    def memory_mb(self) -> tuple[int, int] | None:
+        """Total RAM and active swap in MB, from ``/proc/meminfo``."""
+        if "memory_mb" not in self._cache:
+            result = self.conn.run("cat /proc/meminfo", timeout=15)
+            fields = dict(re.findall(r"^(MemTotal|SwapTotal):\s+(\d+) kB", result.stdout, re.MULTILINE))
+            if result.returncode != 0 or len(fields) != 2:
+                self._cache["memory_mb"] = None
+            else:
+                self._cache["memory_mb"] = (int(fields["MemTotal"]) // 1024, int(fields["SwapTotal"]) // 1024)
+        return self._cache["memory_mb"]
+
     def installed_packages(self, packages: list[str]) -> set[str]:
         if not packages:
             return set()

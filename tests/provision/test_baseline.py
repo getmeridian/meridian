@@ -69,13 +69,14 @@ def test_declarative_baseline_leaves_public_ports_to_compiled_firewall_resources
 
 
 @pytest.mark.parametrize("harden", [False, True])
-def test_setup_recipe_keeps_baseline_as_its_prefix(harden: bool) -> None:
+def test_setup_recipe_runs_swap_then_the_whole_baseline(harden: bool) -> None:
+    """A retry after a starved panel start finds the panel running; swap must not wait behind apt."""
     ctx = ProvisionContext(ip="198.51.100.1", harden=harden)
     baseline = build_server_baseline_steps(ctx, install_docker=True)
 
-    steps = build_setup_steps(ctx)
+    names = [step.name for step in build_setup_steps(ctx)]
 
-    assert [step.name for step in steps[: len(baseline)]] == [step.name for step in baseline]
+    assert names[: len(baseline) + 1] == ["Add swap space", *(step.name for step in baseline)]
 
 
 def test_docker_check_reports_missing_docker_as_drift_in_a_real_shell(tmp_path) -> None:

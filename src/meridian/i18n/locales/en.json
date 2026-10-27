@@ -190,6 +190,7 @@
   "progress.kind.egress_pool": "Egress pool",
   "progress.kind.route_rule": "Routing rule",
   "progress.kind.probe": "Connection check",
+  "step.add_swap_space": "Add swap space",
   "step.check_disk_space": "Check disk space",
   "step.install_system_packages": "Install system packages",
   "step.enable_automatic_security_updates": "Enable automatic security updates",

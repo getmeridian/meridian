@@ -190,6 +190,7 @@
   "progress.kind.egress_pool": "مجموعه خروجی‌ها",
   "progress.kind.route_rule": "قانون مسیریابی",
   "progress.kind.probe": "بررسی اتصال",
+  "step.add_swap_space": "افزودن فضای swap",
   "step.check_disk_space": "بررسی فضای دیسک",
   "step.install_system_packages": "نصب بسته‌های سیستمی",
   "step.enable_automatic_security_updates": "فعال‌سازی به‌روزرسانی خودکار امنیتی",

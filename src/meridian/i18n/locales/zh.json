@@ -190,6 +190,7 @@
   "progress.kind.egress_pool": "出口池",
   "progress.kind.route_rule": "路由规则",
   "progress.kind.probe": "连接检查",
+  "step.add_swap_space": "添加交换空间",
   "step.check_disk_space": "检查磁盘空间",
   "step.install_system_packages": "安装系统软件包",
   "step.enable_automatic_security_updates": "启用自动安全更新",
