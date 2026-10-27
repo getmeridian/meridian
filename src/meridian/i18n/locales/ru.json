@@ -190,6 +190,7 @@
   "progress.kind.egress_pool": "Пул выходов",
   "progress.kind.route_rule": "Правило маршрутизации",
   "progress.kind.probe": "Проверка подключения",
+  "step.add_swap_space": "Добавление файла подкачки",
   "step.check_disk_space": "Проверка места на диске",
   "step.install_system_packages": "Установка системных пакетов",
   "step.enable_automatic_security_updates": "Включение автоматических обновлений безопасности",

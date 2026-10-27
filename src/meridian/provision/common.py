@@ -12,6 +12,12 @@ from meridian.ssh import ServerConnection
 # Minimum disk space required (in MB)
 MIN_DISK_SPACE_MB = 2048
 
+# The control stack peaked near 1.25 GB of RAM plus swap on a 1 GB server; below
+# this total, the panel's first start starved sshd until the deploy timed out.
+CONTROL_MIN_MEMORY_MB = 1800
+SWAP_FILE = "/swapfile"
+SWAP_FILE_MB = 2048
+
 # Packages required by the deployment stack
 # Debian 12 logs only to the journal (no auth.log) while its fail2ban reads log files by
 # default, so the sshd jail found nothing and fail2ban exited; the journal backend works on
@@ -31,7 +37,6 @@ REQUIRED_PACKAGES = [
     "gnupg",
     "apt-transport-https",
     "ca-certificates",
-    "python3-pip",
     "unattended-upgrades",
     "apt-listchanges",
     # Debian 13 keeps "dnsutils" only as a virtual name, which dpkg-query never reports installed.
@@ -94,6 +99,81 @@ class CheckDiskSpace:
             )
 
         return StepResult(name=self.name, status="ok", detail=f"{avail_mb}MB available")
+
+
+class EnsureSwap:
+    """Give a small control server swap before the panel stack starts."""
+
+    name = "Add swap space"
+
+    def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        facts = ServerFacts(conn)
+        memory = facts.memory_mb()
+        if memory is None:
+            return StepResult(name=self.name, status="skipped", detail="could not read /proc/meminfo")
+        ram_mb, swap_mb = memory
+        if ram_mb + swap_mb >= CONTROL_MIN_MEMORY_MB:
+            return StepResult(name=self.name, status="ok", detail=f"{ram_mb}MB RAM, {swap_mb}MB swap")
+
+        q_file = shlex.quote(SWAP_FILE)
+        exists = conn.run(f"test -e {q_file}", timeout=15).returncode == 0
+        if not exists:
+            avail_mb = facts.free_disk_mb("/")
+            if avail_mb is not None and avail_mb < SWAP_FILE_MB + MIN_DISK_SPACE_MB:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=(
+                        f"{ram_mb}MB RAM needs swap, but only {avail_mb}MB disk is free "
+                        f"(need {SWAP_FILE_MB + MIN_DISK_SPACE_MB}MB). Free disk space, add swap, "
+                        "or use a server with 2 GB RAM"
+                    ),
+                )
+            # Built beside the target and moved in whole, so an interrupted run never leaves a half-written swap file.
+            q_tmp = shlex.quote(f"{SWAP_FILE}.new")
+            create = conn.run(
+                f"rm -f {q_tmp} && (fallocate -l {SWAP_FILE_MB}M {q_tmp} 2>/dev/null"
+                f" || dd if=/dev/zero of={q_tmp} bs=1M count={SWAP_FILE_MB} status=none)"
+                f" && chmod 600 {q_tmp} && mkswap {q_tmp} >/dev/null && mv {q_tmp} {q_file}"
+                f" || {{ rm -f {q_tmp}; exit 1; }}",
+                timeout=300,
+                operation_name="create swap file",
+            )
+            if create.returncode != 0:
+                return StepResult(
+                    name=self.name, status="failed", detail=f"could not create {SWAP_FILE}: {create.stderr[:200]}"
+                )
+
+        enable = conn.run(f"swapon {q_file}", timeout=60, operation_name="enable swap")
+        if enable.returncode != 0:
+            return StepResult(
+                name=self.name,
+                status="failed",
+                detail=(
+                    f"{ram_mb}MB RAM needs swap, but {SWAP_FILE} could not be enabled: {enable.stderr.strip()[:200]}. "
+                    "Add swap yourself or use a server with 2 GB RAM"
+                ),
+            )
+
+        fstab = conn.get_text("/etc/fstab")
+        current = fstab.stdout if fstab.returncode == 0 else ""
+        if not any(line.split()[:1] == [SWAP_FILE] for line in current.splitlines()):
+            persisted = conn.put_text(
+                "/etc/fstab",
+                current + ("" if not current or current.endswith("\n") else "\n") + f"{SWAP_FILE} none swap sw 0 0\n",
+                mode="644",
+                atomic=True,
+                operation_name="persist swap",
+            )
+            if persisted.returncode != 0:
+                return StepResult(
+                    name=self.name,
+                    status="failed",
+                    detail=f"swap is on, but /etc/fstab could not be updated: {persisted.stderr[:200]}",
+                )
+        return StepResult(
+            name=self.name, status="changed", detail=f"enabled {SWAP_FILE} for {ram_mb}MB RAM, {swap_mb}MB swap"
+        )
 
 
 class InstallPackages:

@@ -391,6 +391,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   stopped right after starting, which failed server preparation; it now reads
   the system journal on every supported release, and a package Debian only
   remembers is no longer mistaken for an installed one.
+- **1 GB control servers deploy** — without swap, the panel's first start used
+  up the memory and the server stopped answering SSH; the deploy then failed on
+  "Install system packages" though that step was never the cause. A control
+  server with less than about 2 GB of memory now gets a 2 GB `/swapfile` before
+  anything else runs. Servers also no longer install `python3-pip`, which
+  pulled in a compiler toolchain nothing used.
 - **Re-running a command resumes it** — `relay add` for a relay that is already
   declared finishes it instead of failing on a duplicate listener, and a bare
   `meridian test` after removing servers tests what is left instead of asking

@@ -1,7 +1,7 @@
 """Provisioning engine — deploys and configures proxy servers via SSH.
 
 build_setup_steps() assembles the control-server bootstrap:
-  baseline -> docker -> remnawave panel -> nginx -> TLS -> PWA assets
+  swap -> baseline -> docker -> remnawave panel -> nginx -> TLS -> PWA assets
 
 Uses the Remnawave panel/node architecture.
 """
@@ -34,12 +34,14 @@ def build_setup_steps(ctx: ProvisionContext) -> list[Step]:
     The reviewed plan's tagged firewall rules own every public port; the
     bootstrap must not add untagged ones (it used to open 443/udp always).
     """
+    from meridian.provision.common import EnsureSwap
     from meridian.provision.nginx import ConfigureNginx, DeployPWAAssets, InstallNginx
     from meridian.provision.remnawave_panel import DeployRemnawavePanel
     from meridian.provision.tls import IssueTLSCert
 
+    # Swap comes first: a retry after a starved panel start finds the panel already running.
     # The Remnawave node is deployed after API setup, not here.
-    steps = [*build_server_baseline_steps(ctx, install_docker=True), DeployRemnawavePanel()]
+    steps = [EnsureSwap(), *build_server_baseline_steps(ctx, install_docker=True), DeployRemnawavePanel()]
     if not ctx.needs_web_server:
         return steps
     if ctx.domain_mode:

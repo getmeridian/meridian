@@ -1,7 +1,7 @@
 # provision — Pure-Python step pipeline
 ## Design decisions
 **Steps over scripts** — each step is a class with `run(conn, ctx) → StepResult` (ok/changed/skipped/failed); the pipeline stops on the first failure.
-**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime driver.
+**Recipes are ordered lists** — `build_server_baseline_steps()` (OS, SSH-safe UFW, optional Docker; paired with read-only `build_server_baseline_checks()`) and `build_setup_steps()` (swap, control plane, nginx, TLS) return steps in execution order, gated by plain `if`; keep each step after what it depends on. WARP installs through the reconciler's node-runtime driver.
 **Typed context** — `ProvisionContext` has explicit fields for configuration and inter-step data; no dictionary escape hatches.
 **Remnawave containers** — the panel stack runs in a bridge network on `127.0.0.1:3000` behind nginx; the node (`node_deploy.py`) runs host-network with `cap_add: NET_ADMIN`, without which the panel's node plugins and IP Control silently do nothing.
 **SSH for infrastructure, REST for configuration** — steps deploy containers; panel, user, and profile setup happens over the API once they run.
@@ -19,8 +19,7 @@
 - **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window.
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
 - **nginx ≥ 1.25 comes from nginx.org** — `http2 on;` needs it; keep old conffiles (`--force-confdef --force-confold`) and add the `sites-enabled` include. The system-lab image pre-installs 1.27 and hides all three.
-- **Internal TLS servers need `absolute_redirect off`** — behind the 443 stream router on 127.0.0.1:8443, automatic slash redirects point browsers at `:8443`.
-- **Internal TLS servers need `http2 on`** — Xray's fingerprinted XHTTP client speaks HTTP/2 whatever ALPN says.
+- **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router on 127.0.0.1:8443, slash redirects point browsers at `:8443`, and Xray's fingerprinted XHTTP client speaks HTTP/2 whatever ALPN says.
 - **XHTTP locations need `client_max_body_size 0`** — nginx counts streamed bodies against its 1m default; serve packet-up only.
 - **Never `return 444` in HTTPS blocks** — use 403/404 (less fingerprintable).
 - **Legacy stream config yields to V4** — `ConfigureNginx` skips `stream.d/meridian.conf` once a `meridian-v4-*` stream file listens on 443, or `nginx -t` fails on a duplicate listener.
@@ -31,6 +30,7 @@
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
 - **Realm is the static musl build, run before it replaces anything** — upstream's 2.9.6 gnu build needs glibc 2.38, so `fleet upgrade` on Ubuntu 22.04 overwrote a working binary with one that could not start. A binary that runs and fails observes as drift (reinstall), not unavailable evidence.
+- **A 1 GB control server needs swap** — without it the panel's first start starved sshd, and the retry hung on "Install system packages" (the step users saw); `EnsureSwap` runs first and adds `/swapfile` below `CONTROL_MIN_MEMORY_MB`. Teardown leaves it.
 - **Firewall follows the effective sshd port** — never assume `22/tcp`.
 - **Recipes never own public ports** — compiled, tagged rules open them; `ConfigureFirewall` deletes only the bare, comment-less `443/udp` an old bootstrap added.
 - **Baseline checks exit 1 for absence** — a bare `docker` or `ufw` exits 127 (stock Debian has no ufw), which observation treats as unavailable evidence.
