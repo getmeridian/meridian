@@ -31,7 +31,6 @@ REQUIRED_PACKAGES = [
     "gnupg",
     "apt-transport-https",
     "ca-certificates",
-    "python3-pip",
     "unattended-upgrades",
     "apt-listchanges",
     # Debian 13 keeps "dnsutils" only as a virtual name, which dpkg-query never reports installed.

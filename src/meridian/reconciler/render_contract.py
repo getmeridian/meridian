@@ -13,7 +13,7 @@ _RENDERER_MANIFEST = {
     "node-compose": "neutral-names-v4",
     "panel-compose": "neutral-names-v3",
     "realm": "neutral-systemd-musl-v3",
-    "server-baseline": "fail2ban-journal-v3",
+    "server-baseline": "lean-packages-v4",
     "xray-workload": "exit-doh-v8",
 }
 
