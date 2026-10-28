@@ -410,6 +410,9 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   exit kept the old server's IP as its XHTTP and Hysteria2 certificate name,
   so the new server could never get a certificate and the move failed. If a
   move already failed that way, rerun the same `meridian node replace`.
+- **`node add NAME` keeps the saved name** — adding a saved server without
+  `--name` resaved it under its IP, so the name stopped working; it now keeps
+  the name and uses it for the exit too.
 - **`meridian test NAME` and `meridian probe NAME` take saved names** — a name
   without a dot was refused as "not a full domain name".
 - **Certificate failures say why** — the error kept acme.sh's first lines

@@ -60,11 +60,16 @@ def run_add(
 
     registry = ServerRegistry(SERVER_PROFILES_FILE)
     target = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
+    try:
+        saved = registry.find(target.ip)
+    except LocalStateError as exc:
+        fail(exc)
     request = validate_command_input(
         NodeAddRequest,
         "Invalid node add request",
         ip=target.ip,
-        name=name,
+        # A saved server keeps its title (saving it as its IP renamed it) and names the exit.
+        name=name or (saved.name if saved is not None else ""),
         user=target.user,
         ssh_port=target.port,
         sni=sni,
@@ -284,7 +289,7 @@ def _run_list(*, operation: OperationContext) -> None:
         raise typer.Exit(3)
 
 
-def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
+def run_remove(ip_or_name: str, yes: bool = False, force: bool = False, forget_unreachable: bool = False) -> None:
     """Remove a server's exit or routing-gateway role, then apply the reviewed removal."""
     request = validate_command_input(NodeTargetRequest, "Invalid node remove request", ip_or_name=ip_or_name)
     from meridian.commands.topology_removal import apply_topology_removal
@@ -330,7 +335,9 @@ def run_remove(ip_or_name: str, yes: bool = False, force: bool = False) -> None:
         fail(
             f"Node '{request.ip_or_name}' not found", hint="Check node list with: meridian node list", hint_type="user"
         )
-    apply_topology_removal(cluster, updated, subject=subject, yes=yes, extra_lines=extra_lines)
+    apply_topology_removal(
+        cluster, updated, subject=subject, yes=yes, extra_lines=extra_lines, forget_unreachable=forget_unreachable
+    )
 
 
 def _exit_removal(
