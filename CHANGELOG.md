@@ -402,6 +402,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   followed could still catch the panel noticing that restart, failing the apply
   until a rerun. Node and gateway checks now wait up to a minute for the node
   to reconnect.
+- **`node replace` moves a bare-IP exit's certificate address** — the moved
+  exit kept the old server's IP as its XHTTP and Hysteria2 certificate name,
+  so the new server could never get a certificate and the move failed. If a
+  move already failed that way, rerun the same `meridian node replace`.
 - **`meridian test NAME` and `meridian probe NAME` take saved names** — a name
   without a dot was refused as "not a full domain name".
 - **Certificate failures say why** — the error kept acme.sh's first lines

@@ -11,7 +11,7 @@ import typer
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.commands.node_replace import run_replace
-from meridian.core.topology import SetupIntent
+from meridian.core.topology import ProtocolPathIntent, SetupIntent
 from meridian.reconciler.resources import ResourceExecutionResult
 from meridian.servers import ServerEntry, ServerRegistry
 from tests.test_topology_removal_commands import SERVERS, _intent
@@ -141,3 +141,50 @@ def test_an_unfinished_move_is_a_system_failure_that_points_to_apply(
 
     assert code == 3
     assert "meridian apply" in capsys.readouterr().err
+
+
+def test_bare_ip_paths_take_the_new_address_and_domains_stay(registry: ServerRegistry) -> None:
+    """The moved exit kept the old IP as certificate name, so the new server could never get a certificate."""
+    payload = _intent().model_dump(mode="json")
+    extra = [
+        ProtocolPathIntent(id="xhttp-b", protocol="xhttp", tls_sni="198.51.100.12", host="198.51.100.12", path="/xh"),
+        ProtocolPathIntent(id="hy2-b", protocol="hysteria2", tls_sni="198.51.100.12"),
+        ProtocolPathIntent(id="wss-b", protocol="wss", tls_sni="vpn.example.com", host="vpn.example.com", path="/ws"),
+    ]
+    next(exit_ for exit_ in payload["exits"] if exit_["id"] == "exit-b")["paths"] += [
+        path.model_dump(mode="json") for path in extra
+    ]
+
+    code, runtime, _connect = _replace("exit-b", "198.51.100.20", intent=SetupIntent.model_validate(payload))
+
+    assert code == 0 and runtime.applied is not None
+    moved = {path.id: path for exit_ in runtime.applied[0].exits if exit_.id == "exit-b" for path in exit_.paths}
+    assert (moved["xhttp-b"].tls_sni, moved["xhttp-b"].host) == ("198.51.100.20", "198.51.100.20")
+    assert moved["hy2-b"].tls_sni == "198.51.100.20"
+    assert (moved["wss-b"].tls_sni, moved["wss-b"].host) == ("vpn.example.com", "vpn.example.com")
+    assert moved["reality-b"].reality_sni == "www.example.org"
+
+
+def test_rerun_on_the_current_server_repairs_a_stale_bare_ip_path(registry: ServerRegistry) -> None:
+    """A pre-b9 move left the old server's IP on the exit; rerunning the same move repairs it."""
+    payload = _intent().model_dump(mode="json")
+    exit_b = next(exit_ for exit_ in payload["exits"] if exit_["id"] == "exit-b")
+    exit_b["server_ref"] = "srv-spare"
+    exit_b["paths"].append(
+        ProtocolPathIntent(id="hy2-b", protocol="hysteria2", tls_sni="198.51.100.12").model_dump(mode="json")
+    )
+
+    code, runtime, _connect = _replace("exit-b", "198.51.100.30", intent=SetupIntent.model_validate(payload))
+
+    assert code == 0 and runtime.applied is not None
+    moved = next(exit_ for exit_ in runtime.applied[0].exits if exit_.id == "exit-b")
+    assert [path.tls_sni for path in moved.paths if path.id == "hy2-b"] == ["198.51.100.30"]
+
+
+def test_rerun_on_the_current_server_without_stale_paths_is_refused(registry: ServerRegistry) -> None:
+    payload = _intent().model_dump(mode="json")
+    next(exit_ for exit_ in payload["exits"] if exit_["id"] == "exit-b")["server_ref"] = "srv-spare"
+
+    code, runtime, _connect = _replace("exit-b", "198.51.100.30", intent=SetupIntent.model_validate(payload))
+
+    assert code == 2 and runtime.applied is None

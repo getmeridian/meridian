@@ -33,7 +33,7 @@
 - An error in a setup stage that asks nothing (review, apply, verify) offers back/retry/save, and `--yes` raises it; re-running the stage looped forever on the same error.
 - Pickers open the terminal's real device (`os.ttyname`), never the `/dev/tty` alias (macOS kqueue refuses it with EOFError), and accept Ctrl+J as Enter (pexpect and some terminals send a bare line feed); validate through `Prompter.ask(validate=)` so both modes re-ask.
 - Re-running `node add` or `relay add` for a declared server resumes it and refuses a conflicting SNI, domain, exit, or port; never add a second entry.
-- `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing.
+- `node replace` refuses the control server (subscription URLs would change) and a new server that already holds a role; check roles before dialing. A bare-IP exit's certificate SNI/Host follow it to the new IP (keeping them failed every move), and a rerun on the current server repairs one a pre-b9 move left behind.
 - Bare `test` follows the intent, not the saved-server count: removed servers stay saved.
 - A new public command needs a `_HELP_LAYOUT` entry, a `rich_help_panel`, and a `core.command_catalog.COMMAND_OUTPUTS` entry (`None` unless it declares `--json`); `test_cli_catalog.py` enforces it.
 - `deploy` port preflight (`port_check.py`) covers every port nginx binds, including loopback 8443/8444; a missed one failed mid-deploy on `nginx -t`.

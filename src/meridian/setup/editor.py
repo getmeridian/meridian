@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH
+from meridian.core.inputs import TOPOLOGY_ID_MAX_LENGTH, is_ip
 from meridian.core.topology import (
     AccessIntent,
     EgressOverrideAction,
@@ -150,14 +150,26 @@ def remove_exit_from_intent(intent: SetupIntent, exit_id: str) -> SetupIntent:
     return _validated(payload)
 
 
-def move_exit_in_intent(intent: SetupIntent, exit_id: str, server_ref: str) -> SetupIntent:
-    """Return validated intent with one exit on another server; its ID, paths, and settings stay."""
+def move_exit_in_intent(
+    intent: SetupIntent, exit_id: str, server_ref: str, *, old_address: str = "", new_address: str = ""
+) -> SetupIntent:
+    """Return validated intent with one exit on another server; its ID, paths, and settings stay.
+
+    A bare-IP path names the old server's address as its certificate SNI and Host;
+    those follow the exit to ``new_address`` (domains stay: their DNS is the operator's).
+    """
     if not any(exit_.id == exit_id for exit_ in intent.exits):
         raise ValueError(f"Exit {exit_id!r} is not in the topology.")
+    follows = is_ip(old_address) and is_ip(new_address)
     payload = intent.model_dump(mode="json")
     for exit_ in payload["exits"]:
-        if exit_["id"] == exit_id:
-            exit_["server_ref"] = server_ref
+        if exit_["id"] != exit_id:
+            continue
+        exit_["server_ref"] = server_ref
+        for path in exit_["paths"] if follows else []:
+            for field in ("tls_sni", "host"):
+                if path.get(field) == old_address:
+                    path[field] = new_address
     return _validated(payload)
 
 
