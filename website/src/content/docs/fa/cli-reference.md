@@ -84,12 +84,13 @@ topology را در `cluster.yml` دستی ویرایش نکنید. آن را ب�
 توپولوژی بررسی‌شده در `cluster.yml` را برای سروری شما اعمال کنید. Apply hash برنامه و تعداد منابع را نشان می‌دهد، برای تأیید درخواست می‌کند، سپس دقیقاً برنامه را اعمال می‌کند که نشان داده، با checkpoints. استقرار قطع‌شده جایی‌که متوقف شد از سر می‌گیرد.
 
 ```
-meridian apply [--yes] [--json]
+meridian apply [--yes] [--forget-unreachable] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
 | `--yes`, `-y` | | تأیید را رد کنید |
+| `--forget-unreachable` | | آنچه روی سرورِ حذف‌شده مستقر شده را فراموش کن اگر از طریق SSH پاسخ نمی‌دهد (مسدود یا حذف شده)، به جای شکست در پاک‌سازی؛ تا وقتی حذفش نکنید به کاربران قبلی‌اش سرویس می‌دهد |
 | `--json` | | نتیجه نهایی اعمال را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
 JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "converged" | "applied" | "failed" | "unknown" | "skipped"` است. JSON mode هرگز پرسش نمی‌کند: بدون `--yes` `MERIDIAN_CONFIRMATION_REQUIRED` را با hash برنامه بازگردانده و exit `2` می‌شود. منابع شکسته exit `3`؛ علت را رفع کنید و اعمال را دوباره اجرا کنید. اگر وضعیت محلی نتوانست بعد از تغییرات راه دور ذخیره شود، اعمال exit `3` و می‌گوید؛ `~/.config/meridian` permissions را تعمیر کنید، سپس `plan` و `apply` را دوباره اجرا کنید.
@@ -154,8 +155,8 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node remove NAME_OR_IP [--yes] [--force]
-meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
@@ -170,6 +171,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--country CC` | رجیستری آدرس | کشور نمایش‌داده‌شده در نام اتصال‌ها؛ وقتی رجیستری اشتباه است (anycast یا بازه‌های اجاره‌ای) آن را مشخص کنید |
 | `--harden / --no-harden` | فعال | مقاوم‌سازی سیستم‌عامل، SSH و firewall. سرورهای ناوگان همیشه آن را نگه می‌دارند؛ `--no-harden` رد می‌شود |
 | `--yes` | | پرسش تأیید را رد کنید |
+| `--forget-unreachable` | | `node remove`, `node replace`: آنچه روی سرورِ حذف‌شده مستقر شده را فراموش کن اگر از طریق SSH پاسخ نمی‌دهد (مسدود یا حذف شده)، به جای شکست در پاک‌سازی؛ تا وقتی حذفش نکنید به کاربران قبلی‌اش سرویس می‌دهد |
 | `--force` | | `node remove`: همچنین زنجیرهای relay که به این exit مسیریابی می‌کنند را بردارید |
 | `--json` | | `node list` را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
@@ -190,7 +192,7 @@ relayها را مدیریت کنید — فورواردرهای TCP مبتنی �
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay remove RELAY [--exit EXIT] [--yes] [--forget-unreachable]
 meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
@@ -203,6 +205,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 | `--user/-u USER` | ذخیره‌شده، وگرنه root | کاربر SSH روی relay |
 | `--ssh-port PORT` | ذخیره‌شده، وگرنه 22 | پورت SSH روی سرور relay (`relay add`) |
 | `--yes/-y` | | پرسش تأیید را رد کنید |
+| `--forget-unreachable` | | `relay remove`: آنچه روی سرورِ حذف‌شده مستقر شده را فراموش کن اگر از طریق SSH پاسخ نمی‌دهد (مسدود یا حذف شده)، به جای شکست در پاک‌سازی؛ تا وقتی حذفش نکنید به کاربران قبلی‌اش سرویس می‌دهد |
 | `--json` | | `relay list` (`data.relays[]`) را به عنوان پاکت `meridian.output/v1` ارسال کنید |
 
 **`relay add`** — relay تک‌hop را به topology شما اضافه کرده و آن را اعمال می‌کند. کلاینت‌ها آن را در بعدی تازه‌سازی اشتراک دریافت می‌کنند. برای زنجیری با بیش از یک hop، از `meridian setup` استفاده کنید.

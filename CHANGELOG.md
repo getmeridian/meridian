@@ -110,6 +110,13 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   keeps the exit's ID, Reality keys, protocol paths, SNI, WARP and geo-block
   settings, and relays, so clients keep working, then cleans up the old server
   through the reviewed apply. The control server can't be moved yet.
+- **Forget a server that no longer answers** — when a server a change removes
+  doesn't answer over SSH (blocked from your network, or deleted at the
+  provider), its cleanup failed on every apply. `node replace`, `node remove`,
+  `relay remove`, and `apply` now offer to forget what was deployed there, or do
+  it with `--forget-unreachable`; `--yes` alone never does. The panel still
+  deletes what it held, and the server keeps serving the users it had until
+  you delete or wipe it.
 - **Change a camouflage SNI in one command** — `meridian node sni EXIT NEW_SNI`
   and `meridian relay sni RELAY NEW_SNI` switch an exit or relay to another
   site when `meridian test --probe` says the SNI is blocked. They check that

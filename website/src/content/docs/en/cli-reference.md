@@ -84,12 +84,13 @@ Don't edit the topology in `cluster.yml` by hand. Change it with `meridian setup
 Apply the reviewed topology in `cluster.yml` to your servers. Apply shows the plan hash and resource count, asks for confirmation, then applies the exact plan it showed, with checkpoints. An interrupted apply resumes where it stopped.
 
 ```
-meridian apply [--yes] [--json]
+meridian apply [--yes] [--forget-unreachable] [--json]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--yes`, `-y` | | Skip confirmation |
+| `--forget-unreachable` | | Forget what was deployed on a removed server that doesn't answer over SSH (blocked or deleted) instead of failing its cleanup; it keeps serving its old users until you delete it |
 | `--json` | | Emit the final apply result as a `meridian.output/v1` envelope |
 
 JSON `data` contains `plan_hash`, `generation`, and `actions[]` with `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON mode never prompts: without `--yes` it returns `MERIDIAN_CONFIRMATION_REQUIRED` with the plan hash and exits `2`. A failed resource exits `3`; fix the cause and run apply again. If local state cannot be saved after remote changes, apply exits `3` and says so; repair `~/.config/meridian` permissions, then run `plan` and `apply` again.
@@ -154,8 +155,8 @@ Manage exit servers. The first server is deployed with `meridian deploy` (or `me
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node remove NAME_OR_IP [--yes] [--force]
-meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
@@ -170,6 +171,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--country CC` | address registry | Country shown in connection names; set it when the registry is wrong (anycast or leased ranges) |
 | `--harden / --no-harden` | on | OS, SSH, and firewall hardening. Fleet servers always keep it; `--no-harden` is refused |
 | `--yes` | | Skip confirmation prompts |
+| `--forget-unreachable` | | `node remove`, `node replace`: Forget what was deployed on a removed server that doesn't answer over SSH (blocked or deleted) instead of failing its cleanup; it keeps serving its old users until you delete it |
 | `--force` | | `node remove`: also remove the relay chains that route to this exit |
 | `--json` | | Emit `node list` as a `meridian.output/v1` envelope |
 
@@ -190,7 +192,7 @@ Manage relays — Realm TCP forwarders that give users a domestic entry point to
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay remove RELAY [--exit EXIT] [--yes] [--forget-unreachable]
 meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
@@ -203,6 +205,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 | `--user/-u USER` | saved, else root | SSH user on the relay |
 | `--ssh-port PORT` | saved, else 22 | SSH port on the relay server (`relay add`) |
 | `--yes/-y` | | Skip confirmation prompts |
+| `--forget-unreachable` | | `relay remove`: Forget what was deployed on a removed server that doesn't answer over SSH (blocked or deleted) instead of failing its cleanup; it keeps serving its old users until you delete it |
 | `--json` | | Emit `relay list` (`data.relays[]`) as a `meridian.output/v1` envelope |
 
 **`relay add`** — adds a single-hop relay to your topology and applies it. Clients receive it on their next subscription refresh. For chains with more than one hop, use `meridian setup`.

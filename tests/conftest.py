@@ -58,6 +58,12 @@ def _instant_stall_retries(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _reachable_retiring_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Servers a change removes answer by default; tests of the forget offer stub them unreachable."""
+    monkeypatch.setattr("meridian.commands._helpers.ssh_port_answers", lambda _host, _port: True)
+
+
+@pytest.fixture(autouse=True)
 def _offline_registry_country(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exit-country lookups never leave the test process; tests that need one inject a transport."""
     import httpx

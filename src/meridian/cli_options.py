@@ -25,6 +25,13 @@ Timeout = Annotated[
     str, typer.Option("--timeout", metavar="SECONDS", help="Per-network-operation timeout, 1-30 seconds")
 ]
 Yes = Annotated[bool, typer.Option("--yes", "-y", help=YES_HELP)]
+ForgetUnreachable = Annotated[
+    bool,
+    typer.Option(
+        "--forget-unreachable",
+        help="Forget what was deployed on a removed server whose SSH port does not answer (blocked or deleted)",
+    ),
+]
 SELF_STEAL_HELP = (
     "Camouflage with your own domain (--sni, else --domain) instead of someone else's site: the server gets "
     "its certificate and answers probes itself. Point a DNS-only A record at the server first"

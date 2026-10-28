@@ -6,7 +6,7 @@ import typer
 from rich.markup import escape
 
 from meridian.cluster import ClusterConfig
-from meridian.commands._helpers import require_intent, reviewed_runtime
+from meridian.commands._helpers import forget_unreachable_servers, require_intent, reviewed_runtime
 from meridian.commands.apply_progress import apply_progress
 from meridian.console import confirm, err_console, fail, ok, warn
 from meridian.core.apply import CompiledApplyPreview, build_compiled_apply_result
@@ -22,6 +22,7 @@ def run_v4_apply(
     yes: bool,
     json_output: bool,
     operation: OperationContext,
+    forget_unreachable: bool = False,
 ) -> None:
     """Apply the compiled topology through the checkpointed executor."""
     from meridian.config import SERVER_PROFILES_FILE
@@ -30,7 +31,8 @@ def run_v4_apply(
 
     intent = require_intent(cluster)
     registry = ServerRegistry(SERVER_PROFILES_FILE)
-    review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent))
+    forget_unreachable_servers(cluster, registry, intent, forget=forget_unreachable, yes=yes)
+    review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
     if not yes:
         if json_output:
             error = ErrorModel(

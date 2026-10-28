@@ -333,6 +333,7 @@ def run_remove(
     relay_ip: str,
     exit_arg: str = "",
     yes: bool = False,
+    forget_unreachable: bool = False,
 ) -> None:
     """Drop every relay chain through a relay server (or one chain by ID), then apply the reviewed removal."""
     request = validate_command_input(
@@ -364,4 +365,6 @@ def run_remove(
     subject = f"{noun} {', '.join(chain_ids)}" + (f" through {label}" if label not in chain_ids else "")
     hop_counts = [len(relay.hop_server_refs) for relay in chains]
     extra = (f"Every hop of the chain stops forwarding ({sum(hop_counts)} hops in total).",)
-    apply_topology_removal(cluster, updated, subject=subject, yes=request.yes, extra_lines=extra)
+    apply_topology_removal(
+        cluster, updated, subject=subject, yes=request.yes, extra_lines=extra, forget_unreachable=forget_unreachable
+    )

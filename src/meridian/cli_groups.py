@@ -9,7 +9,17 @@ from typing import Annotated
 
 import typer
 
-from meridian.cli_options import Json, NewServer, SelfSteal, SshPort, Target, User, Yes, enable_json_output
+from meridian.cli_options import (
+    ForgetUnreachable,
+    Json,
+    NewServer,
+    SelfSteal,
+    SshPort,
+    Target,
+    User,
+    Yes,
+    enable_json_output,
+)
 
 client_app = typer.Typer(
     help="Manage who can connect: add, show, list, reissue, enable, disable, remove", no_args_is_help=True
@@ -198,6 +208,7 @@ def relay_remove_cmd(
     relay_ip: str = typer.Argument(..., help="Relay server IP, saved name, or relay chain ID"),
     exit: str = typer.Option("", "--exit", "-e", help="Only chains toward this exit (IP, name, or exit ID)"),
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Remove relay chains through a relay server
 
@@ -212,7 +223,7 @@ def relay_remove_cmd(
     """
     from meridian.commands.relay import run_remove
 
-    run_remove(relay_ip, exit, yes)
+    run_remove(relay_ip, exit, yes, forget_unreachable=forget_unreachable)
 
 
 @relay_app.command("sni")
@@ -353,6 +364,7 @@ def node_replace_cmd(
     user: User = "",
     ssh_port: SshPort = 0,
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Move an exit to another server
 
@@ -367,7 +379,7 @@ def node_replace_cmd(
     """
     from meridian.commands.node_replace import run_replace
 
-    run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes)
+    run_replace(old, new, name=name, user=user, ssh_port=ssh_port, yes=yes, forget_unreachable=forget_unreachable)
 
 
 @node_app.command("sni")
@@ -406,6 +418,7 @@ def node_remove_cmd(
     node: str = typer.Argument(..., help="Node IP or name"),
     yes: Yes = False,
     force: bool = typer.Option(False, "--force", help="Also remove relay chains that route to this exit"),
+    forget_unreachable: ForgetUnreachable = False,
 ) -> None:
     """Remove an exit or routing gateway from the fleet
 
@@ -420,7 +433,7 @@ def node_remove_cmd(
     """
     from meridian.commands.node import run_remove
 
-    run_remove(node, yes=yes, force=force)
+    run_remove(node, yes=yes, force=force, forget_unreachable=forget_unreachable)
 
 
 @fleet_app.command("status")

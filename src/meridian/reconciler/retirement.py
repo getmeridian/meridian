@@ -66,6 +66,24 @@ SERVER_PLACED: frozenset[str] = frozenset(
 )
 
 
+def forget_server(cluster: ClusterConfig, bindings: Iterable[ManagedResourceBinding], server_ref: str) -> list[str]:
+    """Drop the retiring server-side bindings on one unreachable server without contacting it.
+
+    Panel-side bindings stay, so the panel still deletes what it holds; whatever
+    ran on the server keeps running until the operator deletes or wipes it.
+    """
+    server_side = SERVER_PLACED | {"server_baseline"}
+    forgotten: list[str] = []
+    for binding in bindings:
+        if binding.server_ref != server_ref or binding.resource_kind not in server_side:
+            continue
+        for saved in cluster.managed_bindings.values():
+            if saved.active and saved.logical_id == binding.logical_id and saved.server_ref == server_ref:
+                saved.active = False
+                forgotten.append(saved.logical_id)
+    return sorted(set(forgotten))
+
+
 @runtime_checkable
 class RetiringDriver(Protocol):
     def retire(self, binding: ManagedResourceBinding) -> None: ...

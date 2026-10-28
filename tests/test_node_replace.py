@@ -44,7 +44,15 @@ def registry(servers_file: Path) -> ServerRegistry:
 
 
 def _replace(
-    old: str, new: str, *, intent: SetupIntent | None = None, runtime: _Runtime | None = None, name: str = ""
+    old: str,
+    new: str,
+    *,
+    intent: SetupIntent | None = None,
+    runtime: _Runtime | None = None,
+    name: str = "",
+    cluster: ClusterConfig | None = None,
+    yes: bool = True,
+    forget: bool = False,
 ) -> tuple[int, _Runtime, MagicMock]:
     runtime = runtime or _Runtime()
     host = new.rpartition("@")[2]
@@ -54,7 +62,7 @@ def _replace(
     with (
         patch(
             "meridian.commands.node_replace.load_topology_cluster",
-            return_value=ClusterConfig(topology_intent=intent or _intent()),
+            return_value=cluster or ClusterConfig(topology_intent=intent or _intent()),
         ),
         patch("meridian.commands.resolve.resolve_server", return_value=target),
         patch(
@@ -63,7 +71,7 @@ def _replace(
         patch("meridian.setup.runtime.SetupRuntime", return_value=runtime),
     ):
         try:
-            run_replace(old, new, name=name, yes=True)
+            run_replace(old, new, name=name, yes=yes, forget_unreachable=forget)
         except typer.Exit as exc:
             return int(exc.exit_code), runtime, connect
     return 0, runtime, connect
@@ -188,3 +196,38 @@ def test_rerun_on_the_current_server_without_stale_paths_is_refused(registry: Se
     code, runtime, _connect = _replace("exit-b", "198.51.100.30", intent=SetupIntent.model_validate(payload))
 
     assert code == 2 and runtime.applied is None
+
+
+def _cluster_with_old_runtime() -> ClusterConfig:
+    binding = ManagedResourceBinding(
+        logical_id="node:exit-b", resource_kind="node_runtime", generation=1, active=True, server_ref="srv-exit-b"
+    )
+    return ClusterConfig(topology_intent=_intent(), managed_bindings={"node:exit-b@1": binding})
+
+
+@pytest.mark.parametrize(
+    ("yes", "forget", "confirmed", "forgotten"),
+    [
+        (True, True, False, True),
+        (True, False, False, False),
+        (False, False, True, True),
+        (False, False, False, False),
+    ],
+    ids=["flag-forgets", "yes-alone-never-forgets", "confirmed-forgets", "declined-keeps"],
+)
+def test_an_unreachable_old_server_is_forgotten_only_when_asked(
+    registry: ServerRegistry, monkeypatch: pytest.MonkeyPatch, yes: bool, forget: bool, confirmed: bool, forgotten: bool
+) -> None:
+    """A blocked or deleted old server failed cleanup on every later apply."""
+    monkeypatch.setattr("meridian.commands._helpers.ssh_port_answers", lambda _host, _port: False)
+    cluster = _cluster_with_old_runtime()
+    answers = iter([confirmed, True])  # the forget offer, then the move itself
+    with (
+        patch.object(ClusterConfig, "save"),
+        patch("meridian.console.confirm", side_effect=lambda *_a, **_k: next(answers)),
+        patch("meridian.commands.node_replace.confirm", return_value=True),
+    ):
+        code, runtime, _connect = _replace("exit-b", "198.51.100.20", cluster=cluster, yes=yes, forget=forget)
+
+    assert code == 0 and runtime.applied is not None
+    assert cluster.managed_bindings["node:exit-b@1"].active is not forgotten

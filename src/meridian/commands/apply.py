@@ -9,12 +9,18 @@ from meridian.core.errors import MeridianError
 from meridian.core.output import OperationContext
 
 
-def run(yes: bool = False) -> None:
+def run(yes: bool = False, forget_unreachable: bool = False) -> None:
     """Review the compiled topology, confirm, then apply it with checkpoints."""
     operation = OperationContext()
     with error_context("apply", timer=operation.timer):
         cluster = load_topology_cluster()
         try:
-            run_v4_apply(cluster, yes=yes, json_output=is_json_mode(), operation=operation)
+            run_v4_apply(
+                cluster,
+                yes=yes,
+                json_output=is_json_mode(),
+                operation=operation,
+                forget_unreachable=forget_unreachable,
+            )
         except MeridianError as exc:
             fail(exc)

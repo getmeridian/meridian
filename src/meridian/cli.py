@@ -19,6 +19,7 @@ from meridian.cli_options import (
     SSH_PORT_HELP,
     USER_HELP,
     YES_HELP,
+    ForgetUnreachable,
     Json,
     SshPort,
     Target,
@@ -330,6 +331,7 @@ def plan_cmd(
 @app.command("apply", rich_help_panel=CHECK_AND_FIX)
 def apply_cmd(
     yes: Yes = False,
+    forget_unreachable: ForgetUnreachable = False,
     _json: Json = False,
 ) -> None:
     """Apply the reviewed topology in cluster.yml to your servers
@@ -343,7 +345,7 @@ def apply_cmd(
     """
     from meridian.commands.apply import run
 
-    run(yes=yes)
+    run(yes=yes, forget_unreachable=forget_unreachable)
 
 
 @app.command("setup", rich_help_panel=GET_STARTED)

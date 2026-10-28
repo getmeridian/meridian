@@ -13,6 +13,8 @@ meridian test 198.51.100.10
 
 If the TCP check on port 443 fails from your network but works from elsewhere (another network or a VPN), the IP is most likely blocked. A TCP failure everywhere usually means a cloud firewall or a server that is down.
 
+When nothing on an exit answers from your network, `meridian test` ends with the `node replace` command for that exit (below); `--json` returns it as `data.recovery`.
+
 To see what exactly is blocked, run [`meridian test 198.51.100.10 --probe`](/en/cli-reference/#censors-view-meridian-test---probe) from inside the censored network: it reports whether the server IP or the camouflage SNI looks blocked. People without the CLI can open their connection page; if it loads on their network, the control server is reachable from there.
 
 ## Immediate relief
@@ -44,6 +46,14 @@ meridian node replace exit-1 198.51.100.20
 ```
 
 Clients pick up the new address on their next subscription refresh. The control server can't be moved this way: its address is part of every subscription URL.
+
+If the old server is blocked from your own network too, the move still deploys the new server first, so clients move over; only the cleanup of the old server fails. Finish it with `meridian apply` once the block lifts or from a network that reaches the old server. If it never will (you deleted it at your provider, or it stays blocked), let Meridian forget it:
+
+```bash
+meridian apply --forget-unreachable
+```
+
+Meridian then skips that cleanup; the panel still deletes what it held. Whatever ran on the old server keeps serving the users it had, including clients you remove later, until you delete or wipe it at your provider. Pass `--forget-unreachable` to `node replace` directly to do it in one step.
 
 ### Add a domain for CDN fallback
 

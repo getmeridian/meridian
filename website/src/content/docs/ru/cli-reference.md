@@ -84,12 +84,13 @@ meridian plan [--json]
 Применить одобренную топологию в `cluster.yml` на ваши серверы. Apply показывает хеш плана и подсчёт ресурсов, просит подтверждение, затем применяет точный показанный план с контрольными точками. Прерванное применение возобновляется там, где остановилось.
 
 ```
-meridian apply [--yes] [--json]
+meridian apply [--yes] [--forget-unreachable] [--json]
 ```
 
 | Флаг | По умолчанию | Описание |
 |------|---------|-------------|
 | `--yes`, `-y` | | Пропустить подтверждение |
+| `--forget-unreachable` | | Забыть развёрнутое на удаляемом сервере, если он не отвечает по SSH (заблокирован или удалён), вместо неудачной очистки; он обслуживает прежних пользователей, пока вы его не удалите |
 | `--json` | | Выдать окончательный результат применения как конверт `meridian.output/v1` |
 
 JSON `data` содержит `plan_hash`, `generation` и `actions[]` с `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`. JSON режим никогда не спрашивает: без `--yes` возвращает `MERIDIAN_CONFIRMATION_REQUIRED` с хешем плана и выходит `2`. Неудавшийся ресурс выходит `3`; исправьте причину и снова запустите apply. Если локальное состояние не может быть сохранено после удалённых изменений, apply выходит `3` и говорит это; исправьте разрешения `~/.config/meridian`, затем запустите `plan` и `apply` снова.
@@ -154,8 +155,8 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node remove NAME_OR_IP [--yes] [--force]
-meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
@@ -170,6 +171,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--country CC` | реестр адреса | Страна в названиях подключений; задайте её, если реестр ошибается (anycast или арендованные диапазоны) |
 | `--harden / --no-harden` | вкл | Защита ОС, SSH и файрвола. На серверах в топологии она всегда включена; `--no-harden` отклоняется |
 | `--yes` | | Пропустить диалоги подтверждения |
+| `--forget-unreachable` | | `node remove`, `node replace`: Забыть развёрнутое на удаляемом сервере, если он не отвечает по SSH (заблокирован или удалён), вместо неудачной очистки; он обслуживает прежних пользователей, пока вы его не удалите |
 | `--force` | | `node remove`: также удалить цепочки промежуточных серверов, которые маршрутизируют к этому выходу |
 | `--json` | | Выдать `node list` как конверт `meridian.output/v1` |
 
@@ -190,7 +192,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay remove RELAY [--exit EXIT] [--yes] [--forget-unreachable]
 meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
@@ -203,6 +205,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 | `--user/-u USER` | сохранено, иначе root | SSH пользователь на промежуточном сервере |
 | `--ssh-port PORT` | сохранено, иначе 22 | SSH порт на промежуточном сервере (`relay add`) |
 | `--yes/-y` | | Пропустить диалоги подтверждения |
+| `--forget-unreachable` | | `relay remove`: Забыть развёрнутое на удаляемом сервере, если он не отвечает по SSH (заблокирован или удалён), вместо неудачной очистки; он обслуживает прежних пользователей, пока вы его не удалите |
 | `--json` | | Выдать `relay list` (`data.relays[]`) как конверт `meridian.output/v1` |
 
 **`relay add`** — добавляет одноузловой промежуточный сервер в вашу топологию и применяет её. Клиенты получают его при следующем обновлении подписки. Для цепей с несколькими узлами используйте `meridian setup`.

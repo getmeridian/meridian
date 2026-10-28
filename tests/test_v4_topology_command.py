@@ -352,7 +352,7 @@ def test_v4_apply_preview_lists_retirements_and_applies_only_the_retirement_boun
     runtime = _runtime(result)
     runtime.review.return_value = SimpleNamespace(
         plan=SimpleNamespace(plan_hash=_PLAN_HASH, resources=[_resource()]),
-        retiring=(SimpleNamespace(logical_id="realm:relay-a:0"),),
+        retiring=(SimpleNamespace(logical_id="realm:relay-a:0", resource_kind="realm_hop", server_ref=""),),
         review_hash=_REVIEW_HASH,
     )
     preview = io.StringIO()

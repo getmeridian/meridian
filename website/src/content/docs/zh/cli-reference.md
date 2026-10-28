@@ -84,12 +84,13 @@ meridian plan [--json]
 应用 `cluster.yml` 中已审核的拓扑到你的服务器。应用显示计划哈希和资源计数，要求确认，然后应用它显示的确切计划，带检查点。中断的应用从停止的地方恢复。
 
 ```
-meridian apply [--yes] [--json]
+meridian apply [--yes] [--forget-unreachable] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
 | `--yes`, `-y` | | 跳过确认 |
+| `--forget-unreachable` | | 被移除的服务器无法通过 SSH 连接（被封锁或已删除）时，忘记其上部署的内容，而不是让清理失败；在你删除它之前，它会继续为原有用户提供服务 |
 | `--json` | | 将最终应用结果作为 `meridian.output/v1` 信封发出 |
 
 JSON `data` 包含 `plan_hash`、`generation` 和 `actions[]` 带 `status: "converged" | "applied" | "failed" | "unknown" | "skipped"`。JSON 模式永不提示：没有 `--yes` 它返回 `MERIDIAN_CONFIRMATION_REQUIRED` 带计划哈希并退出 `2`。失败的资源退出 `3`；修复原因并再次运行应用。如果远程变更后本地状态无法保存，应用退出 `3` 并说明；修复 `~/.config/meridian` 权限，然后再次运行 `plan` 和 `apply`。
@@ -154,8 +155,8 @@ meridian server remove NAME_OR_IP [--yes]
 ```
 meridian node add [USER@]IP[:PORT] [flags]
 meridian node list [--json]
-meridian node remove NAME_OR_IP [--yes] [--force]
-meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes]
+meridian node remove NAME_OR_IP [--yes] [--force] [--forget-unreachable]
+meridian node replace EXIT [USER@]NEW_IP[:PORT] [--name NAME] [--yes] [--forget-unreachable]
 meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 
@@ -170,6 +171,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 | `--country CC` | 地址注册机构 | 显示在连接名称中的国家；注册机构信息有误时（任播或租用地址段）请手动指定 |
 | `--harden / --no-harden` | 启 | 操作系统、SSH 和防火墙加固。集群服务器始终保持启用；`--no-harden` 会被拒绝 |
 | `--yes` | | 跳过确认提示 |
+| `--forget-unreachable` | | `node remove`, `node replace`: 被移除的服务器无法通过 SSH 连接（被封锁或已删除）时，忘记其上部署的内容，而不是让清理失败；在你删除它之前，它会继续为原有用户提供服务 |
 | `--force` | | `node remove`：同时删除指向此出口的中继链 |
 | `--json` | | 将 `node list` 作为 `meridian.output/v1` 信封发出 |
 
@@ -190,7 +192,7 @@ meridian node sni EXIT NEW_SNI [--self-steal] [--yes]
 ```
 meridian relay add [USER@]RELAY_IP[:PORT] --exit EXIT [flags]
 meridian relay list [--exit EXIT] [--json]
-meridian relay remove RELAY [--exit EXIT] [--yes]
+meridian relay remove RELAY [--exit EXIT] [--yes] [--forget-unreachable]
 meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 ```
 
@@ -203,6 +205,7 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 | `--user/-u USER` | 已保存或 root | 中继服务器上的 SSH 用户 |
 | `--ssh-port PORT` | 已保存或 22 | 中继服务器的 SSH 端口（`relay add`） |
 | `--yes/-y` | | 跳过确认提示 |
+| `--forget-unreachable` | | `relay remove`: 被移除的服务器无法通过 SSH 连接（被封锁或已删除）时，忘记其上部署的内容，而不是让清理失败；在你删除它之前，它会继续为原有用户提供服务 |
 | `--json` | | 将 `relay list`（`data.relays[]`）作为 `meridian.output/v1` 信封发出 |
 
 **`relay add`** — 添加单跳中继到拓扑并应用它。客户端在下次订阅刷新时接收它。对于多于一跳的链，使用 `meridian setup`。

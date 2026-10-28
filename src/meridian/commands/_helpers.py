@@ -159,6 +159,68 @@ def apply_reviewed_intent(
     return result
 
 
+def ssh_port_answers(host: str, port: int) -> bool:
+    """Whether a server's SSH port accepts a TCP connection; one probe, so a blocked server costs 10s."""
+    from meridian.health import tcp_connect
+
+    return tcp_connect(host, port, 10)
+
+
+def forget_unreachable_servers(
+    cluster: ClusterConfig,
+    registry: ServerRegistry,
+    intent: SetupIntent,
+    *,
+    forget: bool,
+    yes: bool,
+) -> None:
+    """Offer to forget servers that only cleanup still needs and whose SSH port does not answer.
+
+    A blocked or deleted server would fail cleanup on every apply. Forgetting drops
+    only its server-side records; the panel still deletes what it holds. ``--yes``
+    alone never forgets: an automated run must say ``--forget-unreachable``.
+    """
+    from rich.markup import escape
+
+    from meridian.compiler.deployment import deployment_server_refs
+    from meridian.console import confirm, err_console, is_json_mode
+    from meridian.core.setup import SetupDraft
+    from meridian.reconciler.retirement import forget_server, retiring_server_refs
+
+    try:
+        review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(intent), cluster=cluster)
+    except MeridianError as exc:
+        fail(exc)
+    for server_ref in sorted(retiring_server_refs(review.retiring) - deployment_server_refs(intent)):
+        entry = registry.find(server_ref)
+        if entry is None or entry.runs_here() or ssh_port_answers(entry.host, entry.ssh_port or 22):
+            continue
+        label = escape(entry.name or entry.host)
+        if not forget:
+            if yes or is_json_mode():
+                if not is_json_mode():
+                    err_console.print(
+                        f"  [yellow]{label} does not answer over SSH; its cleanup will fail.[/yellow] "
+                        "[dim]Pass --forget-unreachable to forget it instead.[/dim]"
+                    )
+                continue
+            err_console.print()
+            err_console.print(f"  [bold]{label} does not answer over SSH from here.[/bold]")
+            err_console.print("  Meridian can't clean it up, and every apply would keep trying.")
+            err_console.print("  Forgetting it skips that cleanup. Whatever runs there keeps serving the users it had,")
+            err_console.print("  including clients you remove later, until you delete or wipe it at your provider.")
+            if not confirm(f"Forget what Meridian deployed on {entry.name or entry.host}?"):
+                continue
+        forgotten = forget_server(cluster, review.retiring, server_ref)
+        try:
+            cluster.save()
+        except LOCAL_STATE_SAVE_ERRORS as exc:
+            fail(f"Could not save local state: {exc}", hint="Nothing on the servers changed.", hint_type="system")
+        err_console.print(
+            f"  [dim]Forgot {len(forgotten)} resources on {label}; delete or wipe it at your provider.[/dim]"
+        )
+
+
 def format_traffic(bytes_used: int, bytes_limit: int = 0) -> str:
     """Format traffic usage as a human-readable string."""
 

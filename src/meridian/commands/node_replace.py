@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
-from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
+from meridian.commands._helpers import (
+    apply_reviewed_intent,
+    forget_unreachable_servers,
+    load_topology_cluster,
+    require_intent,
+    reviewed_runtime,
+)
 from meridian.commands._validation import validate_command_input
 from meridian.console import confirm, err_console, fail, ok
 from meridian.core.command_inputs import NodeTargetRequest
@@ -18,7 +24,16 @@ if TYPE_CHECKING:
     from meridian.servers import ServerEntry, ServerRegistry
 
 
-def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port: int = 0, yes: bool = False) -> None:
+def run_replace(
+    old: str,
+    new: str,
+    *,
+    name: str = "",
+    user: str = "",
+    ssh_port: int = 0,
+    yes: bool = False,
+    forget_unreachable: bool = False,
+) -> None:
     """Move exit OLD onto server NEW, keeping its ID, keys, paths, settings, and relays."""
     request = validate_command_input(NodeTargetRequest, "Invalid node replace request", ip_or_name=old)
     from meridian.commands.resolve import resolve_server
@@ -56,6 +71,7 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
     except ValueError as exc:
         fail(f"Cannot move exit {exit_.id}: {exc}", hint="Adjust the topology in `meridian setup`.", hint_type="user")
 
+    forget_unreachable_servers(cluster, registry, updated, forget=forget_unreachable, yes=yes)
     try:
         review = reviewed_runtime(registry, cluster).review(SetupDraft.from_intent(updated), cluster=cluster)
     except MeridianError as exc:
@@ -86,7 +102,10 @@ def run_replace(old: str, new: str, *, name: str = "", user: str = "", ssh_port:
         registry,
         updated,
         failure=f"Exit {exit_.id} was not fully moved",
-        hint=f"The topology already places it on {new_label}; rerun `meridian apply` to finish the move.",
+        hint=(
+            f"The topology already places it on {new_label}; rerun `meridian apply` to finish the move "
+            "(add --forget-unreachable if the old server no longer answers)."
+        ),
         expected_plan_hash=review.review_hash,
     )
     ok(f"Moved {subject} ({len(result.retired)} old resources cleaned up). {old_label} stays in your saved servers.")

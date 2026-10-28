@@ -17,6 +17,7 @@ from meridian.reconciler.resources import UnsupportedResourceRetirementError
 from meridian.reconciler.retirement import (
     FORGET_ONLY,
     RETIREMENT_ORDER,
+    forget_server,
     retire,
     retired_bindings,
     retirement_review_hash,
@@ -256,3 +257,25 @@ def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements
     assert "node_runtime" in kinds and "nginx_artifact" in kinds and "firewall_rule" in kinds
     # The panel Node keeps its UUID and is re-addressed in place, never deleted.
     assert "node_binding" not in kinds
+
+
+def test_forgetting_a_server_keeps_panel_cleanup_and_other_servers() -> None:
+    def binding(logical_id: str, kind: str, server_ref: str) -> ManagedResourceBinding:
+        return ManagedResourceBinding(
+            logical_id=logical_id, resource_kind=kind, generation=1, active=True, server_ref=server_ref
+        )
+
+    retiring = [
+        binding("node:exit-b", "node_runtime", "srv-old"),
+        binding("firewall:old:443", "firewall_rule", "srv-old"),
+        binding("baseline:srv-old", "server_baseline", "srv-old"),
+        binding("binding:exit-b", "node_binding", "srv-old"),
+        binding("firewall:other:443", "firewall_rule", "srv-other"),
+    ]
+    cluster = ClusterConfig(managed_bindings={f"{item.logical_id}@1": item for item in retiring})
+
+    forgotten = forget_server(cluster, retiring, "srv-old")
+
+    assert forgotten == ["baseline:srv-old", "firewall:old:443", "node:exit-b"]
+    still_active = sorted(item.logical_id for item in cluster.managed_bindings.values() if item.active)
+    assert still_active == ["binding:exit-b", "firewall:other:443"]
