@@ -29,6 +29,7 @@
 - Bare-IP clients send no SNI: IP paths route on the no-SNI stream key and, on the control server, join the panel TLS server as `location` artifacts.
 - Client geodata must exist in stock dat files (v2fly, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole config. Server rules are checked by `geodata.py` against `core/geodata_lists.py`, generated from the pinned node image.
 - Every TCP Host and gateway edge carries its path's `fingerprint` (empty means Go's ClientHello, a DPI signature); Reality and XHTTP publish a copy per `FINGERPRINT_COPIES`. Hysteria2 carries none.
+- **Client Xray JSON's `dns` block stays unused** — the final balancer rule matches every domain before `IPIfNonMatch` needs an IP; narrow or move it and plain lookups to 1.1.1.1/8.8.8.8 (redirected in Russia) leave through DIRECT (real-Xray test).
 - Mihomo IP rules keep `no-resolve`: local resolution leaks names, and spoofed domestic answers would match `geoip:ru`.
 - Xray server pools use `leastPing` balancers; never claim strict-priority failover.
 - Access usernames keep their case in the panel, but `user:` logical IDs lowercase them (`AccessIntent` refuses case-only twins); a raw `user:Biba` failed every review.
