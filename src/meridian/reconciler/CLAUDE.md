@@ -28,7 +28,7 @@
 - **Always render Reality `minClientVer`** — Xray 26.7.11+ otherwise rejects Mihomo/sing-box (they announce 1.8.x), and Meridian's own Xray-based `test` never notices.
 - **Inbounds are Profile-derived** — update the aggregate Profile, then observe each profile-scoped tag and UUID; there is no standalone Inbound mutation.
 - **One TLS output path per Host, one stream owner per listener** — hostname-derived certificate directories; the V4 port-443 artifact carries the panel/no-SNI route and retires `stream.d/meridian.conf` with rollback.
-- **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path.
+- **Normalize asynchronous observations** — compare UFW rules as `shlex` tokens, read Realm's version before feature suffixes, and wait for panel node connectivity after every deploy path; node and gateway probes poll on apply, because a recreated container still reads connected until the panel notices the restart.
 - **Only a step-boundary `OperationCancelledError` is `cancelled`** — timeouts and killed processes stay `unknown`.
 - **Attest server artifacts against their own inputs** (target, pins, renderer contract) — hashing the whole deployment re-runs every server on any fleet edit.
 - **Delete, never mark inactive** — give a kind an idempotent driver `retire()` (404 = done) before adding it to `RETIREMENT_ORDER`; server-side retirement needs the binding's recorded `server_ref`.

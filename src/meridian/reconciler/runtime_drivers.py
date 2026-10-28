@@ -18,6 +18,7 @@ from meridian.compiler.models import (
     ResourcePlan,
     RoutingGatewayPayload,
 )
+from meridian.health import ReadinessTimeout, poll_until_ready
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
@@ -29,6 +30,11 @@ from meridian.reconciler.resources import (
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE
 from meridian.ssh import ServerConnection
 from meridian.xray_client import is_supported_proxy_outbound, parse_xray_subscription, proxy_outbounds
+
+# A recreated node container can still read as connected until the panel notices the
+# restart, so a node or gateway probe polls for its state instead of reading it once.
+NODE_SETTLE_TIMEOUT = 60.0
+NODE_SETTLE_INTERVAL = 3.0
 
 
 class RuntimePanel(Protocol):
@@ -129,11 +135,25 @@ class ProbeDriver:
         payload = action.resource.payload
         if not isinstance(payload, ProbePayload):
             raise ResourceReconcileError(f"Probe driver received {payload.kind}.")
-        if not self._run(payload, action.generation):
+        if not self._settled(payload, action.generation):
             raise ResourceReconcileError(
                 f"{payload.probe.replace('_', ' ').title()} probe failed for {payload.target_ref!r}."
             )
         return ResourceApplyReceipt(remote_id=payload.target_ref)
+
+    def _settled(self, payload: ProbePayload, generation: int) -> bool:
+        if payload.probe not in {"node", "route"}:
+            return self._run(payload, generation)
+        try:
+            poll_until_ready(
+                lambda: self._run(payload, generation),
+                timeout=NODE_SETTLE_TIMEOUT,
+                interval=NODE_SETTLE_INTERVAL,
+                description=f"{payload.probe} probe for {payload.target_ref}",
+            )
+        except ReadinessTimeout:
+            return False
+        return True
 
     def _run(self, payload: ProbePayload, generation: int) -> bool:
         if payload.probe == "node":

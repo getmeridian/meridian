@@ -397,6 +397,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   stopped right after starting, which failed server preparation; it now reads
   the system journal on every supported release, and a package Debian only
   remembers is no longer mistaken for an installed one.
+- **Edits that restart an exit's node converge on the first apply** — the
+  first WARP route on an exit restarts its node, and the connection check that
+  followed could still catch the panel noticing that restart, failing the apply
+  until a rerun. Node and gateway checks now wait up to a minute for the node
+  to reconnect.
 - **Unknown geo lists are refused at review** — a gateway rule or exit override
   naming a `geosite:`/`geoip:` list or country the servers' Xray data lacks made
   Xray refuse its whole config, so the server stopped converging. Review now

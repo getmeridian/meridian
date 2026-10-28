@@ -376,3 +376,65 @@ def test_gateway_probe_requires_connected_node_on_reviewed_profile() -> None:
     )
 
     assert observation_converges(action, driver.observe(action, None))
+
+
+def _node_probe_driver(panel: MagicMock) -> tuple[ProbeDriver, ResourceAction]:
+    binding = make_resource(
+        "binding:exit-a",
+        NodeBindingPayload(
+            workload_ref="exit-a",
+            server_ref="srv-exit",
+            name="M4 exit-a",
+            profile_ref="profile:exit-a",
+            inbound_refs=["inbound:exit-a"],
+        ),
+    )
+    runtime = make_resource(
+        "node:exit-a",
+        NodeRuntimePayload(workload_ref="exit-a", server_ref="srv-exit", binding_ref=binding.logical_id),
+        dependencies=[binding.logical_id],
+    )
+    probe = make_resource(
+        "probe:node:exit-a",
+        ProbePayload(probe="node", target_ref=runtime.logical_id),
+        dependencies=[runtime.logical_id],
+    )
+    plan = resource_plan(binding, runtime, probe)
+    cluster = ClusterConfig(
+        managed_bindings={
+            f"{binding.logical_id}@1": ManagedResourceBinding(
+                logical_id=binding.logical_id, resource_kind="node_binding", generation=1, remote_id="node-uuid"
+            )
+        }
+    )
+    context = ProbeDriverContext(
+        plan=plan, cluster=cluster, panel=panel, connection_for=MagicMock(), server_addresses={}
+    )
+    return ProbeDriver(context), build_resource_actions(plan, 1)[-1]
+
+
+def _node(connected: bool) -> SimpleNamespace:
+    return SimpleNamespace(is_disabled=False, is_connected=connected)
+
+
+def test_node_probe_waits_out_the_panel_noticing_a_recreated_container(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The runtime saw the stale "connected" from before the restart; the probe read the drop and failed the apply."""
+    monkeypatch.setattr("meridian.reconciler.runtime_drivers.NODE_SETTLE_INTERVAL", 0)
+    panel = MagicMock()
+    panel.get_node.side_effect = [_node(False), _node(False), _node(True)]
+    driver, action = _node_probe_driver(panel)
+
+    driver.apply(action, None)
+
+    assert panel.get_node.call_count == 3
+
+
+def test_node_probe_that_never_connects_fails_the_apply(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("meridian.reconciler.runtime_drivers.NODE_SETTLE_TIMEOUT", 0)
+    panel = MagicMock()
+    panel.get_node.return_value = _node(False)
+    driver, action = _node_probe_driver(panel)
+
+    assert not observation_converges(action, driver.observe(action, None))
+    with pytest.raises(ResourceReconcileError, match="Node probe failed"):
+        driver.apply(action, None)
