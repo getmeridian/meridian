@@ -219,14 +219,16 @@ Send chosen destinations from an exit through Cloudflare WARP, directly, or nowh
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route add EXIT --preset ai [--via warp|direct|block] [--name ID] [--json]
 meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--via ACTION` | (required for add) | `warp`, `direct`, or `block` |
-| `--name ID` | the action, numbered | Route ID shown by `route list` and used by `route remove` |
+| `--via ACTION` | `warp` with `--preset`, else required for add | `warp`, `direct`, or `block` |
+| `--preset NAME` | | Add a named destination set instead of `VALUE`s: `ai` (AI services) |
+| `--name ID` | the preset, or the action, numbered | Route ID shown by `route list` and used by `route remove` |
 | `--yes/-y` | | Skip the removal confirmation (required with `--json`) |
 | `--json` | | Emit a `meridian.output/v1` envelope (`data.override` for add/remove, `data.exits[]` for list) |
 

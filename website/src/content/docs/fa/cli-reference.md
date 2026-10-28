@@ -219,14 +219,16 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route add EXIT --preset ai [--via warp|direct|block] [--name ID] [--json]
 meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
 | پرچم | پیش‌فرض | توضیح |
 |------|---------|-------------|
-| `--via ACTION` | (الزامی برای add) | `warp`، `direct` یا `block` |
-| `--name ID` | action، numbered | Route ID نشان داده‌شده توسط `route list` و استفاده شده توسط `route remove` |
+| `--via ACTION` | `warp` همراه `--preset`، وگرنه الزامی برای add | `warp`، `direct` یا `block` |
+| `--preset NAME` | | مجموعه نام‌دار مقصدها به جای `VALUE`: `ai` (سرویس‌های هوش مصنوعی) |
+| `--name ID` | نام preset، یا action شماره‌دار | Route ID نشان داده‌شده توسط `route list` و استفاده شده توسط `route remove` |
 | `--yes/-y` | | تأیید حذف را رد کنید (با `--json` الزامی است) |
 | `--json` | | پاکت `meridian.output/v1` ارسال کنید (`data.override` برای add/remove، `data.exits[]` برای list) |
 

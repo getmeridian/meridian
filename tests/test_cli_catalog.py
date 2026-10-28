@@ -24,8 +24,8 @@ def test_contracts_take_argv_flags_and_help_from_the_command() -> None:
     contracts = {contract.command: contract for contract in command_contracts()}
 
     route_add = contracts["route.add"]
-    assert route_add.argv == ["route", "add", "EXIT", "VALUE..."]
-    assert route_add.machine_flags == ["--via", "--name", "--json"]
+    assert route_add.argv == ["route", "add", "EXIT", "[VALUE...]"]
+    assert route_add.machine_flags == ["--via", "--preset", "--name", "--json"]
     assert route_add.description == "Send matching destinations through WARP, directly, or nowhere"
     assert command_argv("check", commands["check"]) == ["check", "[SERVER]"]
     assert "dev.preview" not in contracts

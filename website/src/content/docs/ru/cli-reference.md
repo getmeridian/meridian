@@ -219,14 +219,16 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route add EXIT --preset ai [--via warp|direct|block] [--name ID] [--json]
 meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
 | Флаг | По умолчанию | Описание |
 |------|---------|-------------|
-| `--via ACTION` | (требуется для add) | `warp`, `direct`, или `block` |
-| `--name ID` | действие, пронумеровано | ID маршрута показанный через `route list` и используемый через `route remove` |
+| `--via ACTION` | `warp` с `--preset`, иначе обязателен для add | `warp`, `direct` или `block` |
+| `--preset NAME` | | Готовый набор направлений вместо `VALUE`: `ai` (AI-сервисы) |
+| `--name ID` | пресет или действие с номером | ID маршрута показанный через `route list` и используемый через `route remove` |
 | `--yes/-y` | | Пропустить подтверждение удаления (требуется с `--json`) |
 | `--json` | | Выдать конверт `meridian.output/v1` (`data.override` для add/remove, `data.exits[]` для list) |
 

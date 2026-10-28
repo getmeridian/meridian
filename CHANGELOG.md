@@ -196,6 +196,12 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   `geoip:` ranges through Cloudflare WARP, directly, or nowhere, ahead of the
   exit's default egress (for example, AI services that block datacenter IPs).
   `route list` and `route remove` complete it; the wizard keeps existing routes.
+- **One route for AI services** — `meridian route add EXIT --preset ai` sends
+  ChatGPT, Claude, Gemini, Cursor, and the rest of the AI site list through
+  WARP as one route named `ai`, so they never see the exit's hosting address
+  (`--via direct` keeps them on it). The deploy guide adds what a server route
+  cannot fix: changing exit countries, device-side leaks, and Google's
+  country-association request.
 - **Gateway rules can send traffic directly** — a routing-gateway rule can
   send matching traffic out of the gateway itself instead of to an exit or
   pool, so Russian sites can leave from a gateway in Russia. The wizard offers

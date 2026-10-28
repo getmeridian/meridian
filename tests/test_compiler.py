@@ -1203,3 +1203,11 @@ def test_built_in_server_rules_name_lists_the_pinned_geodata_has() -> None:
 
     assert {"category-ru", "geolocation-!cn"} <= GEOSITE_LISTS
     assert {"ru", "private"} <= GEOIP_LISTS
+
+
+def test_route_presets_name_lists_the_pinned_geodata_has() -> None:
+    from meridian.core.geodata_lists import GEOSITE_LISTS
+    from meridian.core.routes import ROUTE_PRESETS
+
+    for values in ROUTE_PRESETS.values():
+        assert {value.removeprefix("geosite:") for value in values} <= GEOSITE_LISTS

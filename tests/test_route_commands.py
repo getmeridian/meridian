@@ -144,3 +144,41 @@ def test_json_removal_requires_yes(registry: ServerRegistry) -> None:
 
     assert _run(lambda: run_remove("exit-a", "ai"), _intent([_AI]), runtime) == 2
     assert _run(lambda: run_remove("exit-a", "ai", yes=True), _intent([_AI]), runtime) == 0
+
+
+def test_ai_preset_is_one_warp_route_named_ai(registry: ServerRegistry) -> None:
+    runtime = _Runtime(ResourceExecutionResult(plan_hash="sha256:plan", generation=2))
+
+    assert _run(lambda: run_add("exit-a", [], "", preset="AI"), _intent(), runtime) == 0
+
+    (override,) = runtime.applied[0].exits[0].egress_overrides
+    assert (override.id, override.match, override.action) == ("ai", "geosite", "warp")
+    assert {"category-ai-!cn", "openai", "anthropic"} <= set(override.values)
+
+
+def test_ai_preset_keeps_an_explicit_via_and_name(registry: ServerRegistry) -> None:
+    runtime = _Runtime(ResourceExecutionResult(plan_hash="sha256:plan", generation=2))
+
+    assert _run(lambda: run_add("exit-a", [], "direct", "llm", preset="ai"), _intent(), runtime) == 0
+
+    (override,) = runtime.applied[0].exits[0].egress_overrides
+    assert (override.id, override.action) == ("llm", "direct")
+
+
+@pytest.mark.parametrize(
+    ("values", "via", "preset"),
+    [
+        (["example.com"], "warp", "ai"),
+        ([], "warp", "games"),
+        ([], "warp", ""),
+        (["example.com"], "", ""),
+    ],
+    ids=["preset-plus-values", "unknown-preset", "no-values", "no-via"],
+)
+def test_bad_preset_or_missing_input_fails_before_apply(
+    registry: ServerRegistry, values: list[str], via: str, preset: str
+) -> None:
+    runtime = _Runtime(ResourceExecutionResult(plan_hash="sha256:plan", generation=2))
+
+    assert _run(lambda: run_add("exit-a", values, via, preset=preset), _intent(), runtime) == 2
+    assert runtime.applied == []

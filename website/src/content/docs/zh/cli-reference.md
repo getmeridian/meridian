@@ -219,14 +219,16 @@ meridian relay sni RELAY NEW_SNI [--exit EXIT] [--yes]
 
 ```
 meridian route add EXIT VALUE... --via warp|direct|block [--name ID] [--json]
+meridian route add EXIT --preset ai [--via warp|direct|block] [--name ID] [--json]
 meridian route list [EXIT] [--json]
 meridian route remove EXIT ROUTE [--yes] [--json]
 ```
 
 | 标志 | 默认值 | 说明 |
 |------|---------|-------------|
-| `--via ACTION` | （add 需要） | `warp`、`direct` 或 `block` |
-| `--name ID` | 操作，编号 | 路由 ID 显示在 `route list` 并由 `route remove` 使用 |
+| `--via ACTION` | 使用 `--preset` 时为 `warp`，否则 add 必填 | `warp`、`direct` 或 `block` |
+| `--preset NAME` | | 用命名的目标集合代替 `VALUE`：`ai`（AI 服务） |
+| `--name ID` | 预设名，或带编号的操作 | 路由 ID 显示在 `route list` 并由 `route remove` 使用 |
 | `--yes/-y` | | 跳过删除确认（需要用 `--json`） |
 | `--json` | | 发出 `meridian.output/v1` 信封（`data.override` 用于 add/remove，`data.exits[]` 用于 list） |
 

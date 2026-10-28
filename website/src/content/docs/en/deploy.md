@@ -194,6 +194,16 @@ meridian route remove exit-1 warp
 
 Values are domains (subdomains included), `geosite:NAME` lists, or `geoip:NAME` lists from the stock v2fly data files; one route holds one kind. `--via direct` does the opposite on a WARP exit: those destinations skip WARP. Routes apply in the order you added them, before the exit's default egress and before geo-blocking. These routes live on the server; they are separate from the client-side rules that send Russian sites direct on the user's device, and from routing-gateway rules, which can send traffic directly from a domestic gateway ([Split routing](/en/split-routing/#through-a-routing-gateway)).
 
+### AI services
+
+AI services (ChatGPT, Claude, Gemini, Cursor, and others) refuse some hosting addresses, and a session whose address jumps between countries, or briefly shows a home connection in Russia, can end in a logout or a suspended account. One route sends them all through WARP:
+
+```
+meridian route add exit-1 --preset ai
+```
+
+The preset is a single route named `ai` covering `geosite:category-ai-!cn`, `anthropic`, `openai`, `cursor`, and `google-gemini`; add `--via direct` to keep it on the exit's own address. WARP leaves in the exit's region, so keep AI users on exits in one country. A server route cannot catch traffic the device sends outside the VPN: on macOS, Happ may send traffic directly for a moment after the lid opens. If Google services still treat you as being in Russia, the "change the country associated with your account" request in Google Account help usually fixes it within hours.
+
 ## Geo-blocking
 
 By default, the server blocks Russian domains (`geosite:category-ru`) and Russian IP ranges (`geoip:ru`) through the proxy. This keeps your VPS IP out of Russian services' logs, which lowers the chance of it being found and blocked.

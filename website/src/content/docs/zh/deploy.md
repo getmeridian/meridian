@@ -194,6 +194,16 @@ meridian route remove exit-1 warp
 
 匹配值可以是域名（包含子域名）、内置 v2fly 数据文件中的 `geosite:NAME` 列表或 `geoip:NAME` 列表；同一条路由只能包含同一种类型。在启用了全局 WARP 的出口上，`--via direct` 作用相反：让匹配的目标绕过 WARP 直接出站。路由按添加顺序生效，优先级高于出口默认出站和地理封锁。这些路由运行在服务器端，与用户设备上将俄罗斯网站直连的客户端分流规则相互独立，也与路由网关规则无关；后者可以让流量直接从境内网关发出（[分流路由](/zh/split-routing/#通过路由网关)）。
 
+### AI 服务
+
+AI 服务（ChatGPT、Claude、Gemini、Cursor 等）会拒绝部分托管商地址；如果会话的地址在不同国家之间跳动，或短暂暴露出家庭网络连接，可能导致账号被登出或封禁。一条路由即可让它们全部走 WARP：
+
+```
+meridian route add exit-1 --preset ai
+```
+
+该预设是一条名为 `ai` 的路由，涵盖 `geosite:category-ai-!cn`、`anthropic`、`openai`、`cursor` 和 `google-gemini`；加上 `--via direct` 则让它们使用出口自身的地址。WARP 在出口所在地区出站，因此请让使用 AI 服务的用户固定在同一国家的出口上。服务器端路由无法拦截设备绕过 VPN 发出的流量：在 macOS 上，Happ 可能在打开笔记本盖子后的片刻直接发送流量。如果 Google 服务仍认为你身处其他国家，可在 Google 账号帮助中提交“更改与账号关联的国家/地区”申请，通常几小时内即可解决。
+
 ## 地理封锁
 
 默认情况下，服务器会拒绝通过代理访问俄罗斯域名（`geosite:category-ru`）和俄罗斯 IP 段（`geoip:ru`）。这样可以避免你的 VPS IP 出现在俄罗斯服务的日志中，降低被发现和封锁的风险。

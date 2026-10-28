@@ -241,25 +241,29 @@ def relay_sni_cmd(
 @route_app.command("add")
 def route_add_cmd(
     exit: str = typer.Argument(..., help="Exit ID, saved server name, or IP"),
-    values: list[str] = typer.Argument(
-        ..., metavar="VALUE", help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"
+    values: list[str] | None = typer.Argument(
+        None, metavar="VALUE", help="Domains, geosite:NAME, or geoip:NAME (one kind per route)"
     ),
-    via: str = typer.Option(..., "--via", help="warp, direct, or block"),
-    name: str = typer.Option("", "--name", help="Route ID (default: the --via value, numbered)"),
+    via: str = typer.Option("", "--via", help="warp, direct, or block (default for --preset: warp)"),
+    preset: str = typer.Option("", "--preset", help="A named destination set instead of VALUEs: ai"),
+    name: str = typer.Option("", "--name", help="Route ID (default: the preset, or the --via value, numbered)"),
     _json: Json = False,
 ) -> None:
     """Send matching destinations through WARP, directly, or nowhere
 
     Overrides apply on the exit, ahead of its default egress, in the order
     they were added. Using --via warp sets up WARP on the exit if needed.
+    --preset ai sends AI services (ChatGPT, Claude, Gemini, Cursor, ...)
+    through WARP instead of the exit's hosting address, which some refuse.
 
     [dim]Examples:[/dim]
+      [cyan]meridian route add exit-1 --preset ai[/cyan]
       [cyan]meridian route add exit-1 --via warp netflix.com chatgpt.com[/cyan]
       [cyan]meridian route add exit-1 --via block geosite:category-ads-all[/cyan]
     """
     from meridian.commands.route import run_add
 
-    run_add(exit, values, via, name)
+    run_add(exit, values or [], via, name, preset=preset)
 
 
 @route_app.command("list")

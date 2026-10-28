@@ -7,6 +7,19 @@ from pydantic import Field
 from meridian.core.models import CoreModel
 from meridian.core.topology import EgressOverrideIntent, ExitIntent
 
+# Named destination sets for `route add --preset`, each added as one override. AI
+# services refuse or flag hosting addresses, so `ai` leaves through WARP by default.
+# Every name must exist in the pinned geodata (tested).
+ROUTE_PRESETS: dict[str, tuple[str, ...]] = {
+    "ai": (
+        "geosite:category-ai-!cn",
+        "geosite:anthropic",
+        "geosite:openai",
+        "geosite:cursor",
+        "geosite:google-gemini",
+    ),
+}
+
 
 class ExitEgressOverrides(CoreModel):
     """One exit's default egress and its overrides in first-match order."""
