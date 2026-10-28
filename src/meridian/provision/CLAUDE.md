@@ -16,7 +16,7 @@
 ## Pitfalls
 - **Panel sub-path rewrites follow the bundle** — Remnawave has no base path, so `sub_filter` must match the shipped frontend's literals (3.4 uses backticks); re-grep on every backend bump and never rewrite `` `/api ``.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops parent headers; use `map`.
-- **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window.
+- **acme.sh short-lived IP certs** — 6-day certs need `--days 5` and an explicit renew window; report acme.sh's last lines (`_acme_reason`), since its first ones are only timestamps.
 - **nginx stream is a dynamic module** — install `libnginx-mod-stream`.
 - **nginx ≥ 1.25 comes from nginx.org** — `http2 on;` needs it; keep old conffiles (`--force-confdef --force-confold`) and add the `sites-enabled` include. The system-lab image pre-installs 1.27 and hides all three.
 - **Internal TLS servers need `absolute_redirect off` and `http2 on`** — behind the 443 stream router on 127.0.0.1:8443, slash redirects point browsers at `:8443`, and Xray's fingerprinted XHTTP client speaks HTTP/2 whatever ALPN says.

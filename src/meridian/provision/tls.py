@@ -24,6 +24,15 @@ _SHORTLIVED_IP_CERT_RENEWAL_DAYS = 5
 _SHORTLIVED_IP_CERT_MAX_NEXT_RENEW_SECONDS = 7 * 24 * 60 * 60
 
 
+_ACME_STAMP = re.compile(r"^\[[^]]*\]\s*")
+
+
+def _acme_reason(output: str) -> str:
+    """acme.sh's last lines without timestamps: its error comes after the banner and progress lines."""
+    lines = [_ACME_STAMP.sub("", line).strip() for line in output.strip().splitlines()]
+    return " / ".join(line for line in lines if line)[-300:]
+
+
 def _load_acme_domain_info(conn: ServerConnection, cert_host: str) -> str | None:
     """Return acme.sh domain config output, or None if this host is unknown."""
     q_cert_host = shlex.quote(cert_host)
@@ -150,7 +159,7 @@ class IssueTLSCert:
                 return StepResult(
                     name=self.name,
                     status="failed",
-                    detail=f"Failed to install TLS cert for {cert_host}: {detail[:200]}",
+                    detail=f"Failed to install TLS cert for {cert_host}: {_acme_reason(detail)}",
                 )
             # Reload to pick up the real cert
             reload = conn.run("systemctl reload nginx", timeout=15)
@@ -174,7 +183,7 @@ class IssueTLSCert:
             name=self.name,
             status="failed",
             detail=(
-                f"Failed to issue a trusted TLS certificate for {cert_host}: {detail[:200]}. "
+                f"Failed to issue a trusted TLS certificate for {cert_host}: {_acme_reason(detail)}. "
                 "Check port 80, DNS, and ACME reachability; panel credentials are not sent over self-signed TLS."
             ),
         )

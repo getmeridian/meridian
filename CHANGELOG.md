@@ -402,6 +402,8 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   followed could still catch the panel noticing that restart, failing the apply
   until a rerun. Node and gateway checks now wait up to a minute for the node
   to reconnect.
+- **Certificate failures say why** — the error kept acme.sh's first lines
+  (timestamps and progress) and cut off its reason; it now shows the last ones.
 - **Unknown geo lists are refused at review** — a gateway rule or exit override
   naming a `geosite:`/`geoip:` list or country the servers' Xray data lacks made
   Xray refuse its whole config, so the server stopped converging. Review now

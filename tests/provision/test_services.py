@@ -375,6 +375,22 @@ class TestIssueTLSCert:
         assert "not sent over self-signed TLS" in result.detail
         conn.assert_not_called_with_pattern("systemctl reload")
 
+    def test_acme_failure_names_its_reason_not_its_banner(self):
+        """The first 200 characters were timestamps; the 404 that explained the failure was cut off."""
+        banner = "\n".join(f"[Wed Oct 28 05:56:18 PM UTC 2026] progress line {n}" for n in range(8))
+        conn = MockConnection()
+        conn.when("acme.sh --info", rc=1)
+        conn.when(
+            "acme.sh --issue",
+            stdout=f"{banner}\n[Wed Oct 28 05:56:20 PM UTC 2026] Verification error details: Invalid response: 404",
+            rc=1,
+        )
+        result = IssueTLSCert(domain="", ip_mode=True, server_ip="198.51.100.1").run(
+            conn, ProvisionContext(ip="198.51.100.1")
+        )
+        assert "Verification error details: Invalid response: 404" in result.detail
+        assert "PM UTC" not in result.detail
+
     def test_install_cert_failure_returns_failed(self):
         conn = _acme()
         conn.when("acme.sh --install-cert", stderr="copy failed", rc=1)
