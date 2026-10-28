@@ -120,3 +120,6 @@ if broken or not flowed:
     raise SystemExit(f"meridian test exited {sys.argv[2]} with broken traffic: {broken or 'no traffic evidence'}")
 PYEOF
 pass "meridian test pushed traffic through the remaining fleet"
+
+python3 "$GOLDEN_CAPTURE" --topology reduced --user acceptance
+pass "golden subscription corpus captured for exit A and the routing gateway"

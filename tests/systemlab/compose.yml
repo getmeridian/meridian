@@ -161,6 +161,10 @@ services:
       PYTHONPATH: /workspace
       SYSTEMLAB_STAGES: "${SYSTEMLAB_STAGES:-}"
       SYSTEMLAB_KEEP: "${SYSTEMLAB_KEEP:-}"
+      SYSTEMLAB_GOLDEN_RAW: /systemlab-output/golden-raw
+    volumes:
+      # Raw golden subscription captures (live secrets; gitignored) for the host to normalize.
+      - ./output:/systemlab-output
     command: ["bash", "/workspace/tests/systemlab/scripts/controller-run.sh"]
 
 networks:

@@ -40,6 +40,9 @@ assert [entry["url"] for entry in page.json()["protocols"]] == [link.url for lin
 PYEOF
 pass "public subscription and connection page serve the deployed Reality link"
 
+python3 "$GOLDEN_CAPTURE" --topology single --user solo
+pass "golden subscription corpus captured for the single-exit fleet"
+
 
 meridian deploy "$EXIT_B_IP" --client-name solo --yes
 pass "redeploy with the same settings is idempotent"

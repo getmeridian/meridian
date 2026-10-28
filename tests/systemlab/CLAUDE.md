@@ -9,7 +9,8 @@ uv run pytest tests/systemlab/ -q
 **Real services over mocks** — privileged systemd/SSH containers stand in for two exits, two relay hops, and a routing gateway; the controller deploys through the same CLI and SSH paths as a VPS.
 **Nested Docker** — exits run their own Docker daemon and pull the pinned Remnawave backend, database, Valkey, subscription-page, and node images.
 **Deterministic topology** — a fixed `172.30.0.0/24` bridge keeps SSH host keys, deploy targets, the local Pebble CA, and relay routing repeatable.
-**Small fail-fast stages** — the controller runs bootstrap, single deploy, fleet deploy, subscription, resilience, and removal scripts under `scripts/stages/`; Make always tears Compose down. Pure contract tests run in normal pytest.
+**Small fail-fast stages** — the controller runs bootstrap, single deploy, fleet deploy, subscription, golden capture, resilience, and removal scripts under `scripts/stages/`; Make always tears Compose down. Pure contract tests run in normal pytest.
+**Golden subscription corpus** — `scripts/capture-golden.py` records what the public subscription URL serves each `golden_agents.py` User-Agent, per topology, into gitignored `output/golden-raw/`; `golden_corpus.py` normalizes that into `golden/` (never hand-edited) and diffs new captures against it, the reference for #95.
 
 ## What's done well
 
@@ -38,4 +39,5 @@ uv run pytest tests/systemlab/ -q
 - Lab exits egress through Docker NAT, so an exit-IP mismatch counts only as traffic evidence, never a passed egress check.
 - Qualify a Reality target only by authenticated Xray traffic, never raw TLS reachability.
 - The DNS capture matches a name and its subdomains; keep the control name outside every observer's domain, or one lookup counts as both.
+- Add any new secret to `capture-golden.py`'s known values: the golden leak check sees only those; the UUID and field patterns are a net.
 - `sing-box check` resolves no outbound tags and `mihomo -t` downloads missing geodata: keep the graph check in `subscription_client.py`, pin new rule files in the image, and move the client-management docs with any engine pin.

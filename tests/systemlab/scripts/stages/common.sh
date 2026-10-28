@@ -4,6 +4,7 @@ set -euo pipefail
 
 SYSTEMLAB_ROOT=/workspace/tests/systemlab
 INTENT_PATH=/tmp/meridian-v4-systemlab-intent.json
+GOLDEN_CAPTURE=$SYSTEMLAB_ROOT/scripts/capture-golden.py
 
 pass() {
   echo "    ✓ $1"
