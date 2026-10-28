@@ -1,0 +1,52 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: warning
+ipv6: true
+proxies:
+  - name: 🚫 Subscription disabled
+    type: vless
+    server: 0.0.0.0
+    port: 1
+    network: tcp
+    udp: true
+    uuid: <uuid:1>
+    packet-encoding: xudp
+    client-fingerprint: chrome
+  - name: Contact support
+    type: vless
+    server: 0.0.0.0
+    port: 1
+    network: tcp
+    udp: true
+    uuid: <uuid:1>
+    packet-encoding: xudp
+    client-fingerprint: chrome
+proxy-groups:
+  - name: Meridian
+    type: select
+    proxies:
+      - Automatic
+      - 🚫 Subscription disabled
+      - Contact support
+  - name: Automatic
+    type: fallback
+    url: https://www.apple.com/library/test/success.html
+    interval: 300
+    lazy: true
+    exclude-filter: >-
+      ^(exit-a · Reality · Firefox|exit-a · Reality · Firefox via
+      relay-chain|exit-b · Reality · Firefox)$
+    proxies:
+      - 🚫 Subscription disabled
+      - Contact support
+rules:
+  - GEOSITE,private,DIRECT
+  - GEOIP,private,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,ru,DIRECT
+  - DOMAIN-SUFFIX,su,DIRECT
+  - DOMAIN-SUFFIX,xn--p1ai,DIRECT
+  - GEOSITE,category-ru,DIRECT
+  - GEOIP,RU,DIRECT,no-resolve
+  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
+  - MATCH,Meridian

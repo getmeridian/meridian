@@ -1,0 +1,378 @@
+[
+  {
+    "dns": {
+      "servers": [
+        "1.1.1.1",
+        "8.8.8.8"
+      ]
+    },
+    "log": {
+      "loglevel": "warning"
+    },
+    "routing": {
+      "rules": [
+        {
+          "type": "field",
+          "domain": [
+            "geosite:private"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "ip": [
+            "geoip:private"
+          ],
+          "type": "field",
+          "outboundTag": "DIRECT"
+        },
+        {
+          "type": "field",
+          "domain": [
+            "domain:ru",
+            "domain:su",
+            "domain:xn--p1ai",
+            "geosite:category-ru"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "ip": [
+            "geoip:ru"
+          ],
+          "type": "field",
+          "outboundTag": "DIRECT"
+        },
+        {
+          "port": "443",
+          "type": "field",
+          "network": "udp",
+          "outboundTag": "BLOCK"
+        },
+        {
+          "type": "field",
+          "protocol": [
+            "bittorrent"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "balancerTag": "MERIDIAN_AUTO"
+        }
+      ],
+      "balancers": [
+        {
+          "tag": "MERIDIAN_AUTO",
+          "selector": [
+            "MERIDIAN_PROXY"
+          ],
+          "strategy": {
+            "type": "leastLoad",
+            "settings": {
+              "maxRTT": "1s",
+              "expected": 1,
+              "baselines": [
+                "1s"
+              ],
+              "tolerance": 0.01
+            }
+          },
+          "fallbackTag": "BLOCK"
+        }
+      ],
+      "domainStrategy": "IPIfNonMatch"
+    },
+    "inbounds": [
+      {
+        "tag": "SOCKS",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "routeOnly": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      },
+      {
+        "tag": "HTTP",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+          "enabled": true,
+          "routeOnly": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "tag": "MERIDIAN_PROXY",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "<host:exit-a>",
+              "port": 443,
+              "users": [
+                {
+                  "id": "<vless-uuid:1>",
+                  "encryption": "none",
+                  "flow": "xtls-rprx-vision"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "tcpSettings": {},
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.google.com",
+            "publicKey": "<reality-pbk:1>",
+            "shortId": "<short-id:1>",
+            "fingerprint": "chrome"
+          }
+        }
+      },
+      {
+        "tag": "MERIDIAN_PROXY-2",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "<host:gateway-a>",
+              "port": 443,
+              "users": [
+                {
+                  "id": "<vless-uuid:1>",
+                  "encryption": "none",
+                  "flow": "xtls-rprx-vision"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "tcpSettings": {},
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.google.com",
+            "publicKey": "<reality-pbk:2>",
+            "shortId": "<short-id:2>",
+            "fingerprint": "chrome"
+          }
+        }
+      },
+      {
+        "tag": "DIRECT",
+        "protocol": "freedom"
+      },
+      {
+        "tag": "BLOCK",
+        "protocol": "blackhole"
+      }
+    ],
+    "burstObservatory": {
+      "pingConfig": {
+        "timeout": "3s",
+        "interval": "1m",
+        "sampling": 1,
+        "destination": "https://www.apple.com/library/test/success.html",
+        "connectivity": ""
+      },
+      "subjectSelector": [
+        "MERIDIAN_PROXY"
+      ]
+    },
+    "remarks": "Automatic"
+  },
+  {
+    "dns": {
+      "servers": [
+        "1.1.1.1",
+        "8.8.8.8"
+      ]
+    },
+    "log": {
+      "loglevel": "warning"
+    },
+    "routing": {
+      "rules": [
+        {
+          "type": "field",
+          "domain": [
+            "geosite:private"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "ip": [
+            "geoip:private"
+          ],
+          "type": "field",
+          "outboundTag": "DIRECT"
+        },
+        {
+          "type": "field",
+          "domain": [
+            "domain:ru",
+            "domain:su",
+            "domain:xn--p1ai",
+            "geosite:category-ru"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "ip": [
+            "geoip:ru"
+          ],
+          "type": "field",
+          "outboundTag": "DIRECT"
+        },
+        {
+          "port": "443",
+          "type": "field",
+          "network": "udp",
+          "outboundTag": "BLOCK"
+        },
+        {
+          "type": "field",
+          "protocol": [
+            "bittorrent"
+          ],
+          "outboundTag": "DIRECT"
+        },
+        {
+          "type": "field",
+          "network": "tcp,udp",
+          "balancerTag": "MERIDIAN_AUTO"
+        }
+      ],
+      "balancers": [
+        {
+          "tag": "MERIDIAN_AUTO",
+          "selector": [
+            "MERIDIAN_PROXY"
+          ],
+          "strategy": {
+            "type": "leastLoad",
+            "settings": {
+              "maxRTT": "1s",
+              "expected": 1,
+              "baselines": [
+                "1s"
+              ],
+              "tolerance": 0.01
+            }
+          },
+          "fallbackTag": "BLOCK"
+        }
+      ],
+      "domainStrategy": "IPIfNonMatch"
+    },
+    "inbounds": [
+      {
+        "tag": "SOCKS",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+          "udp": true
+        },
+        "sniffing": {
+          "enabled": true,
+          "routeOnly": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      },
+      {
+        "tag": "HTTP",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+          "enabled": true,
+          "routeOnly": true,
+          "destOverride": [
+            "http",
+            "tls",
+            "quic"
+          ]
+        }
+      }
+    ],
+    "outbounds": [
+      {
+        "tag": "MERIDIAN_PROXY",
+        "protocol": "vless",
+        "settings": {
+          "vnext": [
+            {
+              "address": "<host:exit-a>",
+              "port": 443,
+              "users": [
+                {
+                  "id": "<vless-uuid:1>",
+                  "encryption": "none",
+                  "flow": "xtls-rprx-vision"
+                }
+              ]
+            }
+          ]
+        },
+        "streamSettings": {
+          "network": "tcp",
+          "tcpSettings": {},
+          "security": "reality",
+          "realitySettings": {
+            "serverName": "www.google.com",
+            "publicKey": "<reality-pbk:1>",
+            "shortId": "<short-id:1>",
+            "fingerprint": "firefox"
+          }
+        }
+      },
+      {
+        "tag": "DIRECT",
+        "protocol": "freedom"
+      },
+      {
+        "tag": "BLOCK",
+        "protocol": "blackhole"
+      }
+    ],
+    "burstObservatory": {
+      "pingConfig": {
+        "timeout": "3s",
+        "interval": "1m",
+        "sampling": 1,
+        "destination": "https://www.apple.com/library/test/success.html",
+        "connectivity": ""
+      },
+      "subjectSelector": [
+        "MERIDIAN_PROXY"
+      ]
+    },
+    "remarks": "Automatic · Firefox"
+  }
+]

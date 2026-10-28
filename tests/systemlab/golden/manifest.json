@@ -1,0 +1,372 @@
+{
+  "remnawave_backend": "remnawave/backend:3.4.5@sha256:b16d724b90fd7c9fec2df04bd28938a671cafc62894105068e11550ee3449c56",
+  "meridian_version": "4.0.0b8",
+  "serve_json_at_base_subscription": true,
+  "response_rules": {
+    "rules": [
+      {
+        "name": "Browser Subscription",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [
+          {
+            "value": "text/html",
+            "operator": "CONTAINS",
+            "headerName": "accept",
+            "caseSensitive": true
+          }
+        ],
+        "description": "System critical: do not delete or disable this rule.",
+        "responseType": "BROWSER"
+      },
+      {
+        "name": "Mihomo Clients",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [
+          {
+            "value": "^(?:flclash|rabbit|flowvy|murge|mihomo|prizrak-box|koala-clash|clash(?:-verge|-nyanpasu|x meta|[-.]?meta))",
+            "operator": "REGEX",
+            "headerName": "user-agent",
+            "caseSensitive": false
+          }
+        ],
+        "description": "Response with generated YAML config (Mihomo Template)",
+        "responseType": "MIHOMO"
+      },
+      {
+        "name": "Stash (iOS, macOS)",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [
+          {
+            "value": "^stash",
+            "operator": "REGEX",
+            "headerName": "user-agent",
+            "caseSensitive": false
+          }
+        ],
+        "description": "Response with generated YAML config (Stash Template)",
+        "responseType": "STASH"
+      },
+      {
+        "name": "Sing-box clients",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [
+          {
+            "value": "^sfa|sfi|sfm|sft|karing|singbox",
+            "operator": "REGEX",
+            "headerName": "user-agent",
+            "caseSensitive": false
+          }
+        ],
+        "description": "Response with generated JSON config (Singbox template)",
+        "responseType": "SINGBOX"
+      },
+      {
+        "name": "Clash Core Clients",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [
+          {
+            "value": "^clash",
+            "operator": "REGEX",
+            "headerName": "user-agent",
+            "caseSensitive": false
+          }
+        ],
+        "description": "Response with generated YAML config (Clash Template)",
+        "responseType": "CLASH"
+      },
+      {
+        "name": "Fallback Base64",
+        "enabled": true,
+        "operator": "AND",
+        "conditions": [],
+        "description": "System critical: do not delete or disable this rule.",
+        "responseType": "XRAY_BASE64"
+      }
+    ],
+    "version": "1"
+  },
+  "topologies": {
+    "fleet": "two exits in a leastPing pool, a two-hop Realm relay chain to exit A, and a routing gateway",
+    "reduced": "the fleet after removing the relay chain and exit B: exit A and the routing gateway",
+    "single": "one exit deployed by `meridian deploy` (exit B is control and exit)"
+  },
+  "agents": [
+    {
+      "id": "happ",
+      "app": "Happ",
+      "user_agent": "Happ/3.2.1",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "flclashx",
+      "app": "FlClashX",
+      "user_agent": "FlClash X/v0.3.1 Platform/android",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "clash-mi",
+      "app": "Clash Mi",
+      "user_agent": "ClashMeta/1.19.32; mihomo/1.19.32",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "throne",
+      "app": "Throne",
+      "user_agent": "Throne/1.0.13",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "shadowrocket",
+      "app": "ShadowRocket",
+      "user_agent": "Shadowrocket/2678 CFNetwork/3826.500.131 Darwin/24.5.0",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "streisand",
+      "app": "Streisand",
+      "user_agent": "Streisand/1.6.53",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "v2raytun",
+      "app": "v2RayTun",
+      "user_agent": "v2raytun/ios",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "v2rayng",
+      "app": "v2rayNG",
+      "user_agent": "v2rayNG/1.10.16",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "nekobox",
+      "app": "NekoBox",
+      "user_agent": "NekoBox/Android/1.3.9 (Prefer ClashMeta Format)",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "flclash",
+      "app": "FlClash",
+      "user_agent": "FlClash/v0.8.87 clash-verge Platform/android",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "sing-box-android",
+      "app": "sing-box",
+      "user_agent": "SFA/1.12.9 (588; sing-box 1.12.9; language en_US)",
+      "accept": "*/*",
+      "expected_rule": "Sing-box clients",
+      "expected_type": "SINGBOX"
+    },
+    {
+      "id": "sing-box-ios",
+      "app": "sing-box",
+      "user_agent": "SFI/1.12.9 (588; sing-box 1.12.9; language en_US)",
+      "accept": "*/*",
+      "expected_rule": "Sing-box clients",
+      "expected_type": "SINGBOX"
+    },
+    {
+      "id": "sing-box-macos",
+      "app": "sing-box",
+      "user_agent": "SFM/1.12.9 (588; sing-box 1.12.9; language en_US)",
+      "accept": "*/*",
+      "expected_rule": "Sing-box clients",
+      "expected_type": "SINGBOX"
+    },
+    {
+      "id": "hiddify",
+      "app": "Hiddify",
+      "user_agent": "HiddifyNext/2.5.7 (android) like ClashMeta v2ray sing-box",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "karing",
+      "app": "Karing",
+      "user_agent": "karing/1.2.5.888 android",
+      "accept": "*/*",
+      "expected_rule": "Sing-box clients",
+      "expected_type": "SINGBOX"
+    },
+    {
+      "id": "v2box",
+      "app": "V2Box",
+      "user_agent": "V2Box/9.3.1 (iOS)",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "v2rayn",
+      "app": "v2rayN",
+      "user_agent": "v2rayN/7.14.4",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "clash-verge-rev",
+      "app": "Clash Verge Rev",
+      "user_agent": "clash-verge/v2.4.2",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "mihomo",
+      "app": "",
+      "user_agent": "mihomo/1.19.32",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "clash-meta-android",
+      "app": "",
+      "user_agent": "ClashMetaForAndroid/2.11.18.Meta",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "flowvy",
+      "app": "",
+      "user_agent": "Flowvy/1.0.4",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "prizrak-box",
+      "app": "",
+      "user_agent": "prizrak-box/1.2.0",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "koala-clash",
+      "app": "",
+      "user_agent": "koala-clash/0.2.7",
+      "accept": "*/*",
+      "expected_rule": "Mihomo Clients",
+      "expected_type": "MIHOMO"
+    },
+    {
+      "id": "stash",
+      "app": "",
+      "user_agent": "Stash/3.2.0 Clash/1.11.0",
+      "accept": "*/*",
+      "expected_rule": "Stash (iOS, macOS)",
+      "expected_type": "STASH"
+    },
+    {
+      "id": "clash-for-android",
+      "app": "",
+      "user_agent": "ClashForAndroid/2.5.12",
+      "accept": "*/*",
+      "expected_rule": "Clash Core Clients",
+      "expected_type": "CLASH"
+    },
+    {
+      "id": "incy",
+      "app": "",
+      "user_agent": "INCY/1.4.0",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "ktor-client",
+      "app": "",
+      "user_agent": "ktor-client",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "saeeddev94-xray",
+      "app": "",
+      "user_agent": "io.github.saeeddev94.xray/6.2.0",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "v2plus",
+      "app": "",
+      "user_agent": "v2plus/1.2.3",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_JSON"
+    },
+    {
+      "id": "browser",
+      "app": "",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "expected_rule": "Browser Subscription",
+      "expected_type": "BROWSER"
+    },
+    {
+      "id": "curl",
+      "app": "",
+      "user_agent": "curl/8.5.0",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "python-httpx",
+      "app": "",
+      "user_agent": "python-httpx/0.28.1",
+      "accept": "*/*",
+      "expected_rule": "Fallback Base64",
+      "expected_type": "XRAY_BASE64"
+    },
+    {
+      "id": "empty",
+      "app": "",
+      "user_agent": "",
+      "accept": "*/*",
+      "expected_rule": "",
+      "expected_type": "FORBIDDEN"
+    },
+    {
+      "id": "absent",
+      "app": "",
+      "user_agent": null,
+      "accept": "*/*",
+      "expected_rule": "",
+      "expected_type": "FORBIDDEN"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "topology": "single",
+  "request": {
+    "id": "absent",
+    "agent": "absent",
+    "app": "",
+    "user": "active",
+    "selector": "",
+    "user_agent": null,
+    "accept": "*/*"
+  },
+  "expected": {
+    "rule": "",
+    "response_type": "FORBIDDEN"
+  },
+  "matched": null,
+  "response": {
+    "status": 403,
+    "format": "json",
+    "headers": [
+      ["server", "nginx"],
+      ["date", "<volatile>"],
+      ["content-type", "application/json; charset=utf-8"],
+      ["content-length", "<volatile>"],
+      ["content-security-policy", "default-src 'self';base-uri 'self';font-src 'self' https: data:;form-action 'self';frame-ancestors 'self';img-src 'self' data: https:;object-src 'none';script-src 'self' 'wasm-unsafe-eval';script-src-attr 'none';style-src 'self' https: 'unsafe-inline';upgrade-insecure-requests;connect-src 'self' https://raw.githubusercontent.com https://ungh.cc"],
+      ["cross-origin-opener-policy", "same-origin"],
+      ["cross-origin-resource-policy", "same-origin"],
+      ["origin-agent-cluster", "?1"],
+      ["referrer-policy", "no-referrer"],
+      ["strict-transport-security", "max-age=31536000; includeSubDomains"],
+      ["x-content-type-options", "nosniff"],
+      ["x-dns-prefetch-control", "off"],
+      ["x-download-options", "noopen"],
+      ["x-frame-options", "SAMEORIGIN"],
+      ["x-permitted-cross-domain-policies", "none"],
+      ["x-xss-protection", "0"],
+      ["x-robots-tag", "noindex, nofollow, noarchive, nosnippet, noimageindex"],
+      ["access-control-allow-origin", "*"],
+      ["etag", "<volatile>"],
+      ["referrer-policy", "no-referrer"]
+    ],
+    "body": {
+      "encoding": "identity",
+      "layout": "compact-json",
+      "file": "bodies/json-484d5d80ba6c.json",
+      "sha256": "484d5d80ba6cdbb0b03a8099d64ca0b3a8bc815105ae2527ab66b193f980acc3"
+    }
+  }
+}

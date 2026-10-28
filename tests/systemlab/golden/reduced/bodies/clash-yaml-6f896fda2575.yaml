@@ -1,0 +1,79 @@
+mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: warning
+ipv6: true
+proxies:
+  - name: Reality · Chrome
+    type: vless
+    server: <host:exit-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: chrome
+  - name: Reality · Firefox
+    type: vless
+    server: <host:exit-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: firefox
+  - name: Smart routing
+    type: vless
+    server: <host:gateway-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:2>
+      short-id: <short-id:2>
+    client-fingerprint: chrome
+proxy-groups:
+  - name: Meridian
+    type: select
+    proxies:
+      - Automatic
+      - Reality · Chrome
+      - Reality · Firefox
+      - Smart routing
+  - name: Automatic
+    type: fallback
+    url: https://www.apple.com/library/test/success.html
+    interval: 300
+    lazy: true
+    exclude-filter: ^(Reality · Firefox)$
+    proxies:
+      - Reality · Chrome
+      - Reality · Firefox
+      - Smart routing
+rules:
+  - GEOSITE,private,DIRECT
+  - GEOIP,private,DIRECT,no-resolve
+  - DOMAIN-SUFFIX,ru,DIRECT
+  - DOMAIN-SUFFIX,su,DIRECT
+  - DOMAIN-SUFFIX,xn--p1ai,DIRECT
+  - GEOSITE,category-ru,DIRECT
+  - GEOIP,RU,DIRECT,no-resolve
+  - AND,((NETWORK,UDP),(DST-PORT,443)),REJECT
+  - MATCH,Meridian

@@ -1,0 +1,158 @@
+proxy-groups:
+  - name: → Remnawave
+    type: select
+    proxies:
+      - exit-a · Reality · Chrome
+      - exit-a · Reality · Firefox
+      - exit-a · Reality · Chrome via relay-chain
+      - exit-a · Reality · Firefox via relay-chain
+      - exit-b · Reality · Chrome
+      - exit-b · Reality · Firefox
+      - Smart routing
+proxies:
+  - name: exit-a · Reality · Chrome
+    type: vless
+    server: <host:exit-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: chrome
+  - name: exit-a · Reality · Firefox
+    type: vless
+    server: <host:exit-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: firefox
+  - name: exit-a · Reality · Chrome via relay-chain
+    type: vless
+    server: <host:relay-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.cloudflare.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: chrome
+  - name: exit-a · Reality · Firefox via relay-chain
+    type: vless
+    server: <host:relay-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.cloudflare.com
+    reality-opts:
+      public-key: <reality-pbk:1>
+      short-id: <short-id:1>
+    client-fingerprint: firefox
+  - name: exit-b · Reality · Chrome
+    type: vless
+    server: <host:exit-b>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:2>
+      short-id: <short-id:2>
+    client-fingerprint: chrome
+  - name: exit-b · Reality · Firefox
+    type: vless
+    server: <host:exit-b>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:2>
+      short-id: <short-id:2>
+    client-fingerprint: firefox
+  - name: Smart routing
+    type: vless
+    server: <host:gateway-a>
+    port: 443
+    network: tcp
+    udp: true
+    uuid: <vless-uuid:1>
+    packet-encoding: xudp
+    flow: xtls-rprx-vision
+    tls: true
+    servername: www.google.com
+    reality-opts:
+      public-key: <reality-pbk:3>
+      short-id: <short-id:3>
+    client-fingerprint: chrome
+rules:
+  - SCRIPT,quic,REJECT
+  - DOMAIN-SUFFIX,iphone-ld.apple.com,DIRECT
+  - DOMAIN-SUFFIX,lcdn-locator.apple.com,DIRECT
+  - DOMAIN-SUFFIX,lcdn-registration.apple.com,DIRECT
+  - DOMAIN-SUFFIX,push.apple.com,DIRECT
+  - PROCESS-NAME,v2ray,DIRECT
+  - PROCESS-NAME,Surge,DIRECT
+  - PROCESS-NAME,ss-local,DIRECT
+  - PROCESS-NAME,privoxy,DIRECT
+  - PROCESS-NAME,trojan,DIRECT
+  - PROCESS-NAME,trojan-go,DIRECT
+  - PROCESS-NAME,naive,DIRECT
+  - PROCESS-NAME,CloudflareWARP,DIRECT
+  - PROCESS-NAME,Cloudflare WARP,DIRECT
+  - IP-CIDR,162.159.193.0/24,DIRECT,no-resolve
+  - PROCESS-NAME,p4pclient,DIRECT
+  - PROCESS-NAME,Thunder,DIRECT
+  - PROCESS-NAME,DownloadService,DIRECT
+  - PROCESS-NAME,qbittorrent,DIRECT
+  - PROCESS-NAME,Transmission,DIRECT
+  - PROCESS-NAME,fdm,DIRECT
+  - PROCESS-NAME,aria2c,DIRECT
+  - PROCESS-NAME,Folx,DIRECT
+  - PROCESS-NAME,NetTransport,DIRECT
+  - PROCESS-NAME,uTorrent,DIRECT
+  - PROCESS-NAME,WebTorrent,DIRECT
+  - GEOIP,LAN,DIRECT
+  - MATCH,→ Remnawave
+script:
+  shortcuts:
+    quic: network == 'udp' and dst_port == 443
+dns:
+  default-nameserver:
+    - 1.1.1.1
+    - 1.0.0.1
+  nameserver:
+    - 1.1.1.1
+    - 1.0.0.1
+log-level: warning
+mode: rule

@@ -1,0 +1,24 @@
+{
+  "isFound": true,
+  "user": {
+    "shortUuid": "<short-uuid:1>",
+    "daysLeft": "<volatile>",
+    "trafficUsed": "<volatile>",
+    "trafficLimit": "0",
+    "lifetimeTrafficUsed": "<volatile>",
+    "lifetimeTrafficUsedBytes": "<volatile>",
+    "trafficLimitBytes": "0",
+    "trafficUsedBytes": "<volatile>",
+    "username": "acceptance",
+    "expiresAt": "<timestamp:1>",
+    "isActive": false,
+    "userStatus": "DISABLED",
+    "trafficLimitStrategy": "NO_RESET"
+  },
+  "links": [
+    "vless://<uuid:1>@0.0.0.0:1?encryption=none&type=tcp&security=none#%F0%9F%9A%AB%20Subscription%20disabled",
+    "vless://<uuid:1>@0.0.0.0:1?encryption=none&type=tcp&security=none#Contact%20support"
+  ],
+  "ssConfLinks": {},
+  "subscriptionUrl": "https://<host:exit-a>/<sub-path:1>/sub/<short-uuid:1>"
+}
