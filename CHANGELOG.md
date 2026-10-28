@@ -402,6 +402,8 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   followed could still catch the panel noticing that restart, failing the apply
   until a rerun. Node and gateway checks now wait up to a minute for the node
   to reconnect.
+- **`meridian test NAME` and `meridian probe NAME` take saved names** — a name
+  without a dot was refused as "not a full domain name".
 - **Certificate failures say why** — the error kept acme.sh's first lines
   (timestamps and progress) and cut off its reason; it now shows the last ones.
 - **Unknown geo lists are refused at review** — a gateway rule or exit override

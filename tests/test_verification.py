@@ -141,6 +141,15 @@ def test_saved_server_name_is_resolved_before_dns(tmp_path: Path, monkeypatch: p
     assert target.label == "exit (198.51.100.11)"
 
 
+def test_positional_saved_name_is_resolved_before_dns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`meridian test exit` validated the name as a domain and refused it."""
+    monkeypatch.setattr("meridian.verification.resolve_domain", lambda _name, **_kwargs: "203.0.113.77")
+
+    target = resolve_verification_target("exit", "", _registry(tmp_path / "servers.json"), allow_domain=True)
+
+    assert target.ip == "198.51.100.11"
+
+
 def test_domain_target_reports_resolver_unavailability_as_system_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

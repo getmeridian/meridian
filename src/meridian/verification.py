@@ -243,6 +243,12 @@ def resolve_verification_target(
         if is_ip(value):
             normalized = str(ipaddress.ip_address(value))
             return ResolvedVerificationTarget(ip=normalized, label=normalized, local=address_is_local(normalized))
+        try:
+            entry = registry.find(value)
+        except LocalStateError:
+            entry = None  # an unreadable registry must not block an explicit domain
+        if entry is not None:
+            return _entry_target(entry)
         if not allow_domain:
             raise VerificationTargetError(
                 f"Target {value!r} is not an IP address.",

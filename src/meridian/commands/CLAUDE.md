@@ -27,7 +27,7 @@
 - Post-mutation local save failures exit 3, say remote state changed, and keep typed partial data where the contract allows.
 - Client reads and tests expose only `topology_intent.access.users`, never panel-wide service users.
 - Never render saved admin credentials except `panel --show-password`; handoff links (`HANDOFF_LINK_KEYS`) appear only in the producing command's final output (`emit_json(..., reveal=...)`); doctor and `logs` pass free-form text through `redact_diagnostic_text()` with `ClusterConfig.secret_values()` (bare request paths match no pattern) and never through Rich markup.
-- A bare word that is neither a saved name nor an address is refused, never dialed; keep `--timeout` a string so bad values still get the JSON error envelope.
+- A bare word that is neither a saved name nor an address is refused, never dialed; `test`/`probe` targets check saved names before DNS (a dot-less name was refused as a domain); keep `--timeout` a string so bad values still get the JSON error envelope.
 - `ensure_server_connection(offer_key_setup=True)` (deploy without `--yes`, setup) may return a target pinned to Meridian's new key; save `resolved.conn.identity_file` as the profile's `key_path`. Never offer it without a terminal or in JSON mode.
 - The wizard needs a terminal (`prompt()` returns defaults without `/dev/tty`); `setup` refuses without one unless `--yes`.
 - An error in a setup stage that asks nothing (review, apply, verify) offers back/retry/save, and `--yes` raises it; re-running the stage looped forever on the same error.
