@@ -1,0 +1,26 @@
+{
+  "additionalProperties": false,
+  "description": "Rotates the node key: a CSR for a fresh Ed25519 key generated on the node.",
+  "properties": {
+    "csr_pem": {
+      "description": "PKCS#10 certificate signing request in PEM for an Ed25519 key generated on the node.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE REQUEST-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE REQUEST-----\\n?$",
+      "title": "Csr Pem",
+      "type": "string"
+    },
+    "type": {
+      "const": "renew",
+      "default": "renew",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "csr_pem"
+  ],
+  "title": "RenewRequest",
+  "type": "object"
+}

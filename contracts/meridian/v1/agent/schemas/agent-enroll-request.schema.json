@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "description": "First contact: trade the one-time enrollment token and a CSR for a node certificate.",
+  "properties": {
+    "agent_version": {
+      "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+      "title": "Agent Version",
+      "type": "string"
+    },
+    "arch": {
+      "enum": [
+        "amd64",
+        "arm64"
+      ],
+      "title": "Arch",
+      "type": "string"
+    },
+    "csr_pem": {
+      "description": "PKCS#10 certificate signing request in PEM for an Ed25519 key generated on the node.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE REQUEST-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE REQUEST-----\\n?$",
+      "title": "Csr Pem",
+      "type": "string"
+    },
+    "enrollment_token": {
+      "description": "Opaque base64url token.",
+      "maxLength": 256,
+      "minLength": 32,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Enrollment Token",
+      "type": "string"
+    },
+    "fleet_id": {
+      "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Fleet Id",
+      "type": "string"
+    },
+    "node_id": {
+      "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "type": {
+      "const": "enroll",
+      "default": "enroll",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "protocol",
+    "fleet_id",
+    "node_id",
+    "enrollment_token",
+    "csr_pem",
+    "agent_version",
+    "arch"
+  ],
+  "title": "EnrollRequest",
+  "type": "object"
+}

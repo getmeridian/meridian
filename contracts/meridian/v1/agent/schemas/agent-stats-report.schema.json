@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "UserTraffic": {
+      "additionalProperties": false,
+      "description": "Cumulative traffic of one user since the counter epoch began. Never decreases.",
+      "properties": {
+        "downlink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Downlink Bytes",
+          "type": "integer"
+        },
+        "uplink_bytes": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "title": "Uplink Bytes",
+          "type": "integer"
+        },
+        "user_id": {
+          "description": "Opaque, stable user identifier assigned by the service. Xray carries it as the client `email`, so traffic counters map back to it; it is never a person's name.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "uplink_bytes",
+        "downlink_bytes"
+      ],
+      "title": "UserTraffic",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Cumulative per-user traffic counters.\n\nThe agent folds Xray's resettable counters into a durable store, so totals\nsurvive Xray and agent restarts. Each report carries the totals at one moment\nand the next `seq`. The service keeps the last (counter_epoch, seq, totals)\nper node and counts only the growth since then: a resent or older `seq` is\nacknowledged without counting, so a flaky link never loses or double-counts\ntraffic. A new `counter_epoch` starts every user from zero. A user missing\nfrom a report keeps its stored total; the agent may forget a removed user's\ncounter once a report holding its final total is acknowledged.",
+  "properties": {
+    "collected_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Collected At",
+      "type": "string"
+    },
+    "counter_epoch": {
+      "description": "Identity of the agent's traffic counter store: a lowercase UUID the agent draws when it creates the store. It changes only when the store is lost, which restarts every cumulative counter from zero.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Counter Epoch",
+      "type": "string"
+    },
+    "seq": {
+      "description": "Report number within `counter_epoch`, growing by one.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "type": {
+      "const": "stats",
+      "default": "stats",
+      "title": "Type",
+      "type": "string"
+    },
+    "users": {
+      "items": {
+        "$ref": "#/$defs/UserTraffic"
+      },
+      "maxItems": 10000,
+      "title": "Users",
+      "type": "array"
+    }
+  },
+  "required": [
+    "type",
+    "counter_epoch",
+    "seq",
+    "collected_at",
+    "users"
+  ],
+  "title": "StatsReport",
+  "type": "object"
+}

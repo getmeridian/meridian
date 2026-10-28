@@ -1,0 +1,1040 @@
+{
+  "$defs": {
+    "AgentUpgradeResource": {
+      "additionalProperties": false,
+      "description": "A staged self-upgrade of the agent with automatic rollback.\n\nThe agent downloads and verifies the new binary, keeps the running one as the\nprevious version, swaps, and restarts. The new agent must complete `hello` and\nreport this resource `applied` within `health_timeout_seconds`; otherwise the\nprevious binary is restored and the resource reports `failed` / `rolled_back`.",
+      "properties": {
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "health_timeout_seconds": {
+          "maximum": 900,
+          "minimum": 30,
+          "title": "Health Timeout Seconds",
+          "type": "integer"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "agent_upgrade",
+          "default": "agent_upgrade",
+          "title": "Kind",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "Lowercase hex SHA-256 digest.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 536870912,
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "sources": {
+          "description": "Tried in order.",
+          "items": {
+            "description": "Where to download an artifact: an https URL, or `service` for the control service's blob endpoint (`blobs/{sha256}`). Relays in censored regions may reach only the service, so it is usually last.",
+            "maxLength": 2048,
+            "pattern": "^(?:service|https://[^\\s]+)$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "version": {
+          "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "version",
+        "sources",
+        "size",
+        "sha256",
+        "health_timeout_seconds"
+      ],
+      "title": "AgentUpgradeResource",
+      "type": "object"
+    },
+    "BinaryPinResource": {
+      "additionalProperties": false,
+      "description": "A pinned upstream binary or data file installed only after its SHA-256 matches.",
+      "properties": {
+        "archive": {
+          "enum": [
+            "none",
+            "zip",
+            "tar.gz"
+          ],
+          "title": "Archive",
+          "type": "string"
+        },
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "install_path": {
+          "description": "Absolute path. No segment may start with a dot, so `.`/`..` traversal and hidden files are impossible. The agent may still refuse a path outside its allowlist with `path_not_allowed`.",
+          "maxLength": 255,
+          "pattern": "^(?:/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)+$",
+          "title": "Install Path",
+          "type": "string"
+        },
+        "kind": {
+          "const": "binary_pin",
+          "default": "binary_pin",
+          "title": "Kind",
+          "type": "string"
+        },
+        "member": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(?:/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Path of the installed file inside the archive; `null` exactly when `archive` is `none`.",
+          "title": "Member"
+        },
+        "mode": {
+          "description": "Octal permission bits, for example 0644.",
+          "pattern": "^[0-7]{4}$",
+          "title": "Mode",
+          "type": "string"
+        },
+        "name": {
+          "enum": [
+            "xray",
+            "realm",
+            "geoip",
+            "geosite"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the downloaded artifact (the archive, when there is one).",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "description": "Download size in bytes.",
+          "maximum": 536870912,
+          "minimum": 1,
+          "title": "Size",
+          "type": "integer"
+        },
+        "sources": {
+          "description": "Tried in order.",
+          "items": {
+            "description": "Where to download an artifact: an https URL, or `service` for the control service's blob endpoint (`blobs/{sha256}`). Relays in censored regions may reach only the service, so it is usually last.",
+            "maxLength": 2048,
+            "pattern": "^(?:service|https://[^\\s]+)$",
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "version": {
+          "description": "Version string as its upstream publishes it, for example 26.7.11 or v2.9.6.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.+_-]*$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "name",
+        "version",
+        "sources",
+        "size",
+        "sha256",
+        "archive",
+        "member",
+        "install_path",
+        "mode"
+      ],
+      "title": "BinaryPinResource",
+      "type": "object"
+    },
+    "FileResource": {
+      "additionalProperties": false,
+      "description": "A regular file written atomically (temporary file, fsync, rename).",
+      "properties": {
+        "content_b64": {
+          "anyOf": [
+            {
+              "description": "Standard base64 with padding.",
+              "maxLength": 1398105,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inline content in base64, at most 1 MiB decoded. `null` means fetch it from `blobs/{sha256}`.",
+          "title": "Content B64"
+        },
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "group": {
+          "description": "POSIX user or group name.",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z_][a-z0-9_-]*$",
+          "title": "Group",
+          "type": "string"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "file",
+          "default": "file",
+          "title": "Kind",
+          "type": "string"
+        },
+        "mode": {
+          "description": "Octal permission bits, for example 0644.",
+          "pattern": "^[0-7]{4}$",
+          "title": "Mode",
+          "type": "string"
+        },
+        "owner": {
+          "description": "POSIX user or group name.",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z_][a-z0-9_-]*$",
+          "title": "Owner",
+          "type": "string"
+        },
+        "path": {
+          "description": "Absolute path. No segment may start with a dot, so `.`/`..` traversal and hidden files are impossible. The agent may still refuse a path outside its allowlist with `path_not_allowed`.",
+          "maxLength": 255,
+          "pattern": "^(?:/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "sensitive": {
+          "description": "Holds key material: the agent never logs or echoes the content and writes it with `mode` only.",
+          "title": "Sensitive",
+          "type": "boolean"
+        },
+        "sha256": {
+          "description": "SHA-256 of the file content. The agent verifies it before writing.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "description": "Content length in bytes.",
+          "maximum": 67108864,
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "path",
+        "mode",
+        "owner",
+        "group",
+        "size",
+        "sha256",
+        "content_b64",
+        "sensitive"
+      ],
+      "title": "FileResource",
+      "type": "object"
+    },
+    "FirewallRuleResource": {
+      "additionalProperties": false,
+      "description": "One inbound firewall allowance. Only compiled rules open public ports.",
+      "properties": {
+        "allow_from": {
+          "description": "Server networks allowed to connect (for source-restricted relay hops); empty allows anyone.",
+          "items": {
+            "maxLength": 49,
+            "pattern": "^[0-9A-Fa-f:.]+/[0-9]{1,3}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Allow From",
+          "type": "array"
+        },
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "firewall_rule",
+          "default": "firewall_rule",
+          "title": "Kind",
+          "type": "string"
+        },
+        "port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "title": "Protocol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "port",
+        "protocol",
+        "allow_from"
+      ],
+      "title": "FirewallRuleResource",
+      "type": "object"
+    },
+    "Hysteria2User": {
+      "additionalProperties": false,
+      "description": "A Hysteria2 client of one inbound.",
+      "properties": {
+        "auth": {
+          "description": "The client's Hysteria2 password.",
+          "maxLength": 128,
+          "minLength": 16,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "title": "Auth",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Opaque, stable user identifier assigned by the service. Xray carries it as the client `email`, so traffic counters map back to it; it is never a person's name.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "auth"
+      ],
+      "title": "Hysteria2User",
+      "type": "object"
+    },
+    "Hysteria2UsersResource": {
+      "additionalProperties": false,
+      "description": "The complete client list of one Hysteria2 inbound (served by Xray), applied like `xray_users`.",
+      "properties": {
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inbound_tag": {
+          "description": "Xray inbound tag.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "kind": {
+          "const": "hysteria2_users",
+          "default": "hysteria2_users",
+          "title": "Kind",
+          "type": "string"
+        },
+        "users": {
+          "items": {
+            "$ref": "#/$defs/Hysteria2User"
+          },
+          "maxItems": 10000,
+          "title": "Users",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "inbound_tag",
+        "users"
+      ],
+      "title": "Hysteria2UsersResource",
+      "type": "object"
+    },
+    "NginxArtifactResource": {
+      "additionalProperties": false,
+      "description": "A set of nginx files applied as one unit.\n\nThe agent writes every file, runs `nginx -t`, and reloads. If the test or the\nreload fails it restores the previous files, reloads again, and reports the\nresource `failed` with `validation_failed` or `reload_failed`.",
+      "properties": {
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/NginxFile"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "nginx_artifact",
+          "default": "nginx_artifact",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "files"
+      ],
+      "title": "NginxArtifactResource",
+      "type": "object"
+    },
+    "NginxFile": {
+      "additionalProperties": false,
+      "description": "One nginx configuration file inside an atomic artifact.",
+      "properties": {
+        "content": {
+          "description": "File text.",
+          "maxLength": 262144,
+          "title": "Content",
+          "type": "string"
+        },
+        "path": {
+          "description": "A path below /etc/nginx/.",
+          "maxLength": 255,
+          "pattern": "^/etc/nginx(?:/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of `content` encoded as UTF-8.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content",
+        "sha256"
+      ],
+      "title": "NginxFile",
+      "type": "object"
+    },
+    "RealmForwarderResource": {
+      "additionalProperties": false,
+      "description": "A Realm L4 TCP forwarder, run as an agent-named systemd unit.\n\nAddresses here are servers of the fleet, never clients. Realm's own logs stay\non the node and the agent never reports connection sources.",
+      "properties": {
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "realm_forwarder",
+          "default": "realm_forwarder",
+          "title": "Kind",
+          "type": "string"
+        },
+        "listen_address": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "format": "ipv6",
+              "type": "string"
+            }
+          ],
+          "title": "Listen Address"
+        },
+        "listen_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Listen Port",
+          "type": "integer"
+        },
+        "remote_host": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "format": "ipv6",
+              "type": "string"
+            },
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^(?=.{1,253}\\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.?$",
+              "type": "string"
+            }
+          ],
+          "description": "The next hop: an exit or relay server.",
+          "title": "Remote Host"
+        },
+        "remote_port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Remote Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "listen_address",
+        "listen_port",
+        "remote_host",
+        "remote_port"
+      ],
+      "title": "RealmForwarderResource",
+      "type": "object"
+    },
+    "ServiceSignature": {
+      "additionalProperties": false,
+      "description": "Ed25519 signature by the control service's signing key.\n\nThe key's certificate is issued by the fleet's pinned internal CA and reaches\nthe agent in `EnrollResponse` and `HelloResponse`. The agent verifies the\nsignature before acting, so a TLS interception or a self-signed fallback\ncertificate on 443 can never inject desired state or commands.",
+      "properties": {
+        "key_id": {
+          "description": "SHA-256 of the DER signing certificate that made the signature.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "signature": {
+          "description": "Ed25519 signature (64 bytes) in standard base64.",
+          "maxLength": 88,
+          "minLength": 88,
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+          "title": "Signature",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "signature"
+      ],
+      "title": "ServiceSignature",
+      "type": "object"
+    },
+    "SystemdUnitResource": {
+      "additionalProperties": false,
+      "description": "A systemd unit file plus its enablement and run state.",
+      "properties": {
+        "content": {
+          "description": "Unit file text.",
+          "maxLength": 65536,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        },
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "systemd_unit",
+          "default": "systemd_unit",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unit name, written to /etc/systemd/system/<name>.",
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9:_.@-]*\\.(?:service|timer|socket|path|target)$",
+          "title": "Name",
+          "type": "string"
+        },
+        "restart_on": {
+          "description": "Restart the unit when any of these resources changed in the same apply; a subset of `depends_on`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Restart On",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "started",
+            "stopped"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "name",
+        "content",
+        "enabled",
+        "state",
+        "restart_on"
+      ],
+      "title": "SystemdUnitResource",
+      "type": "object"
+    },
+    "VlessUser": {
+      "additionalProperties": false,
+      "description": "A VLESS client of one inbound.",
+      "properties": {
+        "flow": {
+          "description": "VLESS flow; empty for XHTTP and WebSocket inbounds.",
+          "enum": [
+            "",
+            "xtls-rprx-vision"
+          ],
+          "title": "Flow",
+          "type": "string"
+        },
+        "user_id": {
+          "description": "Opaque, stable user identifier assigned by the service. Xray carries it as the client `email`, so traffic counters map back to it; it is never a person's name.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "User Id",
+          "type": "string"
+        },
+        "uuid": {
+          "description": "The client's VLESS UUID (its credential), lowercase.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "user_id",
+        "uuid",
+        "flow"
+      ],
+      "title": "VlessUser",
+      "type": "object"
+    },
+    "XrayConfigResource": {
+      "additionalProperties": false,
+      "description": "The Xray configuration, validated with `xray run -test` before it replaces the old file.\n\nInbounds whose users come from `xray_users` or `hysteria2_users` resources keep\nan empty `settings.clients` list here. The agent adds users through Xray's gRPC\nAPI and also writes them into those `clients` lists on disk (without a restart),\nso a reboot never loses a user. A change to this resource restarts Xray through\nthe systemd unit that lists it in `restart_on`.",
+      "properties": {
+        "api_address": {
+          "description": "Loopback address of the Xray gRPC API inbound declared in `config`.",
+          "pattern": "^127\\.0\\.0\\.1:[0-9]{1,5}$",
+          "title": "Api Address",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": true,
+          "description": "Xray JSON configuration object, without managed users.",
+          "title": "Config",
+          "type": "object"
+        },
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "xray_config",
+          "default": "xray_config",
+          "title": "Kind",
+          "type": "string"
+        },
+        "path": {
+          "description": "Absolute path. No segment may start with a dot, so `.`/`..` traversal and hidden files are impossible. The agent may still refuse a path outside its allowlist with `path_not_allowed`.",
+          "maxLength": 255,
+          "pattern": "^(?:/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)+$",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "path",
+        "config",
+        "api_address"
+      ],
+      "title": "XrayConfigResource",
+      "type": "object"
+    },
+    "XrayUsersResource": {
+      "additionalProperties": false,
+      "description": "The complete VLESS client list of one Xray inbound, applied through gRPC and persisted to disk.",
+      "properties": {
+        "depends_on": {
+          "description": "Resources that must be applied first; each names an earlier entry of `resources`.",
+          "items": {
+            "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "id": {
+          "description": "Resource identifier, unique within one desired-state document and stable across revisions.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inbound_tag": {
+          "description": "Xray inbound tag.",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "title": "Inbound Tag",
+          "type": "string"
+        },
+        "kind": {
+          "const": "xray_users",
+          "default": "xray_users",
+          "title": "Kind",
+          "type": "string"
+        },
+        "users": {
+          "items": {
+            "$ref": "#/$defs/VlessUser"
+          },
+          "maxItems": 10000,
+          "title": "Users",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "depends_on",
+        "kind",
+        "inbound_tag",
+        "users"
+      ],
+      "title": "XrayUsersResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Everything one node should run, as one signed document.\n\nThe agent refuses a document whose `fleet_epoch` is below the highest it has\naccepted, whose (fleet_epoch, revision) is below the one it holds, or that\nrepeats a held (fleet_epoch, revision) with a different `sha256`. Equal\n`sha256` means equal content, so a new revision with the same hash only\nrecords the new revision.",
+  "properties": {
+    "fleet_epoch": {
+      "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Fleet Epoch",
+      "type": "integer"
+    },
+    "fleet_id": {
+      "description": "Fleet identifier: a lowercase UUID fixed when the fleet is created.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Fleet Id",
+      "type": "string"
+    },
+    "issued_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "node_id": {
+      "description": "Node identifier: the server's lowercase topology ID, unique within the fleet.",
+      "maxLength": 48,
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Node Id",
+      "type": "string"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "resources": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "agent_upgrade": "#/$defs/AgentUpgradeResource",
+            "binary_pin": "#/$defs/BinaryPinResource",
+            "file": "#/$defs/FileResource",
+            "firewall_rule": "#/$defs/FirewallRuleResource",
+            "hysteria2_users": "#/$defs/Hysteria2UsersResource",
+            "nginx_artifact": "#/$defs/NginxArtifactResource",
+            "realm_forwarder": "#/$defs/RealmForwarderResource",
+            "systemd_unit": "#/$defs/SystemdUnitResource",
+            "xray_config": "#/$defs/XrayConfigResource",
+            "xray_users": "#/$defs/XrayUsersResource"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/FileResource"
+          },
+          {
+            "$ref": "#/$defs/SystemdUnitResource"
+          },
+          {
+            "$ref": "#/$defs/NginxArtifactResource"
+          },
+          {
+            "$ref": "#/$defs/XrayConfigResource"
+          },
+          {
+            "$ref": "#/$defs/XrayUsersResource"
+          },
+          {
+            "$ref": "#/$defs/Hysteria2UsersResource"
+          },
+          {
+            "$ref": "#/$defs/RealmForwarderResource"
+          },
+          {
+            "$ref": "#/$defs/FirewallRuleResource"
+          },
+          {
+            "$ref": "#/$defs/BinaryPinResource"
+          },
+          {
+            "$ref": "#/$defs/AgentUpgradeResource"
+          }
+        ]
+      },
+      "maxItems": 1024,
+      "title": "Resources",
+      "type": "array"
+    },
+    "revision": {
+      "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "sha256": {
+      "description": "Protocol hash of the `resources` array as sent (JCS, SHA-256).",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "signature": {
+      "$ref": "#/$defs/ServiceSignature",
+      "description": "Context line `meridian.agent/v1 desired-state`."
+    }
+  },
+  "required": [
+    "protocol",
+    "fleet_id",
+    "node_id",
+    "fleet_epoch",
+    "revision",
+    "sha256",
+    "issued_at",
+    "resources",
+    "signature"
+  ],
+  "title": "DesiredNodeState",
+  "type": "object"
+}

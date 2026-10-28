@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import patch
 
 from meridian.cli_catalog import command_catalog
+from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.deploy import DeployRequest, DeployResult
 from meridian.core.models import ErrorModel, Event, OutputEnvelope, OutputStatus, Summary
 from meridian.core.output import EVENT_SCHEMA, OUTPUT_SCHEMA, json_dumps, jsonl_dumps
@@ -20,6 +21,7 @@ from meridian.core.schema import (
     schema_names,
     validate_command_envelope,
 )
+from meridian.core.schema_agent import AGENT_SCHEMAS, agent_schema
 from meridian.core.services.workflows import collect_workflow, workflow_catalog
 from meridian.setup.single_server import PENDING_SERVER_REF, preview_single_server_deploy
 
@@ -219,6 +221,10 @@ def build_contract_files() -> dict[Path, str]:
 
     files[Path("commands.json")] = _plain_json({"schema": "meridian.command-catalog/v1", "commands": command_catalog()})
     files[Path("events.json")] = _plain_json(event_type_catalog())
+    # The service-to-agent protocol is internal (consumed by the Rust agent), so it stays out of `schemas/`.
+    for name in sorted(AGENT_SCHEMAS):
+        files[Path("agent") / "schemas" / f"{name}.schema.json"] = _plain_json(agent_schema(name))
+    files[Path("agent") / "http.json"] = _plain_json(AGENT_HTTP_SURFACE.to_data())
 
     workflows = workflow_catalog()
     files[Path("workflows") / "index.json"] = _plain_json(

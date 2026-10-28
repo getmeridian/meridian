@@ -6,6 +6,8 @@
 
 **Core imports plus the CLI tree** — contract export imports `meridian.core` services and schemas, and `meridian.cli_catalog` walks the in-process Typer app for `commands.json`; it never spawns `meridian`, imports command modules, or hits prompts and process exits.
 
+**Agent protocol apart** — `agent/` holds the internal `meridian.agent/v1` service-to-agent contract (`agent/schemas/`, `agent/http.json`) for the Rust node agent; it stays out of `schemas/`, so Studio's generator and `meridian api schemas` never see it.
+
 **Redacted fixtures** — golden fixtures are safe passive artifacts. Operator-visible handoff details remain available through explicit UI/CLI result views.
 
 ## What's done well

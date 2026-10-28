@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "description": "Every report of `counter_epoch` up to `acked_seq` is durably counted.",
+  "properties": {
+    "acked_seq": {
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Acked Seq",
+      "type": "integer"
+    },
+    "counter_epoch": {
+      "description": "Identity of the agent's traffic counter store: a lowercase UUID the agent draws when it creates the store. It changes only when the store is lost, which restarts every cumulative counter from zero.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Counter Epoch",
+      "type": "string"
+    },
+    "type": {
+      "const": "stats_ack",
+      "default": "stats_ack",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "counter_epoch",
+    "acked_seq"
+  ],
+  "title": "StatsAck",
+  "type": "object"
+}

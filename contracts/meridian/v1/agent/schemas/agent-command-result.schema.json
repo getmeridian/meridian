@@ -1,0 +1,100 @@
+{
+  "$defs": {
+    "ResourceError": {
+      "additionalProperties": false,
+      "description": "Why a resource or command did not converge.",
+      "properties": {
+        "code": {
+          "enum": [
+            "download_failed",
+            "hash_mismatch",
+            "path_not_allowed",
+            "write_failed",
+            "disk_full",
+            "validation_failed",
+            "reload_failed",
+            "service_failed",
+            "xray_api_failed",
+            "rolled_back",
+            "timeout",
+            "unsupported",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "description": "Operator-facing text. Never carries secrets, client addresses, or raw command lines.",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        },
+        "retryable": {
+          "description": "True when the agent will retry on its own.",
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "ResourceError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Outcome of one command. Sending it again for the same `command_id` is harmless.",
+  "properties": {
+    "command_id": {
+      "description": "Idempotency key of a command: a lowercase UUID chosen by the service, never reused.",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "title": "Command Id",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResourceError"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Set when `status` is `failed` or `rejected`."
+    },
+    "finished_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "rejected",
+        "expired"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "type": {
+      "const": "command_result",
+      "default": "command_result",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "command_id",
+    "status",
+    "error",
+    "finished_at"
+  ],
+  "title": "CommandResult",
+  "type": "object"
+}

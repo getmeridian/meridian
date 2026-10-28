@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "AgentError": {
+      "additionalProperties": false,
+      "description": "A refused or failed request.",
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_request",
+            "unsupported_protocol",
+            "enrollment_token_invalid",
+            "unauthenticated",
+            "credential_expired",
+            "credential_revoked",
+            "clock_skew",
+            "epoch_superseded",
+            "counter_regression",
+            "conflict",
+            "not_found",
+            "payload_too_large",
+            "rate_limited",
+            "unavailable",
+            "internal"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "description": "Operator-facing text. Never carries secrets, client addresses, or raw command lines.",
+          "maxLength": 1000,
+          "title": "Message",
+          "type": "string"
+        },
+        "retry_after_seconds": {
+          "anyOf": [
+            {
+              "description": "Duration in whole seconds.",
+              "maximum": 86400,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Back off at least this long before retrying; mirrored in the HTTP `Retry-After` header.",
+          "title": "Retry After Seconds"
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "server_time": {
+          "description": "The service clock, so an agent can detect `clock_skew`.",
+          "maxLength": 40,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "title": "Server Time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "retry_after_seconds",
+        "server_time"
+      ],
+      "title": "AgentError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Body of every non-2xx response.",
+  "properties": {
+    "error": {
+      "$ref": "#/$defs/AgentError"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "default": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "type": {
+      "const": "error",
+      "default": "error",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "protocol",
+    "error"
+  ],
+  "title": "AgentErrorResponse",
+  "type": "object"
+}

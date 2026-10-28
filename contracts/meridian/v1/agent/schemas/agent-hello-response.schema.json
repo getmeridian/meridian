@@ -1,0 +1,138 @@
+{
+  "$defs": {
+    "PollSettings": {
+      "additionalProperties": false,
+      "description": "Timing the service asks the agent to use for this session.",
+      "properties": {
+        "max_wait_seconds": {
+          "description": "Longest `wait_seconds` the service honours.",
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Max Wait Seconds",
+          "type": "integer"
+        },
+        "report_interval_seconds": {
+          "description": "Send `report` at least this often.",
+          "maximum": 3600,
+          "minimum": 10,
+          "title": "Report Interval Seconds",
+          "type": "integer"
+        },
+        "stats_interval_seconds": {
+          "description": "Send `stats` about this often.",
+          "maximum": 3600,
+          "minimum": 10,
+          "title": "Stats Interval Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_wait_seconds",
+        "report_interval_seconds",
+        "stats_interval_seconds"
+      ],
+      "title": "PollSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The session: chosen protocol, capabilities the service will use, and a bearer token.",
+  "properties": {
+    "capabilities": {
+      "description": "The subset of the agent's capabilities the service will rely on. It sends no resource kind, command, or field whose capability is missing here.",
+      "items": {
+        "enum": [
+          "long_poll",
+          "files",
+          "systemd_units",
+          "nginx_artifacts",
+          "xray_config",
+          "xray_users",
+          "hysteria2_users",
+          "realm_forwarders",
+          "firewall_rules",
+          "binary_pins",
+          "agent_upgrade",
+          "traffic_stats",
+          "blob_fetch"
+        ],
+        "type": "string"
+      },
+      "maxItems": 64,
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "fleet_epoch": {
+      "description": "Fleet epoch. A restore of the control service bumps it. An agent remembers the highest epoch it accepted and refuses desired state and commands from an older one (a resurrected old control server).",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "title": "Fleet Epoch",
+      "type": "integer"
+    },
+    "poll": {
+      "$ref": "#/$defs/PollSettings"
+    },
+    "protocol": {
+      "const": "meridian.agent/v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "renew_after": {
+      "description": "Request a new node certificate (`renew`) after this time.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Renew After",
+      "type": "string"
+    },
+    "server_time": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Server Time",
+      "type": "string"
+    },
+    "service_certificate_pem": {
+      "description": "One X.509 certificate in PEM.",
+      "maxLength": 8192,
+      "minLength": 64,
+      "pattern": "^-----BEGIN CERTIFICATE-----\\n[A-Za-z0-9+/=\\n]+-----END CERTIFICATE-----\\n?$",
+      "title": "Service Certificate Pem",
+      "type": "string"
+    },
+    "session_expires_at": {
+      "description": "RFC 3339 timestamp in UTC, ending in Z.",
+      "maxLength": 40,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "title": "Session Expires At",
+      "type": "string"
+    },
+    "session_token": {
+      "description": "Send as `Authorization: Bearer <token>` on session endpoints.",
+      "maxLength": 256,
+      "minLength": 32,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Session Token",
+      "type": "string"
+    },
+    "type": {
+      "const": "welcome",
+      "default": "welcome",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "protocol",
+    "fleet_epoch",
+    "capabilities",
+    "session_token",
+    "session_expires_at",
+    "server_time",
+    "poll",
+    "renew_after",
+    "service_certificate_pem"
+  ],
+  "title": "HelloResponse",
+  "type": "object"
+}

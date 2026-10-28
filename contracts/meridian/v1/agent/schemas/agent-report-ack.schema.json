@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "description": "The service stored the report.",
+  "properties": {
+    "applied_revision": {
+      "anyOf": [
+        {
+          "description": "Desired-state revision for one node. Ordering is (fleet_epoch, revision): within an epoch revisions only grow; a higher epoch wins even with a lower revision.",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The applied revision the service recorded.",
+      "title": "Applied Revision"
+    },
+    "type": {
+      "const": "report_ack",
+      "default": "report_ack",
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "applied_revision"
+  ],
+  "title": "ReportAck",
+  "type": "object"
+}
