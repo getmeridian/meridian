@@ -172,6 +172,10 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
 - **`meridian test` says how each path fails** — every delivered path reports
   its time to first byte, and a failed one is reported as "connects, but no
   traffic passes" or "unreachable". `--json` adds `data.transports`.
+- **`meridian test` says what to do about a blocked exit** — when nothing on
+  an exit answers from your network, it prints the `meridian node replace`
+  command for that exit (`--json`: `data.recovery`). A blocked control server
+  points to the recovery guide instead, since it can't be moved yet.
 - **Name the server first, like ssh** — every server command takes one target:
   an IP, a saved name, `user@host:port`, or `local`. `--user` and `--ssh-port`
   default to the saved values (else `root` and `22`) everywhere, including

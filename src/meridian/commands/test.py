@@ -15,9 +15,13 @@ from meridian.console import err_console, error_context, fail, is_json_mode
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.output import OperationContext
+from meridian.core.topology import SetupIntent
 from meridian.core.verification import (
     FleetTestResult,
+    RecoveryHint,
     TestResult,
+    TransportResult,
+    VerificationCheck,
     VerificationTarget,
     aggregate_verification,
 )
@@ -202,6 +206,13 @@ def collect_test_result(
     )
     checks = [context_check, *run_result.checks] if context_check is not None else run_result.checks
     aggregate = aggregate_verification(checks)
+    entry = registry.find(requested_server or target.ip)
+    recovery = recovery_hint(
+        checks,
+        run_result.transports,
+        cluster.topology_intent if cluster is not None else None,
+        entry.id if entry is not None else "",
+    )
     return TestResult(
         target=VerificationTarget(
             requested=target_value or requested_server or target.label,
@@ -216,7 +227,29 @@ def collect_test_result(
         scope="basic" if basic else "full",
         client=run_result.client,
         transports=run_result.transports,
+        recovery=recovery,
     )
+
+
+def recovery_hint(
+    checks: list[VerificationCheck],
+    transports: list[TransportResult],
+    intent: SetupIntent | None,
+    server_ref: str,
+) -> RecoveryHint | None:
+    """The move to suggest when an exit's server answers nothing from here: TCP/443 fails and no transport passes."""
+    if intent is None or not server_ref:
+        return None
+    if not any(check.id == "tcp_reachability" and check.status == "failed" for check in checks):
+        return None
+    if any(transport.outcome in {"ok", "no_traffic", "egress_mismatch"} for transport in transports):
+        return None
+    exit_ = next((item for item in intent.exits if item.server_ref == server_ref), None)
+    if exit_ is None:
+        return None
+    if server_ref == intent.control.server_ref:
+        return RecoveryHint(code="control_unreachable", exit=exit_.id)
+    return RecoveryHint(code="replace_exit", exit=exit_.id, command=f"meridian node replace {exit_.id} NEW_SERVER")
 
 
 def _summary_text(result: TestResult | FleetTestResult) -> str:
@@ -265,3 +298,19 @@ def _render_result(result: TestResult) -> None:
         _summary_text(result),
         redact=True,
     )
+    if result.recovery is not None:
+        _render_recovery(result.recovery)
+
+
+def _render_recovery(hint: RecoveryHint) -> None:
+    exit_id = escape(hint.exit)
+    err_console.print(f"  [bold]Nothing on exit {exit_id} answers from this network.[/bold]")
+    err_console.print("  If the server runs in your provider's console, its address is probably blocked here.")
+    if hint.code == "replace_exit":
+        err_console.print("  Move the exit to a new server; subscription links keep working:")
+        err_console.print(f"    [cyan]{escape(hint.command)}[/cyan]")
+    else:
+        err_console.print("  The control server can't be moved yet; the guide covers what still reaches it")
+        err_console.print("  (a relay, a domain behind Cloudflare) and what to prepare before the next block.")
+    err_console.print("  [dim]Guide: https://getmeridian.org/en/recovery/[/dim]")
+    err_console.print()

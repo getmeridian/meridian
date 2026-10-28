@@ -212,12 +212,25 @@ class ProbeResult(VerificationResult):
     """External fingerprint and exposure verification result."""
 
 
+class RecoveryHint(CoreModel):
+    """Next step when nothing on an exit's server answers from the deployer's network.
+
+    ``replace_exit`` carries the ``node replace`` command for that exit;
+    ``control_unreachable`` has none, because the control server cannot move.
+    """
+
+    code: Literal["replace_exit", "control_unreachable"]
+    exit: str
+    command: str = ""
+
+
 class TestResult(VerificationResult):
     """End-to-end proxy connection verification result."""
 
     scope: Literal["basic", "full"] = "full"
     client: str = ""
     transports: list[TransportResult] = Field(default_factory=list)
+    recovery: RecoveryHint | None = Field(default=None, exclude_if=lambda hint: hint is None)
 
 
 class FleetTestResult(CoreModel):

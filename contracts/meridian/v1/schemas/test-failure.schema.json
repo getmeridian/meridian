@@ -50,6 +50,35 @@
       "title": "FleetTestResult",
       "type": "object"
     },
+    "RecoveryHint": {
+      "additionalProperties": false,
+      "description": "Next step when nothing on an exit's server answers from the deployer's network.\n\n``replace_exit`` carries the ``node replace`` command for that exit;\n``control_unreachable`` has none, because the control server cannot move.",
+      "properties": {
+        "code": {
+          "enum": [
+            "replace_exit",
+            "control_unreachable"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "command": {
+          "default": "",
+          "title": "Command",
+          "type": "string"
+        },
+        "exit": {
+          "title": "Exit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "exit"
+      ],
+      "title": "RecoveryHint",
+      "type": "object"
+    },
     "TestResult": {
       "additionalProperties": false,
       "description": "End-to-end proxy connection verification result.",
@@ -80,6 +109,17 @@
           ],
           "title": "Exit Code",
           "type": "integer"
+        },
+        "recovery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RecoveryHint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "scope": {
           "default": "full",

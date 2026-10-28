@@ -12,18 +12,21 @@ from typer.testing import CliRunner
 import meridian.cli as cli
 from meridian.cli import app
 from meridian.cluster import ClusterConfig
-from meridian.commands.test import collect_test_result, fleet_test_targets
+from meridian.commands.test import collect_test_result, fleet_test_targets, recovery_hint
 from meridian.connectivity import ConnectivityChecks
 from meridian.core.verification import (
-    TestResult as CoreTestResult,
-)
-from meridian.core.verification import (
+    RecoveryHint,
+    TransportResult,
     VerificationCheck,
     VerificationContext,
     VerificationFinding,
     VerificationStatus,
     VerificationTarget,
     aggregate_verification,
+    build_verification_check,
+)
+from meridian.core.verification import (
+    TestResult as CoreTestResult,
 )
 from meridian.servers import ServerEntry, ServerRegistry
 from tests.support.text import unstyle
@@ -347,3 +350,42 @@ def test_fleet_shrunk_to_one_entry_tests_it_while_others_stay_saved(monkeypatch:
     set_quiet_mode(False)
     assert result.exit_code == 0
     assert seen == ["exit-a"]
+
+
+def _tcp(status: VerificationStatus) -> VerificationCheck:
+    finding = VerificationFinding(code="TCP_443", status=status, message="TCP/443")
+    return build_verification_check("tcp_reachability", "TCP/443", [finding])
+
+
+def _transport(outcome: str) -> TransportResult:
+    return TransportResult(check_id="proxy:reality", label="Reality", outcome=outcome)
+
+
+_REPLACE = RecoveryHint(code="replace_exit", exit="exit-a", command="meridian node replace exit-a NEW_SERVER")
+
+
+@pytest.mark.parametrize(
+    ("exit_ref", "tested", "tcp", "transports", "expected"),
+    [
+        ("srv-exit", "srv-exit", "failed", [_transport("unreachable"), _transport("failed")], _REPLACE),
+        ("srv-control", "srv-control", "failed", [], RecoveryHint(code="control_unreachable", exit="exit-a")),
+        ("srv-exit", "srv-exit", "failed", [_transport("unreachable"), _transport("ok")], None),
+        ("srv-exit", "srv-exit", "passed", [_transport("no_traffic")], None),
+        ("srv-exit", "srv-relay", "failed", [_transport("unreachable")], None),
+    ],
+    ids=["exit-answers-nothing", "control-answers-nothing", "one-path-works", "tcp-answers", "not-an-exit"],
+)
+def test_recovery_hint_only_when_nothing_on_an_exit_answers(
+    exit_ref: str,
+    tested: str,
+    tcp: VerificationStatus,
+    transports: list[TransportResult],
+    expected: RecoveryHint | None,
+) -> None:
+    intent = single_exit_intent(control="srv-control", exit_ref=exit_ref)
+
+    assert recovery_hint([_tcp(tcp)], transports, intent, tested) == expected
+
+
+def test_recovery_hint_stays_out_of_json_when_absent() -> None:
+    assert "recovery" not in _result("passed").to_data()
