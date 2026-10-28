@@ -24,6 +24,7 @@ from meridian.compiler.deployment import (
 from meridian.compiler.errors import TopologyCompileError
 from meridian.compiler.firewalls import add_firewall, stable_token
 from meridian.compiler.gateway_compile import compile_routing_gateways
+from meridian.compiler.geodata import validate_geodata_lists
 from meridian.compiler.models import (
     COMPILER_VERSION,
     AccessUserPayload,
@@ -75,6 +76,7 @@ def compile_topology(
     """Compile complete setup intent without network, filesystem, or randomness."""
     reviewed_contract = deployment_contract if deployment_contract is not None else DeploymentContract()
     validate_deployment_contract(intent, reviewed_contract)
+    validate_geodata_lists(intent)
     builder = PlanBuilder()
     ports = PortAllocator()
     baseline_ids = compile_server_baselines(builder, intent)

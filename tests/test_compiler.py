@@ -1145,3 +1145,61 @@ def test_direct_gateway_rules_are_validated(route: dict[str, object], message: s
 def test_direct_rules_need_a_routing_gateway() -> None:
     with pytest.raises(ValidationError, match="require at least one routing gateway"):
         single_exit_intent(routes=[OrderedRouteIntent(id="domestic", priority=1, action="direct")])
+
+
+@pytest.mark.parametrize(
+    ("match", "value", "refusal"),
+    [
+        ("geosite", "category-ru", None),
+        ("geosite", "google@cn", None),
+        ("country", "RU", None),
+        ("geosite", "categry-ru", "Did you mean 'category-ru'"),
+        ("country", "ZZ", "country 'zz'"),
+    ],
+    ids=["geosite", "geosite-attribute", "country", "geosite-typo", "unknown-country"],
+)
+def test_gateway_rules_name_only_lists_the_servers_xray_has(match: str, value: str, refusal: str | None) -> None:
+    """Xray refuses the whole config over one unknown list, so the gateway would never converge."""
+    intent = _with_routes(
+        {
+            "id": "regional",
+            "priority": 10,
+            "match": match,
+            "match_values": [value],
+            "target_ref": "primary",
+            "source_gateway_ref": "gateway-a",
+        }
+    )
+
+    if refusal is None:
+        compile_topology(intent)
+    else:
+        with pytest.raises(TopologyCompileError, match=refusal):
+            compile_topology(intent)
+
+
+def test_exit_overrides_with_an_unknown_geoip_list_are_refused_but_still_load() -> None:
+    """A saved fleet with a bad name must still load, or `route remove` could never fix it."""
+    payload = _intent().model_dump()
+    payload["exits"][0]["egress_overrides"] = [
+        {"id": "block-1", "match": "geoip", "values": ["nowhere"], "action": "block"}
+    ]
+    intent = SetupIntent.model_validate(payload)
+
+    with pytest.raises(TopologyCompileError, match="geoip list 'nowhere'"):
+        compile_topology(intent)
+
+
+def test_geodata_lists_follow_the_pinned_node_image() -> None:
+    from meridian.config import REMNAWAVE_NODE_IMAGE
+    from meridian.core.geodata_lists import SOURCE_IMAGE
+
+    assert SOURCE_IMAGE == REMNAWAVE_NODE_IMAGE, "Node image moved: run scripts/export_geodata_lists.py"
+
+
+def test_built_in_server_rules_name_lists_the_pinned_geodata_has() -> None:
+    """geo_block, the private-range block, and exit DoH scoping are rendered on every exit."""
+    from meridian.core.geodata_lists import GEOIP_LISTS, GEOSITE_LISTS
+
+    assert {"category-ru", "geolocation-!cn"} <= GEOSITE_LISTS
+    assert {"ru", "private"} <= GEOIP_LISTS

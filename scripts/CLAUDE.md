@@ -14,6 +14,7 @@
 
 - `subset_fonts.py` rebuilds the website's WOFF2 subsets from the upstream font releases (instanced axes, per-script `unicode-range` files; network, never CI); keep its ranges equal to `website/src/styles/fonts.css`.
 - `bump_pins.py` raises Realm, RealiTLScanner, acme.sh (hashed here; it publishes no assets), and the Remnawave images to the newest release in each tested major and rewrites `config.py` by exact substring, refusing an ambiguous match; the weekly `bump-pins` workflow runs it and opens a PR.
+- `export_geodata_lists.py` writes `core/geodata_lists.py` from the geodata inside the pinned node image (Docker, never CI); a test fails until it is rerun after the image moves.
 - `pin_image_digests.py` resolves every `*_IMAGE` constant in `meridian.config` to its multi-arch index digest, refuses indexes without linux/amd64 and linux/arm64, and prints paste-ready lines (network, never CI).
 
 ## Pitfalls

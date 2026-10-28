@@ -391,6 +391,11 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   stopped right after starting, which failed server preparation; it now reads
   the system journal on every supported release, and a package Debian only
   remembers is no longer mistaken for an installed one.
+- **Unknown geo lists are refused at review** — a gateway rule or exit override
+  naming a `geosite:`/`geoip:` list or country the servers' Xray data lacks made
+  Xray refuse its whole config, so the server stopped converging. Review now
+  stops with the name and a close match (`categry-ru` → `category-ru`), and a
+  saved fleet with such a name still loads so the rule can be removed.
 - **1 GB control servers deploy** — without swap, the panel's first start used
   up the memory and the server stopped answering SSH; the deploy then failed on
   "Install system packages" though that step was never the cause. A control

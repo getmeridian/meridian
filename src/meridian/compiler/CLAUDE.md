@@ -27,7 +27,7 @@
 - Xray-JSON-only Hosts (hidden edges, the automatic-fallback virtual Host) exclude every other subscription type, or sing-box and Stash list duplicates.
 - One exit workload per server: a Remnawave node runtime activates only one Profile.
 - Bare-IP clients send no SNI: IP paths route on the no-SNI stream key and, on the control server, join the panel TLS server as `location` artifacts.
-- Client geodata must exist in stock dat files (v2fly, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole config.
+- Client geodata must exist in stock dat files (v2fly, MetaCubeX for Mihomo); an unknown `geosite:` category makes Xray refuse the whole config. Server rules are checked by `geodata.py` against `core/geodata_lists.py`, generated from the pinned node image.
 - Every TCP Host and gateway edge carries its path's `fingerprint` (empty means Go's ClientHello, a DPI signature); Reality and XHTTP publish a copy per `FINGERPRINT_COPIES`. Hysteria2 carries none.
 - Mihomo IP rules keep `no-resolve`: local resolution leaks names, and spoofed domestic answers would match `geoip:ru`.
 - Xray server pools use `leastPing` balancers; never claim strict-priority failover.

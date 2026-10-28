@@ -103,6 +103,7 @@ def summary(bumps: list[Bump], failures: list[str]) -> str:
                 "- [ ] `make system-lab` passes (Remnawave moved)",
                 "- [ ] the CHANGELOG version matrix names the new images",
                 "- [ ] `XRAY_VERSION` and `XRAY_SHA256` match the Xray bundled in the new node image",
+                "- [ ] `uv run python scripts/export_geodata_lists.py` rerun for the new node image",
             ]
         lines += ["- [ ] CHANGELOG mentions the bump"]
     if failures:
