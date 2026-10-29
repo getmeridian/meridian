@@ -2,8 +2,7 @@
 
 use std::io::{self, Read};
 use std::process::{Command, Stdio};
-use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -29,43 +28,52 @@ pub struct RealExec;
 
 impl Exec for RealExec {
     fn run(&self, program: &str, args: &[&str], env: &[(&str, &str)]) -> io::Result<CmdOutput> {
-        let mut child = Command::new(program)
-            .args(args)
-            .envs(env.iter().copied())
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-        let stdout = read_all(child.stdout.take());
-        let stderr = read_all(child.stderr.take());
-        let pid = child.id();
-        let (done_tx, done_rx) = mpsc::channel();
-        let waiter = std::thread::spawn(move || {
-            let status = child.wait();
-            let _ = done_tx.send(());
-            status
-        });
-        if done_rx.recv_timeout(COMMAND_TIMEOUT).is_err() {
-            // SAFETY: plain kill(2) on a child we spawned and have not reaped yet.
-            unsafe {
-                libc::kill(pid as libc::pid_t, libc::SIGKILL);
-            }
-        }
-        let status = waiter
-            .join()
-            .map_err(|_| io::Error::other("waiter panicked"))??;
-        let out = stdout
-            .join()
-            .map_err(|_| io::Error::other("reader panicked"))?;
-        let err = stderr
-            .join()
-            .map_err(|_| io::Error::other("reader panicked"))?;
-        Ok(CmdOutput {
-            success: status.success(),
-            stdout: String::from_utf8_lossy(&out).into_owned(),
-            stderr: String::from_utf8_lossy(&err).into_owned(),
-        })
+        run_with_timeout(program, args, env, COMMAND_TIMEOUT)
     }
+}
+
+/// One owner waits, kills, and reaps the child: a separate waiter could reap it just before a
+/// timeout's kill(2), which would then hit whatever process reused the PID.
+fn run_with_timeout(
+    program: &str,
+    args: &[&str],
+    env: &[(&str, &str)],
+    timeout: Duration,
+) -> io::Result<CmdOutput> {
+    let mut child = Command::new(program)
+        .args(args)
+        .envs(env.iter().copied())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdout = read_all(child.stdout.take());
+    let stderr = read_all(child.stderr.take());
+    let deadline = Instant::now() + timeout;
+    let mut pause = Duration::from_millis(1);
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            // try_wait just saw it running and nothing else reaps it, so the PID is still ours.
+            child.kill()?;
+            break child.wait()?;
+        }
+        std::thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
+        pause = (pause * 2).min(Duration::from_millis(50));
+    };
+    let out = stdout
+        .join()
+        .map_err(|_| io::Error::other("reader panicked"))?;
+    let err = stderr
+        .join()
+        .map_err(|_| io::Error::other("reader panicked"))?;
+    Ok(CmdOutput {
+        success: status.success(),
+        stdout: String::from_utf8_lossy(&out).into_owned(),
+        stderr: String::from_utf8_lossy(&err).into_owned(),
+    })
 }
 
 fn read_all<R: Read + Send + 'static>(pipe: Option<R>) -> std::thread::JoinHandle<Vec<u8>> {
@@ -76,4 +84,21 @@ fn read_all<R: Read + Send + 'static>(pipe: Option<R>) -> std::thread::JoinHandl
         }
         buf
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_command_past_its_timeout_is_killed_and_reaped() {
+        let started = Instant::now();
+        let slow = run_with_timeout("sleep", &["30"], &[], Duration::from_millis(100)).unwrap();
+        assert!(!slow.success);
+        assert!(started.elapsed() < Duration::from_secs(10));
+        let quick =
+            run_with_timeout("sh", &["-c", "echo hi"], &[], Duration::from_secs(30)).unwrap();
+        assert!(quick.success);
+        assert_eq!(quick.stdout, "hi\n");
+    }
 }
