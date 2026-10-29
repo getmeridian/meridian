@@ -38,6 +38,7 @@ from meridian.core.output import OperationContext
 from meridian.core.reporters import NoopReporter, Reporter
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
+from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
 from meridian.handoff import HandoffLinks, publish_connection_pages
 from meridian.reconciler.fence import ApplyFence, local_fence_view
 from meridian.reconciler.remnawave_drivers import (
@@ -331,6 +332,7 @@ class SetupRuntime:
             **self._retirement_entries(review.retiring, review.plan),
             **self._entries(targets),
         }
+        refuse_servers_claimed_elsewhere(entries[ref].host for ref in targets)
         connections = {server_ref: self._connection_builder(entry) for server_ref, entry in entries.items()}
         addresses = {server_ref: entry.host for server_ref, entry in entries.items()}
         refuse_legacy_deployments({ref: connections[ref] for ref in targets}, addresses)

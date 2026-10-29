@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NoReturn
 
+from meridian import config
 from meridian.cluster import ClusterConfig, ClusterConfigExternallyModifiedError
 from meridian.commands.apply_progress import apply_progress
-from meridian.config import HOME_DISPLAY
 from meridian.console import fail
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.topology import ExitIntent, SetupIntent
@@ -36,11 +36,9 @@ class ReviewedApplyPersistenceError(MeridianError):
 
 def has_meridian_v3_state() -> bool:
     """Return True when 3.x left local state in its home (or in an explicit MERIDIAN_HOME)."""
-    from meridian import config
-
     return any(
         (home / "credentials").is_dir() or (home / "servers").is_file()
-        for home in {config.LEGACY_HOME, config.MERIDIAN_HOME}
+        for home in {config.LEGACY_HOME, config.INSTALL_HOME}
     )
 
 
@@ -68,7 +66,7 @@ def load_topology_cluster() -> ClusterConfig:
     if cluster.is_configured:
         fail(
             "This cluster.yml was written by a Meridian 4.0 development build",
-            hint=f"Move {HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
+            hint=f"Move {config.HOME_DISPLAY}/cluster.yml aside, then deploy again to rebuild it from scratch.",
             hint_type="user",
         )
     fail(
@@ -87,11 +85,10 @@ def require_intent(cluster: ClusterConfig) -> SetupIntent:
 
 def resolve_exit(intent: SetupIntent, query: str) -> ExitIntent:
     """Match an exit by ID, saved server ID, saved name, or address."""
-    from meridian.config import SERVER_PROFILES_FILE
     from meridian.servers import ServerRegistry
 
     try:
-        entry = ServerRegistry(SERVER_PROFILES_FILE).find(query)
+        entry = ServerRegistry(config.SERVER_PROFILES_FILE).find(query)
     except LocalStateError as exc:
         fail(exc)
     server_ref = entry.id if entry is not None else query

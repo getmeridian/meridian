@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 import typer
 from rich.markup import escape
 
+from meridian import config
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import fail_meridian_v3_state, has_meridian_v3_state
 from meridian.commands._validation import validate_command_input
-from meridian.config import HOME_DISPLAY, SERVER_PROFILES_FILE
 from meridian.console import confirm, err_console, fail, info, line, ok
 from meridian.core.command_inputs import ServerAddRequest, ServerRemoveRequest
 from meridian.core.errors import LocalStateError
@@ -26,7 +26,7 @@ def run_add(ip: str, name: str = "", user: str = "", ssh_port: int = 0, *, offer
     """Register a server after verifying access: over SSH, or locally for `local`/this machine."""
     from meridian.commands.resolve import resolve_server
 
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     resolved = resolve_server(registry, explicit_ip=ip, user=user, port=ssh_port)
     request = validate_command_input(
         ServerAddRequest,
@@ -80,7 +80,7 @@ def register_server(
     except OSError as exc:
         fail(
             f"Could not save server profile: {exc}",
-            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
+            hint=f"Check {config.HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
     if entry is None:
@@ -90,7 +90,7 @@ def register_server(
 
 def run_list() -> None:
     """Display all registered servers."""
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         entries = registry.list()
     except LocalStateError as exc:
@@ -114,7 +114,7 @@ def run_list() -> None:
 def run_remove(query: str, *, yes: bool = False) -> None:
     """Remove a server by IP or name."""
     request = validate_command_input(ServerRemoveRequest, "Invalid server remove request", query=query)
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
 
     try:
         entry = registry.find(request.query)
@@ -133,7 +133,7 @@ def run_remove(query: str, *, yes: bool = False) -> None:
     except OSError as exc:
         fail(
             f"Could not update saved servers: {exc}",
-            hint=f"Check {HOME_DISPLAY} permissions and disk space, then retry.",
+            hint=f"Check {config.HOME_DISPLAY} permissions and disk space, then retry.",
             hint_type="system",
         )
 

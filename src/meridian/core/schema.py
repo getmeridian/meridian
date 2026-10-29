@@ -41,6 +41,7 @@ from meridian.core.command_inputs import (
     ServerAddRequest,
     ServerRemoveRequest,
 )
+from meridian.core.contexts import ContextListResult, ContextSummary
 from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest, DeployResult
 from meridian.core.events import EVENT_TYPES
 from meridian.core.fleet import FleetInventory, FleetStatus, NodeListResult, RelayListResult
@@ -471,6 +472,13 @@ _, _, RouteRemoveOutputEnvelope = _make_command_envelope(
     doc="Envelope schema for `meridian route remove --json`.",
 )
 
+_, _, ContextListOutputEnvelope = _make_command_envelope(
+    "ContextList",
+    "context.list",
+    ContextListResult,
+    doc="Envelope schema for `meridian context list --json`.",
+)
+
 _, _, ApiSchemasOutputEnvelope = _make_command_envelope(
     "ApiSchemas",
     "api.schemas",
@@ -531,6 +539,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "route-add-envelope": RouteAddOutputEnvelope,
     "route-list-envelope": RouteListOutputEnvelope,
     "route-remove-envelope": RouteRemoveOutputEnvelope,
+    "context-list-envelope": ContextListOutputEnvelope,
     "check": HealthCheckResult,
     "check-envelope": CheckOutputEnvelope,
     "check-failure": CheckFailureData,
@@ -617,6 +626,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "relay-list": RelayListResult,
     "route-list": RouteListResult,
     "route-mutation": RouteMutationResult,
+    "context-list": ContextListResult,
+    "context-summary": ContextSummary,
     "command-contract": CommandContract,
     "command-catalog-entry": CommandCatalogEntry,
     "command-outcome": CommandOutcome,

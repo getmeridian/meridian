@@ -281,5 +281,21 @@
   "fleet_import.exit_moved_hint": "آن را با `meridian node replace {exit} {new}` منتقل کنید؛ کلیدها حفظ و سرور قبلی پاک می‌شود.",
   "fleet_import.client_taken": "کاربر '{name}' از قبل در پنل هست اما از کاربران ناوگان شما نیست",
   "fleet_import.client_taken_hint": "نام آن کاربر پنل را عوض کنید یا در فایل نام دیگری بگذارید.",
-  "fleet_import.page_failed": "کاربر '{name}' تغییر کرد، اما صفحهٔ اتصال او به‌روز نشد: {error}"
+  "fleet_import.page_failed": "کاربر '{name}' تغییر کرد، اما صفحهٔ اتصال او به‌روز نشد: {error}",
+  "context.creating": "زمینهٔ تازهٔ {name}: این اجرا ناوگان آن را آغاز می‌کند. برای رفتن به آن: `meridian context use {name}`.",
+  "context.empty": "هنوز سروری ندارد",
+  "context.unreadable": "فایل‌های محلی نیاز به تعمیر دارند",
+  "context.pinned": "MERIDIAN_HOME یک ناوگان را در {path} نگه می‌دارد؛ برای استفاده از زمینه‌ها آن را بردارید.",
+  "context.exit_one": "{count} سرور خروجی",
+  "context.exit_many": "{count} سرور خروجی",
+  "context.relay_one": "{count} رله",
+  "context.relay_many": "{count} رله",
+  "context.gateway_one": "{count} دروازهٔ مسیریابی",
+  "context.gateway_many": "{count} دروازهٔ مسیریابی",
+  "context.switched": "اکنون روی {name} کار می‌کنید",
+  "context.env_override": "{env} برابر {name} است و در این پوسته همچنان اولویت دارد",
+  "context.renamed": "نام زمینهٔ {old} به {new} تغییر کرد",
+  "context.remove_confirm": "{name} هنوز {count} سرور دارد. فقط نسخهٔ این دستگاه از ناوگان حذف شود؟ سرورها به کار ادامه می‌دهند، اما این دستگاه دیگر نمی‌تواند آن‌ها را مدیریت کند.",
+  "context.remove_confirm_unreadable": "فایل‌های {name} خوانده نمی‌شوند، پس شاید هنوز سرور داشته باشد. فقط نسخهٔ این دستگاه حذف شود؟ سرورها به کار ادامه می‌دهند.",
+  "context.removed": "زمینهٔ {name} حذف شد؛ به سرورهایش دست زده نشد"
 }

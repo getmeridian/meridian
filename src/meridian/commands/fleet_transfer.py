@@ -54,13 +54,13 @@ _STYLES = {"add": "green", "remove": "red", "change": "yellow"}
 
 def run_export() -> None:
     """Print the fleet document: YAML on stdout, or the JSON envelope."""
-    from meridian.config import SERVER_PROFILES_FILE
+    from meridian import config
     from meridian.setup.fleet_document import dump_fleet_document, fleet_document
 
     operation = OperationContext()
     with error_context(EXPORT_COMMAND, timer=operation.timer):
         intent = require_intent(load_topology_cluster())
-        registry = ServerRegistry(SERVER_PROFILES_FILE)
+        registry = ServerRegistry(config.SERVER_PROFILES_FILE)
         try:
             document = fleet_document(intent, registry)
             unsaved = [ref for ref in intent_server_refs(intent) if registry.find(ref) is None]
@@ -91,14 +91,14 @@ def run_import(source: str, *, dry_run: bool = False, yes: bool = False, forget_
 
 
 def _import(source: str, *, dry_run: bool, yes: bool, forget_unreachable: bool, operation: OperationContext) -> None:
-    from meridian.config import SERVER_PROFILES_FILE
+    from meridian import config
     from meridian.core.setup import SetupDraft
     from meridian.setup.fleet_document import intent_from_document, parse_fleet_document, server_labels
 
     text = _read(source)
     cluster = load_topology_cluster()
     current = require_intent(cluster)
-    registry = ServerRegistry(SERVER_PROFILES_FILE)
+    registry = ServerRegistry(config.SERVER_PROFILES_FILE)
     try:
         updated = intent_from_document(parse_fleet_document(text), current, registry)
         labels = server_labels(registry, [*intent_server_refs(current), *intent_server_refs(updated)])

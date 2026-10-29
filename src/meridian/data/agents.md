@@ -19,6 +19,7 @@ You are probably helping one of two people:
 
 - The home directory is `~/.config/meridian` (or `$XDG_CONFIG_HOME/meridian`). `MERIDIAN_HOME` overrides it. Meridian also uses an existing `~/.meridian-v4` or `~/.meridian` when either holds a fleet (it has a `servers.json`) and the default directory doesn't exist yet.
 - That directory is how the deployer manages the fleet: `cluster.yml` holds the topology and panel access, and `servers.json` holds saved SSH targets. Tell the user to back it up. To manage the fleet from another machine, they copy the whole directory there.
+- One machine can keep several separate fleets as contexts. The home directory itself is the `default` context; each other one lives in `contexts/NAME/` with its own `cluster.yml` and `servers.json`. `meridian context list --json` shows them all from local files, `meridian context use NAME` changes the current one, and `--context NAME` (before or after the command) or `MERIDIAN_CONTEXT` picks one for a single run. When the user has more than one fleet, pass `--context` on every command so nothing lands on the wrong fleet. `meridian deploy IP --context NAME` starts a new one.
 - Never edit `cluster.yml` by hand. Change the fleet through commands, or edit the file `meridian fleet export` prints and apply it with `meridian fleet import`.
 
 ## Rules for agents

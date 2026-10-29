@@ -10,15 +10,13 @@ from __future__ import annotations
 import logging
 import secrets
 
+from meridian import config
 from meridian.cluster import (
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
     PanelConfig,
 )
-from meridian.config import (
-    DEFAULT_SNI,
-    HOME_DISPLAY,
-)
+from meridian.config import DEFAULT_SNI
 from meridian.core.cancellation import CancellationToken
 from meridian.core.errors import PanelSetupError, ProvisioningError
 from meridian.core.output import OperationContext
@@ -211,8 +209,8 @@ def ensure_control_plane_access(
                 raise PanelSetupError(
                     f"{resolved.ip} already runs a Remnawave panel with an administrator Meridian doesn't know",
                     hint=(
-                        f"It is probably left from an earlier deploy whose {HOME_DISPLAY} was lost or moved. "
-                        f"To keep its users, restore that {HOME_DISPLAY}/cluster.yml and run the command again. "
+                        f"It is probably left from an earlier deploy whose {config.HOME_DISPLAY} was lost or moved. "
+                        f"To keep its users, restore that {config.HOME_DISPLAY}/cluster.yml and run the command again. "
                         f"To start over, wipe it with `meridian teardown {resolved.ip}` "
                         "(this deletes the panel and every user on it), then deploy again."
                     ),

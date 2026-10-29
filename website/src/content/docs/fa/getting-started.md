@@ -96,6 +96,19 @@ meridian setup
 
 همچنین می‌توانید سرورها را گام‌به‌گام با `meridian node add` و `meridian relay add` اضافه کنید. هر تغییر از همان توپولوژی بازبینی‌شده می‌گذرد؛ `meridian plan` تغییرات را نشان می‌دهد و `meridian apply` آن‌ها را اعمال می‌کند.
 
+## ناوگان‌های جدا
+
+برای جدا نگه داشتن ناوگان‌ها، مثلاً یکی برای خانواده و یکی برای کار، به هر کدام یک زمینهٔ جدا بدهید. اولین deploy در زمینهٔ تازه آن را می‌سازد؛ `context use` آن را زمینهٔ فعلی می‌کند و `--context` یک دستور را روی ناوگان دیگری اجرا می‌کند:
+
+```
+meridian deploy 203.0.113.5 --context work
+meridian context list
+meridian context use work
+meridian --context default client list
+```
+
+اولین ناوگان شما زمینهٔ `default` است و در `~/.config/meridian/` می‌ماند؛ هر زمینهٔ دیگر `cluster.yml` و سرورهای ذخیره‌شدهٔ خودش را در `~/.config/meridian/contexts/NAME/` نگه می‌دارد. کلید SSH ‏Meridian مشترک است و هر سرور در هر زمان فقط به یک ناوگان تعلق دارد. `MERIDIAN_CONTEXT=NAME` زمینه را برای یک پوسته انتخاب می‌کند؛ `MERIDIAN_HOME` یک ناوگان را ثابت می‌کند و زمینه‌ها را خاموش می‌کند. ببینید: [meridian context](/fa/cli-reference/#meridian-context).
+
 ## گام‌های بعدی
 
 - [راهنمای Deploy](/fa/deploy/) — همهٔ گزینه‌های استقرار، هدف‌های استتار، استقرار مجدد

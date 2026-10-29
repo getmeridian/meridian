@@ -4,16 +4,27 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import typer
 from typer.core import TyperGroup
 
 from meridian import __version__
 from meridian import cli_types as click
-from meridian.cli_catalog import command_path, requests_machine_output, supports_json
-from meridian.cli_groups import api_app, client_app, dev_app, fleet_app, node_app, relay_app, route_app, server_app
+from meridian.cli_catalog import command_path, requested_context, requests_machine_output, supports_json
+from meridian.cli_groups import (
+    api_app,
+    client_app,
+    context_app,
+    dev_app,
+    fleet_app,
+    node_app,
+    relay_app,
+    route_app,
+    server_app,
+)
 from meridian.cli_options import (
+    CONTEXT_HELP,
     JSON_HELP,
     SELF_STEAL_HELP,
     SSH_PORT_HELP,
@@ -26,6 +37,7 @@ from meridian.cli_options import (
     Timeout,
     User,
     Yes,
+    add_context_option,
     enable_json_output,
 )
 from meridian.config import DISABLE_UPDATE_CHECK
@@ -41,7 +53,7 @@ ADVANCED = "Advanced"
 _HELP_LAYOUT: tuple[tuple[str, tuple[str, ...]], ...] = (
     (GET_STARTED, ("setup", "deploy", "help")),
     (CLIENTS, ("client",)),
-    (SERVERS, ("node", "relay", "route", "fleet", "server")),
+    (SERVERS, ("node", "relay", "route", "fleet", "server", "context")),
     (CHECK_AND_FIX, ("check", "test", "probe", "doctor", "logs", "plan", "apply")),
     (ADVANCED, ("panel", "scan", "studio", "update", "teardown", "api")),
 )
@@ -72,6 +84,7 @@ class _Invocation:
     supports_json: bool
     machine_output: bool
     help_requested: bool
+    context: str = ""
 
 
 _INVOCATION = "meridian.invocation"
@@ -82,7 +95,12 @@ class _SectionedGroup(TyperGroup):
 
     Resolving a command also records what it is (`_Invocation`) for the root callback,
     which runs before Click parses the command's own options, and refuses `RENAMED` spellings.
+    Every leaf also accepts the root's `--context` (`cli_options.add_context_option`).
     """
+
+    def __init__(self, **attrs: Any) -> None:
+        super().__init__(**attrs)
+        add_context_option(self)
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         names = super().list_commands(ctx)
@@ -100,6 +118,7 @@ class _SectionedGroup(TyperGroup):
                 supports_json=leaf is not None and supports_json(leaf),
                 machine_output=leaf is not None and requests_machine_output(ctx, path[-1], leaf, rest),
                 help_requested=any(arg in ctx.help_option_names for arg in args),
+                context=requested_context(ctx, path[-1], leaf, rest) if leaf is not None else "",
             )
         return super().resolve_command(ctx, args)
 
@@ -155,6 +174,7 @@ app.add_typer(node_app, name="node", rich_help_panel=SERVERS)
 app.add_typer(relay_app, name="relay", rich_help_panel=SERVERS)
 app.add_typer(route_app, name="route", rich_help_panel=SERVERS)
 app.add_typer(fleet_app, name="fleet", rich_help_panel=SERVERS)
+app.add_typer(context_app, name="context", rich_help_panel=SERVERS)
 app.add_typer(api_app, name="api", rich_help_panel=ADVANCED)
 app.add_typer(dev_app, name="dev", hidden=True)
 
@@ -169,6 +189,7 @@ def main_callback(
     ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress progress output"),
     lang: str = typer.Option("", "--lang", help="Language for the setup wizard: en, ru, fa, zh", show_default=False),
+    context: str = typer.Option("", "--context", metavar="NAME", help=CONTEXT_HELP, show_default=False),
 ) -> None:
     """Meridian — Censorship-resistant proxy server management."""
     if ctx.resilient_parsing:
@@ -224,6 +245,16 @@ def main_callback(
     if version:
         print(f"meridian {__version__}")
         raise typer.Exit()
+
+    from meridian.commands.context import select_for_invocation
+
+    select_for_invocation(
+        root=context,
+        leaf=invocation.context if invocation is not None else "",
+        command=invocation.name if invocation is not None else "",
+        help_requested=invocation is not None and invocation.help_requested,
+        machine_output=invocation is not None and invocation.machine_output,
+    )
 
     if ctx.invoked_subcommand is None:
         _offer_setup_or_help(ctx, interactive=not (machine_output or quiet))

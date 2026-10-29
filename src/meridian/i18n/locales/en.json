@@ -281,5 +281,21 @@
   "fleet_import.exit_moved_hint": "Move it with `meridian node replace {exit} {new}`, which keeps its keys and cleans up the old server.",
   "fleet_import.client_taken": "Client '{name}' already exists in the panel but is not one of your fleet's clients",
   "fleet_import.client_taken_hint": "Rename the unmanaged panel user, or pick another name in the file.",
-  "fleet_import.page_failed": "Client '{name}' changed, but their connection page could not be updated: {error}"
+  "fleet_import.page_failed": "Client '{name}' changed, but their connection page could not be updated: {error}",
+  "context.creating": "New context {name}: this run starts its fleet. Switch to it with `meridian context use {name}`.",
+  "context.empty": "no servers yet",
+  "context.unreadable": "local files need repair",
+  "context.pinned": "MERIDIAN_HOME keeps one fleet in {path}; unset it to use contexts.",
+  "context.exit_one": "{count} exit",
+  "context.exit_many": "{count} exits",
+  "context.relay_one": "{count} relay",
+  "context.relay_many": "{count} relays",
+  "context.gateway_one": "{count} routing gateway",
+  "context.gateway_many": "{count} routing gateways",
+  "context.switched": "Now working on {name}",
+  "context.env_override": "{env} is set to {name}, which still wins in this shell",
+  "context.renamed": "Renamed context {old} to {new}",
+  "context.remove_confirm": "{name} still has {count} server(s). Delete only this machine's copy of its fleet? The servers keep running, but this machine can no longer manage them.",
+  "context.remove_confirm_unreadable": "{name}'s files cannot be read, so it may still have servers. Delete only this machine's copy? The servers keep running.",
+  "context.removed": "Removed context {name}; its servers were not touched"
 }

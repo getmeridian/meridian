@@ -25,7 +25,7 @@ from collections.abc import Callable
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 
-from meridian.config import HOME_DISPLAY
+from meridian import config
 from meridian.reconciler.fence import (
     RENEW_AFTER,
     FenceRecord,
@@ -273,7 +273,7 @@ class SSHApplyFence:
 def swap_conflict() -> FleetFenceError:
     return FleetFenceError(
         "Another machine changed this fleet's apply fence at the same moment.",
-        hint=f"Copy {HOME_DISPLAY} from the machine that applied last, then retry.",
+        hint=f"Copy {config.HOME_DISPLAY} from the machine that applied last, then retry.",
         category="user",
     )
 

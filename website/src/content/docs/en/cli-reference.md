@@ -282,6 +282,35 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet import`** — reads an edited file (or `-` for standard input) and shows what it changes, one line each: `+` adds, `-` removes, and `~` changes a field (`~ exit-2 sni www.example.com -> www.example.org`). It then lists every resource the change deletes and the review hash, asks, and applies exactly that review, like `apply`. A file with no edits prints "No changes". Removing a client from `access.users` removes them like `client remove`: their links stop working and their connection page is deleted. Adding one creates them like `client add` and publishes their page; `client show NAME` prints their links. New camouflage SNIs get the checks `node sni` runs. Import refuses another `schema`, a server you haven't saved (save it with `meridian server add`), transport paths in the file, changes to the control server, its domain, or its backend, removing or renaming the exit on the control server, and moving an exit to another server (use `node replace`). Keys and credentials stay as they are. Without a terminal, pass `--yes`; `--dry-run` shows the changes and the review without applying anything.
 
+### meridian context
+
+Keep several separate fleets on one machine, for example one for family and one for work, and choose which one commands work on.
+
+```
+meridian context list [--json]
+meridian context use NAME
+meridian context rename OLD NEW
+meridian context remove NAME [--yes]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` | | `context list`: emit a `meridian.output/v1` envelope |
+| `--yes`, `-y` | | `context remove`: remove a context whose fleet still has servers without asking |
+
+**`context list`** — every context with its control server and how many exits, relays, and routing gateways it has, read from this machine only; `*` marks the current one:
+
+```
+  * default   198.51.100.10    2 exits, 1 relay
+    family    198.51.100.40    1 exit
+```
+
+**`context use`** — makes NAME the fleet every later command works on. `meridian deploy IP --context NAME` creates a new context, and any command takes `--context NAME` to work on another fleet once.
+
+**`context rename`** — renames a context; its fleet and servers are untouched.
+
+**`context remove`** — deletes the context's files from this machine and never contacts a server: the servers keep running, but this machine can no longer manage them. It refuses the current context, and while the fleet still has servers it asks first (`--yes` skips the question). The `default` context is Meridian's home directory itself, so it can be neither renamed nor removed.
+
 ### meridian check
 
 Check a server's health, or whether a new server can run Meridian. What runs depends on the server's role in your fleet:
@@ -473,6 +502,7 @@ Global options go before the command, for example `meridian --quiet doctor`. Com
 | `--version`, `-v` | Show the CLI version and exit |
 | `--verbose` | Enable debug logging |
 | `--quiet`, `-q` | Suppress progress output |
+| `--context NAME` | Work on another fleet ([meridian context](#meridian-context)); default: `MERIDIAN_CONTEXT`, else the current context. Also accepted after the command, as in `meridian deploy 203.0.113.5 --context work` |
 | `--lang CODE` | Language for the setup wizard: `en`, `ru`, `fa`, or `zh` (default: saved choice, else asked) |
 | `--json` | Request a JSON envelope from a command that supports it; other commands fail explicitly |
 | `--install-completion` | Install shell completion for the current shell |

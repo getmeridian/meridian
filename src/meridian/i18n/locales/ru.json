@@ -281,5 +281,21 @@
   "fleet_import.exit_moved_hint": "Перенесите его командой `meridian node replace {exit} {new}`: она сохраняет ключи и очищает старый сервер.",
   "fleet_import.client_taken": "Клиент '{name}' уже есть в панели, но не входит в клиентов ваших серверов",
   "fleet_import.client_taken_hint": "Переименуйте этого пользователя панели или выберите в файле другое имя.",
-  "fleet_import.page_failed": "Клиент '{name}' изменён, но его страницу подключения не удалось обновить: {error}"
+  "fleet_import.page_failed": "Клиент '{name}' изменён, но его страницу подключения не удалось обновить: {error}",
+  "context.creating": "Новый контекст {name}: эта команда создаёт в нём новые серверы. Переключиться на него: `meridian context use {name}`.",
+  "context.empty": "серверов пока нет",
+  "context.unreadable": "локальные файлы нужно восстановить",
+  "context.pinned": "MERIDIAN_HOME хранит один набор серверов в {path}; уберите эту переменную, чтобы пользоваться контекстами.",
+  "context.exit_one": "выходных серверов: {count}",
+  "context.exit_many": "выходных серверов: {count}",
+  "context.relay_one": "промежуточных серверов: {count}",
+  "context.relay_many": "промежуточных серверов: {count}",
+  "context.gateway_one": "шлюзов маршрутизации: {count}",
+  "context.gateway_many": "шлюзов маршрутизации: {count}",
+  "context.switched": "Теперь работаем с {name}",
+  "context.env_override": "{env} равна {name} и в этой оболочке по-прежнему важнее",
+  "context.renamed": "Контекст {old} переименован в {new}",
+  "context.remove_confirm": "В {name} ещё серверов: {count}. Удалить только копию их настроек на этом компьютере? Серверы продолжат работать, но управлять ими отсюда будет нельзя.",
+  "context.remove_confirm_unreadable": "Файлы {name} не читаются, поэтому в нём могут оставаться серверы. Удалить только копию на этом компьютере? Серверы продолжат работать.",
+  "context.removed": "Контекст {name} удалён; его серверы не затронуты"
 }

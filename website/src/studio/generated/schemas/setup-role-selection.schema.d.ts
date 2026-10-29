@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type Backend = "remnawave" | "meridian";
 export type PublicHostname = "" | string;
 export type ServerRef = string;
 export type Title = string;
@@ -54,9 +55,10 @@ export interface SetupRoleSelection {
   transparent_relays?: TransparentRelays;
 }
 /**
- * One server that owns the Remnawave control-plane workload.
+ * One server that owns the control-plane workload.
  */
 export interface ControlPlaneIntent {
+  backend?: Backend;
   public_hostname?: PublicHostname;
   server_ref: ServerRef;
   title?: Title;

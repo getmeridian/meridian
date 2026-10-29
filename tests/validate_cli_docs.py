@@ -70,11 +70,18 @@ COMMAND_SECTIONS: dict[str, str] = {
     "fleet upgrade": "### meridian fleet",
     "fleet export": "### meridian fleet",
     "fleet import": "### meridian fleet",
+    "context list": "### meridian context",
+    "context use": "### meridian context",
+    "context rename": "### meridian context",
+    "context remove": "### meridian context",
     "api schemas": "### meridian api",
     "api commands": "### meridian api",
     "api schema": "### meridian api",
     "api workflow": "### meridian api",
 }
+
+# Root options every leaf also accepts (`cli_options.add_context_option`): documented once, globally.
+LEAF_GLOBALS = {"--context"}
 
 GLOBAL_SECTIONS = {
     "en": "## Global options",
@@ -147,7 +154,7 @@ def main() -> int:
             if section_text is None:
                 errors.append(f"  {locale}: section '{heading}' not found")
                 continue
-            for flag in sorted(long_flags(discovered[command]) - flags_in_section(section_text)):
+            for flag in sorted(long_flags(discovered[command]) - LEAF_GLOBALS - flags_in_section(section_text)):
                 errors.append(f"  {locale}: meridian {command}: {flag} not documented in '{heading}'")
 
     if errors:

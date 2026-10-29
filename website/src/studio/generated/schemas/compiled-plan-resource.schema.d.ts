@@ -28,7 +28,13 @@ export type Kind =
   | "routing_gateway"
   | "egress_pool"
   | "route_rule"
-  | "probe";
+  | "probe"
+  | "control_service"
+  | "agent_runtime"
+  | "node_workload"
+  | "client_endpoint"
+  | "control_user"
+  | "service_settings";
 export type LogicalId = string;
 
 /**

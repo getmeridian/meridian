@@ -380,3 +380,66 @@ def test_no_tracked_text_file_carries_merge_conflict_markers() -> None:
         )
     ]
     assert marked == []
+
+
+# Paths `config.select_context()` rebinds (or tests repoint): a copy taken at import keeps the wrong fleet.
+CONTEXT_BOUND_PATHS = frozenset(
+    {
+        "PINNED_HOME",
+        "INSTALL_HOME",
+        "CACHE_DIR",
+        "PREFERENCES_FILE",
+        "MERIDIAN_SSH_KEY_FILE",
+        "CONTEXT",
+        "FLEET_HOME",
+        "HOME_DISPLAY",
+        "CLUSTER_CONFIG",
+        "CLUSTER_BACKUP",
+        "SERVER_PROFILES_FILE",
+        "SETUP_DRAFT_FILE",
+    }
+)
+
+
+def _import_time_nodes(tree: ast.Module) -> list[ast.AST]:
+    """Every node Python evaluates when the module is imported: not function or lambda bodies."""
+    found: list[ast.AST] = []
+
+    def visit(node: ast.AST) -> None:
+        found.append(node)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            args = node.args
+            for default in (*args.defaults, *(d for d in args.kw_defaults if d is not None)):
+                visit(default)
+            for decorator in getattr(node, "decorator_list", ()):
+                visit(decorator)
+            return
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    visit(tree)
+    return found
+
+
+def test_no_module_copies_a_context_bound_path_at_import() -> None:
+    """`from meridian.config import CLUSTER_CONFIG` at module level would ignore `--context`."""
+    violations = []
+    for path in sorted(SRC.rglob("*.py")):
+        if path == SRC / "config.py":
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in _import_time_nodes(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "meridian.config":
+                names = sorted(alias.name for alias in node.names if alias.name in CONTEXT_BOUND_PATHS)
+                if names:
+                    violations.append(f"{path.relative_to(SRC)}:{node.lineno} imports {', '.join(names)}")
+            elif (
+                isinstance(node, ast.Attribute)
+                and node.attr in CONTEXT_BOUND_PATHS
+                and isinstance(node.value, ast.Name)
+                and node.value.id in {"config", "cfg"}
+            ):
+                violations.append(f"{path.relative_to(SRC)}:{node.lineno} reads config.{node.attr} at import")
+    assert violations == [], (
+        "Read context-bound paths as `config.NAME` inside functions (see meridian.contexts):\n" + "\n".join(violations)
+    )

@@ -282,6 +282,35 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 **`fleet import`** — 读取编辑后的文件（或用 `-` 从标准输入读取），每处变更一行：`+` 表示添加，`-` 表示删除，`~` 表示修改字段（`~ exit-2 sni www.example.com -> www.example.org`）。随后列出变更将删除的每个资源和审查哈希，询问确认，并像 `apply` 一样只应用这次审查。未编辑的文件会输出“没有变更”。从 `access.users` 中删除客户端等同于 `client remove`：其链接失效，连接页面被删除。添加客户端等同于 `client add`，并发布其页面；用 `client show NAME` 查看链接。新的伪装 SNI 会经过与 `node sni` 相同的检查。导入会拒绝：其他 `schema`、未保存的服务器（用 `meridian server add` 保存）、文件中的传输路径、对控制服务器及其域名或后端的更改、删除或重命名控制服务器上的出口，以及把出口移到另一台服务器（请用 `node replace`）。密钥和凭据保持不变。没有终端时请传入 `--yes`；`--dry-run` 只显示变更和审查结果，不应用任何内容。
 
+### meridian context
+
+在一台电脑上保存多组互相独立的服务器（例如一组给家人、一组用于工作），并选择命令作用于哪一组。
+
+```
+meridian context list [--json]
+meridian context use NAME
+meridian context rename OLD NEW
+meridian context remove NAME [--yes]
+```
+
+| 标志 | 默认值 | 说明 |
+|------|---------|-------------|
+| `--json` | | `context list`：输出 `meridian.output/v1` 信封 |
+| `--yes`, `-y` | | `context remove`：不经询问删除仍有服务器的上下文 |
+
+**`context list`** — 列出每个上下文的控制服务器以及出口、中继和路由网关的数量，只读取本机保存的信息；`*` 标记当前上下文：
+
+```
+  * default   198.51.100.10    2 exits, 1 relay
+    family    198.51.100.40    1 exit
+```
+
+**`context use`** — 让之后的所有命令都作用于 NAME。`meridian deploy IP --context NAME` 会创建新上下文，任何命令都可以加 `--context NAME` 临时操作另一组服务器。
+
+**`context rename`** — 重命名上下文，不影响其服务器。
+
+**`context remove`** — 只删除本机上该上下文的文件，从不连接服务器：服务器继续运行，但本机将无法再管理它们。它拒绝删除当前上下文；如果该组仍有服务器，会先询问（`--yes` 跳过询问）。`default` 上下文就是 Meridian 的主目录本身，因此既不能重命名也不能删除。
+
 ### meridian check
 
 检查服务器健康状态，或检查一台新服务器能否运行 Meridian。检查项取决于服务器在集群中的角色：
@@ -473,6 +502,7 @@ meridian help [agents | COMMAND...]
 | `--version`, `-v` | 显示 CLI 版本并退出 |
 | `--verbose` | 启用调试日志 |
 | `--quiet`, `-q` | 压制进度输出 |
+| `--context NAME` | 操作另一组服务器（[meridian context](#meridian-context)）；默认：`MERIDIAN_CONTEXT`，否则为当前上下文。也可以写在命令之后，如 `meridian deploy 203.0.113.5 --context work` |
 | `--lang CODE` | 设置向导的语言：`en`、`ru`、`fa` 或 `zh`（默认：已保存的选择，否则询问） |
 | `--json` | 从支持它的命令请求 JSON 信封；其他命令明确失败 |
 | `--install-completion` | 为当前 shell 安装补全 |

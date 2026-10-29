@@ -96,6 +96,19 @@ meridian setup
 
 You can also grow a deployment one step at a time with `meridian node add` and `meridian relay add`. Every change goes through the same reviewed topology; `meridian plan` shows what would change and `meridian apply` applies it.
 
+## Separate fleets
+
+To keep fleets apart, say one for family and one for work, give each its own context. The first deploy into a new context creates it; `context use` makes it current, and `--context` runs one command on another fleet:
+
+```
+meridian deploy 203.0.113.5 --context work
+meridian context list
+meridian context use work
+meridian --context default client list
+```
+
+Your first fleet is the `default` context and stays in `~/.config/meridian/`; every other context keeps its own `cluster.yml` and saved servers in `~/.config/meridian/contexts/NAME/`. Meridian's SSH key is shared, and a server belongs to one fleet at a time. `MERIDIAN_CONTEXT=NAME` chooses a context for one shell; `MERIDIAN_HOME` pins a single fleet and turns contexts off. See [meridian context](/en/cli-reference/#meridian-context).
+
 ## Next steps
 
 - [Deploy guide](/en/deploy/) — every deploy option, camouflage targets, redeploys

@@ -11,10 +11,21 @@
 export type ClientListOutputEnvelope = _ClientListSuccessEnvelope | _ClientListTerminalEnvelope;
 export type Command = "client.list";
 export type CreatedAt = string;
+/**
+ * UTC timestamp; empty means never.
+ */
+export type ExpiresAt = string;
 export type Id = string;
 export type LastSeen = string;
 export type Status = string;
+/**
+ * 0 means unlimited.
+ */
 export type TrafficLimitBytes = number;
+/**
+ * When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).
+ */
+export type TrafficReset = string;
 export type TrafficUsedBytes = number;
 export type Username = string;
 export type Clients = ClientRecord[];
@@ -84,10 +95,12 @@ export interface ClientListResult {
  */
 export interface ClientRecord {
   created_at: CreatedAt;
+  expires_at: ExpiresAt;
   id: Id;
   last_seen: LastSeen;
   status: Status;
   traffic_limit_bytes: TrafficLimitBytes;
+  traffic_reset: TrafficReset;
   traffic_used_bytes: TrafficUsedBytes;
   username: Username;
 }

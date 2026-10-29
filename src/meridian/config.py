@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from meridian.contexts import CONTEXT_ENV, DEFAULT_CONTEXT, ContextError, ContextSelection, resolve_context
+
 # Meridian 3.x keeps its state here; 4.x never writes to it.
 LEGACY_HOME = Path.home() / ".meridian"
 # Only Meridian 4 writes servers.json (3.x used `servers`), so it marks a 4.x home.
@@ -36,15 +38,55 @@ def display_path(path: Path) -> str:
         return str(path)
 
 
-MERIDIAN_HOME = Path(os.environ["MERIDIAN_HOME"]) if os.environ.get("MERIDIAN_HOME") else default_home()
-HOME_DISPLAY = display_path(MERIDIAN_HOME)
-CLUSTER_CONFIG = MERIDIAN_HOME / "cluster.yml"
-CLUSTER_BACKUP = MERIDIAN_HOME / "cluster.yml.bak"
-CACHE_DIR = MERIDIAN_HOME / "cache"
-SERVER_PROFILES_FILE = MERIDIAN_HOME / "servers.json"
-SETUP_DRAFT_FILE = MERIDIAN_HOME / "setup.json"
-PREFERENCES_FILE = MERIDIAN_HOME / "preferences.json"
-MERIDIAN_SSH_KEY_FILE = MERIDIAN_HOME / "ssh" / "meridian_ed25519"
+# Per-install state: whoever runs Meridian, whichever fleet they work on.
+# MERIDIAN_HOME pins one directory that is both the install home and the only fleet.
+PINNED_HOME = bool(os.environ.get("MERIDIAN_HOME"))
+INSTALL_HOME = Path(os.environ["MERIDIAN_HOME"]) if PINNED_HOME else default_home()
+CACHE_DIR = INSTALL_HOME / "cache"
+PREFERENCES_FILE = INSTALL_HOME / "preferences.json"
+MERIDIAN_SSH_KEY_FILE = INSTALL_HOME / "ssh" / "meridian_ed25519"
+
+# Per-fleet state, rebound by select_context(). Read these as `config.NAME` (or import them
+# inside a function), never with a module-level `from meridian.config import NAME`: that copy
+# would keep the fleet chosen at import time (tests/test_architecture.py refuses it).
+CONTEXT = DEFAULT_CONTEXT
+FLEET_HOME = INSTALL_HOME
+HOME_DISPLAY = display_path(FLEET_HOME)
+CLUSTER_CONFIG = FLEET_HOME / "cluster.yml"
+CLUSTER_BACKUP = FLEET_HOME / "cluster.yml.bak"
+SERVER_PROFILES_FILE = FLEET_HOME / "servers.json"
+SETUP_DRAFT_FILE = FLEET_HOME / "setup.json"
+
+
+def bind_context(selection: ContextSelection) -> None:
+    """Point every per-fleet path at ``selection``'s directory."""
+    global CONTEXT, FLEET_HOME, HOME_DISPLAY, CLUSTER_CONFIG, CLUSTER_BACKUP, SERVER_PROFILES_FILE, SETUP_DRAFT_FILE
+    CONTEXT = selection.name
+    FLEET_HOME = selection.home
+    HOME_DISPLAY = display_path(selection.home)
+    CLUSTER_CONFIG = selection.home / "cluster.yml"
+    CLUSTER_BACKUP = selection.home / "cluster.yml.bak"
+    SERVER_PROFILES_FILE = selection.home / "servers.json"
+    SETUP_DRAFT_FILE = selection.home / "setup.json"
+
+
+def select_context(flag: str = "") -> ContextSelection:
+    """Resolve the fleet for this run (see ``contexts.resolve_context``) and bind its paths.
+
+    Runs at import with no flag, so library callers start on the current context; the
+    CLI root callback runs it again with ``--context`` before any command reads a path.
+    """
+    selection = resolve_context(
+        INSTALL_HOME, pinned=PINNED_HOME, flag=flag, env=os.environ.get(CONTEXT_ENV, "").strip()
+    )
+    bind_context(selection)
+    return selection
+
+
+try:
+    select_context()
+except ContextError:
+    pass  # stays on default; the CLI root callback re-resolves and reports the error
 
 DEFAULT_SNI = "www.google.com"  # mirrored in meridian.core.defaults for core isolation
 ACME_SERVER = os.environ.get("MERIDIAN_ACME_SERVER", "letsencrypt").strip() or "letsencrypt"

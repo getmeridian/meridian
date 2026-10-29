@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from meridian import config
 from meridian.cluster import ClusterConfig, WorkloadBinding
-from meridian.config import HOME_DISPLAY
 from meridian.core.errors import LocalStateError
 from meridian.core.fleet import (
     FleetTopology,
@@ -23,9 +23,8 @@ from meridian.servers import ServerEntry, ServerRegistry
 
 def topology_from_local_cluster(cluster: ClusterConfig) -> FleetTopology:
     """Project the topology, resolving its server references from local state."""
-    from meridian.config import SERVER_PROFILES_FILE
 
-    servers = ServerRegistry(SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else []
+    servers = ServerRegistry(config.SERVER_PROFILES_FILE).list() if cluster.topology_intent is not None else []
     return topology_from_cluster(cluster, servers=servers)
 
 
@@ -52,7 +51,7 @@ def topology_from_cluster(
         if servers is None:
             raise LocalStateError(
                 "Saved server profiles are required to read the topology.",
-                hint=f"Restore {HOME_DISPLAY}/servers.json, then retry.",
+                hint=f"Restore {config.HOME_DISPLAY}/servers.json, then retry.",
             )
         server_map = _v4_server_map(cluster, servers)
         nodes = _v4_nodes(cluster, server_map)

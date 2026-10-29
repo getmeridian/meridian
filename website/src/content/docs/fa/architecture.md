@@ -145,3 +145,5 @@ Backend Xray ports از طریق nginx قابل دسترسی است؛ UFW آن�
 - `~/.config/meridian/cache/` — update-check cache
 
 این دایرکتوری در صورت تنظیم بودن `$XDG_CONFIG_HOME` از آن پیروی می‌کند و `MERIDIAN_HOME` آن را بازنویسی می‌کند. تا زمانی که `~/.config/meridian/` وجود ندارد، Meridian اگر `~/.meridian-v4/` یا `~/.meridian/` یک fleet داشته باشد (فایل `servers.json` دارد) از آن‌ها هم استفاده می‌کند. وضعیت Meridian 3.x در `~/.meridian/` هرگز دست نمی‌خورد.
+
+چند ناوگان می‌توانند به‌صورت زمینه (`meridian context`) روی یک دستگاه باشند. این دایرکتوری زمینهٔ `default` است؛ هر زمینهٔ دیگر `cluster.yml`، نسخهٔ پشتیبان آن، `servers.json` و `setup.json` خودش را در `contexts/NAME/` نگه می‌دارد، و کلید SSH، کش بررسی به‌روزرسانی، انتخاب زبان و Xray محلی مشترک می‌مانند. انتخاب با `--context`، سپس `MERIDIAN_CONTEXT`، سپس `current-context` ذخیره‌شده است؛ `MERIDIAN_HOME` یک ناوگان را ثابت می‌کند.

@@ -10,6 +10,7 @@ export type SquadName = string;
  * @minItems 1
  */
 export type Users = [string, ...string[]];
+export type Backend = "remnawave" | "meridian";
 export type PublicHostname = "" | string;
 export type ServerRef = string;
 export type Title = string;
@@ -124,9 +125,10 @@ export interface DisplayNames {
   [k: string]: string;
 }
 /**
- * One server that owns the Remnawave control-plane workload.
+ * One server that owns the control-plane workload.
  */
 export interface ControlPlaneIntent {
+  backend?: Backend;
   public_hostname?: PublicHostname;
   server_ref: ServerRef;
   title?: Title;

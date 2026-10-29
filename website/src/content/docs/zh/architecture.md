@@ -145,3 +145,5 @@ Meridian 会将拓扑编译为资源列表：防火墙规则、nginx 路由、�
 - `~/.config/meridian/cache/` — 更新检查缓存
 
 该目录在设置了 `$XDG_CONFIG_HOME` 时跟随它，`MERIDIAN_HOME` 则会覆盖它。在 `~/.config/meridian/` 不存在期间，若 `~/.meridian-v4/` 或 `~/.meridian/` 中存有集群（含有 `servers.json`），Meridian 也会使用它们。`~/.meridian/` 中的 Meridian 3.x 状态不会被触碰。
+
+一台电脑可以用上下文（`meridian context`）保存多组服务器。该目录就是 `default` 上下文；其他上下文在 `contexts/NAME/` 中保存自己的 `cluster.yml`、其备份、`servers.json` 和 `setup.json`，而 SSH 密钥、更新检查缓存、语言选择和本地 Xray 运行时是共用的。选择顺序为 `--context`、`MERIDIAN_CONTEXT`、已保存的 `current-context`；`MERIDIAN_HOME` 固定使用单独一组。

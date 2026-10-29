@@ -44,6 +44,15 @@ reviewed topology in `~/.config/meridian/cluster.yml` describes your whole fleet
   needs, instead of sharing Meridian's full-access token.
 
 ### Deploy
+- **Several fleets on one computer** — `meridian context list|use|rename|remove`
+  keeps separate fleets apart, say family and work, kubectl-style:
+  `meridian deploy IP --context work` starts one, `--context NAME` (before or
+  after any command) or `MERIDIAN_CONTEXT` picks one for a run, and
+  `context use` changes the current one. An existing fleet becomes the
+  `default` context without moving a file; others live in `contexts/NAME/`
+  with their own saved servers, sharing Meridian's SSH key. A server belongs
+  to one fleet at a time, `context remove` deletes only local files (asking
+  first while the fleet has servers), and `MERIDIAN_HOME` still pins one fleet.
 - **One command, verified end to end** — `meridian deploy IP` sets up the panel
   and proxy, picks a camouflage target the server can actually use, pushes real
   traffic through the delivered subscription, and only then prints "Done" with a
