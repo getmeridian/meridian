@@ -527,6 +527,44 @@ class TestCheckpointedExecution:
             "host:gone@2",
         ]
 
+    def test_commit_of_the_active_plan_forgets_an_abandoned_newer_generation(self) -> None:
+        """Re-applying the active plan reuses its generation; the abandoned one's agent was retired on every apply."""
+        plan = _plan()
+        action = build_resource_actions(plan, generation=1)[0]
+        abandoned = ManagedResourceBinding(
+            logical_id="agent_runtime:exit-2",
+            resource_kind="agent_runtime",
+            generation=2,
+            remote_id="agent-2",
+            server_ref="srv-gone",
+        )
+        cluster = ClusterConfig(
+            managed_bindings={"agent_runtime:exit-2@2": abandoned},
+            active_generation=1,
+            active_plan_hash=plan.plan_hash,
+            pending_generation=2,
+            pending_plan_hash=_HASH_B,
+        )
+        retired: list[str] = []
+
+        class Retiring(ScriptedDriver):
+            def retire(self, binding: ManagedResourceBinding) -> None:
+                retired.append(binding.logical_id)
+
+        drivers = {
+            "firewall_rule": ScriptedDriver([_converged(action)] * 2),
+            "agent_runtime": Retiring([]),
+        }
+
+        first = execute_resource_plan(plan, cluster, drivers, persist=lambda _s: None, clock=_clock)
+        drivers["firewall_rule"] = ScriptedDriver([_converged(action)] * 2)
+        second = execute_resource_plan(plan, cluster, drivers, persist=lambda _s: None, clock=_clock)
+
+        assert first.all_succeeded and second.all_succeeded
+        assert retired == ["agent_runtime:exit-2"]
+        assert "agent_runtime:exit-2@2" not in cluster.managed_bindings
+        assert cluster.active_generation == 1
+
     def test_old_generation_remains_active_until_resumed_cutover_succeeds(self) -> None:
         old_plan = _plan(public_port=8443)
         new_plan = _plan()

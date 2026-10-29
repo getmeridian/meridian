@@ -673,17 +673,20 @@ def _drop_superseded_bindings(cluster: ClusterConfig, generation: int) -> None:
 
     Every generation re-binds each resource, so without this cluster.yml grew with
     every apply. A (logical ID, remote ID) pair is what ownership checks match
-    (``was_managed``), so keeping its newest binding keeps that evidence.
+    (``was_managed``), so keeping its newest binding keeps that evidence. What an
+    abandoned newer generation bound is forgotten too: retirement has removed what
+    it installed outside this plan, and this plan re-bound the rest.
     """
+    kept = {key: binding for key, binding in cluster.managed_bindings.items() if binding.generation <= generation}
     newest: dict[tuple[str, str], int] = {}
-    for binding in cluster.managed_bindings.values():
+    for binding in kept.values():
         pair = (binding.logical_id, binding.remote_id)
         newest[pair] = max(newest.get(pair, 0), binding.generation)
     cluster.managed_bindings = {
         key: binding
-        for key, binding in cluster.managed_bindings.items()
+        for key, binding in kept.items()
         if binding.active
-        or binding.generation >= generation
+        or binding.generation == generation
         or newest[(binding.logical_id, binding.remote_id)] == binding.generation
     }
 
