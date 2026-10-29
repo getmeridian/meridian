@@ -463,3 +463,26 @@ def test_an_empty_context_drops_an_unfinished_restore_an_older_snapshot_carried(
     restored = restore_command._fleet_state(ClusterConfig(), source.snapshot)
 
     assert restored.control_restore is None
+
+
+def test_picking_an_older_snapshot_warns_what_comes_back(
+    fleet: tuple[ClusterConfig, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Revoked tokens and devices live in the database; an older one brings them back."""
+    from meridian.backup.pull import save_snapshot
+    from meridian.commands.restore import _open_snapshot
+    from meridian.control.snapshot import encrypt_snapshot
+
+    _cluster, older = fleet
+    opened = _source(older).snapshot
+    assert opened is not None
+    header = opened.header.model_copy(
+        update={"revision": opened.header.revision + 1, "created_at": "2099-01-01T00:00:00Z"}
+    )
+    newer = save_snapshot(encrypt_snapshot(header, opened.files), header)
+
+    _open_snapshot("", recovery_key=False)
+    assert "newer than this snapshot" not in capsys.readouterr().err
+
+    _open_snapshot(str(older), recovery_key=False)
+    assert f"{newer.name} is newer than this snapshot" in capsys.readouterr().err.replace("\n", " ")

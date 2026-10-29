@@ -9,6 +9,7 @@ device can open it, and keep the newest `KEEP` files.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from meridian import config
@@ -18,7 +19,7 @@ from meridian.cluster import ClusterConfig, ControlRestore
 from meridian.cluster_persistence import dump_cluster
 from meridian.control.client import ControlClient, ControlServiceConflict
 from meridian.control.models import DeployerStateDeposit
-from meridian.control.snapshot import KeyPair, SnapshotHeader, decrypt_snapshot, read_header
+from meridian.control.snapshot import KeyPair, SnapshotError, SnapshotHeader, decrypt_snapshot, read_header
 
 KEEP = 5
 SUFFIX = ".snapshot"
@@ -108,6 +109,22 @@ def saved_snapshots() -> list[Path]:
     if not directory.is_dir():
         return []
     return sorted((path for path in directory.iterdir() if path.name.endswith(SUFFIX)), reverse=True)
+
+
+def newer_saved_snapshot(header: SnapshotHeader) -> Path | None:
+    """This context's newest snapshot of the same fleet if it is newer than `header`, else None."""
+
+    def order(item: SnapshotHeader) -> tuple[int, int, datetime]:
+        return item.fleet_epoch, item.revision, datetime.fromisoformat(item.created_at.replace("Z", "+00:00"))
+
+    for path in saved_snapshots():
+        try:
+            saved = read_header(path.read_bytes())
+        except (OSError, SnapshotError):
+            continue
+        if saved.fleet_id == header.fleet_id:
+            return path if order(saved) > order(header) else None
+    return None
 
 
 def _register(client: ControlClient, key: KeyPair, name: str) -> bool:

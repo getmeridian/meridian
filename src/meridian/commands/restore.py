@@ -19,7 +19,7 @@ from rich.markup import escape
 from meridian import config
 from meridian.backup import BackupError
 from meridian.backup.keys import load_device_key, write_private
-from meridian.backup.pull import finished_restore, saved_snapshots
+from meridian.backup.pull import finished_restore, newer_saved_snapshot, saved_snapshots
 from meridian.backup.restore import ControlRestorer, RestoreOutcome, RestoreReview, RestoreSource
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import apply_reviewed_intent, load_cluster, persist_reviewed_apply
@@ -112,9 +112,17 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
             )
         keys = [device.secret]
     try:
-        return RestoreSource(path, decrypt_snapshot(blob, keys))
+        opened = decrypt_snapshot(blob, keys)
     except MeridianError as exc:
         fail(exc)
+    newer = newer_saved_snapshot(opened.header)
+    if newer is not None:
+        warn(
+            f"{newer.name} is newer than this snapshot. The older state brings back API tokens and backup "
+            "devices revoked since, and undoes changes to people made since: revoke them again afterwards "
+            "(meridian backup devices; tokens in the web console)."
+        )
+    return RestoreSource(path, opened)
 
 
 def _read_recovery_key() -> str:
