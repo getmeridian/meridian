@@ -22,6 +22,7 @@ from meridian.cluster import (
     BrandingConfig,
     ClusterConfig,
     ClusterConfigExternallyModifiedError,
+    ControlMigration,
     PanelConfig,
     SubscriptionPageConfig,
     TelegramConfig,
@@ -138,6 +139,9 @@ def _serialize_cluster(cfg: ClusterConfig) -> dict[str, Any]:
         if tg_dict:
             out["telegram"] = tg_dict
 
+    if cfg.control_migration is not None:
+        out["control_migration"] = _serialize_dataclass(cfg.control_migration)
+
     if cfg.connection_page_markers:
         out["connection_page_markers"] = list(cfg.connection_page_markers)
     if cfg.fleet_id:
@@ -250,6 +254,16 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
             _public_fields(TelegramConfig),
         )
 
+    control_migration: ControlMigration | None = None
+    if data.get("control_migration") is not None:
+        raw_migration = data["control_migration"]
+        control_migration = _load_dataclass(
+            raw_migration,
+            ControlMigration,
+            _public_fields(ControlMigration),
+            transforms={"imported_users": lambda value: [str(item) for item in value or []]},
+        )
+
     connection_page_markers = _load_string_list(data, "connection_page_markers")
     raw_fleet_id = data.get("fleet_id")
     fleet_id = raw_fleet_id if isinstance(raw_fleet_id, str) else ""
@@ -271,6 +285,7 @@ def _load_cluster(data: dict[str, Any]) -> ClusterConfig:
         branding=branding,
         subscription_page=subscription_page,
         telegram=telegram,
+        control_migration=control_migration,
         topology_intent=v3.topology_intent,
         workloads=v3.workloads,
         managed_bindings=v3.managed_bindings,
@@ -316,7 +331,7 @@ def _validate_cluster_structure(data: dict[str, Any]) -> None:
 
     for key in ("panel", "branding"):
         _require_mapping(data, key)
-    for key in ("subscription_page", "telegram"):
+    for key in ("subscription_page", "telegram", "control_migration"):
         _require_mapping(data, key, nullable=True)
 
     validate_cluster_v3_structure(data)

@@ -195,6 +195,33 @@ class ResourceAllocation:
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
 
+# `meridian migrate` checkpoints, in order: each names the last step that finished.
+MigrationStep = Literal["started", "backed_up", "imported", "cut_over", "applied", "done"]
+MIGRATION_STEPS: tuple[MigrationStep, ...] = ("started", "backed_up", "imported", "cut_over", "applied", "done")
+
+
+@dataclass
+class ControlMigration:
+    """Progress of moving a Remnawave fleet onto Meridian's own control service (`meridian migrate`).
+
+    A re-run continues after `step`; `done` makes it a no-op. The service token lives
+    here only until the cut-over moves it into `panel.api_token`.
+    """
+
+    step: MigrationStep = "started"
+    started_at: str = ""
+    finished_at: str = ""
+    backup_dir: str = ""  # on the deployer, under the Meridian home
+    server_backup_dir: str = ""  # on the control server; teardown never deletes it
+    service_token: str = field(default="", repr=False)
+    imported_users: list[str] = field(default_factory=list)
+    _extra: dict[str, Any] = field(default_factory=dict, repr=False)
+
+    def reached(self, step: MigrationStep) -> bool:
+        """Whether `step` has finished."""
+        return MIGRATION_STEPS.index(self.step) >= MIGRATION_STEPS.index(step)
+
+
 ActionCheckpointStatus = Literal["pending", "running", "unknown", "succeeded", "failed", "skipped", "cancelled"]
 
 
@@ -230,6 +257,8 @@ class ClusterConfig:
     subscription_page: SubscriptionPageConfig | None = None
     # Telegram notifications (None = not configured, disable in panel)
     telegram: TelegramConfig | None = None
+    # `meridian migrate` checkpoints (None = never started).
+    control_migration: ControlMigration | None = None
     # Workload-scoped topology and durable compiled-resource state.
     topology_intent: SetupIntent | None = None
     workloads: list[WorkloadBinding] = field(default_factory=list)
@@ -388,6 +417,8 @@ class ClusterConfig:
                 errors.append(f"{field_name} is not a SHA-256 hash")
         if self.active_generation < 0 or self.pending_generation < 0:
             errors.append("cluster generations cannot be negative")
+        if self.control_migration is not None and self.control_migration.step not in MIGRATION_STEPS:
+            errors.append(f"control_migration.step is unknown: {self.control_migration.step}")
 
         return errors
 
@@ -420,6 +451,7 @@ class ClusterConfig:
             self.panel.sub_path,
             self.subscription_page.path if self.subscription_page else "",
             self.telegram.bot_token if self.telegram else "",
+            self.control_migration.service_token if self.control_migration else "",
             *(keys.private_key for workload in self.workloads for keys in workload.reality_keys.values()),
             *(allocation.path for allocation in self.allocations.values()),
         ]
