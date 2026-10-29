@@ -1,6 +1,8 @@
 //! The apply engine against a temporary host root, a fake systemctl/xray, and a fake fetcher.
 
 mod common;
+#[path = "apply/readiness.rs"]
+mod readiness;
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
@@ -469,7 +471,13 @@ fn hysteria2_users_change_live_and_config_changes_restart() {
         ["unit:netcore", "users:vless", "xray:config"]
     );
     assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
-    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+    assert!(
+        host.exec
+            .calls()
+            .iter()
+            .all(|c| !c.contains(" api ")
+                || (c.contains(" api statsquery ") && !c.contains("-reset")))
+    );
 }
 
 #[test]
@@ -487,7 +495,13 @@ fn a_stopped_xray_gets_the_new_users_from_its_file() {
 
     let pass = host.apply(&full_document(&[("u-b", UUID_B, "")]));
     assert!(pass.converged);
-    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
+    assert!(
+        host.exec
+            .calls()
+            .iter()
+            .all(|c| !c.contains(" api ")
+                || (c.contains(" api statsquery ") && !c.contains("-reset")))
+    );
     assert!(host.exec.unit("netcore.service").active);
     assert_eq!(clients(&host, 0), json!([{"id": UUID_B, "email": "u-b"}]));
 }
@@ -598,7 +612,7 @@ fn a_rejected_config_keeps_the_old_file_and_blocks_users_and_unit() {
 }
 
 #[test]
-fn a_unit_that_dies_after_start_fails_with_its_journal() {
+fn a_core_that_dies_after_start_fails_without_raw_journal_text() {
     let mut host = Host::new(fetcher());
     host.exec
         .crashing
@@ -619,7 +633,9 @@ fn a_unit_that_dies_after_start_fails_with_its_journal() {
         .unwrap()
         .message;
     assert!(
-        message.contains("address in use") && message.len() <= 400,
+        message.contains("netcore is not running")
+            && !message.contains("address in use")
+            && message.len() <= 300,
         "{message}"
     );
 }

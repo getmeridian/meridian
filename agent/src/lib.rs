@@ -9,6 +9,7 @@
 
 pub mod agent;
 pub mod apply;
+mod backoff;
 pub mod bootstrap;
 pub mod compose;
 pub mod fetch;
@@ -24,8 +25,10 @@ pub mod state;
 pub mod stats;
 pub mod system;
 pub mod timeutil;
+mod unit;
 pub mod verify;
 pub mod xray;
+mod xray_health;
 
 /// The build version (`build.rs`), reported as `agent_version` and `versions.agent`.
 pub const VERSION: &str = env!("NETAGENT_VERSION");

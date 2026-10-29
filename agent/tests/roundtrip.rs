@@ -240,7 +240,9 @@ fn a_converged_document_is_recorded_and_same_content_bumps_only_the_revision() {
     assert!(
         exec.calls()
             .iter()
-            .all(|c| c.starts_with("systemctl is-active")),
+            .all(|c| c.starts_with("systemctl is-active")
+                || c.starts_with("systemctl show")
+                || (c.starts_with("netcore api statsquery") && !c.contains("-reset"))),
         "{:?}",
         exec.calls()
     );

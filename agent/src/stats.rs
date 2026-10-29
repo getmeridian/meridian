@@ -11,6 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::ErrorKind;
 use std::path::Path;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -176,11 +177,38 @@ pub fn query(exec: &dyn Exec, xray: &str, api: &str) -> Result<BTreeMap<String, 
     parse_statsquery(&output.stdout)
 }
 
+/// Check the stats API without resetting counters or retaining command output in errors.
+pub(crate) fn probe(
+    exec: &dyn Exec,
+    xray: &str,
+    api: &str,
+    timeout: Duration,
+) -> Result<(), &'static str> {
+    let server = format!("--server={api}");
+    let output = exec
+        .run_timeout(
+            xray,
+            &["api", "statsquery", &server, "-pattern", "user>>>"],
+            &[],
+            timeout,
+        )
+        .map_err(|_| "Xray API query could not run")?;
+    if !output.success {
+        return Err("Xray API query failed");
+    }
+    parse_statsquery(&output.stdout)
+        .map(|_| ())
+        .map_err(|_| "Xray API returned invalid stats")
+}
+
 /// Parse `statsquery` JSON: `{"stat":[{"name":"user>>>ID>>>traffic>>>uplink","value":N}]}`.
 /// Protobuf JSON writes int64 as a string and omits zero values and an empty list.
 pub fn parse_statsquery(stdout: &str) -> Result<BTreeMap<String, Totals>, String> {
     let parsed: Value = serde_json::from_str(stdout.trim())
         .map_err(|err| format!("statsquery output is not JSON: {err}"))?;
+    if !parsed.is_object() {
+        return Err("statsquery output is not an object".into());
+    }
     let stats = match parsed.get("stat") {
         None | Some(Value::Null) => return Ok(BTreeMap::new()),
         Some(Value::Array(items)) => items,

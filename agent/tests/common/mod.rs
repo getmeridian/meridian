@@ -11,8 +11,8 @@ use std::net::TcpListener;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -101,6 +101,16 @@ pub struct FakeExec {
     pub live_users: Mutex<BTreeSet<String>>,
     /// `xray api statsquery` output (protobuf JSON).
     pub stats_output: Mutex<String>,
+    pub stats_down: Mutex<bool>,
+    pub stats_down_when: Mutex<Option<(PathBuf, String)>>,
+    pub stats_failures: Mutex<usize>,
+    pub stats_restart: Mutex<bool>,
+    pub stats_exit: Mutex<bool>,
+    pub main_pids: Mutex<HashMap<String, u32>>,
+    pub sleeps: Mutex<Vec<Duration>>,
+    pub elapsed: Mutex<Duration>,
+    clock: OnceLock<Instant>,
+    pub timeouts: Mutex<Vec<Duration>>,
 }
 
 impl FakeExec {
@@ -164,6 +174,15 @@ impl Exec for FakeExec {
                     "is-enabled" => fail("disabled\n", ""),
                     "is-active" if unit.active => ok("active\n"),
                     "is-active" => fail("inactive\n", ""),
+                    "show" => {
+                        let pid = if unit.active {
+                            *self.main_pids.lock().unwrap().entry(name).or_insert(42)
+                        } else {
+                            0
+                        };
+                        let state = if unit.active { "active" } else { "inactive" };
+                        ok(&format!("ActiveState={state}\nMainPID={pid}\n"))
+                    }
                     "enable" => {
                         unit.enabled = true;
                         ok("")
@@ -186,6 +205,7 @@ impl Exec for FakeExec {
                                         .is_ok_and(|body| body.contains(text))
                                 });
                         unit.active = !poisoned && !self.crashing.lock().unwrap().contains(&name);
+                        *self.main_pids.lock().unwrap().entry(name).or_insert(41) += 1;
                         ok("")
                     }
                     "stop" if self.stuck.lock().unwrap().contains(&name) => {
@@ -216,15 +236,70 @@ impl Exec for FakeExec {
         }
     }
 
-    fn sleep(&self, _duration: Duration) {}
+    fn sleep(&self, duration: Duration) {
+        self.sleeps.lock().unwrap().push(duration);
+        *self.elapsed.lock().unwrap() += duration;
+    }
+
+    fn now(&self) -> Instant {
+        *self.clock.get_or_init(Instant::now) + *self.elapsed.lock().unwrap()
+    }
+
+    fn run_timeout(
+        &self,
+        program: &str,
+        args: &[&str],
+        env: &[(&str, &str)],
+        timeout: Duration,
+    ) -> io::Result<CmdOutput> {
+        self.timeouts.lock().unwrap().push(timeout);
+        self.run(program, args, env)
+    }
 }
 
 impl FakeExec {
     fn xray_api(&self, args: &[&str]) -> io::Result<CmdOutput> {
         assert_eq!(args[2], "--server=127.0.0.1:10085");
         if args[1] == "statsquery" {
-            assert_eq!(&args[3..], ["-pattern", "user>>>", "-reset"]);
-            let output = std::mem::take(&mut *self.stats_output.lock().unwrap());
+            assert!(matches!(
+                &args[3..],
+                ["-pattern", "user>>>"] | ["-pattern", "user>>>", "-reset"]
+            ));
+            if std::mem::take(&mut *self.stats_restart.lock().unwrap()) {
+                *self
+                    .main_pids
+                    .lock()
+                    .unwrap()
+                    .entry("netcore.service".into())
+                    .or_insert(42) += 1;
+            }
+            if std::mem::take(&mut *self.stats_exit.lock().unwrap()) {
+                self.units
+                    .lock()
+                    .unwrap()
+                    .entry("netcore.service".into())
+                    .or_default()
+                    .active = false;
+            }
+            let poisoned =
+                self.stats_down_when
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .is_some_and(|(path, text)| {
+                        std::fs::read_to_string(path).is_ok_and(|body| body.contains(text))
+                    });
+            let mut failures = self.stats_failures.lock().unwrap();
+            if *self.stats_down.lock().unwrap() || poisoned || *failures > 0 {
+                *failures = failures.saturating_sub(1);
+                return fail("", "stats query failed: secret-canary\n");
+            }
+            let mut output = self.stats_output.lock().unwrap();
+            let output = if args.contains(&"-reset") {
+                std::mem::take(&mut *output)
+            } else {
+                output.clone()
+            };
             return ok(if output.is_empty() { "{}" } else { &output });
         }
         if *self.api_down.lock().unwrap() {

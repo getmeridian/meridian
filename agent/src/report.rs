@@ -17,7 +17,9 @@ pub fn health(
     resources: &[Resource],
     observations: &[ResourceObservation],
 ) -> NodeHealth {
-    let mut checks = Vec::new();
+    let mut checks: Vec<_> = crate::xray_health::api_check(root, exec, resources)
+        .into_iter()
+        .collect();
     for resource in resources {
         let Spec::Unit(unit) = &resource.spec else {
             continue;

@@ -27,7 +27,7 @@
 - **Fold traffic before dialing the service** — `send_stats` once connected first, so an outage left hours of counters in Xray, lost on any core restart.
 - **`statsquery` is protobuf JSON** — int64 values arrive as strings; zeros and empty lists are omitted.
 - **A restart is owed until it succeeds** — content on disk that the saved ledger does not record (a crash before the save) counts as changed, and a unit that did not finish keeps a null `installed_sha256`, so the next pass restarts it; matching bytes alone once left Xray on its old config.
-- **Passing `run -test` is not starting** — a taken port fails only at start, so a replaced file, binary, or config keeps a hard-linked `.netagent-prev` for one pass, and a unit that will not (re)start gets its `restart_on` versions back and restarts on them.
+- **Passing `run -test` or `is-active` is not readiness** — after a netcore start/restart, bound read-only `statsquery` probes to 10 s, abort on exit/MainPID change, and restore hard-linked `.netagent-prev` artifacts through `restart_on`; probes never reset traffic or expose raw output. Reports sample `xray.api` independently.
 - **A retirement counts only once nothing runs** — `stop`'s exit code says little (the unit may be gone), so check `is-active` before deleting the file; an entry that failed to retire keeps the document unconverged.
 - **Save a document before holding or applying it** — applying an unsaved one let a restart reconcile the older cached document and bring revoked users back; a failed save refuses it.
 - **Save credentials before nulling the token** — after a crash in between, `enrollment_token_invalid` falls back to the stored credentials.

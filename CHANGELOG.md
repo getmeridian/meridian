@@ -82,6 +82,8 @@ that dials out to it.
   stays on the tested version or what you already upgraded to.
 
 ### Fixed
+- Core starts and restarts now wait for the Xray API and restore the previous
+  configuration if readiness fails; node health reports API failures.
 - An exit whose first apply failed is now cleaned up when you remove it: its
   agent and firewall rules no longer stay behind, and `--forget-unreachable`
   forgets them when the server is already gone.

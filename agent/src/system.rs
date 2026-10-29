@@ -17,7 +17,23 @@ pub trait Exec {
     /// Run a program to completion and capture its output.
     fn run(&self, program: &str, args: &[&str], env: &[(&str, &str)]) -> io::Result<CmdOutput>;
 
-    /// Pause between starting a service and checking it is still active.
+    /// A shorter command deadline for local readiness probes. Test hosts can use `run`.
+    fn run_timeout(
+        &self,
+        program: &str,
+        args: &[&str],
+        env: &[(&str, &str)],
+        _timeout: Duration,
+    ) -> io::Result<CmdOutput> {
+        self.run(program, args, env)
+    }
+
+    /// The monotonic clock used for readiness and collection freshness.
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    /// Pause between local probes.
     fn sleep(&self, duration: Duration) {
         std::thread::sleep(duration);
     }
@@ -29,6 +45,16 @@ pub struct RealExec;
 impl Exec for RealExec {
     fn run(&self, program: &str, args: &[&str], env: &[(&str, &str)]) -> io::Result<CmdOutput> {
         run_with_timeout(program, args, env, COMMAND_TIMEOUT)
+    }
+
+    fn run_timeout(
+        &self,
+        program: &str,
+        args: &[&str],
+        env: &[(&str, &str)],
+        timeout: Duration,
+    ) -> io::Result<CmdOutput> {
+        run_with_timeout(program, args, env, timeout)
     }
 }
 

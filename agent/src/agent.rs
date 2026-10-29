@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -11,7 +11,6 @@ use ureq::tls::RootCerts;
 use crate::apply::Engine;
 use crate::bootstrap::Bootstrap;
 use crate::fetch::{Client, HttpError, load_roots};
-use crate::fsutil::host_path;
 use crate::identity::Identity;
 use crate::model::{
     NodeStateRef, ObservedStateReport, PROTOCOL, PollRequest, PollResponse, ReportAck, Resource,
@@ -29,7 +28,8 @@ use crate::{debug, info, report};
 pub const REPORT_INTERVAL: Duration = Duration::from_secs(60);
 /// Drift re-check and retry of failed resources between new documents.
 pub const RECONCILE_INTERVAL: Duration = Duration::from_secs(300);
-const MAX_BACKOFF: Duration = Duration::from_secs(60);
+pub use crate::backoff::Backoff;
+use crate::backoff::MAX_BACKOFF;
 /// After `unsupported_protocol`, say hello again no sooner than this (or the service's
 /// `retry_after_seconds`, if longer): only a matching agent or service can fix it.
 pub const PROTOCOL_REFUSED_BACKOFF: Duration = Duration::from_secs(300);
@@ -501,19 +501,8 @@ impl<'a> Agent<'a> {
 
     /// The installed Xray binary and its API address, once the held document names both.
     fn xray_api(&self) -> Option<(String, String)> {
-        let binary = self.resources.iter().find_map(|r| match &r.spec {
-            Spec::BinaryPin(pin) if pin.name == "xray" => {
-                Some(host_path(&self.opts.root, &pin.install_path))
-            }
-            _ => None,
-        })?;
-        let api = self.resources.iter().find_map(|r| match &r.spec {
-            Spec::XrayConfig(config) => Some(config.api_address.clone()),
-            _ => None,
-        })?;
-        binary
-            .is_file()
-            .then(|| (binary.to_string_lossy().into_owned(), api))
+        crate::xray_health::api(&self.opts.root, &self.resources)
+            .map(|(binary, address)| (binary, address.to_string()))
     }
 
     fn managed_users(&self) -> BTreeSet<String> {
@@ -766,65 +755,4 @@ enum Accepted {
     Recorded,
     Nothing,
     Refused,
-}
-
-/// Exponential backoff with jitter: 1 s doubling to 60 s, never below `retry_after_seconds`.
-pub struct Backoff {
-    attempt: u32,
-    seed: u64,
-}
-
-impl Default for Backoff {
-    fn default() -> Self {
-        Backoff::new()
-    }
-}
-
-impl Backoff {
-    pub fn new() -> Backoff {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0x9e37_79b9_7f4a_7c15)
-            | 1;
-        Backoff { attempt: 0, seed }
-    }
-
-    pub fn reset(&mut self) {
-        self.attempt = 0;
-    }
-
-    pub fn next(&mut self, retry_after: Option<u64>) -> Duration {
-        let ceiling_ms = 1000u64
-            .saturating_mul(1 << self.attempt.min(6))
-            .min(MAX_BACKOFF.as_millis() as u64);
-        self.attempt = self.attempt.saturating_add(1);
-        // xorshift64: jitter only, not security.
-        self.seed ^= self.seed << 13;
-        self.seed ^= self.seed >> 7;
-        self.seed ^= self.seed << 17;
-        let jittered = ceiling_ms / 2 + self.seed % (ceiling_ms / 2 + 1);
-        let floor_ms = retry_after.unwrap_or(0).min(86_400) * 1000;
-        Duration::from_millis(jittered.max(floor_ms))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Backoff;
-    use std::time::Duration;
-
-    #[test]
-    fn backoff_doubles_to_sixty_seconds_with_jitter_and_honours_retry_after() {
-        let mut backoff = Backoff::new();
-        let first = backoff.next(None);
-        assert!(first >= Duration::from_millis(500) && first <= Duration::from_secs(1));
-        for _ in 0..10 {
-            assert!(backoff.next(None) <= Duration::from_secs(60));
-        }
-        assert!(backoff.next(None) >= Duration::from_secs(30));
-        assert_eq!(backoff.next(Some(120)), Duration::from_secs(120));
-        backoff.reset();
-        assert!(backoff.next(None) <= Duration::from_secs(1));
-    }
 }
