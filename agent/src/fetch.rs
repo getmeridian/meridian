@@ -1,12 +1,14 @@
 //! HTTP: the control-service client (enroll, hello, session endpoints, blobs) and artifact downloads.
 
 use std::io::{self, Write};
+use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use ureq::tls::{PemItem, RootCerts, TlsConfig};
 
 /// Largest JSON body the agent accepts (the contract's `max_response_bytes`).
 pub const MAX_RESPONSE_BYTES: u64 = 32 * 1024 * 1024;
@@ -63,6 +65,27 @@ impl std::fmt::Display for HttpError {
     }
 }
 
+/// The CA certificates in `path` (PEM), trusted instead of the WebPKI roots.
+///
+/// For a control server whose certificate comes from a private ACME CA (the system lab's
+/// Pebble); production units never set `NETAGENT_TLS_CA_FILE`.
+pub fn load_roots(path: &Path) -> Result<RootCerts, String> {
+    let pem = std::fs::read(path)
+        .map_err(|err| format!("cannot read CA file {}: {err}", path.display()))?;
+    let mut certs = Vec::new();
+    for item in ureq::tls::parse_pem(&pem) {
+        match item {
+            Ok(PemItem::Certificate(cert)) => certs.push(cert),
+            Ok(_) => {}
+            Err(err) => return Err(format!("CA file {} is not PEM: {err}", path.display())),
+        }
+    }
+    if certs.is_empty() {
+        return Err(format!("CA file {} holds no certificate", path.display()));
+    }
+    Ok(RootCerts::new_with_certs(&certs))
+}
+
 /// Talks to `{service_url}/agent/v1/...`; session endpoints carry the session bearer token.
 pub struct Client {
     agent: ureq::Agent,
@@ -74,9 +97,14 @@ pub struct Client {
 
 impl Client {
     /// `allow_http` exists for tests; production requires https everywhere. TLS is verified
-    /// against the WebPKI roots (the control server serves a Let's Encrypt certificate).
-    pub fn new(service_url: &str, allow_http: bool) -> Client {
-        let agent = ureq::Agent::config_builder()
+    /// against the WebPKI roots (the control server serves a Let's Encrypt certificate),
+    /// or only against `roots` when the unit names a private CA (`load_roots`).
+    pub fn new(service_url: &str, allow_http: bool, roots: Option<RootCerts>) -> Client {
+        let mut config = ureq::Agent::config_builder();
+        if let Some(roots) = roots {
+            config = config.tls_config(TlsConfig::builder().root_certs(roots).build());
+        }
+        let agent = config
             .http_status_as_error(false)
             .https_only(!allow_http)
             .timeout_connect(Some(Duration::from_secs(10)))

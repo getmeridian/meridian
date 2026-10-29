@@ -92,6 +92,7 @@ impl Node {
             allow_http: true,
             settle: Duration::ZERO,
             wait_seconds: 0,
+            tls_ca_file: None,
         }
     }
 }

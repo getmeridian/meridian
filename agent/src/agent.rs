@@ -6,10 +6,11 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use ureq::tls::RootCerts;
 
 use crate::apply::Engine;
 use crate::bootstrap::Bootstrap;
-use crate::fetch::{Client, HttpError};
+use crate::fetch::{Client, HttpError, load_roots};
 use crate::fsutil::host_path;
 use crate::identity::Identity;
 use crate::model::{
@@ -44,6 +45,8 @@ pub struct Options {
     pub settle: Duration,
     /// Longest poll the agent asks for; the session's `max_wait_seconds` caps it.
     pub wait_seconds: u64,
+    /// A private CA trusted instead of the WebPKI roots (`NETAGENT_TLS_CA_FILE`).
+    pub tls_ca_file: Option<PathBuf>,
 }
 
 impl Options {
@@ -55,6 +58,7 @@ impl Options {
             allow_http: false,
             settle: Duration::from_secs(2),
             wait_seconds: 55,
+            tls_ca_file: None,
         }
     }
 }
@@ -85,6 +89,7 @@ pub struct Agent<'a> {
     /// The service refused this agent's protocol; no hello is sent before this instant.
     protocol_refused_until: Option<Instant>,
     traffic: TrafficStore,
+    roots: Option<RootCerts>,
     exec: &'a dyn Exec,
     opts: Options,
     resources: Vec<Resource>,
@@ -139,7 +144,8 @@ impl<'a> Agent<'a> {
             now_unix(),
         )?;
         let traffic = TrafficStore::load(&opts.state_dir)?;
-        let client = Client::new(&bootstrap.service_url, opts.allow_http);
+        let roots = opts.tls_ca_file.as_deref().map(load_roots).transpose()?;
+        let client = Client::new(&bootstrap.service_url, opts.allow_http, roots.clone());
         let mut agent = Agent {
             bootstrap,
             state,
@@ -150,6 +156,7 @@ impl<'a> Agent<'a> {
             revoked: false,
             protocol_refused_until: None,
             traffic,
+            roots,
             exec,
             opts,
             resources: Vec::new(),
@@ -320,7 +327,7 @@ impl<'a> Agent<'a> {
             }
         };
         if fresh.service_url != self.bootstrap.service_url {
-            self.client = Client::new(&fresh.service_url, self.opts.allow_http);
+            self.client = Client::new(&fresh.service_url, self.opts.allow_http, self.roots.clone());
         }
         let identity = Identity::load(
             &self.opts.state_dir,

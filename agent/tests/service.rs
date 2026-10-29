@@ -95,6 +95,7 @@ fn the_rust_agent_enrolls_applies_and_counts_traffic_against_the_python_service(
         allow_http: true,
         settle: Duration::ZERO,
         wait_seconds: 0,
+        tls_ca_file: None,
     };
     let mut agent = Agent::new(options, &exec).unwrap();
     let outcome = agent.poll_once().unwrap();

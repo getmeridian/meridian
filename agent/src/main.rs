@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use meridian_agent::agent::{Agent, Options};
+use meridian_agent::fetch::load_roots;
 use meridian_agent::selfcheck::self_check;
 use meridian_agent::system::RealExec;
 use meridian_agent::{VERSION, info, log};
@@ -54,11 +55,20 @@ fn parse_run(args: &[String]) -> Result<Options, String> {
     if std::env::var_os("NETAGENT_DEBUG").is_some_and(|v| v == "1") {
         log::set_debug(true);
     }
+    opts.tls_ca_file = std::env::var_os("NETAGENT_TLS_CA_FILE")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from);
     Ok(opts)
 }
 
 /// Print one JSON line when this build can take over the node's files; exit 1 when it cannot.
 fn check(opts: &Options) -> ExitCode {
+    if let Some(path) = &opts.tls_ca_file
+        && let Err(err) = load_roots(path)
+    {
+        eprintln!("netagent: {err}");
+        return ExitCode::from(1);
+    }
     match self_check(&opts.bootstrap, &opts.state_dir, opts.allow_http) {
         Ok(report) => {
             println!("{report}");
