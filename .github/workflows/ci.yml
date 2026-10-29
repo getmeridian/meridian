@@ -161,6 +161,35 @@ jobs:
       - name: Shellcheck
         run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
 
+  # The node agent's own suite, including the round trip against the real Python
+  # control service (tests/service.rs), which needs uv and the package installed.
+  agent:
+    name: Agent
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install package with dev dependencies
+        working-directory: .
+        run: uv sync --extra dev
+
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked
+
   # System Lab costs ~15 minutes of nested Docker, so it runs only when a change can
   # alter what a real deploy does: runtime code, the lab itself, dependencies, or CI.
   # Docs, website, contracts, and other tests skip it; a manual dispatch always runs it.
