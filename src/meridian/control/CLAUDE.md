@@ -29,6 +29,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored; so is one whose `access` block is malformed (the console reads `access.users` on every person screen, and a `null` there broke them all).
 
 ## Pitfalls
+- ClientEndpoint strips one matching pair of IPv6 brackets at the API boundary; structured server addresses stay bare, and only URI authorities add brackets.
 - Enforcement and subscription refill dates share control.periods UTC boundaries: weeks start Monday, and months advance by calendar month rather than a fixed number of days.
 - Empty supported endpoint sets use inert availability placeholders in all four locales, with existing status notices taking priority; filter Stash XHTTP and sing-box XHTTP/copies before checking availability.
 - Allocate unique presentation names before filtering endpoints, reserving generated groups and direct/reject labels; preserve original suffix-shaped remarks and use the same names in proxies, tags, and copy exclusions.

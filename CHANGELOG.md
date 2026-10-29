@@ -128,6 +128,8 @@ that dials out to it.
   minutes without a successful query, while stored totals keep being sent.
 - Core starts and restarts now wait for the Xray API and restore the previous
   configuration if readiness fails; node health reports API failures.
+- API-created IPv6 endpoints accept one pair of brackets, keep server addresses bare
+  in structured formats, and produce share links with exactly one pair of brackets.
 - Empty or unsupported-only subscriptions now show inert “No connections available
   yet” entries in English, Russian, Persian, and Chinese instead of empty documents.
 - Duplicate connection names and names matching automatic groups now receive

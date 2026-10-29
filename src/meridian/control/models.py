@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BeforeValidator, Field, model_validator
+from pydantic import BeforeValidator, Field, field_validator, model_validator
 
 from meridian.core.agent_desired import AgentResource
 from meridian.core.agent_types import (
@@ -27,6 +27,7 @@ from meridian.core.agent_types import (
     Version,
 )
 from meridian.core.client_devices import ClientDevicesResult
+from meridian.core.inputs import validate_ip_address_value
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind
 
@@ -122,6 +123,15 @@ class ClientEndpoint(CoreModel):
         description="Another fingerprint of an entry listed before it: Base64 and Mihomo list it, failover groups "
         "skip it, Xray JSON gives copies their own Automatic config, and sing-box omits it.",
     )
+
+    @field_validator("address")
+    @classmethod
+    def bare_ipv6_address(cls, address: str) -> str:
+        if "[" not in address and "]" not in address:
+            return address
+        if not address.startswith("[") or not address.endswith("]") or ":" not in address:
+            raise ValueError("Enter a valid IPv6 address, with optional brackets.")
+        return validate_ip_address_value(address[1:-1])
 
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
