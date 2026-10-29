@@ -61,6 +61,13 @@ def test_every_request_carries_the_csrf_header() -> None:
             assert "fetch(" not in source, f"{name} calls fetch directly instead of M.api"
 
 
+def test_the_console_never_calls_a_cli_only_route() -> None:
+    """`server.MACHINE_ONLY` refuses an owner session there, so a screen that called one would always fail."""
+    for name, source in JS.items():
+        for route in ("api/backup/", "/enrollment", "api/import/"):
+            assert route not in source, f"{name} calls {route}"
+
+
 def test_setup_token_is_stripped_from_the_address_bar() -> None:
     assert "history.replaceState(null" in JS["auth.js"]
 

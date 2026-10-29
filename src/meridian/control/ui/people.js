@@ -10,7 +10,7 @@
 
   M.displayName = function (username) {
     var names = (M.state.fleet && M.state.fleet.display_names) || {};
-    return names[username] || username;
+    return M.has(names, username) && names[username] ? String(names[username]) : username;
   };
 
   M.isDeclared = function (username) {
@@ -88,10 +88,14 @@
       search,
       list,
     ]);
-    M.api("GET", "api/users").then(function (data) {
-      users = data.users || [];
-      draw();
-    }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
+    // The fleet view comes again with the list: who is declared changes whenever the deployer applies.
+    Promise.all([M.api("GET", "api/users"), M.api("GET", "ui/api/fleet").then(function (fleet) {
+      M.state.fleet = fleet;
+    }, function () { /* keep the last fleet view; the person screen and the service decide */ })])
+      .then(function (results) {
+        users = results[0].users || [];
+        draw();
+      }, function (e) { M.mount(list, h("div", { class: "notice notice-err", text: M.errorText(e) })); });
   };
 
   /* Limits as a form block, shared by "add" and the person screen. */
@@ -162,7 +166,8 @@
           }).then(function () {
             var change = limits.value();
             if (expiry.value) change.expire_at = M.endOfDay(expiry.value);
-            if (!change.traffic_limit_bytes && !change.expire_at) return null;
+            var defaults = !change.traffic_limit_bytes && change.traffic_limit_strategy === "no_reset";
+            if (defaults && !change.expire_at) return null; // what a new person starts with already
             return M.api("PATCH", "api/users/" + encodeURIComponent(username), change);
           });
         }).then(function () {

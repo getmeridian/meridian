@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from meridian.control.backups import NOT_SNAPSHOTTED
+from meridian.control.backups import strip_unsnapshotted
 from meridian.control.errors import ServiceError
 from meridian.control.models import DeployerState
 from meridian.control.service import ControlService
@@ -64,8 +64,7 @@ def stage_restored_database(
             with store.transaction():
                 epoch = store.fleet_epoch + 1
                 store.set_meta("fleet_epoch", str(epoch))
-                for statement in NOT_SNAPSHOTTED:
-                    store.db.execute(statement)
+                strip_unsnapshotted(store.db)  # before migrations: an older snapshot lacks newer tables
                 store.db.execute(
                     "UPDATE node_certificates SET revoked_at = ? WHERE revoked_at IS NULL", (int(clock()),)
                 )

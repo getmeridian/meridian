@@ -100,7 +100,6 @@ class UiRequest(Protocol):
 
     command: str
     headers: Message
-    client_address: Any
     caller: Caller | None
     owner_session: OwnerSession | None
 
@@ -143,11 +142,6 @@ def owner_session(request: UiRequest) -> OwnerSession:
     session = request.ui.service.owner.authenticate(session_token(request.headers))
     request.owner_session = session
     return session
-
-
-def source(request: UiRequest) -> str:
-    """The peer the guess limiter keys on: always nginx's loopback today, never a header a client can set."""
-    return str(request.client_address[0]) if request.client_address else ""
 
 
 def passkey_state(headers: Message) -> PasskeyState:
@@ -250,8 +244,9 @@ def auth_state(request: UiRequest, _match: re.Match[str]) -> None:
 
 def check_setup_link(request: UiRequest, _match: re.Match[str]) -> None:
     require_same_origin(request)
+    _require_configured(request.ui)  # before the form: completing it would be refused anyway
     body: SetupLinkCheck = _body(request, SetupLinkCheck)
-    purpose = request.ui.service.owner.check_setup_link(body.token, source=source(request))
+    purpose = request.ui.service.owner.check_setup_link(body.token)
     _send_json(request, {"purpose": purpose})
 
 
@@ -259,7 +254,7 @@ def complete_setup(request: UiRequest, _match: re.Match[str]) -> None:
     require_same_origin(request)
     _require_configured(request.ui)
     body: SetupCompletion = _body(request, SetupCompletion)
-    session = request.ui.service.owner.complete_setup(body.token, body.password, source=source(request))
+    session = request.ui.service.owner.complete_setup(body.token, body.password)
     _send_json(request, {"signed_in": True}, cookie=_session_cookie(request.ui, session.token))
 
 
@@ -267,7 +262,7 @@ def login(request: UiRequest, _match: re.Match[str]) -> None:
     require_same_origin(request)
     _require_configured(request.ui)
     body: LoginRequest = _body(request, LoginRequest)
-    session = request.ui.service.owner.login(body.password, body.code, source=source(request))
+    session = request.ui.service.owner.login(body.password, body.code)
     _send_json(request, {"signed_in": True}, cookie=_session_cookie(request.ui, session.token))
 
 
@@ -283,7 +278,7 @@ def logout(request: UiRequest, _match: re.Match[str]) -> None:
 def confirm(request: UiRequest, _match: re.Match[str]) -> None:
     session = owner_session(request)
     body: LoginRequest = _body(request, LoginRequest)
-    request.ui.service.owner.confirm(session, body.password, body.code, source=source(request))
+    request.ui.service.owner.confirm(session, body.password, body.code)
     _send_json(request, {"confirmed": True})
 
 
@@ -314,7 +309,7 @@ def begin_totp(request: UiRequest, _match: re.Match[str]) -> None:
 def enable_totp(request: UiRequest, _match: re.Match[str]) -> None:
     session = owner_session(request)
     body: TotpCode = _body(request, TotpCode)
-    request.ui.service.owner.enable_totp(session, body.code, source=source(request))
+    request.ui.service.owner.enable_totp(session, body.code)
     _send_json(request, {"totp_enabled": True})
 
 

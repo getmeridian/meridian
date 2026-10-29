@@ -54,6 +54,7 @@ from meridian.control.service import ControlService
 from meridian.control.times import utc_now
 from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
 from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
+from meridian.control.ui_views import is_declared
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
 
@@ -136,8 +137,10 @@ class _Handler(BaseHTTPRequestHandler):
                 if match and route_method == method:
                     if scope is not None:
                         self.caller = self._authorize(scope)
-                        if self.owner_session is not None and handler in OWNER_STEP_UP:
-                            self._service.owner.require_recent(self.owner_session)
+                        if self.owner_session is not None:
+                            _owner_may(handler)
+                            if handler in OWNER_STEP_UP:
+                                self._service.owner.require_recent(self.owner_session)
                     result = handler(self, match)
                     if result is not None:
                         self._json(200, result)
@@ -321,14 +324,27 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.update_user(match[1], self._model(UserUpdate))
 
     def reissue_user(self, match: re.Match[str]) -> Any:
+        self._refuse_declared(match[1], "meridian client reissue")
         return self._service.reissue_user(match[1])
 
     def reset_user_traffic(self, match: re.Match[str]) -> Any:
         return self._service.reset_user_traffic(match[1])
 
     def delete_user(self, match: re.Match[str]) -> Any:
+        self._refuse_declared(match[1], "meridian client remove")
         self._service.delete_user(match[1])
         return {"deleted": match[1]}
+
+    def _refuse_declared(self, username: str, command: str) -> None:
+        """A person the deployer declared is the CLI's to remove or relink: only it moves their connection page.
+
+        An API token (the CLI itself, or a script acting for the deployer) stays allowed;
+        the web owner is told the command instead.
+        """
+        if self.owner_session is not None and is_declared(self._service, username):
+            raise ServiceError(
+                "declared_user", f"The fleet file declares {username}; run `{command} {username}` instead.", 409
+            )
 
     def get_endpoint(self, match: re.Match[str]) -> Any:
         endpoint = self._service.get_endpoint(match[1])
@@ -524,6 +540,29 @@ ROUTES: list[Route] = [
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
 # What a web owner may do only after confirming their password again within minutes: mint a credential.
 OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token})
+# Routes only the deployer's CLI (or an API token) calls, never the console: credentials an agent or
+# a backup device holds, users imported with their credentials, and snapshots that carry every one.
+# An owner session is refused outright, step-up or not, so a borrowed browser cannot reach them.
+MACHINE_ONLY: frozenset[Callable[..., Any]] = frozenset(
+    {
+        _Handler.grant_enrollment,
+        _Handler.import_users,
+        _Handler.list_device_keys,
+        _Handler.register_device_key,
+        _Handler.revoke_device_key,
+        _Handler.get_recovery_key,
+        _Handler.put_recovery_key,
+        _Handler.deposit_deployer_state,
+        _Handler.snapshot,
+    }
+)
+
+
+def _owner_may(handler: Callable[..., Any]) -> None:
+    if handler in MACHINE_ONLY:
+        raise ServiceError(
+            "insufficient_scope", "Only the meridian CLI or an API token does this; the console never needs it.", 403
+        )
 
 
 def _validation_message(exc: ValidationError) -> str:

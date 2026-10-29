@@ -10,7 +10,8 @@
   after sign-in, whichever comes first. Sensitive changes need the password (and
   code) again within `CONFIRM_SECONDS` (`require_recent`).
 - **No addresses** — sessions keep only times; guess limits live in memory
-  (`login_limits.py`).
+  (`login_limits.py`), per bucket: sign-in, setup links, and each session's own
+  password or code re-checks, so failures at one never lock another.
 
 Times in these tables are integer epoch seconds (session arithmetic, not protocol
 timestamps). Every table is `ui_*`: snapshots must leave them out, and a restored
@@ -24,7 +25,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeVar
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
@@ -44,14 +45,16 @@ from meridian.control.times import format_timestamp
 from meridian.control.tokens import unauthenticated
 from meridian.control.ui_models import SessionInfo, SessionList
 
+T = TypeVar("T")
 SETUP_LINK_SECONDS = 15 * 60
 IDLE_SECONDS = 30 * 60
 ABSOLUTE_SECONDS = 12 * 60 * 60
 CONFIRM_SECONDS = 5 * 60
 TOUCH_RESOLUTION_SECONDS = 60
 MAX_SESSIONS = 10
-OWNER_ACCOUNT = "owner"
-SETUP_ACCOUNT = "setup-link"
+# Guess-limit buckets (`login_limits.py`): sign-in, setup links, and each session's own re-checks.
+OWNER_BUCKET = "owner"
+SETUP_BUCKET = "setup-link"
 TOTP_ISSUER = "Meridian"
 
 UI_OWNER_TABLE = """CREATE TABLE IF NOT EXISTS ui_owner (
@@ -135,18 +138,18 @@ class OwnerAuth:
             )
         return SetupLinkGrant(token=token, purpose=purpose, expires_at=format_timestamp(now + SETUP_LINK_SECONDS))
 
-    def check_setup_link(self, token: str, *, source: str) -> str:
+    def check_setup_link(self, token: str) -> str:
         """The purpose of a live link, without spending it."""
-        self.limiter.check(SETUP_ACCOUNT, source)
-        row = self._live_link(token)
-        if row is None:
-            self.limiter.failed(SETUP_ACCOUNT, source)
-            raise _dead_link()
+        with self.limiter.turn(SETUP_BUCKET):
+            row = self._live_link(token)
+            if row is None:
+                self.limiter.failed(SETUP_BUCKET)
+                raise _dead_link()
         return str(row["purpose"])
 
-    def complete_setup(self, token: str, password: str, *, source: str) -> OwnerSession:
+    def complete_setup(self, token: str, password: str) -> OwnerSession:
         """Spend the link: set the password (a reset also turns TOTP off and ends every session) and sign in."""
-        self.check_setup_link(token, source=source)  # cheap refusal before the slow hash
+        self.check_setup_link(token)  # cheap refusal before the slow hash
         try:
             check_password_policy(password)
         except PasswordPolicyError as exc:
@@ -156,7 +159,7 @@ class OwnerAuth:
         with self._store.transaction():
             row = self._live_link(token)
             if row is None:
-                self.limiter.failed(SETUP_ACCOUNT, source)
+                self.limiter.failed(SETUP_BUCKET)
                 raise _dead_link()
             exists = self._owner() is not None
             if row["purpose"] == "setup" and exists:
@@ -171,43 +174,53 @@ class OwnerAuth:
             )
             self._store.db.execute("DELETE FROM ui_sessions")
             session = self._new_session(now)
-        self.limiter.succeeded(SETUP_ACCOUNT, source)
+        self.limiter.succeeded(SETUP_BUCKET)
         return session
 
     # -- sign-in -----------------------------------------------------------------------
 
-    def login(self, password: str, code: str, *, source: str) -> OwnerSession:
-        self._verify(password, code, source=source)
-        with self._store.transaction():
-            return self._new_session(self._now())
+    def login(self, password: str, code: str) -> OwnerSession:
+        return self._verify(password, code, bucket=OWNER_BUCKET, then=self._new_session)
 
-    def confirm(self, session: OwnerSession, password: str, code: str, *, source: str) -> None:
+    def confirm(self, session: OwnerSession, password: str, code: str) -> None:
         """Prove the owner is still at the keyboard; sensitive changes need it within `CONFIRM_SECONDS`."""
-        self._verify(password, code, source=source)
-        with self._store.transaction():
-            self._store.db.execute(
-                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ?", (self._now(), session.session_id)
-            )
 
-    def _verify(self, password: str, code: str, *, source: str) -> None:
-        """Check password and code together; any failure counts once and reads the same."""
-        self.limiter.check(OWNER_ACCOUNT, source)
-        row = self._owner()
-        if row is None:
-            raise ServiceError("setup_required", "The web UI has no owner yet; run `meridian panel`.", 409)
-        password_ok = verify_password(password, str(row["password_hash"]))
-        with self._store.transaction():
-            owner = self._owner()
-            secret = owner["totp_secret"] if owner is not None else None
-            step = None
-            if owner is not None and secret:
-                step = totp_match(str(secret), code, now=self._clock(), last_step=owner["totp_last_step"])
-            if not password_ok or (secret and step is None):
-                self.limiter.failed(OWNER_ACCOUNT, source)
-                raise wrong_credentials()
-            if step is not None:
-                self._store.db.execute("UPDATE ui_owner SET totp_last_step = ? WHERE id = 1", (step,))
-        self.limiter.succeeded(OWNER_ACCOUNT, source)
+        def mark(now: int) -> None:
+            cursor = self._store.db.execute(
+                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ?", (now, session.session_id)
+            )
+            if cursor.rowcount != 1:
+                raise unauthenticated()  # signed out (or reset) while the password hashed
+
+        self._verify(password, code, bucket=session_bucket(session), then=mark)
+
+    def _verify(self, password: str, code: str, *, bucket: str, then: Callable[[int], T]) -> T:
+        """Check password and code together and, in the same transaction, run `then`; any failure reads the same.
+
+        The hash runs outside the store lock, so the transaction also checks that the
+        password it was compared with is still the owner's: a reset or change that
+        landed meanwhile must not let the old password open a session.
+        """
+        with self.limiter.turn(bucket):
+            row = self._owner()
+            if row is None:
+                raise ServiceError("setup_required", "The web UI has no owner yet; run `meridian panel`.", 409)
+            password_ok = verify_password(password, str(row["password_hash"]))
+            with self._store.transaction():
+                owner = self._owner()
+                current = owner is not None and owner["password_hash"] == row["password_hash"]
+                secret = owner["totp_secret"] if owner is not None else None
+                step = None
+                if owner is not None and secret:
+                    step = totp_match(str(secret), code, now=self._clock(), last_step=owner["totp_last_step"])
+                if not (password_ok and current) or (secret and step is None):
+                    self.limiter.failed(bucket)
+                    raise wrong_credentials()
+                if step is not None:
+                    self._store.db.execute("UPDATE ui_owner SET totp_last_step = ? WHERE id = 1", (step,))
+                result = then(self._now())
+            self.limiter.succeeded(bucket)
+        return result
 
     # -- sessions ----------------------------------------------------------------------
 
@@ -267,7 +280,20 @@ class OwnerAuth:
     def require_recent(self, session: OwnerSession) -> None:
         """Refuse a sensitive change unless the owner confirmed their password within `CONFIRM_SECONDS`."""
         if self._now() - session.confirmed_at > CONFIRM_SECONDS:
-            raise ServiceError("reauth_required", "Confirm your password to continue.", 403)
+            raise _reauth_required()
+
+    def _hold_recent(self, session: OwnerSession) -> None:
+        """Inside the change's transaction: the session still exists and was confirmed recently.
+
+        `require_recent` judged the session as it was read; a sign-out, a reset, or
+        another device's password change may have ended it since (while a new password
+        hashed, say), and an ended session must change nothing.
+        """
+        row = self._store.row("SELECT confirmed_at FROM ui_sessions WHERE session_id = ?", (session.session_id,))
+        if row is None:
+            raise unauthenticated()
+        if self._now() - int(row["confirmed_at"]) > CONFIRM_SECONDS:
+            raise _reauth_required()
 
     # -- password and TOTP -------------------------------------------------------------
 
@@ -280,6 +306,7 @@ class OwnerAuth:
             raise ServiceError("weak_password", str(exc), 400) from exc
         now = self._now()
         with self._store.transaction():
+            self._hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET password_hash = ?, password_changed_at = ? WHERE id = 1", (password_hash, now)
             )
@@ -290,34 +317,36 @@ class OwnerAuth:
         self.require_recent(session)
         secret = new_totp_secret()
         with self._store.transaction():
+            self._hold_recent(session)
             if self._owner() is None:
                 raise ServiceError("setup_required", "The web UI has no owner yet.", 409)
             self._store.db.execute("UPDATE ui_owner SET totp_pending = ? WHERE id = 1", (secret,))
         return secret, otpauth_uri(secret, account=account, issuer=TOTP_ISSUER)
 
-    def enable_totp(self, session: OwnerSession, code: str, *, source: str) -> None:
+    def enable_totp(self, session: OwnerSession, code: str) -> None:
         """Turn TOTP on once a code from the pending secret matches; other sessions end."""
         self.require_recent(session)
-        self.limiter.check(OWNER_ACCOUNT, source)
-        with self._store.transaction():
+        with self.limiter.turn(session_bucket(session)), self._store.transaction():
+            self._hold_recent(session)
             owner = self._owner()
             pending = owner["totp_pending"] if owner is not None else None
             if not pending:
                 raise ServiceError("conflict", "Start setting up the authenticator again.", 409)
             step = totp_match(str(pending), code, now=self._clock(), last_step=None)
             if step is None:
-                self.limiter.failed(OWNER_ACCOUNT, source)
+                self.limiter.failed(session_bucket(session))
                 raise ServiceError("wrong_code", "That code does not match. Check the device's clock.", 400)
             self._store.db.execute(
                 "UPDATE ui_owner SET totp_secret = totp_pending, totp_pending = NULL, totp_last_step = ? WHERE id = 1",
                 (step,),
             )
             self._store.db.execute("DELETE FROM ui_sessions WHERE session_id != ?", (session.session_id,))
-        self.limiter.succeeded(OWNER_ACCOUNT, source)
+            self.limiter.succeeded(session_bucket(session))
 
     def disable_totp(self, session: OwnerSession) -> None:
         self.require_recent(session)
         with self._store.transaction():
+            self._hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET totp_secret = NULL, totp_pending = NULL, totp_last_step = NULL WHERE id = 1"
             )
@@ -357,6 +386,15 @@ class OwnerAuth:
 
     def _now(self) -> int:
         return int(self._clock())
+
+
+def session_bucket(session: OwnerSession) -> str:
+    """A signed-in browser's own guess bucket: failed sign-ins elsewhere never lock its re-checks."""
+    return f"session:{session.session_id}"
+
+
+def _reauth_required() -> ServiceError:
+    return ServiceError("reauth_required", "Confirm your password to continue.", 403)
 
 
 def _dead_link() -> ServiceError:

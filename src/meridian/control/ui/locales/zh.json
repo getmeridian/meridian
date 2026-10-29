@@ -152,6 +152,7 @@
   "person.danger": "链接与移除",
   "person.reissue": "签发新链接",
   "person.reissue_text": "用于链接泄露的情况。旧链接和二维码会立即失效。",
+  "person.reissue_declared": "服务器配置文件列出了此用户，其连接页面会随链接一起迁移。请在你的电脑上签发：",
   "person.reissue_title": "签发新链接？",
   "person.reissue_confirm": "当前链接会立即失效，你需要把新链接发给对方。",
   "person.reissued_toast": "已签发新链接，请发送给对方。",
@@ -274,5 +275,6 @@
   "error.insufficient_scope": "此操作需要更高的权限。",
   "error.invalid_request": "部分输入无效。",
   "error.conflict": "期间有内容发生了变化。请刷新后重试。",
+  "error.declared_user": "服务器配置文件列出了此用户。请在你的电脑上用 meridian 修改。",
   "error.internal": "控制服务出错，请重试。"
 }

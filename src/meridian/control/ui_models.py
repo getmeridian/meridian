@@ -107,6 +107,9 @@ class ShareView(CoreModel):
     """How one person connects: their subscription link and QR, and their connection page when one exists."""
 
     username: str
+    declared: bool = Field(
+        description="The last applied revision's intent lists them: removing them or issuing a new link is the CLI's."
+    )
     subscription_url: str
     page_url: str
     qr_svg: str
