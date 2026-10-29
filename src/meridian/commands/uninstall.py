@@ -13,7 +13,7 @@ from meridian.commands.resolve import (
 )
 from meridian.compiler.deployment import deployment_server_refs
 from meridian.console import confirm, err_console, fail, info, ok, warn
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, previous_release_command
 from meridian.servers import ServerEntry, ServerRegistry
 
 
@@ -86,9 +86,16 @@ def run(
         references = _topology_references(cluster, saved_server)
         entire_fleet = deployment_server_refs(cluster.topology_intent) == {saved_server.id}
         if references and not entire_fleet:
+            hint = "Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown."
+            if cluster.topology_intent.control.backend == "remnawave":
+                # `setup` and `node remove` refuse a Remnawave fleet; only its own release still edits it.
+                hint = (
+                    "This fleet still runs Remnawave: move it first (meridian migrate), or take it apart with "
+                    f"the release that deployed it: {previous_release_command(cluster.panel.deployed_with, 'setup')}"
+                )
             fail(
                 f"Server {resolved.ip} still has roles in your topology: {', '.join(references)}",
-                hint="Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown.",
+                hint=hint,
                 hint_type="user",
             )
     is_panel_host = bool(cluster.panel.server_ip) and cluster.panel.server_ip == resolved.ip

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from meridian.control.models import SUB_TOKEN_PATTERN, LimitStrategy, UserImport, UserImportBatch, UserStatus
 from meridian.core.client_limits import NEVER_EXPIRES_YEAR
+from meridian.core.errors import previous_release_command
 from meridian.migrate import MigrationError
 from meridian.remnawave import User
 from meridian.remnawave.client import ACCESS_USER_DESCRIPTION, ACCESS_USER_TAG
@@ -55,14 +56,17 @@ class CarriedUsers:
     skipped: list[str] = field(default_factory=list)
 
 
-def carry_users(panel_users: Sequence[User], wanted: Sequence[str]) -> CarriedUsers:
+def carry_users(panel_users: Sequence[User], wanted: Sequence[str], *, deployed_with: str = "") -> CarriedUsers:
     """Map the intent's users from the panel; refuse what cannot be imported without breaking a link."""
     by_name = {user.username: user for user in panel_users}
     missing = sorted(set(wanted) - set(by_name))
     if missing:
         raise MigrationError(
             "The panel has no user for: " + ", ".join(missing),
-            hint="Run `meridian apply` to converge the fleet first, or remove those clients, then migrate.",
+            hint=(
+                "Converge the fleet with the release that deployed it, then migrate: "
+                + previous_release_command(deployed_with, "apply")
+            ),
             category="user",
         )
     unfit = sorted(name for name in wanted if not re.fullmatch(SUB_TOKEN_PATTERN, by_name[name].short_uuid))

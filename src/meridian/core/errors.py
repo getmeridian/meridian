@@ -88,6 +88,16 @@ class LocalStateError(MeridianError):
         super().__init__(message, hint=hint, category=category)
 
 
+def previous_release_command(deployed_with: str, args: str) -> str:
+    """The command that runs *args* with the Meridian release that deployed a Remnawave fleet.
+
+    This Meridian no longer drives a Remnawave fleet, so finishing its last apply (or
+    removing its servers) before or instead of `meridian migrate` takes that release.
+    """
+    # 4.0.0b8 is the last release that drives Remnawave.
+    return f"uvx --from 'meridian-vpn=={deployed_with or '4.0.0b8'}' meridian {args}"
+
+
 class RemnawaveFleetError(LocalStateError):
     """A fleet that still runs Remnawave: this Meridian only moves it onto its control service."""
 

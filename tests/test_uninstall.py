@@ -120,6 +120,29 @@ def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
     registry.remove.assert_not_called()
 
 
+def test_teardown_of_a_remnawave_fleet_server_points_at_migrate_or_its_own_release() -> None:
+    """`setup` refuses a Remnawave fleet, so the usual hint would loop; its own release still edits it."""
+    intent = single_exit_intent(users=["alice"])
+    intent = intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
+    cluster = ClusterConfig(panel=PanelConfig(deployed_with="4.0.0b8"), topology_intent=intent)
+    registry = MagicMock()
+    registry.find.return_value = ServerEntry(id="srv-exit", host="198.51.100.2", name="exit-server")
+    resolved = SimpleNamespace(ip="198.51.100.2", user="root", conn=MagicMock())
+
+    with (
+        patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
+        patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
+        patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.uninstall.fail", side_effect=typer.Exit(2)) as failure,
+        pytest.raises(typer.Exit),
+    ):
+        run(ip=resolved.ip, yes=True)
+
+    hint = failure.call_args.kwargs["hint"]
+    assert "meridian migrate" in hint
+    assert "uvx --from 'meridian-vpn==4.0.0b8' meridian setup" in hint
+
+
 def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> None:
     from meridian.setup.single_server import single_server_intent
 

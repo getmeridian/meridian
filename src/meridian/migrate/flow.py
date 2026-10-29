@@ -25,7 +25,7 @@ from meridian.compiler.meridian_backend import validate_meridian_backend
 from meridian.compiler.models import AgentRuntimePayload, ResourcePlan
 from meridian.control.models import UserImportBatch
 from meridian.control_artifacts import agent_binary
-from meridian.core.errors import LocalStateError
+from meridian.core.errors import LocalStateError, previous_release_command
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
 from meridian.migrate import MigrationError
@@ -318,7 +318,10 @@ class ControlMigrator:
         except PendingPlanConflictError as exc:
             raise MigrationError(
                 f"The last apply did not finish: {exc}",
-                hint="Run `meridian apply` until it converges, then `meridian migrate`.",
+                hint=(
+                    "Finish it with the release that deployed this fleet, then migrate: "
+                    + previous_release_command(self.cluster.panel.deployed_with, "apply")
+                ),
                 category="user",
             ) from exc
 
@@ -346,7 +349,7 @@ class ControlMigrator:
             users = panel.list_users()
         finally:
             panel.close()
-        return carry_users(users, list(intent.access.users))
+        return carry_users(users, list(intent.access.users), deployed_with=self.cluster.panel.deployed_with)
 
     def _control_connection(self, intent: SetupIntent) -> ServerConnection:
         return self._connection(intent.control.server_ref)

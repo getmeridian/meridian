@@ -462,7 +462,8 @@ def test_an_unresolved_earlier_apply_is_refused_before_anything_stops(fleet: Fle
     with pytest.raises(MigrationError, match="last apply did not finish") as error:
         fleet.migrator().review()
 
-    assert "meridian apply" in (error.value.hint or "")
+    # This Meridian refuses `apply` on a Remnawave fleet; only the release that deployed it can finish one.
+    assert (error.value.hint or "").endswith("uvx --from 'meridian-vpn==4.0.0b8' meridian apply")
     assert not any("docker" in call for call in fleet.control.calls)
 
 
