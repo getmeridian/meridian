@@ -108,6 +108,8 @@ class _Handler(BaseHTTPRequestHandler):
     server: ControlServer
     server_version = "nginx"
     sys_version = ""
+    # A socket read deadline: a client that stops sending mid-request frees its thread (one request per connection).
+    timeout = 60
     caller: Caller | None = None
     owner_session: OwnerSession | None = None
 
@@ -212,7 +214,11 @@ class _Handler(BaseHTTPRequestHandler):
     # -- bodies --------------------------------------------------------------------------
 
     def _body(self) -> bytes:
-        length = int(self.headers.get("Content-Length") or 0)
+        declared = (self.headers.get("Content-Length") or "0").strip()
+        if not declared.isascii() or not declared.isdigit():
+            # `read(-1)` would read to EOF, past the limit below.
+            raise ServiceError("invalid_request", "Content-Length is not a byte count.", 400)
+        length = int(declared)
         if length > MAX_BODY_BYTES:
             raise ServiceError("payload_too_large", "Request body is too large.", 413)
         return self.rfile.read(length) if length else b""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import socket
 import threading
 import time
 import urllib.error
@@ -388,6 +389,17 @@ def test_an_unsupported_protocol_carries_its_retry_in_body_and_header(http: str)
     assert body["error"]["retryable"] is False
     assert body["error"]["retry_after_seconds"] == UNSUPPORTED_PROTOCOL_RETRY_SECONDS
     assert raised.value.headers["Retry-After"] == str(UNSUPPORTED_PROTOCOL_RETRY_SECONDS)
+
+
+@pytest.mark.parametrize("length", ["-1", "12abc"], ids=["negative", "not-a-number"])
+def test_a_malformed_content_length_is_refused_without_reading_on(http: str, length: str) -> None:
+    host, port = http.removeprefix("http://").split(":")
+    with socket.create_connection((host, int(port)), timeout=5) as connection:
+        # The connection stays open: read(-1) would wait for an EOF that never comes.
+        connection.sendall(f"POST /agent/v1/enroll HTTP/1.1\r\nContent-Length: {length}\r\n\r\n{{}}".encode())
+        status_line = connection.makefile("rb").readline()
+
+    assert status_line.split()[1] == b"400"
 
 
 def test_admin_validation_errors_are_400(http: str) -> None:
