@@ -34,9 +34,9 @@ It also refuses QUIC (UDP 443) to everything else, so apps fall back to TCP, whe
 
 Apps that import the plain link list (Base64) don't receive routing rules. In those apps, add **direct** rules for `geosite:category-ru` and `geoip:ru` in the routing settings, or switch to an app that imports Xray JSON or Mihomo subscriptions. Hiddify users can instead set the region to **Russia**.
 
-### Why not edit the template in the panel?
+### Where the rules come from
 
-Meridian manages its own Xray JSON and Mihomo subscription templates in Remnawave. They carry the automatic fallback between your exits and relays, and the routing above. Meridian restores them on every apply (including redeploys and `client add`, `node add`, `relay add`), so rules added there in the panel won't last.
+The control service builds every Xray JSON, Mihomo, and sing-box subscription from your reviewed topology: the automatic fallback between your exits and relays, and the routing above. There is no template to edit by hand. To send traffic differently, use [`meridian route`](/en/cli-reference/#meridian-route) on an exit or the routing rules of a [routing gateway](#through-a-routing-gateway).
 
 ## How the layers work together
 

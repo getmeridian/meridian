@@ -54,7 +54,7 @@ Meridian 会在交互式命令前定期检查 PyPI，并在有新版本时打印
 
 ## 从 3.x 升级
 
-Meridian 4 **不是就地升级**。它用 Remnawave 替换了 3x-ui 面板，3.x 服务器上的链接无法直接继承：每个用户都需要新链接。
+Meridian 4 **不是就地升级**。它用自己的控制服务替换了 3x-ui 面板，3.x 服务器上的链接无法直接继承：每个用户都需要新链接。
 
 你的 3.x 服务器会继续正常运行。你有两个选择：
 
@@ -69,6 +69,8 @@ Meridian 4 **不是就地升级**。它用 Remnawave 替换了 3x-ui 面板，3.
   3. 等所有人都切换完成后，用 `meridian teardown OLD_IP` 卸载旧服务器——Meridian 4 的 `teardown` 也会一并移除 3x-ui
 
 Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或改动 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为提示上述选项。
+
+由更早的 Meridian 4 版本部署的集群运行的是 Remnawave 面板，它可以就地迁移并保留所有链接：见[从 Remnawave 迁移](/zh/deploy/#从-remnawave-迁移)。
 
 本文档介绍的是 Meridian 4。仍在使用 3.x 的服务器可以参阅保留在 GitHub 上的 [Meridian 3.17.3 文档](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/zh)。
 

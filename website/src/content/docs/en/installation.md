@@ -54,7 +54,7 @@ Updating the CLI changes nothing on your servers. If a server works, there is no
 
 ## Upgrading from 3.x
 
-Meridian 4 is **not an in-place upgrade**. It replaces the 3x-ui panel with Remnawave, and links from a 3.x server cannot carry over: every user needs a new link.
+Meridian 4 is **not an in-place upgrade**. It replaces the 3x-ui panel with its own control service, and links from a 3.x server cannot carry over: every user needs a new link.
 
 Your 3.x servers keep working. You have two choices:
 
@@ -69,6 +69,8 @@ Your 3.x servers keep working. You have two choices:
   3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — Meridian 4's teardown also removes 3x-ui
 
 Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
+
+A fleet deployed by an earlier Meridian 4 release runs the Remnawave panel. That one moves in place, keeping every link: see [Moving from Remnawave](/en/deploy/#moving-from-remnawave).
 
 These docs describe Meridian 4. The [Meridian 3.17.3 docs](https://github.com/getmeridian/meridian/tree/v3.17.3/website/src/content/docs/en) stay on GitHub for servers you keep on 3.x.
 

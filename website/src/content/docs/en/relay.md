@@ -15,7 +15,7 @@ Censors see traffic to a domestic IP. The relay forwards raw TCP to the exit; en
 
 ## How relays work
 
-A relay runs [Realm](https://github.com/zhboner/realm), a small zero-copy TCP forwarder. It listens on port 443 (configurable) and forwards to the exit's Reality listener. No Docker and no panel run on the relay.
+A relay runs [Realm](https://github.com/zhboner/realm), a small zero-copy TCP forwarder. It listens on port 443 (configurable) and forwards to the exit's Reality listener. Nothing else runs on the relay: no agent and no control service. Meridian manages it over SSH.
 
 Relays carry **Reality** traffic. XHTTP, WSS, and Hysteria2 stay on the exit's own address and domain, and remain in the same subscription as alternatives.
 

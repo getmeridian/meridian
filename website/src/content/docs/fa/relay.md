@@ -15,7 +15,7 @@ description: مسیریابی ترافیک از طریق سرور داخلی ب�
 
 ## چگونه relays کار می‌کند
 
-relay [Realm](https://github.com/zhboner/realm) را اجرا می‌کند، یک TCP forwarder کوچک و بدون کپی. روی پورت 443 (قابل تنظیم) گوش می‌دهد و به listener Reality خروجی فوروارد می‌کند. Docker و پنلی روی relay اجرا نمی‌شود.
+relay [Realm](https://github.com/zhboner/realm) را اجرا می‌کند، یک TCP forwarder کوچک و بدون کپی. روی پورت 443 (قابل تنظیم) گوش می‌دهد و به listener Reality خروجی فوروارد می‌کند. هیچ چیز دیگری روی relay اجرا نمی‌شود: نه agent و نه سرویس کنترل. Meridian آن را از طریق SSH مدیریت می‌کند.
 
 Relays ترافیک **Reality** را حمل می‌کند. XHTTP، WSS و Hysteria2 روی آدرس و دامنه خود خروجی می‌مانند و در subscription به عنوان جایگزین‌ها می‌مانند.
 

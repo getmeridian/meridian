@@ -26,7 +26,7 @@ meridian help agents
 - **无需交互。** 会修改内容的命令都接受 `--yes`。`setup` 向导需要终端，因此智能体使用 `deploy`、`node add`、`relay add` 和 `client add`，或 `setup --intent FILE --yes`。
 - **JSON 信封。** 带 `--json` 的命令会在 stdout 输出一个 `meridian.output/v1` 信封，错误也不例外。进度和警告输出到 stderr。
 - **契约。** `meridian api commands` 列出所有命令及其机器可读的契约；`meridian api schema NAME` 输出对应的 JSON Schema。
-- **有意义的退出码。** `0` 表示成功，`2` 表示用户错误，`3` 表示缺少证据（SSH、面板或本地状态），`4` 表示检查已完成但发现了问题。各命令的详情见 [CLI 参考](/zh/cli-reference/)。
+- **有意义的退出码。** `0` 表示成功，`2` 表示用户错误，`3` 表示缺少证据（SSH、控制服务或本地状态），`4` 表示检查已完成但发现了问题。各命令的详情见 [CLI 参考](/zh/cli-reference/)。
 - **先审核，再变更。** `meridian plan` 显示将发生的变更，`meridian apply --yes` 则原样应用这些变更。
 
 ## 文档为智能体提供什么
@@ -37,4 +37,4 @@ meridian help agents
 
 ## 不要把机密带进聊天
 
-连接页面和订阅 URL 会让持有者获得对你服务器的访问权限。智能体指南要求智能体只把每条链接交给它所属的人，除非你提出要求，否则绝不透露面板密码。不要把链接粘贴到与他人共享的聊天中。`meridian doctor` 会生成已脱敏的报告，可以放心分享。
+连接页面和订阅 URL 会让持有者获得对你服务器的访问权限。智能体指南要求智能体只把每条链接交给它所属的人，除非你提出要求，否则绝不打印控制台设置链接。不要把链接粘贴到与他人共享的聊天中。`meridian doctor` 会生成已脱敏的报告，可以放心分享。

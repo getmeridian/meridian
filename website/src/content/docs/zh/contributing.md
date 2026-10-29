@@ -44,7 +44,11 @@ CLI 是一个 Python 包（`src/meridian/`），通过 PyPI 分发为 `meridian-
 - `setup/` — `meridian setup` 向导状态和部署、设置和应用背后的共享运行时
 - `compiler/` — 将拓扑变成已审核、哈希标识的资源列表（无 I/O）
 - `reconciler/` — 带检查点观察和应用这些资源
-- `provision/` — 服务器准备步骤（包、加固、Docker、Realm）
+- `provision/` — 服务器准备步骤（包、加固、控制服务、Realm）
+- `control/` — 控制服务（`meridian serve`）：用户、订阅、签名的节点文档、备份和网页控制台
+- `backup/` — 快照、设备密钥和 `meridian restore`
+
+节点 agent 是仓库根目录下 `agent/` 中的 Rust crate；它的构建产物随 Python 软件包一起发布。
 
 ## Pull Requests
 

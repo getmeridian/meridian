@@ -36,11 +36,12 @@ meridian deploy 198.51.100.10
 ## 部署过程会做什么
 
 1. **加固服务器** — 仅允许 SSH 密钥登录、启用 fail2ban、配置只开放必要端口的 UFW 防火墙，并启用 BBR 拥塞控制
-2. **安装控制平面** — 在 Docker 中部署 [Remnawave](https://remna.st/) 面板以及运行 Xray 的节点
+2. **安装控制平面** — Meridian 的控制服务（保存你的用户并提供他们的订阅）以及运行 Xray 的节点 agent。不需要 Docker
 3. **选择伪装目标** — 先在服务器自身所在网络中寻找合适的 TLS 1.3 网站，找不到时回退到 `www.google.com`、`dl.google.com` 和 `www.cloudflare.com`（也可用 `--sni` 手动指定）
 4. **配置连接方式** — 在 nginx 后的 TCP 443 端口上配置 VLESS+Reality 和 XHTTP（使用为服务器 IP 签发的 Let's Encrypt 证书），并在 UDP 443 上配置 Hysteria2
 5. **验证真实流量** — 在输出“Done”之前，Meridian 会通过交付的订阅发送真实流量；若流量不通则自动尝试下一个伪装目标
 6. **发布连接页面** — 为第一个客户端生成专属连接页面
+7. **显示一次恢复密钥** — 请离线保存；有了它，丢失的控制服务器可以重建（见[备份](/zh/deploy/#备份)）
 
 部署带有检查点。如果中途中断，重新运行同一条命令即可从中断处继续。
 
@@ -80,11 +81,13 @@ meridian client add alice
 
 | 内容 | 位置 |
 |------|------|
-| 拓扑、面板访问凭据和密钥 | 你电脑上的 `~/.config/meridian/cluster.yml` |
+| 拓扑、控制服务访问凭据和密钥 | 你电脑上的 `~/.config/meridian/cluster.yml` |
 | 已保存的 SSH 服务器 | 你电脑上的 `~/.config/meridian/servers.json` |
-| 代理服务 | VPS 上的 Docker、Xray 和 nginx |
+| 控制服务的加密快照 | 你电脑上的 `~/.config/meridian/snapshots/` |
+| 用户、限额和流量 | VPS 上的控制服务 |
+| 代理服务 | VPS 上的 Xray、nginx 和节点 agent |
 
-客户端管理命令直接调用 `cluster.yml` 中记录的 Remnawave 面板 API，不需要 SSH。请备份 `~/.config/meridian/`——Meridian 依靠它管理你的服务器。
+客户端管理命令直接调用 `cluster.yml` 中记录的控制服务 API，不需要 SSH。`meridian panel` 可以在网页控制台中打开同样的用户列表。请备份 `~/.config/meridian/`——Meridian 依靠它管理你的服务器。
 
 ## 多台服务器
 
