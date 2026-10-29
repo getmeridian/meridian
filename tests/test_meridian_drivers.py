@@ -557,15 +557,19 @@ def _agent_binding(server_ref: str) -> ManagedResourceBinding:
     )
 
 
-@pytest.mark.parametrize(("rc", "retires"), [(0, True), (1, False)], ids=["stopped", "still-running"])
-def test_retiring_an_agent_stops_and_deletes_its_core_too(plan: ResourcePlan, rc: int, retires: bool) -> None:
+@pytest.mark.parametrize(
+    ("rc", "refusal"),
+    [(0, ""), (1, "still running"), (255, "evidence is unavailable")],
+    ids=["stopped", "still-running", "unreachable"],
+)
+def test_retiring_an_agent_stops_and_deletes_its_core_too(plan: ResourcePlan, rc: int, refusal: str) -> None:
     conn = MockConnection().when("systemctl daemon-reload", rc=rc)
     drivers, _control, _cluster = _setup(plan, conn)
 
-    if retires:
+    if not refusal:
         drivers["agent_runtime"].retire(_agent_binding("srv-gone"))  # type: ignore[union-attr]
     else:
-        with pytest.raises(ResourceReconcileError, match="still running"):
+        with pytest.raises(ResourceReconcileError, match=refusal):
             drivers["agent_runtime"].retire(_agent_binding("srv-gone"))  # type: ignore[union-attr]
 
     (command,) = conn.calls

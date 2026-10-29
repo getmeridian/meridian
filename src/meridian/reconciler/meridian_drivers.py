@@ -384,6 +384,7 @@ class AgentRuntimeDriver:
             f" ! systemctl is-active --quiet {AGENT_UNIT} && ! systemctl is-active --quiet {CORE_UNIT}",
             timeout=60,
         )
+        require_available_evidence(binding.logical_id, result, f"the node agent's removal on {binding.server_ref}")
         if result.returncode != 0:
             raise ResourceReconcileError(f"The node agent on {binding.server_ref} is still running after removal.")
 

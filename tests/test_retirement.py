@@ -293,3 +293,15 @@ def test_forgetting_a_server_keeps_service_cleanup_and_other_servers() -> None:
     assert forgotten == ["agent:exit-b", "baseline:srv-old", "firewall:old:443"]
     still_active = sorted(item.logical_id for item in cluster.managed_bindings.values() if item.active)
     assert still_active == ["firewall:other:443", "workload:exit-b"]
+
+
+def test_forgetting_a_server_drops_what_an_uncommitted_apply_recorded_there() -> None:
+    """Those bindings are already inactive, so deactivating them forgot nothing and retirement kept failing."""
+    failed = _binding("agent_runtime", "exit-2", server_ref="srv-b", active=False)
+    failed.generation = 2
+    cluster = _cluster(failed)
+
+    forgotten = forget_server(cluster, retired_bindings(_plan(), cluster), "srv-b")
+
+    assert forgotten == ["agent_runtime:exit-2"]
+    assert retired_bindings(_plan(), cluster) == []

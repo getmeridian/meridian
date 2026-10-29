@@ -52,17 +52,27 @@ def forget_server(cluster: ClusterConfig, bindings: Iterable[ManagedResourceBind
     """Drop the retiring server-side bindings on one unreachable server without contacting it.
 
     Service-side bindings stay, so the service still deletes what it holds; whatever
-    ran on the server keeps running until the operator deletes or wipes it.
+    ran on the server keeps running until the operator deletes or wipes it. A committed
+    binding is deactivated; one only an uncommitted apply recorded is dropped, since
+    `retired_bindings()` picks those up inactive.
     """
     server_side = SERVER_PLACED | {"server_baseline"}
+    retiring = {
+        binding.logical_id
+        for binding in bindings
+        if binding.server_ref == server_ref and binding.resource_kind in server_side
+    }
     forgotten: list[str] = []
-    for binding in bindings:
-        if binding.server_ref != server_ref or binding.resource_kind not in server_side:
+    for key, saved in list(cluster.managed_bindings.items()):
+        if saved.logical_id not in retiring or saved.server_ref != server_ref:
             continue
-        for saved in cluster.managed_bindings.values():
-            if saved.active and saved.logical_id == binding.logical_id and saved.server_ref == server_ref:
-                saved.active = False
-                forgotten.append(saved.logical_id)
+        if saved.active:
+            saved.active = False
+        elif saved.generation > cluster.active_generation:
+            del cluster.managed_bindings[key]
+        else:
+            continue
+        forgotten.append(saved.logical_id)
     return sorted(set(forgotten))
 
 
