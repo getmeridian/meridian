@@ -28,6 +28,7 @@
 - **Save credentials before nulling the token** — after a crash in between, `enrollment_token_invalid` falls back to the stored credentials.
 - **`run -test` needs a `.json` name** — the temp config is `.<name>.netagent-test.json`.
 - **Xray must run as root** — the composed config holds Reality keys and UUIDs at 0600; `User=`/`DynamicUser=` units cannot read it.
+- **Check service text is ASCII before slicing by byte** — a non-ASCII timestamp panicked `parse_rfc3339`, and release builds abort on panic.
 - **Health check names are sanitized resource IDs** — `:` becomes `-` and a leading digit gets `u`.
 - **Bump the crate version with every agent change that ships** — `make agent` writes it beside each binary as `.version`, and `meridian check` warns about nodes reporting another.
 - **Colima has no amd64 emulation** — `--platform linux/amd64` fails with `exec format error`; hence the cross-compile.

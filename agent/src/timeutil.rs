@@ -18,7 +18,8 @@ pub fn now_unix() -> u64 {
 /// Parse a protocol timestamp (`YYYY-MM-DDTHH:MM:SS[.fraction]Z`) into whole Unix seconds.
 pub fn parse_rfc3339(text: &str) -> Option<u64> {
     let bytes = text.as_bytes();
-    if bytes.len() < 20 || !text.ends_with('Z') {
+    // ASCII first: every slice below is by byte offset, and one inside a character panics.
+    if bytes.len() < 20 || !text.is_ascii() || !text.ends_with('Z') {
         return None;
     }
     let shape_ok = [4, 7].iter().all(|&i| bytes[i] == b'-')
@@ -119,6 +120,8 @@ mod tests {
             "2026-13-29T10:04:05Z",
             "2026-10-29T10:04:05.Z",
             "+026-10-29T10:04:05Z",
+            "2026-10-29T10:04:0\u{e9}Z",
+            "2026-10-29T10:04:05.1\u{e9}Z",
         ] {
             assert_eq!(parse_rfc3339(bad), None, "{bad}");
         }
