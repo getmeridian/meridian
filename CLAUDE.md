@@ -22,6 +22,7 @@ Also see [AGENTS.md](AGENTS.md) for cross-tool discovery rules.
 - **Domain mode:** XHTTP moves onto the domain and WSS is added, both able to ride Cloudflare's CDN.
 - **Roles:** relays are L4 TCP forwarders (Realm); one server can hold several roles, such as relay and exit.
 - **Plan and apply:** every fleet is a reviewed `topology_intent` in `cluster.yml`; `meridian plan` / `apply` compile it and reconcile resource drivers.
+- **Control service (hidden, #95):** `meridian serve` replaces Remnawave on new fleets; `meridian migrate` moves a Remnawave fleet onto it in place, keeping every link.
 - **Website and Studio:** Astro, with docs on Starlight (every page also served as Markdown for agents). Static Studio consumes generated contracts; executable Studio runs through a localhost-only Engine (`meridian studio`) for server onboarding, deploy dry-runs, and deploys.
 - **Real-VM harness:** optional, local-only, in `tests/realvm/`.
 
@@ -58,6 +59,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
 ├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
+├── migrate/CLAUDE.md                   — hidden `meridian migrate`: Remnawave fleet onto the control service
 ├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 

@@ -338,6 +338,7 @@ class TestStructuralHealth:
             SRC / "reality_keys.py",
         ]
         library_files.extend(sorted((SRC / "provision").rglob("*.py")))
+        library_files.extend(sorted((SRC / "migrate").rglob("*.py")))
 
         violations = []
         for path in library_files:

@@ -739,6 +739,14 @@ def update_cmd(
         raise typer.Exit(exit_code)
 
 
+@app.command("migrate", hidden=True)
+def migrate_cmd(yes: Yes = False) -> None:
+    """Move this Remnawave fleet onto Meridian's own control service, keeping every link"""
+    from meridian.commands.migrate import run
+
+    run(yes)
+
+
 @app.command("serve", hidden=True)
 def serve_cmd(
     config: str = typer.Option("/etc/ctld/config.json", "--config", help="Service configuration file"),
