@@ -521,21 +521,31 @@ impl<'a> Agent<'a> {
         users
     }
 
-    /// Fold Xray's counters into the store and send the totals. `Ok(false)` when the session
-    /// does not use `traffic_stats` or no Xray runs here yet.
+    /// Fold Xray's counters into the store, then send the totals. `Ok(false)` when the session
+    /// does not use `traffic_stats` or no Xray runs here yet. Folding comes first, service or
+    /// not: Xray's own counters die with the core, so an outage must not leave them there.
     pub fn send_stats(&mut self) -> Result<bool, HttpError> {
+        let api = self.xray_api();
+        if let Some((xray, api)) = &api {
+            match stats::query(self.exec, xray, api) {
+                Ok(deltas) if !deltas.is_empty() => {
+                    self.traffic.fold(&deltas);
+                    if let Err(err) = self.traffic.save(&self.opts.state_dir) {
+                        info!("{err}");
+                    }
+                }
+                Ok(_) => {}
+                // Stored totals still go out: the service counts only growth.
+                Err(err) => debug!("traffic counters unavailable: {err}"),
+            }
+        }
         self.connect()?;
         let uses = self
             .session
             .as_ref()
             .is_some_and(|s| s.uses("traffic_stats"));
-        let Some((xray, api)) = self.xray_api().filter(|_| uses) else {
+        if api.is_none() || !uses {
             return Ok(false);
-        };
-        match stats::query(self.exec, &xray, &api) {
-            Ok(deltas) => self.traffic.fold(&deltas),
-            // Stored totals still go out: the service counts only growth.
-            Err(err) => debug!("traffic counters unavailable: {err}"),
         }
         let report = self.traffic.next_report(now_rfc3339());
         self.traffic

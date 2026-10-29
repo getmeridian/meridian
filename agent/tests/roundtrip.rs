@@ -537,6 +537,40 @@ fn traffic_is_folded_sent_cumulatively_and_removed_users_forgotten_after_ack() {
 }
 
 #[test]
+fn traffic_is_kept_while_the_service_is_unreachable() {
+    let pki = TestPki::new();
+    let service = service(&pki);
+    service.push(document(1, 1, &supported(), &pki));
+    let node = Node::new(&service.url(), &pki);
+    let exec = FakeExec::default();
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    agent.poll_once().unwrap();
+    drop(agent);
+
+    // An outage outlasting the session: the agent restarts and cannot say hello.
+    let mut boot = node.read_bootstrap();
+    boot["service_url"] = json!("http://127.0.0.1:9/s3cr3t");
+    node.write_bootstrap(&boot);
+    let mut offline = Agent::new(node.options(), &exec).unwrap();
+    *exec.stats_output.lock().unwrap() =
+        r#"{"stat":[{"name":"user>>>u-a>>>traffic>>>downlink","value":"700"}]}"#.into();
+    assert!(offline.send_stats().is_err());
+    // Xray's counters were reset into the store, which a restarted core cannot lose.
+    drop(offline);
+    *exec.stats_output.lock().unwrap() = "{}".into();
+
+    boot["service_url"] = json!(service.url());
+    node.write_bootstrap(&boot);
+    let mut agent = Agent::new(node.options(), &exec).unwrap();
+    assert!(agent.send_stats().unwrap());
+    let sent = service.requests_to("stats")[0].json();
+    assert_eq!(
+        sent["users"],
+        json!([{"user_id": "u-a", "uplink_bytes": 0, "downlink_bytes": 700}])
+    );
+}
+
+#[test]
 fn stats_wait_for_the_capability_and_an_installed_xray() {
     let pki = TestPki::new();
     let service = service(&pki);

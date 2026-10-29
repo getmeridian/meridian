@@ -24,6 +24,7 @@
 - **`xray api adu`/`rmu` exit 0 when a user fails** — check the `Added/Removed N user(s)` line; the adu and adi files hold credentials (0600, deleted at once).
 - **`adu` cannot build Hysteria2 users** — Xray 26.7.28's CLI has no hysteria case (prints "unsupported inbound type", `Added 0`), and a VLESS-shaped account would panic the hysteria validator; `rmi`/`adi` exit 1 on failure, and a failed `adi` leaves the inbound gone until the fallback restart.
 - **A returning user resumes their retired totals** — the service keeps every baseline, so restarting a re-enabled user at zero was a `counter_regression` that refused the whole report.
+- **Fold traffic before dialing the service** — `send_stats` once connected first, so an outage left hours of counters in Xray, lost on any core restart.
 - **`statsquery` is protobuf JSON** — int64 values arrive as strings; zeros and empty lists are omitted.
 - **Save a document before holding or applying it** — applying an unsaved one let a restart reconcile the older cached document and bring revoked users back; a failed save refuses it.
 - **Save credentials before nulling the token** — after a crash in between, `enrollment_token_invalid` falls back to the stored credentials.
