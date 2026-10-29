@@ -13,6 +13,7 @@ from meridian.core.deploy import DeployPlan, DeployPorts, DeployRequest
 from meridian.core.errors import LocalStateError
 from meridian.core.topology import (
     AccessIntent,
+    ControlBackend,
     ControlPlaneIntent,
     ExitIntent,
     SetupIntent,
@@ -40,6 +41,7 @@ def single_server_intent(
     fingerprint: TlsFingerprint | None = None,
     address: str = "",
     region: str = "",
+    control: ControlBackend = "remnawave",
 ) -> SetupIntent:
     """Return the intent for deploying (or redeploying) one server.
 
@@ -65,12 +67,18 @@ def single_server_intent(
             geo_block=geo_block,
         )
         return SetupIntent(
-            control=ControlPlaneIntent(server_ref=server_ref),
+            control=ControlPlaneIntent(server_ref=server_ref, backend=control),
             exits=[exit_],
             default_egress_ref=exit_.id,
             access=AccessIntent(users=[client_name or DEFAULT_CLIENT]),
         )
 
+    if control != "remnawave" and existing.control.backend != control:
+        raise LocalStateError(
+            "This fleet's control backend cannot change on redeploy.",
+            hint="Deploy the other backend to a fresh fleet.",
+            category="user",
+        )
     current = next((item for item in existing.exits if item.server_ref == server_ref), None)
     if current is None:
         raise LocalStateError(
@@ -127,6 +135,7 @@ def request_intent(
         hysteria2=request.hysteria2,
         fingerprint=request.fingerprint,
         region=request.country,
+        control=request.control,
     ).model_copy(update={"harden": request.harden, "forward_client_ips": request.client_ips})
 
 

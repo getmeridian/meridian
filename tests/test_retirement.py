@@ -25,7 +25,13 @@ from meridian.reconciler.retirement import (
 )
 from tests.support.topology import firewall_resource, resource_plan
 
-TEARDOWN_OWNED = {"control_plane_runtime", "subscription_template", "subscription_settings"}
+TEARDOWN_OWNED = {
+    "control_plane_runtime",
+    "subscription_template",
+    "subscription_settings",
+    "control_service",
+    "service_settings",
+}
 
 
 def _plan() -> ResourcePlan:

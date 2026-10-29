@@ -11,6 +11,7 @@ from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import (
     AccessUserPayload,
     ControlPlaneRuntimePayload,
+    ControlServicePayload,
     HostPayload,
     NodeBindingPayload,
     NodeRuntimePayload,
@@ -264,9 +265,9 @@ def _probe_observation(
     )
 
 
-def _control_payload(action: ResourceAction) -> ControlPlaneRuntimePayload:
+def _control_payload(action: ResourceAction) -> ControlPlaneRuntimePayload | ControlServicePayload:
     payload = action.resource.payload
-    if not isinstance(payload, ControlPlaneRuntimePayload):
+    if not isinstance(payload, ControlPlaneRuntimePayload | ControlServicePayload):
         raise ResourceReconcileError(f"Control runtime driver received {payload.kind}.")
     return payload
 

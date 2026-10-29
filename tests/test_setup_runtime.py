@@ -619,7 +619,7 @@ def test_review_fails_closed_when_a_retiring_server_profile_is_gone(tmp_path) ->
 
 
 def test_control_attestation_ignores_other_servers_but_tracks_runtime_pins(tmp_path) -> None:
-    from meridian.setup.runtime import _control_runtime_attestation
+    from meridian.setup.control_plane import control_runtime_attestation
 
     registry = ServerRegistry(tmp_path / "servers.json")
     _add_servers(registry, relay=True)
@@ -641,7 +641,7 @@ def test_control_attestation_ignores_other_servers_but_tracks_runtime_pins(tmp_p
     def attestation(intent: SetupIntent) -> tuple[str, ResourcePlan]:
         plan = runtime.review(SetupDraft.from_intent(intent)).plan
         control = next(item for item in plan.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
-        return _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan), plan
+        return control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan), plan
 
     relay_attestation, relay_plan = attestation(with_relay)
     plain_attestation, _ = attestation(base)
@@ -657,7 +657,7 @@ def test_control_attestation_ignores_other_servers_but_tracks_runtime_pins(tmp_p
         }
     )
     control = next(item for item in bumped.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
-    bumped_attestation = _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), bumped)
+    bumped_attestation = control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), bumped)
     assert bumped_attestation != relay_attestation
 
 
@@ -694,7 +694,7 @@ def test_stale_copy_is_refused_before_its_intent_edit_is_saved(tmp_path, monkeyp
 
 
 def test_adding_an_exit_that_sorts_first_never_reruns_the_control_bootstrap(tmp_path) -> None:
-    from meridian.setup.runtime import _control_runtime_attestation
+    from meridian.setup.control_plane import control_runtime_attestation
 
     registry = ServerRegistry(tmp_path / "servers.json")
     _add_servers(registry, relay=True)
@@ -711,14 +711,14 @@ def test_adding_an_exit_that_sorts_first_never_reruns_the_control_bootstrap(tmp_
     def attestation(intent: SetupIntent) -> str:
         plan = runtime.review(SetupDraft.from_intent(intent)).plan
         control = next(item for item in plan.resources if isinstance(item.payload, ControlPlaneRuntimePayload))
-        return _control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan)
+        return control_runtime_attestation(SimpleNamespace(expected_hash=control.desired_hash), plan)
 
     assert attestation(grown) == attestation(base)
 
 
 def test_surviving_pre_rename_panel_directory_makes_the_control_runtime_drift() -> None:
     """Bootstrap then moves it; the attestation alone would call the runtime converged."""
-    from meridian.setup.runtime import _control_runtime_ready
+    from meridian.setup.control_plane import control_runtime_ready
 
     action = SimpleNamespace(
         resource=SimpleNamespace(logical_id="control", payload=ControlPlaneRuntimePayload(server_ref="srv-control"))
@@ -728,7 +728,7 @@ def test_surviving_pre_rename_panel_directory_makes_the_control_runtime_drift() 
     connection = MagicMock(spec=ServerConnection)
     connection.run.return_value = SimpleNamespace(returncode=1, stdout="", stderr="")
 
-    ready = _control_runtime_ready(action, None, cluster, entry, connection, MagicMock())  # type: ignore[arg-type]
+    ready = control_runtime_ready(action, None, cluster, entry, connection, MagicMock())  # type: ignore[arg-type]
 
     assert ready is False
     assert connection.run.call_args.args[0] == "test ! -e /opt/remnawave"
@@ -738,9 +738,9 @@ def test_surviving_pre_rename_panel_directory_makes_the_control_runtime_drift() 
 def test_self_steal_exit_on_the_control_server_bootstraps_with_a_borrowed_target() -> None:
     """The interim legacy 443 fallback dials the bootstrap SNI; the operator's own name would loop to itself."""
     from meridian.compiler import compile_topology
-    from meridian.setup.runtime import _bootstrap_profile_values
+    from meridian.setup.control_plane import bootstrap_profile_values
 
     own = ProtocolPathIntent(id="reality-a", protocol="reality", reality_sni="www.example.org", self_steal=True)
     plan = compile_topology(single_exit_intent(exit_ref="srv-control", paths=[own]))
 
-    assert _bootstrap_profile_values(plan)[1] == DEFAULT_SNI
+    assert bootstrap_profile_values(plan)[1] == DEFAULT_SNI

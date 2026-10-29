@@ -71,12 +71,17 @@ def _default_delivery_formats() -> list[DeliveryFormat]:
     return ["base64", "xray_json", "mihomo", "singbox"]
 
 
+ControlBackend = Literal["remnawave", "meridian"]
+
+
 class ControlPlaneIntent(CoreModel):
-    """One server that owns the Remnawave control-plane workload."""
+    """One server that owns the control-plane workload."""
 
     server_ref: ServerReferenceValue
     public_hostname: OptionalHostnameValue = ""
     title: ServerTitleValue = "Meridian"
+    # Meridian's own control service and node agent replace Remnawave (#95, hidden in betas).
+    backend: ControlBackend = Field(default="remnawave", exclude_if=lambda backend: backend == "remnawave")
 
 
 class ProtocolPathIntent(CoreModel):

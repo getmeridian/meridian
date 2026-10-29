@@ -178,6 +178,7 @@ def render_nginx_http_config(
     xhttp_internal_port: int = 0,
     subscription_page_path: str = "",
     subscription_page_port: int = 0,
+    control_service: bool = False,
 ) -> str:
     """Render the nginx http configuration for domain mode.
 
@@ -224,6 +225,7 @@ def render_nginx_http_config(
         redirect_http=True,
         subscription_page_path=subscription_page_path,
         subscription_page_port=subscription_page_port,
+        control_service=control_service,
     )
 
 
@@ -237,6 +239,7 @@ def render_nginx_ip_config(
     xhttp_internal_port: int = 0,
     subscription_page_path: str = "",
     subscription_page_port: int = 0,
+    control_service: bool = False,
 ) -> str:
     """Render nginx http configuration for IP certificate mode (no domain).
 
@@ -268,6 +271,7 @@ def render_nginx_ip_config(
         redirect_http=False,
         subscription_page_path=subscription_page_path,
         subscription_page_port=subscription_page_port,
+        control_service=control_service,
     )
 
 
@@ -286,6 +290,7 @@ def render_nginx_server_block(
     upstream_blocks: str = "",
     subscription_page_path: str = "",
     subscription_page_port: int = 0,
+    control_service: bool = False,
 ) -> str:
     """Render the shared nginx server block structure.
 
@@ -321,6 +326,81 @@ def render_nginx_server_block(
                 proxy_set_header X-Forwarded-Port $server_port;
             }}
         """).rstrip()
+
+    if control_service:
+        # Meridian's control service has no UI to rewrite: the admin API, the
+        # agent long-poll (held up to 55 s), and nothing else live under the path.
+        panel_block = textwrap.indent(
+            textwrap.dedent(f"""\
+                # --- Control service (admin and agent APIs on secret path) ---
+                location /{panel_web_base_path}/ {{
+                    proxy_pass http://127.0.0.1:{panel_internal_port}/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                    proxy_buffering off;
+                    proxy_read_timeout 90s;
+                    client_max_body_size 4m;
+                }}
+            """).rstrip(),
+            " " * 12,
+        )
+        subscription_upstream = f"http://127.0.0.1:{panel_internal_port}/sub/"
+    else:
+        panel_block = textwrap.indent(
+            textwrap.dedent(f"""\
+                # --- Remnawave Panel (management interface on secret path) ---
+                location /{panel_web_base_path}/ {{
+                    proxy_pass http://127.0.0.1:{panel_internal_port}/;
+                    proxy_http_version 1.1;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $remote_addr;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection $connection_upgrade;
+
+                    # Rewrite paths for subpath deployment.  Remnawave is not
+                    # designed for sub-paths (docs: "must be hosted on root path"),
+                    # so we patch responses with sub_filter.
+                    #
+                    # HTML: href/src for assets, favicons, splash_screens
+                    #       CSS url() for fonts
+                    # JS:   axios baseURL (every /api call, the backend-tools
+                    #       queue link, and the node SSH websocket derive from
+                    #       it), plus backtick literals the 3.4 bundle uses for
+                    #       React Router routes, i18next loadPath, Lottie,
+                    #       favicon fallback, workers, wasm, and editor schemas.
+                    #       Never rewrite `/api: it is joined onto the
+                    #       rewritten baseURL and would double the prefix.
+                    # Backend-tools auth redirects and cookie paths are root-
+                    # absolute, so Location and Set-Cookie are mapped too.
+                    #
+                    # This eliminates all root-level paths — every probe
+                    # returns stock nginx 403/404.
+                    proxy_redirect default;
+                    proxy_redirect /api/ /{panel_web_base_path}/api/;
+                    proxy_cookie_path /api/ /{panel_web_base_path}/api/;
+                    proxy_set_header Accept-Encoding "";
+                    sub_filter_once off;
+                    sub_filter_types application/javascript text/javascript;
+                    sub_filter 'href="/a' 'href="/{panel_web_base_path}/a';
+                    sub_filter 'href="/f' 'href="/{panel_web_base_path}/f';
+                    sub_filter 'href="/s' 'href="/{panel_web_base_path}/s';
+                    sub_filter 'src="/a' 'src="/{panel_web_base_path}/a';
+                    sub_filter 'url(/a' 'url(/{panel_web_base_path}/a';
+                    sub_filter '=window.location.origin;' '=window.location.origin+"/{panel_web_base_path}";';
+                    sub_filter '`/dashboard' '`/{panel_web_base_path}/dashboard';
+                    sub_filter '`/auth' '`/{panel_web_base_path}/auth';
+                    sub_filter '`/oauth2/' '`/{panel_web_base_path}/oauth2/';
+                    sub_filter '`/locales/' '`/{panel_web_base_path}/locales/';
+                    sub_filter '`/lotties/' '`/{panel_web_base_path}/lotties/';
+                    sub_filter '`/favicons/' '`/{panel_web_base_path}/favicons/';
+                    sub_filter '`/assets/' '`/{panel_web_base_path}/assets/';
+                }}
+            """).rstrip(),
+            " " * 12,
+        )
+        subscription_upstream = f"http://127.0.0.1:{panel_internal_port}/api/sub/"
 
     return textwrap.dedent(f"""\
         # Meridian Proxy Configuration ({mode_comment})
@@ -383,55 +463,7 @@ def render_nginx_server_block(
     {extra_locations}
             include {NGINX_LOCATION_DIR}/*.conf;
 
-            # --- Remnawave Panel (management interface on secret path) ---
-            location /{panel_web_base_path}/ {{
-                proxy_pass http://127.0.0.1:{panel_internal_port}/;
-                proxy_http_version 1.1;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $remote_addr;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection $connection_upgrade;
-
-                # Rewrite paths for subpath deployment.  Remnawave is not
-                # designed for sub-paths (docs: "must be hosted on root path"),
-                # so we patch responses with sub_filter.
-                #
-                # HTML: href/src for assets, favicons, splash_screens
-                #       CSS url() for fonts
-                # JS:   axios baseURL (every /api call, the backend-tools
-                #       queue link, and the node SSH websocket derive from
-                #       it), plus backtick literals the 3.4 bundle uses for
-                #       React Router routes, i18next loadPath, Lottie,
-                #       favicon fallback, workers, wasm, and editor schemas.
-                #       Never rewrite `/api: it is joined onto the
-                #       rewritten baseURL and would double the prefix.
-                # Backend-tools auth redirects and cookie paths are root-
-                # absolute, so Location and Set-Cookie are mapped too.
-                #
-                # This eliminates all root-level paths — every probe
-                # returns stock nginx 403/404.
-                proxy_redirect default;
-                proxy_redirect /api/ /{panel_web_base_path}/api/;
-                proxy_cookie_path /api/ /{panel_web_base_path}/api/;
-                proxy_set_header Accept-Encoding "";
-                sub_filter_once off;
-                sub_filter_types application/javascript text/javascript;
-                sub_filter 'href="/a' 'href="/{panel_web_base_path}/a';
-                sub_filter 'href="/f' 'href="/{panel_web_base_path}/f';
-                sub_filter 'href="/s' 'href="/{panel_web_base_path}/s';
-                sub_filter 'src="/a' 'src="/{panel_web_base_path}/a';
-                sub_filter 'url(/a' 'url(/{panel_web_base_path}/a';
-                sub_filter '=window.location.origin;' '=window.location.origin+"/{panel_web_base_path}";';
-                sub_filter '`/dashboard' '`/{panel_web_base_path}/dashboard';
-                sub_filter '`/auth' '`/{panel_web_base_path}/auth';
-                sub_filter '`/oauth2/' '`/{panel_web_base_path}/oauth2/';
-                sub_filter '`/locales/' '`/{panel_web_base_path}/locales/';
-                sub_filter '`/lotties/' '`/{panel_web_base_path}/lotties/';
-                sub_filter '`/favicons/' '`/{panel_web_base_path}/favicons/';
-                sub_filter '`/assets/' '`/{panel_web_base_path}/assets/';
-            }}
+{panel_block}
 
     {subscription_block}
 
@@ -439,7 +471,7 @@ def render_nginx_server_block(
             # Public under the connection-page path, never the admin path:
             # only the panel's /api/sub/ route is reachable from here.
             location /{info_page_path}/sub/ {{
-                proxy_pass http://127.0.0.1:{panel_internal_port}/api/sub/;
+                proxy_pass {subscription_upstream};
                 proxy_http_version 1.1;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;

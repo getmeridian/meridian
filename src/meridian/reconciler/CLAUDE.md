@@ -11,6 +11,7 @@
 - **Fenced applies** — `fence.py` decides and `state_fence.py` stores the control server's `fence.json` (fleet ID, committed generation and plan hash, 30-minute lease) by compare-and-swap and holds it for the whole apply. A copy behind refuses, one ahead heals a lost commit, and only a fresh copy replaces a foreign fleet's fence; a swap that lost its connection re-reads before swapping again.
 - **Stalled connections retry read-only work** — `stall_retry.py` re-runs observations and fence reads/swaps on retryable system errors after 2/5/10/20s pauses, reported as `warning` events with `code: connection_stalled`; one outage that outlasts it ends retries for the run.
 - **Graph-owned preparation** — one attested baseline prepares packages, hardening, SSH-safe UFW, and optional Docker; only compiled rules open public ports.
+- **Meridian drivers (#95)** — `meridian_drivers.py` enrolls `netagent` over SSH (binary, bootstrap pinning the service's `signing.pub`, a fresh node token) and PUTs `agent_spec.py` node specs, endpoints, users, and settings; a workload converges only once its agent reports the current revision applied. Reality keys come from `LocalRealityKeyFactory`, not a panel.
 
 ## What's done well
 

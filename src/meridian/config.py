@@ -161,6 +161,21 @@ XRAY_SHA256: dict[str, str] = {
     "Xray-linux-arm64-v8a.zip": "f5698bb218ada3b4022db26fafc39601c5f53b46b19eb76c9616325985807501",
 }
 
+# Xray archive sizes, which the node agent checks before the hash (`binary_pin.size`)
+XRAY_ARCHIVE_BYTES: dict[str, int] = {
+    "Xray-linux-64.zip": 21164807,
+}
+
+# uv installs Meridian's control service (`meridian serve`) with its own Python on the control
+# server; the static musl build runs on every supported distribution.
+UV_VERSION = "0.13.6"
+UV_GITHUB_URL = "https://github.com/astral-sh/uv/releases/download"
+UV_SHA256: dict[str, str] = {
+    "x86_64": "5d61f26b6c7213779eda90edc6971ea6b0b796bfb8d49a574c8ad69b59838548",
+    "aarch64": "819692e404d23e5aae6bc44c0e260f1f5492fd1910ab4693b2c650f926dbe800",
+}
+CONTROL_SERVICE_PYTHON = "3.12"
+
 # RealiTLScanner (remote SNI discovery helper)
 REALITL_SCANNER_VERSION = "0.2.3"
 REALITL_SCANNER_GITHUB_URL = "https://github.com/XTLS/RealiTLScanner/releases/download"

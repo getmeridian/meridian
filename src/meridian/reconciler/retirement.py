@@ -21,8 +21,10 @@ from meridian.compiler.models import DeploymentTarget, ResourcePlan, canonical_h
 # firewall openings, and baseline beneath them.
 RETIREMENT_ORDER: tuple[str, ...] = (
     "access_user",
+    "control_user",
     "service_user",
     "host",
+    "client_endpoint",
     "external_squad",
     "internal_squad",
     "inbound",
@@ -31,7 +33,9 @@ RETIREMENT_ORDER: tuple[str, ...] = (
     "routing_gateway",
     "egress_pool",
     "route_rule",
+    "node_workload",
     "node_runtime",
+    "agent_runtime",
     "realm_hop",
     "nginx_artifact",
     "firewall_rule",

@@ -49,6 +49,8 @@ CONFIGS = {
     "stream_domain": render_nginx_stream_config(**_STREAM, domain="example.com"),
     "ip": render_nginx_ip_config(**_IP),
     "ip_xhttp": render_nginx_ip_config(**_IP, xhttp_path="xh-abc123", xhttp_internal_port=29000),
+    # Meridian's own control service has a base path and no frontend to rewrite.
+    "ip_control_service": render_nginx_ip_config(**_IP, control_service=True),
     "domain": render_nginx_http_config(**_DOMAIN),
     "domain_xhttp": render_nginx_http_config(**_DOMAIN, xhttp_path="xh-def456", xhttp_internal_port=29500),
 }
@@ -81,6 +83,7 @@ PRESENT = {
         "proxy_socket_keepalive on",
     ),
     "stream_domain": ("example.com  nginx_https", "198.51.100.1  nginx_https"),
+    "ip_control_service": ("proxy_buffering off", "proxy_read_timeout 90s", "proxy_pass http://127.0.0.1:2053/sub/"),
     "ip": (
         "ssl_certificate",
         "/etc/ssl/meridian/fullchain.pem",
@@ -132,6 +135,7 @@ PRESENT = {
 }
 
 ABSENT = {
+    "ip_control_service": ("sub_filter_types", "/api/sub/;"),
     "stream": ("example.com", "blackhole"),
     # IP mode never redirects port 80 to HTTPS: a redirect to a 403 is a contradiction.
     "ip": ("XHTTP", "meridian_xhttp", "VLESS+WSS", "TLSv1.0", "TLSv1.1", "SSLv", "return 301"),

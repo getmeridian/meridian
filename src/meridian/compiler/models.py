@@ -439,6 +439,66 @@ class ProbePayload(CoreModel):
     expected: str = ""
 
 
+# Meridian's own control service (#95): these kinds replace the Remnawave ones above when
+# `ControlPlaneIntent.backend` is "meridian".
+
+
+class ControlServicePayload(CoreModel):
+    """`meridian serve` behind the control server's nginx, with its TLS and secret paths."""
+
+    kind: Literal["control_service"] = "control_service"
+    server_ref: str
+    public_hostname: str = ""
+    internal_https_port: int = Field(default=8443, ge=1, le=65535)
+    service_port: int = Field(default=3000, ge=1, le=65535)
+
+
+class AgentRuntimePayload(CoreModel):
+    """The node agent on one server, enrolled with the control service over SSH."""
+
+    kind: Literal["agent_runtime"] = "agent_runtime"
+    workload_ref: str
+    server_ref: str
+
+
+class NodeWorkloadPayload(CoreModel):
+    """Everything one exit's agent runs: the reviewed Xray profile it renders into a node spec."""
+
+    kind: Literal["node_workload"] = "node_workload"
+    workload_ref: str
+    server_ref: str
+    agent_ref: str
+    profile: ConfigProfilePayload
+
+
+class ClientEndpointPayload(CoreModel):
+    """One way into an exit that subscriptions publish."""
+
+    kind: Literal["client_endpoint"] = "client_endpoint"
+    owner_ref: str
+    workload_ref: str
+    remark: str
+    protocol: ProtocolKind
+    address_server_ref: str
+    address: str = ""
+    public_port: int
+    sni: str = ""
+    host: str = ""
+    path: str = ""
+    fingerprint: str = ""
+    position: int = 0
+
+
+class ControlUserPayload(CoreModel):
+    kind: Literal["control_user"] = "control_user"
+    username: RemnawaveUsername
+
+
+class ServiceSettingsPayload(CoreModel):
+    kind: Literal["service_settings"] = "service_settings"
+    profile_title: str
+
+
 ResourcePayload: TypeAlias = Annotated[
     ServerBaselinePayload
     | ControlPlaneRuntimePayload
@@ -460,7 +520,13 @@ ResourcePayload: TypeAlias = Annotated[
     | RoutingGatewayPayload
     | EgressPoolPayload
     | RouteRulePayload
-    | ProbePayload,
+    | ProbePayload
+    | ControlServicePayload
+    | AgentRuntimePayload
+    | NodeWorkloadPayload
+    | ClientEndpointPayload
+    | ControlUserPayload
+    | ServiceSettingsPayload,
     Field(discriminator="kind"),
 ]
 

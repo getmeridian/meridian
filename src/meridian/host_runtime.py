@@ -58,6 +58,7 @@ def container_role(name: str) -> str:
             return f"{container.role}, pre-rename (meridian apply renames it)"
     return ""
 
+
 # Meridian's own control service (`meridian serve`, a uv-managed tool) and node agent.
 # The agent's names stay bland like the relay's: the Xray it runs is `netcore`.
 CONTROL_SERVICE_NAME = "ctld"

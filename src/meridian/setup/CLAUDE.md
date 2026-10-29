@@ -16,6 +16,8 @@
 
 **Attested lazy control plane** — panel construction waits for checkpointed bootstrap; readiness binds the reviewed host, URL, listener, and only the bootstrap's own inputs (control target, runtime pins, renderer contract, profile ports/SNI, hardening) to a remote marker, so editing another server never re-runs the panel provisioner.
 
+**Two control backends** — `control_service.py` mirrors the panel bootstrap and saves the service URL and admin token in `cluster.panel`, so subscription links keep their shape; verify, handoff (subscription only, no pages yet), and `meridian test` (`control_verification.py`) dispatch on `ControlPlaneIntent.backend`.
+
 ## What's done well
 - Downstream answers are invalidated whenever an earlier stage changes.
 - Apply accepts only the exact hash shown at review.

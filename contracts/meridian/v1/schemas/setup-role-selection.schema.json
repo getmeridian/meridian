@@ -2,8 +2,17 @@
   "$defs": {
     "ControlPlaneIntent": {
       "additionalProperties": false,
-      "description": "One server that owns the Remnawave control-plane workload.",
+      "description": "One server that owns the control-plane workload.",
       "properties": {
+        "backend": {
+          "default": "remnawave",
+          "enum": [
+            "remnawave",
+            "meridian"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
         "public_hostname": {
           "anyOf": [
             {

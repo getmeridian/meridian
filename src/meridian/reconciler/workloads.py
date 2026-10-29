@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import base64
 import secrets
 from collections.abc import Callable
 from typing import Protocol
+
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
 
 from meridian.cluster import (
     ClusterConfig,
@@ -238,3 +242,21 @@ def _require_complete_keys(workload_id: str, keys: RealityKeyBinding) -> None:
             f"Reality key material is incomplete for workload {workload_id}.",
             hint="Recover the public key, private key, and short ID together; Meridian will not rotate partial state.",
         )
+
+
+class LocalRealityKeyFactory:
+    """Generate one Reality key triple on this machine (X25519 in Xray's unpadded base64url)."""
+
+    def __call__(self, server_ref: str) -> RealityKeyBinding:
+        private = X25519PrivateKey.generate()
+        private_raw = private.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+        public_raw = private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        return RealityKeyBinding(
+            public_key=_xray_key(public_raw),
+            private_key=_xray_key(private_raw),
+            short_id=secrets.token_hex(4),
+        )
+
+
+def _xray_key(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")

@@ -33,6 +33,7 @@ from meridian.remnawave import (
     RemnawaveAuthError,
     RemnawaveError,
     RemnawaveNetworkError,
+    SubscriptionDocument,
     User,
 )
 from meridian.verification import (
@@ -56,7 +57,18 @@ from meridian.xray_client import (
     use_free_local_ports,
 )
 
-PanelFactory = Callable[[str, str, float], MeridianPanel]
+
+class VerificationPanel(Protocol):
+    """What client verification reads from the control backend."""
+
+    def __enter__(self) -> VerificationPanel: ...
+    def __exit__(self, *args: Any) -> None: ...
+    def get_user(self, username: str) -> User | None: ...
+    def list_users(self) -> list[User]: ...
+    def fetch_subscription(self, short_uuid: str, *, client_type: str = "") -> SubscriptionDocument: ...
+
+
+PanelFactory = Callable[[str, str, float], VerificationPanel]
 EndpointProbe = Callable[[str, int, float], bool]
 
 
@@ -81,6 +93,16 @@ class ConnectionTester(Protocol):
 def create_verification_panel(url: str, token: str, timeout: float) -> MeridianPanel:
     """Create a single-attempt panel client bounded by the verification timeout."""
     return MeridianPanel(url, token, timeout=max(1, math.ceil(timeout)), max_retries=1)
+
+
+def verification_panel_factory(cluster: ClusterConfig) -> PanelFactory:
+    """The fleet's control backend: Remnawave, or Meridian's own control service."""
+    intent = cluster.topology_intent
+    if intent is not None and intent.control.backend == "meridian":
+        from meridian.control_verification import ServiceVerificationPanel
+
+        return ServiceVerificationPanel
+    return create_verification_panel
 
 
 @dataclass(frozen=True)
@@ -161,7 +183,7 @@ def collect_connectivity_checks(
     client: str = "",
     basic: bool = False,
     timeout: float = 5,
-    panel_factory: PanelFactory = create_verification_panel,
+    panel_factory: PanelFactory | None = None,
     xray_provider: XrayProvider = ensure_xray_binary,
     connection_tester: ConnectionTester = test_connection,
 ) -> ConnectivityChecks:
@@ -221,7 +243,7 @@ def collect_connectivity_checks(
         target_ip,
         requested_client=client,
         timeout=timeout,
-        panel_factory=panel_factory,
+        panel_factory=panel_factory or verification_panel_factory(cluster),
         xray_provider=xray_provider,
         connection_tester=connection_tester,
     )
@@ -703,7 +725,7 @@ def _classify_attempt(
     )
 
 
-def select_active_client(panel: MeridianPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
+def select_active_client(panel: VerificationPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
     """Choose a deterministic active user with a usable canonical subscription."""
     intent = cluster.topology_intent
     if requested_client:

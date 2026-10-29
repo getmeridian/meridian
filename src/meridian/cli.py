@@ -490,6 +490,9 @@ def deploy_cmd(
         hidden=True,
         help="Stop at the next safe point once this file exists (used by Studio)",
     ),
+    control: str = typer.Option(
+        "remnawave", "--control", hidden=True, help="Control backend for a fresh fleet: remnawave or meridian"
+    ),
 ) -> None:
     """Deploy one server and get a shareable connection link
 
@@ -533,6 +536,7 @@ def deploy_cmd(
         events=events,
         dry_run=dry_run,
         cancel_file=cancel_file,
+        control=control,
     )
 
 

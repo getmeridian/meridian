@@ -18,7 +18,7 @@ from meridian.core.inputs import (
     OptionalSshUserValue,
 )
 from meridian.core.models import CoreModel
-from meridian.core.topology import TlsFingerprint
+from meridian.core.topology import ControlBackend, TlsFingerprint
 from meridian.core.workflow import InputField, InputOption, InputSection, WorkflowPlan
 
 DeployMode = Literal["first_deploy", "redeploy"]
@@ -47,6 +47,8 @@ class DeployRequest(CoreModel):
     fingerprint: TlsFingerprint | None = None
     # Camouflage with the operator's own hostname (sni, else domain) instead of a borrowed site.
     self_steal: bool = False
+    # Hidden until Meridian's own control service reaches parity (#95); a fresh fleet only.
+    control: ControlBackend = Field(default="remnawave", exclude_if=lambda control: control == "remnawave")
 
     @field_validator("fingerprint", mode="before")
     @classmethod

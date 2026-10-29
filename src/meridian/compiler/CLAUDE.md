@@ -9,6 +9,7 @@
 **Gateway rule targets** — a rule reaches an exit's bridge edge, a pool's balancer, or the gateway's own `direct`/`block` Outbound (no edge); `SetupIntent.gateway_routes()` is the one rule order, shared with the wizard summary.
 **Self-steal camouflage** — `self_steal.py`: a `self_steal` Reality path falls back to a loopback nginx TLS server holding the operator's own certificate (Reality `dest`, unknown-SNI stream fallback, relays inheriting the name, gateway bridges). XHTTP/WSS on the same name use that server, and the 443 route for the name belongs to Reality.
 **Capability-specific fallback** — Xray JSON, Mihomo, and sing-box (urltest; Remnawave omits XHTTP) get managed health-checked templates; Base64 gets ordered alternatives without a failover claim.
+**Meridian backend (hidden, #95)** — `ControlPlaneIntent.backend == "meridian"` runs `meridian_backend.py` after the Remnawave compile: refuse anything but one bare-IP exit on the control server, then swap panel kinds for `control_service`, `agent_runtime`, `node_workload`, `client_endpoint`, `control_user`, `service_settings`. Certificates never depend on the workload (the workload needs them).
 ## What's done well
 - Ports, tags, listener routes, and dependency order are deterministic; Realm hops are emitted downstream-first.
 - Every unique server has one baseline resource, and every server mutation depends on it.

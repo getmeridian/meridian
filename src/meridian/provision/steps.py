@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from meridian.core.events import CoreEventType
     from meridian.core.models import EventLevel
     from meridian.core.output import OperationContext
+    from meridian.provision.control_service import ControlServiceInstall
     from meridian.remnawave import MeridianPanel
 
 StepStatus = Literal["ok", "changed", "skipped", "failed"]
@@ -67,6 +68,8 @@ class ProvisionContext:
     ws_path: str = ""
     subscription_page_path: str = ""
     panel_api: MeridianPanel | None = field(default=None, repr=False)
+    # Meridian's own control service instead of the Remnawave panel stack (#95).
+    control_service: ControlServiceInstall | None = field(default=None, repr=False)
     cluster: ClusterConfig | None = field(default=None, repr=False)
 
     @property

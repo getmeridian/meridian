@@ -24,4 +24,10 @@ ResourceKind = Literal[
     "egress_pool",
     "route_rule",
     "probe",
+    "control_service",
+    "agent_runtime",
+    "node_workload",
+    "client_endpoint",
+    "control_user",
+    "service_settings",
 ]

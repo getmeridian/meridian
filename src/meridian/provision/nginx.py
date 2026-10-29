@@ -282,7 +282,9 @@ class ConfigureNginx:
         xhttp_internal_port: int | None = None,
         subscription_page_path: str | None = None,
         subscription_page_port: int | None = None,
+        control_service: bool = False,
     ) -> None:
+        self.control_service = control_service
         self.domain = domain
         self.reality_sni = reality_sni
         self.reality_backend_port = reality_backend_port
@@ -385,8 +387,9 @@ class ConfigureNginx:
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path=sub_page_path,
-                subscription_page_port=sub_page_port,
+                subscription_page_path="" if self.control_service else sub_page_path,
+                subscription_page_port=0 if self.control_service else sub_page_port,
+                control_service=self.control_service,
             )
         else:
             http_config = render_nginx_http_config(
@@ -399,8 +402,9 @@ class ConfigureNginx:
                 info_page_path=info_page_path,
                 xhttp_path=xhttp_path,
                 xhttp_internal_port=xhttp_internal_port,
-                subscription_page_path=sub_page_path,
-                subscription_page_port=sub_page_port,
+                subscription_page_path="" if self.control_service else sub_page_path,
+                subscription_page_port=0 if self.control_service else sub_page_port,
+                control_service=self.control_service,
             )
         result = conn.put_text(
             "/etc/nginx/conf.d/meridian-http.conf",

@@ -808,7 +808,8 @@
         "--events",
         "--request",
         "--dry-run",
-        "--cancel-file"
+        "--cancel-file",
+        "--control"
       ],
       "outcomes": [
         {

@@ -95,6 +95,7 @@ def run(
     events: str = "",
     dry_run: bool = False,
     cancel_file: str = "",
+    control: str = "remnawave",
 ) -> None:
     """Deploy (or redeploy) one server and hand off its first client.
 
@@ -134,6 +135,7 @@ def run(
                 ssh_port=ssh_port,
                 self_steal=self_steal,
                 fingerprint=fingerprint,
+                control=control,
             )
         )
         machine_mode = final_json or bool(request_path) or dry_run
@@ -571,7 +573,7 @@ def _print_success(server_ip: str, cluster: ClusterConfig, request: DeployReques
     err_console.print()
     line()
     err_console.print(f"\n  [dim]Redeploy with the same settings:  {_redeploy_command(server_ip, request)}[/dim]")
-    if cluster.panel.url:
+    if cluster.panel.url and request.control == "remnawave":
         err_console.print(f"  [dim]Remnawave panel (advanced):        {cluster.panel.display_url}[/dim]")
     err_console.print()
 
