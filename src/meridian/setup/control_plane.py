@@ -41,7 +41,7 @@ from meridian.resolve import ResolvedServer
 from meridian.servers import ServerEntry
 from meridian.ssh import ServerConnection
 
-_CONTROL_ATTESTATION_PATH = "/var/lib/meridian/control-runtime.attestation"
+CONTROL_RUNTIME_ATTESTATION_PATH = "/var/lib/meridian/control-runtime.attestation"
 
 
 def control_runtime_ready(
@@ -70,7 +70,7 @@ def control_runtime_ready(
     legacy = connection.run(LEGACY_PANEL_DIR_ABSENT, timeout=15)
     if not negated_path_is_absent(action.resource.logical_id, legacy, "legacy panel directory"):
         return False
-    attestation = connection.get_text(_CONTROL_ATTESTATION_PATH, timeout=15)
+    attestation = connection.get_text(CONTROL_RUNTIME_ATTESTATION_PATH, timeout=15)
     expected_attestation = control_runtime_attestation(action, plan)
     attestation_content = file_content_or_absent(
         action.resource.logical_id,
@@ -98,7 +98,7 @@ def write_control_runtime_attestation(
 ) -> None:
     result = ensure_file_content(
         connection,
-        _CONTROL_ATTESTATION_PATH,
+        CONTROL_RUNTIME_ATTESTATION_PATH,
         f"{control_runtime_attestation(action, plan)}\n",
         mode="600",
         create_parent=True,
