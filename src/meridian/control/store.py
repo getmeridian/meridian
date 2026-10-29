@@ -1,6 +1,7 @@
 """The control service's one SQLite file and its process-wide lock.
 
-`ControlService`, `NodeAuthority`, and `TrafficLedger` each own their tables
+`ControlService`, `NodeAuthority`, `TrafficLedger`, `TokenRegistry`, and
+`RevisionLedger` each own their tables
 and share this connection, lock, and change condition, so a transaction can
 span them and a waiting poll wakes on any revision.
 """
