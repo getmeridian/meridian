@@ -135,3 +135,26 @@ def test_redeploy_keeps_the_meridian_backend_without_the_switch() -> None:
     intent = request_intent(_intent(), DeployRequest(), server_ref="srv-a", address=ADDRESS)
 
     assert intent.control.backend == "meridian"
+
+
+@pytest.mark.parametrize("target", [ADDRESS, "198.51.100.20", "198.51.100.30"], ids=["control", "exit", "relay"])
+def test_verification_sees_a_control_service_fleet_like_a_panel_fleet(tmp_path, target: str) -> None:
+    """`meridian test` dropped route checks on a control-service fleet until it read client endpoints."""
+    from meridian.cluster import ClusterConfig
+    from meridian.servers import ServerEntry, ServerRegistry
+    from meridian.verification import resolve_deployment_verification_context
+
+    registry = ServerRegistry(tmp_path / "servers.json")
+    for ref, host in (("srv-a", ADDRESS), ("srv-b", "198.51.100.20"), ("srv-r", "198.51.100.30")):
+        registry.add(ServerEntry(host=host, user="root", id=ref))
+    meridian = _intent(exits=[*_intent().exits, _second_exit()], transparent_relays=[_relay()])
+    panel = meridian.model_copy(update={"control": meridian.control.model_copy(update={"backend": "remnawave"})})
+
+    contexts = []
+    for intent in (meridian, panel):
+        cluster = ClusterConfig()
+        cluster.topology_intent = intent
+        contexts.append(resolve_deployment_verification_context(registry, target, cluster=cluster)[1])
+
+    assert contexts[0] == contexts[1]
+    assert contexts[0].https_routes

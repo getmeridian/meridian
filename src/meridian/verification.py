@@ -4,18 +4,23 @@ from __future__ import annotations
 
 import ipaddress
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology, deployment_server_refs
 from meridian.compiler.models import (
+    ClientEndpointPayload,
     ControlPlaneRuntimePayload,
+    ControlServicePayload,
     HostPayload,
     InboundPayload,
     NginxArtifactPayload,
+    NodeWorkloadPayload,
     RealmHopPayload,
+    ResourcePayload,
+    ResourcePlan,
 )
 from meridian.core.errors import LocalStateError, MeridianError
 from meridian.core.inputs import is_ip, validate_hostname_value
@@ -399,25 +404,27 @@ def _v4_context(
     endpoint_addresses: set[str] = {target_ip}
     protocols: set[ProtocolKind] = set()
 
-    for resource in plan.resources:
-        payload = resource.payload
-        if isinstance(payload, ControlPlaneRuntimePayload) and payload.server_ref in matching_refs:
+    for logical_id, payload in _published_resources(plan):
+        if (
+            isinstance(payload, ControlPlaneRuntimePayload | ControlServicePayload)
+            and payload.server_ref in matching_refs
+        ):
             internal_ports["control/https"] = payload.internal_https_port
             continue
         if isinstance(payload, InboundPayload):
             server_ref = workload_servers.get(payload.workload_ref, "")
             if server_ref not in matching_refs:
                 continue
-            allocation = cluster.allocations.get(resource.logical_id)
+            allocation = cluster.allocations.get(logical_id)
             listen_port = allocation.port if allocation and allocation.port else payload.listen_port
             if listen_port and payload.purpose in ("bridge", "relay"):
-                internal_ports[f"{payload.purpose}/{resource.logical_id}"] = listen_port
+                internal_ports[f"{payload.purpose}/{logical_id}"] = listen_port
             elif listen_port and listen_port != payload.public_port:
                 internal_ports[f"{payload.workload_ref}/{payload.protocol}"] = listen_port
             continue
         if isinstance(payload, NginxArtifactPayload) and payload.server_ref in matching_refs:
             if payload.layer == "http":
-                internal_ports[f"nginx/{resource.logical_id}"] = payload.listener_port
+                internal_ports[f"nginx/{logical_id}"] = payload.listener_port
             continue
         if isinstance(payload, RealmHopPayload) and payload.server_ref in matching_refs:
             if payload.advertised:
@@ -426,7 +433,7 @@ def _v4_context(
             else:
                 internal_ports[f"realm/{payload.chain_ref}/hop/{payload.hop_index}"] = payload.listen_port
             continue
-        if not isinstance(payload, HostPayload):
+        if not isinstance(payload, HostPayload | ClientEndpointPayload):
             continue
 
         endpoint_ip = addresses.get(payload.address_server_ref, "")
@@ -434,7 +441,8 @@ def _v4_context(
         owner_is_related = (
             payload.owner_ref in target_exit_ids or relay_exit_by_id.get(payload.owner_ref) in target_exit_ids
         )
-        is_public = payload.advertised and not payload.is_hidden
+        # The control service publishes only the visible primary entries (`compiler/meridian_backend.py`).
+        is_public = isinstance(payload, ClientEndpointPayload) or (payload.advertised and not payload.is_hidden)
         if is_public and (payload.address_server_ref in matching_refs or owner_is_related):
             if endpoint:
                 endpoint_addresses.add(endpoint)
@@ -515,6 +523,15 @@ def _v4_context(
         connection_page_path=cluster.panel.sub_path if intent.control.server_ref in matching_refs else "",
         expected_egress_ip=expected_egress_ip,
     )
+
+
+def _published_resources(plan: ResourcePlan) -> Iterator[tuple[str, ResourcePayload]]:
+    """Every payload by logical ID, with the Inbounds a control-service workload embeds in its profile."""
+    for resource in plan.resources:
+        yield resource.logical_id, resource.payload
+        if isinstance(resource.payload, NodeWorkloadPayload):
+            profile = resource.payload.profile
+            yield from zip(profile.inbound_refs, profile.inbounds, strict=True)
 
 
 def _v4_expected_egress_ip(
