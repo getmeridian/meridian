@@ -234,6 +234,24 @@ def test_a_new_traffic_period_resets_use(service: ControlService, strategy: str,
     assert service.get_user("alice").used_traffic_bytes == 0  # type: ignore[union-attr]
 
 
+def test_traffic_arriving_after_midnight_counts_toward_the_new_day_and_limits_it(service: ControlService) -> None:
+    alice = service.put_user("alice")
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=1000, traffic_limit_strategy="day"))
+    service.enforce("2026-10-29T00:00:01Z")
+
+    def stats(total: int, seq: int, now: str) -> None:
+        traffic = UserTraffic(user_id=alice.user_id, uplink_bytes=total, downlink_bytes=0)
+        report = StatsReport(counter_epoch=EPOCH, seq=seq, collected_at=now, users=[traffic])
+        service.record_stats("main", report, now)
+
+    stats(500, 1, "2026-10-29T23:59:00Z")
+    stats(1700, 2, "2026-10-30T00:00:05Z")
+    service.enforce("2026-10-30T00:00:20Z")  # the timer's next tick must not fold the new day's use away
+
+    alice_now = service.get_user("alice")
+    assert alice_now is not None and (alice_now.used_traffic_bytes, alice_now.status) == (1200, "limited")
+
+
 def test_traffic_without_a_reset_strategy_accumulates(service: ControlService) -> None:
     alice = service.put_user("alice")
     _count(service, alice.user_id, 1200, seq=1)

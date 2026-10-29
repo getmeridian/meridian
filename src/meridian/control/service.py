@@ -52,7 +52,7 @@ from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
 from meridian.control.traffic import PER_EPOCH_BASELINES, TrafficLedger
 from meridian.core.agent_desired import DesiredNodeState
-from meridian.core.agent_protocol import ObservedStateReport, PollRequest
+from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
@@ -485,6 +485,21 @@ class ControlService:
             if changed:
                 self._compose_all()
             return changed
+
+    def record_stats(self, node_id: str, report: StatsReport, now: str | None = None) -> StatsAck:
+        """Count an agent's stats report and enforce limits on it, in one transaction.
+
+        Periods advance before the growth is counted: traffic that arrives after a UTC
+        boundary belongs to the new period, and a reset the timer ran afterwards would
+        fold it into the offset and erase it.
+        """
+        moment = now or utc_now()
+        with self._transaction():
+            changed = self._enforce(moment)
+            ack = self.traffic.count(node_id, report)
+            if [*changed, *self._enforce(moment)]:
+                self._compose_all()
+        return ack
 
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:

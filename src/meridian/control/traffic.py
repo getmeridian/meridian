@@ -73,60 +73,64 @@ class TrafficLedger:
 
     def record(self, node_id: str, report: StatsReport) -> StatsAck:
         """Count one stats report idempotently and acknowledge the highest counted `seq` of its epoch."""
+        with self._store.transaction():
+            return self.count(node_id, report)
+
+    def count(self, node_id: str, report: StatsReport) -> StatsAck:
+        """`record()` inside a transaction the caller holds."""
         db = self._store.db
         epoch = report.counter_epoch
-        with self._store.transaction():
-            last = self._store.row(
-                "SELECT seq FROM traffic_reports WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch)
+        last = self._store.row(
+            "SELECT seq FROM traffic_reports WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch)
+        )
+        if last is not None and report.seq <= last["seq"]:
+            return StatsAck(counter_epoch=epoch, acked_seq=int(last["seq"]))
+        if (
+            last is None
+            and db.execute(
+                "SELECT 1 FROM traffic_retired_epochs WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch)
+            ).fetchone()
+        ):
+            return StatsAck(counter_epoch=epoch, acked_seq=report.seq)
+        baselines = {
+            str(row["user_id"]): (int(row["uplink_bytes"]), int(row["downlink_bytes"]))
+            for row in self._store.rows(
+                "SELECT user_id, uplink_bytes, downlink_bytes FROM traffic_counters"
+                " WHERE node_id = ? AND counter_epoch = ?",
+                (node_id, epoch),
             )
-            if last is not None and report.seq <= last["seq"]:
-                return StatsAck(counter_epoch=epoch, acked_seq=int(last["seq"]))
-            if (
-                last is None
-                and db.execute(
-                    "SELECT 1 FROM traffic_retired_epochs WHERE node_id = ? AND counter_epoch = ?", (node_id, epoch)
-                ).fetchone()
-            ):
-                return StatsAck(counter_epoch=epoch, acked_seq=report.seq)
-            baselines = {
-                str(row["user_id"]): (int(row["uplink_bytes"]), int(row["downlink_bytes"]))
-                for row in self._store.rows(
-                    "SELECT user_id, uplink_bytes, downlink_bytes FROM traffic_counters"
-                    " WHERE node_id = ? AND counter_epoch = ?",
-                    (node_id, epoch),
+        }
+        growth: list[tuple[str, int, int, int, int]] = []
+        for user in report.users:
+            base_up, base_down = baselines.get(user.user_id, (0, 0))
+            up, down = user.uplink_bytes - base_up, user.downlink_bytes - base_down
+            if up < 0 or down < 0:
+                raise agent_error(
+                    "counter_regression", f"Counters of {user.user_id} went down within one counter epoch."
                 )
-            }
-            growth: list[tuple[str, int, int, int, int]] = []
-            for user in report.users:
-                base_up, base_down = baselines.get(user.user_id, (0, 0))
-                up, down = user.uplink_bytes - base_up, user.downlink_bytes - base_down
-                if up < 0 or down < 0:
-                    raise agent_error(
-                        "counter_regression", f"Counters of {user.user_id} went down within one counter epoch."
-                    )
-                growth.append((user.user_id, user.uplink_bytes, user.downlink_bytes, up, down))
-            now = utc_now()
-            for user_id, total_up, total_down, up, down in growth:
-                db.execute(
-                    "INSERT INTO traffic_counters VALUES (?, ?, ?, ?, ?) ON CONFLICT(node_id, counter_epoch, user_id)"
-                    " DO UPDATE SET uplink_bytes = excluded.uplink_bytes, downlink_bytes = excluded.downlink_bytes",
-                    (node_id, epoch, user_id, total_up, total_down),
-                )
-                if up or down:
-                    db.execute(
-                        "INSERT INTO traffic_totals VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET"
-                        " uplink_bytes = uplink_bytes + excluded.uplink_bytes,"
-                        " downlink_bytes = downlink_bytes + excluded.downlink_bytes,"
-                        " last_seen_at = excluded.last_seen_at",
-                        (user_id, up, down, now),
-                    )
+            growth.append((user.user_id, user.uplink_bytes, user.downlink_bytes, up, down))
+        now = utc_now()
+        for user_id, total_up, total_down, up, down in growth:
             db.execute(
-                "INSERT INTO traffic_reports VALUES (?, ?, ?,"
-                " (SELECT COALESCE(MAX(arrival), 0) + 1 FROM traffic_reports WHERE node_id = ?))"
-                " ON CONFLICT(node_id, counter_epoch) DO UPDATE SET seq = excluded.seq, arrival = excluded.arrival",
-                (node_id, epoch, report.seq, node_id),
+                "INSERT INTO traffic_counters VALUES (?, ?, ?, ?, ?) ON CONFLICT(node_id, counter_epoch, user_id)"
+                " DO UPDATE SET uplink_bytes = excluded.uplink_bytes, downlink_bytes = excluded.downlink_bytes",
+                (node_id, epoch, user_id, total_up, total_down),
             )
-            self._retire_beyond_kept(node_id)
+            if up or down:
+                db.execute(
+                    "INSERT INTO traffic_totals VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET"
+                    " uplink_bytes = uplink_bytes + excluded.uplink_bytes,"
+                    " downlink_bytes = downlink_bytes + excluded.downlink_bytes,"
+                    " last_seen_at = excluded.last_seen_at",
+                    (user_id, up, down, now),
+                )
+        db.execute(
+            "INSERT INTO traffic_reports VALUES (?, ?, ?,"
+            " (SELECT COALESCE(MAX(arrival), 0) + 1 FROM traffic_reports WHERE node_id = ?))"
+            " ON CONFLICT(node_id, counter_epoch) DO UPDATE SET seq = excluded.seq, arrival = excluded.arrival",
+            (node_id, epoch, report.seq, node_id),
+        )
+        self._retire_beyond_kept(node_id)
         return StatsAck(counter_epoch=epoch, acked_seq=report.seq)
 
     def _retire_beyond_kept(self, node_id: str) -> None:

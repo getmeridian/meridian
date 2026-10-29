@@ -496,7 +496,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def agent_stats(self, _match: re.Match[str]) -> Any:
         service, session = self._session()
-        return service.traffic.record(session.node_id, self._model(StatsReport))
+        return service.record_stats(session.node_id, self._model(StatsReport))
 
     def agent_blob(self, match: re.Match[str]) -> Any:
         service, session = self._session()
