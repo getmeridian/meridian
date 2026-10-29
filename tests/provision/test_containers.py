@@ -161,3 +161,13 @@ def test_health_timeout_says_the_stack_started_and_why_it_is_not_healthy() -> No
 
     assert result.started is True
     assert "restarts 4, health unhealthy" in result.detail
+
+
+def test_an_up_killed_by_its_timeout_says_so_instead_of_quoting_progress() -> None:
+    conn = MockConnection()
+    conn.when("docker compose up", rc=124, stderr=" Network ctlsvc_internal  Creating\n Volume ctlsvc_data  Created\n")
+
+    result = _deploy(conn, up_timeout=600)
+
+    assert result.detail.startswith("docker compose up did not finish within 600 s")
+    assert "Creating" not in result.detail

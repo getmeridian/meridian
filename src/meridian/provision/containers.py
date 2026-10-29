@@ -61,6 +61,7 @@ def deploy_compose_stack(
     pull_retries: int = 3,
     pull_retry_delay: float = 10,
     pull_timeout: int = 300,
+    up_timeout: int = 120,
     service_name: str = "",
     stop_first: bool = False,
 ) -> ComposeDeployResult:
@@ -84,6 +85,8 @@ def deploy_compose_stack(
         pull_retries: Number of ``docker compose pull`` attempts.
         pull_retry_delay: Seconds between pull retries.
         pull_timeout: Timeout in seconds for each pull attempt.
+        up_timeout: Timeout for ``docker compose up -d``, which waits for every
+            ``depends_on: service_healthy`` dependency before starting dependents.
         service_name: Label for log collection on failure.
         stop_first: Run ``docker compose down`` before pull+up.
 
@@ -158,14 +161,15 @@ def deploy_compose_stack(
         )
 
     # -- Bring stack up --
-    result = conn.run("docker compose up -d", cwd=work_dir, timeout=120)
+    result = conn.run("docker compose up -d", cwd=work_dir, timeout=up_timeout)
     if result.returncode != 0:
         logs = collect_stack_diagnostics(conn, work_dir)
-        return ComposeDeployResult(
-            changed=False,
-            detail=f"docker compose up failed: {compose_error(result.stderr)}\n{logs}",
-            logs=logs,
-        )
+        if getattr(result, "timed_out", False) or result.returncode == 124:
+            # Killed mid-wait, Compose never printed its error: say so instead of quoting progress lines.
+            failure = f"docker compose up did not finish within {up_timeout} s (containers still starting)"
+        else:
+            failure = f"docker compose up failed: {compose_error(result.stderr)}"
+        return ComposeDeployResult(changed=False, detail=f"{failure}\n{logs}", logs=logs)
 
     # -- Health check (optional) --
     if health_check is not None:

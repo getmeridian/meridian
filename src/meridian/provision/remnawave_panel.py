@@ -569,6 +569,10 @@ class DeployRemnawavePanel:
             health_check=_panel_healthy,
             health_timeout=120,
             health_interval=3.0,
+            # `up -d` waits for the backend's health (first check 30 s in, then every 30 s) before
+            # starting the subscription page; a 1 vCPU server took 104 s under load, and 120 s
+            # killed it mid-wait on testers' servers with only progress lines to show.
+            up_timeout=600,
             service_name="Remnawave panel",
             stop_first=True,
         )
