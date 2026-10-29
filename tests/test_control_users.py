@@ -227,10 +227,11 @@ def test_a_new_traffic_period_resets_use(
     service: ControlService, monkeypatch: pytest.MonkeyPatch, strategy: str, inside: str, next_period: str
 ) -> None:
     # Edits enforce at the service's own clock; a real one inside `next_period`'s period hid the reset.
-    monkeypatch.setattr("meridian.control.service.utc_now", lambda: inside.replace("23:59:59", "00:00:01"))
+    period_began = inside.replace("23:59:59", "00:00:01")
+    monkeypatch.setattr("meridian.control.service.utc_now", lambda: period_began)
     alice = service.put_user("alice")
     service.update_user("alice", UserUpdate(traffic_limit_bytes=1000, traffic_limit_strategy=strategy))  # type: ignore[arg-type]
-    service.enforce(inside.replace("23:59:59", "00:00:01"))
+    service.enforce(period_began)
     _count(service, alice.user_id, 1200, seq=1)
 
     assert service.enforce(inside) == ["alice"]

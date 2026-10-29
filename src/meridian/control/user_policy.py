@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
-from meridian.control.models import LimitStrategy, UserImport, UserRecord, UserStatus
+from meridian.control.models import UserImport, UserRecord, UserStatus
+from meridian.control.periods import period_start
 
 
 def enforced_status(user: UserRecord, now: str) -> UserStatus:
@@ -15,18 +16,6 @@ def enforced_status(user: UserRecord, now: str) -> UserStatus:
         return "expired"
     over = user.traffic_limit_bytes > 0 and user.used_traffic_bytes >= user.traffic_limit_bytes
     return "limited" if over else "active"
-
-
-def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
-    """The start of the traffic period *now* falls in (UTC), or None when traffic never resets."""
-    midnight = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    if strategy == "day":
-        return midnight
-    if strategy == "week":
-        return midnight - timedelta(days=midnight.weekday())
-    if strategy == "month":
-        return midnight.replace(day=1)
-    return None
 
 
 def whole_seconds(timestamp: str | None) -> str | None:

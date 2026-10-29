@@ -17,7 +17,7 @@ import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +47,7 @@ from meridian.control.models import (
     users_resource_id,
 )
 from meridian.control.owner import UI_TABLES, OwnerAuth
+from meridian.control.periods import period_start
 from meridian.control.privacy import PRIVACY_TABLES, PrivacyLedger, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
@@ -59,7 +60,7 @@ from meridian.control.subscriptions import (
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
 from meridian.control.traffic import DAILY_TABLES, PER_EPOCH_BASELINES, TrafficLedger
-from meridian.control.user_policy import enforced_status, period_began, period_start, whole_seconds
+from meridian.control.user_policy import enforced_status, period_began, whole_seconds
 from meridian.control.users import USER_SELECT, user_record
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
@@ -135,6 +136,7 @@ class ControlService:
 
     def __init__(self, database: Path, *, fleet_id: str, version: str, clock: Callable[[], float] = time.time) -> None:
         self._version = version
+        self._clock = clock
         self._store = Store(database)
         self._lock = self._store.lock
         self._changed = self._store.changed
@@ -647,6 +649,7 @@ class ControlService:
             document,
             profile_title=settings.profile_title,
             public_url=settings.public_url,
+            now=datetime.fromtimestamp(self._clock(), UTC),
             placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
             extra_headers=hwid_flags,
         )

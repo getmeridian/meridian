@@ -24,6 +24,7 @@ from meridian.control.formats.selector import DocumentFormat
 from meridian.control.formats.singbox import singbox_document
 from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
+from meridian.control.periods import next_period_start
 from meridian.core.defaults import SUPPORT_PAGE
 
 JSON_TYPE = "application/json; charset=utf-8"
@@ -66,15 +67,16 @@ def render_subscription(
 ) -> SubscriptionResponse:
     """Render *document* for *user*; a suspended user's entries are status placeholders."""
     placeholders = user.placeholders if placeholder_remarks is None else placeholder_remarks
+    moment = now or datetime.now(UTC)
     if document == "browser":
         info = subscription_info(
             user,
             links(endpoints, user.uuid, placeholders),
             subscription_url(public_url, user.short_id),
-            now or datetime.now(UTC),
+            moment,
         )
-        return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS))
-    headers = subscription_headers(user, profile_title=profile_title, public_url=public_url)
+        return SubscriptionResponse(200, JSON_TYPE, _json(info), dict(COMMON_HEADERS) | _refill_headers(user, moment))
+    headers = subscription_headers(user, profile_title=profile_title, public_url=public_url, now=moment)
     headers.update(extra_headers or {})
     if document == "xray-json":
         body = _json(xray_json_document(endpoints, user.uuid, placeholders))
@@ -93,9 +95,12 @@ def unknown_subscription() -> SubscriptionResponse:
     return SubscriptionResponse(404, JSON_TYPE, _json(not_found()), dict(COMMON_HEADERS))
 
 
-def subscription_headers(user: SubscriptionUser, *, profile_title: str, public_url: str = "") -> dict[str, str]:
+def subscription_headers(
+    user: SubscriptionUser, *, profile_title: str, public_url: str = "", now: datetime | None = None
+) -> dict[str, str]:
     """The headers apps read: name, traffic and expiry, refresh interval, and page links."""
     headers = dict(COMMON_HEADERS)
+    headers.update(_refill_headers(user, now or datetime.now(UTC)))
     headers["content-disposition"] = _disposition(user.username)
     # Upload and download are one total until per-direction counters exist; `expire` 0 is "never".
     expire = 0
@@ -116,6 +121,11 @@ def subscription_headers(user: SubscriptionUser, *, profile_title: str, public_u
 def subscription_url(public_url: str, short_id: str) -> str:
     """The URL apps subscribe to (and a browser opens); empty without a public URL."""
     return f"{public_url}/sub/{quote(short_id, safe='')}" if public_url else ""
+
+
+def _refill_headers(user: SubscriptionUser, now: datetime) -> dict[str, str]:
+    next_start = next_period_start(user.limit_strategy, now)
+    return {"subscription-refill-date": str(int(next_start.timestamp()))} if next_start is not None else {}
 
 
 def _disposition(username: str) -> str:

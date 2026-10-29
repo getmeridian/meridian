@@ -26,6 +26,8 @@ that dials out to it.
   IP limits).
 
 ### Control service
+- Subscriptions expose the next UTC day, week, or month quota reset as Unix seconds
+  in the subscription-refill-date header.
 - Subscription links accept /v2ray-json, /stash, and /clash alongside the
   existing explicit formats.
 - **Subscription status** — `/sub/<token>/info` returns account status and connection
