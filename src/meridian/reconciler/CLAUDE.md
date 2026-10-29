@@ -22,6 +22,7 @@
 
 ## Pitfalls
 
+- **An unseen but installed agent gets its backoff first** — after a control-service outage a healthy agent reads not-live until it retries (≤ 60 s); `AgentRuntimeDriver.apply` waits for it before re-enrolling, which once re-keyed every agent on the first apply after a ctld restart.
 - **Raise `UnknownResourceOutcome` for an uncertain mutation** (a timeout or SSH exit 255) — never catch it as an ordinary failure or retry it through `StallRetry`; the executor observes before any retry. Only transport loss marks evidence retryable.
 - **Unavailable evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
 - **Access users are partly operator-owned** — manage only username and squads (the control service's user driver only creates); status, description, limits, expiry, and quotas are the operator's (rewriting them undid `client disable`).

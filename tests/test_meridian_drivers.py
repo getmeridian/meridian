@@ -24,6 +24,7 @@ from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
 from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP
+from meridian.reconciler import meridian_drivers
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -271,3 +272,34 @@ def test_fingerprint_copies_reach_the_service_flagged(plan: ResourcePlan) -> Non
     drivers["client_endpoint"].apply(_action(plan, "endpoint:main:main-reality:direct:firefox"), None)
 
     assert control.endpoints["main:main-reality:direct:firefox"].fingerprint_copy is True
+
+
+def _installed_agent(plan: ResourcePlan) -> tuple[dict[str, Any], FakeControl, MockConnection]:
+    conn = MockConnection()
+    conn.when("uname -m", stdout="x86_64\n")
+    conn.when("sha256sum", stdout=f"{BINARY.sha256}  {AGENT_BINARY}\n")
+    conn.when("systemctl is-active", stdout="active\n")
+    conn.when(f"cat {AGENT_BOOTSTRAP}", stdout=_enrolled_bootstrap())
+    drivers, control, _cluster = _setup(plan, conn)
+    return drivers, control, conn
+
+
+def test_an_installed_agent_back_from_a_service_outage_is_not_re_enrolled(plan: ResourcePlan) -> None:
+    drivers, control, conn = _installed_agent(plan)
+    control.reports = [{"last_seen_at": "2000-01-01T00:00:00Z"}] * 3 + [{"last_seen_at": "2999-01-01T00:00:00Z"}]
+
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert control.tokens == []
+    assert AGENT_BINARY not in conn.write_map
+
+
+def test_an_installed_agent_that_never_returns_is_enrolled_again(plan: ResourcePlan) -> None:
+    drivers, control, conn = _installed_agent(plan)
+    unseen = int(meridian_drivers.AGENT_RECONNECT_SECONDS / meridian_drivers.POLL_INTERVAL) + 1
+    control.reports = [{"last_seen_at": "2000-01-01T00:00:00Z"}] * unseen + [{"last_seen_at": "2999-01-01T00:00:00Z"}]
+
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert len(control.tokens) == 1
+    assert conn.write_map[AGENT_BINARY] == BINARY.data

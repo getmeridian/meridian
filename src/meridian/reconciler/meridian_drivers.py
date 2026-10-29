@@ -49,6 +49,8 @@ from meridian.xray_workload import salamander_password
 
 # An agent polls at least every 35 s (25 s wait plus margin); twice that is "seen".
 AGENT_CONNECT_TIMEOUT = 90.0
+# An agent that lost the service retries with a backoff of at most 60 s.
+AGENT_RECONNECT_SECONDS = 75.0
 # The first apply downloads the Xray archive (about 21 MB) before anything runs.
 WORKLOAD_APPLY_TIMEOUT = 300.0
 POLL_INTERVAL = 3.0
@@ -118,23 +120,15 @@ class AgentRuntimeDriver:
 
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         payload = payload_of(action, AgentRuntimePayload)
-        conn = self.context.connection_for(payload.server_ref)
-        arch = _run(conn, "uname -m", "read the architecture").strip()
-        binary = self.context.agent_binary(arch)
-        installed = _run(conn, f"sha256sum {AGENT_BINARY} 2>/dev/null || true", "hash the agent").split()
-        active = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15).stdout.strip() == "active"
-        bootstrap = conn.run(f"cat {AGENT_BOOTSTRAP} 2>/dev/null", timeout=15, sensitive=True).stdout
-        with self.context.client() as client:
-            ca_sha256 = client.fleet_authority().ca_sha256
-            status = client.node(payload.workload_ref)
-        expected = self._identity(payload, ca_sha256)
-        current = _bootstrap_identity(bootstrap)
-        in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
-        seen = status is not None and status.is_live()
+        in_place, seen = self._inspect(payload)
         return _observation(action, exists=in_place, connected=in_place and seen, remote_id=payload.workload_ref)
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
         payload = payload_of(action, AgentRuntimePayload)
+        in_place, seen = self._inspect(payload)
+        if in_place and not seen and self._reconnects(payload):
+            # A service outage leaves a healthy agent unseen until its backoff ends; re-enrolling it is churn.
+            return ResourceApplyReceipt(remote_id=payload.workload_ref)
         conn = self.context.connection_for(payload.server_ref)
         arch = _run(conn, "uname -m", "read the architecture").strip()
         binary = self.context.agent_binary(arch)
@@ -178,6 +172,31 @@ class AgentRuntimeDriver:
                     )
                 self.context.sleep(POLL_INTERVAL)
         return ResourceApplyReceipt(remote_id=payload.workload_ref)
+
+    def _inspect(self, payload: AgentRuntimePayload) -> tuple[bool, bool]:
+        """Whether this agent build runs with the expected identity, and whether the service sees it live."""
+        conn = self.context.connection_for(payload.server_ref)
+        arch = _run(conn, "uname -m", "read the architecture").strip()
+        binary = self.context.agent_binary(arch)
+        installed = _run(conn, f"sha256sum {AGENT_BINARY} 2>/dev/null || true", "hash the agent").split()
+        active = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15).stdout.strip() == "active"
+        bootstrap = conn.run(f"cat {AGENT_BOOTSTRAP} 2>/dev/null", timeout=15, sensitive=True).stdout
+        with self.context.client() as client:
+            ca_sha256 = client.fleet_authority().ca_sha256
+            status = client.node(payload.workload_ref)
+        expected = self._identity(payload, ca_sha256)
+        current = _bootstrap_identity(bootstrap)
+        in_place = bool(installed) and installed[0] == binary.sha256 and active and current == expected
+        return in_place, status is not None and status.is_live()
+
+    def _reconnects(self, payload: AgentRuntimePayload) -> bool:
+        with self.context.client() as client:
+            for _ in range(int(AGENT_RECONNECT_SECONDS / POLL_INTERVAL)):
+                self.context.sleep(POLL_INTERVAL)
+                status = client.node(payload.workload_ref)
+                if status is not None and status.is_live():
+                    return True
+        return False
 
     def retire(self, binding: ManagedResourceBinding) -> None:
         if not binding.server_ref:
