@@ -2,7 +2,7 @@
 
 The first config, "Automatic", puts every primary entry behind the health-checked
 `MERIDIAN_AUTO` balancer (`compiler.delivery.xray_json_template`); fingerprint copies get
-their own "Automatic · <fingerprint>" config, so no balancer ever mixes fingerprints. A
+one "Automatic · <fingerprint>" config per fingerprint, so no balancer ever mixes fingerprints. A
 suspended user gets one config per placeholder with no proxy at all (the balancer falls
 back to BLOCK). `meridian test` reads the first config (`xray_client.parse_xray_subscription`).
 """
@@ -16,8 +16,7 @@ from meridian.compiler.delivery import xray_json_template
 from meridian.control.formats.entries import (
     AUTOMATIC,
     absolute,
-    copies,
-    copies_remark,
+    copy_groups,
     primaries,
     tls_fingerprint,
 )
@@ -34,8 +33,7 @@ def xray_json_document(
     if placeholders:
         return [_config([], uuid, remark) for remark in placeholders]
     configs = [_config(primaries(endpoints), uuid, AUTOMATIC)]
-    if alternates := copies(endpoints):
-        configs.append(_config(alternates, uuid, copies_remark(endpoints)))
+    configs += [_config(members, uuid, remark) for remark, members in copy_groups(endpoints)]
     return configs
 
 

@@ -21,6 +21,7 @@ import yaml
 
 from meridian.control.formats.entries import STATUS_REMARKS, SubscriptionUser, UserStatus
 from meridian.control.formats.selector import DocumentFormat, select_format
+from meridian.control.formats.xray_json import xray_json_document
 from meridian.control.models import ClientEndpoint
 from meridian.control.subscriptions import SubscriptionResponse, render_subscription
 from meridian.xray_client import parse_xray_subscription, proxy_outbounds
@@ -222,6 +223,40 @@ def test_wss_joins_every_failover_group() -> None:
     balancer = automatic["routing"]["balancers"][0]["selector"]
     ws_tag = next(item["tag"] for item in proxy_outbounds(automatic) if item["streamSettings"]["network"] == "ws")
     assert any(ws_tag.startswith(prefix) for prefix in balancer)
+
+
+def test_a_safari_paths_two_copies_get_an_automatic_config_each() -> None:
+    endpoints = [
+        ClientEndpoint(
+            remark=f"Reality · {label}",
+            protocol="reality",
+            address=EXIT_B,
+            port=443,
+            position=position,
+            fingerprint=label.lower(),
+            reality_sni=DOMAIN,
+            reality_public_key=KEYS["exit-b"][0],
+            reality_short_id=KEYS["exit-b"][1],
+            fingerprint_copy=label != "Safari",
+        )
+        for position, label in enumerate(("Safari", "Chrome", "Firefox"))
+    ]
+
+    configs = xray_json_document(endpoints, UUID)
+
+    fingerprints = {
+        config["remarks"]: sorted(
+            outbound["streamSettings"]["realitySettings"]["fingerprint"]
+            for outbound in config["outbounds"]
+            if outbound.get("protocol") == "vless"
+        )
+        for config in configs
+    }
+    assert fingerprints == {
+        "Automatic": ["safari"],
+        "Automatic · Chrome": ["chrome"],
+        "Automatic · Firefox": ["firefox"],
+    }
 
 
 def test_links_from_the_public_url_are_left_out_without_one() -> None:

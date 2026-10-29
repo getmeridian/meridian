@@ -66,10 +66,16 @@ def copies(endpoints: list[ClientEndpoint]) -> list[ClientEndpoint]:
     return [endpoint for endpoint in ordered(endpoints) if endpoint.fingerprint_copy]
 
 
-def copies_remark(endpoints: list[ClientEndpoint]) -> str:
-    """Remark of the copies' own automatic entry: their fingerprint, or "Backup" when they mix."""
-    labels = sorted({fingerprint_label(endpoint.fingerprint) for endpoint in copies(endpoints)})
-    return f"{AUTOMATIC} · {labels[0] if len(labels) == 1 else 'Backup'}"
+def copy_groups(endpoints: list[ClientEndpoint]) -> list[tuple[str, list[ClientEndpoint]]]:
+    """Fingerprint copies grouped by fingerprint, in view order, each with its automatic entry's remark.
+
+    A path whose primary is neither copy fingerprint (Safari) has two copies; one group holding
+    both would switch fingerprints toward the same server, which TSPU escalates.
+    """
+    groups: dict[str, list[ClientEndpoint]] = {}
+    for endpoint in copies(endpoints):
+        groups.setdefault(fingerprint_label(endpoint.fingerprint), []).append(endpoint)
+    return [(f"{AUTOMATIC} · {label}", members) for label, members in groups.items()]
 
 
 def tls_fingerprint(endpoint: ClientEndpoint) -> str:
