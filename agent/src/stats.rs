@@ -38,6 +38,10 @@ pub struct TrafficStore {
     /// The last `seq` handed out; each send attempt takes a new one.
     pub seq: u64,
     pub users: BTreeMap<String, Totals>,
+    /// Final totals of users the service counted before the document dropped them: one who
+    /// comes back (re-enabled) continues from here, because the service kept its baseline.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub retired: BTreeMap<String, Totals>,
 }
 
 impl TrafficStore {
@@ -46,6 +50,7 @@ impl TrafficStore {
             counter_epoch: random_uuid()?,
             seq: 0,
             users: BTreeMap::new(),
+            retired: BTreeMap::new(),
         })
     }
 
@@ -80,8 +85,13 @@ impl TrafficStore {
     /// Add one round of reset counters.
     pub fn fold(&mut self, deltas: &BTreeMap<String, Totals>) {
         for (user, delta) in deltas {
-            if !self.users.contains_key(user) && self.users.len() >= MAX_USERS {
-                continue;
+            if !self.users.contains_key(user) {
+                if self.users.len() >= MAX_USERS {
+                    continue;
+                }
+                if let Some(last) = self.retired.remove(user) {
+                    self.users.insert(user.clone(), last);
+                }
             }
             let total = self.users.entry(user.clone()).or_default();
             total.uplink = total.uplink.saturating_add(delta.uplink).min(MAX_COUNT);
@@ -110,8 +120,9 @@ impl TrafficStore {
         }
     }
 
-    /// The service counted everything up to the latest report: forget users no longer managed
-    /// (that report held their final totals). Returns whether the store changed.
+    /// The service counted everything up to the latest report: retire users no longer managed
+    /// (that report held their final totals), so they leave reports but keep their baseline.
+    /// Returns whether the store changed.
     pub fn acknowledged(&mut self, ack: &StatsAck, managed: &BTreeSet<String>) -> bool {
         if ack.kind != "stats_ack"
             || ack.counter_epoch != self.counter_epoch
@@ -119,9 +130,23 @@ impl TrafficStore {
         {
             return false;
         }
-        let before = self.users.len();
-        self.users.retain(|user, _| managed.contains(user));
-        self.users.len() != before
+        let gone: Vec<String> = self
+            .users
+            .keys()
+            .filter(|user| !managed.contains(*user))
+            .cloned()
+            .collect();
+        let mut changed = false;
+        for user in gone {
+            // A full retired set keeps the user reported instead: never restart a baseline.
+            if self.retired.len() >= MAX_USERS {
+                break;
+            }
+            let total = self.users.remove(&user).expect("listed above");
+            self.retired.insert(user, total);
+            changed = true;
+        }
+        changed
     }
 }
 
@@ -250,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn only_an_ack_of_the_latest_report_forgets_removed_users() {
+    fn only_an_ack_of_the_latest_report_retires_removed_users() {
         let mut store = TrafficStore::new().unwrap();
         store.fold(&deltas(&[("u-1", 1, 1), ("u-2", 2, 2)]));
         store.next_report("2026-10-29T10:00:00Z".into());
@@ -266,6 +291,27 @@ mod tests {
         assert!(!store.acknowledged(&ack(2, &other), &managed));
         assert!(store.acknowledged(&ack(2, &store.counter_epoch.clone()), &managed));
         assert_eq!(store.users.keys().collect::<Vec<_>>(), ["u-1"]);
+    }
+
+    #[test]
+    fn a_user_who_returns_continues_from_the_totals_the_service_counted() {
+        let mut store = TrafficStore::new().unwrap();
+        store.fold(&deltas(&[("u-1", 1000, 10), ("u-2", 5, 5)]));
+        store.next_report("2026-10-29T10:00:00Z".into());
+        let ack = StatsAck {
+            kind: "stats_ack".into(),
+            counter_epoch: store.counter_epoch.clone(),
+            acked_seq: 1,
+        };
+        let managed: BTreeSet<String> = ["u-2".to_string()].into();
+        assert!(store.acknowledged(&ack, &managed));
+        let report = store.next_report("2026-10-29T10:01:00Z".into());
+        assert_eq!(report.users.len(), 1, "a disabled user leaves reports");
+        store.fold(&deltas(&[("u-1", 0, 100)]));
+        let report = store.next_report("2026-10-29T10:02:00Z".into());
+        let back = report.users.iter().find(|u| u.user_id == "u-1").unwrap();
+        assert_eq!((back.uplink_bytes, back.downlink_bytes), (1000, 110));
+        assert!(store.retired.is_empty());
     }
 
     #[test]
