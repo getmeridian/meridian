@@ -381,3 +381,16 @@ class TestSelfCheck:
         keys = {lang: set(re.findall(r"'?([\w.]+)'?: '", block)) for lang, block in blocks.items()}
         for lang in ("ru", "fa", "zh"):
             assert keys[lang] == keys["en"], f"{lang}: {sorted(keys['en'] ^ keys[lang])}"
+
+
+def test_stash_is_additional_on_ios_with_a_self_hosted_icon() -> None:
+    catalog = json.loads(render_apps_catalog())
+    stash = next((app for app in catalog["apps"] if app["name"] == "Stash"), None)
+    assert stash is not None, "Stash is missing from the app catalog"
+    assert stash["platforms"] == ["iOS"]
+    assert not stash.get("recommended")
+    assert stash["deeplink"] == "stash://install-config?url={url}"
+    assert stash["icon"].startswith("data:image/svg+xml;base64,")
+    for lang in ("en", "ru", "fa", "zh"):
+        assert stash["manual"][lang]
+        assert len(stash["connect"][lang]) >= 3

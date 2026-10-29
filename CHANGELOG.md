@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Stash is available among the additional iOS apps, with direct import,
+  localized setup guidance, and a self-hosted icon.
 - Connection pages offer labelled store and direct-install alternatives from
   pinned app defaults, including desktop architecture and Linux package choices.
 - Connection setup follows your chosen platform and app through installation,

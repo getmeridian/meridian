@@ -9,7 +9,7 @@ _RENDERER_MANIFEST = {
     "compiler": COMPILER_VERSION,
     "agent-runtime": "staged-upgrade-v1",
     "agent-spec": "service-blob-v1",
-    "pwa": "install-alternatives-v17",
+    "pwa": "stash-ios-v18",
     "firewall": "ufw-comment-v2",
     "nginx": "service-only-v10",
     "realm": "neutral-systemd-musl-v3",

@@ -511,3 +511,18 @@ def test_install_alternatives_are_labelled_and_platform_specific(page_data: dict
         """,
         page_data,
     )
+
+
+def test_stash_import_is_percent_encoded_and_keeps_additional_status(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { userAgent: 'iPhone', info: data.info }); await browser.start();
+        const choice = browser.document.getElementById('app-choice');
+        const option = choice.querySelectorAll('option').find(option => option.value === 'Stash');
+        assert.ok(option); assert.equal(option.parentNode.getAttribute('label'), 'More apps');
+        choice.value = 'Stash'; browser.fire('change', choice);
+        assert.equal(browser.document.querySelector('[data-import]').getAttribute('href'), 'stash://install-config?url=' + encodeURIComponent(data.config.subscription_url));
+        assert.ok(browser.document.querySelector('.app-mark').getAttribute('src').startsWith('data:image/svg+xml;base64,'));
+        """,
+        page_data,
+    )

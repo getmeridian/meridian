@@ -292,6 +292,42 @@ _PWA_APPS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "Stash",
+        "platform": "iOS",
+        "platforms": ["iOS"],
+        "url": "https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349",
+        "deeplink": "stash://install-config?url={url}",
+        "protocols": ["reality", "wss"],
+        "manual": {
+            "en": "Settings → Config → ＋ → Download from URL",
+            "ru": "Настройки → Конфигурация → ＋ → Загрузить по URL",
+            "fa": "تنظیمات، پیکربندی، + و سپس «دانلود از نشانی»",
+            "zh": "设置 → 配置 → ＋ → 从 URL 下载",
+        },
+        "connect": {
+            "en": [
+                "Allow adding a VPN configuration when asked.",
+                "Select the imported configuration, then choose a server in Policy.",
+                "Tap Start on the main screen.",
+            ],
+            "ru": [
+                "Разрешите добавление конфигурации VPN, когда появится запрос.",
+                "Выберите добавленную конфигурацию и сервер в разделе «Политика».",
+                "Нажмите «Старт» на главном экране.",
+            ],
+            "fa": [
+                "وقتی درخواست شد، اجازهٔ افزودن پیکربندی VPN را بدهید.",
+                "پیکربندی اضافه\u200cشده و سپس یک سرور را در بخش «Policy» انتخاب کنید.",
+                "در صفحهٔ اصلی، «Start» را بزنید.",
+            ],
+            "zh": [
+                "出现提示时，请允许添加 VPN 配置。",
+                "选择导入的配置，再在「策略」中选择服务器。",
+                "在主界面点击「Start」。",
+            ],
+        },
+    },
+    {
         "name": "v2rayNG",
         "platform": "Android",
         "platforms": ["Android"],
@@ -497,6 +533,9 @@ def _load_app_icons() -> dict[str, str]:
             result[app_name] = f"data:image/webp;base64,{b64}"
         except OSError:
             pass
+    # Stash's offline monogram is a packaged SVG; other app icons are WebP.
+    monogram = files("meridian") / "templates" / "pwa" / "stash.svg"
+    result["Stash"] = "data:image/svg+xml;base64," + base64.b64encode(monogram.read_bytes()).decode()
     _app_icons_cache = result
     return result
 

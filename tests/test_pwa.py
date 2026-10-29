@@ -97,7 +97,9 @@ class TestLoadPWAStaticAssets:
     def test_shared_catalog_carries_icons(self) -> None:
         catalog = json.loads(load_pwa_static_assets()["apps.json"])
         assert catalog["apps"][0]["name"] == "Happ"
-        assert all(app["icon"].startswith("data:image/webp;base64,") for app in catalog["apps"])
+        assert all(
+            app["icon"].startswith(("data:image/webp;base64,", "data:image/svg+xml;base64,")) for app in catalog["apps"]
+        )
 
     def test_probe_asset_is_large_and_incompressible(self) -> None:
         """The self-check needs a >=64 KB asset that clears the throttling freeze point."""
