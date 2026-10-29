@@ -198,8 +198,8 @@ jobs:
           uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
           uv run python scripts/verify_package_assets.py --agent-only "$RUNNER_TEMP"/wheel/*.whl
 
-  # System Lab costs ~15 minutes of nested Docker, so it runs only when a change can
-  # alter what a real deploy does: runtime code, the lab itself, dependencies, or CI.
+  # System Lab costs ~15 minutes of Docker, so it runs only when a change can alter what
+  # a real deploy does: runtime code, the node agent, the lab itself, dependencies, or CI.
   # Docs, website, contracts, and other tests skip it; a manual dispatch always runs it.
   changes:
     name: Changes
@@ -223,7 +223,7 @@ jobs:
             while IFS= read -r changed; do
               case "$changed" in
                 src/meridian/*.md | src/meridian/i18n/locales/*) ;;
-                src/meridian/* | tests/systemlab/* | pyproject.toml | uv.lock | .github/workflows/ci.yml)
+                src/meridian/* | agent/* | tests/systemlab/* | tests/test_control_subscription_corpus.py | pyproject.toml | uv.lock | .github/workflows/ci.yml)
                   needed=true
                   echo "System Lab needed: $changed"
                   break ;;
@@ -243,6 +243,10 @@ jobs:
 
       - name: Generate test fixtures
         run: bash tests/systemlab/scripts/setup-fixtures.sh
+
+      # The controller deploys this checkout's agent; build the runner's architecture only.
+      - name: Build the node agent
+        run: make system-lab-agent
 
       - name: Run system lab
         run: docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller

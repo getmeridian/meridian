@@ -27,8 +27,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - exit-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -48,8 +46,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - exit-b-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -107,8 +103,6 @@ services:
     tmpfs:
       - /run
       - /run/lock
-    volumes:
-      - gateway-docker:/var/lib/docker
     healthcheck:
       test: ["CMD", "bash", "-c", "nc -z 127.0.0.1 22"]
       interval: 5s
@@ -161,10 +155,6 @@ services:
       PYTHONPATH: /workspace
       SYSTEMLAB_STAGES: "${SYSTEMLAB_STAGES:-}"
       SYSTEMLAB_KEEP: "${SYSTEMLAB_KEEP:-}"
-      SYSTEMLAB_GOLDEN_RAW: /systemlab-output/golden-raw
-    volumes:
-      # Raw golden subscription captures (live secrets; gitignored) for the host to normalize.
-      - ./output:/systemlab-output
     command: ["bash", "/workspace/tests/systemlab/scripts/controller-run.sh"]
 
 networks:
@@ -173,8 +163,3 @@ networks:
     ipam:
       config:
         - subnet: 172.30.0.0/24
-
-volumes:
-  exit-docker:
-  exit-b-docker:
-  gateway-docker:

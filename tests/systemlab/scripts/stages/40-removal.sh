@@ -42,8 +42,8 @@ python3 "$ASSERT_RETIRED" verify "$SNAPSHOT" \
   --expect realm_hop \
   --expect firewall_rule \
   --expect nginx_artifact \
-  --expect host
-pass "relay removal retired Realm units, firewall rules, exit listener, and Hosts"
+  --expect client_endpoint
+pass "relay removal retired Realm units, firewall rules, exit listener, and client endpoints"
 
 for host in "$RELAY_A_IP" "$RELAY_B_IP"; do
   require_command \
@@ -71,20 +71,19 @@ pass "plan converged after relay removal"
 python3 "$ASSERT_RETIRED" snapshot "$SNAPSHOT"
 meridian node remove "$EXIT_B_IP" --yes
 python3 "$ASSERT_RETIRED" verify "$SNAPSHOT" \
-  --expect node_runtime \
-  --expect node_binding \
-  --expect config_profile \
-  --expect service_user \
-  --expect internal_squad \
+  --expect agent_runtime \
+  --expect node_workload \
+  --expect client_endpoint \
   --expect firewall_rule \
-  --expect nginx_artifact \
-  --expect host
-pass "exit removal retired the node runtime, panel node/profile, bridge, firewall, nginx, and Hosts"
+  --expect nginx_artifact
+pass "exit removal retired the agent and core, service node, endpoints, firewall, and nginx"
 
 require_command \
-  "control plane still running on exit A" \
-  ssh root@"$EXIT_A_IP" \
-  "docker ps --format '{{.Names}}' | grep -qx ctlsvc-api"
+  "control service still running on exit A" \
+  ssh root@"$EXIT_A_IP" systemctl is-active --quiet ctld
+for host in "$EXIT_A_IP" "$GATEWAY_IP"; do
+  wait_for_agent "$host"
+done
 
 meridian plan
 pass "plan converged after exit removal"
@@ -121,5 +120,5 @@ if broken or not flowed:
 PYEOF
 pass "meridian test pushed traffic through the remaining fleet"
 
-python3 "$GOLDEN_CAPTURE" --topology reduced --user acceptance
-pass "golden subscription corpus captured for exit A and the routing gateway"
+python3 "$GOLDEN_DIFF" --topology reduced --user acceptance
+pass "every recorded client gets the golden corpus answer from exit A and the routing gateway"

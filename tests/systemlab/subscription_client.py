@@ -16,7 +16,7 @@ from uuid import UUID
 
 import yaml
 
-from meridian.control_access import ServiceAccessPanel
+from meridian.control.client import ControlClient
 from meridian.remnawave import XRAY_JSON_CLIENT_TYPE, SubscriptionDocument
 from meridian.xray_client import (
     outbound_address,
@@ -78,23 +78,24 @@ def select_outbound(config: dict[str, Any], address: str) -> str:
 
 
 def fetch_canonical_document(
-    panel: ServiceAccessPanel,
+    client: ControlClient,
     username: str,
     client_type: str,
 ) -> SubscriptionDocument:
-    """Fetch one client format exactly as the control service renders it."""
-    user = panel.get_user(username)
-    if user is None or not user.short_uuid:
+    """Fetch one client format exactly as the control service renders it ("" is Base64)."""
+    user = client.get_user(username)
+    if user is None or not user.sub_token:
         raise ValueError(f"User {username!r} has no subscription")
-    return panel.fetch_subscription(user.short_uuid, client_type=client_type)
+    content = client.fetch_subscription(user.sub_token, document=client_type)
+    return SubscriptionDocument(url=f"sub/{user.sub_token}", content=content, client_type=client_type)
 
 
 def fetch_canonical_xray(
-    panel: ServiceAccessPanel,
+    client: ControlClient,
     username: str,
 ) -> SubscriptionDocument:
     """Fetch the Xray JSON document the control service renders."""
-    return fetch_canonical_document(panel, username, XRAY_JSON_CLIENT_TYPE)
+    return fetch_canonical_document(client, username, XRAY_JSON_CLIENT_TYPE)
 
 
 def parse_base64_subscription(content: str) -> list[str]:

@@ -1,4 +1,4 @@
-.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab system-lab-fast \
+.PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab-agent system-lab system-lab-fast \
        templates dead-code ai-docs build publish clean hooks agent
 
 ## —— Setup ——————————————————————————————————————————————
@@ -53,7 +53,14 @@ ci: check typecheck templates validate dead-code ## Run full CI locally
 system-lab-preflight: ## Check Compose, daemon registry access, and container DNS
 	bash tests/systemlab/scripts/preflight.sh
 
-system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10min)
+# The lab's servers run the Docker daemon's architecture; build just that agent target.
+system-lab-agent:
+	@arch=$$(docker info --format '{{.Architecture}}'); \
+		case "$$arch" in x86_64|amd64) target=x86_64-unknown-linux-musl ;; aarch64|arm64) target=aarch64-unknown-linux-musl ;; \
+		*) echo "System lab has no agent target for $$arch" >&2; exit 2 ;; esac; \
+		$(MAKE) agent AGENT_TARGETS=$$target
+
+system-lab: system-lab-preflight system-lab-agent ## Run multi-node system lab (clean state, ~10min)
 	bash tests/systemlab/scripts/setup-fixtures.sh
 	@set -eu; \
 		cleanup() { docker compose -f tests/systemlab/compose.yml down -v; }; \
@@ -67,7 +74,7 @@ system-lab: system-lab-preflight ## Run multi-node system lab (clean state, ~10m
 		cleanup; \
 		docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
 
-system-lab-fast: system-lab-preflight ## Re-run system lab preserving cached images (~3-4min after first run)
+system-lab-fast: system-lab-preflight system-lab-agent ## Re-run system lab preserving cached images (~3-4min after first run)
 	bash tests/systemlab/scripts/setup-fixtures.sh
 	@set -eu; \
 		cleanup() { docker compose -f tests/systemlab/compose.yml down; }; \

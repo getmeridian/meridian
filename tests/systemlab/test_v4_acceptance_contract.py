@@ -5,7 +5,9 @@ from pathlib import Path
 
 import yaml
 
+from meridian.compiler import compile_topology
 from meridian.compiler.models import (
+    ClientEndpointPayload,
     ConfigProfilePayload,
     EgressPoolPayload,
     HostPayload,
@@ -23,7 +25,7 @@ _BOOTSTRAP_PATH = Path(__file__).parent / "scripts/stages/00-bootstrap.sh"
 _RESILIENCE_PATH = Path(__file__).parent / "scripts/stages/30-resilience.sh"
 _SUBSCRIPTIONS_PATH = Path(__file__).parent / "scripts/stages/20-subscriptions.sh"
 _CLIENT_DOCS = Path(__file__).parents[2] / "website/src/content/docs/en/client-management.md"
-_INTERRUPTED_HOST_RESOURCE = "host:exit-a:exit-a-reality:direct"
+_INTERRUPTED_RESOURCE = "endpoint:exit-a:exit-a-reality:direct"
 
 
 def _server_refs() -> dict[str, str]:
@@ -74,11 +76,13 @@ def test_systemlab_intent_compiles_every_v4_acceptance_path() -> None:
         "srv-gateway",
     }
     assert all(host.address_server_ref != "srv-relay-b" for host in visible_hosts)
-    interrupted_host = next(
-        resource.payload for resource in plan.resources if resource.logical_id == _INTERRUPTED_HOST_RESOURCE
+    interrupted = next(
+        resource.payload
+        for resource in compile_topology(intent).resources
+        if resource.logical_id == _INTERRUPTED_RESOURCE
     )
-    assert isinstance(interrupted_host, HostPayload)
-    assert interrupted_host.address_server_ref == "srv-exit-a"
+    assert isinstance(interrupted, ClientEndpointPayload)
+    assert interrupted.address_server_ref == "srv-exit-a"
 
     pools = [resource.payload for resource in plan.resources if isinstance(resource.payload, EgressPoolPayload)]
     assert len(pools) == 1
@@ -135,10 +139,19 @@ def test_controller_trusts_the_local_acme_certificate_chain() -> None:
     assert "update-ca-certificates" in bootstrap
 
 
-def test_resilience_kills_a_real_apply_after_the_exact_host_mutation() -> None:
+def test_every_agent_trusts_the_local_acme_chain_before_deploy() -> None:
+    """Agents verify the control service against their unit's CA file; Pebble is no WebPKI CA."""
+    bootstrap = _BOOTSTRAP_PATH.read_text(encoding="utf-8")
+    deploy = bootstrap.index('meridian server add "$EXIT_A_IP"')
+
+    assert bootstrap.index("NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt") < deploy
+    assert bootstrap.index("for host in $(all_server_ips)", bootstrap.index("Pebble issuance root trusted")) < deploy
+
+
+def test_resilience_kills_a_real_apply_after_the_exact_endpoint_mutation() -> None:
     script = _RESILIENCE_PATH.read_text(encoding="utf-8")
 
-    assert f"INTERRUPTED_HOST_RESOURCE={_INTERRUPTED_HOST_RESOURCE}" in script
+    assert f"INTERRUPTED_RESOURCE={_INTERRUPTED_RESOURCE}" in script
     assert "MERIDIAN_TEST_AFTER_APPLY_RESOURCE" in script
     assert "MERIDIAN_TEST_AFTER_APPLY_MARKER" in script
     assert "for _ in $(seq 1 90)" in script

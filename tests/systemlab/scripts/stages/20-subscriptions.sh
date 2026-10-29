@@ -13,8 +13,8 @@ python3 "$SUBSCRIPTION_TEST" \
   --forbid-address "$RELAY_B_IP"
 pass "canonical subscription executes every advertised V4 path"
 
-# Proxied names resolve over DoH only. Sniff every interface on exit A (loopback too, where
-# Docker's embedded resolver answers) while a client fetches the IP observers through it: no
+# Proxied names resolve over DoH only. Sniff every interface on exit A (loopback included)
+# while a client fetches the IP observers through it: no
 # packet may carry a plain DNS question for them. The host resolver's own lookup of a control
 # name (never a parent or child of an observer name) proves the capture sees plain DNS.
 observer_names=$(python3 -c '
@@ -63,7 +63,9 @@ python3 <<'PYEOF'
 import os
 
 from meridian.cluster import ClusterConfig
-from meridian.remnawave import MeridianPanel, XRAY_JSON_CLIENT_TYPE
+from meridian.control.client import ControlClient
+from meridian.control_access import access_panel
+from meridian.remnawave import XRAY_JSON_CLIENT_TYPE
 from tests.systemlab.subscription_client import (
     MIHOMO_CLIENT_TYPE,
     SINGBOX_CLIENT_TYPE,
@@ -82,24 +84,22 @@ from tests.systemlab.subscription_client import (
 )
 
 cluster = ClusterConfig.load()
-with MeridianPanel(
-    cluster.panel.url,
-    cluster.panel.api_token,
-) as panel:
+with access_panel(cluster) as panel:
     user = panel.get_user("acceptance")
-    assert user is not None and user.short_uuid
-    base64_document = panel.fetch_subscription(user.short_uuid)
-    xray_document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
-    mihomo_document = panel.fetch_subscription(user.short_uuid, client_type=MIHOMO_CLIENT_TYPE)
-    singbox_document = panel.fetch_subscription(user.short_uuid, client_type=SINGBOX_CLIENT_TYPE)
+assert user is not None and user.short_uuid
+with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+    base64_document = client.fetch_subscription(user.short_uuid)
+    xray_document = client.fetch_subscription(user.short_uuid, document=XRAY_JSON_CLIENT_TYPE)
+    mihomo_document = client.fetch_subscription(user.short_uuid, document=MIHOMO_CLIENT_TYPE)
+    singbox_document = client.fetch_subscription(user.short_uuid, document=SINGBOX_CLIENT_TYPE)
 
-base64_urls = parse_base64_subscription(base64_document.content)
-xray_config = parse_xray_subscription(xray_document.content)
-mihomo_config = parse_mihomo_subscription(mihomo_document.content)
-singbox_config = parse_singbox_subscription(singbox_document.content)
+base64_urls = parse_base64_subscription(base64_document)
+xray_config = parse_xray_subscription(xray_document)
+mihomo_config = parse_mihomo_subscription(mihomo_document)
+singbox_config = parse_singbox_subscription(singbox_document)
 
 # The link handed to end users must serve the same subscription without
-# revealing the admin panel's secret path (in the URL or response headers).
+# revealing the control service's secret path (in the URL or response headers).
 import httpx
 
 public_url = cluster.panel.subscription_url(user.short_uuid)

@@ -11,17 +11,22 @@ meridian deploy "$EXIT_B_IP" --client-name solo --yes 2>&1 | tee "$DEPLOY_LOG"
 grep -qE "Traffic verified end to end|Traffic works, but leaves through" "$DEPLOY_LOG"
 pass "single-server deploy converged, verified, and carried real traffic"
 
+require_command "control service running on the single server" ssh root@"$EXIT_B_IP" systemctl is-active --quiet ctld
+wait_for_agent "$EXIT_B_IP"
+pass "node agent and core running on the single server"
+
 python3 <<'PYEOF'
 import httpx
 
 from meridian.cluster import ClusterConfig
 from meridian.handoff import page_url, subscription_protocol_urls
-from meridian.remnawave import MeridianPanel
+from meridian.control_access import access_panel
 
 cluster = ClusterConfig.load()
+assert cluster.runs_control_service
 assert cluster.topology_intent is not None
 assert cluster.topology_intent.access.users == ["solo"]
-with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
+with access_panel(cluster) as panel:
     user = panel.get_user("solo")
 assert user is not None and user.short_uuid
 
@@ -40,8 +45,8 @@ assert [entry["url"] for entry in page.json()["protocols"]] == [link.url for lin
 PYEOF
 pass "public subscription and connection page serve the deployed Reality link"
 
-python3 "$GOLDEN_CAPTURE" --topology single --user solo
-pass "golden subscription corpus captured for the single-exit fleet"
+python3 "$GOLDEN_DIFF" --topology single --user solo
+pass "every recorded client gets the golden corpus answer from the single-exit fleet"
 
 
 meridian deploy "$EXIT_B_IP" --client-name solo --yes
@@ -51,20 +56,25 @@ meridian client add bob
 meridian client remove bob --yes
 python3 <<'PYEOF'
 from meridian.cluster import ClusterConfig
-from meridian.remnawave import MeridianPanel
+from meridian.control.client import ControlClient
 
 cluster = ClusterConfig.load()
 assert cluster.topology_intent is not None
 assert cluster.topology_intent.access.users == ["solo"], cluster.topology_intent.access.users
-with MeridianPanel(cluster.panel.url, cluster.panel.api_token) as panel:
-    assert panel.get_user("bob") is None, "removed client still exists in the panel"
-    assert panel.get_user("solo") is not None
+with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
+    assert client.get_user("bob") is None, "removed client still exists in the control service"
+    assert client.get_user("solo") is not None
 PYEOF
-pass "client remove retired the panel user and kept the others"
+pass "client remove retired the service user and kept the others"
 
 meridian teardown "$EXIT_B_IP" --yes
 test ! -e "$MERIDIAN_HOME/cluster.yml"
-ssh root@"$EXIT_B_IP" 'test ! -e /opt/ctlsvc && test ! -e /opt/netagent && test ! -e /etc/nginx/stream.d/meridian.conf'
+ssh root@"$EXIT_B_IP" '
+  test ! -e /opt/ctld && test ! -e /usr/local/bin/netagent && test ! -e /usr/local/lib/netagent
+  test ! -e /etc/systemd/system/ctld.service && test ! -e /etc/systemd/system/netagent.service
+  ! systemctl is-active --quiet ctld && ! systemctl is-active --quiet netagent && ! systemctl is-active --quiet netcore
+  ! ls /etc/nginx/stream.d/meridian-v4-*.conf >/dev/null 2>&1
+'
 pass "teardown removed the deployment and local fleet state"
 
 meridian server add "$EXIT_B_IP" --name exit-b

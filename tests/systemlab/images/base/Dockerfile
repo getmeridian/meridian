@@ -48,20 +48,6 @@ RUN curl -fsSL https://nginx.org/keys/nginx_signing.key \
     && apt-get update \
     && apt-get install -y --no-install-recommends nginx
 
-# ---------- Docker CE (Meridian checks dpkg-query -s docker-ce) ----------
-RUN install -m 0755 -d /etc/apt/keyrings \
-    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-       -o /etc/apt/keyrings/docker.asc \
-    && chmod a+r /etc/apt/keyrings/docker.asc \
-    && echo "deb [arch=$(dpkg --print-architecture) \
-       signed-by=/etc/apt/keyrings/docker.asc] \
-       https://download.docker.com/linux/ubuntu \
-       $(. /etc/os-release && echo $VERSION_CODENAME) stable" \
-       > /etc/apt/sources.list.d/docker.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-       docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
 # ---------- SSH ----------
 RUN mkdir -p /run/sshd /root/.ssh \
     && chmod 700 /root/.ssh \
@@ -73,16 +59,9 @@ RUN mkdir -p /run/sshd /root/.ssh \
 COPY tests/systemlab/fixtures/controller_authorized_keys /root/.ssh/authorized_keys
 RUN chmod 600 /root/.ssh/authorized_keys
 
-# ---------- Docker daemon config (nested: vfs driver, default bridge NAT) ----------
-RUN mkdir -p /etc/docker \
-    && printf '{"storage-driver":"vfs"}\n' \
-       > /etc/docker/daemon.json
-
 # ---------- systemd wiring ----------
 RUN ln -sf /lib/systemd/system/ssh.service \
-       /etc/systemd/system/multi-user.target.wants/ssh.service \
-    && ln -sf /lib/systemd/system/docker.service \
-       /etc/systemd/system/multi-user.target.wants/docker.service
+       /etc/systemd/system/multi-user.target.wants/ssh.service
 
 # Mask noisy/unnecessary units
 RUN systemctl mask \
@@ -95,5 +74,4 @@ RUN systemctl mask \
 RUN systemd-machine-id-setup 2>/dev/null || dbus-uuidgen --ensure=/etc/machine-id || true
 
 STOPSIGNAL SIGRTMIN+3
-VOLUME ["/var/lib/docker"]
 CMD ["/sbin/init"]

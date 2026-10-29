@@ -18,19 +18,13 @@ keep_alive() {
   fi
 }
 
-cleanup_nested() {
+on_exit() {
   local status=$?
   trap - EXIT
-  set +e
   keep_alive
-  bash "$SCRIPT_DIR/stages/90-cleanup.sh"
-  local cleanup_status=$?
-  if [ "$status" -ne 0 ]; then
-    exit "$status"
-  fi
-  exit "$cleanup_status"
+  exit "$status"
 }
-trap cleanup_nested EXIT
+trap on_exit EXIT
 
 run_stage() {
   local stage=$1
@@ -42,17 +36,14 @@ run_stage() {
 }
 
 run_stage 00-bootstrap.sh
-bash "$SCRIPT_DIR/stages/90-cleanup.sh"
 
 for stage in $STAGES; do
   run_stage "$stage"
 done
 
 trap - EXIT
-keep_alive
-bash "$SCRIPT_DIR/stages/90-cleanup.sh"
-
 echo
 echo "═══════════════════════════════════════"
 echo "  V4 SYSTEM LAB PASSED"
 echo "═══════════════════════════════════════"
+keep_alive

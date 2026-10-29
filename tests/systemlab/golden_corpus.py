@@ -1,9 +1,10 @@
 """Golden subscription corpus: normalize System Lab captures, store fixtures, compare.
 
-``scripts/capture-golden.py`` records raw answers (live secrets included) to
-``output/golden-raw/<topology>/``. This module turns them into fixtures under
-``golden/<topology>/``: one JSON file per request (status, format, headers, matched rule)
-pointing at a deduplicated, normalized body in ``golden/<topology>/bodies/``.
+The corpus was captured once from Remnawave, as raw answers (live secrets included) under
+``output/golden-raw/<topology>/``, and is now frozen. This module turned them into fixtures
+under ``golden/<topology>/``: one JSON file per request (status, format, headers, matched
+rule) pointing at a deduplicated, normalized body in ``golden/<topology>/bodies/``.
+``scripts/diff-golden.py`` normalizes live control-service answers the same way.
 
 Normalization replaces every secret and every random value with ``<kind:N>``, numbered per
 kind in order of first appearance (body first, then headers, in one numbering scope), and
@@ -265,7 +266,7 @@ def _expected(agent_id: str, selector: str) -> dict[str, Any] | None:
 
 
 def normalize_raw(raw: Mapping[str, Any], known: Sequence[tuple[str, str]]) -> Capture:
-    """Normalize one raw capture file written by ``scripts/capture-golden.py``."""
+    """Normalize one raw capture file in the capture format."""
     from tests.systemlab.golden_agents import AGENTS_BY_ID
 
     request = dict(raw["request"])
