@@ -223,7 +223,7 @@
   "client.expires_never": "never",
   "client.limits_updated": "Updated limits for '{name}'",
   "client.traffic_reset": "Reset traffic for '{name}'; their usage starts again from zero.",
-  "client.limits_hint": "Change limits: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE",
+  "client.limits_hint": "Change limits: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "exit {exit}",
   "sni.relay_subject": "relay {relays}",
   "sni.relay_through": "{subject} through {server}",
@@ -293,5 +293,17 @@
   "context.removed": "Removed context {name}; its servers were not touched",
   "context.superseded": "superseded by {by}: read-only",
   "context.clear_default_confirm": "Delete the default context's copy of its fleet (cluster.yml, servers.json, snapshots, device key)? Your SSH key and settings stay, and the servers keep running.",
-  "context.cleared_default": "Removed the default context's copy of its fleet; its servers were not touched"
+  "context.cleared_default": "Removed the default context's copy of its fleet; its servers were not touched",
+  "client.label.devices": "Devices",
+  "client.device_default": "fleet default",
+  "client.devices_count": "{count} of {limit} devices",
+  "client.devices_removed": "Forgot {count} device(s). They can register again on their next subscription refresh.",
+  "client.devices_off": "Device limits are off. No devices are read or stored.",
+  "client.devices_private": "Only a count is shown. Use --clear to let devices register again.",
+  "client.device_id": "ID",
+  "client.device_system": "System",
+  "client.device_model": "Model",
+  "client.device_app": "App",
+  "client.device_first_seen": "First fetched",
+  "client.device_last_seen": "Last fetched"
 }

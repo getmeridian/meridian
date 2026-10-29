@@ -31,6 +31,7 @@ from meridian.control.passwords import (
 )
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.store import Store
+from tests.support.control_service import drop_device_privacy_schema
 
 PRODUCTION_SCRYPT = passwords.SCRYPT_PARAMS
 RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # b"12345678901234567890", RFC 6238 appendix B
@@ -536,6 +537,7 @@ def test_schema_step_eight_adds_the_ui_tables_to_an_older_database(tmp_path: Pat
     db = sqlite3.connect(database)
     for table in ("ui_owner", "ui_sessions", "ui_setup_links"):
         db.execute(f"DROP TABLE {table}")
+    drop_device_privacy_schema(db)
     db.execute("UPDATE meta SET value = '6' WHERE key = 'schema_version'")
     db.commit()
     db.close()

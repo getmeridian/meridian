@@ -211,8 +211,9 @@ def test_staging_a_schema_seven_snapshot_from_before_the_web_console(tmp_path: P
     service, _node = _enrolled_service(tmp_path / "live.db")
     service.close()
     db = sqlite3.connect(tmp_path / "live.db")
-    for table in ("ui_owner", "ui_sessions", "ui_setup_links"):
+    for table in ("ui_owner", "ui_sessions", "ui_setup_links", "devices", "privacy_changes", "privacy"):
         db.execute(f"DROP TABLE {table}")
+    db.execute("ALTER TABLE users DROP COLUMN device_limit")
     db.execute("UPDATE meta SET value = '7' WHERE key = 'schema_version'")
     db.commit()
     db.close()

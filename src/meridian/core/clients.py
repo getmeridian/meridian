@@ -45,6 +45,9 @@ class PanelUserLike(Protocol):
     @property
     def online_at(self) -> str: ...
 
+    @property
+    def hwid_device_limit(self) -> int | None: ...
+
 
 class ClientRecord(CoreModel):
     """Redacted client metadata suitable for list views."""
@@ -61,6 +64,7 @@ class ClientRecord(CoreModel):
     expires_at: str = Field(description="UTC timestamp; empty means never.")
     created_at: str
     last_seen: str
+    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     declared: bool = Field(
         default=True,
         description="False for a person added in the control service's web console rather than the fleet's "
@@ -180,6 +184,7 @@ def build_client_record(user: PanelUserLike, *, declared: bool = True) -> Client
         expires_at=canonical_expiry(user.expire_at),
         created_at=user.created_at,
         last_seen=user.online_at,
+        device_limit=user.hwid_device_limit,
         declared=declared,
     )
 

@@ -26,6 +26,7 @@ from meridian.core.agent_types import (
     Timestamp,
     Version,
 )
+from meridian.core.client_devices import ClientDevicesResult
 from meridian.core.models import CoreModel
 from meridian.core.topology import ProtocolKind
 
@@ -122,6 +123,26 @@ class ClientEndpoint(CoreModel):
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
 LimitStrategy = Literal["no_reset", "day", "week", "month"]
+DeviceLimitLevel = Literal["off", "private", "full"]
+UsageHistoryLevel = Literal["off", "daily"]
+
+
+class PrivacySettings(CoreModel):
+    device_limits: DeviceLimitLevel = "off"
+    default_device_limit: int = Field(default=3, ge=1, le=100)
+    usage_history: UsageHistoryLevel = "off"
+    history_days: int = Field(default=90, ge=7, le=730)
+
+
+class PrivacyChange(CoreModel):
+    changed_at: Timestamp
+    author: str
+    before: PrivacySettings
+    after: PrivacySettings
+
+
+class UserDevices(ClientDevicesResult):
+    level: DeviceLimitLevel
 
 
 class UserRecord(CoreModel):
@@ -141,6 +162,7 @@ class UserRecord(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0, description="0 means unlimited.")
     traffic_limit_strategy: LimitStrategy = "no_reset"
+    device_limit: int | None = Field(default=None, ge=1, le=100, description="None uses the fleet's default cap.")
     traffic_reset_at: Timestamp | None = Field(default=None, description="When the current traffic period began.")
     used_traffic_bytes: int = Field(default=0, ge=0, description="Traffic since the period began.")
     lifetime_traffic_bytes: int = Field(
@@ -150,12 +172,13 @@ class UserRecord(CoreModel):
 
 
 class UserUpdate(CoreModel):
-    """A partial change to one user; omitted fields keep their value, `expire_at: null` clears the expiry."""
+    """A partial change: omitted fields keep their value; null clears expiry or selects the default device cap."""
 
     status: Literal["active", "disabled"] | None = None
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int | None = Field(default=None, ge=0)
     traffic_limit_strategy: LimitStrategy | None = None
+    device_limit: int | None = Field(default=None, ge=1, le=100)
 
 
 SUB_TOKEN_PATTERN = r"^[A-Za-z0-9_-]{16,64}$"
@@ -172,6 +195,7 @@ class UserCreate(CoreModel):
     expire_at: Timestamp | None = None
     traffic_limit_bytes: int = Field(default=0, ge=0)
     traffic_limit_strategy: LimitStrategy = "no_reset"
+    device_limit: int | None = Field(default=None, ge=1, le=100)
 
 
 class UserImport(CoreModel):

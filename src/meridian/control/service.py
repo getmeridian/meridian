@@ -17,11 +17,12 @@ import time
 import uuid as uuid_module
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE, BackupLedger
+from meridian.control.devices import DEVICES_TABLE, DeviceLedger, HeaderReader, browser_request
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.errors import ServiceError
 from meridian.control.formats.entries import SubscriptionUser
@@ -29,34 +30,41 @@ from meridian.control.formats.selector import SUFFIX_FORMATS, select_format
 from meridian.control.models import (
     ClientEndpoint,
     EnrollmentGrant,
-    LimitStrategy,
     ManagedInbound,
     NodeSpec,
     NodeStatus,
+    PrivacySettings,
     ServiceHealth,
     ServiceSettings,
     UserCreate,
-    UserImport,
+    UserDevices,
     UserImportBatch,
     UserImportResult,
     UserRecord,
-    UserStatus,
     UserUpdate,
     users_resource_id,
 )
 from meridian.control.owner import UI_TABLES, OwnerAuth
+from meridian.control.privacy import PRIVACY_TABLES, read_privacy
 from meridian.control.revisions import APPLY_FENCE_TABLE, REVISIONS_TABLE, RevisionLedger
 from meridian.control.store import Store
-from meridian.control.subscriptions import SubscriptionResponse, render_subscription, unknown_subscription
+from meridian.control.subscriptions import (
+    DEVICE_LIMIT_REMARKS,
+    SubscriptionResponse,
+    render_subscription,
+    unknown_subscription,
+)
 from meridian.control.times import utc_now
 from meridian.control.tokens import API_TOKENS_TABLE, TokenRegistry
 from meridian.control.traffic import PER_EPOCH_BASELINES, TrafficLedger
+from meridian.control.users import USER_SELECT, enforced_status, period_began, period_start, user_record, whole_seconds
 from meridian.core.agent_desired import DesiredNodeState
 from meridian.core.agent_protocol import ObservedStateReport, PollRequest, StatsAck, StatsReport
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
+from meridian.core.client_devices import DevicesRemoved
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 11
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -86,10 +94,12 @@ CREATE TABLE IF NOT EXISTS users (
     traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
     traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
     traffic_reset_at TEXT,
-    traffic_carried_bytes INTEGER NOT NULL DEFAULT 0
+    traffic_carried_bytes INTEGER NOT NULL DEFAULT 0,
+    device_limit INTEGER
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
+_SCHEMA += "\n".join(PRIVACY_TABLES) + "\n" + DEVICES_TABLE + ";\n"
 # Statements that bring a database from version N to N + 1 (index N - 1).
 _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     (
@@ -108,31 +118,13 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     # 7 -> 8: the web UI's owner, sessions, and setup links (`owner.py`).
     UI_TABLES,
     PER_EPOCH_BASELINES,
+    # 9 -> 10: shared privacy settings and changes; usage history adds its tables on the other branch.
+    PRIVACY_TABLES,
+    # 10 -> 11: subscription devices and operator-owned per-user caps.
+    (DEVICES_TABLE, "ALTER TABLE users ADD COLUMN device_limit INTEGER"),
 )
 # meta key prefix: the last revision a deleted node was signed at.
 _RETIRED_REVISION = "retired_revision:"
-_USER_FIELDS = (
-    "username",
-    "user_id",
-    "uuid",
-    "sub_token",
-    "status",
-    "created_at",
-    "expire_at",
-    "traffic_limit_bytes",
-    "traffic_limit_strategy",
-    "traffic_reset_at",
-)
-# A user's stored fields plus their lifetime traffic: what the ledger counted and what an
-# import carried in from before (`traffic_carried_bytes`). `used` is the growth since the
-# last reset (lifetime minus the offset the reset, or the import, recorded).
-_USER_SELECT = (
-    "SELECT "
-    + ", ".join(f"u.{name}" for name in _USER_FIELDS)
-    + ", COALESCE(t.uplink_bytes + t.downlink_bytes, 0) + u.traffic_carried_bytes AS lifetime,"
-    " u.traffic_offset_bytes, t.last_seen_at"
-    " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
-)
 
 
 class ControlService:
@@ -163,6 +155,7 @@ class ControlService:
         self.revisions = RevisionLedger(self._store, self.tokens, fleet_id, clock=clock)
         self.backups = BackupLedger(self._store, clock=clock)
         self.owner = OwnerAuth(self._store, clock=clock)
+        self.devices = DeviceLedger(self._store, clock=clock)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -197,6 +190,11 @@ class ControlService:
         return ServiceSettings(
             profile_title=self._meta("profile_title") or "Meridian", public_url=self._meta("public_url") or ""
         )
+
+    def privacy(self) -> PrivacySettings:
+        """Control-service settings, independent of the reviewed fleet intent."""
+        with self._lock:
+            return read_privacy(self._db)
 
     # -- nodes ----------------------------------------------------------------------
 
@@ -365,7 +363,7 @@ class ControlService:
     def _insert_user(self, create: UserCreate) -> None:
         self._db.execute(
             "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
-            " traffic_limit_bytes, traffic_limit_strategy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " traffic_limit_bytes, traffic_limit_strategy, device_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 create.username,
                 f"u{secrets.token_hex(8)}",
@@ -376,6 +374,7 @@ class ControlService:
                 create.expire_at,
                 create.traffic_limit_bytes,
                 create.traffic_limit_strategy,
+                create.device_limit,
             ),
         )
 
@@ -417,11 +416,11 @@ class ControlService:
                     uuid,
                     sub_token,
                     item.status,
-                    _whole_seconds(item.created_at) or now,
-                    _whole_seconds(item.expire_at),
+                    whole_seconds(item.created_at) or now,
+                    whole_seconds(item.expire_at),
                     item.traffic_limit_bytes,
                     item.traffic_limit_strategy,
-                    _period_began(item, now),
+                    period_began(item, now),
                     carried,
                 )
                 if existing is None:
@@ -460,15 +459,17 @@ class ControlService:
                 if field in changes and changes[field] is None:
                     del changes[field]
             # Enforcement below turns an expired or limited user active again once the change lifts it.
-            merged = user.model_copy(update=changes)
+            merged = UserRecord.model_validate({**user.model_dump(), **changes})
             self._db.execute(
-                "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ? "
+                "UPDATE users SET status = ?, expire_at = ?, traffic_limit_bytes = ?, traffic_limit_strategy = ?,"
+                " device_limit = ? "
                 "WHERE username = ?",
                 (
                     merged.status,
                     merged.expire_at,
                     merged.traffic_limit_bytes,
                     merged.traffic_limit_strategy,
+                    merged.device_limit,
                     username,
                 ),
             )
@@ -477,9 +478,10 @@ class ControlService:
             return self._require_user(username)
 
     def reissue_user(self, username: str) -> UserRecord:
-        """Replace the user's VLESS UUID and subscription token; old links stop working."""
+        """Replace link credentials and forget devices atomically; old links stop working."""
         with self._transaction():
-            self._require_user(username)
+            user = self._require_user(username)
+            self.devices.remove(user.user_id)
             self._db.execute(
                 "UPDATE users SET uuid = ?, sub_token = ? WHERE username = ?",
                 (str(uuid_module.uuid4()), secrets.token_urlsafe(18), username),
@@ -523,13 +525,21 @@ class ControlService:
 
     def get_user(self, username: str) -> UserRecord | None:
         with self._lock:
-            row = self._db.execute(f"{_USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
-        return _user(row) if row else None
+            row = self._db.execute(f"{USER_SELECT} WHERE u.username = ?", (username,)).fetchone()
+        return user_record(row) if row else None
 
     def list_users(self) -> list[UserRecord]:
         with self._lock:
-            rows = self._db.execute(f"{_USER_SELECT} ORDER BY u.username").fetchall()
-        return [_user(row) for row in rows]
+            rows = self._db.execute(f"{USER_SELECT} ORDER BY u.username").fetchall()
+        return [user_record(row) for row in rows]
+
+    def user_devices(self, username: str) -> UserDevices:
+        with self._lock:
+            return self.devices.for_user(self._require_user(username), self.privacy())
+
+    def delete_user_devices(self, username: str, device_key: str | None = None) -> DevicesRemoved:
+        with self._transaction():
+            return self.devices.remove(self._require_user(username).user_id, device_key)
 
     def delete_user(self, username: str) -> None:
         with self._transaction():
@@ -551,7 +561,7 @@ class ControlService:
             ):
                 self._reset_traffic(user, now)
                 user = self._require_user(user.username)
-            status = _enforced_status(user, now)
+            status = enforced_status(user, now)
             if status != user.status:
                 self._db.execute("UPDATE users SET status = ? WHERE username = ?", (status, user.username))
                 changed.append(user.username)
@@ -581,16 +591,30 @@ class ControlService:
             self._db.execute("DELETE FROM endpoints WHERE endpoint_id = ?", (endpoint_id,))
 
     def subscription(
-        self, sub_token: str, suffix: str = "", *, user_agent: str | None = None, accept: str | None = None
+        self,
+        sub_token: str,
+        suffix: str = "",
+        *,
+        user_agent: str | None = None,
+        accept: str | None = None,
+        device_headers: HeaderReader | None = None,
     ) -> SubscriptionResponse:
         """Answer a subscription request: the document a suffix names, else the one the app reads."""
+        document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
+        hwid_flags: dict[str, str] = {}
         with self._lock:
-            row = self._db.execute(f"{_USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
+            row = self._db.execute(f"{USER_SELECT} WHERE u.sub_token = ?", (sub_token,)).fetchone()
+            if row is None:
+                return unknown_subscription()
+            record = user_record(row)
             bodies = [item[0] for item in self._db.execute("SELECT body FROM endpoints").fetchall()]
             settings = self.settings()
-        if row is None:
-            return unknown_subscription()
-        record = _user(row)
+            privacy = self.privacy()
+            if privacy.device_limits != "off" and not browser_request(user_agent, accept):
+                with self._transaction():
+                    hwid_flags = self.devices.fetch(
+                        record, privacy, device_headers if device_headers is not None else {}
+                    )
         user = SubscriptionUser(
             username=record.username,
             uuid=record.uuid,
@@ -603,9 +627,14 @@ class ControlService:
             limit_strategy=record.traffic_limit_strategy,
         )
         endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
-        document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
         return render_subscription(
-            user, endpoints, document, profile_title=settings.profile_title, public_url=settings.public_url
+            user,
+            endpoints,
+            document,
+            profile_title=settings.profile_title,
+            public_url=settings.public_url,
+            placeholder_remarks=DEVICE_LIMIT_REMARKS if "x-hwid-limit" in hwid_flags else None,
+            extra_headers=hwid_flags,
         )
 
     # -- composition -------------------------------------------------------------------
@@ -715,64 +744,3 @@ def _users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id:
         # An imported UUID keeps its case for Hysteria2; the document wants VLESS UUIDs lowercase.
         "users": [{"user_id": user.user_id, "uuid": user.uuid.lower(), "flow": inbound.flow} for user in users],
     }
-
-
-def _user(row: Any) -> UserRecord:
-    *stored, lifetime, offset, online_at = tuple(row)
-    return UserRecord.model_validate(
-        {
-            **dict(zip(_USER_FIELDS, stored, strict=True)),
-            "lifetime_traffic_bytes": lifetime,
-            # A ledger that lost totals (a rebuilt database) never shows negative use.
-            "used_traffic_bytes": max(0, lifetime - offset),
-            "online_at": online_at,
-        }
-    )
-
-
-def _enforced_status(user: UserRecord, now: str) -> UserStatus:
-    """The status enforcement gives a user; `disabled` is the operator's and never changes."""
-    if user.status == "disabled":
-        return "disabled"
-    if _expired(user, now):
-        return "expired"
-    over = user.traffic_limit_bytes > 0 and user.used_traffic_bytes >= user.traffic_limit_bytes
-    return "limited" if over else "active"
-
-
-def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
-    """The start of the traffic period *now* falls in (UTC), or None when traffic never resets."""
-    midnight = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    if strategy == "day":
-        return midnight
-    if strategy == "week":
-        return midnight - timedelta(days=midnight.weekday())
-    if strategy == "month":
-        return midnight.replace(day=1)
-    return None
-
-
-def _whole_seconds(timestamp: str | None) -> str | None:
-    """A protocol timestamp without its fraction, as the service writes every time."""
-    return f"{timestamp[:19]}Z" if timestamp else None
-
-
-def _period_began(item: UserImport, now: str) -> str | None:
-    """When an imported user's current traffic period began.
-
-    The source's last reset is kept only inside the current period: an older one would
-    make the next enforcement reset the imported use at once. Otherwise the period runs
-    on from the import with the use the source counted, until its next boundary.
-    """
-    reset_at = _whole_seconds(item.traffic_reset_at)
-    start = period_start(item.traffic_limit_strategy, datetime.fromisoformat(now))
-    if start is None:
-        return reset_at
-    if reset_at is not None and datetime.fromisoformat(reset_at) >= start:
-        return reset_at
-    return now
-
-
-def _expired(user: UserRecord, now: str) -> bool:
-    # Parse, never compare strings: a fractional "…:00.5Z" sorts before "…:00Z".
-    return user.expire_at is not None and datetime.fromisoformat(user.expire_at) <= datetime.fromisoformat(now)

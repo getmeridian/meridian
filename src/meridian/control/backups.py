@@ -27,9 +27,11 @@ from meridian.control.models import (
     DeviceKeyCreate,
     DeviceKeyList,
     DeviceKeyRecord,
+    PrivacySettings,
     RecoveryKeyState,
     RecoveryKeyUpdate,
 )
+from meridian.control.privacy import read_privacy
 from meridian.control.snapshot import SnapshotHeader, SnapshotRecipient, encrypt_snapshot
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
@@ -61,13 +63,20 @@ _DEPLOYER = "deployer_state"
 _COLUMNS = "device_id, name, public_key, created_at, revoked_at"
 
 
-def strip_unsnapshotted(db: sqlite3.Connection) -> None:
+def strip_unsnapshotted(db: sqlite3.Connection, *, restoring: bool = False) -> None:
     """Empty every `NOT_SNAPSHOTTED` table `db` has; a snapshot from an older schema may lack some.
 
-    The web owner's tables arrived in schema 8, so a schema-7 snapshot has none of
-    them, and a restore strips the database before its migrations run.
+    Privacy settings and changes ride every snapshot; devices ride only while on.
+    On restore, private fingerprints cannot match the replacement HMAC key and go.
     """
     present = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    privacy = read_privacy(db) if "privacy" in present else PrivacySettings()
+    if "devices" in present:
+        if privacy.device_limits == "off" or (restoring and privacy.device_limits == "private"):
+            db.execute("DELETE FROM devices")
+        elif restoring:
+            # A raise to full may still hold private fingerprints awaiting their next fetch.
+            db.execute("DELETE FROM devices WHERE first_seen_at IS NULL")
     for table in NOT_SNAPSHOTTED:
         if table in present:
             db.execute(f"DELETE FROM {table}")  # a name from the constant above, never input

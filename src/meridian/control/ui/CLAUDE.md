@@ -7,6 +7,7 @@
 - **People the deployer declared stay the deployer's** — users in the last applied revision's intent (`ui_views.is_declared`, `declared` on each share view, `declared_users` on the fleet view); only they have a connection page. Removing one or issuing a new link shows `meridian client remove|reissue NAME`, and the service refuses both to an owner session (`declared_user`); API tokens stay allowed.
 - **Same locale approach as the PWA** — `locales/{en,ru,fa,zh}.json`, English fallback, `fa` sets `dir="rtl"`; numbers and sizes are bidi-isolated.
 - **Passkeys are a seam** — `PasskeyState` reports `no_domain` on a bare IP and `not_built` otherwise; py_webauthn would add pyOpenSSL, pyasn1, and cbor2 to every CLI install, and attestation is never parsed by hand.
+- **Device controls** — `devices.js` owns the person card: counts/clear in private, metadata/remove in full, no device data in off. Cap edits PATCH only `device_limit`; blank uses the fleet default. Confirmation explains that removed registrations can return; global privacy choices stay in Settings.
 
 ## What's done well
 - **CSP with no exceptions for script** — `default-src 'none'`, `script-src 'self'`, `frame-ancestors 'none'`, `Referrer-Policy: no-referrer` on every console response; `test_control_ui_assets.py` refuses inline script, style, handlers, HTML sinks, outside URLs, and locale drift.
@@ -29,3 +30,4 @@
 - Judge "declared" from the person's own share view, never only the fleet list fetched at boot — a console reissue once moved a declared person's UUID while their page stayed under the old one (the service cannot write `/var/www/private/`), and a stale list offered Remove.
 - Keep each script under 800 lines and every `M.t("…")` key in `en.json`; the asset tests read literal keys only.
 - A screen that re-requests on every pick wraps its request in `M.latestOnly()` and labels from the value it asked for — the revision diff once showed #2's reply under "1 to 3".
+- Reject invalid numeric cap input before treating blank as default; a browser's `badInput` must never clear an override.

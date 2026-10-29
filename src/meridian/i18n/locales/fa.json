@@ -223,7 +223,7 @@
   "client.expires_never": "بدون انقضا",
   "client.limits_updated": "محدودیت‌های «{name}» به‌روز شد",
   "client.traffic_reset": "ترافیک «{name}» صفر شد و شمارش از نو آغاز می‌شود.",
-  "client.limits_hint": "تغییر محدودیت‌ها: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE",
+  "client.limits_hint": "تغییر محدودیت‌ها: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "خروجی {exit}",
   "sni.relay_subject": "relay {relays}",
   "sni.relay_through": "{subject} از طریق {server}",
@@ -293,5 +293,17 @@
   "context.removed": "زمینهٔ {name} حذف شد؛ به سرورهایش دست زده نشد",
   "context.superseded": "جایگزین‌شده با {by}: فقط خواندنی",
   "context.clear_default_confirm": "نسخهٔ ناوگان در زمینهٔ پیش‌فرض (cluster.yml، servers.json، اسنپ‌شات‌ها، کلید دستگاه) حذف شود؟ کلید SSH و تنظیمات شما می‌مانند و سرورها به کار ادامه می‌دهند.",
-  "context.cleared_default": "نسخهٔ ناوگان در زمینهٔ پیش‌فرض حذف شد؛ به سرورهایش دست زده نشد"
+  "context.cleared_default": "نسخهٔ ناوگان در زمینهٔ پیش‌فرض حذف شد؛ به سرورهایش دست زده نشد",
+  "client.label.devices": "دستگاه‌ها",
+  "client.device_default": "سقف پیش‌فرض مجموعه",
+  "client.devices_count": "{count} از {limit} دستگاه",
+  "client.devices_removed": "{count} دستگاه فراموش شد. در تازه‌سازی بعدی اشتراک می‌توانند دوباره ثبت شوند.",
+  "client.devices_off": "محدودیت دستگاه خاموش است. هیچ دادهٔ دستگاهی خوانده یا ذخیره نمی‌شود.",
+  "client.devices_private": "فقط تعداد نمایش داده می‌شود. با --clear دستگاه‌ها می‌توانند دوباره ثبت شوند.",
+  "client.device_id": "شناسه",
+  "client.device_system": "سیستم",
+  "client.device_model": "مدل",
+  "client.device_app": "برنامه",
+  "client.device_first_seen": "اولین دریافت",
+  "client.device_last_seen": "آخرین دریافت"
 }

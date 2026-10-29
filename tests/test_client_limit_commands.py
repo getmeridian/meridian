@@ -190,12 +190,13 @@ def test_client_add_sets_limits_after_the_reviewed_apply(
                 return_value=[HandoffLinks("carol", subscription_url="https://198.51.100.1/pages/sub/short-carol")],
             ),
         ):
-            run_add(["carol"], limit="50GB", reset="month", expires=FUTURE_DAY)
+            run_add(["carol"], limit="50GB", reset="month", expires=FUTURE_DAY, devices="2")
         payload = _envelope(capsys, "client-add-envelope")
         with access_panel_for(fleet.cluster) as panel:
             carol = build_client_record(panel.get_user("carol"))  # type: ignore[arg-type]
 
     assert payload["status"] == "ok" and payload["warnings"] == []
+    assert carol.device_limit == 2
     assert (carol.traffic_limit_bytes, carol.traffic_reset, carol.expires_at) == (
         50 * GB,
         "month",

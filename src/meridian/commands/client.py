@@ -74,12 +74,17 @@ def _console_names(cluster: ClusterConfig) -> list[str]:
 
 
 def run_add(
-    names: list[str], *, limit: str | None = None, reset: str | None = None, expires: str | None = None
+    names: list[str],
+    *,
+    limit: str | None = None,
+    reset: str | None = None,
+    expires: str | None = None,
+    devices: str | None = None,
 ) -> None:
     """Add one or more clients to the proxy cluster, optionally with traffic limits and an expiry."""
     operation = OperationContext()
     with error_context("client.add", timer=operation.timer):
-        limits = parse_limit_options(limit=limit, reset=reset, expires=expires)
+        limits = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices)
         seen: set[str] = set()
         for name in names:
             if name.strip().casefold() in seen:

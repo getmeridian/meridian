@@ -5,7 +5,6 @@
   "action.done": "Done",
   "action.retry": "Try again",
   "action.save": "Save",
-
   "auth.footer": "This console runs on your control server and makes no outside requests.",
   "auth.setup_title": "Welcome to your console",
   "auth.setup_text": "Choose a password for this console. You are its only owner: people, tokens, and settings live here, while servers stay on your computer.",
@@ -31,11 +30,9 @@
   "auth.no_owner_text": "Run this on the computer you deployed from. It prints a one-time setup link, valid for 15 minutes.",
   "auth.link_title": "This link no longer works",
   "auth.link_text": "Setup links work once and expire after 15 minutes. Get a fresh one on the computer you deployed from:",
-
   "reauth.title": "Confirm it's you",
   "reauth.text": "This change needs your password again.",
   "reauth.submit": "Confirm",
-
   "totp.title": "Sign-in code",
   "totp.on": "On",
   "totp.off": "Off",
@@ -59,12 +56,10 @@
   "totp.off_title": "Turn off the sign-in code?",
   "totp.off_text": "Sign-in will ask only for your password. You can turn the code on again any time.",
   "totp.disabled_toast": "Sign-in code is off.",
-
   "passkeys.title": "Passkeys",
   "passkeys.unavailable": "Not available",
   "passkeys.no_domain": "Passkeys need the console to open on a domain name; browsers never allow them on a bare IP address.",
   "passkeys.not_built": "This version of Meridian doesn't support passkeys yet. Use a password and, if you like, a sign-in code.",
-
   "sessions.title": "Signed-in devices",
   "sessions.text": "A device stays signed in for 12 hours at most, and for 30 minutes without use.",
   "sessions.sign_out_others": "Sign out other devices",
@@ -72,17 +67,14 @@
   "sessions.signed_in": "Signed in {when}",
   "sessions.active": "Active {when}",
   "sessions.this_device": "This device",
-
   "nav.label": "Sections",
   "nav.people": "People",
   "nav.servers": "Servers",
   "nav.revisions": "Revisions",
   "nav.tokens": "Tokens",
   "nav.settings": "Settings",
-
   "cli.title": "Change servers with meridian on your computer",
   "cli.text": "This console never holds SSH keys, so a seized control server can't reach the others. Adding, moving, or removing servers happens where you deployed from.",
-
   "people.lede": "Everyone who connects through this fleet.",
   "people.search": "Search people",
   "people.add": "Add person",
@@ -107,17 +99,14 @@
   "people.expires": "Ends {when}",
   "people.expired_on": "Ended {when}",
   "people.online": "Online {when}",
-
   "status.active": "Active",
   "status.disabled": "Disabled",
   "status.limited": "Over limit",
   "status.expired": "Expired",
-
   "reset.no_reset": "Never",
   "reset.day": "Every day",
   "reset.week": "Every week",
   "reset.month": "Every month",
-
   "person.since": "Added {when}",
   "person.share": "Share",
   "person.share_text": "Send the link, or let them scan the code in their VPN app. It updates itself when servers change.",
@@ -155,7 +144,7 @@
   "person.reissue_text": "For a link that leaked. The old link and QR code stop working at once.",
   "person.reissue_declared": "Your fleet file lists this person, and their connection page moves with the link. Issue it on your computer:",
   "person.reissue_title": "Issue a new link?",
-  "person.reissue_confirm": "The current link stops working at once. You'll need to send the new one.",
+  "person.reissue_confirm": "The current link stops working at once. You'll need to send the new one. Registered devices are cleared too.",
   "person.reissued_toast": "New link issued. Send it to them.",
   "person.remove": "Remove",
   "person.remove_text": "Deletes this person and their link.",
@@ -163,7 +152,6 @@
   "person.remove_title": "Remove {name}?",
   "person.remove_confirm": "Their link stops working and their traffic history goes. This can't be undone.",
   "person.removed_toast": "Removed.",
-
   "servers.lede": "Every server whose agent reports to this console.",
   "servers.empty": "No server reports here yet.",
   "servers.country": "Country",
@@ -179,11 +167,9 @@
   "servers.waiting": "Waiting",
   "servers.traffic": "Traffic",
   "servers.failed": "Some parts failed to apply:",
-
   "role.exit": "Exit",
   "role.gateway": "Gateway",
   "role.node": "Server",
-
   "revisions.lede": "Every change applied from your computer, newest first.",
   "revisions.empty": "No revisions yet. They appear after the first apply.",
   "revisions.by": "by {name}",
@@ -198,12 +184,10 @@
   "revisions.first": "This is the first revision.",
   "revisions.same": "Revisions {a} and {b} describe the same fleet.",
   "revisions.diff_of": "From revision {a} to {b}:",
-
   "revision.proposed": "Proposed",
   "revision.approved": "Approved",
   "revision.applied": "Applied",
   "revision.failed": "Failed",
-
   "tokens.lede": "Keys for scripts and other devices to use this console's API. Each one can be revoked on its own.",
   "tokens.create": "Create token",
   "tokens.create_title": "Create an API token",
@@ -221,7 +205,6 @@
   "tokens.revoked_toast": "Token revoked.",
   "tokens.secret_title": "Your new token",
   "tokens.secret_once": "Copy it now: it is shown only this once. Anyone with it can act with the scope you chose.",
-
   "scope.read": "Read",
   "scope.read_hint": "see everything but secrets",
   "scope.propose": "Propose",
@@ -230,7 +213,6 @@
   "scope.approve_hint": "also approve others' revisions",
   "scope.admin": "Admin",
   "scope.admin_hint": "everything, including people's links",
-
   "settings.fleet": "Fleet",
   "settings.title": "Title",
   "settings.title_hint": "Shown in VPN apps and here. It comes from your fleet file, so change it from your computer: meridian setup, or delivery.profile_title in meridian fleet export, then meridian fleet import.",
@@ -245,15 +227,12 @@
   "settings.password_text": "Changing it signs out every other device.",
   "settings.change_password": "Change password",
   "settings.password_toast": "Password changed. Other devices were signed out.",
-
   "theme.auto": "System",
   "theme.light": "Light",
   "theme.dark": "Dark",
-
   "time.never": "never",
   "time.just_now": "just now",
   "toast.copied": "Copied.",
-
   "error.generic": "Something went wrong. Try again.",
   "error.fatal_title": "The console can't load",
   "error.network": "Can't reach the control service. Check your connection.",
@@ -277,5 +256,27 @@
   "error.conflict": "Something changed meanwhile. Reload and try again.",
   "error.declared_user": "Your fleet file lists this person. Change them with meridian on your computer.",
   "error.internal": "The control service hit an error. Try again.",
-  "error.payload_too_large": "That's too much to send at once. Shorten it and try again."
+  "error.payload_too_large": "That's too much to send at once. Shorten it and try again.",
+  "devices.title": "Devices",
+  "devices.limit": "Device cap",
+  "devices.limit_hint": "Leave empty for the fleet default. Caps take effect when device limits are on in Settings → Privacy.",
+  "devices.limit_invalid": "Use a whole number from 1 to 100, or leave empty for the fleet default.",
+  "devices.count": "{count} of {limit} devices",
+  "devices.off": "Device limits are off. No device information is read or stored.",
+  "devices.private": "Only the count is shown. Device names, systems, apps, and fetch times are never stored.",
+  "devices.empty": "No devices have registered yet.",
+  "devices.clear": "Clear devices",
+  "devices.remove": "Remove",
+  "devices.clear_title": "Clear all devices?",
+  "devices.remove_title": "Remove this device?",
+  "devices.clear_text": "Frees every device slot. Devices can register again on their next subscription refresh. Existing configurations keep working.",
+  "devices.remove_text": "Frees one device slot. This device can register again on its next subscription refresh. Existing configurations keep working.",
+  "devices.removed_toast": "Forgot {count} device(s).",
+  "devices.system": "System",
+  "devices.model": "Model",
+  "devices.app": "App",
+  "devices.first_seen": "First fetched",
+  "devices.last_seen": "Last fetched",
+  "devices.unknown": "Not provided",
+  "devices.pending": "After the next refresh"
 }

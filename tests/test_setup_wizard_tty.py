@@ -41,7 +41,7 @@ def test_bare_meridian_offers_setup_asks_language_and_saves_it(tmp_path: Path) -
     child.sendline("")  # preselected from LANG
     child.expect("local")
     child.sendline("подробнее")
-    child.expect("никогда не сохраняет пароли")
+    child.expect(r"никогда\s+не\s+сохраняет\s+пароли")
     child.expect("local")
     child.sendline("выйти")
     child.expect("meridian setup")

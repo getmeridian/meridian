@@ -223,7 +223,7 @@
   "client.expires_never": "бессрочно",
   "client.limits_updated": "Лимиты для «{name}» обновлены",
   "client.traffic_reset": "Трафик «{name}» сброшен: учёт начинается с нуля.",
-  "client.limits_hint": "Изменить лимиты: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE",
+  "client.limits_hint": "Изменить лимиты: meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "выхода {exit}",
   "sni.relay_subject": "промежуточного сервера {relays}",
   "sni.relay_through": "{subject} через {server}",
@@ -293,5 +293,17 @@
   "context.removed": "Контекст {name} удалён; его серверы не затронуты",
   "context.superseded": "заменён контекстом {by}: только чтение",
   "context.clear_default_confirm": "Удалить копию флота в контексте по умолчанию (cluster.yml, servers.json, снимки, ключ устройства)? SSH-ключ и настройки останутся, серверы продолжат работать.",
-  "context.cleared_default": "Копия флота в контексте по умолчанию удалена; его серверы не затронуты"
+  "context.cleared_default": "Копия флота в контексте по умолчанию удалена; его серверы не затронуты",
+  "client.label.devices": "Устройства",
+  "client.device_default": "общий лимит",
+  "client.devices_count": "{count} из {limit} устройств",
+  "client.devices_removed": "Удалено устройств: {count}. Они смогут зарегистрироваться при следующем обновлении подписки.",
+  "client.devices_off": "Лимиты устройств выключены. Данные устройств не читаются и не сохраняются.",
+  "client.devices_private": "Показывается только количество. --clear позволяет устройствам зарегистрироваться заново.",
+  "client.device_id": "ID",
+  "client.device_system": "Система",
+  "client.device_model": "Модель",
+  "client.device_app": "Приложение",
+  "client.device_first_seen": "Первое обновление",
+  "client.device_last_seen": "Последнее обновление"
 }

@@ -92,6 +92,36 @@ meridian client reset-traffic alice
 
 应用、重新部署和服务器变更都不会改动客户端的限额和到期时间。
 
+## 限制设备数量
+
+设备限制**默认关闭**：Meridian 不读取或存储设备信息。需要上限时，在 **Settings → Privacy** 中选择 `private` 或 `full`。隐私级别和每个人的设备上限保存在控制服务中，应用配置不会改动它们。
+
+- **Private：**每个人的设备通过不可读的指纹计数。Meridian 不存储设备名称、系统或应用。夺取控制服务器的人只能核查自己已经持有的某台设备是否被使用过。
+- **Full：**Meridian 存储每台设备的 ID、系统、型号、应用以及最近获取订阅的时间。夺取控制服务器的人会知道每个人使用哪些设备。地址永远不会被存储。
+
+Private 模式也不存储首次或最近获取订阅的时间。指纹包含在加密快照中，但其集群密钥留在控制服务器上。恢复后会清除 private 登记，设备在下次刷新订阅时重新登记。从 full 降到 private 会将 ID 转为指纹并删除元数据；关闭设备限制会删除所有登记。
+
+添加用户时或之后可设置 1 到 100 的上限。`default` 使用集群上限，初始值为 3：
+
+```
+meridian client add alice --devices 2
+meridian client set alice --devices 4
+meridian client set alice --devices default
+```
+
+查看或清除登记：
+
+```
+meridian client devices alice
+meridian client devices alice --json
+meridian client devices alice --remove ID
+meridian client devices alice --clear
+```
+
+Private 模式只显示“N / M 台设备”；JSON 还返回指纹 ID，以便单独移除。Full 模式列出 ID、系统及版本、型号、应用、首次和最近获取时间。控制台中的用户页面显示相同的数量或列表，提供全部清除按钮，full 模式还提供单台设备移除按钮。
+
+降低上限后，已登记设备仍可使用。超过上限的新设备会收到提示移除设备或申请提高上限的订阅占位配置。计数需要应用发送有效的 `x-hwid` 请求头；浏览器、连接页面的请求以及不发送受支持 HWID 的应用始终正常获取订阅，且不计数。清除登记会腾出名额，设备可在下次刷新时重新登记。上限只控制订阅刷新，不会撤销已导入应用的配置。`client reissue` 更换凭证并清除所有登记，同时保留上限。`migrate` 永远不会导入 Remnawave 的设备登记。
+
 ## 暂停和恢复客户端
 
 ```
@@ -111,7 +141,7 @@ meridian client enable alice
 meridian client reissue alice
 ```
 
-控制服务会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 删除旧页面、发布新页面，并打印新的页面和订阅 URL，供你发给该客户端。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。其他一切保持不变：状态、流量限额和用量、到期时间。
+控制服务会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 删除旧页面、发布新页面，并打印新的页面和订阅 URL，供你发给该客户端。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。状态、流量限额和用量、到期时间及设备上限保持不变。设备登记会被清除。
 
 使用 `--json` 时请传入 `--yes`。新链接只出现在该命令的输出中。
 

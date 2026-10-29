@@ -22,7 +22,8 @@ from meridian.control.client import (
     ControlServiceError,
     ControlServiceScopeError,
 )
-from meridian.control.models import LimitStrategy, UserRecord, UserUpdate
+from meridian.control.models import LimitStrategy, UserDevices, UserRecord, UserUpdate
+from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
 from meridian.remnawave import (
@@ -88,6 +89,8 @@ class ServiceAccessPanel:
             fields["traffic_limit_strategy"] = _RESET_STRATEGIES[change.traffic_reset]
         if change.sets_expiry:
             fields["expire_at"] = change.expires_at  # None clears the expiry
+        if change.sets_devices:
+            fields["device_limit"] = change.device_limit
         username = self._username(user_id)
         update = UserUpdate.model_validate(fields)
         return self._user(_translated(lambda: self._client.update_user(username, update)))
@@ -99,6 +102,14 @@ class ServiceAccessPanel:
     def revoke_user_subscription(self, user_id: str) -> User:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))
+
+    def user_devices(self, user_id: str) -> UserDevices:
+        username = self._username(user_id)
+        return _translated(lambda: self._client.user_devices(username))
+
+    def delete_user_devices(self, user_id: str, device_key: str | None = None) -> DevicesRemoved:
+        username = self._username(user_id)
+        return _translated(lambda: self._client.delete_user_devices(username, device_key))
 
     def _update(self, user_id: str, update: UserUpdate) -> User:
         username = self._username(user_id)
@@ -125,6 +136,7 @@ class ServiceAccessPanel:
             expire_at=record.expire_at or "",
             created_at=record.created_at,
             online_at=record.online_at or "",
+            hwid_device_limit=record.device_limit,
         )
 
 

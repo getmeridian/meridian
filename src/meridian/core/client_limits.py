@@ -53,6 +53,7 @@ class ClientLimitChange(CoreModel):
     traffic_limit_bytes: int | None = Field(default=None, ge=0, description="0 means unlimited.")
     traffic_reset: TrafficReset | None = Field(default=None, description="When used traffic starts again from zero.")
     expires_at: Timestamp | None = Field(default=None, description="UTC; null with the field set means never.")
+    device_limit: int | None = Field(default=None, ge=1, le=100, description="Explicit null uses the fleet default.")
 
     @property
     def is_empty(self) -> bool:
@@ -62,12 +63,17 @@ class ClientLimitChange(CoreModel):
     def sets_expiry(self) -> bool:
         return "expires_at" in self.model_fields_set
 
+    @property
+    def sets_devices(self) -> bool:
+        return "device_limit" in self.model_fields_set
+
 
 def build_limit_change(
     *,
     limit: str | None = None,
     reset: str | None = None,
     expires: str | None = None,
+    devices: str | None = None,
     now: datetime | None = None,
 ) -> ClientLimitChange:
     """Parse the `--limit`, `--reset`, and `--expires` values that were given into one change."""
@@ -78,7 +84,22 @@ def build_limit_change(
         fields["traffic_reset"] = parse_traffic_reset(reset)
     if expires is not None:
         fields["expires_at"] = parse_expiry(expires, now=now)
+    if devices is not None:
+        fields["device_limit"] = parse_device_limit(devices)
     return ClientLimitChange(**fields)  # type: ignore[arg-type]
+
+
+def parse_device_limit(text: str) -> int | None:
+    """A per-user cap, or None for the control service's default; no value disables fleet privacy settings."""
+    value = _normalized(text)
+    if value == "default":
+        return None
+    if value.isascii() and value.isdigit() and len(value) <= 3 and 1 <= int(value) <= 100:
+        return int(value)
+    raise ClientLimitError(
+        f"Device limit '{text}' is not between 1 and 100",
+        hint="Use --devices 1 to 100, or --devices default for the fleet's cap.",
+    )
 
 
 def parse_traffic_limit(text: str) -> int:

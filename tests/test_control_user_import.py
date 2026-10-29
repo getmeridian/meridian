@@ -13,7 +13,7 @@ from meridian.control.client import ControlClient, ControlServiceConflict
 from meridian.control.models import UserImport, UserImportBatch
 from meridian.control.service import ControlService, ServiceError, period_start
 from meridian.core.agent_protocol import StatsReport, UserTraffic
-from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.control_service import ADMIN_TOKEN, drop_device_privacy_schema, serve_control
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 ALICE_UUID = "3f2a9c4e-7b1d-4e6a-9c2f-1a2b3c4d5e6f"
@@ -221,6 +221,7 @@ def test_a_version_five_database_gains_carried_traffic(tmp_path: Path) -> None:
     ControlService(path, fleet_id=FLEET_ID, version="4.0.0").put_user("alice")
     db = sqlite3.connect(path)
     db.execute("ALTER TABLE users DROP COLUMN traffic_carried_bytes")
+    drop_device_privacy_schema(db)
     db.execute("UPDATE meta SET value = '5' WHERE key = 'schema_version'")
     db.commit()
     db.close()

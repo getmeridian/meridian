@@ -5,7 +5,6 @@
   "action.done": "完成",
   "action.retry": "重试",
   "action.save": "保存",
-
   "auth.footer": "此控制台运行在你的控制服务器上，不会向外部发出任何请求。",
   "auth.setup_title": "欢迎使用控制台",
   "auth.setup_text": "为此控制台设置密码。你是它唯一的所有者：用户、令牌和设置都在这里管理，服务器则保留在你的电脑上管理。",
@@ -31,11 +30,9 @@
   "auth.no_owner_text": "在你用来部署的电脑上运行此命令。它会输出一个一次性设置链接，15 分钟内有效。",
   "auth.link_title": "此链接已失效",
   "auth.link_text": "设置链接只能使用一次，15 分钟后过期。请在你用来部署的电脑上获取新链接：",
-
   "reauth.title": "确认是你本人",
   "reauth.text": "此更改需要再次输入密码。",
   "reauth.submit": "确认",
-
   "totp.title": "登录验证码",
   "totp.on": "已开启",
   "totp.off": "已关闭",
@@ -59,12 +56,10 @@
   "totp.off_title": "关闭登录验证码？",
   "totp.off_text": "登录将只需要密码。你可以随时重新开启验证码。",
   "totp.disabled_toast": "登录验证码已关闭。",
-
   "passkeys.title": "通行密钥",
   "passkeys.unavailable": "不可用",
   "passkeys.no_domain": "通行密钥要求通过域名打开控制台；浏览器不允许在纯 IP 地址上使用。",
   "passkeys.not_built": "此版本的 Meridian 尚不支持通行密钥。请使用密码，并可选择添加登录验证码。",
-
   "sessions.title": "已登录的设备",
   "sessions.text": "设备最多保持登录 12 小时，闲置 30 分钟后自动退出。",
   "sessions.sign_out_others": "退出其他设备",
@@ -72,17 +67,14 @@
   "sessions.signed_in": "登录于 {when}",
   "sessions.active": "活动于 {when}",
   "sessions.this_device": "本设备",
-
   "nav.label": "栏目",
   "nav.people": "用户",
   "nav.servers": "服务器",
   "nav.revisions": "修订",
   "nav.tokens": "令牌",
   "nav.settings": "设置",
-
   "cli.title": "在你的电脑上用 meridian 更改服务器",
   "cli.text": "此控制台从不保存 SSH 密钥，因此即使控制服务器被扣押，也无法访问其他服务器。添加、迁移或移除服务器都在你部署的那台电脑上进行。",
-
   "people.lede": "所有通过你的服务器连接的人。",
   "people.search": "搜索用户",
   "people.add": "添加用户",
@@ -107,17 +99,14 @@
   "people.expires": "{when}到期",
   "people.expired_on": "已于{when}到期",
   "people.online": "{when}在线",
-
   "status.active": "正常",
   "status.disabled": "已停用",
   "status.limited": "超出上限",
   "status.expired": "已过期",
-
   "reset.no_reset": "从不",
   "reset.day": "每天",
   "reset.week": "每周",
   "reset.month": "每月",
-
   "person.since": "添加于 {when}",
   "person.share": "分享",
   "person.share_text": "发送链接，或让对方在 VPN 应用中扫描二维码。服务器变化时订阅会自动更新。",
@@ -155,7 +144,7 @@
   "person.reissue_text": "用于链接泄露的情况。旧链接和二维码会立即失效。",
   "person.reissue_declared": "服务器配置文件列出了此用户，其连接页面会随链接一起迁移。请在你的电脑上签发：",
   "person.reissue_title": "签发新链接？",
-  "person.reissue_confirm": "当前链接会立即失效，你需要把新链接发给对方。",
+  "person.reissue_confirm": "当前链接会立即失效，你需要把新链接发给对方。已登记设备也会清除。",
   "person.reissued_toast": "已签发新链接，请发送给对方。",
   "person.remove": "移除",
   "person.remove_text": "删除此用户及其链接。",
@@ -163,7 +152,6 @@
   "person.remove_title": "移除 {name}？",
   "person.remove_confirm": "其链接将失效，流量记录将被删除。此操作无法撤销。",
   "person.removed_toast": "已移除。",
-
   "servers.lede": "所有代理程序向此控制台报告的服务器。",
   "servers.empty": "还没有服务器在这里报告。",
   "servers.country": "国家/地区",
@@ -179,11 +167,9 @@
   "servers.waiting": "等待中",
   "servers.traffic": "流量",
   "servers.failed": "部分配置未能应用：",
-
   "role.exit": "出口",
   "role.gateway": "网关",
   "role.node": "服务器",
-
   "revisions.lede": "从你的电脑应用的每一次更改，最新的在前。",
   "revisions.empty": "还没有修订。首次应用后就会出现。",
   "revisions.by": "由 {name}",
@@ -198,12 +184,10 @@
   "revisions.first": "这是第一个修订。",
   "revisions.same": "修订 {a} 和 {b} 描述的是相同的服务器配置。",
   "revisions.diff_of": "从修订 {a} 到 {b}：",
-
   "revision.proposed": "已提出",
   "revision.approved": "已批准",
   "revision.applied": "已应用",
   "revision.failed": "失败",
-
   "tokens.lede": "供脚本和其他设备使用此控制台 API 的密钥。每个都可以单独撤销。",
   "tokens.create": "创建令牌",
   "tokens.create_title": "创建 API 令牌",
@@ -221,7 +205,6 @@
   "tokens.revoked_toast": "令牌已撤销。",
   "tokens.secret_title": "你的新令牌",
   "tokens.secret_once": "请立即复制：它只显示这一次。任何持有它的人都能以所选权限操作。",
-
   "scope.read": "只读",
   "scope.read_hint": "查看除机密外的一切",
   "scope.propose": "提议",
@@ -230,7 +213,6 @@
   "scope.approve_hint": "还可批准他人的修订",
   "scope.admin": "管理员",
   "scope.admin_hint": "全部权限，包括用户的链接",
-
   "settings.fleet": "服务器",
   "settings.title": "标题",
   "settings.title_hint": "显示在 VPN 应用和这里。它由服务器配置文件设置，请在你的电脑上更改：meridian setup，或在 meridian fleet export 中修改 delivery.profile_title，然后运行 meridian fleet import。",
@@ -245,15 +227,12 @@
   "settings.password_text": "更改后，其他所有设备都会退出登录。",
   "settings.change_password": "更改密码",
   "settings.password_toast": "密码已更改。其他设备已退出登录。",
-
   "theme.auto": "跟随系统",
   "theme.light": "浅色",
   "theme.dark": "深色",
-
   "time.never": "从未",
   "time.just_now": "刚刚",
   "toast.copied": "已复制。",
-
   "error.generic": "出了点问题，请重试。",
   "error.fatal_title": "控制台无法加载",
   "error.network": "无法连接到控制服务，请检查网络。",
@@ -277,5 +256,27 @@
   "error.conflict": "期间有内容发生了变化。请刷新后重试。",
   "error.declared_user": "服务器配置文件列出了此用户。请在你的电脑上用 meridian 修改。",
   "error.internal": "控制服务出错，请重试。",
-  "error.payload_too_large": "一次发送的内容太多，请精简后重试。"
+  "error.payload_too_large": "一次发送的内容太多，请精简后重试。",
+  "devices.title": "设备",
+  "devices.limit": "设备上限",
+  "devices.limit_hint": "留空使用集群默认上限。在 Settings → Privacy 中启用设备限制后，上限才会生效。",
+  "devices.limit_invalid": "请输入 1 到 100 的整数，或留空使用集群默认上限。",
+  "devices.count": "{count} / {limit} 台设备",
+  "devices.off": "设备限制已关闭。不读取或存储任何设备信息。",
+  "devices.private": "仅显示数量。不存储设备名称、系统、应用或获取订阅的时间。",
+  "devices.empty": "尚未登记任何设备。",
+  "devices.clear": "清除设备",
+  "devices.remove": "移除",
+  "devices.clear_title": "清除所有设备？",
+  "devices.remove_title": "移除此设备？",
+  "devices.clear_text": "释放所有设备名额。设备可在下次刷新订阅时重新登记。现有配置继续工作。",
+  "devices.remove_text": "释放一个设备名额。此设备可在下次刷新订阅时重新登记。现有配置继续工作。",
+  "devices.removed_toast": "已清除 {count} 台设备。",
+  "devices.system": "系统",
+  "devices.model": "型号",
+  "devices.app": "应用",
+  "devices.first_seen": "首次获取",
+  "devices.last_seen": "最近获取",
+  "devices.unknown": "未提供",
+  "devices.pending": "下次刷新后显示"
 }

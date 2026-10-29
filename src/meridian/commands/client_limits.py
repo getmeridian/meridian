@@ -32,10 +32,12 @@ _RESET_KEYS = {
 }
 
 
-def parse_limit_options(*, limit: str | None, reset: str | None, expires: str | None) -> ClientLimitChange:
+def parse_limit_options(
+    *, limit: str | None, reset: str | None, expires: str | None, devices: str | None = None
+) -> ClientLimitChange:
     """The change `--limit`, `--reset`, and `--expires` ask for; a bad value exits 2 before any connection."""
     try:
-        return build_limit_change(limit=limit, reset=reset, expires=expires)
+        return build_limit_change(limit=limit, reset=reset, expires=expires, devices=devices)
     except ClientLimitError as exc:
         fail(exc)
 
@@ -63,6 +65,10 @@ def print_client_usage(record: ClientRecord) -> None:
         (t("client.label.status"), format_status(record.status)),
         (t("client.label.traffic"), escape(format_usage(record))),
         (t("client.label.expires"), escape(format_expiry(record.expires_at))),
+        (
+            t("client.label.devices"),
+            str(record.device_limit) if record.device_limit is not None else t("client.device_default"),
+        ),
     ]
     last_seen = t("client.label.last_seen")
     if record.last_seen:
@@ -80,22 +86,24 @@ def limits_warning(name: str, exc: RemnawaveError) -> ErrorModel:
         code="MERIDIAN_CLIENT_LIMITS_FAILED",
         category="system",
         message=f"Client '{name}' was added, but their limits could not be set: {exc}",
-        hint=f"Set them with: meridian client set {name} --limit/--reset/--expires",
+        hint=f"Set them with: meridian client set {name} --limit/--reset/--expires/--devices",
         retryable=True,
         exit_code=3,
         details={"client": name},
     )
 
 
-def run_set(name: str, *, limit: str | None, reset: str | None, expires: str | None) -> None:
+def run_set(
+    name: str, *, limit: str | None, reset: str | None, expires: str | None, devices: str | None = None
+) -> None:
     """Change a client's traffic limit, reset period, or expiry."""
     operation = OperationContext()
     with error_context("client.set", timer=operation.timer):
-        change = parse_limit_options(limit=limit, reset=reset, expires=expires)
+        change = parse_limit_options(limit=limit, reset=reset, expires=expires, devices=devices)
         if change.is_empty:
             fail(
                 "Nothing to change",
-                hint="Pass --limit, --reset, or --expires (for example: meridian client set alice --limit 50GB).",
+                hint="Pass --limit, --reset, --expires, or --devices; for example, --devices 3.",
                 hint_type="user",
             )
         _mutate(

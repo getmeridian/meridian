@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 
 from meridian.cli_options import (
+    DeviceLimit,
     Expires,
     ForgetUnreachable,
     Json,
@@ -47,6 +48,7 @@ def client_add(
     limit: TrafficLimit = None,
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
+    devices: DeviceLimit = None,
     _json: Json = False,
     # Adding never asks; accepted so scripts can pass --yes to every mutating command.
     _yes: bool = typer.Option(False, "--yes", "-y", hidden=True),
@@ -62,7 +64,7 @@ def client_add(
     """
     from meridian.commands.client import run_add
 
-    run_add(names, limit=limit, reset=reset, expires=expires)
+    run_add(names, limit=limit, reset=reset, expires=expires, devices=devices)
 
 
 @client_app.command("show")
@@ -97,6 +99,7 @@ def client_set_cmd(
     limit: TrafficLimit = None,
     reset: TrafficResetPeriod = None,
     expires: Expires = None,
+    devices: DeviceLimit = None,
     _json: Json = False,
 ) -> None:
     """Change a client's traffic limit, reset period, or expiry
@@ -111,7 +114,23 @@ def client_set_cmd(
     """
     from meridian.commands.client_limits import run_set
 
-    run_set(name, limit=limit, reset=reset, expires=expires)
+    run_set(name, limit=limit, reset=reset, expires=expires, devices=devices)
+
+
+@client_app.command("devices", rich_help_panel="Device limits")
+def client_devices_cmd(
+    name: str = typer.Argument(..., help="Client name"),
+    remove: str | None = typer.Option(None, "--remove", metavar="ID", help="Forget one device ID"),
+    clear: bool = typer.Option(False, "--clear", help="Forget all of this client's devices"),
+    _json: Json = False,
+) -> None:
+    """Show device counts or details, or forget a device so another can register
+
+    Private mode shows a count; full mode lists devices. Nothing is counted while device limits are off.
+    """
+    from meridian.commands.client_devices import run_devices
+
+    run_devices(name, remove=remove, clear=clear)
 
 
 @client_app.command("reset-traffic")
@@ -149,7 +168,7 @@ def client_reissue_cmd(
 ) -> None:
     """Replace a client's links after a leak; the old page and subscription stop working
 
-    Keeps the client and their panel settings (limits, expiry, HWID devices).
+    Keeps the client and their settings (limits and expiry), and clears registered devices.
 
     [dim]Examples:[/dim]
       [cyan]meridian client reissue alice[/cyan]

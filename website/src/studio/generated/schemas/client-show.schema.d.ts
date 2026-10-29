@@ -11,6 +11,10 @@ export type CreatedAt = string;
  */
 export type Declared = boolean;
 /**
+ * None uses the fleet's default cap.
+ */
+export type DeviceLimit = number | null;
+/**
  * UTC timestamp; empty means never.
  */
 export type ExpiresAt = string;
@@ -45,6 +49,7 @@ export interface ClientShowResult {
 export interface ClientDetail {
   created_at: CreatedAt;
   declared?: Declared;
+  device_limit?: DeviceLimit;
   expires_at: ExpiresAt;
   id: Id;
   last_seen: LastSeen;

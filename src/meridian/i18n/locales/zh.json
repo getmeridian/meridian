@@ -223,7 +223,7 @@
   "client.expires_never": "永不",
   "client.limits_updated": "已更新“{name}”的限制",
   "client.traffic_reset": "已重置“{name}”的流量，用量从零开始计算。",
-  "client.limits_hint": "修改限制：meridian client set NAME --limit SIZE --reset PERIOD --expires DATE",
+  "client.limits_hint": "修改限制：meridian client set NAME --limit SIZE --reset PERIOD --expires DATE --devices N",
   "sni.exit_subject": "出口 {exit}",
   "sni.relay_subject": "中继 {relays}",
   "sni.relay_through": "{subject}（经 {server}）",
@@ -293,5 +293,17 @@
   "context.removed": "已删除上下文 {name}；其服务器未受影响",
   "context.superseded": "已由 {by} 取代：只读",
   "context.clear_default_confirm": "删除默认上下文保存的集群副本（cluster.yml、servers.json、快照、设备密钥）吗？你的 SSH 密钥和设置会保留，服务器会继续运行。",
-  "context.cleared_default": "已删除默认上下文保存的集群副本；其服务器未受影响"
+  "context.cleared_default": "已删除默认上下文保存的集群副本；其服务器未受影响",
+  "client.label.devices": "设备",
+  "client.device_default": "集群默认上限",
+  "client.devices_count": "{count} / {limit} 台设备",
+  "client.devices_removed": "已清除 {count} 台设备。它们可在下次刷新订阅时重新登记。",
+  "client.devices_off": "设备限制已关闭。不读取或存储任何设备数据。",
+  "client.devices_private": "仅显示数量。使用 --clear 可让设备重新登记。",
+  "client.device_id": "ID",
+  "client.device_system": "系统",
+  "client.device_model": "型号",
+  "client.device_app": "应用",
+  "client.device_first_seen": "首次获取",
+  "client.device_last_seen": "最近获取"
 }

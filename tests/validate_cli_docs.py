@@ -37,6 +37,7 @@ COMMAND_SECTIONS: dict[str, str] = {
     "client list": "### meridian client",
     "client set": "### meridian client",
     "client reset-traffic": "### meridian client",
+    "client devices": "### meridian client",
     "client reissue": "### meridian client",
     "client remove": "### meridian client",
     "client enable": "### meridian client",

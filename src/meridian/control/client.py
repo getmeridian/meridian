@@ -40,11 +40,13 @@ from meridian.control.models import (
     TokenRecord,
     TokenScope,
     TrafficSummary,
+    UserDevices,
     UserImportBatch,
     UserImportResult,
     UserRecord,
     UserUpdate,
 )
+from meridian.core.client_devices import DevicesRemoved
 from meridian.core.errors import MeridianError
 
 _GATEWAY_FAILURES = frozenset({502, 503, 504})
@@ -181,6 +183,15 @@ class ControlClient:
 
     def reset_user_traffic(self, username: str) -> UserRecord:
         return UserRecord.model_validate(self._call("POST", f"api/users/{_segment(username)}/reset-traffic", {}))
+
+    def user_devices(self, username: str) -> UserDevices:
+        return UserDevices.model_validate(self._call("GET", f"api/users/{_segment(username)}/devices"))
+
+    def delete_user_devices(self, username: str, device_key: str | None = None) -> DevicesRemoved:
+        path = f"api/users/{_segment(username)}/devices"
+        if device_key is not None:
+            path += "/" + _segment(device_key)
+        return DevicesRemoved.model_validate(self._call("DELETE", path))
 
     def delete_user(self, username: str) -> None:
         self._call("DELETE", f"api/users/{_segment(username)}")

@@ -24,6 +24,7 @@ from meridian.control.revisions import secret_paths
 from meridian.control.server import ControlServer
 from meridian.control.service import SCHEMA_VERSION, ControlService
 from meridian.control.ui_views import declared_users
+from tests.support.control_service import drop_device_privacy_schema
 from tests.support.topology import single_exit_intent
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
@@ -245,6 +246,7 @@ def test_a_version_four_database_gains_revisions_and_the_fence(tmp_path: Path) -
     db.execute("DROP TABLE revisions")
     db.execute("DROP TABLE apply_fence")
     db.execute("ALTER TABLE users DROP COLUMN traffic_carried_bytes")  # added in version 6
+    drop_device_privacy_schema(db)
     db.execute("UPDATE meta SET value = '4' WHERE key = 'schema_version'")
     db.commit()
     db.close()

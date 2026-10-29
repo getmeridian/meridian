@@ -52,6 +52,9 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 |------|---------|-------------|
 | `--intent FILE` | (هیچ) | از بررسی توپولوژی کامل JSON شروع کنید؛ از `-` برای stdin استفاده کنید |
 | `--restart` | | پیشرفت setup ذخیره‌شده را قبل از شروع دور کنید |
+| `--devices N\|default` | سقف مجموعه | سقف هر فرد، 1–100 (`client add`، `client set`)؛ `default` سقف مجموعه را دنبال می‌کند |
+| `--remove ID` | | فراموش‌کردن یک ثبت (`client devices`)؛ در تازه‌سازی بعدی می‌تواند دوباره ثبت شود |
+| `--clear` | | فراموش‌کردن همهٔ ثبت‌ها (`client devices`)؛ هم‌زمان با `--remove` مجاز نیست |
 | `--yes`, `-y` | | بررسی و اعمال را بدون پرسش تأیید کنید |
 
 اولین سؤال زبان است (English, Русский, فارسی, 中文)، از ترمینال شما پیش‌انتخاب‌شده و در `~/.config/meridian/preferences.json` به‌خاطر سپرده می‌شود؛ `--lang` یا `MERIDIAN_LANG` آن را رد می‌کنند. سپس wizard از طریق سروری (یک IP، `user@IP:port` یا `local` برای این ماشین)، آنچه که هر سرور انجام می‌دهد، روش‌های اتصال، مسیریابی (تنها زمانی پرسیده می‌شود که routing gateway داشته باشید: هر قانون ترافیک منطبق را به یک خروجی یا pool، مستقیم از دروازه، یا به هیچ‌جا می‌فرستد)، users، خلاصهٔ ساده‌زبان و اعمال راه‌اندازی می‌شود. گزینه‌ها فهرست هستند: با کلیدهای جهت‌دار حرکت کنید (یا شمارهٔ گزینه را بزنید)، موارد چک‌لیست را با Space علامت بزنید، برای جزئیات `?` را بزنید، با Enter تأیید کنید، با Esc به عقب برگردید و با Ctrl+C خارج شوید. هر جا که فهرستی «مورد دیگر» را پیشنهاد می‌دهد، می‌توانید مقدار دلخواه خود را تایپ کنید. در فیلدهای متنی نیز می‌توانید `back`، `details`، `save` یا `quit` تایپ کنید (یا همان کلمات به زبان شما). برای «سایت برای پنهان‌سازی»، wizard ابتدا شبکهٔ خود exit را اسکن می‌کند (حدود یک دقیقه) و آن سایت‌ها را پیش از سایت‌های شناخته‌شده فهرست می‌کند. برای prompt‌های شماره‌دار `MERIDIAN_PLAIN_PROMPTS=1` را تنظیم کنید (وقتی ترمینال نتواند فهرست‌ها را رسم کند، به‌طور خودکار استفاده می‌شوند). اجرای `meridian` بدون فرمان در یک ترمینال، قبل از آن‌که VPN موجود باشد، برای شروع wizard پیشنهاد می‌دهد. پیشرفت بعد از هر مرحله در `~/.config/meridian/setup.json` ذخیره می‌شود، بنابراین `meridian setup` دوباره اجرا resume می‌شود؛ رمزهای عبور و کلیدهای خصوصی هرگز در آنجا ذخیره نمی‌شوند. `--intent` draft موجود را جایگزین نمی‌کند مگر `--restart` همچنین داده شود. هنگامی‌که اعمال موفق باشد، setup هر گره و اشتراک را تأیید کرده و صفحه اتصال هر کاربر را چاپ می‌کند.
@@ -103,11 +106,12 @@ JSON `data` شامل `plan_hash`، `generation` و `actions[]` با `status: "co
 افرادی را که متصل می‌شوند مدیریت کنید.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--yes] [--json]
@@ -138,6 +142,8 @@ meridian client remove NAME [--yes] [--json]
 **`client reissue`** — لینک‌های کلاینت را پس از لو رفتن جایگزین می‌کند. سرویس کنترل شناسه اشتراک و کلیدهای جدید صادر می‌کند، پس نشانی اشتراک، صفحه اتصال و لینک‌های قبلی از کار می‌افتند. Meridian اول صفحه قبلی را حذف می‌کند، سپس صفحه جدید را منتشر و لینک‌های جدید را چاپ می‌کند. وضعیت، سقف‌ها و تاریخ انقضا همان‌طور که بودند می‌مانند. تأیید می‌خواهد مگر `--yes`، و نام‌هایی را که جزو کلاینت‌های شما نیستند رد می‌کند. اگر صفحه جدید منتشر نشود، لینک‌ها باز هم با هشدار و خروج `3` نمایش داده می‌شوند (با `client show --repair-page` درستش کنید).
 
 **`client remove`** — کلاینت را از topology حذف می‌کند و حساب او در سرویس کنترل و صفحهٔ اتصالش را پاک می‌کند. تأیید می‌خواهد مگر `--yes`. آخرین کلاینت نمی‌تواند حذف شود. افرادی که در کنسول وب اضافه شده‌اند همان‌جا حذف می‌شوند.
+
+**`client devices`** — در private تعداد و در full اطلاعات دستگاه‌ها را نشان می‌دهد؛ off هیچ دستگاهی را نمی‌خواند. `--json` فیلدهای `username`، `level`، `count`، سقف مؤثر `limit`، `devices` و `removed` را برمی‌گرداند. `--remove ID` یا `--clear` ثبت‌ها را بدون لغو اعتبارنامه فراموش می‌کند؛ تکرار آن صفر حذف گزارش می‌دهد. افراد کنسول هم قابل مشاهده‌اند؛ ثبت‌های آن‌ها در کنسول مدیریت می‌شود. `client set --devices N` سقف را تعیین و `--devices default` سقف مجموعه را انتخاب می‌کند. بخش [سقف دستگاه‌ها](/fa/client-management/#سقف-دستگاهها) را ببینید. صدور لینک جدید همهٔ ثبت‌ها را پاک می‌کند و سقف را نگه می‌دارد.
 
 ### meridian server
 

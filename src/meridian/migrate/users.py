@@ -37,11 +37,11 @@ _STRATEGIES: dict[str, LimitStrategy] = {
 }
 _TIMESTAMP = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|\+00:00)$")
 
-# Fleet-wide panel state the service has no place for; reported at review, gone with the panel.
+# Fleet-wide panel state intentionally left behind; reported at review, gone with the panel.
 DROPPED_PANEL_STATE: tuple[str, ...] = (
     "the panel's admin account and API tokens",
     "usage history per node and per day, online and first-connection times",
-    "subscription request history and HWID device registrations",
+    "subscription request history and HWID device registrations (never imported, even with Meridian device limits on)",
     "panel plugins (Torrent Blocker, IP Control) and response rules Meridian does not manage",
     "the Remnawave subscription page (Meridian's own connection pages stay)",
 )

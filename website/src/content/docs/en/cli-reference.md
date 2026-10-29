@@ -52,6 +52,9 @@ meridian setup [--intent FILE|-] [--restart] [--yes]
 |------|---------|-------------|
 | `--intent FILE` | (none) | Start at review from a complete topology JSON document; use `-` for stdin |
 | `--restart` | | Discard saved setup progress before starting |
+| `--devices N\|default` | fleet default | Per-person cap, 1–100 (`client add`, `client set`); `default` follows the fleet cap |
+| `--remove ID` | | Forget one registration (`client devices`); it can register again on its next refresh |
+| `--clear` | | Forget all registrations (`client devices`); mutually exclusive with `--remove` |
 | `--yes`, `-y` | | Approve the review and apply without asking |
 
 The first question is the language (English, Русский, فارسی, 中文), preselected from your terminal and remembered in `~/.config/meridian/preferences.json`; `--lang` or `MERIDIAN_LANG` skips it. Then the wizard walks through servers (an IP, `user@IP:port`, or `local` for this machine), what each server does, connection methods, routing (only asked when you have a routing gateway: each rule sends matching traffic to an exit or pool, directly from the gateway, or nowhere), users, a plain-language summary, and apply. Choices are lists: move with the arrow keys (or press an option's number), toggle checklist items with Space, press `?` for details, Enter to confirm, Esc to go back, and Ctrl+C to quit. Wherever a list offers "Something else", you can type your own value. In text fields you can also type `back`, `details`, `save`, or `quit` (or the same words in your language). For the camouflage site, the wizard scans the exit's own network first (about a minute) and lists those sites ahead of the well-known ones. Set `MERIDIAN_PLAIN_PROMPTS=1` for numbered prompts (they are used automatically when the terminal can't draw lists). Running `meridian` with no command in a terminal, before any VPN exists, offers to start the wizard. Progress is saved in `~/.config/meridian/setup.json` after each stage, so running `meridian setup` again resumes; passwords and private keys are never stored there. `--intent` does not replace an existing draft unless `--restart` is also given. When apply succeeds, setup verifies every node and subscription and prints each user's connection page.
@@ -103,11 +106,12 @@ Every apply is recorded in the control service as a revision (see `meridian flee
 Manage the people who connect.
 
 ```
-meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client add NAME [NAME...] [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client show NAME [--repair-page] [--json]
 meridian client list [--json]
-meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--json]
+meridian client set NAME [--limit SIZE] [--reset PERIOD] [--expires DATE] [--devices N|default] [--json]
 meridian client reset-traffic NAME [--json]
+meridian client devices NAME [--remove ID | --clear] [--json]
 meridian client enable NAME [--json]
 meridian client disable NAME [--json]
 meridian client reissue NAME [--yes] [--json]
@@ -138,6 +142,8 @@ meridian client remove NAME [--yes] [--json]
 **`client reissue`** — replaces a client's links after a leak. The control service issues a new subscription ID and new keys, so the old subscription URL, connection page, and links stop working. Meridian deletes the old page first, then publishes the new one and prints the new links. Status, limits, and expiry stay as set. Asks for confirmation unless `--yes`, and refuses names that aren't your clients. If the new page can't be published, the links are still shown with a warning and exit `3` (repair it with `client show --repair-page`).
 
 **`client remove`** — removes the client from the topology, deletes their account in the control service and their connection page. Asks for confirmation unless `--yes`. The last client cannot be removed. People added in the web console are removed there.
+
+**`client devices`** — shows a count in private mode and device details in full mode; off reads no devices. `--json` returns `username`, `level`, `count`, the effective `limit`, `devices`, and `removed`. `--remove ID` or `--clear` forgets registrations without revoking credentials; a repeat reports zero removals. Reads include console people; manage their registrations in the console. `client set --devices N` sets a cap; `--devices default` uses the fleet cap. See [Device limits](/en/client-management/#limit-devices). Reissuing a client clears all device registrations and keeps the cap.
 
 ### meridian server
 
