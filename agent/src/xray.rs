@@ -2,10 +2,15 @@
 //!
 //! The composed config (users filled into their inbounds) is validated with
 //! `xray run -test` and written to disk, which stays the source of truth after
-//! a restart. When only VLESS users changed and Xray is running the previous
-//! composition, the change goes through Xray's own API (`xray api rmu` / `adu`)
-//! without a restart; anything else (a config change, a Hysteria2 user change,
-//! an API failure) restarts Xray through the unit's `restart_on`.
+//! a restart. When only users changed and Xray is running the previous
+//! composition, the change goes through Xray's own API without a restart:
+//! VLESS users through `xray api rmu` / `adu`; Hysteria2 removals through `rmu`
+//! (the hysteria inbound removes by email), and Hysteria2 additions by
+//! rebuilding only that inbound with `rmi` + `adi`, because `adu` cannot build
+//! hysteria users (Xray 26.7.28 answers "unsupported inbound type") although the
+//! inbound itself accepts them over gRPC. A rebuild drops open Hysteria2 sessions
+//! on that inbound (clients reconnect) and nothing else. Anything more (a config
+//! change, an API failure) restarts Xray through the unit's `restart_on`.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -17,18 +22,21 @@ use serde_json::{Value, json};
 use crate::apply::{Engine, Failure, Outcome, last_line, truncate};
 use crate::compose::{self, UsersRef};
 use crate::fsutil::{self, host_path};
-use crate::model::{Resource, Spec, XrayConfigSpec, XrayUsersSpec};
+use crate::model::{Hysteria2UsersSpec, Resource, Spec, XrayConfigSpec, XrayUsersSpec};
 use crate::state::LedgerEntry;
 use crate::{debug, info};
 
-/// Users of one VLESS inbound to remove and add through the API.
+/// Users of one inbound to change through the API.
 #[derive(Debug, PartialEq)]
 pub struct LiveChange {
     pub tag: String,
     /// Emails (user IDs) to remove: users gone or whose credentials changed.
     pub remove: Vec<String>,
-    /// The inbound object from the composed config with only the users to add as clients.
+    /// VLESS: the inbound object from the composed config with only the users to add as clients.
     pub add: Option<Value>,
+    /// Hysteria2 with users to add: the whole composed inbound, removed and added back
+    /// (`remove` and `add` are then empty: the rebuilt inbound carries every user).
+    pub rebuild: Option<Value>,
 }
 
 impl LiveChange {
@@ -53,6 +61,54 @@ fn vless_clients(spec: &XrayUsersSpec) -> BTreeMap<&str, (&str, &str)> {
         .collect()
 }
 
+fn composed_inbound(composed: &Value, tag: &str) -> Result<Value, String> {
+    composed
+        .get("inbounds")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|i| i.get("tag").and_then(Value::as_str) == Some(tag))
+        })
+        .cloned()
+        .ok_or_else(|| "the composed config lost the inbound".to_string())
+}
+
+/// The API changes that turn `previous` into `current` for one Hysteria2 inbound of `composed`:
+/// removals alone go through `rmu`; any addition or new credential rebuilds the inbound.
+pub fn diff_hysteria2_users(
+    previous: &Hysteria2UsersSpec,
+    current: &Hysteria2UsersSpec,
+    composed: &Value,
+) -> Result<LiveChange, String> {
+    let auth = |spec: &Hysteria2UsersSpec| -> BTreeMap<String, String> {
+        spec.users
+            .iter()
+            .map(|user| (user.user_id.clone(), user.auth.clone()))
+            .collect()
+    };
+    let (before, after) = (auth(previous), auth(current));
+    let adds = after.iter().any(|(id, key)| before.get(id) != Some(key));
+    if adds {
+        return Ok(LiveChange {
+            tag: current.inbound_tag.clone(),
+            remove: Vec::new(),
+            add: None,
+            rebuild: Some(composed_inbound(composed, &current.inbound_tag)?),
+        });
+    }
+    Ok(LiveChange {
+        tag: current.inbound_tag.clone(),
+        remove: before
+            .keys()
+            .filter(|id| !after.contains_key(*id))
+            .cloned()
+            .collect(),
+        add: None,
+        rebuild: None,
+    })
+}
+
 /// The API changes that turn `previous` into `current` for one inbound of `composed`.
 pub fn diff_users(
     previous: &XrayUsersSpec,
@@ -74,16 +130,7 @@ pub fn diff_users(
     let add = if added.is_empty() {
         None
     } else {
-        let mut inbound = composed
-            .get("inbounds")
-            .and_then(Value::as_array)
-            .and_then(|items| {
-                items
-                    .iter()
-                    .find(|i| i.get("tag").and_then(Value::as_str) == Some(&current.inbound_tag))
-            })
-            .cloned()
-            .ok_or("the composed config lost the inbound")?;
+        let mut inbound = composed_inbound(composed, &current.inbound_tag)?;
         let clients = inbound
             .pointer_mut("/settings/clients")
             .and_then(Value::as_array_mut)
@@ -100,6 +147,7 @@ pub fn diff_users(
         tag: current.inbound_tag.clone(),
         remove,
         add,
+        rebuild: None,
     })
 }
 
@@ -247,8 +295,7 @@ impl Engine<'_> {
 
     /// The API changes that bring a running Xray to the new users, or `None` when only a
     /// restart will do: the config resource changed, the file on disk is not the previous
-    /// composition, a users resource is new, a Hysteria2 inbound changed (Xray's `adu`
-    /// supports VLESS, VMess, Trojan, and Shadowsocks only), or Xray is not running.
+    /// composition, a users resource is new or moved to another inbound, or Xray is not running.
     fn live_plan(
         &self,
         spec: &XrayConfigSpec,
@@ -298,6 +345,11 @@ impl Engine<'_> {
                 {
                     changes.push(diff_users(old, new, composed).ok()?);
                 }
+                (Spec::Hysteria2Users(old), Spec::Hysteria2Users(new))
+                    if old.inbound_tag == new.inbound_tag =>
+                {
+                    changes.push(diff_hysteria2_users(old, new, composed).ok()?);
+                }
                 _ => return None,
             }
         }
@@ -335,6 +387,11 @@ impl Engine<'_> {
     fn apply_live(&self, binary: &str, api: &str, changes: &[LiveChange]) -> Result<(), String> {
         let server = format!("--server={api}");
         for change in changes {
+            if let Some(inbound) = &change.rebuild {
+                self.rebuild_inbound(binary, &server, &change.tag, inbound)?;
+                debug!("xray api: rebuilt inbound {}", change.tag);
+                continue;
+            }
             if !change.remove.is_empty() {
                 let tag = format!("-tag={}", change.tag);
                 let mut args = vec!["api", "rmu", server.as_str(), tag.as_str()];
@@ -362,6 +419,28 @@ impl Engine<'_> {
             );
         }
         Ok(())
+    }
+
+    /// Remove one inbound and add it back with all its users (`rmi` + `adi` exit 1 on failure).
+    /// A failed `adi` leaves the inbound missing; the caller's restart brings it back from the file.
+    fn rebuild_inbound(
+        &self,
+        binary: &str,
+        server: &str,
+        tag: &str,
+        inbound: &Value,
+    ) -> Result<(), String> {
+        fs::create_dir_all(&self.cache_dir).map_err(|err| err.to_string())?;
+        // Holds the users' auth and the obfuscation password: private, and removed at once.
+        let path = self.cache_dir.join(format!("adi-{tag}.json"));
+        let body =
+            serde_json::to_vec(&json!({"inbounds": [inbound]})).map_err(|err| err.to_string())?;
+        fsutil::write_atomic(&path, &body, 0o600, None).map_err(|err| err.to_string())?;
+        let file = path.to_string_lossy().into_owned();
+        let removed = self.xray_api(binary, &["api", "rmi", server, tag]);
+        let added = removed.and_then(|_| self.xray_api(binary, &["api", "adi", server, &file]));
+        let _ = fs::remove_file(&path);
+        added.map(|_| ())
     }
 
     fn xray_api(&self, binary: &str, args: &[&str]) -> Result<String, String> {
@@ -442,7 +521,38 @@ pub(crate) fn users_outcome(
 
 #[cfg(test)]
 mod tests {
-    use super::expect_count;
+    use super::{diff_hysteria2_users, expect_count};
+    use crate::model::{Hysteria2User, Hysteria2UsersSpec};
+    use serde_json::json;
+
+    fn hy2(users: &[(&str, &str)]) -> Hysteria2UsersSpec {
+        Hysteria2UsersSpec {
+            id: "users:hy2".into(),
+            kind: "hysteria2_users".into(),
+            depends_on: Vec::new(),
+            inbound_tag: "hy2".into(),
+            users: users
+                .iter()
+                .map(|(id, auth)| Hysteria2User {
+                    user_id: (*id).into(),
+                    auth: (*auth).into(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn hysteria2_removals_use_rmu_and_any_new_credential_rebuilds_the_inbound() {
+        let composed = json!({"inbounds": [{"tag": "hy2", "settings": {"clients": []}}]});
+        let before = hy2(&[("u-a", "k1"), ("u-b", "k2")]);
+        let removal = diff_hysteria2_users(&before, &hy2(&[("u-b", "k2")]), &composed).unwrap();
+        assert_eq!(removal.remove, ["u-a"]);
+        assert!(removal.rebuild.is_none() && removal.add.is_none());
+        // A changed key cannot be removed and re-added: adu has no hysteria case.
+        let rekeyed = diff_hysteria2_users(&before, &hy2(&[("u-a", "k3")]), &composed).unwrap();
+        assert!(rekeyed.remove.is_empty());
+        assert_eq!(rekeyed.rebuild.unwrap()["tag"], "hy2");
+    }
 
     #[test]
     fn api_summaries_must_count_every_user() {

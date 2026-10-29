@@ -308,11 +308,11 @@ fn a_failing_xray_api_falls_back_to_a_restart() {
 }
 
 #[test]
-fn hysteria2_users_and_config_changes_restart_instead_of_using_the_api() {
+fn hysteria2_users_change_live_and_config_changes_restart() {
     let mut host = Host::new(fetcher());
     host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));
 
-    // Xray's adu cannot add Hysteria2 users.
+    // Xray's adu cannot build Hysteria2 users: only the hy2 inbound is rebuilt, with all of them.
     host.exec.clear();
     let mut doc = full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]);
     doc[7] = hy2_users(&[
@@ -320,17 +320,70 @@ fn hysteria2_users_and_config_changes_restart_instead_of_using_the_api() {
         ("u-b", "abcdef0123456789abcd"),
     ]);
     let pass = host.apply(&doc);
+    assert!(
+        pass.converged && pass.changed.is_empty(),
+        "{:?}",
+        pass.changed
+    );
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 0);
+    assert_eq!(
+        host.exec
+            .count("netcore api rmi --server=127.0.0.1:10085 hy2"),
+        1,
+        "{:?}",
+        host.exec.calls()
+    );
+    let rebuilt = host.exec.rebuilt.lock().unwrap()[0].clone();
+    assert_eq!(rebuilt["inbounds"][0]["tag"], "hy2");
+    assert_eq!(
+        rebuilt["inbounds"][0]["settings"]["clients"],
+        clients(&host, 1)
+    );
+    assert_eq!(clients(&host, 1).as_array().unwrap().len(), 2);
+    assert!(
+        !host
+            .state
+            .path()
+            .join("cache")
+            .join("adi-hy2.json")
+            .exists(),
+        "the adi file holding credentials is gone"
+    );
+
+    // A removal alone goes through rmu, without touching the inbound.
+    host.exec.clear();
+    let mut doc = full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]);
+    doc[7] = hy2_users(&[("u-b", "abcdef0123456789abcd")]);
+    let pass = host.apply(&doc);
+    assert!(pass.changed.is_empty(), "{:?}", pass.changed);
+    assert_eq!(
+        host.exec
+            .count("netcore api rmu --server=127.0.0.1:10085 -tag=hy2 u-a"),
+        1,
+        "{:?}",
+        host.exec.calls()
+    );
+    assert!(host.exec.calls().iter().all(|c| !c.contains(" api rmi ")));
+
+    // An API that fails mid-rebuild falls back to one restart from the file.
+    *host.exec.api_down.lock().unwrap() = true;
+    host.exec.clear();
+    let mut doc = full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]);
+    doc[7] = hy2_users(&[
+        ("u-b", "abcdef0123456789abcd"),
+        ("u-c", "fedcba9876543210fedc"),
+    ]);
+    let pass = host.apply(&doc);
     assert_eq!(changed(&pass), ["unit:netcore", "users:hy2", "xray:config"]);
     assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
-    assert!(host.exec.calls().iter().all(|c| !c.contains(" api ")));
-    assert_eq!(clients(&host, 1).as_array().unwrap().len(), 2);
+    *host.exec.api_down.lock().unwrap() = false;
 
     // A config change rides along with a user change: one restart, no API.
     host.exec.clear();
     let mut doc = full_document(&[("u-b", UUID_B, "")]);
     doc[7] = hy2_users(&[
-        ("u-a", "0123456789abcdef0123"),
         ("u-b", "abcdef0123456789abcd"),
+        ("u-c", "fedcba9876543210fedc"),
     ]);
     doc[5]["config"]["log"]["loglevel"] = json!("info");
     let pass = host.apply(&doc);
