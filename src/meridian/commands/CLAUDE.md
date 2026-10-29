@@ -44,4 +44,5 @@
 - `deploy` port preflight (`port_check.py`) covers every port nginx binds, including loopback 8443/8444; a missed one failed mid-deploy on `nginx -t`.
 - `panel` asks for a reset link only with `--setup-link` (a bare one racing an owner's setup would wipe their password) and builds its `ControlClient` with `report_mutations=False`: a setup link is no state a backup keeps.
 - Page palettes live in `core.inputs.PAGE_PALETTES` (tested against `app.js`); normalize `--icon` with `branding.normalize_icon()` before SSH, and a redeploy merges unnamed branding flags from saved values.
+- `check` and `fleet upgrade` compare a node's agent with `control_artifacts.expected_agent_version()`, which accepts any shipped build: a checkout that rebuilt one target carries two IDs, and an ARM node on its own build read as outdated.
 - `doctor` reads the core from the `netcore` unit (`systemctl show -p MainPID`) and its logs from the journal; looking inside the old Docker node container reported Xray not running on every control-service exit.

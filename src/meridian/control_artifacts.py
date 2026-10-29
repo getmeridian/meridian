@@ -149,13 +149,22 @@ def _missing_agent() -> LocalStateError:
     )
 
 
-def agent_version() -> str:
-    """The agent version this Meridian installs (every target shares one crate version), or ""."""
-    for target in AGENT_TARGETS.values():
-        path = _agent_path(target)
-        if path is not None and path.is_file():
-            return _build_version(path)
-    return ""
+def expected_agent_version(reported: str | None) -> str:
+    """The build a node reporting `reported` should run, or "" when this Meridian ships none.
+
+    The node's own architecture's build when `reported` is one of the shipped builds, else
+    the first. A release builds every target from one source, so all share one ID; a
+    checkout that rebuilt one target (`make system-lab-agent`) does not, and comparing an
+    ARM node with the x86 build called a current node outdated.
+    """
+    versions = [
+        _build_version(path)
+        for target in AGENT_TARGETS.values()
+        if (path := _agent_path(target)) is not None and path.is_file()
+    ]
+    if reported and reported in versions:
+        return reported
+    return versions[0] if versions else ""
 
 
 def _agent_path(target: str) -> Path | None:

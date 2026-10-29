@@ -153,3 +153,17 @@ def test_an_arm_server_gets_the_arm_build(packaged: Path) -> None:
     _write_build(packaged, "aarch64-unknown-linux-musl", b"arm build")
 
     assert agent_binary("aarch64").data == b"arm build"
+
+
+def test_a_node_is_compared_with_its_own_architectures_build(packaged: Path) -> None:
+    """A checkout that rebuilt one target ships two IDs; an ARM node on the ARM build was called outdated."""
+    from meridian.control_artifacts import expected_agent_version
+
+    _write_build(packaged, "x86_64-unknown-linux-musl")
+    arm = _write_build(packaged, "aarch64-unknown-linux-musl", b"arm build")
+    arm.with_name(arm.name + ".version").write_text("0.2.1+def\n")
+
+    assert expected_agent_version("0.2.1+def") == "0.2.1+def"
+    assert expected_agent_version("0.2.1+abc") == "0.2.1+abc"
+    assert expected_agent_version("0.2.0+old") in {"0.2.1+abc", "0.2.1+def"}
+    assert expected_agent_version(None) in {"0.2.1+abc", "0.2.1+def"}

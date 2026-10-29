@@ -97,7 +97,7 @@ def _run(fleet: SimpleNamespace, *args: str, **kwargs: object) -> SimpleNamespac
     with (
         patch.object(health, "topology_from_local_cluster", return_value=SimpleNamespace(nodes=[fleet.node])),
         patch.object(health, "ControlClient", return_value=fleet.client),
-        patch.object(health, "agent_version", return_value=kwargs.pop("agent", "0.1.0")),
+        patch.object(health, "expected_agent_version", return_value=kwargs.pop("agent", "0.1.0")),
         patch.object(health, "connection_for_entry", return_value=fleet.conn),
         patch.object(health, "check_unit_active", mocks.units),
         patch.object(health, "check_port_listening", mocks.ports),

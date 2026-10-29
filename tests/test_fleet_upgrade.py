@@ -126,7 +126,7 @@ def test_service_and_agents_are_judged_against_what_this_meridian_installs(
 
     with (
         patch("meridian.control.client.ControlClient", return_value=client),
-        patch("meridian.control_artifacts.agent_version", return_value="0.2.1"),
+        patch("meridian.control_artifacts.expected_agent_version", return_value="0.2.1"),
     ):
         observed = fleet_upgrade._observe_service(cluster, cluster.topology_intent)  # type: ignore[arg-type]
 

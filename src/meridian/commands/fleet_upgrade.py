@@ -131,10 +131,9 @@ def _observe(
 def _observe_service(cluster: ClusterConfig, intent: SetupIntent) -> list[Component]:
     """What the control service and every agent report, against what this Meridian installs."""
     from meridian.control.client import ControlClient, ControlServiceError
-    from meridian.control_artifacts import agent_version
+    from meridian.control_artifacts import expected_agent_version
 
     nodes = [exit_.id for exit_ in intent.exits] + [gateway.id for gateway in intent.routing_gateways]
-    expected_agent = agent_version()
     try:
         with ControlClient(cluster.panel.url, cluster.panel.api_token, timeout=20) as client:
             running = client.health().version
@@ -149,6 +148,7 @@ def _observe_service(cluster: ClusterConfig, intent: SetupIntent) -> list[Compon
     components = [Component("control server", "Control service", running, __version__, service_status)]
     for node, status in statuses.items():
         reported = (status.agent_version if status is not None else None) or ""
+        expected_agent = expected_agent_version(reported)
         if status is None or not expected_agent:
             agent_status: ComponentStatus = "absent" if status is None else "current"
         else:

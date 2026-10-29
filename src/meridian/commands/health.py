@@ -25,7 +25,7 @@ from meridian.commands.resolve import ensure_server_connection, resolve_server
 from meridian.config import DEFAULT_SNI
 from meridian.console import err_console, error_context, fail, info, is_json_mode
 from meridian.control.client import ControlClient, ControlServiceError
-from meridian.control_artifacts import agent_version
+from meridian.control_artifacts import expected_agent_version
 from meridian.core.errors import LocalStateError
 from meridian.core.execution import ServerConnection
 from meridian.core.fleet import TopologyNode
@@ -257,7 +257,8 @@ class _ServiceSession:
             found = finding("agent", "skipped", f"Control service unreachable: {self.error}")
         else:
             found = agent_finding(status, logs_hint=f"meridian logs {node.ip} --component node")
-            version = agent_version_finding(agent_version(), status)
+            expected = expected_agent_version(status.agent_version if status is not None else None)
+            version = agent_version_finding(expected, status)
             if version is not None:
                 return finish_check("agent", "Node agent", [found, version], started)
         return finish_check("agent", "Node agent", [found], started)
