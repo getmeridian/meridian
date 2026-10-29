@@ -75,6 +75,8 @@ that dials out to it.
   the snapshot and the recovery key, restore brings the fleet files back too.
 
 ### Changed
+- Unicode subscription URLs work with raw, percent-encoded, and Base64 import
+  links; an invalid app action leaves the page and manual URL available.
 - Failed copies of connection links or diagnostic reports offer localized
   feedback and selectable text; diagnostic reports omit browser device data.
 - Connection pages validate configuration and app catalogs before rendering,

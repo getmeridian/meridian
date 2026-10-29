@@ -359,3 +359,42 @@ def test_diagnostic_copy_failure_uses_the_same_selectable_fallback(page_data: di
         """,
         page_data,
     )
+
+
+def test_raw_and_percent_deep_links_never_compute_unused_base64(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog);
+        const url = 'https://198.51.100.1/sub/اشتراک';
+        browser.context.btoa = () => { throw new Error('unused Base64'); };
+        assert.equal(browser.context.page.buildDeepLink('happ://add/{url_raw}', url, 'demo'), 'happ://add/' + url);
+        assert.equal(browser.context.page.buildDeepLink('stash://install-config?url={url}', url, 'demo'), 'stash://install-config?url=' + encodeURIComponent(url));
+        """,
+        page_data,
+    )
+
+
+def test_unicode_base64_deep_link_contains_an_ascii_url(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog);
+        const url = 'https://198.51.100.1/sub/连接';
+        const link = browser.context.page.buildDeepLink('throne://addsub/{url_b64}', url, 'demo');
+        assert.equal(Buffer.from(link.split('/').at(-1), 'base64').toString('ascii'), new URL(url).href);
+        """,
+        page_data,
+    )
+
+
+def test_one_invalid_import_action_cannot_replace_the_page_with_an_error(page_data: dict[str, object]) -> None:
+    run_page(
+        """
+        const browser = createBrowser(data.config, data.catalog, { userAgent: 'Windows', info: data.info });
+        browser.context.btoa = () => { throw new Error('handler encoding'); };
+        await browser.start();
+        assert.ok(!browser.document.querySelector('.load-error'), 'an invalid handler must not break the whole page');
+        assert.ok(browser.document.querySelector('[data-import]'));
+        assert.ok(browser.document.querySelector('.sub-url'), 'the canonical manual URL must remain accessible');
+        """,
+        page_data,
+    )

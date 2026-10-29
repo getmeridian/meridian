@@ -29,7 +29,7 @@ Server-hosted Progressive Web App and the only connection-page implementation.
 - **The SW caches stale files** — develop with `meridian dev preview --watch` (disables the SW, injects a reload script).
 - **Catalog timeouts must work without AbortController** — ignore late answers as well as aborting supported requests; optional data never gates config rendering.
 - **`_PWA_APPS` must match `website/src/data/apps.json`** field for field and in order; CI validates.
-- **Deep links follow each app's own handler** — v2rayNG names a subscription from the `#fragment`, Throne's `addsub` takes standard Base64 only, and v2rayN has no import scheme (no button).
+- **Deep links follow each handler lazily** — v2rayNG uses the `#fragment`, Throne takes standard Base64 of an ASCII URL, and v2rayN has no scheme; unused encodings must never break an action.
 - **The CSP has no `style-src 'unsafe-inline'`** — `style=` attributes are silently dropped; use classes (CSSOM `el.style` still works).
 - **Self-check requests skip every cache** — `probe.bin` and `/sub/` bypass the SW with `cache: "no-store"`; a warm connection may be reused, so a freeze is conclusive but a pass is weaker evidence.
 - **Exit countries are data** — validate `config.exit_countries` ISO codes before building flags; names come from `Intl.DisplayNames` and refresh in `applyI18n`.

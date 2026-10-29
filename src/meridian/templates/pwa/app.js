@@ -375,13 +375,17 @@ function dismissInstallBanner() {
 /* Placeholders: {url_raw} as-is, {url_b64} standard Base64, {url} and {name}
    percent-encoded. Function replacements keep `$` in values literal. */
 function buildDeepLink(template, subUrl, name) {
-  var values = {
-    '{url_raw}': subUrl,
-    '{url_b64}': btoa(subUrl),
-    '{url}': encodeURIComponent(subUrl),
-    '{name}': encodeURIComponent(name || 'Meridian'),
-  };
-  return template.replace(/\{(url_raw|url_b64|url|name)\}/g, function(m) { return values[m]; });
+  var values = {};
+  return template.replace(/\{(url_raw|url_b64|url|name)\}/g, function(m, key) {
+    if (Object.prototype.hasOwnProperty.call(values, key)) return values[key];
+    if (key === 'url_raw') values[key] = subUrl;
+    else if (key === 'url') values[key] = encodeURIComponent(subUrl);
+    else if (key === 'name') values[key] = encodeURIComponent(name || 'Meridian');
+    /* Handlers require standard Base64 of an ASCII URL, not UTF-16 bytes.
+       Keep ASCII subscriptions verbatim; URL serializes Unicode when needed. */
+    else values[key] = btoa(/[^\x00-\x7f]/.test(subUrl) ? new URL(subUrl).href : subUrl);
+    return values[key];
+  });
 }
 
 function sharePageUrl() {
@@ -697,7 +701,9 @@ function renderAppRow(a, key) {
 }
 
 function renderImportButton(a, subUrl, serverName, primary) {
-  var href = buildDeepLink(a.deeplink, subUrl, serverName);
+  var href;
+  try { href = buildDeepLink(a.deeplink, subUrl, serverName); }
+  catch (e) { return ''; }
   var html = '<a data-import data-ui-key="import-' + escapeHtml(a.name) + '" class="btn btn-block ' + (primary ? 'btn-primary' : 'btn-soft') + '" href="' + escapeHtml(href) + '">';
   html += a.icon ? renderAppMark(a, 22) : ICON_PLUS;
   html += '<span data-t="import.add" data-t-name="' + escapeHtml(a.name) + '">Add to ' + escapeHtml(a.name) + '</span>';
