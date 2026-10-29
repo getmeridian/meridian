@@ -26,6 +26,7 @@
 - **A returning user resumes their retired totals** — the service keeps every baseline, so restarting a re-enabled user at zero was a `counter_regression` that refused the whole report.
 - **Fold traffic before dialing the service** — `send_stats` once connected first, so an outage left hours of counters in Xray, lost on any core restart.
 - **`statsquery` is protobuf JSON** — int64 values arrive as strings; zeros and empty lists are omitted.
+- **A restart is owed until it succeeds** — content on disk that the saved ledger does not record (a crash before the save) counts as changed, and a unit that did not finish keeps a null `installed_sha256`, so the next pass restarts it; matching bytes alone once left Xray on its old config.
 - **A retirement counts only once nothing runs** — `stop`'s exit code says little (the unit may be gone), so check `is-active` before deleting the file; an entry that failed to retire keeps the document unconverged.
 - **Save a document before holding or applying it** — applying an unsaved one let a restart reconcile the older cached document and bring revoked users back; a failed save refuses it.
 - **Save credentials before nulling the token** — after a crash in between, `enrollment_token_invalid` falls back to the stored credentials.

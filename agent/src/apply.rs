@@ -160,7 +160,7 @@ impl Engine<'_> {
                         "validation_failed",
                         format!("malformed {} resource: {reason}", resource.kind),
                     )),
-                    Spec::File(spec) => self.apply_file(spec),
+                    Spec::File(spec) => self.apply_file(spec, previous_entry),
                     Spec::BinaryPin(spec) => self.apply_pin(spec, previous_entry),
                     Spec::XrayConfig(spec) => {
                         config_seen = true;
@@ -181,7 +181,7 @@ impl Engine<'_> {
                         &placed_users,
                         &changed,
                     ),
-                    Spec::Unit(spec) => self.apply_unit(spec, &changed),
+                    Spec::Unit(spec) => self.apply_unit(spec, &changed, previous_entry),
                 }
             };
             let (status, error) = match outcome {
@@ -224,6 +224,14 @@ impl Engine<'_> {
                 }
                 Outcome::Blocked => ("blocked", None),
             };
+            // A unit that did not finish may owe a restart (its new config or binary is already
+            // on disk): a null installed hash makes the next pass restart it once it runs.
+            if matches!(resource.spec, Spec::Unit(_))
+                && status != "applied"
+                && let Some(entry) = entries.get_mut(&resource.id)
+            {
+                entry.installed_sha256 = None;
+            }
             statuses.insert(resource.id.clone(), status);
             let applied_sha256 = entries
                 .get(&resource.id)
@@ -351,14 +359,18 @@ impl Engine<'_> {
 
     // ---- file -----------------------------------------------------------------
 
-    fn apply_file(&self, spec: &FileSpec) -> Outcome {
-        match self.try_file(spec) {
+    fn apply_file(&self, spec: &FileSpec, previous: Option<&LedgerEntry>) -> Outcome {
+        match self.try_file(spec, previous) {
             Ok(outcome) => outcome,
             Err(failure) => Outcome::Failed(failure),
         }
     }
 
-    fn try_file(&self, spec: &FileSpec) -> Result<Outcome, Failure> {
+    fn try_file(
+        &self,
+        spec: &FileSpec,
+        previous: Option<&LedgerEntry>,
+    ) -> Result<Outcome, Failure> {
         fsutil::check_path(&spec.path).map_err(|msg| Failure::new("path_not_allowed", msg))?;
         let mode = parse_mode(&spec.mode).map_err(|msg| Failure::new("validation_failed", msg))?;
         let uid = fsutil::lookup_id(&self.root, "passwd", &spec.owner)
@@ -372,7 +384,7 @@ impl Engine<'_> {
             fsutil::ensure_mode_owner(&dest, mode, Some((uid, gid)))
                 .map_err(|err| Failure::io(&err, "cannot set mode"))?;
             return Ok(Outcome::Applied {
-                changed: false,
+                changed: unrecorded(previous, &current),
                 installed: current,
             });
         }
@@ -562,14 +574,26 @@ impl Engine<'_> {
         truncate(&joined, 300)
     }
 
-    fn apply_unit(&self, spec: &UnitSpec, changed: &BTreeSet<String>) -> Outcome {
-        match self.try_unit(spec, changed) {
+    fn apply_unit(
+        &self,
+        spec: &UnitSpec,
+        changed: &BTreeSet<String>,
+        previous: Option<&LedgerEntry>,
+    ) -> Outcome {
+        // An entry without an installed hash is a unit that did not finish last time.
+        let owed = previous.is_some_and(|entry| entry.installed_sha256.is_none());
+        match self.try_unit(spec, changed, owed) {
             Ok(outcome) => outcome,
             Err(failure) => Outcome::Failed(failure),
         }
     }
 
-    fn try_unit(&self, spec: &UnitSpec, changed: &BTreeSet<String>) -> Result<Outcome, Failure> {
+    fn try_unit(
+        &self,
+        spec: &UnitSpec,
+        changed: &BTreeSet<String>,
+        owed: bool,
+    ) -> Result<Outcome, Failure> {
         fsutil::check_unit_name(&spec.name).map_err(|msg| Failure::new("path_not_allowed", msg))?;
         let path = self.unit_path(&spec.name);
         let service_failed = |msg: String| Failure::new("service_failed", msg);
@@ -588,7 +612,7 @@ impl Engine<'_> {
                 .map_err(service_failed)?;
         }
         let active = self.query("is-active", &spec.name) == "active";
-        let restart = unit_changed || spec.restart_on.iter().any(|id| changed.contains(id));
+        let restart = owed || unit_changed || spec.restart_on.iter().any(|id| changed.contains(id));
         let mut acted = false;
         if spec.state == "started" {
             let verb = match (active, restart) {
@@ -621,6 +645,12 @@ impl Engine<'_> {
             installed: Some(crate::jcs::sha256_hex(spec.content.as_bytes())),
         })
     }
+}
+
+/// Content already on disk that the saved ledger does not record as applied: an earlier pass
+/// wrote it and stopped (a crash) before saving, so whatever restarts on it has not yet.
+pub(crate) fn unrecorded(previous: Option<&LedgerEntry>, installed: &Option<String>) -> bool {
+    previous.is_none_or(|entry| &entry.installed_sha256 != installed)
 }
 
 /// Copy the installed file out of a downloaded artifact.

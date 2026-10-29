@@ -308,6 +308,55 @@ fn a_failing_xray_api_falls_back_to_a_restart() {
 }
 
 #[test]
+fn a_config_written_before_a_crash_still_restarts_its_unit() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[]));
+    let saved = host.ledger.clone();
+    let mut doc = full_document(&[]);
+    doc[5]["config"]["log"]["loglevel"] = json!("info");
+    host.apply(&doc);
+    // The agent died after writing the config and before saving the ledger or restarting.
+    host.ledger = saved;
+    host.exec.clear();
+
+    let pass = host.apply(&doc);
+    assert!(pass.converged);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
+    host.exec.clear();
+    host.apply(&doc);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 0);
+}
+
+#[test]
+fn a_restart_that_failed_is_owed_until_it_succeeds() {
+    let mut host = Host::new(fetcher());
+    host.apply(&full_document(&[]));
+    host.exec
+        .stuck
+        .lock()
+        .unwrap()
+        .insert("netcore.service".into());
+    let mut doc = full_document(&[]);
+    doc[5]["config"]["log"]["loglevel"] = json!("info");
+    let pass = host.apply(&doc);
+    assert_eq!(
+        status(&pass, "unit:netcore"),
+        ("failed".into(), Some("service_failed".into()))
+    );
+    // Still running the old config: the next pass must restart it, though nothing changes.
+    assert!(host.exec.unit("netcore.service").active);
+    host.exec.stuck.lock().unwrap().clear();
+    host.exec.clear();
+
+    let pass = host.apply(&doc);
+    assert!(pass.converged);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 1);
+    host.exec.clear();
+    host.apply(&doc);
+    assert_eq!(host.exec.count("systemctl restart netcore.service"), 0);
+}
+
+#[test]
 fn hysteria2_users_change_live_and_config_changes_restart() {
     let mut host = Host::new(fetcher());
     host.apply(&full_document(&[("u-a", UUID_A, "xtls-rprx-vision")]));

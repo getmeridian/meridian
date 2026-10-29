@@ -19,7 +19,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::apply::{Engine, Failure, Outcome, last_line, truncate};
+use crate::apply::{Engine, Failure, Outcome, last_line, truncate, unrecorded};
 use crate::compose::{self, UsersRef};
 use crate::fsutil::{self, host_path};
 use crate::model::{Hysteria2UsersSpec, Resource, Spec, XrayConfigSpec, XrayUsersSpec};
@@ -197,8 +197,9 @@ impl Engine<'_> {
             fsutil::ensure_mode_owner(&dest, 0o600, None)
                 .map_err(|err| Failure::io(&err, "cannot set mode"))?;
             placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
+            let entry = entries.get(&spec.id).filter(|e| e.kind == "xray_config");
             return Ok(Outcome::Applied {
-                changed: false,
+                changed: unrecorded(entry, &installed),
                 installed,
             });
         }
