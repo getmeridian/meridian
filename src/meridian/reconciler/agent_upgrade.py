@@ -25,6 +25,7 @@ from meridian.control.models import NodeStatus
 from meridian.control_artifacts import AgentBinary
 from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP, AGENT_STATE_DIR, AGENT_UNIT
 from meridian.reconciler.resources import ResourceReconcileError, UnknownResourceOutcome
+from meridian.reconciler.server_evidence import require_available_evidence
 from meridian.ssh import ServerConnection
 
 STAGED_BINARY = f"{AGENT_BINARY}.new"
@@ -119,6 +120,9 @@ def running_sha256(conn: ServerConnection) -> str:
         f'pid=$(systemctl show -p MainPID --value {AGENT_UNIT}); [ "${{pid:-0}}" != 0 ] && sha256sum /proc/$pid/exe',
         timeout=15,
     )
+    # No main process exits 1 with nothing to say: the agent is not running. Anything else unreadable
+    # (a lost connection, a denied read) is unavailable evidence, not another build.
+    require_available_evidence(AGENT_UNIT, result, "the running agent image")
     words = result.stdout.split()
     return words[0] if result.returncode == 0 and words else ""
 

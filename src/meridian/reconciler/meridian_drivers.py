@@ -62,6 +62,7 @@ from meridian.reconciler.resources import (
     payload_of,
     postcondition_key,
 )
+from meridian.reconciler.server_evidence import require_available_evidence
 from meridian.reconciler.server_support import ensure_warp, warp_connected
 from meridian.reconciler.workloads import WorkloadStateManager
 from meridian.ssh import ServerConnection
@@ -296,8 +297,15 @@ class AgentRuntimeDriver:
         binary = self.context.agent_binary(arch)
         # The running image, not the file: a swap whose restart was lost still runs the old build.
         running = running_sha256(conn)
-        active = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15).stdout.strip() == "active"
-        bootstrap = conn.run(f"cat {AGENT_BOOTSTRAP} 2>/dev/null", timeout=15, sensitive=True).stdout
+        # A lost connection or a denied read is unavailable evidence, never a missing agent:
+        # reading it as absence would re-key a healthy node.
+        logical_id = f"agent:{payload.workload_ref}"
+        unit = conn.run(f"systemctl is-active {AGENT_UNIT}", timeout=15)
+        require_available_evidence(logical_id, unit, f"the {AGENT_UNIT} unit")
+        active = unit.stdout.strip() == "active"
+        read = conn.run(f"cat {AGENT_BOOTSTRAP}", timeout=15, sensitive=True)
+        require_available_evidence(logical_id, read, "the agent bootstrap")
+        bootstrap = read.stdout if read.returncode == 0 else ""
         with self.context.client() as client:
             ca_sha256 = client.fleet_authority().ca_sha256
             status = client.node(payload.workload_ref)

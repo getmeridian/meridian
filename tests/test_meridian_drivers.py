@@ -320,6 +320,32 @@ def test_an_installed_agent_back_from_a_service_outage_is_not_re_enrolled(plan: 
     assert AGENT_BINARY not in conn.write_map
 
 
+@pytest.mark.parametrize(
+    ("pattern", "rc", "stderr", "retryable"),
+    [
+        ("systemctl is-active", 255, "", True),
+        (f"cat {AGENT_BOOTSTRAP}", 124, "", True),
+        (f"cat {AGENT_BOOTSTRAP}", 1, "cat: bootstrap.json: Permission denied", False),
+        ("MainPID", 255, "", True),
+    ],
+    ids=["unit-lost", "bootstrap-timed-out", "bootstrap-denied", "image-lost"],
+)
+def test_an_unreadable_agent_is_unavailable_evidence_never_re_enrolled(
+    plan: ResourcePlan, pattern: str, rc: int, stderr: str, retryable: bool
+) -> None:
+    host = AgentHost()
+    host.binary = host.running = BINARY.sha256
+    host.failing[pattern] = subprocess.CompletedProcess([], rc, "", stderr)
+    drivers, control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN, "agent_version": NEW_VERSION}])
+
+    with pytest.raises(ResourceReconcileError, match="evidence is unavailable") as raised:
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert raised.value.retryable is retryable
+    assert control.tokens == []
+    assert AGENT_BOOTSTRAP not in host.write_map
+
+
 def test_an_installed_agent_that_never_returns_is_enrolled_again(plan: ResourcePlan) -> None:
     drivers, control, conn = _installed_agent(plan)
     unseen = int(meridian_drivers.AGENT_RECONNECT_SECONDS / meridian_drivers.POLL_INTERVAL) + 1
@@ -526,6 +552,8 @@ class AgentHost(MockConnection):
         self.check_rc, self.enrolled = check_rc, enrolled
         # A failing swap renamed the new build in, but its restart failed (or the reply was lost).
         self.swap_rc, self.rollback_rc = swap_rc, rollback_rc
+        # Commands (by substring) whose inspection fails, ahead of everything the node answers.
+        self.failing: dict[str, subprocess.CompletedProcess[str]] = {}
         self.when("uname -m", stdout="x86_64\n")
         self.when("systemctl is-active", stdout="active\n" if active else "failed\n", rc=0 if active else 3)
         self.when(f"cat {AGENT_BOOTSTRAP}", stdout=_enrolled_bootstrap())
@@ -539,6 +567,9 @@ class AgentHost(MockConnection):
 
     def run(self, command: str, timeout: int = 30, **kwargs: object) -> Any:
         result = super().run(command, timeout=timeout, **kwargs)
+        failed = next((reply for pattern, reply in self.failing.items() if pattern in command), None)
+        if failed is not None:
+            return failed
         staged, previous = agent_upgrade.STAGED_BINARY, agent_upgrade.PREVIOUS_BINARY
         if f"mv -f {staged} {AGENT_BINARY}" in command:
             # The previous binary is whatever the command copies; the staged build is renamed in and restarted.
