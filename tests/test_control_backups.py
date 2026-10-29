@@ -11,6 +11,7 @@ import pytest
 from meridian.control.client import ControlClient, ControlServiceConflict, ControlServiceScopeError
 from meridian.control.enrollment import NodeAuthority
 from meridian.control.models import DeployerStateDeposit, DeviceKeyCreate, RevisionProposal
+from meridian.control.owner import OwnerAuth
 from meridian.control.restore import RestoreError, read_deployer_state, stage_restored_database
 from meridian.control.service import ControlService
 from meridian.control.snapshot import SnapshotError, decrypt_snapshot, generate_key_pair
@@ -115,6 +116,22 @@ def test_the_snapshot_is_a_consistent_secret_free_copy(admin: ControlClient, tmp
     assert signing_key is not None and signing_key not in snapshot.database
     deposited = read_deployer_state(snapshot.database)
     assert deposited is not None and deposited.generation == 7
+
+
+def test_the_snapshot_drops_the_web_owner(admin: ControlClient, tmp_path: Path) -> None:
+    """A seized server held the owner's TOTP secret; a restored fleet must not trust it."""
+    device = generate_key_pair()
+    admin.register_device_key("laptop", device.public)
+    owner = OwnerAuth(Store(tmp_path / "state" / "control.db"))
+    link = owner.issue_setup_link(reset=False)
+    owner.complete_setup(link.token, "correct horse battery staple", source="test")
+    owner.issue_setup_link(reset=True)
+
+    copy = sqlite3.connect(":memory:")
+    copy.deserialize(decrypt_snapshot(admin.snapshot(), [device.secret]).database)
+
+    for table in ("ui_owner", "ui_sessions", "ui_setup_links"):
+        assert copy.execute(f"SELECT COUNT(*) FROM {table}").fetchone() == (0,), table
 
 
 def test_the_header_names_the_epoch_and_newest_revision(admin: ControlClient) -> None:

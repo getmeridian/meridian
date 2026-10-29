@@ -108,6 +108,13 @@ class TrafficLedger:
             )
         return StatsAck(counter_epoch=report.counter_epoch, acked_seq=report.seq)
 
+    def node_totals(self) -> dict[str, int]:
+        """Bytes each node counted in its current counter epoch (an agent that lost its counter store starts over)."""
+        rows = self._store.rows(
+            "SELECT node_id, SUM(uplink_bytes + downlink_bytes) AS total FROM traffic_counters GROUP BY node_id"
+        )
+        return {str(row["node_id"]): int(row["total"] or 0) for row in rows}
+
     def summary(self) -> TrafficSummary:
         """Every user's totals across nodes, zero for users no node has counted yet."""
         rows = self._store.rows(

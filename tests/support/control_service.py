@@ -16,10 +16,13 @@ ADMIN_TOKEN = "admin-token-for-tests-only-0123456789"
 
 
 @contextmanager
-def serve_control(state_dir: Path) -> Iterator[str]:
-    """Run a control service whose state lives in `state_dir`; yields its base URL."""
+def serve_control(state_dir: Path, *, public_path: str = "") -> Iterator[str]:
+    """Run a control service whose state lives in `state_dir`; yields its base URL.
+
+    `public_path` stands in for the secret path nginx strips; the web UI's sign-in needs one.
+    """
     service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version="4.0.0")
-    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN))
+    server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN), public_path=public_path)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

@@ -3,7 +3,8 @@
 nginx strips the secret path, so this server sees `/api/...` (a bearer token
 whose scope covers the route's, `tokens.py`),
 `/agent/v1/...` (the auth `AGENT_HTTP_SURFACE` declares per endpoint), and
-`/sub/...` (the connection-page route). The
+`/sub/...` (the connection-page route), and the web UI (`ui_routes.py`: the page,
+its files, the owner's sign-in, whose session maps to the admin scope). The
 standard library's threading server is enough here: a thread per waiting
 long-poll costs little at fleet sizes Meridian targets.
 """
@@ -28,6 +29,7 @@ from meridian import __version__
 from meridian.control.blobs import BlobStore, spec_artifacts
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
+from meridian.control.login_limits import LockedOut
 from meridian.control.models import (
     SUB_TOKEN_PATTERN,
     ApplyFenceSwap,
@@ -47,9 +49,11 @@ from meridian.control.models import (
     UserUpdate,
     scope_covers,
 )
+from meridian.control.owner import OwnerSession
 from meridian.control.service import ControlService
 from meridian.control.times import utc_now
-from meridian.control.tokens import ROOT, Caller, unauthenticated
+from meridian.control.tokens import ROOT, WEB_OWNER, Caller, unauthenticated
+from meridian.control.ui_routes import UI_ROUTES, UiContext, owner_session
 from meridian.core.agent_http import AGENT_HTTP_SURFACE
 from meridian.core.agent_protocol import EnrollRequest, ObservedStateReport, PollRequest, RenewRequest, StatsReport
 
@@ -78,12 +82,15 @@ class ControlServer(ThreadingHTTPServer):
         service: ControlService,
         admin_token_sha256: str,
         blobs: BlobStore | None = None,
+        *,
+        public_path: str = "",
     ) -> None:
         super().__init__(address, _Handler)
         self.service = service
         self.admin_token_sha256 = admin_token_sha256
         # Artifacts agents fetch with source `service`; without a store every blob is unknown.
         self.blobs = blobs
+        self.ui = UiContext(service, public_path)
 
 
 # (method, path, the scope an `/api` route needs or None where the handler authenticates, handler)
@@ -95,6 +102,7 @@ class _Handler(BaseHTTPRequestHandler):
     server_version = "nginx"
     sys_version = ""
     caller: Caller | None = None
+    owner_session: OwnerSession | None = None
 
     def do_GET(self) -> None:
         self._dispatch("GET")
@@ -121,12 +129,15 @@ class _Handler(BaseHTTPRequestHandler):
         path = unquote(self.path.split("?", 1)[0])
         agent = path.startswith("/agent/")
         self.caller = None
+        self.owner_session = None
         try:
-            for route_method, pattern, scope, handler in ROUTES:
+            for route_method, pattern, scope, handler in ALL_ROUTES:
                 match = pattern.fullmatch(path)
                 if match and route_method == method:
                     if scope is not None:
                         self.caller = self._authorize(scope)
+                        if self.owner_session is not None and handler in OWNER_STEP_UP:
+                            self._service.owner.require_recent(self.owner_session)
                     result = handler(self, match)
                     if result is not None:
                         self._json(200, result)
@@ -149,12 +160,20 @@ class _Handler(BaseHTTPRequestHandler):
         return token.strip()
 
     def _authorize(self, needed: TokenScope) -> Caller:
-        """The request's caller: 401 for a missing, wrong, or revoked token, 403 when its scope falls short."""
-        token = self._bearer()
-        if hmac.compare_digest(token_sha256(token), self.server.admin_token_sha256):
-            caller = ROOT
+        """The request's caller: 401 for a missing, wrong, or revoked token, 403 when its scope falls short.
+
+        A request without `Authorization` may instead carry the web owner's session
+        cookie, which holds the admin scope (writes also need the UI's CSRF header).
+        """
+        if not self.headers.get("Authorization") and self.headers.get("Cookie"):
+            owner_session(self)
+            caller = WEB_OWNER
         else:
-            caller = self.server.service.tokens.authenticate(token)
+            token = self._bearer()
+            if hmac.compare_digest(token_sha256(token), self.server.admin_token_sha256):
+                caller = ROOT
+            else:
+                caller = self.server.service.tokens.authenticate(token)
         if not scope_covers(caller.scope, needed):
             raise ServiceError("insufficient_scope", f"This needs a token with the {needed} scope.", 403)
         return caller
@@ -162,6 +181,18 @@ class _Handler(BaseHTTPRequestHandler):
     @property
     def _service(self) -> ControlService:
         return self.server.service
+
+    # -- the web UI's view of this handler (`ui_routes.UiRequest`) -------------------------
+
+    @property
+    def ui(self) -> UiContext:
+        return self.server.ui
+
+    def read_body(self) -> bytes:
+        return self._body()
+
+    def respond(self, status: int, content_type: str, data: bytes, headers: dict[str, str] | None = None) -> None:
+        self._send(status, content_type, data, headers)
 
     def _session(self) -> tuple[ControlService, Session]:
         service = self.server.service
@@ -195,8 +226,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        for name, value in (headers or {}).items():
+        headers = headers or {}
+        if "Cache-Control" not in headers:
+            self.send_header("Cache-Control", "no-store")
+        for name, value in headers.items():
             self.send_header(name, value)
         self.end_headers()
         if self.command != "HEAD":
@@ -220,8 +253,13 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             body = {"error": {"code": exc.code, "message": str(exc)}}
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        # The contract mirrors `retry_after_seconds` in the HTTP header.
-        headers = {"Retry-After": str(retry_after)} if agent and retry_after is not None else None
+        # The contract mirrors `retry_after_seconds` in the HTTP header; a locked-out sign-in says when to retry.
+        if agent and retry_after is not None:
+            headers = {"Retry-After": str(retry_after)}
+        elif isinstance(exc, LockedOut):
+            headers = {"Retry-After": str(exc.retry_after)}
+        else:
+            headers = None
         self._send(exc.status, "application/json", data, headers)
 
     # -- admin API -------------------------------------------------------------------------
@@ -482,6 +520,12 @@ ROUTES: list[Route] = [
 ]
 
 
+# The web UI's routes (`ui_routes.py`) live in their own block; `/api` routes come first.
+ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
+# What a web owner may do only after confirming their password again within minutes: mint a credential.
+OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token})
+
+
 def _validation_message(exc: ValidationError) -> str:
     errors = exc.errors()
     if not errors:
@@ -497,7 +541,13 @@ def serve(config_path: Path) -> None:
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
     blobs = BlobStore(state_dir / "blobs")
     blobs.want(artifact for spec in service.node_specs() for artifact in spec_artifacts(spec))
-    server = ControlServer((config.listen_host, config.listen_port), service, config.admin_token_sha256, blobs)
+    server = ControlServer(
+        (config.listen_host, config.listen_port),
+        service,
+        config.admin_token_sha256,
+        blobs,
+        public_path=config.public_path,
+    )
     stop = threading.Event()
     threading.Thread(target=_enforce_forever, args=(service, stop), daemon=True).start()
     try:

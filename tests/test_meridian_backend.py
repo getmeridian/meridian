@@ -196,6 +196,39 @@ def test_control_service_readiness_requires_the_url_on_its_domain(host: str, obs
     assert bool(conn.calls) is observed  # only a matching URL goes on to read the attestation
 
 
+def test_control_bootstrap_scopes_the_console_to_the_secret_path(tmp_home, monkeypatch) -> None:
+    """The web console's session cookie needs the path nginx strips; without it sign-in is refused."""
+    import meridian.provision as provision
+    from meridian.cluster import ClusterConfig
+    from meridian.servers import ServerEntry
+    from meridian.setup.control_service import bootstrap_control_service
+    from tests.support.mock_connection import MockConnection
+
+    captured = []
+
+    class Capture:
+        def __init__(self, steps) -> None:
+            pass
+
+        def run(self, conn, ctx, **_: object) -> list:
+            captured.append(ctx.control_service.config)
+            raise RuntimeError("stop after the context is built")
+
+    monkeypatch.setattr(provision, "Provisioner", Capture)
+    plan = compile_topology(_intent())
+    payload = next(item.payload for item in plan.resources if isinstance(item.payload, ControlServicePayload))
+    cluster = ClusterConfig()
+    cluster.panel.secret_path = "0123abcd"
+    entry = ServerEntry(host=ADDRESS, user="root", id="srv-a")
+
+    with pytest.raises(RuntimeError, match="stop after"):
+        bootstrap_control_service(
+            payload, plan, cluster, entry, MockConnection(), harden=False, reality_port=10443, reality_sni="a.example"
+        )
+
+    assert captured[0].public_path == "/0123abcd"
+
+
 def _control_only_fleet():
     """The control server runs only the service: exit `de` behind a relay and a routing gateway."""
     relay = TransparentRelayIntent(id="r1", hop_server_refs=["srv-r"], exit_ref="de", protocol_path_ref="de-reality")

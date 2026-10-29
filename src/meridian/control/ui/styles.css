@@ -1,0 +1,189 @@
+/* Meridian console — tokens, base, and components.
+ * Palette: the website's warm light-first tokens (website/src/styles/tokens.css), written
+ * as light defaults plus a dark block, because there is no build step to lower
+ * light-dark(). The OS picks the theme; data-theme on <html> overrides it.
+ * System fonts only: the console makes no outside requests and ships no font files. */
+
+:root {
+  color-scheme: light;
+  --bg: #FDFAF6; --s1: #FFFFFF; --s2: #F5F0E8; --band: #F7F2EA;
+  --b1: #E5DFD3; --b2: #D5CFC3;
+  --t1: #1A1D2E; --t2: #555A6E; --t3: #636879;
+  --ac: #C8933A; --ac-hover: #BC8833; --ac-text: #85601F; --on-ac: #1A1D2E;
+  --ac2: #C8933A1A; --ac3: #C8933A0D;
+  --ok: #23744F; --ok2: #23744F14; --err: #B33A3A; --err2: #B33A3A12; --on-err: #FFFFFF; --warn2: #C8933A1F;
+  --info: #2B6CB0; --info2: #2B6CB014;
+  --code-bg: #F0EBE1;
+  --shadow-sm: 0 1px 2px rgba(26, 29, 46, .05);
+  --shadow-md: 0 2px 8px rgba(26, 29, 46, .07);
+  --shadow-lg: 0 12px 36px rgba(26, 29, 46, .14);
+  --r: 8px; --r2: 12px; --r3: 16px;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --heading: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1C1E28; --s1: #252836; --s2: #2E3145; --band: #20222D;
+    --b1: #3A3E52; --b2: #4A4F66;
+    --t1: #E4E2DE; --t2: #A6A8B6; --t3: #9A9DAE;
+    --ac: #D4A24E; --ac-hover: #E0B060; --ac-text: #D4A24E; --on-ac: #1C1E28;
+    --ac2: #D4A24E1F; --ac3: #D4A24E0F;
+    --ok: #5CE88E; --ok2: #5CE88E14; --err: #F06060; --err2: #F0606014; --on-err: #1C1E28; --warn2: #D4A24E1F;
+    --info: #7FB2F0; --info2: #7FB2F014;
+    --code-bg: #1E2030;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, .3);
+    --shadow-lg: 0 12px 36px rgba(0, 0, 0, .45);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1C1E28; --s1: #252836; --s2: #2E3145; --band: #20222D;
+  --b1: #3A3E52; --b2: #4A4F66;
+  --t1: #E4E2DE; --t2: #A6A8B6; --t3: #9A9DAE;
+  --ac: #D4A24E; --ac-hover: #E0B060; --ac-text: #D4A24E; --on-ac: #1C1E28;
+  --ac2: #D4A24E1F; --ac3: #D4A24E0F;
+  --ok: #5CE88E; --ok2: #5CE88E14; --err: #F06060; --err2: #F0606014; --on-err: #1C1E28; --warn2: #D4A24E1F;
+  --info: #7FB2F0; --info2: #7FB2F014;
+  --code-bg: #1E2030;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, .3);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, .45);
+}
+:lang(fa) { --body: Vazirmatn, "Noto Sans Arabic", Tahoma, system-ui, sans-serif; --heading: var(--body); }
+:lang(zh) { --body: system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; --heading: var(--body); }
+:lang(ru) { --heading: Georgia, "Times New Roman", serif; }
+
+/* -- base ---------------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--body); font-size: 16px; line-height: 1.5; color: var(--t1); background: var(--bg);
+  min-height: 100vh; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+}
+h1, h2 { font-family: var(--heading); font-weight: 600; letter-spacing: -.015em; line-height: 1.2; }
+:lang(fa) h1, :lang(fa) h2, :lang(zh) h1, :lang(zh) h2 { letter-spacing: 0; font-weight: 700; }
+h1 { font-size: 1.75rem; }
+h2 { font-size: 1.125rem; }
+a { color: var(--ac-text); }
+button, input, select { font: inherit; color: inherit; }
+code { font-family: var(--mono); font-size: .9em; }
+.mono { font-family: var(--mono); }
+:focus-visible { outline: 2px solid var(--ac); outline-offset: 2px; border-radius: 6px; }
+::selection { background: var(--ac2); }
+.muted { color: var(--t2); }
+.small { font-size: .875rem; }
+.strong { font-weight: 600; }
+.label { font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--t3); }
+:lang(fa) .label, :lang(zh) .label { letter-spacing: 0; text-transform: none; font-size: .8rem; }
+.icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+  stroke-linejoin: round; flex-shrink: 0; }
+[dir="rtl"] .icon-flip, [dir="rtl"] .back .icon { transform: scaleX(-1); }
+.noscript { padding: 24px; text-align: center; color: var(--t2); }
+
+/* -- boot and spinner ----------------------------------------------------------------------- */
+.boot { min-height: 100vh; display: grid; place-items: center; }
+.spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--b1); border-top-color: var(--ac);
+  display: inline-block; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } * { transition: none !important; } }
+
+/* -- buttons -------------------------------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 0 16px;
+  border-radius: var(--r); border: 1px solid transparent; font-weight: 600; font-size: .95rem; text-decoration: none;
+  cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s, filter .12s, transform .06s;
+  -webkit-user-select: none; user-select: none;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .6; cursor: progress; }
+.btn-block { display: flex; width: 100%; }
+.btn-sm { min-height: 34px; padding: 0 12px; font-size: .875rem; }
+.btn-primary { background: var(--ac); color: var(--on-ac); }
+.btn-primary:hover { background: var(--ac-hover); }
+.btn-soft { background: var(--ac2); color: var(--ac-text); }
+.btn-soft:hover { border-color: var(--ac); }
+.btn-ghost { background: var(--s1); border-color: var(--b1); color: var(--t1); }
+.btn-ghost:hover { border-color: var(--b2); background: var(--s2); }
+.btn-danger { background: var(--err); color: var(--on-err); }
+.btn-danger:hover { filter: brightness(1.08); }
+.btn-icon { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r);
+  border: 1px solid transparent; background: none; color: var(--t2); cursor: pointer; }
+.btn-icon:hover { background: var(--s2); color: var(--t1); }
+
+/* -- forms ---------------------------------------------------------------------------------- */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font-size: .875rem; font-weight: 600; color: var(--t1); }
+input[type="text"], input[type="password"], input[type="number"], input[type="date"], input[type="search"], select {
+  width: 100%; min-height: 44px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--b2);
+  background: var(--s1); color: var(--t1); font-size: 1rem;
+}
+select { padding-inline-end: 32px; }
+input:focus, select:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac2); }
+input::placeholder { color: var(--t3); }
+.code-input { font-family: var(--mono); letter-spacing: .3em; font-size: 1.25rem; text-align: center; direction: ltr; }
+.hint { font-size: .8125rem; color: var(--t2); }
+.form-error { color: var(--err); font-size: .875rem; min-height: 0; }
+.form-error:empty { display: none; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.stack-sm { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: var(--s2);
+  border: 1px solid var(--b1); }
+.segmented button { border: 0; background: none; padding: 6px 12px; border-radius: 7px; cursor: pointer; color: var(--t2);
+  font-weight: 600; font-size: .875rem; font-family: system-ui, sans-serif; }
+.segmented button.active { background: var(--s1); color: var(--t1); box-shadow: var(--shadow-sm); }
+
+/* -- pills, tags, dots ---------------------------------------------------------------------- */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 99px; font-size: .75rem;
+  font-weight: 700; white-space: nowrap; border: 1px solid transparent; }
+.pill-ok { background: var(--ok2); color: var(--ok); }
+.pill-err { background: var(--err2); color: var(--err); }
+.pill-warn { background: var(--warn2); color: var(--ac-text); }
+.pill-info { background: var(--info2); color: var(--info); }
+.pill-muted { background: var(--s2); color: var(--t2); border-color: var(--b1); }
+.tag { font-size: .6875rem; font-weight: 700; color: var(--t3); border: 1px solid var(--b1); border-radius: 6px;
+  padding: 0 6px; white-space: nowrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.dot-ok { background: var(--ok); box-shadow: 0 0 0 3px var(--ok2); }
+.dot-err { background: var(--err); box-shadow: 0 0 0 3px var(--err2); }
+
+/* -- notices, code, commands ---------------------------------------------------------------- */
+.notice { padding: 12px 14px; border-radius: var(--r); font-size: .9rem; border: 1px solid var(--b1); background: var(--s2); }
+.notice-err { background: var(--err2); border-color: color-mix(in srgb, var(--err) 30%, transparent); color: var(--t1); }
+.notice-warn { background: var(--warn2); border-color: color-mix(in srgb, var(--ac) 40%, transparent); }
+.notice ul { margin-top: 6px; padding-inline-start: 18px; }
+.cmd { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; direction: ltr; background: var(--code-bg);
+  border: 1px solid var(--b1); border-radius: 7px; padding: 2px 2px 2px 10px; }
+.cmd code { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-copy { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 5px;
+  background: none; color: var(--t3); cursor: pointer; }
+.cmd-copy:hover { background: var(--s1); color: var(--t1); }
+.cmd-copy .icon { width: 15px; height: 15px; }
+.secret { display: block; font-family: var(--mono); font-size: 1rem; padding: 10px 12px; border-radius: var(--r);
+  background: var(--code-bg); border: 1px solid var(--b1); word-break: break-all; direction: ltr; text-align: start; }
+.secret-token { font-size: .875rem; margin: 12px 0; user-select: all; }
+.link-text { display: block; font-family: var(--mono); font-size: .8125rem; color: var(--t2); word-break: break-all;
+  direction: ltr; text-align: start; }
+.hash { word-break: break-all; }
+
+/* -- dialog and toast ----------------------------------------------------------------------- */
+.dialog { margin: auto; width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 32px); border: 1px solid var(--b1);
+  border-radius: var(--r3); background: var(--s1); color: var(--t1); box-shadow: var(--shadow-lg); padding: 0; }
+.dialog-wide { width: min(560px, calc(100vw - 24px)); }
+.dialog::backdrop { background: rgba(20, 22, 30, .45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 4px; }
+.dialog-body { padding: 8px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+#toast { position: fixed; inset-inline: 0; bottom: max(20px, env(safe-area-inset-bottom)); display: flex;
+  justify-content: center; pointer-events: none; z-index: 300; opacity: 0; transform: translateY(8px);
+  transition: opacity .18s, transform .18s; }
+#toast.show { opacity: 1; transform: none; }
+.toast { padding: 10px 16px; border-radius: 99px; font-size: .9rem; font-weight: 600; box-shadow: var(--shadow-lg);
+  max-width: calc(100vw - 32px); }
+.toast-ok { background: var(--t1); color: var(--bg); }
+.toast-error { background: var(--err); color: var(--on-err); }

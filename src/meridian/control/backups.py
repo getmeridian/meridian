@@ -51,6 +51,10 @@ NOT_SNAPSHOTTED = (
     "DELETE FROM agent_sessions",
     "DELETE FROM enrollment_tokens",
     "DELETE FROM hello_nonces",
+    # The web owner signs in again after a restore: a seized server held its TOTP secret.
+    "DELETE FROM ui_owner",
+    "DELETE FROM ui_sessions",
+    "DELETE FROM ui_setup_links",
 )
 _RECOVERY = "recovery_key"
 _DEPLOYER = "deployer_state"

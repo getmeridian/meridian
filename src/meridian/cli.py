@@ -736,11 +736,14 @@ def logs_cmd(
 @app.command("panel", rich_help_panel=ADVANCED)
 def panel_cmd(
     show_password: bool = typer.Option(False, "--show-password", help="Also print the admin password"),
+    setup_link: bool = typer.Option(
+        False, "--setup-link", hidden=True, help="Print a fresh one-time setup link for the web console"
+    ),
 ) -> None:
     """Show the Remnawave admin panel URL and login, and what Meridian manages there"""
     from meridian.commands.panel import run
 
-    run(show_password=show_password)
+    run(show_password=show_password, setup_link=setup_link)
 
 
 @app.command("teardown", rich_help_panel=ADVANCED)
