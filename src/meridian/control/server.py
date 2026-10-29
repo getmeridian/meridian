@@ -26,6 +26,7 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
+from meridian.control import ui_routes
 from meridian.control.blobs import BlobStore, spec_artifacts
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
@@ -540,26 +541,34 @@ ROUTES: list[Route] = [
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
 # What a web owner may do only after confirming their password again within minutes: mint a credential.
 OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token})
-# Routes only the deployer's CLI (or an API token) calls, never the console: credentials an agent or
-# a backup device holds, users imported with their credentials, and snapshots that carry every one.
-# An owner session is refused outright, step-up or not, so a borrowed browser cannot reach them.
-MACHINE_ONLY: frozenset[Callable[..., Any]] = frozenset(
+# The only routes an owner session reaches: what the console's screens call ("people edit, the rest
+# view"). Everything else — node, endpoint, and fence writes, revisions, enrollment, user import,
+# backups — is the deployer's CLI or an API token, so a borrowed browser cannot reshape the fleet or
+# take credentials, and a route added later stays closed to the console until it is listed here.
+OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
-        _Handler.grant_enrollment,
-        _Handler.import_users,
-        _Handler.list_device_keys,
-        _Handler.register_device_key,
-        _Handler.revoke_device_key,
-        _Handler.get_recovery_key,
-        _Handler.put_recovery_key,
-        _Handler.deposit_deployer_state,
-        _Handler.snapshot,
+        _Handler.get_settings,
+        _Handler.put_settings,
+        _Handler.list_users,
+        _Handler.get_user,
+        _Handler.put_user,
+        _Handler.update_user,
+        _Handler.reissue_user,
+        _Handler.reset_user_traffic,
+        _Handler.delete_user,
+        _Handler.list_tokens,
+        _Handler.create_token,
+        _Handler.revoke_token,
+        _Handler.list_revisions,
+        _Handler.get_revision,
+        ui_routes.fleet,
+        ui_routes.share,
     }
 )
 
 
 def _owner_may(handler: Callable[..., Any]) -> None:
-    if handler in MACHINE_ONLY:
+    if handler not in OWNER_ROUTES:
         raise ServiceError(
             "insufficient_scope", "Only the meridian CLI or an API token does this; the console never needs it.", 403
         )

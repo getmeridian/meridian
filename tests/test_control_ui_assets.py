@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from meridian.control.models import LimitStrategy, RevisionStatus, TokenScope, UserStatus
+from meridian.control.server import ALL_ROUTES, OWNER_ROUTES
 from meridian.control.ui_models import PasskeyState, ServerView
 from meridian.control.ui_routes import UI_DIR
 
@@ -61,11 +62,26 @@ def test_every_request_carries_the_csrf_header() -> None:
             assert "fetch(" not in source, f"{name} calls fetch directly instead of M.api"
 
 
-def test_the_console_never_calls_a_cli_only_route() -> None:
-    """`server.MACHINE_ONLY` refuses an owner session there, so a screen that called one would always fail."""
-    for name, source in JS.items():
-        for route in ("api/backup/", "/enrollment", "api/import/"):
-            assert route not in source, f"{name} calls {route}"
+# How the scripts spell a call: a literal path, optionally `+ name` and `+ "/suffix"`,
+# or person.js's `path(name, "/suffix")`.
+_API_CALL = re.compile(
+    r'M\.api\("([A-Z]+)", (?:"([^"]+)"( \+ [\w.]+(?:\([\w.]+\))?(?: \+ "([^"]*)")?)?|path\(\w+(?:, "([^"]+)")?\))'
+)
+_ID_SAMPLES = ("1", "0123456789ab")  # usernames and revision numbers; token IDs
+
+
+def test_every_route_the_console_calls_admits_an_owner_session() -> None:
+    """`server.OWNER_ROUTES` is an allowlist, so a screen calling an unlisted route would always fail."""
+    calls = [match.groups() for source in JS.values() for match in _API_CALL.finditer(source)]
+    assert len(calls) > 15
+    for method, literal, joined, tail, person_suffix in calls:
+        if literal is None:
+            literal, joined, tail = "api/users/", True, person_suffix
+        paths = ["/" + literal + (sample + (tail or "") if joined else "") for sample in _ID_SAMPLES]
+        routes = [route for route in ALL_ROUTES for path in paths if route[0] == method and route[1].fullmatch(path)]
+        assert routes, f"{method} {paths[0]} matches no route"
+        scope, handler = routes[0][2], routes[0][3]
+        assert scope is None or handler in OWNER_ROUTES, f"{method} {paths[0]} refuses an owner session"
 
 
 def test_setup_token_is_stripped_from_the_address_bar() -> None:

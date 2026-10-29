@@ -228,13 +228,6 @@ def test_a_session_holds_the_admin_scope_and_sees_credentials(fleet: Fleet) -> N
     assert fleet.ui("GET", "/api/tokens").status == 200
 
 
-def test_revisions_a_session_records_name_the_owner(fleet: Fleet) -> None:
-    fleet.set_up()
-    proposal = {"intent": {"access": {"users": ["alice"]}}, "plan_hash": "1" * 64, "review_hash": "2" * 64}
-    created = fleet.ui("POST", "/api/revisions", proposal)
-    assert created.status == 200 and created.body["author"] == {"token_id": None, "name": "owner"}
-
-
 def test_bearer_wins_over_a_session_cookie(fleet: Fleet) -> None:
     fleet.set_up()
     read = fleet.call("POST", "/api/tokens", {"name": "viewer", "scope": "read"}, bearer=ADMIN_TOKEN).body["token"]
@@ -272,13 +265,23 @@ def test_minting_a_token_needs_a_recent_confirmation(fleet: Fleet) -> None:
         ("PUT", "/api/backup/recovery-key", {"public_key": "age1x"}),
         ("PUT", "/api/backup/deployer-state", {}),
         ("GET", "/api/backup/snapshot", None),
+        ("PUT", "/api/nodes/main", {}),
+        ("DELETE", "/api/nodes/main", None),
+        ("PUT", "/api/endpoints/main", {}),
+        ("DELETE", "/api/endpoints/main", None),
+        ("PUT", "/api/fence", {}),
+        ("POST", "/api/revisions", {"intent": {}, "plan_hash": "1" * 64, "review_hash": "2" * 64}),
+        ("POST", "/api/revisions/1/approve", {}),
+        ("POST", "/api/revisions/1/result", {}),
+        ("GET", "/api/traffic", None),
+        ("POST", "/api/owner/setup-link", {}),
     ],
     ids=lambda value: value if isinstance(value, str) and value.startswith("/") else None,
 )
-def test_a_session_never_reaches_cli_only_routes_even_just_confirmed(
+def test_a_session_reaches_only_what_the_console_calls_even_just_confirmed(
     fleet: Fleet, method: str, path: str, body: Any
 ) -> None:
-    """A borrowed browser could seal a snapshot to its own key or enroll a rogue node; the console calls neither."""
+    """A borrowed browser could seal a snapshot to its own key, enroll a rogue node, or reshape the fleet."""
     fleet.set_up()  # signed in this second: step-up would pass
     refused = fleet.ui(method, path, body)
     assert refused.status == 403 and refused.body["error"]["code"] == "insufficient_scope"
