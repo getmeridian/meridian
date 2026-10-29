@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Literal
 
 from meridian.compiler.names import fingerprint_label
-from meridian.control.models import ClientEndpoint
+from meridian.control.models import ClientEndpoint, LimitStrategy
 
 UserStatus = Literal["active", "disabled", "limited", "expired"]
 
@@ -46,6 +46,7 @@ class SubscriptionUser:
     used_bytes: int = 0
     limit_bytes: int = 0
     lifetime_used_bytes: int = 0
+    limit_strategy: LimitStrategy = "no_reset"
 
     @property
     def placeholders(self) -> tuple[str, ...]:

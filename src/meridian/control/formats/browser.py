@@ -35,7 +35,7 @@ def subscription_info(user: SubscriptionUser, links: list[str], subscription_url
             "expiresAt": iso_timestamp(expires),
             "isActive": user.status == "active",
             "userStatus": user.status.upper(),
-            "trafficLimitStrategy": "NO_RESET",
+            "trafficLimitStrategy": user.limit_strategy.upper(),
         },
         "links": links,
         "ssConfLinks": {},

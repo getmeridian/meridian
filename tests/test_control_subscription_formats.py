@@ -200,6 +200,12 @@ def _wss_entry(document: DocumentFormat, body: str) -> Any:
     return next(proxy for proxy in yaml.safe_load(body)["proxies"] if proxy["name"] == WSS.remark)
 
 
+@pytest.mark.parametrize(("strategy", "shown"), [("no_reset", "NO_RESET"), ("month", "MONTH"), ("day", "DAY")])
+def test_the_browser_answer_names_the_users_reset_strategy(strategy: str, shown: str) -> None:
+    info = json.loads(_render("single", "browser", limit_strategy=strategy).body)["user"]
+    assert info["trafficLimitStrategy"] == shown
+
+
 @pytest.mark.parametrize("document", sorted(WSS_ENTRIES))
 def test_wss_entries_match_remnawave_generators(document: DocumentFormat) -> None:
     entry = _wss_entry(document, _render("domain", document).body)

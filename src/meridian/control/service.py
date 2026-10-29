@@ -584,6 +584,7 @@ class ControlService:
             used_bytes=record.used_traffic_bytes,
             limit_bytes=record.traffic_limit_bytes,
             lifetime_used_bytes=record.lifetime_traffic_bytes,
+            limit_strategy=record.traffic_limit_strategy,
         )
         endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
         document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)
