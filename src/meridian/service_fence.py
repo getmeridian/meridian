@@ -159,7 +159,7 @@ class ControlServiceFence:
             version = self._swap(located.version, record, located.committed_revision)
             self._run = _Run(record, version, located.committed_revision, renewed_at=self._now())
             try:
-                self._run.revision = self._propose()
+                self._propose(self._run)
             except BaseException:
                 self.release()
                 raise
@@ -346,12 +346,14 @@ class ControlServiceFence:
 
         return self._call(attempt, patient=patient)
 
-    def _propose(self) -> int | None:
+    def _propose(self, run: _Run) -> None:
         if self._draft is None:
-            return None
+            return
         proposal = self._draft.proposal()
         # A retry after a lost reply may leave one extra revision `proposed`; it is never approved.
         number = self._call(lambda client: client.propose_revision(proposal)).number
+        # Known before approving: an approval that landed but whose reply was lost is marked failed on release.
+        run.revision = number
 
         def approve(client: ControlClient) -> None:
             try:
@@ -362,7 +364,6 @@ class ControlServiceFence:
                     raise
 
         self._call(approve)
-        return number
 
     def _record_late(self, status: Literal["applied", "failed"]) -> None:
         """Record the bootstrap apply once the service it created answers; best effort."""

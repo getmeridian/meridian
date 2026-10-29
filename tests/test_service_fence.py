@@ -38,6 +38,7 @@ class Service:
     url: str
     service: ControlService
     swaps_lost: int = 0  # swaps that land but whose reply is lost
+    approval_lost: bool = False  # the first approval lands, its reply and every retry are lost
 
     def client(self, timeout: float = 20.0) -> ControlClient:
         return _LossyClient(self, self.url, _TOKEN, timeout=timeout)
@@ -54,6 +55,13 @@ class _LossyClient(ControlClient):
             self._owner.swaps_lost -= 1
             raise ControlServiceError("Could not reach the control service: ReadTimeout", retryable=True)
         return answer
+
+    def approve_revision(self, number: int) -> Any:
+        if not self._owner.approval_lost:
+            return super().approve_revision(number)
+        if self._owner.service.revisions.get(number).status == "proposed":
+            super().approve_revision(number)
+        raise ControlServiceError("Could not reach the control service: ReadTimeout", retryable=True)
 
 
 @pytest.fixture
@@ -269,6 +277,20 @@ def test_a_failed_apply_marks_its_revision_failed_and_frees_the_lease(service: S
     assert _revisions(service) == [(2, "failed"), (1, "applied")]
     record = service.service.revisions.fence().record
     assert record is not None and (record.lease_holder, record.generation, record.revision) == ("", 8, 1)
+
+
+def test_an_approval_whose_reply_was_lost_is_marked_failed_when_the_lease_is_freed(service: Service) -> None:
+    """Left approved, the revision would stay in flight in the history forever."""
+    host = FenceHost()
+    _moved(host, service)
+    service.approval_lost = True
+
+    with pytest.raises(FleetFenceError, match="ReadTimeout"):
+        _fence(host, _cluster(service.url), service).acquire(_local(generation=8, plan_hash=_NEW))
+
+    assert _revisions(service) == [(2, "failed"), (1, "applied")]
+    record = service.service.revisions.fence().record
+    assert record is not None and record.lease_holder == ""
 
 
 def test_an_unreachable_service_is_refused_after_retries_never_bypassed_through_fence_json(
