@@ -56,6 +56,7 @@ src/meridian/CLAUDE.md                  — Python CLI package overview
 ├── remnawave/CLAUDE.md                 — typed panel adapter and image version policy
 ├── diagnostics/CLAUDE.md               — reusable health, blocking, and probe checks
 ├── engine/CLAUDE.md                    — local Engine use-case boundary
+├── control/CLAUDE.md                   — `meridian serve`: signed node documents, users, subscriptions
 ├── i18n/CLAUDE.md                      — CLI message catalog, language detection
 └── templates/pwa/CLAUDE.md             — PWA security model, vanilla JS rationale
 

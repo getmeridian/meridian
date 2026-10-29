@@ -87,6 +87,22 @@ COMPILER_FORBIDDEN = (
     "secrets",
 )
 
+# control/ is the service on the control server: it never reaches back into the
+# deployer (CLI, SSH, panel, provisioning, reconciler) or its presentation.
+CONTROL_FORBIDDEN = (
+    "meridian.commands",
+    "meridian.config",
+    "meridian.console",
+    "meridian.engine",
+    "meridian.provision",
+    "meridian.reconciler",
+    "meridian.remnawave",
+    "meridian.ssh",
+    "rich",
+    "typer",
+    "click",
+)
+
 # Shared library modules must not import private (_-prefixed) symbols
 # from commands/.
 LIBRARY_MODULES = [
@@ -119,6 +135,10 @@ class TestLayerBoundaries:
     def test_compiler_has_no_runtime_or_randomness_dependencies(self) -> None:
         violations = _scan_violations(SRC / "compiler", COMPILER_FORBIDDEN)
         assert violations == [], "compiler/ has forbidden imports:\n" + "\n".join(violations)
+
+    def test_control_service_never_imports_the_deployer(self) -> None:
+        violations = _scan_violations(SRC / "control", CONTROL_FORBIDDEN)
+        assert violations == [], "control/ has forbidden imports:\n" + "\n".join(violations)
 
     def test_click_is_reached_only_through_cli_types(self) -> None:
         """Typer ≥ 0.26 vendors Click; the ``click`` package isn't installed in production."""

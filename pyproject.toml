@@ -33,6 +33,7 @@ dependencies = [
     "pydantic>=2.12",
     "prompt-toolkit>=3.0.43",
     "anyascii>=0.3.2",
+    "cryptography>=43",
 ]
 
 [project.scripts]

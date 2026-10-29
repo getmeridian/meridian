@@ -57,3 +57,22 @@ def container_role(name: str) -> str:
         if name == container.legacy:
             return f"{container.role}, pre-rename (meridian apply renames it)"
     return ""
+
+# Meridian's own control service (`meridian serve`, a uv-managed tool) and node agent.
+# The agent's names stay bland like the relay's: the Xray it runs is `netcore`.
+CONTROL_SERVICE_NAME = "ctld"
+CONTROL_SERVICE_UNIT = f"{CONTROL_SERVICE_NAME}.service"
+CONTROL_SERVICE_DIR = f"/opt/{CONTROL_SERVICE_NAME}"
+CONTROL_SERVICE_CONFIG = f"/etc/{CONTROL_SERVICE_NAME}/config.json"
+CONTROL_SERVICE_STATE_DIR = f"/var/lib/{CONTROL_SERVICE_NAME}"
+CONTROL_SERVICE_PUBLIC_KEY = f"{CONTROL_SERVICE_STATE_DIR}/signing.pub"
+AGENT_NAME = "netagent"
+AGENT_BINARY = f"/usr/local/bin/{AGENT_NAME}"
+AGENT_UNIT = f"{AGENT_NAME}.service"
+AGENT_CONFIG_DIR = f"/etc/{AGENT_NAME}"
+AGENT_BOOTSTRAP = f"{AGENT_CONFIG_DIR}/bootstrap.json"
+AGENT_STATE_DIR = f"/var/lib/{AGENT_NAME}"
+AGENT_LIB_DIR = f"/usr/local/lib/{AGENT_NAME}"
+CORE_BINARY = f"{AGENT_LIB_DIR}/netcore"
+CORE_CONFIG = f"{AGENT_CONFIG_DIR}/core.json"
+CORE_UNIT = "netcore.service"

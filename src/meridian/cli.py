@@ -731,3 +731,15 @@ def update_cmd(
     exit_code = run_self_update(major=major)
     if exit_code:
         raise typer.Exit(exit_code)
+
+
+@app.command("serve", hidden=True)
+def serve_cmd(
+    config: str = typer.Option("/etc/ctld/config.json", "--config", help="Service configuration file"),
+) -> None:
+    """Run the control service (on the control server, under systemd)"""
+    from pathlib import Path
+
+    from meridian.control.server import serve
+
+    serve(Path(config))
