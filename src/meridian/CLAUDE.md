@@ -23,7 +23,7 @@
 - **Read-only fleet projection** — `adapters/cluster.py` is the only source of node/relay rows; it never projects routing gateways as exits or source-restricted relay hops as public endpoints.
 ## Pitfalls
 - **A handed-over fence.json is never a fallback** — once the service keeps the fence, an unreachable service is retried and refused; falling back to the file would let a stale copy apply around it.
-- **Server ownership compares canonical addresses** — `refuse_servers_claimed_elsewhere()` matches `canonical_endpoint_address()` forms; `2001:db8::1` and its long spelling once passed as two machines.
+- **Server ownership compares canonical addresses and fails closed** — `refuse_servers_claimed_elsewhere()` matches `canonical_endpoint_address()` forms (`2001:db8::1` and its long spelling once passed as two machines), and a context it cannot read refuses instead of being skipped.
 - **Local state is fail-closed** — only missing `cluster.yml`/`servers.json` means fresh; malformed files need recovery, and `srv-*` IDs survive connection edits.
 - **Never hard-code the home in messages** — print `config.HOME_DISPLAY`; a literal `~/.meridian` sent 4.x users into 3.x's directory.
 - **Read paths as `config.NAME` at call time** — a module-level `from meridian.config import CLUSTER_CONFIG` keeps the fleet chosen at import and ignores `--context` (architecture-tested).

@@ -69,7 +69,7 @@ def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
 
     Two fleets on one server would each rewrite its firewall, nginx, and Xray as their own,
     so a server belongs to one fleet's intent at a time. A pinned home has no other contexts.
-    A context whose files cannot be read is skipped: its own commands report the damage.
+    A context whose files cannot be read refuses too: it may hold any of them.
     """
     if config.PINNED_HOME:
         return
@@ -81,8 +81,16 @@ def refuse_servers_claimed_elsewhere(hosts: Iterable[str]) -> None:
             claimed = wanted & {
                 _same_host(host) for host in fleet_server_hosts(context_home(config.INSTALL_HOME, name))
             }
-        except (LocalStateError, OSError, ValueError):
-            continue
+        except (LocalStateError, OSError, ValueError) as exc:
+            raise LocalStateError(
+                f"Cannot tell which servers the fleet in context {name!r} uses: {exc}",
+                hint=(
+                    f"A server serves one fleet at a time. Repair {name!r} "
+                    f"(`meridian --context {name} fleet status` names the damage), or, if that fleet is gone, "
+                    f"`meridian context remove {name}`."
+                ),
+                category="user",
+            ) from exc
         if claimed:
             raise LocalStateError(
                 f"{', '.join(sorted(claimed))} already belongs to the fleet in context {name!r}",

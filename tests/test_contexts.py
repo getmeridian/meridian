@@ -316,6 +316,20 @@ def test_an_equivalent_ipv6_spelling_is_the_same_server(install: Path) -> None:
         refuse_servers_claimed_elsewhere(["2001:db8:0:0:0:0:0:1"])
 
 
+def test_a_context_that_cannot_be_read_refuses_rather_than_lets_a_server_go(install: Path) -> None:
+    from meridian.fleet_contexts import refuse_servers_claimed_elsewhere
+
+    home = context_home(install, "family")
+    _fleet(home, control="198.51.100.40")
+    (home / "servers.json").write_text("{not json", encoding="utf-8")
+    config.select_context("work")
+
+    with pytest.raises(LocalStateError, match="context 'family'") as error:
+        refuse_servers_claimed_elsewhere(["203.0.113.5"])
+
+    assert "context remove family" in (error.value.hint or "")
+
+
 def test_every_public_leaf_accepts_context_except_the_context_group() -> None:
     from meridian.cli_catalog import long_options, public_commands
 
