@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -36,7 +37,11 @@ def _xray() -> str:
     if explicit:
         return explicit
     home = Path(os.environ.get("MERIDIAN_HOME", ""))
-    found = sorted((home / "bin").glob("xray-*")) if home.name else []
+    # Newest by version, not by name: "xray-26.9.1" sorts after "xray-26.10.1" as text.
+    found = sorted(
+        (home / "bin").glob("xray-*") if home.name else [],
+        key=lambda path: [int(part) for part in re.findall(r"\d+", path.name)],
+    )
     if not found:
         sys.exit("No Xray: set MERIDIAN_TEST_XRAY or source a lab env.sh whose home has bin/xray-*.")
     return str(found[-1])
@@ -54,51 +59,78 @@ def fetch(url: str, out: Path) -> int:
     response.raise_for_status()
     configs = response.json()
     configs = configs if isinstance(configs, list) else [configs]
+    if not configs:
+        sys.exit("The subscription returned no configs.")
     out.write_text(json.dumps(configs, indent=2))
     print(f"saved {len(configs)} config(s)")
     return 0
 
 
+def _listening(port: int, process: subprocess.Popen[bytes], seconds: float = 10) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline and process.poll() is None:
+        with socket.socket() as probe:
+            if probe.connect_ex(("127.0.0.1", port)) == 0:
+                return True
+        time.sleep(0.2)
+    return False
+
+
+def _curl(port: int, *args: str, seconds: int) -> subprocess.CompletedProcess[str]:
+    # curl, not httpx: SOCKS support would need another dependency. --fail: an error page is no egress.
+    command = ["curl", "-sS", "--fail", "--max-time", str(seconds), "--socks5-hostname", f"127.0.0.1:{port}", *args]
+    return subprocess.run(command, capture_output=True, text=True, check=False)
+
+
 def _probe(xray: str, config: dict[str, object], download: int = 0) -> tuple[bool, str]:
     port = _free_port()
-    config = {**config, "inbounds": [{"listen": "127.0.0.1", "port": port, "protocol": "socks"}]}
+    inbound = {"listen": "127.0.0.1", "port": port, "protocol": "socks", "settings": {"udp": True}}
+    config = {**config, "inbounds": [inbound]}
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
-        json.dump(config, handle)
-    process = subprocess.Popen([xray, "run", "-c", handle.name], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        json.dump(config, handle)  # holds the client's credentials: removed whatever happens below
+    process: subprocess.Popen[bytes] | None = None
     try:
-        time.sleep(1.5)
-        if process.poll() is not None:
-            return False, "xray exited: " + (process.stderr.read().decode()[-200:] if process.stderr else "")
-        # curl, not httpx: SOCKS support would need another dependency.
-        trace = subprocess.run(
-            ["curl", "-sS", "--max-time", "15", "--socks5-hostname", f"127.0.0.1:{port}", TRACE_URL],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        line = next((item for item in trace.stdout.splitlines() if item.startswith("ip=")), "")
-        if not line:
-            return False, f"no egress ({trace.stderr.strip()[-120:]})"
-        if download:
-            pulled = subprocess.run(
-                ["curl", "-sS", "--max-time", "120", "-o", os.devnull, "-w", "%{size_download}"]
-                + ["--socks5-hostname", f"127.0.0.1:{port}", DOWNLOAD_URL.format(size=download)],
-                capture_output=True,
-                text=True,
-                check=False,
+        # Xray's log goes to a file, not a pipe nobody reads, which would fill and stall it mid-download.
+        with tempfile.TemporaryFile() as log:
+            process = subprocess.Popen([xray, "run", "-c", handle.name], stdout=subprocess.DEVNULL, stderr=log)
+            if not _listening(port, process):
+                log.seek(0)
+                return False, "xray never listened: " + log.read().decode(errors="replace")[-200:]
+            # A balancer routes to its fallback until the observatory's first round, so retry briefly.
+            for attempt in range(3):
+                trace = _curl(port, TRACE_URL, seconds=15)
+                egress = next((item for item in trace.stdout.splitlines() if item.startswith("ip=")), "")
+                if egress or attempt == 2:
+                    break
+                time.sleep(1)
+            if not egress:
+                return False, f"no egress ({trace.stderr.strip()[-120:]})"
+            if not download:
+                return True, f"egress {egress}"
+            pulled = _curl(
+                port, "-o", os.devnull, "-w", "%{size_download}", DOWNLOAD_URL.format(size=download), seconds=120
             )
-            return pulled.returncode == 0, f"egress seen, downloaded {pulled.stdout or 0} bytes"
-        return True, "egress seen"
+            got = int(pulled.stdout) if pulled.stdout.isdigit() else 0
+            return pulled.returncode == 0 and got >= download, f"egress {egress}, downloaded {got} of {download} bytes"
     finally:
-        process.terminate()
-        process.wait(timeout=5)
-        os.unlink(handle.name)
+        if process is not None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        Path(handle.name).unlink(missing_ok=True)
 
 
 def connect(saved: Path, download: int = 0) -> int:
     xray = _xray()
+    configs = json.loads(saved.read_text())
+    if not configs:
+        print(f"FAIL {saved}: no configs saved")
+        return 1
     failed = 0
-    for config in json.loads(saved.read_text()):
+    for config in configs:
         name = str(config.get("remarks", "config"))
         ok, detail = _probe(xray, config, download)
         failed += not ok
