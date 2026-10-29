@@ -27,6 +27,7 @@ from meridian import __version__
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.models import (
+    SUB_TOKEN_PATTERN,
     ApplyFenceSwap,
     ClientEndpoint,
     NodeSpec,
@@ -36,6 +37,7 @@ from meridian.control.models import (
     ServiceSettings,
     TokenCreate,
     TokenScope,
+    UserImportBatch,
     UserRecord,
     UserUpdate,
     scope_covers,
@@ -53,6 +55,7 @@ _NAME = r"([a-z0-9][a-z0-9_.:-]{0,127})"
 _USERNAME = r"([A-Za-z0-9_.-]{1,64})"
 _TOKEN_ID = r"([0-9a-f]{12})"
 _REVISION = r"([1-9][0-9]{0,15})"
+_SUB_TOKEN = "(" + SUB_TOKEN_PATTERN.removeprefix("^").removesuffix("$") + ")"
 # Every write that changes what the fleet runs or who may use it needs `admin`: it is
 # part of applying a revision. Revisions themselves take `propose` (record one) and
 # `approve` (approve someone else's; `revisions.py`), and recording a revision's result
@@ -252,6 +255,9 @@ class _Handler(BaseHTTPRequestHandler):
     def put_user(self, match: re.Match[str]) -> Any:
         return self._service.put_user(match[1])
 
+    def import_users(self, _match: re.Match[str]) -> Any:
+        return self._service.import_users(self._model(UserImportBatch))
+
     def update_user(self, match: re.Match[str]) -> Any:
         return self._service.update_user(match[1], self._model(UserUpdate))
 
@@ -376,6 +382,8 @@ ROUTES: list[Route] = [
     ("GET", re.compile(r"/api/ca"), "read", _Handler.fleet_authority),
     ("GET", re.compile(r"/api/traffic"), "read", _Handler.traffic),
     ("GET", re.compile(r"/api/users"), "read", _Handler.list_users),
+    # Credentials go in as well as out: importing users (`meridian migrate`) is the root of applying.
+    ("POST", re.compile(r"/api/import/users"), "admin", _Handler.import_users),
     ("GET", re.compile(rf"/api/users/{_USERNAME}"), "read", _Handler.get_user),
     ("PUT", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.put_user),
     ("PATCH", re.compile(rf"/api/users/{_USERNAME}"), WRITE, _Handler.update_user),
@@ -402,7 +410,7 @@ ROUTES: list[Route] = [
     ("POST", re.compile(r"/agent/v1/report"), None, _Handler.agent_report),
     ("POST", re.compile(r"/agent/v1/stats"), None, _Handler.agent_stats),
     ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _Handler.agent_blob),
-    ("GET", re.compile(r"/sub/([A-Za-z0-9_-]{16,64})(?:/(json|mihomo|singbox))?"), None, _Handler.subscription),
+    ("GET", re.compile(rf"/sub/{_SUB_TOKEN}(?:/(json|mihomo|singbox))?"), None, _Handler.subscription),
 ]
 
 

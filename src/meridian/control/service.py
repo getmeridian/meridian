@@ -34,6 +34,9 @@ from meridian.control.models import (
     NodeStatus,
     ServiceHealth,
     ServiceSettings,
+    UserImport,
+    UserImportBatch,
+    UserImportResult,
     UserRecord,
     UserStatus,
     UserUpdate,
@@ -50,7 +53,7 @@ from meridian.core.agent_protocol import ObservedStateReport, PollRequest
 from meridian.core.agent_signing import DESIRED_STATE_CONTEXT
 from meridian.core.agent_types import AGENT_PROTOCOL, NodeStateRef, canonical_sha256
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 MAX_WAIT_SECONDS = 55
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -79,7 +82,8 @@ CREATE TABLE IF NOT EXISTS users (
     traffic_limit_bytes INTEGER NOT NULL DEFAULT 0,
     traffic_limit_strategy TEXT NOT NULL DEFAULT 'no_reset',
     traffic_offset_bytes INTEGER NOT NULL DEFAULT 0,
-    traffic_reset_at TEXT
+    traffic_reset_at TEXT,
+    traffic_carried_bytes INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS endpoints (endpoint_id TEXT PRIMARY KEY, body TEXT NOT NULL);
 """
@@ -96,6 +100,7 @@ _MIGRATIONS: tuple[tuple[str, ...], ...] = (
     ),
     (API_TOKENS_TABLE,),
     (REVISIONS_TABLE, APPLY_FENCE_TABLE),
+    ("ALTER TABLE users ADD COLUMN traffic_carried_bytes INTEGER NOT NULL DEFAULT 0",),
 )
 _USER_FIELDS = (
     "username",
@@ -109,12 +114,14 @@ _USER_FIELDS = (
     "traffic_limit_strategy",
     "traffic_reset_at",
 )
-# A user's stored fields plus what the traffic ledger counted for them: `used` is
-# the growth since the last reset (lifetime minus the offset the reset recorded).
+# A user's stored fields plus their lifetime traffic: what the ledger counted and what an
+# import carried in from before (`traffic_carried_bytes`). `used` is the growth since the
+# last reset (lifetime minus the offset the reset, or the import, recorded).
 _USER_SELECT = (
     "SELECT "
     + ", ".join(f"u.{name}" for name in _USER_FIELDS)
-    + ", COALESCE(t.uplink_bytes + t.downlink_bytes, 0) AS lifetime, u.traffic_offset_bytes, t.last_seen_at"
+    + ", COALESCE(t.uplink_bytes + t.downlink_bytes, 0) + u.traffic_carried_bytes AS lifetime,"
+    " u.traffic_offset_bytes, t.last_seen_at"
     " FROM users u LEFT JOIN traffic_totals t ON t.user_id = u.user_id"
 )
 
@@ -294,6 +301,60 @@ class ControlService:
             )
             self._compose_all()
             return self._require_user(username)
+
+    def import_users(self, batch: UserImportBatch) -> UserImportResult:
+        """Create users with the credentials, status, limits, and usage another control plane gave them.
+
+        All or nothing, and idempotent: a user that already exists with the same UUID and
+        token is left as it is (the first import wins); one with other credentials, or
+        credentials another user holds, refuses the whole batch.
+        """
+        created: list[str] = []
+        unchanged: list[str] = []
+        with self._transaction():
+            now = utc_now()
+            for item in batch.users:
+                uuid, sub_token = item.uuid.lower(), item.sub_token
+                existing = self.get_user(item.username)
+                if existing is not None:
+                    if (existing.uuid, existing.sub_token) != (uuid, sub_token):
+                        raise ServiceError(
+                            "conflict", f"User {item.username!r} already exists with other credentials.", 409
+                        )
+                    unchanged.append(item.username)
+                    continue
+                holder = self._db.execute(
+                    "SELECT username FROM users WHERE uuid = ? OR sub_token = ?", (uuid, sub_token)
+                ).fetchone()
+                if holder is not None:
+                    raise ServiceError(
+                        "conflict", f"User {item.username!r} has credentials that {holder[0]!r} already holds.", 409
+                    )
+                # Carried use counts as lifetime traffic; the offset leaves exactly the period's use toward the limit.
+                carried = max(item.lifetime_traffic_bytes, item.used_traffic_bytes)
+                self._db.execute(
+                    "INSERT INTO users (username, user_id, uuid, sub_token, status, created_at, expire_at,"
+                    " traffic_limit_bytes, traffic_limit_strategy, traffic_offset_bytes, traffic_reset_at,"
+                    " traffic_carried_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        item.username,
+                        f"u{secrets.token_hex(8)}",
+                        uuid,
+                        sub_token,
+                        item.status,
+                        _whole_seconds(item.created_at) or now,
+                        _whole_seconds(item.expire_at),
+                        item.traffic_limit_bytes,
+                        item.traffic_limit_strategy,
+                        carried - item.used_traffic_bytes,
+                        _period_began(item, now),
+                        carried,
+                    ),
+                )
+                created.append(item.username)
+            self._enforce(now)
+            self._compose_all()
+        return UserImportResult(created=created, unchanged=unchanged)
 
     def update_user(self, username: str, update: UserUpdate) -> UserRecord:
         """Apply the operator's change; extending an expiry or raising a limit makes the user active again."""
@@ -574,6 +635,27 @@ def period_start(strategy: LimitStrategy, now: datetime) -> datetime | None:
     if strategy == "month":
         return midnight.replace(day=1)
     return None
+
+
+def _whole_seconds(timestamp: str | None) -> str | None:
+    """A protocol timestamp without its fraction, as the service writes every time."""
+    return f"{timestamp[:19]}Z" if timestamp else None
+
+
+def _period_began(item: UserImport, now: str) -> str | None:
+    """When an imported user's current traffic period began.
+
+    The source's last reset is kept only inside the current period: an older one would
+    make the next enforcement reset the imported use at once. Otherwise the period runs
+    on from the import with the use the source counted, until its next boundary.
+    """
+    reset_at = _whole_seconds(item.traffic_reset_at)
+    start = period_start(item.traffic_limit_strategy, datetime.fromisoformat(now))
+    if start is None:
+        return reset_at
+    if reset_at is not None and datetime.fromisoformat(reset_at) >= start:
+        return reset_at
+    return now
 
 
 def _expired(user: UserRecord, now: str) -> bool:

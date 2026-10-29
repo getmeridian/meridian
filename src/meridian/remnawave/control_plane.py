@@ -40,6 +40,7 @@ from .runtime import (
 
 XRAY_JSON_CLIENT_TYPE = "json"
 SERVICE_USER_DESCRIPTION = "Managed by Meridian service routing"
+ACCESS_USER_DESCRIPTION = "Managed by Meridian access"
 
 
 class ControlPlaneMixin:
@@ -212,7 +213,7 @@ class ControlPlaneMixin:
         body: dict[str, Any] = {
             "username": username,
             "expireAt": expire_at,
-            "description": "Managed by Meridian access",
+            "description": ACCESS_USER_DESCRIPTION,
             "tag": "MERIDIAN_ACCESS",
             "activeInternalSquads": squad_uuids,
         }

@@ -107,6 +107,7 @@ SCOPE_MATRIX = [
     ("PATCH", "/api/users/alice", {"status": "disabled"}, "admin"),
     ("POST", "/api/users/alice/reissue", {}, "admin"),
     ("POST", "/api/users/alice/reset-traffic", {}, "admin"),
+    ("POST", "/api/import/users", {"users": []}, "admin"),
     ("DELETE", "/api/users/alice", None, "admin"),
     ("PUT", "/api/endpoints/main:xhttp", ENDPOINT, "admin"),
     ("DELETE", "/api/endpoints/main:reality", None, "admin"),
@@ -242,6 +243,7 @@ def test_a_version_three_database_gains_api_tokens(tmp_path: Path) -> None:
     service.put_user("alice")
     db = sqlite3.connect(path)
     db.execute("DROP TABLE api_tokens")
+    db.execute("ALTER TABLE users DROP COLUMN traffic_carried_bytes")  # added in version 6
     db.execute("UPDATE meta SET value = '3' WHERE key = 'schema_version'")
     db.commit()
     db.close()

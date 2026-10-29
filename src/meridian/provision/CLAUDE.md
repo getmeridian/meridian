@@ -28,6 +28,7 @@
 - **`docker compose restart` keeps the old environment** — after an `env_file` change, `up -d --no-deps --force-recreate`.
 - **Teardown never removes the `meridian` CLI** — an operator-installed copy is how they redeploy.
 - **Teardown keeps what may predate Meridian** — fail2ban stays on (host hardening, like SSH settings), and nginx is stopped only when no operator config remains.
+- **Teardown never deletes `/var/backups/meridian-migration`** — it holds the only copy of a migrated panel's database; `panel_stack_removal()` is the one panel-removal list teardown and `migrate` share.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned tarball** — `RelayContext.realm_sha256` comes from the reviewed plan; a target without a digest fails (it once skipped verification silently).
 - **Realm is the static musl build, run before it replaces anything** — upstream's 2.9.6 gnu build needs glibc 2.38, so `fleet upgrade` on Ubuntu 22.04 overwrote a working binary with one that could not start. A binary that runs and fails observes as drift (reinstall), not unavailable evidence.
