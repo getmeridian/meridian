@@ -204,3 +204,24 @@ def test_staging_refuses_another_fleets_database(tmp_path: Path) -> None:
             fleet_id="0f1e2d3c-4b5a-4968-8776-655443322111",
             version="4.0.0",
         )
+
+
+def test_staging_a_schema_seven_snapshot_from_before_the_web_console(tmp_path: Path) -> None:
+    """Schema 7 had no `ui_*` tables; stripping them before migrating once refused every such snapshot."""
+    service, _node = _enrolled_service(tmp_path / "live.db")
+    service.close()
+    db = sqlite3.connect(tmp_path / "live.db")
+    for table in ("ui_owner", "ui_sessions", "ui_setup_links"):
+        db.execute(f"DROP TABLE {table}")
+    db.execute("UPDATE meta SET value = '7' WHERE key = 'schema_version'")
+    db.commit()
+    db.close()
+
+    staged = stage_restored_database(
+        (tmp_path / "live.db").read_bytes(), tmp_path / "staged.db", fleet_id=FLEET_ID, version="4.0.0"
+    )
+
+    assert staged.fleet_epoch == 2
+    restored = ControlService(tmp_path / "staged.db", fleet_id=FLEET_ID, version="4.0.0")
+    assert not restored.owner.status().exists
+    assert [user.username for user in restored.list_users()] == ["alice"]

@@ -45,20 +45,32 @@ BACKUP_STATE_TABLE = """CREATE TABLE IF NOT EXISTS backup_state (
     name TEXT PRIMARY KEY,
     body TEXT NOT NULL
 )"""
-# Deleted from every snapshot: a restore regenerates or no longer needs them.
+# Tables emptied in every snapshot: a restore regenerates or no longer needs them.
 NOT_SNAPSHOTTED = (
-    "DELETE FROM secrets",
-    "DELETE FROM agent_sessions",
-    "DELETE FROM enrollment_tokens",
-    "DELETE FROM hello_nonces",
+    "secrets",
+    "agent_sessions",
+    "enrollment_tokens",
+    "hello_nonces",
     # The web owner signs in again after a restore: a seized server held its TOTP secret.
-    "DELETE FROM ui_owner",
-    "DELETE FROM ui_sessions",
-    "DELETE FROM ui_setup_links",
+    "ui_owner",
+    "ui_sessions",
+    "ui_setup_links",
 )
 _RECOVERY = "recovery_key"
 _DEPLOYER = "deployer_state"
 _COLUMNS = "device_id, name, public_key, created_at, revoked_at"
+
+
+def strip_unsnapshotted(db: sqlite3.Connection) -> None:
+    """Empty every `NOT_SNAPSHOTTED` table `db` has; a snapshot from an older schema may lack some.
+
+    The web owner's tables arrived in schema 8, so a schema-7 snapshot has none of
+    them, and a restore strips the database before its migrations run.
+    """
+    present = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    for table in NOT_SNAPSHOTTED:
+        if table in present:
+            db.execute(f"DELETE FROM {table}")  # a name from the constant above, never input
 
 
 class BackupLedger:
@@ -143,8 +155,7 @@ class BackupLedger:
             copy = sqlite3.connect(":memory:", isolation_level=None)
             self._store.db.backup(copy)
         try:
-            for statement in NOT_SNAPSHOTTED:
-                copy.execute(statement)
+            strip_unsnapshotted(copy)
             copy.execute("VACUUM")
             (revision,) = copy.execute("SELECT COALESCE(MAX(number), 0) FROM revisions").fetchone()
             database = copy.serialize()

@@ -31,7 +31,7 @@
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd.
 - Compare timestamps parsed, never as strings — the contract allows fractional seconds, and `…:00.5Z` sorts before `…:00Z`.
 - Never log requests or store where they came from: paths carry the secret path and subscription tokens (`log_message` is silenced); a token keeps only a once-a-minute `last_used_at`.
-- Secrets never ride a snapshot — the copy drops the `secrets` table, sessions, enrollment tokens, nonces, and the `ui_*` owner tables, then VACUUMs (autocommit, or SQLite refuses) so their pages go too; a restore regenerates them, so a seized server's CA signs nothing agents accept.
+- Secrets never ride a snapshot — the copy drops the `secrets` table, sessions, enrollment tokens, nonces, and the `ui_*` owner tables, then VACUUMs (autocommit, or SQLite refuses) so their pages go too; a restore regenerates them, so a seized server's CA signs nothing agents accept. Strip through `strip_unsnapshotted()`, which skips tables an older schema lacks: a restore strips before migrating, and a bare `DELETE FROM ui_owner` refused every schema-7 snapshot.
 - `executescript()` commits on its own — create tables with `Store.create()`, never inside `transaction()`.
 - Hash and sign the document as JSON values, never re-serialized typed models (the agent verifies the bytes it received); verify a `NodeProof` over the hello dict as received, too.
 - Record a hello nonce only after the proof verifies, and keep it until `issued_at` + 300 s + margin, or a captured hello replays.
