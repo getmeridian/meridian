@@ -66,7 +66,7 @@ FORGET_ONLY: Mapping[str, str] = {
 # is retired on the server its binding recorded. Panel-side kinds keep their
 # UUID across the move and are updated in place instead.
 SERVER_PLACED: frozenset[str] = frozenset(
-    {"node_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
+    {"node_runtime", "agent_runtime", "realm_hop", "nginx_artifact", "firewall_rule", "certificate"}
 )
 
 

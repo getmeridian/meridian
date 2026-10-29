@@ -222,13 +222,21 @@ def test_review_hash_covers_the_retirement_set_and_its_ssh_targets() -> None:
     assert base != retirement_review_hash("q" * 64, [relay], {"srv-relay": target})
 
 
-def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements() -> None:
+@pytest.mark.parametrize(
+    ("backend", "runtime"),
+    # A re-enrolled agent revokes the old one's credentials, but only retirement stops its core.
+    [("remnawave", "node_runtime"), ("meridian", "agent_runtime")],
+    ids=["panel-node", "agent"],
+)
+def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements(backend: str, runtime: str) -> None:
     from meridian.compiler import compile_topology
     from meridian.setup.editor import add_exit_to_intent
     from meridian.setup.single_server import single_server_intent
 
+    base = single_server_intent(None, server_ref="srv-a")
+    base = base.model_copy(update={"control": base.control.model_copy(update={"backend": backend})})
     before = add_exit_to_intent(
-        single_server_intent(None, server_ref="srv-a"),
+        base,
         server_ref="srv-b",
         title="exit-b",
         reality_sni="www.google.com",
@@ -260,7 +268,7 @@ def test_an_exit_moved_to_another_server_retires_only_the_old_servers_placements
 
     assert {binding.server_ref for binding in retiring} == {"srv-b"}
     kinds = {binding.resource_kind for binding in retiring}
-    assert "node_runtime" in kinds and "nginx_artifact" in kinds and "firewall_rule" in kinds
+    assert runtime in kinds and "nginx_artifact" in kinds and "firewall_rule" in kinds
     # The panel Node keeps its UUID and is re-addressed in place, never deleted.
     assert "node_binding" not in kinds
 
