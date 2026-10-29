@@ -13,6 +13,7 @@ from __future__ import annotations
 import hmac
 import json
 import re
+import shutil
 import threading
 import time
 from collections.abc import Callable
@@ -24,6 +25,7 @@ from urllib.parse import unquote
 from pydantic import BaseModel, ValidationError
 
 from meridian import __version__
+from meridian.control.blobs import BlobStore, spec_artifacts
 from meridian.control.enrollment import Session, token_sha256
 from meridian.control.errors import ServiceError, agent_error
 from meridian.control.models import (
@@ -67,10 +69,18 @@ WRITE: TokenScope = "admin"
 class ControlServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address: tuple[str, int], service: ControlService, admin_token_sha256: str) -> None:
+    def __init__(
+        self,
+        address: tuple[str, int],
+        service: ControlService,
+        admin_token_sha256: str,
+        blobs: BlobStore | None = None,
+    ) -> None:
         super().__init__(address, _Handler)
         self.service = service
         self.admin_token_sha256 = admin_token_sha256
+        # Artifacts agents fetch with source `service`; without a store every blob is unknown.
+        self.blobs = blobs
 
 
 # (method, path, the scope an `/api` route needs or None where the handler authenticates, handler)
@@ -226,7 +236,11 @@ class _Handler(BaseHTTPRequestHandler):
         return self._service.node_status(match[1])
 
     def put_node(self, match: re.Match[str]) -> Any:
-        return self._service.put_node_spec(match[1], self._model(NodeSpec))
+        spec = self._model(NodeSpec)
+        status = self._service.put_node_spec(match[1], spec)
+        if self.server.blobs is not None:
+            self.server.blobs.want(spec_artifacts(spec))
+        return status
 
     def delete_node(self, match: re.Match[str]) -> Any:
         self._service.delete_node(match[1])
@@ -359,9 +373,24 @@ class _Handler(BaseHTTPRequestHandler):
         service, session = self._session()
         return service.traffic.record(session.node_id, self._model(StatsReport))
 
-    def agent_blob(self, _match: re.Match[str]) -> Any:
+    def agent_blob(self, match: re.Match[str]) -> Any:
         self._session()
-        raise ServiceError("not_found", "Unknown blob.", 404)
+        blobs = self.server.blobs
+        path = blobs.path(match[1]) if blobs is not None else None
+        if blobs is None or path is None:
+            if blobs is not None:
+                blobs.missed(match[1])
+            raise ServiceError("not_found", "Unknown blob.", 404)
+        # Streamed from disk: an Xray archive is tens of megabytes.
+        with path.open("rb") as handle:
+            size = path.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(size))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            shutil.copyfileobj(handle, self.wfile, 1 << 16)
+        return None
 
     # -- subscriptions -----------------------------------------------------------------------
 
@@ -431,7 +460,9 @@ def serve(config_path: Path) -> None:
     config = ServiceConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
     state_dir = Path(config.state_dir)
     service = ControlService(state_dir / "control.db", fleet_id=config.fleet_id, version=__version__)
-    server = ControlServer((config.listen_host, config.listen_port), service, config.admin_token_sha256)
+    blobs = BlobStore(state_dir / "blobs")
+    blobs.want(artifact for spec in service.node_specs() for artifact in spec_artifacts(spec))
+    server = ControlServer((config.listen_host, config.listen_port), service, config.admin_token_sha256, blobs)
     stop = threading.Event()
     threading.Thread(target=_enforce_forever, args=(service, stop), daemon=True).start()
     try:

@@ -9,23 +9,21 @@ VLESS inbound) and one user, then prints one JSON line: the agent bootstrap (a
 fresh enrollment token, the CA pin, and a plain-HTTP loopback `service_url` the
 agent accepts only in tests) and the user's `user_id`. Each line on stdin is a
 command answered with one JSON line: `traffic` (`GET /api/traffic`), `node` (the
-node's status), or `user NAME` (adds a user); end of input stops the service. The service has no blob store yet, so this
-script adds a blob route for the fake Xray binary the spec pins.
+node's status), or `user NAME` (adds a user); end of input stops the service. The fake
+Xray binary the spec pins is seeded into the service's real blob store, which the
+agent fetches through `blobs/{sha256}`.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
 import sys
 import threading
 from pathlib import Path
-from typing import Any
 
-from meridian.control import server as control_server
+from meridian.control.blobs import BlobStore
 from meridian.control.enrollment import token_sha256
-from meridian.control.errors import ServiceError
 from meridian.control.models import NodeSpec, users_resource_id
 from meridian.control.server import ControlServer
 from meridian.control.service import ControlService
@@ -82,18 +80,13 @@ def _spec() -> NodeSpec:
     )
 
 
-def _blob(handler: Any, match: re.Match[str]) -> None:
-    handler._session()
-    if match[1] != hashlib.sha256(XRAY).hexdigest():
-        raise ServiceError("not_found", "Unknown blob.", 404)
-    handler._send(200, "application/octet-stream", XRAY)
-
-
 def main() -> None:
-    control_server.ROUTES.insert(0, ("GET", re.compile(r"/agent/v1/blobs/([0-9a-f]{64})"), None, _blob))
     workdir = Path(sys.argv[1])
     service = ControlService(workdir / "control.db", fleet_id=FLEET_ID, version="4.0.0")
-    server = ControlServer(("127.0.0.1", 0), service, token_sha256("admin-token-for-tests-only-0123456789"))
+    blobs = BlobStore(workdir / "blobs")
+    blobs.put(XRAY)
+    admin = token_sha256("admin-token-for-tests-only-0123456789")
+    server = ControlServer(("127.0.0.1", 0), service, admin, blobs)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     user = service.put_user("alice")
     service.put_node_spec(NODE_ID, _spec())

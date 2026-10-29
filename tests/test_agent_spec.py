@@ -62,3 +62,11 @@ def test_local_reality_keys_are_a_matching_x25519_pair() -> None:
     assert "=" not in keys.private_key + keys.public_key
     assert private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw) == _raw(keys.public_key)
     assert len(bytes.fromhex(keys.short_id)) == 4
+
+
+def test_pins_try_github_first_then_the_control_service_mirror() -> None:
+    spec = build_node_spec(_profile(), LocalRealityKeyFactory()("srv-a"))
+    pins = [item.sources for item in spec.resources if item.kind == "binary_pin"]  # type: ignore[union-attr]
+
+    assert pins and all(sources[0].startswith("https://github.com/") for sources in pins)
+    assert all(sources[-1] == "service" for sources in pins)

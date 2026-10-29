@@ -8,6 +8,7 @@ _RENDERER_MANIFEST = {
     "schema": "meridian.renderer-contract/v1",
     "compiler": COMPILER_VERSION,
     "agent-runtime": "staged-upgrade-v1",
+    "agent-spec": "service-blob-v1",
     "pwa": "support-page-v9",
     "firewall": "ufw-comment-v2",
     "nginx": "upload-size-v9",
