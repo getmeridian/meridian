@@ -52,6 +52,15 @@ def test_an_imported_user_keeps_their_link_credentials(service: ControlService) 
     assert service.subscription(ALICE_SHORT).status == 200
 
 
+def test_an_uppercase_uuid_stays_the_hysteria2_password_it_was(service: ControlService) -> None:
+    service.import_users(UserImportBatch(users=[_alice(uuid=ALICE_UUID.upper())]))
+
+    assert service.get_user("alice").uuid == ALICE_UUID.upper()  # type: ignore[union-attr]
+    with pytest.raises(ServiceError) as error:
+        service.import_users(UserImportBatch(users=[_bob(uuid=ALICE_UUID)]))
+    assert error.value.status == 409
+
+
 def test_imported_use_counts_toward_the_limit(service: ControlService) -> None:
     imported = _alice(traffic_limit_bytes=10 * GB, used_traffic_bytes=10 * GB, lifetime_traffic_bytes=40 * GB)
     service.import_users(UserImportBatch(users=[imported]))

@@ -341,17 +341,18 @@ class ControlService:
         with self._transaction():
             now = utc_now()
             for item in batch.users:
-                uuid, sub_token = item.uuid.lower(), item.sub_token
+                # Kept as given: Hysteria2 authenticates with the exact string (VLESS parses it either way).
+                uuid, sub_token = item.uuid, item.sub_token
                 existing = self.get_user(item.username)
                 if existing is not None:
-                    if (existing.uuid, existing.sub_token) != (uuid, sub_token):
+                    if (existing.uuid.lower(), existing.sub_token) != (uuid.lower(), sub_token):
                         raise ServiceError(
                             "conflict", f"User {item.username!r} already exists with other credentials.", 409
                         )
                     unchanged.append(item.username)
                     continue
                 holder = self._db.execute(
-                    "SELECT username FROM users WHERE uuid = ? OR sub_token = ?", (uuid, sub_token)
+                    "SELECT username FROM users WHERE lower(uuid) = ? OR sub_token = ?", (uuid.lower(), sub_token)
                 ).fetchone()
                 if holder is not None:
                     raise ServiceError(
