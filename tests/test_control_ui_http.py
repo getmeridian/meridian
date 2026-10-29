@@ -469,13 +469,18 @@ def test_only_dot_segments_are_refused_as_usernames(fleet: Fleet, username: str,
 # -- checks that must still hold when the write lands ----------------------------------------------
 
 
-def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet) -> None:
-    """The apply creates its people while its revision is still approved, before it records applied."""
+@pytest.mark.parametrize("outcome", ["approved", "failed"])
+def test_a_person_an_apply_is_declaring_stays_the_clis(fleet: Fleet, outcome: str) -> None:
+    """The apply creates its people while its revision is still approved, before it records applied; one
+    that failed elsewhere still declares them, and the CLI's retry reuses their credentials."""
     fleet.set_up()
+    _declare(fleet.service, "erin")
     proposal = RevisionProposal(intent={"access": {"users": ["dave"]}}, plan_hash="1" * 64, review_hash="2" * 64)
     number = fleet.service.revisions.propose(proposal, caller=ROOT).number
     fleet.service.revisions.approve(number, caller=ROOT)
     fleet.service.put_user("dave")
+    if outcome == "failed":
+        fleet.service.revisions.record_result(number, RevisionResult(status="failed", detail="an exit failed"))
     for method, path in (("POST", "/api/users/dave/reissue"), ("DELETE", "/api/users/dave")):
         refused = fleet.ui(method, path, {} if method == "POST" else None)
         assert refused.status == 409 and refused.body["error"]["code"] == "declared_user"

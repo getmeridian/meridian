@@ -38,17 +38,17 @@ def declared_users(intent: dict[str, Any]) -> list[str]:
 
 
 def is_declared(service: ControlService, username: str) -> bool:
-    """Declared by the newest applied revision or by one in flight after it.
+    """Declared by the newest applied revision or by any revision after it.
 
     An apply creates its people while its revision is still approved, so the applied
-    intent alone would leave them to the console until the apply finished.
+    intent alone would leave them to the console until the apply finished; one that
+    failed elsewhere has still created them, and the CLI's retry reuses their links.
     """
     for summary in service.revisions.list_revisions().revisions:
-        if summary.status in ("proposed", "approved"):
-            if username in declared_users(service.revisions.get(summary.number).intent):
-                return True
-        elif summary.status == "applied":
-            return username in declared_users(service.revisions.get(summary.number).intent)
+        if username in declared_users(service.revisions.get(summary.number).intent):
+            return True
+        if summary.status == "applied":
+            return False
     return False
 
 
