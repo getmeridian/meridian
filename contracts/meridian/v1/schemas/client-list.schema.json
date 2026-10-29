@@ -48,6 +48,11 @@
           "title": "Created At",
           "type": "string"
         },
+        "expires_at": {
+          "description": "UTC timestamp; empty means never.",
+          "title": "Expires At",
+          "type": "string"
+        },
         "id": {
           "title": "Id",
           "type": "string"
@@ -61,8 +66,14 @@
           "type": "string"
         },
         "traffic_limit_bytes": {
+          "description": "0 means unlimited.",
           "title": "Traffic Limit Bytes",
           "type": "integer"
+        },
+        "traffic_reset": {
+          "description": "When used traffic starts again from zero: never, day, week, month, or the panel-only month_rolling (monthly from the day the client was created).",
+          "title": "Traffic Reset",
+          "type": "string"
         },
         "traffic_used_bytes": {
           "title": "Traffic Used Bytes",
@@ -79,6 +90,8 @@
         "status",
         "traffic_used_bytes",
         "traffic_limit_bytes",
+        "traffic_reset",
+        "expires_at",
         "created_at",
         "last_seen"
       ],

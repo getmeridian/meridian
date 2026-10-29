@@ -8,6 +8,7 @@ from urllib.parse import quote
 import httpx
 
 from .models import (
+    NEVER_EXPIRES_AT,
     PROFILE_TITLE_HEADER,
     PROFILE_UPDATE_INTERVAL_HEADER,
     ConfigProfile,
@@ -206,7 +207,7 @@ class ControlPlaneMixin:
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
-        expire_at: str = "2099-12-31T23:59:59.000Z",
+        expire_at: str = NEVER_EXPIRES_AT,
     ) -> User:
         body: dict[str, Any] = {
             "username": username,
@@ -244,7 +245,7 @@ class ControlPlaneMixin:
         *,
         squad_uuids: list[str],
         external_squad_uuid: str = "",
-        expire_at: str = "2099-12-31T23:59:59.000Z",
+        expire_at: str = NEVER_EXPIRES_AT,
     ) -> User:
         body: dict[str, Any] = {
             "username": username,

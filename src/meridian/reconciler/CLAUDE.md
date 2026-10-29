@@ -24,7 +24,7 @@
 
 - **Raise `UnknownResourceOutcome` for an uncertain mutation** (a timeout or SSH exit 255) — never catch it as an ordinary failure or retry it through `StallRetry`; the executor observes before any retry. Only transport loss marks evidence retryable.
 - **Unavailable evidence is not drift** — SSH/tool/panel failures stop reconciliation; only completed inspections prove absence, and read-only observation never allocates workload secrets.
-- **Access users are partly operator-owned** — manage only username and squads; status, description, limits, and quotas are the operator's (rewriting them undid `client disable`).
+- **Access users are partly operator-owned** — manage only username and squads (the control service's user driver only creates); status, description, limits, expiry, and quotas are the operator's (rewriting them undid `client disable`).
 - **Server inbounds sniff route-only** — the panel's Torrent Blocker plugin sees BitTorrent only through sniffing; keep `routeOnly` so destinations are never rewritten.
 - **Always render Reality `minClientVer`** — Xray 26.7.11+ otherwise rejects Mihomo/sing-box (they announce 1.8.x), and Meridian's own Xray-based `test` never notices.
 - **Inbounds are Profile-derived** — update the aggregate Profile, then observe each profile-scoped tag and UUID; there is no standalone Inbound mutation.

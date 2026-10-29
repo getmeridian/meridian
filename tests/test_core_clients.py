@@ -25,6 +25,8 @@ class PanelUser:
     status: str = "ACTIVE"
     used_traffic_bytes: int = 1024
     traffic_limit_bytes: int = 2048
+    traffic_limit_strategy: str = "MONTH"
+    expire_at: str = "2026-12-31T23:59:59.000Z"
     created_at: str = "2026-04-01T12:00:00Z"
     online_at: str = "2026-04-02T12:00:00Z"
 
@@ -81,6 +83,7 @@ def test_client_show_result_carries_handoff_links_outside_the_client_record() ->
     data = result.to_data()
 
     assert data["client"]["username"] == "alice"
+    assert (data["client"]["traffic_reset"], data["client"]["expires_at"]) == ("month", "2026-12-31T23:59:59Z")
     assert "share_url" not in data["client"]
     assert "subscription_url" not in data["client"]
     assert data["handoff"] == {

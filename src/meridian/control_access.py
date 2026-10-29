@@ -2,7 +2,8 @@
 
 `client` commands, connection pages, and `meridian test` read and change users
 through a small panel subset (`get_user`, `list_users`, `fetch_subscription`,
-`enable_user`, `disable_user`, `revoke_user_subscription`). This adapter answers
+`enable_user`, `disable_user`, `update_user_limits`, `reset_user_traffic`,
+`revoke_user_subscription`). This adapter answers
 it from the control service with Remnawave's types and errors, so those paths
 keep one implementation until the panel is removed (#95).
 """
@@ -16,7 +17,8 @@ from typing import Self, TypeVar
 
 from meridian.cluster import ClusterConfig
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
-from meridian.control.models import UserRecord, UserUpdate
+from meridian.control.models import LimitStrategy, UserRecord, UserUpdate
+from meridian.core.client_limits import ClientLimitChange, TrafficReset
 from meridian.core.fleet import FleetTopology
 from meridian.remnawave import (
     XRAY_JSON_CLIENT_TYPE,
@@ -31,6 +33,12 @@ from meridian.remnawave import (
 )
 
 T = TypeVar("T")
+_RESET_STRATEGIES: dict[TrafficReset, LimitStrategy] = {
+    "never": "no_reset",
+    "day": "day",
+    "week": "week",
+    "month": "month",
+}
 
 
 class ServiceAccessPanel:
@@ -65,6 +73,23 @@ class ServiceAccessPanel:
     def disable_user(self, user_id: str) -> None:
         self._update(user_id, UserUpdate(status="disabled"))
 
+    def update_user_limits(self, user_id: str, change: ClientLimitChange) -> User:
+        """Set the limits the change names; the service lifts `limited`/`expired` once they allow the user."""
+        fields: dict[str, object] = {}
+        if change.traffic_limit_bytes is not None:
+            fields["traffic_limit_bytes"] = change.traffic_limit_bytes
+        if change.traffic_reset is not None:
+            fields["traffic_limit_strategy"] = _RESET_STRATEGIES[change.traffic_reset]
+        if change.sets_expiry:
+            fields["expire_at"] = change.expires_at  # None clears the expiry
+        username = self._username(user_id)
+        update = UserUpdate.model_validate(fields)
+        return self._user(_translated(lambda: self._client.update_user(username, update)))
+
+    def reset_user_traffic(self, user_id: str) -> User:
+        username = self._username(user_id)
+        return self._user(_translated(lambda: self._client.reset_user_traffic(username)))
+
     def revoke_user_subscription(self, user_id: str) -> User:
         username = self._username(user_id)
         return self._user(_translated(lambda: self._client.reissue_user(username)))
@@ -90,6 +115,8 @@ class ServiceAccessPanel:
             status=record.status.upper(),
             used_traffic_bytes=record.used_traffic_bytes,
             traffic_limit_bytes=record.traffic_limit_bytes,
+            traffic_limit_strategy=record.traffic_limit_strategy.upper(),
+            expire_at=record.expire_at or "",
             created_at=record.created_at,
             online_at=record.online_at or "",
         )

@@ -18,6 +18,9 @@ PROFILE_UPDATE_INTERVAL_HEADER = "profile-update-interval"
 # app then showed, so Meridian replaces it (an operator's own link stays).
 SUPPORT_URL_HEADER = "support-url"
 SEEDED_SUPPORT_URL = "https://dummy.docs.rw"
+# Remnawave requires an expiry on every user; Meridian's "never" (read back as never by
+# `core.client_limits.canonical_expiry`).
+NEVER_EXPIRES_AT = "2099-12-31T23:59:59.000Z"
 _RW_ENCODE_BASE64 = "rwEncodeBase64:"
 _BASE64_RESULT = "base64:"
 
@@ -54,6 +57,8 @@ class User:
     status: str = ""  # "ACTIVE", "DISABLED", "LIMITED", "EXPIRED"
     used_traffic_bytes: int = 0
     traffic_limit_bytes: int = 0
+    traffic_limit_strategy: str = ""  # "NO_RESET", "DAY", "WEEK", "MONTH", "MONTH_ROLLING"
+    expire_at: str = ""  # Meridian's "never" is NEVER_EXPIRES_AT
     created_at: str = ""
     online_at: str = ""
     sub_revoked_at: str = ""
@@ -264,6 +269,8 @@ def parse_user(data: Any) -> User:
         status=str(raw.get("status") or ""),
         used_traffic_bytes=int(traffic.get("usedTrafficBytes") or 0),
         traffic_limit_bytes=int(raw.get("trafficLimitBytes") or 0),
+        traffic_limit_strategy=str(raw.get("trafficLimitStrategy") or ""),
+        expire_at=str(raw.get("expireAt") or ""),
         created_at=str(raw.get("createdAt") or ""),
         online_at=str(traffic.get("onlineAt") or ""),
         sub_revoked_at=str(raw.get("subRevokedAt") or ""),

@@ -7,6 +7,7 @@ from typing import Literal, Protocol, Sequence
 
 from pydantic import Field
 
+from meridian.core.client_limits import canonical_expiry, traffic_reset_from_strategy
 from meridian.core.models import CoreModel
 
 
@@ -33,6 +34,12 @@ class PanelUserLike(Protocol):
     def traffic_limit_bytes(self) -> int: ...
 
     @property
+    def traffic_limit_strategy(self) -> str: ...
+
+    @property
+    def expire_at(self) -> str: ...
+
+    @property
     def created_at(self) -> str: ...
 
     @property
@@ -46,7 +53,12 @@ class ClientRecord(CoreModel):
     id: str
     status: str
     traffic_used_bytes: int
-    traffic_limit_bytes: int
+    traffic_limit_bytes: int = Field(description="0 means unlimited.")
+    traffic_reset: str = Field(
+        description="When used traffic starts again from zero: never, day, week, month, or the panel-only "
+        "month_rolling (monthly from the day the client was created).",
+    )
+    expires_at: str = Field(description="UTC timestamp; empty means never.")
     created_at: str
     last_seen: str
 
@@ -144,6 +156,12 @@ class ClientStatusResult(CoreModel):
     client: ClientStatus
 
 
+class ClientLimitsResult(CoreModel):
+    """Result for changing a client's limits or resetting their traffic: the client as the panel now has it."""
+
+    client: ClientRecord
+
+
 def build_client_record(user: PanelUserLike) -> ClientRecord:
     """Build a redacted client record from a panel user object."""
     return ClientRecord(
@@ -152,6 +170,8 @@ def build_client_record(user: PanelUserLike) -> ClientRecord:
         status=user.status,
         traffic_used_bytes=user.used_traffic_bytes,
         traffic_limit_bytes=user.traffic_limit_bytes,
+        traffic_reset=traffic_reset_from_strategy(user.traffic_limit_strategy),
+        expires_at=canonical_expiry(user.expire_at),
         created_at=user.created_at,
         last_seen=user.online_at,
     )
@@ -244,3 +264,8 @@ def build_client_remove_result(username: str) -> ClientRemoveResult:
 def build_client_status_result(username: str, status: ClientMutationStatus) -> ClientStatusResult:
     """Build the stable result returned after changing one client status."""
     return ClientStatusResult(client=ClientStatus(username=username, status=status))
+
+
+def build_client_limits_result(user: PanelUserLike) -> ClientLimitsResult:
+    """Build the result returned after changing one client's limits or resetting their traffic."""
+    return ClientLimitsResult(client=build_client_record(user))
