@@ -24,6 +24,7 @@
 - A proposal whose intent has a secret-shaped key or value (`secret_paths()`, keys per `core.redaction`) is refused, never stored.
 
 ## Pitfalls
+- nginx answers 502/503/504 for a stopped or hung service — `ControlClient` raises those as retryable unreachable errors; as plain refusals, a stopped ctld failed the fence at once with "refused: HTTP 502".
 - `serve` is a daemon: the root callback skips the beta banner and the update check for it (it once printed the banner into journald and phoned out on every start).
 - Decode the path before routing — `ControlClient` percent-encodes IDs, so `:` in endpoint IDs arrives as `%3A` and every endpoint PUT 404'd.
 - Compare timestamps parsed, never as strings — the contract allows fractional seconds, and `…:00.5Z` sorts before `…:00Z`.

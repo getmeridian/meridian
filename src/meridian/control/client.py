@@ -35,6 +35,8 @@ from meridian.control.models import (
 )
 from meridian.core.errors import MeridianError
 
+_GATEWAY_FAILURES = frozenset({502, 503, 504})
+
 
 class ControlServiceError(MeridianError):
     """The control service refused a request or could not be reached."""
@@ -230,6 +232,14 @@ class ControlClient:
                 "The control service refused the saved admin token.",
                 hint="Restore the fleet's saved credentials (cluster.yml) or redeploy the control server.",
                 category="user",
+            )
+        if response.status_code in _GATEWAY_FAILURES:
+            # nginx answers for a stopped or hung service: unreachable, not a refusal.
+            raise ControlServiceError(
+                f"The control service did not answer (HTTP {response.status_code} from the control server's proxy).",
+                hint="Check the service: meridian check; on the server, systemctl status ctld.",
+                category="system",
+                retryable=True,
             )
         if response.status_code >= 400:
             raise ControlServiceError(

@@ -6,12 +6,13 @@ import threading
 from collections.abc import Iterator
 from pathlib import Path
 
+import httpx
 import pytest
 
 from meridian.adapters.cluster import topology_from_cluster
 from meridian.cluster import ClusterConfig
 from meridian.connectivity import create_verification_panel, select_active_client, verification_panel_factory
-from meridian.control.client import ControlClient, ControlServiceAuthError
+from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
 from meridian.control.enrollment import token_sha256
 from meridian.control.models import ClientEndpoint, NodeSpec
 from meridian.control.server import ControlServer
@@ -182,3 +183,17 @@ def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(se
     assert isinstance(panel, ServiceFleetPanel)
     cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
     assert isinstance(fleet_panel(cluster, topology), MeridianPanel)
+
+
+@pytest.mark.parametrize("status", [502, 503, 504])
+def test_a_proxy_answering_for_a_stopped_service_is_unreachable_not_a_refusal(status: int) -> None:
+    client = ControlClient("https://198.51.100.10/secret", ADMIN_TOKEN)
+    client._client = httpx.Client(
+        base_url="https://198.51.100.10/secret/", transport=httpx.MockTransport(lambda _request: httpx.Response(status))
+    )
+
+    with client, pytest.raises(ControlServiceError) as error:
+        client.health()
+
+    assert (error.value.retryable, error.value.category) == (True, "system")
+    assert "did not answer" in str(error.value)
