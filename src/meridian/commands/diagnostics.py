@@ -20,29 +20,16 @@ from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.checks import command_evidence_unavailable
 from meridian.diagnostics.logs import NGINX_ERROR_LOG
 from meridian.facts import ServerFacts
-from meridian.host_runtime import NODE, container_role
+from meridian.host_runtime import AGENT_UNIT, CONTROL_SERVICE_UNIT, CORE_BINARY, CORE_UNIT
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult, ServerConnection, SSHError
 from meridian.verification import DeploymentVerificationContext, deployment_verification_context
 
-# The node container's current name, or its pre-rename one on a server not yet migrated.
-_NODE_CONTAINER = (
-    "\"$(docker inspect --type container --format '{{.Name}}' "
-    f'{shlex.quote(NODE.name)} {shlex.quote(NODE.legacy)} 2>/dev/null | head -1 | tr -d /)"'
-)
-# The node image ships no pgrep, so ask Docker for the container's processes from the host.
-# Xray runs as rw-core; match the binary, not the s6 supervisor that keeps running without it.
-XRAY_PID_COMMAND = (
-    f"docker top {_NODE_CONTAINER} -o pid,args 2>/dev/null | awk '$2 ~ /(^|\\/)(rw-core|xray)$/ {{print $1; exit}}'"
-)
-# Node logs carry raw bytes; without -a grep calls them binary and prints nothing.
-NODE_LOG_COMMAND = f"docker logs {_NODE_CONTAINER} --tail 50 2>&1 | grep -a -v '^\\s*$' | sort -u | tail -20"
-
-
-def container_roles(names: str) -> str:
-    """Name each Meridian container's role (the neutral names say nothing); empty when none run."""
-    lines = [f"{name}: {container_role(name)}" for name in names.split() if container_role(name)]
-    return "Container roles:\n" + "\n".join(lines) if lines else ""
+# What doctor shows of Meridian's own units: state and the running core's PID.
+SERVICE_UNITS = (CONTROL_SERVICE_UNIT, AGENT_UNIT, CORE_UNIT)
+UNIT_STATE_COMMAND = "systemctl is-active " + " ".join(shlex.quote(unit) for unit in SERVICE_UNITS) + " 2>&1"
+XRAY_PID_COMMAND = f"systemctl show -p MainPID --value {shlex.quote(CORE_UNIT)} 2>/dev/null"
+NODE_LOG_COMMAND = f"journalctl --no-pager -o short-iso -u {AGENT_UNIT} -u {CORE_UNIT} -n 20 2>&1"
 
 
 class _EvidenceConnection:
@@ -225,7 +212,6 @@ def run(
         f"Free disk: {facts.free_disk_mb('/') or 'unknown'} MB",
         f"Docker: {'installed' if docker.installed else 'not installed'}"
         + (f" ({docker.version})" if docker.version else ""),
-        f"Docker compose: {'available' if docker.compose_available else 'missing'}",
         f"UFW: {'active' if ufw.active else 'inactive' if ufw.installed else 'not installed'}",
     ]
     sections.append(("Server Facts", "\n".join(fact_parts)))
@@ -239,34 +225,25 @@ def run(
     ]
     sections.append(("Server", "\n".join(server_parts)))
 
-    docker_parts = [
-        _collect("docker --version 2>&1", fallback="not installed"),
-        _collect("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>&1", fallback="no containers"),
-    ]
-    names = evidence_conn.run("docker ps -a --format '{{.Names}}' 2>/dev/null", timeout=10).stdout
-    if legend := container_roles(names):
-        docker_parts.append(legend)
-    sections.append(("Docker", "\n".join(docker_parts)))
+    sections.append(("Services", _collect(UNIT_STATE_COMMAND, fallback="systemctl not available")))
 
     if not xray_expected:
         xray_status = "not expected for this server's configured roles"
     else:
         xray_pid_raw = evidence_conn.run(XRAY_PID_COMMAND, timeout=10).stdout.strip()
-        if xray_pid_raw:
+        if xray_pid_raw and xray_pid_raw != "0":
             xray_status = f"running (PID {xray_pid_raw.splitlines()[0]})"
         else:
             xray_status = "NOT RUNNING - proxy traffic is not flowing"
     sections.append(("Xray Process", xray_status))
 
     if xray_expected:
-        sections.append(
-            ("Xray Version", _collect(f"docker exec {_NODE_CONTAINER} rw-core version 2>/dev/null", timeout=15))
-        )
+        sections.append(("Xray Version", _collect(f"{shlex.quote(CORE_BINARY)} version 2>/dev/null", timeout=15)))
 
     if xray_expected:
-        xray_logs = evidence_conn.run(NODE_LOG_COMMAND, timeout=15).stdout.strip() or "container not running"
+        xray_logs = evidence_conn.run(NODE_LOG_COMMAND, timeout=15).stdout.strip() or "no entries"
         xray_logs = redact_diagnostic_text(xray_logs, known_secrets)
-        sections.append((f"{NODE.role} Logs", f"$ {NODE_LOG_COMMAND}\n{xray_logs}"))
+        sections.append(("Node Logs", f"$ {NODE_LOG_COMMAND}\n{xray_logs}"))
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:
@@ -302,10 +279,6 @@ def run(
     sections.append(("Listening Ports", _collect(listener_command)))
 
     sections.append(("Firewall (UFW)", _collect("ufw status verbose 2>&1", fallback="ufw not available")))
-
-    if xray_expected:
-        geo_status = "managed by Remnawave (check panel settings)"
-        sections.append(("Geo-blocking", geo_status))
 
     if xray_expected:
         sni_host = sni or saved_sni or DEFAULT_SNI
