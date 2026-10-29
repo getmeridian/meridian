@@ -368,6 +368,57 @@ def test_password_change_ends_every_other_session(owner: OwnerAuth) -> None:
         owner.authenticate(second)
 
 
+def test_a_reset_while_the_old_password_hashes_opens_no_session(
+    owner: OwnerAuth, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The hash runs outside the store lock; a session written later trusted a password already replaced."""
+    set_up(owner)
+    reset = owner.issue_setup_link(reset=True)
+
+    def verify_then_reset(password: str, stored: str) -> bool:
+        matched = verify_password(password, stored)
+        owner.complete_setup(reset.token, "a brand new passphrase")
+        return matched
+
+    monkeypatch.setattr(owner_module, "verify_password", verify_then_reset)
+    with pytest.raises(ServiceError) as refused:
+        owner.login(PASSWORD, "")
+    assert refused.value.code == "wrong_credentials"
+    with sqlite3.connect(tmp_path / "control.db") as db:
+        assert db.execute("SELECT COUNT(*) FROM ui_sessions").fetchone() == (1,)  # only the reset's own
+
+
+def test_a_session_ended_while_confirming_stays_ended(owner: OwnerAuth, monkeypatch: pytest.MonkeyPatch) -> None:
+    session = owner.authenticate(set_up(owner))
+
+    def verify_then_sign_out(password: str, stored: str) -> bool:
+        owner.logout(session)
+        return verify_password(password, stored)
+
+    monkeypatch.setattr(owner_module, "verify_password", verify_then_sign_out)
+    with pytest.raises(ServiceError) as refused:
+        owner.confirm(session, PASSWORD, "")
+    assert refused.value.code == "unauthenticated"
+
+
+def test_a_session_ended_while_its_new_password_hashes_changes_nothing(
+    owner: OwnerAuth, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = owner.authenticate(set_up(owner))
+    other = owner.login(PASSWORD, "").token
+
+    def hash_then_revoke(password: str) -> str:
+        owner.revoke_others(owner.authenticate(other))
+        return hash_password(password)
+
+    monkeypatch.setattr(owner_module, "hash_password", hash_then_revoke)
+    with pytest.raises(ServiceError) as refused:
+        owner.change_password(session, "another passphrase")
+    assert refused.value.code == "unauthenticated"
+    owner.authenticate(other)  # the revoked session did not sign out the live one
+    assert owner.login(PASSWORD, "").token
+
+
 # -- sessions ---------------------------------------------------------------------------------
 
 

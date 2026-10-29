@@ -25,7 +25,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeVar
 
 from meridian.control.enrollment import token_sha256
 from meridian.control.errors import ServiceError
@@ -45,6 +45,7 @@ from meridian.control.times import format_timestamp
 from meridian.control.tokens import unauthenticated
 from meridian.control.ui_models import SessionInfo, SessionList
 
+T = TypeVar("T")
 SETUP_LINK_SECONDS = 15 * 60
 IDLE_SECONDS = 30 * 60
 ABSOLUTE_SECONDS = 12 * 60 * 60
@@ -179,20 +180,27 @@ class OwnerAuth:
     # -- sign-in -----------------------------------------------------------------------
 
     def login(self, password: str, code: str) -> OwnerSession:
-        self._verify(password, code, bucket=OWNER_BUCKET)
-        with self._store.transaction():
-            return self._new_session(self._now())
+        return self._verify(password, code, bucket=OWNER_BUCKET, then=self._new_session)
 
     def confirm(self, session: OwnerSession, password: str, code: str) -> None:
         """Prove the owner is still at the keyboard; sensitive changes need it within `CONFIRM_SECONDS`."""
-        self._verify(password, code, bucket=session_bucket(session))
-        with self._store.transaction():
-            self._store.db.execute(
-                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ?", (self._now(), session.session_id)
-            )
 
-    def _verify(self, password: str, code: str, *, bucket: str) -> None:
-        """Check password and code together; any failure counts once and reads the same."""
+        def mark(now: int) -> None:
+            cursor = self._store.db.execute(
+                "UPDATE ui_sessions SET confirmed_at = ? WHERE session_id = ?", (now, session.session_id)
+            )
+            if cursor.rowcount != 1:
+                raise unauthenticated()  # signed out (or reset) while the password hashed
+
+        self._verify(password, code, bucket=session_bucket(session), then=mark)
+
+    def _verify(self, password: str, code: str, *, bucket: str, then: Callable[[int], T]) -> T:
+        """Check password and code together and, in the same transaction, run `then`; any failure reads the same.
+
+        The hash runs outside the store lock, so the transaction also checks that the
+        password it was compared with is still the owner's: a reset or change that
+        landed meanwhile must not let the old password open a session.
+        """
         with self.limiter.turn(bucket):
             row = self._owner()
             if row is None:
@@ -200,16 +208,19 @@ class OwnerAuth:
             password_ok = verify_password(password, str(row["password_hash"]))
             with self._store.transaction():
                 owner = self._owner()
+                current = owner is not None and owner["password_hash"] == row["password_hash"]
                 secret = owner["totp_secret"] if owner is not None else None
                 step = None
                 if owner is not None and secret:
                     step = totp_match(str(secret), code, now=self._clock(), last_step=owner["totp_last_step"])
-                if not password_ok or (secret and step is None):
+                if not (password_ok and current) or (secret and step is None):
                     self.limiter.failed(bucket)
                     raise wrong_credentials()
                 if step is not None:
                     self._store.db.execute("UPDATE ui_owner SET totp_last_step = ? WHERE id = 1", (step,))
+                result = then(self._now())
             self.limiter.succeeded(bucket)
+        return result
 
     # -- sessions ----------------------------------------------------------------------
 
@@ -269,7 +280,20 @@ class OwnerAuth:
     def require_recent(self, session: OwnerSession) -> None:
         """Refuse a sensitive change unless the owner confirmed their password within `CONFIRM_SECONDS`."""
         if self._now() - session.confirmed_at > CONFIRM_SECONDS:
-            raise ServiceError("reauth_required", "Confirm your password to continue.", 403)
+            raise _reauth_required()
+
+    def _hold_recent(self, session: OwnerSession) -> None:
+        """Inside the change's transaction: the session still exists and was confirmed recently.
+
+        `require_recent` judged the session as it was read; a sign-out, a reset, or
+        another device's password change may have ended it since (while a new password
+        hashed, say), and an ended session must change nothing.
+        """
+        row = self._store.row("SELECT confirmed_at FROM ui_sessions WHERE session_id = ?", (session.session_id,))
+        if row is None:
+            raise unauthenticated()
+        if self._now() - int(row["confirmed_at"]) > CONFIRM_SECONDS:
+            raise _reauth_required()
 
     # -- password and TOTP -------------------------------------------------------------
 
@@ -282,6 +306,7 @@ class OwnerAuth:
             raise ServiceError("weak_password", str(exc), 400) from exc
         now = self._now()
         with self._store.transaction():
+            self._hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET password_hash = ?, password_changed_at = ? WHERE id = 1", (password_hash, now)
             )
@@ -292,6 +317,7 @@ class OwnerAuth:
         self.require_recent(session)
         secret = new_totp_secret()
         with self._store.transaction():
+            self._hold_recent(session)
             if self._owner() is None:
                 raise ServiceError("setup_required", "The web UI has no owner yet.", 409)
             self._store.db.execute("UPDATE ui_owner SET totp_pending = ? WHERE id = 1", (secret,))
@@ -301,6 +327,7 @@ class OwnerAuth:
         """Turn TOTP on once a code from the pending secret matches; other sessions end."""
         self.require_recent(session)
         with self.limiter.turn(session_bucket(session)), self._store.transaction():
+            self._hold_recent(session)
             owner = self._owner()
             pending = owner["totp_pending"] if owner is not None else None
             if not pending:
@@ -319,6 +346,7 @@ class OwnerAuth:
     def disable_totp(self, session: OwnerSession) -> None:
         self.require_recent(session)
         with self._store.transaction():
+            self._hold_recent(session)
             self._store.db.execute(
                 "UPDATE ui_owner SET totp_secret = NULL, totp_pending = NULL, totp_last_step = NULL WHERE id = 1"
             )
@@ -363,6 +391,10 @@ class OwnerAuth:
 def session_bucket(session: OwnerSession) -> str:
     """A signed-in browser's own guess bucket: failed sign-ins elsewhere never lock its re-checks."""
     return f"session:{session.session_id}"
+
+
+def _reauth_required() -> ServiceError:
+    return ServiceError("reauth_required", "Confirm your password to continue.", 403)
 
 
 def _dead_link() -> ServiceError:

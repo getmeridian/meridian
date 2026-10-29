@@ -17,6 +17,7 @@
 - The session cookie is scoped to `ServiceConfig.public_path` (the bootstrap writes it); without one sign-in is refused (`ui_unconfigured`), since a `/` cookie would ride every subscription request.
 - Guess limits are per bucket, never per source — every browser arrives as nginx's 127.0.0.1, and one shared source bucket let setup-link guesses lock sign-in and failed sign-ins lock a signed-in owner's re-check. Never trust a forwarded-address header.
 - Judge every guess inside `LoginLimiter.turn()` (check, hash, count) — checking the lock before the slow hash let every concurrent request pass it before the first failure counted.
+- Write what a password check grants (a session, `confirmed_at`, a new password) in the same transaction that re-reads the hash it was compared with and the session it acts for — the scrypt runs unlocked, so a reset or sign-out in between once still let the old password or an ended session through.
 - A setup link travels in the URL fragment (never sent to nginx) and `auth.js` strips it with `history.replaceState` before anything else renders.
 - An owner session is full admin; re-check the password (and code) before anything that hands out a credential (`OWNER_STEP_UP`), and keep the `ui_*` tables out of snapshots.
 - The fleet title is intent-owned today: `ServiceSettingsDriver` puts the deployer's back on the next apply, which the Settings screen says.
