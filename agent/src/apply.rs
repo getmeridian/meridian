@@ -81,8 +81,10 @@ pub(crate) enum Outcome {
 #[derive(Debug)]
 pub struct PassResult {
     pub observations: Vec<ResourceObservation>,
-    /// Every resource applied: the document counts as fully applied.
+    /// Every resource applied and everything vanished retired: the document counts as fully applied.
     pub converged: bool,
+    /// Ledger entries the document dropped whose retirement failed (retried next pass).
+    pub unretired: Vec<String>,
     /// Resource IDs that changed on the node in this pass.
     pub changed: BTreeSet<String>,
 }
@@ -249,6 +251,7 @@ impl Engine<'_> {
         }
 
         // Ledger order: leftovers whose retirement failed first, then document order.
+        let unretired: Vec<String> = retained.iter().map(|entry| entry.id.clone()).collect();
         let mut next: Vec<LedgerEntry> = retained;
         for resource in resources {
             if let Some(entry) = entries.remove(&resource.id) {
@@ -257,10 +260,12 @@ impl Engine<'_> {
         }
         *ledger = next;
         let _ = fs::remove_dir_all(&self.cache_dir);
-        let converged = observations.iter().all(|obs| obs.status == "applied");
+        let converged =
+            unretired.is_empty() && observations.iter().all(|obs| obs.status == "applied");
         PassResult {
             observations,
             converged,
+            unretired,
             changed,
         }
     }
@@ -311,9 +316,18 @@ impl Engine<'_> {
                     return Ok(());
                 }
                 fsutil::check_unit_name(&name)?;
-                // Stop and disable are best effort: the unit may already be gone.
-                let _ = self.systemctl(&["stop", &name]);
+                // The unit may already be gone, so their exit codes say little: what counts is
+                // that it no longer runs, checked before its file goes.
+                let stopped = self.systemctl(&["stop", &name]);
                 let _ = self.systemctl(&["disable", &name]);
+                let state = self.query("is-active", &name);
+                if matches!(
+                    state.as_str(),
+                    "active" | "activating" | "reloading" | "deactivating"
+                ) {
+                    let why = stopped.err().unwrap_or_else(|| format!("it is {state}"));
+                    return Err(format!("{name} still runs: {why}"));
+                }
                 fsutil::remove_if_present(&self.unit_path(&name)).map_err(|err| err.to_string())?;
                 self.systemctl(&["daemon-reload"]).map(|_| ())
             }

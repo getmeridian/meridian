@@ -86,6 +86,8 @@ pub struct FakeExec {
     pub calls: Mutex<Vec<String>>,
     pub units: Mutex<HashMap<String, UnitState>>,
     pub crashing: Mutex<HashSet<String>>,
+    /// Units `systemctl stop` cannot stop (they stay active and the call fails).
+    pub stuck: Mutex<HashSet<String>>,
     pub asset_dirs: Mutex<Vec<String>>,
     /// `xray api adu`/`rmu` fail (the agent must fall back to a restart).
     pub api_down: Mutex<bool>,
@@ -171,6 +173,9 @@ impl Exec for FakeExec {
                     "start" | "restart" => {
                         unit.active = !self.crashing.lock().unwrap().contains(&name);
                         ok("")
+                    }
+                    "stop" if self.stuck.lock().unwrap().contains(&name) => {
+                        fail("", "Job for unit failed: timed out\n")
                     }
                     "stop" => {
                         unit.active = false;

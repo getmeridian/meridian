@@ -594,9 +594,37 @@ fn vanished_resources_are_retired_dependents_first() {
         [
             "systemctl stop netfwd-a.service",
             "systemctl disable netfwd-a.service",
+            "systemctl is-active netfwd-a.service",
             "systemctl daemon-reload"
         ]
     );
     let ids: Vec<&str> = host.ledger.iter().map(|e| e.id.as_str()).collect();
     assert_eq!(ids, ["file:renamed"]);
+}
+
+#[test]
+fn a_unit_that_will_not_stop_keeps_the_document_unconverged() {
+    let mut host = Host::new(fetcher());
+    let kept = file_inline("file:kept", "/etc/netagent/kept.conf", b"kept");
+    let first = vec![
+        kept.clone(),
+        unit("unit:fwd", "netfwd-a.service", &["file:kept"], &[]),
+    ];
+    assert!(host.apply(&first).converged);
+    host.exec
+        .stuck
+        .lock()
+        .unwrap()
+        .insert("netfwd-a.service".into());
+
+    let pass = host.apply(std::slice::from_ref(&kept));
+    assert!(!pass.converged, "{:?}", pass.observations);
+    assert_eq!(pass.unretired, ["unit:fwd"]);
+    assert!(host.exists("/etc/systemd/system/netfwd-a.service"));
+    assert!(host.exec.unit("netfwd-a.service").active);
+
+    host.exec.stuck.lock().unwrap().clear();
+    let pass = host.apply(&[kept]);
+    assert!(pass.converged && pass.unretired.is_empty());
+    assert!(!host.exists("/etc/systemd/system/netfwd-a.service"));
 }
