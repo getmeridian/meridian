@@ -1,0 +1,264 @@
+{
+  "bootstrap": {
+    "protocol": "meridian.agent/v1",
+    "service_url": "https://198.51.100.10/s3cr3t-path",
+    "fleet_id": "0b6f3c1e-8f6a-4d2b-9c41-7a5e2d9f0c13",
+    "node_id": "exit-1",
+    "node_token": "ttttttttttttttttttttttttttttttttttttttttttt",
+    "service_public_key": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg="
+  },
+  "key_id": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+  "document": {
+    "protocol": "meridian.agent/v1",
+    "fleet_id": "0b6f3c1e-8f6a-4d2b-9c41-7a5e2d9f0c13",
+    "node_id": "exit-1",
+    "fleet_epoch": 3,
+    "revision": 7,
+    "sha256": "6eb3af99ae44cad2b09bdba03e4e32d881da3493936168132a848b98eddc4311",
+    "issued_at": "2026-10-29T12:00:00Z",
+    "resources": [
+      {
+        "id": "pin:xray",
+        "depends_on": [],
+        "kind": "binary_pin",
+        "name": "xray",
+        "version": "26.7.11",
+        "sources": [
+          "https://github.com/XTLS/Xray-core/releases/download/v26.7.11/Xray-linux-64.zip",
+          "service"
+        ],
+        "size": 12345,
+        "sha256": "abababababababababababababababababababababababababababababababab",
+        "archive": "zip",
+        "member": "xray",
+        "install_path": "/usr/local/lib/netagent/netcore",
+        "mode": "0755"
+      },
+      {
+        "id": "file:extra",
+        "depends_on": [],
+        "kind": "file",
+        "path": "/etc/netagent/extra.conf",
+        "mode": "0640",
+        "owner": "root",
+        "group": "root",
+        "size": 14,
+        "sha256": "e27189c4625a8ce7305f50b6cc8ffd07285bcc56afd27f7793ee5326f5dd7988",
+        "content_b64": "dG9rZW4gPSDDvGJlcgo=",
+        "sensitive": true
+      },
+      {
+        "id": "xray:config",
+        "depends_on": [
+          "pin:xray"
+        ],
+        "kind": "xray_config",
+        "path": "/etc/netagent/core.json",
+        "config": {
+          "log": {
+            "loglevel": "warning",
+            "note": "caf\u00e9 \u00ab\u00bb \"q\" \\ \n\r\t\b\f \u0000"
+          },
+          "inbounds": [
+            {
+              "tag": "vless-reality",
+              "port": 443,
+              "protocol": "vless",
+              "settings": {
+                "clients": [],
+                "decryption": "none"
+              }
+            }
+          ],
+          "outbounds": [
+            {
+              "protocol": "freedom",
+              "tag": "direct"
+            }
+          ]
+        },
+        "api_address": "127.0.0.1:10085"
+      },
+      {
+        "id": "users:vless-reality",
+        "depends_on": [
+          "xray:config"
+        ],
+        "kind": "xray_users",
+        "inbound_tag": "vless-reality",
+        "users": [
+          {
+            "user_id": "u-alpha",
+            "uuid": "3f0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
+            "flow": "xtls-rprx-vision"
+          }
+        ]
+      },
+      {
+        "id": "unit:netcore",
+        "depends_on": [
+          "xray:config",
+          "users:vless-reality"
+        ],
+        "kind": "systemd_unit",
+        "name": "netcore.service",
+        "content": "[Unit]\nDescription=Netcore \u00e9\u00e8 \u2713 \ud83d\udd12 \"quoted\" back\\slash\ttab\u0001\u001f\u007f\u2028\n[Service]\nExecStart=/usr/local/lib/netagent/netcore run -c /etc/netagent/core.json\n",
+        "enabled": true,
+        "state": "started",
+        "restart_on": [
+          "xray:config",
+          "users:vless-reality"
+        ]
+      },
+      {
+        "id": "fw:443",
+        "depends_on": [],
+        "kind": "firewall_rule",
+        "port": 443,
+        "protocol": "tcp",
+        "allow_from": []
+      }
+    ],
+    "signature": {
+      "key_id": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+      "signature": "uNDZ0/q8+w5FKjatNkQQBeE8PLPjvhLACVL5e32rg3TvKGzbeuHHtac6hVQmJwmWGFMlCAS57ZgvAIe6ZFdACg=="
+    }
+  },
+  "tampered": {
+    "protocol": "meridian.agent/v1",
+    "fleet_id": "0b6f3c1e-8f6a-4d2b-9c41-7a5e2d9f0c13",
+    "node_id": "exit-1",
+    "fleet_epoch": 3,
+    "revision": 7,
+    "sha256": "6eb3af99ae44cad2b09bdba03e4e32d881da3493936168132a848b98eddc4311",
+    "issued_at": "2026-10-29T12:00:01Z",
+    "resources": [
+      {
+        "id": "pin:xray",
+        "depends_on": [],
+        "kind": "binary_pin",
+        "name": "xray",
+        "version": "26.7.11",
+        "sources": [
+          "https://github.com/XTLS/Xray-core/releases/download/v26.7.11/Xray-linux-64.zip",
+          "service"
+        ],
+        "size": 12345,
+        "sha256": "abababababababababababababababababababababababababababababababab",
+        "archive": "zip",
+        "member": "xray",
+        "install_path": "/usr/local/lib/netagent/netcore",
+        "mode": "0755"
+      },
+      {
+        "id": "file:extra",
+        "depends_on": [],
+        "kind": "file",
+        "path": "/etc/netagent/extra.conf",
+        "mode": "0640",
+        "owner": "root",
+        "group": "root",
+        "size": 14,
+        "sha256": "e27189c4625a8ce7305f50b6cc8ffd07285bcc56afd27f7793ee5326f5dd7988",
+        "content_b64": "dG9rZW4gPSDDvGJlcgo=",
+        "sensitive": true
+      },
+      {
+        "id": "xray:config",
+        "depends_on": [
+          "pin:xray"
+        ],
+        "kind": "xray_config",
+        "path": "/etc/netagent/core.json",
+        "config": {
+          "log": {
+            "loglevel": "warning",
+            "note": "caf\u00e9 \u00ab\u00bb \"q\" \\ \n\r\t\b\f \u0000"
+          },
+          "inbounds": [
+            {
+              "tag": "vless-reality",
+              "port": 443,
+              "protocol": "vless",
+              "settings": {
+                "clients": [],
+                "decryption": "none"
+              }
+            }
+          ],
+          "outbounds": [
+            {
+              "protocol": "freedom",
+              "tag": "direct"
+            }
+          ]
+        },
+        "api_address": "127.0.0.1:10085"
+      },
+      {
+        "id": "users:vless-reality",
+        "depends_on": [
+          "xray:config"
+        ],
+        "kind": "xray_users",
+        "inbound_tag": "vless-reality",
+        "users": [
+          {
+            "user_id": "u-alpha",
+            "uuid": "3f0c8a52-6c1d-4e8b-9a7f-2b5d4c3e1f00",
+            "flow": "xtls-rprx-vision"
+          }
+        ]
+      },
+      {
+        "id": "unit:netcore",
+        "depends_on": [
+          "xray:config",
+          "users:vless-reality"
+        ],
+        "kind": "systemd_unit",
+        "name": "netcore.service",
+        "content": "[Unit]\nDescription=Netcore \u00e9\u00e8 \u2713 \ud83d\udd12 \"quoted\" back\\slash\ttab\u0001\u001f\u007f\u2028\n[Service]\nExecStart=/usr/local/lib/netagent/netcore run -c /etc/netagent/core.json\n",
+        "enabled": true,
+        "state": "started",
+        "restart_on": [
+          "xray:config",
+          "users:vless-reality"
+        ]
+      },
+      {
+        "id": "fw:443",
+        "depends_on": [],
+        "kind": "firewall_rule",
+        "port": 443,
+        "protocol": "tcp",
+        "allow_from": []
+      }
+    ],
+    "signature": {
+      "key_id": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+      "signature": "uNDZ0/q8+w5FKjatNkQQBeE8PLPjvhLACVL5e32rg3TvKGzbeuHHtac6hVQmJwmWGFMlCAS57ZgvAIe6ZFdACg=="
+    }
+  },
+  "signed_bytes_hex": "6d6572696469616e2e6167656e742f763120646573697265642d73746174650a7b22666c6565745f65706f6368223a332c22666c6565745f6964223a2230623666336331652d386636612d346432622d396334312d376135653264396630633133222c226973737565645f6174223a22323032362d31302d32395431323a30303a30305a222c226e6f64655f6964223a22657869742d31222c2270726f746f636f6c223a226d6572696469616e2e6167656e742f7631222c227265736f7572636573223a5b7b2261726368697665223a227a6970222c22646570656e64735f6f6e223a5b5d2c226964223a2270696e3a78726179222c22696e7374616c6c5f70617468223a222f7573722f6c6f63616c2f6c69622f6e65746167656e742f6e6574636f7265222c226b696e64223a2262696e6172795f70696e222c226d656d626572223a2278726179222c226d6f6465223a2230373535222c226e616d65223a2278726179222c22736861323536223a2261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162222c2273697a65223a31323334352c22736f7572636573223a5b2268747470733a2f2f6769746875622e636f6d2f58544c532f587261792d636f72652f72656c65617365732f646f776e6c6f61642f7632362e372e31312f587261792d6c696e75782d36342e7a6970222c2273657276696365225d2c2276657273696f6e223a2232362e372e3131227d2c7b22636f6e74656e745f623634223a22644739725a5734675053444476474a6c63676f3d222c22646570656e64735f6f6e223a5b5d2c2267726f7570223a22726f6f74222c226964223a2266696c653a6578747261222c226b696e64223a2266696c65222c226d6f6465223a2230363430222c226f776e6572223a22726f6f74222c2270617468223a222f6574632f6e65746167656e742f65787472612e636f6e66222c2273656e736974697665223a747275652c22736861323536223a2265323731383963343632356138636537333035663530623663633866666430373238356263633536616664323766373739336565353332366635646437393838222c2273697a65223a31347d2c7b226170695f61646472657373223a223132372e302e302e313a3130303835222c22636f6e666967223a7b22696e626f756e6473223a5b7b22706f7274223a3434332c2270726f746f636f6c223a22766c657373222c2273657474696e6773223a7b22636c69656e7473223a5b5d2c2264656372797074696f6e223a226e6f6e65227d2c22746167223a22766c6573732d7265616c697479227d5d2c226c6f67223a7b226c6f676c6576656c223a227761726e696e67222c226e6f7465223a22636166c3a920c2abc2bb205c22715c22205c5c205c6e5c725c745c625c66205c7530303030227d2c226f7574626f756e6473223a5b7b2270726f746f636f6c223a2266726565646f6d222c22746167223a22646972656374227d5d7d2c22646570656e64735f6f6e223a5b2270696e3a78726179225d2c226964223a22787261793a636f6e666967222c226b696e64223a22787261795f636f6e666967222c2270617468223a222f6574632f6e65746167656e742f636f72652e6a736f6e227d2c7b22646570656e64735f6f6e223a5b22787261793a636f6e666967225d2c226964223a2275736572733a766c6573732d7265616c697479222c22696e626f756e645f746167223a22766c6573732d7265616c697479222c226b696e64223a22787261795f7573657273222c227573657273223a5b7b22666c6f77223a2278746c732d727072782d766973696f6e222c22757365725f6964223a22752d616c706861222c2275756964223a2233663063386135322d366331642d346538622d396137662d326235643463336531663030227d5d7d2c7b22636f6e74656e74223a225b556e69745d5c6e4465736372697074696f6e3d4e6574636f726520c3a9c3a820e29c9320f09f9492205c2271756f7465645c22206261636b5c5c736c6173685c747461625c75303030315c75303031667fe280a85c6e5b536572766963655d5c6e4578656353746172743d2f7573722f6c6f63616c2f6c69622f6e65746167656e742f6e6574636f72652072756e202d63202f6574632f6e65746167656e742f636f72652e6a736f6e5c6e222c22646570656e64735f6f6e223a5b22787261793a636f6e666967222c2275736572733a766c6573732d7265616c697479225d2c22656e61626c6564223a747275652c226964223a22756e69743a6e6574636f7265222c226b696e64223a2273797374656d645f756e6974222c226e616d65223a226e6574636f72652e73657276696365222c22726573746172745f6f6e223a5b22787261793a636f6e666967222c2275736572733a766c6573732d7265616c697479225d2c227374617465223a2273746172746564227d2c7b22616c6c6f775f66726f6d223a5b5d2c22646570656e64735f6f6e223a5b5d2c226964223a2266773a343433222c226b696e64223a226669726577616c6c5f72756c65222c22706f7274223a3434332c2270726f746f636f6c223a22746370227d5d2c227265766973696f6e223a372c22736861323536223a2236656233616639396165343463616432623039626462613033653465333264383831646133343933393336313638313332613834386239386564646334333131227d",
+  "resource_sha256": {
+    "pin:xray": "8049e385367c665a23b63f01feea6ddc702e0ab65752bd2321bb6b4fe1b50c27",
+    "file:extra": "592b03f0f49161d8068c202634ad180497efa849707da7c31b3795bba021abc5",
+    "xray:config": "ee7211d6a8cf31edfa231ddfe1df958005b6a35ee0d1044b41da0be6611e658e",
+    "users:vless-reality": "92288efea93034ce97862233063e0378e3e3957cd3c25e2e92a72e5e0cfa6ec5",
+    "unit:netcore": "b199ea5b58ba79af5536e6646984285c13758fc7865c008a1df8fe45c35998f0",
+    "fw:443": "4217a9f88cec2317ec98b8f2bb5010e72e226d7afe44982eaa632c2168ccc571"
+  },
+  "canonical": {
+    "value": {
+      "z": "\u00e9\u2713\ud83d\udd12",
+      "a": "\u0000\u0001\b\f\n\r\t\u001f\u007f\"\\/\u2028",
+      "m": [
+        1,
+        -2,
+        9007199254740991
+      ]
+    },
+    "bytes_hex": "7b2261223a225c75303030305c75303030315c625c665c6e5c725c745c75303031667f5c225c5c2fe280a8222c226d223a5b312c2d322c393030373139393235343734303939315d2c227a223a22c3a9e29c93f09f9492227d"
+  }
+}

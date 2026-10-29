@@ -1,5 +1,5 @@
 .PHONY: help install sync test lint format check typecheck validate dead-code ci system-lab-preflight system-lab system-lab-fast \
-       templates dead-code ai-docs build publish clean hooks
+       templates dead-code ai-docs build publish clean hooks agent
 
 ## —— Setup ——————————————————————————————————————————————
 
@@ -127,6 +127,18 @@ studio-assets: ## Build website assets bundled into `meridian studio`
 	cd website && pnpm run contracts:check && pnpm run build
 	cp VERSION website/dist/version
 	find website/dist -name .DS_Store -delete
+
+# Pinned toolchain image (multi-arch index digest), run on the host's own architecture;
+# agent/scripts/build-musl.sh cross-compiles the other target without emulation.
+AGENT_IMAGE := rust:1.99.1-alpine3.22@sha256:731f64e16c12af70970d9a3655eecb1eecab4898352f09688a8e5ca2ab8b77c5
+AGENT_TARGETS ?= x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+
+agent: ## Build static netagent binaries (musl, in Docker) into agent/dist/
+	@mkdir -p agent/dist
+	docker run --rm -v "$(CURDIR)/agent:/src:ro" -v "$(CURDIR)/agent/dist:/out" \
+		-v meridian-agent-registry:/usr/local/cargo/registry -v meridian-agent-target:/target \
+		-e CARGO_TARGET_DIR=/target -w /src $(AGENT_IMAGE) sh /src/scripts/build-musl.sh $(AGENT_TARGETS)
+	@ls -l $(foreach t,$(AGENT_TARGETS),agent/dist/netagent-$(t))
 
 build: ai-docs studio-assets ## Build wheel and sdist
 	uv build
