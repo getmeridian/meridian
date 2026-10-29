@@ -8,7 +8,6 @@
 export type ClientIps = boolean;
 export type ClientName = string;
 export type Color = "" | "ocean" | "sunset" | "forest" | "lavender" | "rose" | "slate";
-export type Control = "remnawave" | "meridian";
 export type Country = string;
 export type Domain = "" | string;
 export type Fingerprint =
@@ -35,7 +34,6 @@ export interface DeployRequest {
   client_ips?: ClientIps;
   client_name?: ClientName;
   color?: Color;
-  control?: Control;
   country?: Country;
   domain?: Domain;
   fingerprint?: Fingerprint;

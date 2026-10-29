@@ -63,6 +63,8 @@ export * as EventSchema from "./event.schema";
 export * as ExitIntentSchema from "./exit-intent.schema";
 export * as FleetExportEnvelopeSchema from "./fleet-export-envelope.schema";
 export * as FleetExportSchema from "./fleet-export.schema";
+export * as FleetHistoryEnvelopeSchema from "./fleet-history-envelope.schema";
+export * as FleetHistorySchema from "./fleet-history.schema";
 export * as FleetImportEnvelopeSchema from "./fleet-import-envelope.schema";
 export * as FleetImportSchema from "./fleet-import.schema";
 export * as FleetInventoryEnvelopeSchema from "./fleet-inventory-envelope.schema";

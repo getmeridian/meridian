@@ -989,7 +989,6 @@ export const commandCatalog = {
         "--request",
         "--dry-run",
         "--cancel-file",
-        "--control",
         "--context"
       ],
       "outcomes": [
@@ -1066,6 +1065,61 @@ export const commandCatalog = {
           "category": "none",
           "exit_code": 0,
           "meaning": "the fleet document was exported",
+          "status": "ok"
+        },
+        {
+          "category": "user",
+          "exit_code": 2,
+          "meaning": "user or configuration error",
+          "status": "failed"
+        },
+        {
+          "category": "system",
+          "exit_code": 3,
+          "meaning": "system or infrastructure failure",
+          "status": "failed"
+        },
+        {
+          "category": "bug",
+          "exit_code": 1,
+          "meaning": "unexpected Meridian bug",
+          "status": "failed"
+        }
+      ],
+      "stability": "preview",
+      "statuses": [
+        "ok",
+        "failed"
+      ]
+    },
+    {
+      "argv": [
+        "fleet",
+        "history"
+      ],
+      "command": "fleet.history",
+      "data_schema": "fleet-history",
+      "description": "List the reviewed applies the control service recorded",
+      "envelope_schema": "fleet-history-envelope",
+      "error_schema": "error",
+      "exit_codes": {
+        "0": "the recorded revisions were listed",
+        "1": "unexpected Meridian bug",
+        "2": "user or configuration error",
+        "3": "system or infrastructure failure",
+        "130": "process interrupted; no JSON envelope is emitted"
+      },
+      "failure_data_schema": "empty-data",
+      "interrupt_behavior": "exit_130_without_envelope",
+      "machine_flags": [
+        "--json",
+        "--context"
+      ],
+      "outcomes": [
+        {
+          "category": "none",
+          "exit_code": 0,
+          "meaning": "the recorded revisions were listed",
           "status": "ok"
         },
         {

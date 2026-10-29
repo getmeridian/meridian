@@ -29,15 +29,6 @@ export const deployRequestSchema = {
       "title": "Color",
       "type": "string"
     },
-    "control": {
-      "default": "remnawave",
-      "enum": [
-        "remnawave",
-        "meridian"
-      ],
-      "title": "Control",
-      "type": "string"
-    },
     "country": {
       "default": "",
       "maxLength": 2,
