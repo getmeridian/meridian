@@ -1,29 +1,20 @@
-"""`meridian fleet upgrade` -- move Remnawave and Realm to newer same-major releases through the reviewed apply."""
+"""`meridian fleet upgrade` -- move Realm, the control service, and node agents forward through the reviewed apply."""
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import typer
 from rich.markup import escape
 
-from meridian import config
+from meridian import __version__, config
 from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError, MeridianError
-from meridian.diagnostics.images import (
-    ImageComponent,
-    ImageObservation,
-    ServerImages,
-    control_components,
-    node_components,
-    observe_images,
-)
-from meridian.host_runtime import PANEL_DATABASE
-from meridian.remnawave.versions import UPGRADABLE_PINS, ImageStatus, data_major, effective_pins, parse_image
+from meridian.core.version_skew import newer_service_hint, service_skew
 
 if TYPE_CHECKING:
     from meridian.cluster import ClusterConfig
@@ -32,79 +23,83 @@ if TYPE_CHECKING:
 
 _BINARY_LABELS = {"realm": "Realm"}
 
-_STATUS_TEXT: dict[ImageStatus, str] = {
+ComponentStatus = Literal["current", "upgrade", "absent", "newer"]
+_STATUS_TEXT: dict[ComponentStatus, str] = {
     "current": "[green]current[/green]",
     "upgrade": "[yellow]upgrade[/yellow]",
     "absent": "[yellow]install[/yellow]",
-    "kept_newer": "[cyan]kept: newer[/cyan]",
-    "kept_unmanaged": "[cyan]kept: operator tag[/cyan]",
-    "held_major": "[red]held: major[/red]",
+    "newer": "[red]newer than this Meridian[/red]",
 }
 
 
+@dataclass(frozen=True)
+class Component:
+    """One versioned piece of the fleet: what runs, what the next apply installs, or why it is unreadable."""
+
+    where: str
+    name: str
+    running: str = ""
+    target: str = ""
+    status: ComponentStatus = "current"
+    error: str = ""
+
+    @property
+    def available(self) -> bool:
+        return not self.error
+
+    @property
+    def behind(self) -> bool:
+        return self.available and self.status in ("upgrade", "absent")
+
+
 def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
-    """Resolve target images, compare them with what runs, apply the reviewed plan, then check every server."""
+    """Resolve targets, compare them with what runs, apply the reviewed plan, then check every server."""
     from meridian.servers import ServerRegistry
 
     cluster = load_topology_cluster()
     intent = require_intent(cluster)
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
 
-    targets = _target_pins(cluster, tested=tested)
-    observed = _observe(registry, intent, targets)
+    binaries = _binary_targets(cluster, intent, tested=tested)
+    realm_target = binaries["realm"][1].version if binaries else ""
+    observed = _observe(cluster, registry, intent, realm_target)
     _render(observed)
-    unavailable = [server for server in observed if not server.available]
+    unavailable = [component for component in observed if not component.available]
     if unavailable:
-        for server in unavailable:
-            warn(f"{server.label}: could not read its images ({server.error})")
+        for component in unavailable:
+            warn(f"{component.where}: could not read {component.name} ({component.error})")
         fail(
             "Cannot tell what an upgrade would change on every server",
-            hint="Restore SSH access (check with `meridian check SERVER`), then rerun `meridian fleet upgrade`.",
+            hint="Restore SSH and service access (check with `meridian check`), then rerun `meridian fleet upgrade`.",
             hint_type="system",
         )
-    _explain_held(observed)
-    binaries = _binary_targets(cluster, intent, tested=tested)
-    relays = _observe_relays(registry, intent) if binaries else []
-    realm_target = binaries["realm"][1].version if binaries else ""
-    _render_binaries(relays, realm_target)
-    if any(not relay.available for relay in relays):
-        for relay in relays:
-            if not relay.available:
-                warn(f"{relay.label}: could not read its Realm version ({relay.error})")
+    if any(component.status == "newer" for component in observed):
+        newest = max((c.running for c in observed if c.status == "newer" and c.name == "Control service"), default="")
         fail(
-            "Cannot tell what an upgrade would change on every relay",
-            hint="Restore SSH access (check with `meridian check SERVER`), then rerun `meridian fleet upgrade`.",
-            hint_type="system",
+            "Part of this fleet runs a newer Meridian than this one",
+            hint=newer_service_hint(newest) if newest else "Update this Meridian (meridian update), then retry.",
+            hint_type="user",
         )
-    overrides = {name: image for name, image in targets.items() if image != UPGRADABLE_PINS[name]}
     binary_overrides = {name: target for name, (_, target) in binaries.items() if target != UPGRADABLE_BINARIES[name]}
-    binary_changes = sum(1 for relay in relays if relay.running != realm_target)
-    changes = sum(len(server.changes) for server in observed) + binary_changes
+    changes = sum(1 for component in observed if component.behind)
     if not changes:
-        if overrides != cluster.image_pins or binary_overrides != cluster.binary_pins:
-            _save_pins(cluster, overrides, binary_overrides)
-        ok("Every server already runs its target images (operator-chosen tags are kept)")
+        if binary_overrides != cluster.binary_pins:
+            _save_pins(cluster, binary_overrides)
+        ok("Every server already runs its target versions")
         return
-    for name in overrides:
-        warn(f"{_short(targets[name])} is newer than this Meridian release was tested with")
     for name, pin in binary_overrides.items():
         warn(f"{_BINARY_LABELS[name]} {pin.version} is newer than this Meridian release was tested with")
     if not yes and not confirm(f"Apply {changes} change(s) through the reviewed plan?"):
         raise typer.Exit(1)
 
-    _save_pins(cluster, overrides, binary_overrides)
+    _save_pins(cluster, binary_overrides)
     _apply(cluster, registry, intent)
-    after = _observe(registry, intent, targets)
-    relays_after = _observe_relays(registry, intent) if binaries else []
-    behind = [(server, image) for server in after for image in server.changes]
-    behind_relays = [relay for relay in relays_after if relay.running != realm_target]
-    unreadable = any(not server.available for server in after) or any(not relay.available for relay in relays_after)
-    if behind or behind_relays or unreadable:
+    after = _observe(cluster, registry, intent, realm_target)
+    if any(component.behind or not component.available for component in after):
         _render(after)
-        _render_binaries(relays_after, realm_target)
         fail(
-            "The apply finished, but some servers still do not run their target images",
-            hint="Inspect the containers with `meridian check`, then rerun `meridian fleet upgrade`.",
+            "The apply finished, but some servers still do not run their target versions",
+            hint="Inspect them with `meridian check`, then rerun `meridian fleet upgrade`.",
             hint_type="system",
         )
     ok(f"Upgraded {changes} component(s); running the health checks")
@@ -113,21 +108,59 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
     run_check()
 
 
-def _target_pins(cluster: ClusterConfig, *, tested: bool) -> dict[str, str]:
-    """The newest release in each pin's major, or this CLI's tested pins with *tested*."""
-    if tested:
-        return effective_pins({})
-    from meridian.remnawave.registry import RegistryError, latest_release
+def _observe(
+    cluster: ClusterConfig, registry: ServerRegistry, intent: SetupIntent, realm_target: str
+) -> list[Component]:
+    """The control service, each node's agent, and each relay's Realm, read-only."""
+    components = list(_observe_service(cluster, intent))
+    if realm_target:
+        for relay in _observe_relays(registry, intent):
+            components.append(
+                Component(
+                    relay.label,
+                    "Realm",
+                    relay.running,
+                    realm_target,
+                    _status(relay.running, realm_target),
+                    relay.error,
+                )
+            )
+    return components
 
-    info("Checking Docker Hub for newer Remnawave releases in the tested major...")
-    targets: dict[str, str] = {}
-    for name, image in effective_pins(cluster.image_pins).items():
-        try:
-            targets[name] = latest_release(image)
-        except RegistryError as exc:
-            warn(f"{exc}; keeping {_short(image)}")
-            targets[name] = image
-    return targets
+
+def _observe_service(cluster: ClusterConfig, intent: SetupIntent) -> list[Component]:
+    """What the control service and every agent report, against what this Meridian installs."""
+    from meridian.control.client import ControlClient, ControlServiceError
+    from meridian.control_artifacts import agent_version
+
+    nodes = [exit_.id for exit_ in intent.exits] + [gateway.id for gateway in intent.routing_gateways]
+    expected_agent = agent_version()
+    try:
+        with ControlClient(cluster.panel.url, cluster.panel.api_token, timeout=20) as client:
+            running = client.health().version
+            statuses = {node: client.node(node) for node in nodes}
+    except ControlServiceError as exc:
+        error = str(exc) or "no answer"
+        return [Component("control server", "Control service", error=error)]
+    skew = service_skew(__version__, running)
+    service_status: ComponentStatus = (
+        "newer" if skew == "service_newer" else "upgrade" if skew == "service_older" else "current"
+    )
+    components = [Component("control server", "Control service", running, __version__, service_status)]
+    for node, status in statuses.items():
+        reported = (status.agent_version if status is not None else None) or ""
+        if status is None or not expected_agent:
+            agent_status: ComponentStatus = "absent" if status is None else "current"
+        else:
+            agent_status = _status(reported, expected_agent)
+        components.append(Component(node, "Node agent", reported, expected_agent, agent_status))
+    return components
+
+
+def _status(running: str, target: str) -> ComponentStatus:
+    if not running:
+        return "absent"
+    return "current" if running == target else "upgrade"
 
 
 def _binary_targets(
@@ -215,121 +248,43 @@ def _observe_relays(registry: ServerRegistry, intent: SetupIntent) -> list[Relay
         return list(executor.map(observe, servers))
 
 
-def _save_pins(cluster: ClusterConfig, overrides: dict[str, str], binary_overrides: dict[str, BinaryPin]) -> None:
+def _save_pins(cluster: ClusterConfig, binary_overrides: dict[str, BinaryPin]) -> None:
     """Record the approved releases so every later apply renders them too."""
-    cluster.image_pins = overrides
     cluster.binary_pins = binary_overrides
     try:
         cluster.save()
     except OSError as exc:
         fail(
-            f"Could not save the image pins: {exc}",
+            f"Could not save the binary pins: {exc}",
             hint=f"Check {config.HOME_DISPLAY} permissions.",
             hint_type="system",
         )
 
 
-def _observe(registry: ServerRegistry, intent: SetupIntent, pins: dict[str, str] | None = None) -> list[ServerImages]:
-    """Observe every server that runs Remnawave containers, in parallel and read-only."""
-    from meridian.compiler import compile_topology
-    from meridian.compiler.models import ControlPlaneRuntimePayload, NodeRuntimePayload
-    from meridian.resolve import connection_for_entry
-
-    control, node = control_components(pins), node_components(pins)
-    components: dict[str, tuple[ImageComponent, ...]] = {}
-    for resource in compile_topology(intent).resources:
-        payload = resource.payload
-        if isinstance(payload, ControlPlaneRuntimePayload):
-            components[payload.server_ref] = control + components.get(payload.server_ref, ())
-        elif isinstance(payload, NodeRuntimePayload) and node[0] not in components.get(payload.server_ref, ()):
-            components[payload.server_ref] = components.get(payload.server_ref, ()) + node
-
-    def observe(server_ref: str) -> ServerImages:
-        try:
-            entry = registry.find(server_ref)
-        except LocalStateError as exc:
-            return ServerImages(server_ref, server_ref, error=str(exc))
-        if entry is None:
-            return ServerImages(server_ref, server_ref, error="the saved server profile is missing")
-        label = entry.name or entry.host
-        return observe_images(connection_for_entry(entry), components[server_ref], server_ref=server_ref, label=label)
-
-    with ThreadPoolExecutor(max_workers=min(8, max(1, len(components)))) as executor:
-        return list(executor.map(observe, components))
-
-
-def _render(observed: list[ServerImages]) -> None:
+def _render(observed: list[Component]) -> None:
     from rich.box import ROUNDED
     from rich.table import Table
 
-    table = Table(title="Remnawave images", box=ROUNDED, pad_edge=False, padding=(0, 1))
-    table.add_column("Server", style="bold cyan")
+    table = Table(title="Fleet components", box=ROUNDED, pad_edge=False, padding=(0, 1))
+    table.add_column("Where", style="bold cyan")
     table.add_column("Component")
     table.add_column("Running", style="dim")
     table.add_column("Target", style="dim")
     table.add_column("Status")
-    for server in observed:
-        if not server.available:
-            table.add_row(escape(server.label), "-", "-", "-", "[red]unavailable[/red]")
+    for component in observed:
+        if not component.available:
+            table.add_row(escape(component.where), component.name, "-", "-", "[red]unavailable[/red]")
             continue
-        for image in server.images:
-            table.add_row(
-                escape(server.label),
-                image.component.replace("_", " "),
-                escape(_short(image.running) or "absent"),
-                escape(_short(image.pinned)),
-                _STATUS_TEXT[image.status],
-            )
+        table.add_row(
+            escape(component.where),
+            component.name,
+            escape(component.running or "absent"),
+            escape(component.target or "-"),
+            _STATUS_TEXT[component.status],
+        )
     err_console.print()
     err_console.print(table)
     err_console.print()
-
-
-def _render_binaries(relays: list[RelayRealm], target: str) -> None:
-    if not relays:
-        return
-    from rich.box import ROUNDED
-    from rich.table import Table
-
-    table = Table(title="Server binaries", box=ROUNDED, pad_edge=False, padding=(0, 1))
-    table.add_column("Server", style="bold cyan")
-    table.add_column("Component")
-    table.add_column("Running", style="dim")
-    table.add_column("Target", style="dim")
-    table.add_column("Status")
-    for relay in relays:
-        if not relay.available:
-            table.add_row(escape(relay.label), "Realm", "-", "-", "[red]unavailable[/red]")
-            continue
-        status: ImageStatus = "current" if relay.running == target else "upgrade" if relay.running else "absent"
-        table.add_row(escape(relay.label), "Realm", relay.running or "absent", target, _STATUS_TEXT[status])
-    err_console.print(table)
-    err_console.print()
-
-
-def _short(image: str) -> str:
-    """The tag plus a 7-character digest; the component column already names the repository."""
-    if not image:
-        return ""
-    ref = parse_image(image)
-    digest = ref.digest.rpartition(":")[2][:7]
-    label = ref.tag or ref.repository
-    return f"{label} @{digest}" if digest else label
-
-
-def _explain_held(observed: list[ServerImages]) -> None:
-    held: list[tuple[ServerImages, ImageObservation]] = [
-        (server, image) for server in observed for image in server.images if image.status == "held_major"
-    ]
-    for server, image in held:
-        warn(
-            f"{server.label}: PostgreSQL {data_major(image.running)} stays; this CLI pins "
-            f"{data_major(image.pinned)}, and a major upgrade needs a dump and restore"
-        )
-        info(
-            f"Back up first (`docker exec {PANEL_DATABASE.name} pg_dumpall -U meridian > panel.sql`), "
-            "then follow the Remnawave PostgreSQL upgrade guide. Meridian never moves a PostgreSQL major."
-        )
 
 
 def _apply(cluster: ClusterConfig, registry: ServerRegistry, intent: SetupIntent) -> None:

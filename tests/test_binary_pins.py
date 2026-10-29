@@ -15,7 +15,6 @@ from meridian.config import REALM_SHA256, REALM_VERSION
 from meridian.core.topology import TransparentRelayIntent
 from meridian.github_releases import ReleaseError, latest_binary_release
 from meridian.provision.relay import InstallRealm, RelayContext
-from meridian.remnawave.versions import UPGRADABLE_PINS
 from meridian.setup.single_server import single_server_intent
 from tests.support.mock_connection import MockConnection
 from tests.support.topology import single_exit_intent
@@ -166,9 +165,8 @@ def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
     default = UPGRADABLE_BINARIES["realm"]
     with (
         patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
-        patch.object(fleet_upgrade, "_target_pins", return_value=dict(UPGRADABLE_PINS)),
         patch.object(fleet_upgrade, "_binary_targets", return_value={"realm": (default, _NEWER)}),
-        patch.object(fleet_upgrade, "_observe", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
         patch.object(
             fleet_upgrade,
             "_observe_relays",
@@ -186,7 +184,7 @@ def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
 
         fleet_upgrade.run_upgrade(yes=True)
 
-    save.assert_called_once_with(cluster, {}, {"realm": _NEWER})
+    save.assert_called_once_with(cluster, {"realm": _NEWER})
     apply.assert_called_once()
 
 
@@ -202,9 +200,8 @@ def test_a_saved_realm_pin_is_compared_with_what_the_relay_runs(running: str, ap
     )
     with (
         patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
-        patch.object(fleet_upgrade, "_target_pins", return_value=dict(UPGRADABLE_PINS)),
         patch.object(fleet_upgrade, "_binary_targets", return_value={"realm": (_NEWER, _NEWER)}),
-        patch.object(fleet_upgrade, "_observe", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
         patch.object(fleet_upgrade, "_observe_relays", side_effect=[[_relay(running)], [_relay(_NEWER.version)]]),
         patch.object(fleet_upgrade, "_save_pins"),
         patch.object(fleet_upgrade, "_apply") as apply,

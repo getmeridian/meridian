@@ -33,7 +33,7 @@ relay_app = typer.Typer(
     help="Add, list, or remove relays that forward traffic to an exit, or change their SNI", no_args_is_help=True
 )
 route_app = typer.Typer(help="Send chosen destinations through WARP, directly, or nowhere", no_args_is_help=True)
-fleet_app = typer.Typer(help="Fleet status, inventory, image upgrades, and the fleet as a file", no_args_is_help=True)
+fleet_app = typer.Typer(help="Fleet status, inventory, upgrades, and the fleet as a file", no_args_is_help=True)
 context_app = typer.Typer(
     help="Keep several fleets on one machine and switch between them: list, use, rename, remove", no_args_is_help=True
 )
@@ -564,18 +564,17 @@ def fleet_upgrade_cmd(
     tested: bool = typer.Option(
         False,
         "--tested",
-        help="Ask neither Docker Hub nor GitHub: Remnawave returns to the tested versions, an upgraded Realm stays",
+        help="Skip GitHub: Realm stays on the tested version or what you already upgraded to",
     ),
 ) -> None:
-    """Upgrade Remnawave and Realm to their newest releases in the tested major
+    """Bring the control service, node agents, and Realm up to date
 
-    Finds the newest backend, node, and subscription page releases on Docker
-    Hub within the major this Meridian release supports (no Meridian update
-    needed), and with relays the newest Realm on GitHub, pinned by the sha256
-    GitHub publishes. Shows what each server runs, applies the reviewed plan,
-    then runs `meridian check`. Newer or floating tags you chose are kept;
-    PostgreSQL and Valkey stay on Meridian's pins, and a PostgreSQL major is
-    never moved.
+    The control service and every node agent move to the versions this
+    Meridian installs (run `meridian update` first for newer ones); agents
+    upgrade in place and keep their identity. With relays, Realm moves to the
+    newest release in the tested major on GitHub, pinned by the sha256 GitHub
+    publishes. Shows what each server runs, applies the reviewed plan, then
+    runs `meridian check`.
 
     [dim]Examples:[/dim]
       [cyan]meridian fleet upgrade[/cyan]
