@@ -72,13 +72,19 @@ def pull_snapshot(cluster: ClusterConfig, *, name: str = "") -> PulledSnapshot:
 
 
 def deployer_state(cluster: ClusterConfig) -> DeployerStateDeposit:
-    """This machine's fleet files, without the admin token a restore replaces anyway.
+    """This machine's fleet files, without the secrets a restore replaces or no longer needs.
 
-    An unfinished restore is this machine's progress, not the fleet's: carried into a fresh
-    context, it would hold that context to a target server that may be gone.
+    The deposit sits in control.db as it is, so it keeps no admin token (a restore mints one),
+    no migration token, and none of a Remnawave panel's leftovers (its password, its Telegram
+    bot). An unfinished restore is this machine's progress, not the fleet's: carried into a
+    fresh context, it would hold that context to a target server that may be gone.
     """
     copy = cluster.clone()
     copy.panel.api_token = ""
+    copy.panel.admin_pass = ""
+    copy.telegram = None
+    if copy.control_migration is not None:
+        copy.control_migration.service_token = ""
     copy.control_restore = finished_restore(copy.control_restore)
     try:
         servers = config.SERVER_PROFILES_FILE.read_text(encoding="utf-8")

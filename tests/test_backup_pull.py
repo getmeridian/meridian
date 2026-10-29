@@ -184,6 +184,22 @@ def test_an_unfinished_restore_stays_on_this_machine(fleet: ClusterConfig) -> No
     assert yaml.safe_load(deployer_state(fleet).cluster_yml)["control_restore"]["fleet_epoch"] == 2
 
 
+def test_the_deposit_keeps_no_token_or_panel_leftover(fleet: ClusterConfig) -> None:
+    """It sits in control.db as it is; a restore mints new tokens and needs none of a Remnawave panel's."""
+    from meridian.backup.pull import deployer_state
+    from meridian.cluster import ControlMigration, TelegramConfig
+
+    fleet.panel.admin_pass = "panel-password-1"
+    fleet.telegram = TelegramConfig(bot_token="123456:bot-token-1")
+    fleet.control_migration = ControlMigration(step="done", service_token="service-token-1")
+
+    deposited = deployer_state(fleet).cluster_yml
+
+    for secret in ("panel-password-1", "bot-token-1", "service-token-1", fleet.panel.api_token):
+        assert secret not in deposited
+    assert fleet.control_migration.service_token == "service-token-1"  # this machine's copy is untouched
+
+
 def test_a_key_another_run_made_first_is_kept_and_used(fleet: ClusterConfig) -> None:
     """Two first pulls at once: the second must not replace the key the first sealed its snapshot to."""
     first = create_device_key()
