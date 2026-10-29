@@ -26,6 +26,7 @@ from meridian.setup.editor import add_relay_to_intent
 from meridian.setup.single_server import single_server_intent
 from meridian.xray_client import parse_xray_subscription, proxy_outbounds
 from tests.support.control_service import ADMIN_TOKEN, serve_control
+from tests.support.topology import GATEWAY_SERVERS, gateway_fleet_intent
 
 REALITY = ClientEndpoint(
     remark="Reality",
@@ -173,6 +174,22 @@ def test_fleet_projection_names_service_nodes_and_relays_by_their_service_ids(se
     assert isinstance(panel, ServiceFleetPanel)
     cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
     assert isinstance(fleet_panel(cluster, topology), MeridianPanel)
+
+
+def test_fleet_projection_names_a_service_gateway_by_its_node_id(servers_file: Path) -> None:
+    """Status matched the gateway's empty panel UUID, so a running gateway read as unknown."""
+    registry = ServerRegistry(servers_file)
+    for ref, host in GATEWAY_SERVERS.items():
+        registry.add(ServerEntry(host=host, user="root", id=ref))
+    cluster = ClusterConfig(topology_intent=gateway_fleet_intent())
+
+    topology = topology_from_cluster(cluster, servers=registry.list())
+
+    assert {(node.name, node.uuid, node.role) for node in topology.nodes} == {
+        ("main", "main", "exit"),
+        ("de", "de", "exit"),
+        ("gw", "gw", "routing_gateway"),
+    }
 
 
 @pytest.mark.parametrize("status", [502, 503, 504])

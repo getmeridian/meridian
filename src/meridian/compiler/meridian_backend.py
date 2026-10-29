@@ -3,10 +3,11 @@
 The Remnawave compile already places ports, nginx routes, certificates, and
 firewall rules. For the skeleton this module keeps those server-side kinds and
 replaces the panel-shaped ones: the control plane becomes `control_service`, an
-exit's Profile, Inbounds, binding, and node become one `agent_runtime` plus one
-`node_workload`, primary Hosts become `client_endpoint`s, and users become
-`control_user`s. Squads, templates, node-API firewall rules, and panel probes
-have no equivalent. Once Remnawave is gone the compiler emits these directly.
+exit's or routing gateway's Profile, Inbounds, binding, and node become one
+`agent_runtime` plus one `node_workload` (a gateway's pools, routes, and gateway
+resource fold into it), primary Hosts become `client_endpoint`s, and users become
+`control_user`s. Squads, templates, service users, node-API firewall rules, and
+panel probes have no equivalent. Once Remnawave is gone the compiler emits these directly.
 """
 
 from __future__ import annotations
@@ -24,12 +25,15 @@ from meridian.compiler.models import (
     ControlPlaneRuntimePayload,
     ControlServicePayload,
     ControlUserPayload,
+    EgressPoolPayload,
     FirewallRulePayload,
     HostPayload,
     NodeRuntimePayload,
     NodeWorkloadPayload,
     ResourcePayload,
     ResourcePostcondition,
+    RouteRulePayload,
+    RoutingGatewayPayload,
     ServerBaselinePayload,
     ServiceSettingsPayload,
     SubscriptionSettingsPayload,
@@ -44,20 +48,13 @@ SERVICE_SETTINGS_ID = "settings:service"
 def validate_meridian_backend(intent: SetupIntent) -> None:
     """Refuse what the control service cannot run yet.
 
-    Exits (bare-IP or domain, WSS, self-steal, egress overrides, WARP), Realm relays, and a
-    control domain run; their nginx, certificates, and firewall rules are shared server kinds,
-    and WARP installs over SSH with the agent (`AgentRuntimePayload.warp`).
+    Exits (bare-IP or domain, WSS, self-steal, egress overrides, WARP), Realm relays, routing
+    gateways with pools and routes, and a control domain run; their nginx, certificates, and
+    firewall rules are shared server kinds, and WARP installs over SSH with the agent
+    (`AgentRuntimePayload.warp`). Client IP forwarding changes the PROXY protocol chain in
+    front of every workload and waits for its own review.
     """
-    unsupported = [
-        name
-        for name, present in (
-            ("routing gateways", bool(intent.routing_gateways)),
-            ("egress pools", bool(intent.egress_pools)),
-            ("routes", bool(intent.routes)),
-            ("client IP forwarding", intent.forward_client_ips),
-        )
-        if present
-    ]
+    unsupported = ["client IP forwarding"] if intent.forward_client_ips else []
     if not any(exit_.server_ref == intent.control.server_ref for exit_ in intent.exits):
         # The control bootstrap takes its nginx Reality route from the exit beside it.
         unsupported.append("a control server without an exit")
@@ -161,6 +158,10 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
                 [CONTROL_SERVICE_ID],
                 _exists(SERVICE_SETTINGS_ID),
             )
+        elif isinstance(payload, RoutingGatewayPayload | EgressPoolPayload | RouteRulePayload):
+            # The gateway's node spec carries its edges, balancers, and rules; its agent applies them at once.
+            gateway_ref = payload.gateway_id if isinstance(payload, RoutingGatewayPayload) else payload.gateway_ref
+            renamed[logical_id] = f"workload:{gateway_ref}"
         elif isinstance(payload, ServerBaselinePayload):
             replacements[logical_id] = (
                 payload.model_copy(update={"install_docker": False}),
@@ -200,8 +201,11 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
 
 
 def _panel_only(payload: ResourcePayload, old: dict[str, CompiledResource]) -> bool:
-    """Kinds with no Meridian equivalent: squads, templates, panel probes, the node-API rule."""
-    if payload.kind in {"internal_squad", "external_squad", "subscription_template", "probe"}:
+    """Kinds with no Meridian equivalent: squads, templates, panel probes, the node-API rule.
+
+    A gateway's service users go too: each bridge's one client ID derives from its exit's keys.
+    """
+    if payload.kind in {"internal_squad", "external_squad", "subscription_template", "probe", "service_user"}:
         return True
     if isinstance(payload, FirewallRulePayload):
         node_ports = {item.payload.api_port for item in old.values() if isinstance(item.payload, NodeRuntimePayload)}
@@ -212,7 +216,7 @@ def _panel_only(payload: ResourcePayload, old: dict[str, CompiledResource]) -> b
 def _workload_of(host: HostPayload, old: dict[str, CompiledResource]) -> str:
     runtime = old[host.node_ref].payload
     if not isinstance(runtime, NodeRuntimePayload):
-        raise TopologyCompileError(f"Host {host.remark!r} is not served by an exit node.")
+        raise TopologyCompileError(f"Host {host.remark!r} is not served by a node.")
     return runtime.workload_ref
 
 

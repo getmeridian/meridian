@@ -205,7 +205,7 @@ def _v4_nodes(
         nodes.append(
             TopologyNode(
                 ip=server.host,
-                uuid=workload.node_uuids.get(gateway.server_ref, "") if workload else "",
+                uuid=_node_ref(cluster, workload, gateway.id, gateway.server_ref),
                 name=gateway.id,
                 ssh_user=server.user,
                 ssh_port=server.port,

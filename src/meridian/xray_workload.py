@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -320,6 +321,17 @@ def salamander_password(keys: RealityKeyBinding) -> str:
     """
     digest = hmac.new(keys.private_key.encode("utf-8"), b"meridian-hysteria2-salamander", hashlib.sha256)
     return digest.hexdigest()[:32]
+
+
+def bridge_client_uuid(keys: RealityKeyBinding, bridge_inbound_ref: str) -> str:
+    """Derive the VLESS ID a routing gateway dials one exit bridge with (control-service fleets).
+
+    Like the salamander password it follows the exit's Reality private key, so both ends render
+    it from saved state with nothing new to store; each bridge Inbound gets its own ID.
+    """
+    message = f"meridian-gateway-bridge:{bridge_inbound_ref}".encode()
+    digest = hmac.new(keys.private_key.encode("utf-8"), message, hashlib.sha256).digest()
+    return str(uuid.UUID(bytes=digest[:16], version=4))
 
 
 def _render_service_outbound(

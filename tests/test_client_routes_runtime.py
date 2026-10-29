@@ -21,21 +21,9 @@ from pathlib import Path
 import pytest
 
 from meridian.compiler.delivery import xray_json_template
-from meridian.config import XRAY_VERSION
 
 _HANDSHAKE = b"\x13BitTorrent protocol" + bytes(8) + bytes(range(20)) + b"-MR0001-123456789012"
 _DHT_PING = b"d1:ad2:id20:abcdefghij0123456789e1:q4:ping1:t2:aa1:y1:qe"
-
-
-@pytest.fixture(scope="module")
-def xray_binary() -> Path:
-    configured = os.environ.get("MERIDIAN_TEST_XRAY")
-    if not configured:
-        pytest.skip("set MERIDIAN_TEST_XRAY to run real Xray routing tests")
-    binary = Path(configured).resolve()
-    version = subprocess.run([str(binary), "version"], capture_output=True, text=True, check=True, timeout=10)
-    assert version.stdout.startswith(f"Xray {XRAY_VERSION} "), version.stdout
-    return binary
 
 
 def _bound_socket(kind: socket.SocketKind) -> socket.socket:

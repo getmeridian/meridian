@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+import os
+import subprocess
+import uuid
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import TracebackType
 from typing import Any
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology
@@ -23,6 +33,7 @@ from meridian.control.models import (
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_protocol import AgentBootstrap
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
+from meridian.core.topology import EgressOverrideIntent
 from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP
 from meridian.reconciler import meridian_drivers
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
@@ -35,6 +46,7 @@ from meridian.reconciler.resources import (
 from meridian.reconciler.workloads import LocalRealityKeyFactory, WorkloadStateManager
 from meridian.setup.single_server import single_server_intent
 from tests.support.mock_connection import MockConnection
+from tests.support.topology import GATEWAY_SERVERS, gateway_fleet_intent
 
 FLEET_ID = "0f1e2d3c-4b5a-4968-8776-655443322110"
 CA_SHA256 = "c" * 64
@@ -117,7 +129,7 @@ def plan() -> ResourcePlan:
     return compile_topology(single_server_intent(None, server_ref="srv-a", address="198.51.100.10", control="meridian"))
 
 
-def _setup(plan: ResourcePlan, conn: MockConnection | None = None):
+def _setup(plan: ResourcePlan, conn: MockConnection | None = None, addresses: dict[str, str] | None = None):
     cluster = ClusterConfig()
     cluster.fleet_id = FLEET_ID
     cluster.panel.url = "https://198.51.100.10/secret"
@@ -130,7 +142,7 @@ def _setup(plan: ResourcePlan, conn: MockConnection | None = None):
             client=lambda: control,  # type: ignore[arg-type,return-value]
             workloads=WorkloadStateManager(cluster, persist=lambda _c: None, key_factory=LocalRealityKeyFactory()),
             connection_for=lambda _ref: conn or MockConnection(),
-            server_addresses={"srv-a": "198.51.100.10"},
+            server_addresses=addresses or {"srv-a": "198.51.100.10"},
             agent_binary=lambda _arch: BINARY,
             sleep=lambda _s: None,
         )
@@ -333,3 +345,121 @@ def test_warp_repair_never_re_enrolls_a_healthy_agent(monkeypatch: pytest.Monkey
     assert "warp-cli --accept-tos connect" in conn.calls
     assert control.tokens == []
     assert AGENT_BINARY not in conn.write_map
+
+
+def _gateway_plan(*, warp: bool = False) -> ResourcePlan:
+    intent = gateway_fleet_intent()
+    if warp:
+        main, de = intent.exits
+        override = EgressOverrideIntent(id="ai", match="domain", values=["ai.example.org"], action="warp")
+        exits = [main.model_copy(update={"warp": True}), de.model_copy(update={"egress_overrides": [override]})]
+        intent = intent.model_copy(update={"exits": exits})
+    return compile_topology(intent)
+
+
+def _applied_fleet(plan: ResourcePlan) -> tuple[dict[str, Any], FakeControl, ClusterConfig]:
+    """Apply every workload, exits before the gateway, as the plan orders them."""
+    drivers, control, cluster = _setup(plan, addresses=GATEWAY_SERVERS)
+    control.reports = [{"applied": True}]
+    for workload in ("main", "de", "gw"):
+        drivers["node_workload"].apply(_action(plan, f"workload:{workload}"), None)
+    return drivers, control, cluster
+
+
+def _core_config(spec: NodeSpec) -> dict[str, Any]:
+    return next(item for item in spec.resources if item.id == "core-config").config  # type: ignore[union-attr]
+
+
+def test_a_gateway_dials_each_exit_bridge_with_the_one_id_it_accepts() -> None:
+    plan = _gateway_plan()
+    drivers, control, cluster = _applied_fleet(plan)
+    edges = {
+        (outbound["settings"]["vnext"][0]["address"], outbound["settings"]["vnext"][0]["port"]): outbound
+        for outbound in _core_config(control.specs["gw"])["outbounds"]
+        if outbound["tag"].startswith("meridian-edge-")
+    }
+
+    for exit_ref, server_ref in (("main", "srv-a"), ("de", "srv-b")):
+        spec = control.specs[exit_ref]
+        bridge = next(
+            item for item in _core_config(spec)["inbounds"] if item["tag"] == f"meridian-{exit_ref}-bridge-gw"
+        )
+        keys = next(item for item in cluster.workloads if item.id == exit_ref).reality_keys[server_ref]
+        edge = edges[(GATEWAY_SERVERS[server_ref], bridge["port"])]
+        (client,) = bridge["settings"]["clients"]
+        assert client == {"id": edge["settings"]["vnext"][0]["users"][0]["id"], "flow": "xtls-rprx-vision"}
+        reality = edge["streamSettings"]["realitySettings"]
+        assert (reality["publicKey"], reality["shortId"]) == (keys.public_key, keys.short_id)
+        # Users never reach a bridge: the service fills only the managed inbounds.
+        assert bridge["tag"] not in {inbound.tag for inbound in spec.managed_inbounds}
+    assert [inbound.tag for inbound in control.specs["gw"].managed_inbounds] == ["meridian-gw-reality"]
+    action = _action(plan, "workload:gw")
+    assert observation_converges(action, drivers["node_workload"].observe(action, None))
+
+
+def test_a_gateway_workload_is_unobserved_until_its_exits_hold_keys() -> None:
+    plan = _gateway_plan()
+    drivers, control, cluster = _setup(plan, addresses=GATEWAY_SERVERS)
+    control.reports = [{"applied": True}]
+    drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+    action = _action(plan, "workload:gw")
+
+    assert not drivers["node_workload"].observe(action, None).exists
+    with pytest.raises(ResourceReconcileError, match="has no Reality keys yet"):
+        drivers["node_workload"].apply(action, None)
+
+
+def _self_signed(directory: Path) -> tuple[str, str]:
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "vpn.example.com")])
+    now = datetime.now(UTC)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    cert_path, key_path = directory / "fullchain.pem", directory / "key.pem"
+    cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    )
+    return str(cert_path), str(key_path)
+
+
+def _composed(spec: NodeSpec, certificate: tuple[str, str]) -> dict[str, Any]:
+    """The config as an agent writes it: one user per managed inbound, the certificate on this machine."""
+    config = copy.deepcopy(_core_config(spec))
+    managed = {inbound.tag: inbound for inbound in spec.managed_inbounds}
+    for inbound in config["inbounds"]:
+        item = managed.get(inbound["tag"])
+        if item is not None and item.protocol == "hysteria2":
+            inbound["settings"]["clients"] = [{"auth": str(uuid.uuid4()), "email": "user-1"}]
+        elif item is not None:
+            client = {"id": str(uuid.uuid4()), "email": "user-1"}
+            inbound["settings"]["clients"] = [{**client, "flow": item.flow} if item.flow else client]
+        for entry in inbound.get("streamSettings", {}).get("tlsSettings", {}).get("certificates", []):
+            entry["certificateFile"], entry["keyFile"] = certificate
+    return config
+
+
+@pytest.mark.parametrize("warp", [False, True], ids=["direct", "warp"])
+def test_rendered_exit_and_gateway_configs_pass_xray_test(xray_binary: Path, tmp_path: Path, warp: bool) -> None:
+    _drivers, control, _cluster = _applied_fleet(_gateway_plan(warp=warp))
+    certificate = _self_signed(tmp_path)
+
+    for node_id, spec in control.specs.items():
+        config_file = tmp_path / f"{node_id}.json"
+        config_file.write_text(json.dumps(_composed(spec, certificate)), encoding="utf-8")
+        result = subprocess.run(
+            [str(xray_binary), "run", "-test", "-c", str(config_file)],
+            env={**os.environ, "XRAY_LOCATION_ASSET": str(xray_binary.parent)},
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, f"{node_id}: {result.stdout}{result.stderr}"

@@ -21,8 +21,11 @@ from meridian.compiler.models import (
 from meridian.core.topology import (
     AccessIntent,
     ControlPlaneIntent,
+    EgressPoolIntent,
     ExitIntent,
+    OrderedRouteIntent,
     ProtocolPathIntent,
+    RoutingGatewayIntent,
     SetupIntent,
 )
 
@@ -89,3 +92,38 @@ def panel_mock(**return_values: Any) -> MagicMock:
     for method, value in return_values.items():
         getattr(panel, method).return_value = value
     return panel
+
+
+GATEWAY_SERVERS = {"srv-a": "198.51.100.10", "srv-b": "198.51.100.20", "srv-g": "198.51.100.40"}
+
+
+def gateway_fleet_intent(*, control: str = "meridian") -> SetupIntent:
+    """Exits `main` (srv-a, the control server) and `de` (srv-b) behind routing gateway `gw` (srv-g).
+
+    The gateway blocks one domain, sends one out of its own address, one to `de`, and the
+    rest to pool `both`; addresses are `GATEWAY_SERVERS`.
+    """
+    from meridian.setup.default_paths import default_exit_paths
+    from meridian.setup.single_server import single_server_intent
+
+    intent = single_server_intent(None, server_ref="srv-a", address=GATEWAY_SERVERS["srv-a"], control=control)
+    second = ExitIntent(id="de", server_ref="srv-b", paths=default_exit_paths("de", address=GATEWAY_SERVERS["srv-b"]))
+    return intent.model_copy(
+        update={
+            "exits": [*intent.exits, second],
+            "routing_gateways": [RoutingGatewayIntent(id="gw", server_ref="srv-g", bridge_path_ref="main-reality")],
+            "egress_pools": [EgressPoolIntent(id="both", exit_refs=["main", "de"])],
+            "routes": [
+                OrderedRouteIntent(
+                    id="ads", priority=0, match="domain", match_values=["ads.example.org"], action="block"
+                ),
+                OrderedRouteIntent(
+                    id="local", priority=1, match="domain", match_values=["example.net"], action="direct"
+                ),
+                OrderedRouteIntent(
+                    id="video", priority=2, match="domain", match_values=["video.example.com"], target_ref="de"
+                ),
+            ],
+            "default_egress_ref": "both",
+        }
+    )

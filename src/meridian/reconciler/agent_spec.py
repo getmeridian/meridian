@@ -1,20 +1,22 @@
-"""Render an exit's reviewed Xray profile into the node spec its agent runs.
+"""Render an exit's or routing gateway's reviewed Xray profile into the node spec its agent runs.
 
 The spec pins the Xray archive (binary plus both geodata files from the same
 release), the server config without users, and the systemd unit that restarts
-on any of them. The control service adds one users resource per inbound.
+on any of them. The control service adds one users resource per client inbound.
+A gateway bridge on an exit is no client inbound: its one client is the gateway,
+with an ID derived from the exit's keys (`bridge_client_uuid`), rendered here.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final
 
 from meridian.cluster import RealityKeyBinding
 from meridian.compiler.models import ConfigProfilePayload
 from meridian.config import XRAY_ARCHIVE_BYTES, XRAY_GITHUB_URL, XRAY_SHA256, XRAY_VERSION
 from meridian.control.models import ManagedInbound, NodeSpec, users_resource_id
 from meridian.host_runtime import AGENT_LIB_DIR, CORE_BINARY, CORE_CONFIG, CORE_UNIT
-from meridian.xray_workload import render_workload_config
+from meridian.xray_workload import ServiceRouteCredential, bridge_client_uuid, render_workload_config
 
 XRAY_LINUX_ASSET = "Xray-linux-64.zip"
 # Loopback gRPC API the agent will use for users and traffic counters (M2).
@@ -26,19 +28,28 @@ _PINS = (
 )
 
 
+_VISION: Final = "xtls-rprx-vision"
+
+
 def managed_inbounds(profile: ConfigProfilePayload) -> list[ManagedInbound]:
+    """The inbounds whose clients are the service's users: every one but gateway bridges."""
     return [
         ManagedInbound(
             tag=inbound.tag,
             protocol="hysteria2" if inbound.protocol == "hysteria2" else "vless",
-            flow="xtls-rprx-vision" if inbound.protocol == "reality" else "",
+            flow=_VISION if inbound.protocol == "reality" else "",
         )
         for inbound in profile.inbounds
+        if inbound.purpose != "bridge"
     ]
 
 
-def build_node_spec(profile: ConfigProfilePayload, reality_keys: RealityKeyBinding | None) -> NodeSpec:
-    """Return the agent resources for one exit workload."""
+def build_node_spec(
+    profile: ConfigProfilePayload,
+    reality_keys: RealityKeyBinding | None,
+    service_credentials: dict[str, ServiceRouteCredential] | None = None,
+) -> NodeSpec:
+    """Return the agent resources for one workload; a gateway passes its edges' credentials."""
     inbounds = managed_inbounds(profile)
     users = [users_resource_id(inbound.tag) for inbound in inbounds]
     pins = [pin[0] for pin in _PINS]
@@ -64,7 +75,7 @@ def build_node_spec(profile: ConfigProfilePayload, reality_keys: RealityKeyBindi
             "depends_on": pins,
             "kind": "xray_config",
             "path": CORE_CONFIG,
-            "config": _with_api(render_workload_config(profile, reality_keys=reality_keys)),
+            "config": _with_api(_with_bridge_clients(profile, reality_keys, service_credentials)),
             "api_address": f"127.0.0.1:{CORE_API_PORT}",
         }
     )
@@ -81,6 +92,36 @@ def build_node_spec(profile: ConfigProfilePayload, reality_keys: RealityKeyBindi
         }
     )
     return NodeSpec.model_validate({"resources": resources, "managed_inbounds": inbounds})
+
+
+def _with_bridge_clients(
+    profile: ConfigProfilePayload,
+    reality_keys: RealityKeyBinding | None,
+    service_credentials: dict[str, ServiceRouteCredential] | None,
+) -> dict[str, Any]:
+    """Render the profile, giving each gateway bridge its one client (the gateway's edge)."""
+    config = render_workload_config(profile, reality_keys=reality_keys, service_credentials=service_credentials)
+    bridges = {
+        inbound.tag: ref
+        for ref, inbound in zip(profile.inbound_refs, profile.inbounds, strict=True)
+        if inbound.purpose == "bridge"
+    }
+    if not bridges:
+        return config
+    assert reality_keys is not None  # rendering a Reality bridge already required the keys
+    inbounds = [
+        {
+            **inbound,
+            "settings": {
+                **inbound["settings"],
+                "clients": [{"id": bridge_client_uuid(reality_keys, bridges[inbound["tag"]]), "flow": _VISION}],
+            },
+        }
+        if inbound["tag"] in bridges
+        else inbound
+        for inbound in config["inbounds"]
+    ]
+    return {**config, "inbounds": inbounds}
 
 
 def _with_api(config: dict[str, Any]) -> dict[str, Any]:
