@@ -139,7 +139,6 @@ class Fleet:
         self.control.when("pg_dump", stdout=f"{hashlib.sha256(DUMP).hexdigest()}\nbackup-done\n")
         self.control.when("base64 /var/backups/", stdout=base64.encodebytes(DUMP).decode())
         self.control.when("panel.env", stdout="APP_SECRET=secret-for-tests\n")
-        self.control.when("docker ps -a --format", rc=1)
         self.relay = MockConnection()
         self.installs: list[str] = []
         self.imports: list[UserImportBatch] = []

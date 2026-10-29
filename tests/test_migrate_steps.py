@@ -213,12 +213,38 @@ def test_stopping_the_panel_keeps_it_from_returning_on_reboot() -> None:
 
 def test_panel_removal_reuses_teardowns_commands_and_checks_nothing_is_left() -> None:
     conn = MockConnection()
-    conn.when("docker ps -a --format", stdout="ctlsvc-db\n")
+    conn.when("docker ps -a --format", stdout="ctlsvc-db\n/opt/remnawave\n")
 
-    with pytest.raises(MigrationError, match="ctlsvc-db"):
+    with pytest.raises(MigrationError, match="ctlsvc-db, /opt/remnawave"):
         remove_panel(conn)
 
     assert conn.calls[: len(panel_stack_removal())] == panel_stack_removal()
+
+
+def test_panel_removal_passes_once_the_check_finds_nothing() -> None:
+    conn = MockConnection()
+
+    remove_panel(conn)
+
+    assert "if [ -e" in conn.calls[-1]
+
+
+@pytest.mark.parametrize(
+    ("pattern", "rc", "message"),
+    [
+        ("rm -rf", 1, "Could not remove the panel"),
+        ("rm -rf", 255, "Could not remove the panel"),
+        ("docker ps -a --format", 3, "Could not check"),
+        ("docker ps -a --format", 255, "Could not check"),
+    ],
+    ids=["removal-failed", "removal-lost-connection", "no-docker", "check-lost-connection"],
+)
+def test_panel_removal_that_fails_or_cannot_be_checked_is_never_done(pattern: str, rc: int, message: str) -> None:
+    conn = MockConnection()
+    conn.when(pattern, rc=rc, stderr="boom")
+
+    with pytest.raises(MigrationError, match=message):
+        remove_panel(conn)
 
 
 def test_teardown_removes_the_panel_stack_but_never_the_migration_backup() -> None:

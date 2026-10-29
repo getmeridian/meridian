@@ -20,4 +20,5 @@
 - **Panel-side kinds cannot retire after the cut-over** — no API answers; forget them at cut-over or the commit refuses kinds outside `RETIREMENT_ORDER`.
 - **Node containers go before the apply** — the agent's core binds the same inbound ports; the panel stops first, because the bootstrap restarts `ctld` on 3000.
 - **Compare against links saved before the cut-over** — the post-apply panel URL loses its trailing slash; `subscription_url()` reads only host and path.
+- **Done only after a completed check finds no panel** — every removal command's exit counts, and the last check lists containers and directories; a failed `rm -rf` or a lost connection once reached `done`, after which reruns are no-ops.
 - **A short UUID outside `SUB_TOKEN_PATTERN` is refused at review** with a `client reissue` hint; never widen the pattern silently.

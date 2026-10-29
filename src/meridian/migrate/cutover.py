@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding
 from meridian.compiler.models import ResourcePlan
-from meridian.host_runtime import PANEL_STOP_ORDER
+from meridian.host_runtime import LEGACY_PANEL_DIR, PANEL_DIR, PANEL_STOP_ORDER
 from meridian.migrate import MigrationError
 from meridian.provision.uninstall import panel_stack_removal
 from meridian.reconciler.server_retirement import NodeRuntimeRetirement
@@ -125,18 +125,40 @@ def forget(bindings: list[ManagedResourceBinding]) -> None:
 
 
 def remove_panel(conn: ServerConnection) -> None:
-    """Delete the panel stack, its data directory, and the panel bootstrap's attestation."""
+    """Delete the panel stack, its data directory, and the panel bootstrap's attestation, then prove they are gone.
+
+    Raises unless a completed inspection finds no panel container or directory, so a failed removal
+    (or a lost connection) leaves the migration at `applied` for a re-run instead of marking it done.
+    """
     for command in [*panel_stack_removal(), f"rm -f {shlex.quote(CONTROL_RUNTIME_ATTESTATION_PATH)}"]:
-        conn.run(command, timeout=300)
+        result = conn.run(command, timeout=300, operation_name="remove the panel")
+        if result.returncode != 0:
+            raise MigrationError(
+                f"Could not remove the panel: {_detail(result.stderr or result.stdout, result.returncode)}",
+                hint="Check the control server over SSH, then run `meridian migrate` again.",
+            )
+    directories = " ".join(shlex.quote(path) for path in (PANEL_DIR, LEGACY_PANEL_DIR))
     left = conn.run(
-        "docker ps -a --format '{{.Names}}' | grep -x -e " + " -e ".join(_PANEL_NAMES),
+        "names=$(docker ps -a --format '{{.Names}}') || exit 3;"
+        f" printf '%s\\n' \"$names\" | grep -x -e {' -e '.join(_PANEL_NAMES)};"
+        f' for d in {directories}; do if [ -e "$d" ]; then echo "$d"; fi; done; true',
         timeout=30,
+        operation_name="check the panel is gone",
     )
-    if left.returncode == 0 and left.stdout.strip():
+    if left.returncode != 0:
         raise MigrationError(
-            "Panel containers are still present after removal: " + ", ".join(left.stdout.split()),
-            hint="Remove them with `docker rm -f`, then run `meridian migrate` again.",
+            f"Could not check that the panel is gone: {_detail(left.stderr or left.stdout, left.returncode)}",
+            hint="Check the control server over SSH, then run `meridian migrate` again.",
         )
+    if left.stdout.strip():
+        raise MigrationError(
+            "Panel containers or directories are still present after removal: " + ", ".join(left.stdout.split()),
+            hint="Remove them (`docker rm -f`, `rm -rf`), then run `meridian migrate` again.",
+        )
+
+
+def _detail(output: str, returncode: int) -> str:
+    return output.strip()[:200] or f"exit {returncode}"
 
 
 def drop_panel_state(cluster: ClusterConfig) -> None:
