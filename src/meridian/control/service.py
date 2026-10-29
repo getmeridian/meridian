@@ -390,7 +390,12 @@ class ControlService:
             return unknown_subscription()
         record = _user(row)
         user = SubscriptionUser(
-            username=record.username, uuid=record.uuid, short_id=record.sub_token, status=record.status
+            username=record.username,
+            uuid=record.uuid,
+            short_id=record.sub_token,
+            status=record.status,
+            expires_at=datetime.fromisoformat(record.expire_at) if record.expire_at else None,
+            limit_bytes=record.traffic_limit_bytes,
         )
         endpoints = [ClientEndpoint.model_validate_json(body) for body in bodies]
         document = SUFFIX_FORMATS[suffix] if suffix else select_format(user_agent, accept)

@@ -27,12 +27,18 @@ def test_meridian_plan_replaces_every_panel_kind() -> None:
 
     assert {"control_service", "agent_runtime", "node_workload", "control_user", "service_settings"} <= kinds
     assert not kinds & {"control_plane_runtime", "profile", "inbound", "node", "host", "access_user", "squad"}
-    endpoints = sorted(item.logical_id for item in plan.resources if item.payload.kind == "client_endpoint")
-    assert endpoints == [
-        "endpoint:main:main-hysteria2:direct",
-        "endpoint:main:main-reality:direct",
-        "endpoint:main:main-xhttp:direct",
-    ]
+    endpoints = {
+        item.logical_id: item.payload.fingerprint_copy  # type: ignore[union-attr]
+        for item in plan.resources
+        if item.payload.kind == "client_endpoint"
+    }
+    assert endpoints == {
+        "endpoint:main:main-hysteria2:direct": False,
+        "endpoint:main:main-reality:direct": False,
+        "endpoint:main:main-reality:direct:firefox": True,
+        "endpoint:main:main-xhttp:direct": False,
+        "endpoint:main:main-xhttp:direct:firefox": True,
+    }
 
 
 def test_meridian_plan_keeps_certificates_independent_of_the_workload() -> None:

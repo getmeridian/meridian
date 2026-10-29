@@ -487,6 +487,8 @@ class ClientEndpointPayload(CoreModel):
     path: str = ""
     fingerprint: str = ""
     position: int = 0
+    # Another fingerprint of an earlier entry: listed, but never in the same failover group.
+    fingerprint_copy: bool = False
 
 
 class ControlUserPayload(CoreModel):

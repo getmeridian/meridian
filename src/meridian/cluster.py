@@ -60,6 +60,13 @@ class PanelConfig:
     deployed_with: str = ""  # Meridian CLI version
     _extra: dict[str, Any] = field(default_factory=dict, repr=False)
 
+    def public_base_url(self) -> str:
+        """Scheme, host, and connection-page path that public links start with; empty when unknown."""
+        if not self.url or not self.sub_path:
+            return ""
+        parsed = urlsplit(self.url)
+        return f"{parsed.scheme}://{parsed.netloc}/{self.sub_path}"
+
     def subscription_url(self, short_uuid: str) -> str:
         """Public subscription URL for a user; empty when it cannot be built.
 

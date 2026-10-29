@@ -160,3 +160,13 @@ def test_a_newer_database_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(ServiceError, match="newer"):
         ControlService(path, fleet_id=FLEET_ID, version="4.0.0")
+
+
+def test_subscription_userinfo_carries_the_users_limit_and_expiry(service: ControlService) -> None:
+    user = service.put_user("alice")
+    service.update_user("alice", UserUpdate(traffic_limit_bytes=5 * 10**9, expire_at="2030-01-01T00:00:00Z"))
+
+    info = service.subscription(user.sub_token).headers["subscription-userinfo"]
+
+    assert "total=5000000000" in info
+    assert "expire=1893456000" in info

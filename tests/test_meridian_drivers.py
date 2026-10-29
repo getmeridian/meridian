@@ -13,7 +13,7 @@ import pytest
 from meridian.cluster import ClusterConfig
 from meridian.compiler import compile_topology
 from meridian.compiler.models import ResourcePlan
-from meridian.control.models import ClientEndpoint, MintedToken, NodeSpec, NodeStatus
+from meridian.control.models import ClientEndpoint, MintedToken, NodeSpec, NodeStatus, ServiceSettings
 from meridian.control_artifacts import AgentBinary
 from meridian.core.agent_types import NodeStateRef, canonical_sha256
 from meridian.host_runtime import AGENT_BINARY, AGENT_BOOTSTRAP, CONTROL_SERVICE_PUBLIC_KEY
@@ -43,6 +43,7 @@ class FakeControl:
         self.tokens: list[str] = []
         # Each node() call pops the next scripted status; the last one repeats.
         self.reports: list[dict[str, Any]] = []
+        self.current_settings = ServiceSettings(profile_title="Meridian")
 
     def __enter__(self) -> FakeControl:
         return self
@@ -71,6 +72,13 @@ class FakeControl:
         self.endpoints[endpoint_id] = endpoint
         return endpoint
 
+    def settings(self) -> ServiceSettings:
+        return self.current_settings
+
+    def put_settings(self, settings: ServiceSettings) -> ServiceSettings:
+        self.current_settings = settings
+        return settings
+
     def _status(self, node_id: str, *, applied: bool = False, **fields: Any) -> NodeStatus:
         spec = self.specs.get(node_id)
         sha = "b" * 64
@@ -96,6 +104,7 @@ def _setup(plan: ResourcePlan, conn: MockConnection | None = None):
     cluster = ClusterConfig()
     cluster.fleet_id = FLEET_ID
     cluster.panel.url = "https://198.51.100.10/secret"
+    cluster.panel.sub_path = "pages"
     control = FakeControl()
     drivers = build_meridian_drivers(
         MeridianDriverContext(
@@ -187,3 +196,24 @@ def test_agent_refuses_a_malformed_service_key(plan: ResourcePlan) -> None:
     with pytest.raises(ResourceReconcileError, match="malformed"):
         drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
     assert control.tokens == []
+
+
+def test_settings_carry_the_public_base_of_pages_and_subscriptions(plan: ResourcePlan) -> None:
+    drivers, control, _cluster = _setup(plan)
+    action = _action(plan, "settings:service")
+
+    assert not observation_converges(action, drivers["service_settings"].observe(action, None))
+    drivers["service_settings"].apply(action, None)
+
+    assert control.current_settings.public_url == "https://198.51.100.10/pages"
+    assert observation_converges(action, drivers["service_settings"].observe(action, None))
+
+
+def test_fingerprint_copies_reach_the_service_flagged(plan: ResourcePlan) -> None:
+    drivers, control, _cluster = _setup(plan)
+    control.reports = [{"applied": True}]
+    drivers["node_workload"].apply(_action(plan, "workload:main"), None)
+
+    drivers["client_endpoint"].apply(_action(plan, "endpoint:main:main-reality:direct:firefox"), None)
+
+    assert control.endpoints["main:main-reality:direct:firefox"].fingerprint_copy is True

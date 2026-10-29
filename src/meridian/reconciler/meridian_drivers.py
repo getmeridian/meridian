@@ -309,6 +309,7 @@ class ClientEndpointDriver:
             host=payload.host,
             path=payload.path,
             salamander_password=salamander_password(keys) if keys and payload.protocol == "hysteria2" else "",
+            fingerprint_copy=payload.fingerprint_copy,
         )
 
 
@@ -337,22 +338,26 @@ class ControlUserDriver:
 
 
 class ServiceSettingsDriver:
+    """Keep the subscription title and the public base its links use (from the bootstrap, not the plan)."""
+
     def __init__(self, context: MeridianDriverContext) -> None:
         self.context = context
 
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
-        payload = payload_of(action, ServiceSettingsPayload)
         with self.context.client() as client:
             current = client.settings()
-        return _observation(
-            action, exists=current.profile_title == payload.profile_title, connected=False, remote_id="settings"
-        )
+        return _observation(action, exists=current == self._settings(action), connected=False, remote_id="settings")
 
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
-        payload = payload_of(action, ServiceSettingsPayload)
         with self.context.client() as client:
-            client.put_settings(ServiceSettings(profile_title=payload.profile_title))
+            client.put_settings(self._settings(action))
         return ResourceApplyReceipt(remote_id="settings")
+
+    def _settings(self, action: ResourceAction) -> ServiceSettings:
+        payload = payload_of(action, ServiceSettingsPayload)
+        return ServiceSettings(
+            profile_title=payload.profile_title, public_url=self.context.cluster.panel.public_base_url()
+        )
 
 
 def _observation(action: ResourceAction, *, exists: bool, connected: bool, remote_id: str) -> ResourceObservation:

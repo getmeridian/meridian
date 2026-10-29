@@ -122,12 +122,8 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
                 connected=True,
             )
         elif isinstance(payload, HostPayload):
-            # Keep the entries Base64 clients see, minus fingerprint copies (one balancer per fingerprint).
-            if (
-                payload.is_hidden
-                or ALT_FINGERPRINT_TAG in payload.tags
-                or "XRAY_BASE64" in (payload.exclude_from_subscription_types)
-            ):
+            # Keep the entries Base64 clients see; the service renders every other format from them.
+            if payload.is_hidden or "XRAY_BASE64" in payload.exclude_from_subscription_types:
                 renamed[logical_id] = None
                 continue
             replace(
@@ -146,6 +142,7 @@ def to_meridian_backend(builder: PlanBuilder) -> PlanBuilder:
                     path=payload.path,
                     fingerprint=payload.fingerprint,
                     position=payload.view_position,
+                    fingerprint_copy=ALT_FINGERPRINT_TAG in payload.tags,
                 ),
                 [logical_id],
             )
