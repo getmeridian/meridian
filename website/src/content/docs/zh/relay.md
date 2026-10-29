@@ -15,7 +15,7 @@ Client → Relay (domestic IP) → Exit server (abroad) → Internet
 
 ## 中继如何工作
 
-中继运行 [Realm](https://github.com/zhboner/realm)，一个轻量的零拷贝 TCP 转发器。它监听端口 443（可配置），并将连接转发到出口的 Reality 监听端口。中继服务器上不运行 Docker，也不运行面板。
+中继运行 [Realm](https://github.com/zhboner/realm)，一个轻量的零拷贝 TCP 转发器。它监听端口 443（可配置），并将连接转发到出口的 Reality 监听端口。中继服务器上不运行其他任何东西：没有 agent，也没有控制服务。Meridian 通过 SSH 管理它。
 
 中继只承载 **Reality** 流量。XHTTP、WSS 和 Hysteria2 仍使用出口自己的地址和域名，并保留在同一份订阅中作为备用方式。
 

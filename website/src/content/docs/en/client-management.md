@@ -72,7 +72,7 @@ meridian client set alice --expires 2027-06-30
 meridian client set alice --limit none --expires never
 ```
 
-- `--limit` takes a size such as `500MB`, `50GB`, or `1.5TB` (1 GB is 1024³ bytes, as the panel counts); `none` removes the limit.
+- `--limit` takes a size such as `500MB`, `50GB`, or `1.5TB` (1 GB is 1024³ bytes, as the control service counts); `none` removes the limit.
 - `--reset` starts used traffic from zero every `day`, `week`, or `month`; `never` keeps counting.
 - `--expires` takes a date (access ends when that day ends, in UTC), an ISO time such as `2026-12-31T18:00:00+03:00`, or `never`.
 
@@ -111,27 +111,25 @@ If a client's link or connection page reaches someone it shouldn't, replace it:
 meridian client reissue alice
 ```
 
-Remnawave gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Everything else the panel holds for the client stays: status, traffic limit and usage, expiry, description, and HWID device limit.
-
-The HWID device limit lives in the panel, not in the link. Devices already registered stay on the client's HWID list after a reissue and keep taking slots, even though their old link no longer connects. Open the client in the panel and delete devices you don't recognize, so the limit counts only the client's own. Meridian adds no claim tickets or device binding of its own.
+The control service gives the client a new subscription ID and new keys. The old subscription URL and connection page return 404, and the servers refuse the old keys. Meridian deletes the old page, publishes a new one, and prints the new page and subscription URL to send the client. They import the new link once: their apps can't follow a subscription URL that no longer exists. Everything else stays: status, traffic limit and usage, and expiry.
 
 With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 ## Removing a client
 
-`meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client. Don't delete users in the Remnawave panel directly — Meridian recreates any client still in the topology on the next apply.
+`meridian client remove NAME` removes the client permanently: their links stop working and their connection page is deleted. A fleet keeps at least one client.
 
 ## Subscription links
 
-Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the Remnawave admin panel stays on a separate secret path that shared links never reveal.
+Subscription URLs look like `https://198.51.100.10/<page-path>/sub/<id>`. They live under the connection-page path; the control service's console stays on a separate secret path that shared links never reveal.
 
 Every subscription asks apps to refresh it every 6 hours (the `profile-update-interval` header, which apps such as Happ and Clash Verge follow), so when you add an exit or relay, clients pick it up within a few hours without a new link. Apps that ignore the header refresh on their own schedule; a manual refresh in the app picks up changes at once.
 
-An app's support button opens that person's connection page, with its "Not connecting?" help. To send people somewhere else, set your own `support-url` header in the panel's subscription settings; Meridian keeps it.
+An app's support button opens that person's connection page, with its "Not connecting?" help.
 
 ### Tested apps and engines
 
-One subscription URL serves each app the format it reads. Every change to Meridian runs a multi-node test lab that fetches each format from a real Remnawave panel and checks it with the engine those apps are built on:
+One subscription URL serves each app the format it reads; Stash gets a profile in its own dialect. Every change to Meridian checks each format the control service serves with the engine those apps are built on:
 
 | Format | Apps | Engine tested | What the lab checks |
 |--------|------|---------------|---------------------|
@@ -144,53 +142,41 @@ Apps ship their own engine updates, so an app may run a slightly older or newer 
 
 ### BitTorrent in Xray apps
 
-Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorrent peer connections directly from the device, so torrents use the person's own connection and don't trip Torrent Blocker on the exit. This is best effort: encrypted peers and UDP DHT/uTP may still go through the VPN. Mihomo, sing-box, and Base64 subscriptions don't get this rule.
+Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorrent peer connections directly from the device, so torrents use the person's own connection instead of the exit's address. This is best effort: encrypted peers and UDP DHT/uTP may still go through the VPN. Mihomo, sing-box, and Base64 subscriptions don't get this rule.
 
 ## Where client data lives
 
-Client accounts (keys, status, traffic) live in the Remnawave panel database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the panel API and don't need SSH; publishing a connection page uses SSH to the control server.
+Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API and don't need SSH; publishing a connection page uses SSH to the control server. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
 
-## Web panel
+## Web console
 
-The [Remnawave](https://remna.st/) admin panel shows traffic, users, and nodes in a browser, and you are welcome to use it. `meridian panel` prints its URL and admin username; `meridian panel --show-password` also prints the password.
+The control service has a web console where you can manage people from a browser, including your phone. `meridian panel` prints its address and, the first time, a one-time setup link where you choose the owner's password. You can add a sign-in code from an authenticator app afterwards, in **Settings**.
 
-Meridian and the panel split the work so your edits don't get overwritten:
-
-| Meridian manages (the next apply restores its version) | Yours to change (apply never touches these) |
+| Change in the console | Shown read-only (change with `meridian`) |
 |---|---|
-| Nodes, config profiles, inbounds, published Hosts, squads | Each client's status: enable/disable, traffic limits, expiry, HWID limits, description |
-| Subscription templates and the settings Meridian sets (title, refresh interval, Xray JSON for apps that read it, the support link unless you set your own) | Users you create yourself in the panel |
-| Which clients exist, their names, and their squads | Notifications, plugins, IP control, and other panel settings |
+| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, reset traffic, issue a new link, remove | **Servers**: every exit and gateway, whether its agent is online and up to date, its version, and its traffic |
+| **Tokens**: create and revoke API tokens | **Revisions**: every change applied from your computer, with its plan |
+| Your password and sign-in code | The subscription title shown in apps |
 
-`meridian plan` shows any difference in what Meridian manages before anything changes. Users you add in the panel are never listed, changed, or deleted by Meridian; to give someone a Meridian-managed link and connection page, use `meridian client add` instead.
+Changes in the console and in the CLI are the same changes: `meridian client list` shows people added in the console too, and applies never undo a status, limit, or expiry set in either. People you added with `meridian client add` stay yours on the CLI: the console can change their limits and status, but removing them or issuing a new link prints the `meridian client` command instead, because their connection page lives on the server. People added in the console get a subscription link and QR code, but no connection page.
 
-### Node plugins
+The console never holds SSH keys, so a stolen session can't change your servers. Every sign-in expires after 30 minutes idle and 12 hours at most, and creating a token asks for your password again.
 
-Remnawave's node plugins (Ingress Filter, Egress Filter, Torrent Blocker, Connection Drop) are optional and live in the panel. To use one, open **Node Plugins** in the admin UI, create a plugin configuration, turn on the plugins you want, and attach it to your nodes. Meridian already runs every node with the `NET_ADMIN` capability the plugins need, and never changes or removes your plugin configurations.
+### API tokens
 
-The plugins write nftables rules on the host, so upstream also requires a Linux kernel 5.7 or newer; on an older one they silently do nothing. `meridian check` reports this as **Node plugin readiness** on every exit and gateway, and warns about an old kernel (move to Ubuntu 22.04+ or Debian 11+). If you don't use plugins, you can ignore that warning.
+Scripts and community bots, such as a Telegram bot that tells people how much traffic they have left, talk to the control service's API. Give each one its own token:
 
-Torrent Blocker recognizes BitTorrent through traffic sniffing, which Meridian turns on (route-only, so destinations are never rewritten) on every inbound it renders. Turn the plugin on in the panel and it works on every exit.
+1. Open the console (`meridian panel` prints the address), go to **Tokens**, and choose **Create token**.
+2. Name it after the bot and pick **Read**. The console shows the token once; store it with the bot's secrets.
+3. Point the bot at the console address and send the token as `Authorization: Bearer <token>`. API paths go below that address, for example `https://198.51.100.10/<secret-path>/api/users/alice`. The address contains the secret path, so keep it as private as the token.
 
-### Connect a bot to the panel
+A read token sees:
 
-Community bots, such as a Telegram bot that tells people how much traffic they have left, talk to the Remnawave API directly. Give each bot its own token with only the access it needs:
+| Endpoint | Returns |
+|---|---|
+| `GET /api/users/{username}` | One person's status, traffic used and limit, reset period, and expiry |
+| `GET /api/users` | Every person |
+| `GET /api/traffic` | Traffic totals per person |
+| `GET /api/health` | The service's version |
 
-1. Open the panel (`meridian panel` prints the URL), go to **Remnawave Settings → API tokens**, and choose **Create API token**.
-2. Name the token after the bot and set **Expires in (days)** to a period you will actually rotate, such as 30 or 90 days.
-3. Start from the **Read only** preset, or pick single endpoints, and grant only what the bot uses. The panel shows the token once; store it with the bot's secrets.
-4. Point the bot at the panel URL from `meridian panel` and send the token as `Authorization: Bearer <token>`. API paths go below that URL, for example `https://198.51.100.10/<secret-path>/api/users/by-username/alice`. The URL contains the panel's secret path, so keep it as private as the token.
-
-Scopes are named `resource:endpoint`; `resource:read` grants every read endpoint of a resource and `resource:write` every write. A typical read-only bot needs:
-
-| Scope | Endpoint | Returns |
-|---|---|---|
-| `users:by-username` | `GET /api/users/by-username/{username}` | One user's status, traffic used and limit, and expiry |
-| `users:by-short-uuid` | `GET /api/users/by-short-uuid/{shortUuid}` | The same, found from the ID in the user's subscription link |
-| `users:list` | `GET /api/users` | Every user, paginated |
-| `system:stats` | `GET /api/system/stats` | Panel-wide user and traffic totals |
-| `nodes:list` | `GET /api/nodes` | Each node's status and traffic |
-
-Add a write scope only when the bot changes accounts, for example `users:extend` (`POST /api/users/{id}/actions/extend`) for a payment bot that extends expiry. Status, limits, and expiry are yours to change (see the table above), so the next apply keeps a bot's edits. A bot must not rename or delete Meridian's clients: the next apply recreates them.
-
-Don't hand a bot Meridian's own token (`meridian-provisioner` in the token list). It has full access to the panel and practically never expires, so a leak from the bot's host would expose every node, key, and user. A separate token limits the damage to what the bot can do, expires on its own, and can be deleted without affecting Meridian. Leave `meridian-provisioner` alone; every client and apply command uses it.
+Read tokens never see anyone's keys or subscription ID. Tokens don't expire on their own: revoke one in **Tokens** and anything using it loses access at once. No token the console creates can change people or servers; those changes go through the console itself or the `meridian` CLI.

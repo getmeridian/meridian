@@ -33,7 +33,7 @@ MERMAID_SHA512 = "GSGloRsBs+JINmmhl0JDwjpuezCsHB4WGI4NASHxL3fHo3o/BRXTxhDLKnln8/
 MERMAID_URL = f"https://registry.npmjs.org/mermaid/-/mermaid-{MERMAID_VERSION}.tgz"
 CACHE = Path.home() / ".cache" / "meridian-figures"
 WEBSITE = Path(__file__).resolve().parent.parent
-FONT = WEBSITE / "public" / "fonts" / "source-sans-3.woff2"
+FONT = WEBSITE / "public" / "fonts" / "source-sans-3-latin.woff2"
 
 # Sentinel color -> CSS. Docs pages define --sl-color-*, blog pages the tokens.css palette.
 PAGE_BG = "var(--sl-color-black, var(--bg, #fdfaf6))"

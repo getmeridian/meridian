@@ -2,32 +2,36 @@
 #
 # Meridian writes this file; you generally do NOT edit it by hand. Change the
 # fleet with `meridian deploy`, `meridian setup`, `meridian node add`,
-# `meridian relay deploy`, and `meridian client add`, which review and apply
+# `meridian relay add`, and `meridian client add`, which review and apply
 # `topology_intent` for you.
 #
 # Two parts:
-#   1. Control-service access and presentation (panel, branding) — written
+#   1. Control service access and presentation (panel, branding) — written
 #      during deploy.
 #   2. topology_intent — the reviewed description of your fleet. Servers are
-#      referenced by the stable IDs saved in servers.json beside this file, never
-#      by address. Compiled-resource bookkeeping (workloads, managed_bindings,
-#      allocations, action_checkpoints, generations) is appended after apply.
+#      referenced by the stable IDs saved in servers.json beside this file,
+#      never by address. Compiled-resource bookkeeping (workloads,
+#      managed_bindings, allocations, action_checkpoints, generations) is
+#      appended after apply.
+#
+# Users, traffic, and revisions live in the control service, not here; every
+# change also pulls an encrypted snapshot of it into snapshots/.
 #
 # All IPs in this example use RFC 5737 documentation ranges (198.51.100.x).
 
 version: 4
 
 # ---------------------------------------------------------------------------
-# Panel — the control service, populated by `meridian deploy`. The URL and
-# admin token reach it through nginx's secret path on 443.
+# Control service access — populated by `meridian deploy`. The key is still
+# named `panel` so older files load unchanged.
 # ---------------------------------------------------------------------------
 panel:
-  url: https://198.51.100.1/panel-secret-path
-  api_token: example-control-service-admin-token
+  url: https://198.51.100.1/service-secret-path
+  api_token: example-root-token              # the CLI's own token; never share it
   server_ip: 198.51.100.1
   ssh_user: root
   ssh_port: 22
-  secret_path: panel-secret-path             # nginx reverse proxy path
+  secret_path: service-secret-path           # nginx path to the control service and console
   sub_path: subscription-secret-path         # connection-page and subscription path
   deployed_with: 4.0.0
 
@@ -40,14 +44,15 @@ branding:
   color: ocean                               # ocean | sunset | forest | lavender | rose | slate
 
 # ---------------------------------------------------------------------------
-# Topology intent — one control plane, one exit, and a relay in front of it.
+# Topology intent — one control server, one exit, and a relay in front of it.
 # `meridian deploy 198.51.100.1` writes the control + exit part;
-# `meridian relay deploy 198.51.100.10 --exit main --name relay-moscow`
+# `meridian relay add 198.51.100.10 --exit main --name relay-moscow`
 # adds the relay. Omitted fields take their defaults.
 # ---------------------------------------------------------------------------
 topology_intent:
   control:
     server_ref: srv-0a1b2c3d4e5f             # 198.51.100.1 in servers.json
+    backend: meridian                        # the default (a version-3 file without it is Remnawave)
   exits:
     - id: main
       server_ref: srv-0a1b2c3d4e5f

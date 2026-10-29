@@ -34,9 +34,9 @@ Meridian split routing را در subscriptions **Xray JSON** و **Mihomo** خو�
 
 برنامه‌هایی که لیست پیوند ساده (Base64) را وارد می‌کنند، قوانین مسیریابی را دریافت نمی‌کنند. در آن برنامه‌ها، قوانین **direct** برای `geosite:category-ru` و `geoip:ru` را در تنظیمات مسیریابی اضافه کنید، یا به برنامه‌ای که Xray JSON یا subscriptions Mihomo را وارد می‌کند، تغییر دهید. کاربران Hiddify می‌توانند به جای آن منطقه را روی **روسیه** تنظیم کنند.
 
-### چرا template را در پنل ویرایش نکنید؟
+### قوانین از کجا می‌آیند
 
-Meridian template JSON Xray و subscription Mihomo خود را در Remnawave مدیریت می‌کند. آن‌ها fallback خودکار بین exits و relays شما را حمل می‌کند، و مسیریابی بالا را دارند. Meridian آن‌ها را در هر apply (شامل redeploys و `client add`، `node add`، `relay add`) restore می‌کند، بنابراین قوانین اضافه‌شده در پنل آنجا دوام نخواهند داشت.
+سرویس کنترل هر اشتراک Xray JSON، Mihomo و sing-box را از توپولوژی بازبینی‌شدهٔ شما می‌سازد: fallback خودکار بین exitها و relayهای شما، و مسیریابی بالا. هیچ قالبی برای ویرایش دستی وجود ندارد. برای اینکه ترافیک را طور دیگری بفرستید، از [`meridian route`](/fa/cli-reference/#meridian-route) روی یک exit یا از قوانین مسیریابی یک [دروازهٔ مسیریابی](#از-طریق-دروازه-مسیریابی) استفاده کنید.
 
 ## چگونه لایه‌ها با هم کار می‌کنند
 

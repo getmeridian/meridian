@@ -72,7 +72,7 @@ meridian client set alice --expires 2027-06-30
 meridian client set alice --limit none --expires never
 ```
 
-- `--limit` 接受 `500MB`、`50GB` 或 `1.5TB` 这样的大小（1 GB 为 1024³ 字节，与面板一致）；`none` 取消限额。
+- `--limit` 接受 `500MB`、`50GB` 或 `1.5TB` 这样的大小（1 GB 为 1024³ 字节，与控制服务的计算方式一致）；`none` 取消限额。
 - `--reset` 每天（`day`）、每周（`week`）或每月（`month`）把已用流量清零；`never` 表示一直累计。
 - `--expires` 接受日期（访问在当天结束时终止，按 UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`，或 `never`。
 
@@ -111,27 +111,25 @@ meridian client enable alice
 meridian client reissue alice
 ```
 
-Remnawave 会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 删除旧页面、发布新页面，并打印新的页面和订阅 URL，供你发给该客户端。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。面板为该客户端保存的其他内容都保持不变：状态、流量限额和用量、到期时间、描述以及 HWID 设备数限制。
-
-HWID 设备数限制保存在面板中，而不是链接里。重新签发后，已注册的设备仍留在该客户端的 HWID 列表中并继续占用名额，尽管它们的旧链接已无法连接。请在面板中打开该客户端，删除你不认识的设备，让限制只计算客户端本人的设备。Meridian 不会额外添加领取凭证或设备绑定。
+控制服务会为该客户端生成新的订阅 ID 和新的密钥。旧的订阅 URL 和连接页面返回 404，服务器拒绝旧密钥。Meridian 删除旧页面、发布新页面，并打印新的页面和订阅 URL，供你发给该客户端。他们需要重新导入一次新链接：应用无法刷新一个已经不存在的订阅 URL。其他一切保持不变：状态、流量限额和用量、到期时间。
 
 使用 `--json` 时请传入 `--yes`。新链接只出现在该命令的输出中。
 
 ## 删除客户端
 
-`meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面被删除。集群至少保持一个客户端。不要直接在 Remnawave 面板中删除用户 — Meridian 在下次应用时重新创建拓扑中保留的任何客户端。
+`meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面被删除。集群至少保持一个客户端。
 
 ## 订阅链接
 
-订阅 URL 看起来像 `https://198.51.100.10/<page-path>/sub/<id>`。它们位于连接页面路径下；Remnawave 管理面板位于共享链接永远不会暴露的单独密钥路径上。
+订阅 URL 看起来像 `https://198.51.100.10/<page-path>/sub/<id>`。它们位于连接页面路径下；控制服务的控制台位于共享链接永远不会暴露的单独秘密路径上。
 
 每个订阅都会要求应用每 6 小时刷新一次（通过 `profile-update-interval` 响应头，Happ 和 Clash Verge 等应用会遵循它），因此当你添加出口或中继时，客户端会在几小时内自动获取，无需发送新链接。忽略该响应头的应用会按各自的周期刷新；在应用中手动刷新则会立即生效。
 
-应用中的支持按钮会打开该用户的连接页面，其中带有“无法连接？”排查指南。若要把用户引导到其他地址，可以在面板的订阅设置中配置你自己的 `support-url` 响应头；Meridian 会保留它。
+应用中的支持按钮会打开该用户的连接页面，其中带有“无法连接？”排查指南。
 
 ### 已测试的应用和引擎
 
-同一个订阅 URL 会向每个应用提供它能读取的格式。Meridian 的每次变更都会运行一个多节点测试实验室，从真实的 Remnawave 面板获取每种格式，并用这些应用所基于的引擎进行检查：
+同一个订阅 URL 会向每个应用提供它能读取的格式；Stash 会收到它自己方言的配置。Meridian 的每次变更都会用这些应用所基于的引擎检查控制服务提供的每种格式：
 
 | 格式 | 应用 | 测试的引擎 | 实验室检查内容 |
 |--------|------|---------------|---------------------|
@@ -144,53 +142,41 @@ HWID 设备数限制保存在面板中，而不是链接里。重新签发后，
 
 ### Xray 应用中的 BitTorrent
 
-Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitTorrent 对等连接直接从设备发出，因此种子流量走用户自己的网络，不会触发出口上的 Torrent Blocker。这只是尽力而为：加密的对等连接和 UDP（DHT/uTP）仍可能经过 VPN。Mihomo、sing-box 和 Base64 订阅不包含这条规则。
+Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitTorrent 对等连接直接从设备发出，因此种子流量走用户自己的网络，而不是出口的地址。这只是尽力而为：加密的对等连接和 UDP（DHT/uTP）仍可能经过 VPN。Mihomo、sing-box 和 Base64 订阅不包含这条规则。
 
 ## 客户端数据存放在哪里
 
-客户端账户（密钥、状态、流量）保存在控制服务器上的 Remnawave 面板数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用面板 API，不需要 SSH；发布连接页面则会通过 SSH 连接控制服务器。
+客户端账户（密钥、状态、限额、流量）保存在控制服务器上控制服务的数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用控制服务的 API，不需要 SSH；发布连接页面则会通过 SSH 连接控制服务器。每次变更后，你的机器都会保存一份该数据库的加密快照（见[备份](/zh/deploy/#备份)）。
 
-## Web 面板
+## 网页控制台
 
-[Remnawave](https://remna.st/) 管理面板可在浏览器中显示流量、用户和节点，你可以随时使用。`meridian panel` 会打印面板 URL 和管理员用户名；`meridian panel --show-password` 还会一并打印密码。
+控制服务带有一个网页控制台，你可以在浏览器（包括手机）中管理用户。`meridian panel` 会打印它的地址；第一次还会打印一个一次性设置链接，用来设置所有者的密码。之后可以在 **Settings** 中添加来自身份验证器应用的登录验证码。
 
-Meridian 与面板明确分工，因此你的修改不会被覆盖：
-
-| 由 Meridian 管理（下次 `apply` 会恢复为 Meridian 的版本） | 由你自由修改（`apply` 绝不会改动这些） |
+| 在控制台中修改 | 只读显示（用 `meridian` 修改） |
 |---|---|
-| 节点、配置文件、入站、发布的 Host、内外小队（squads） | 每个客户端的状态：启用/禁用、流量限额、到期时间、HWID 设备限制、备注描述 |
-| 订阅模板以及由 Meridian 维护的设置（标题、刷新间隔、向支持的应用下发 Xray JSON、未自定义时的支持链接） | 你在面板中手动创建的用户 |
-| 受管客户端的存在与否、名称和所属小队 | 通知、插件、IP 限制及其他面板设置 |
+| **People**：添加用户、分享链接和二维码、启用或禁用、设置到期时间、流量限额和重置周期、重置流量、签发新链接、删除 | **Servers**：每个出口和网关，其 agent 是否在线、是否已应用最新配置、版本和流量 |
+| **Tokens**：创建和撤销 API 令牌 | **Revisions**：从你电脑上应用的每次变更及其计划 |
+| 你的密码和登录验证码 | 应用中显示的订阅标题 |
 
-在改动任何内容之前，`meridian plan` 会显示受 Meridian 管理的资源是否存在差异。你在面板中手动添加的用户绝不会被 Meridian 列出、修改或删除；如果要为某人创建由 Meridian 管理的链接和连接页面，请使用 `meridian client add`。
+在控制台和 CLI 中所做的修改是同一回事：`meridian client list` 也会显示在控制台中添加的用户，而无论在哪边设置的状态、限额或到期时间，应用都不会撤销。用 `meridian client add` 添加的用户仍归 CLI 管理：控制台可以修改他们的限额和状态，但删除他们或签发新链接时，会显示相应的 `meridian client` 命令，因为他们的连接页面存放在服务器上。在控制台中添加的用户会获得订阅链接和二维码，但没有连接页面。
 
-### 节点插件
+控制台不保存任何 SSH 密钥，因此被盗的会话无法修改你的服务器。每次登录在闲置 30 分钟后过期，最长 12 小时；创建令牌时会再次要求输入密码。
 
-Remnawave 的节点插件（Ingress Filter、Egress Filter、Torrent Blocker、Connection Drop）是可选功能，在面板中配置。如需使用，请在管理界面打开 **Node Plugins**，创建插件配置，开启所需的插件并关联到你的节点。Meridian 已经以插件所需的 `NET_ADMIN` 权限运行每个节点，并且从不修改或删除你的插件配置。
+### API 令牌
 
-插件会在宿主机上写入 nftables 规则，因此上游还要求 Linux 内核版本为 5.7 或更高；在更旧的内核上插件会静默失效。`meridian check` 会在每个出口和网关上将其报告为 **Node plugin readiness**，并对旧内核给出警告（请升级到 Ubuntu 22.04+ 或 Debian 11+）。如果你不使用节点插件，可以忽略该警告。
+脚本和社区机器人（例如告知用户剩余流量的 Telegram 机器人）通过控制服务的 API 通信。请为每个机器人单独创建令牌：
 
-Torrent Blocker 通过流量嗅探来识别 BitTorrent，Meridian 会在其生成的每个入站上开启嗅探（仅用于路由，因此不会改写目标地址）。在面板中开启该插件，它就会在每个出口上生效。
+1. 打开控制台（`meridian panel` 会打印地址），进入 **Tokens**，选择 **Create token**。
+2. 以机器人的名字命名令牌，并选择 **Read**。控制台只显示一次令牌；请将其与机器人的密钥一起保存。
+3. 将机器人指向控制台地址，并以 `Authorization: Bearer <token>` 发送令牌。API 路径位于该地址之下，例如 `https://198.51.100.10/<secret-path>/api/users/alice`。该地址包含秘密路径，因此要像令牌一样严格保密。
 
-### 将机器人连接到面板
+只读令牌可以看到：
 
-社区机器人（例如告知用户剩余流量的 Telegram 机器人）直接与 Remnawave API 通信。请为每个机器人单独创建令牌，只授予它所需的最小权限：
+| 端点 | 返回 |
+|---|---|
+| `GET /api/users/{username}` | 某个用户的状态、已用流量和限额、重置周期以及到期时间 |
+| `GET /api/users` | 所有用户 |
+| `GET /api/traffic` | 每个用户的流量总计 |
+| `GET /api/health` | 服务的版本 |
 
-1. 打开面板（`meridian panel` 会打印 URL），进入 **Remnawave Settings → API tokens**（Remnawave 设置 → API 令牌），选择 **Create API token**。
-2. 以机器人名称为令牌命名，并将 **Expires in (days)** 设为你确实会轮换的期限，例如 30 或 90 天。
-3. 从 **Read only** 预设开始，或选择单个端点，只授予机器人用到的权限。面板只显示一次令牌；请将其与机器人的密钥一起保存。
-4. 将机器人指向 `meridian panel` 给出的面板 URL，并以 `Authorization: Bearer <token>` 发送令牌。API 路径位于该 URL 之下，例如 `https://198.51.100.10/<secret-path>/api/users/by-username/alice`。该 URL 包含面板的秘密路径，因此要像令牌一样严格保密。
-
-权限范围命名为 `resource:endpoint`；`resource:read` 授予某资源的所有读取端点，`resource:write` 授予所有写入端点。典型的只读机器人需要：
-
-| 范围 | 端点 | 返回 |
-|---|---|---|
-| `users:by-username` | `GET /api/users/by-username/{username}` | 单个用户的状态、已用流量和限额、过期时间 |
-| `users:by-short-uuid` | `GET /api/users/by-short-uuid/{shortUuid}` | 同上，通过用户订阅链接中的 ID 查找 |
-| `users:list` | `GET /api/users` | 所有用户，分页 |
-| `system:stats` | `GET /api/system/stats` | 面板范围内的用户和流量总计 |
-| `nodes:list` | `GET /api/nodes` | 每个节点的状态和流量 |
-
-仅当机器人需要修改账户时才添加写入范围，例如用于续期的支付机器人的 `users:extend`（`POST /api/users/{id}/actions/extend`）。状态、限额和过期时间由你自行修改（见上表），因此下一次应用会保留机器人的修改。机器人不得重命名或删除 Meridian 的客户端：下一次应用会重新创建它们。
-
-不要把 Meridian 自己的令牌（令牌列表中的 `meridian-provisioner`）交给机器人。它拥有面板的完全访问权限，而且几乎不会过期，机器人所在主机一旦泄露，所有节点、密钥和用户都会暴露。单独的令牌把损失限制在机器人能做的范围内，会自行过期，并且删除它不影响 Meridian。请不要动 `meridian-provisioner`；所有客户端命令和应用命令都使用它。
+只读令牌永远看不到任何人的密钥或订阅 ID。令牌不会自行过期：在 **Tokens** 中撤销后，使用它的任何程序都会立即失去访问权限。控制台创建的令牌都无法修改用户或服务器；这些修改只能通过控制台本身或 `meridian` CLI 完成。

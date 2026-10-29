@@ -9,16 +9,16 @@ You are probably helping one of two people:
 
 ## How Meridian works
 
-- **Fleet roles.** One server is the *control server*. It runs the Remnawave panel, its database, and the connection pages. *Exits* are where traffic leaves for the internet, and the control server is usually an exit too. *Relays* are plain TCP forwarders, placed where an exit's address is blocked. *Gateways* pick an exit (or a pool of exits) for each destination by rule, or send it directly from the gateway.
+- **Fleet roles.** One server is the *control server*. It runs Meridian's control service (users, subscriptions, the web console) and the connection pages; every exit and gateway runs a small agent that dials out to it. *Exits* are where traffic leaves for the internet, and the control server is usually an exit too. *Relays* are plain TCP forwarders, placed where an exit's address is blocked. *Gateways* pick an exit (or a pool of exits) for each destination by rule, or send it directly from the gateway.
 - **One reviewed topology.** The deployer's machine keeps the whole fleet description in `cluster.yml`, inside Meridian's home directory. Every change is an edit to that topology: `deploy`, `setup`, `node add`, `relay add`, `client add`, and `route add` all edit it. Meridian then compiles it into a hash-reviewed plan and applies it with checkpoints. An interrupted apply resumes where it stopped. A converged fleet plans no changes.
-- **Users live in the panel.** Client accounts, their keys, and their traffic are stored in Remnawave on the control server. `cluster.yml` lists which clients Meridian manages.
+- **Users live in the control service.** Client accounts, their keys, and their traffic are stored in the control service on the control server. `cluster.yml` lists which clients Meridian manages; people added in the web console show up in `client list` too (`declared: false`).
 - **Delivery.** Each client gets a connection page with QR codes and app links, plus a subscription URL. Apps refresh the subscription, so fleet changes reach devices without new links.
 - **Connection methods.** Reality and XHTTP run on TCP 443, Hysteria2 on UDP 443 as a fallback, and WSS through Cloudflare when a domain is set. Apps try them in order.
 
 ## Where state lives
 
 - The home directory is `~/.config/meridian` (or `$XDG_CONFIG_HOME/meridian`). `MERIDIAN_HOME` overrides it. Meridian also uses an existing `~/.meridian-v4` or `~/.meridian` when either holds a fleet (it has a `servers.json`) and the default directory doesn't exist yet.
-- That directory is how the deployer manages the fleet: `cluster.yml` holds the topology and panel access, and `servers.json` holds saved SSH targets. Tell the user to back it up. To manage the fleet from another machine, they copy the whole directory there.
+- That directory is how the deployer manages the fleet: `cluster.yml` holds the topology and control service access, `servers.json` holds saved SSH targets, and `snapshots/` holds encrypted backups of the control service that every change refreshes. Tell the user to back the directory up and keep the recovery key deploy showed once. To manage the fleet from another machine, they copy the directory there without `device.key` and `snapshots/` (each machine keeps its own). If the control server is lost, `meridian restore --to NEW_SERVER` rebuilds it from a snapshot.
 - One machine can keep several separate fleets as contexts. The home directory itself is the `default` context; each other one lives in `contexts/NAME/` with its own `cluster.yml` and `servers.json`. `meridian context list --json` shows them all from local files, `meridian context use NAME` changes the current one, and `--context NAME` (before or after the command) or `MERIDIAN_CONTEXT` picks one for a single run. When the user has more than one fleet, pass `--context` on every command so nothing lands on the wrong fleet. `meridian deploy IP --context NAME` starts a new one.
 - Never edit `cluster.yml` by hand. Change the fleet through commands, or edit the file `meridian fleet export` prints and apply it with `meridian fleet import`.
 
@@ -27,10 +27,10 @@ You are probably helping one of two people:
 1. **Run non-interactively.** Pass `--yes` to commands that confirm. `meridian setup` is a wizard that needs a terminal. Use `deploy`, `node add`, `relay add`, and `client add` instead, or `setup --intent FILE --yes` with a complete topology document.
 2. **Prefer JSON.** Commands that support `--json` print one `meridian.output/v1` envelope on stdout. Read results under `data`; failures come back as an envelope too. Progress, warnings, and update notices go to stderr. `meridian api commands` lists every command with a machine-readable contract.
 3. **Read before you change.** Run `meridian plan` to see pending changes. It exits `0` when converged and `2` when changes are pending. Then run `meridian apply --yes`.
-4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, `client reissue`, or a `fleet import` whose changes include `-` lines. Removal deletes the panel and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link.
-5. **Treat links as secrets.** Connection pages and subscription URLs grant access. They appear in full only in the output of the command that produced them (`deploy`, `client add`, `client show`, `client reissue`). Hand each one only to the person it belongs to, and don't log it. Never run `meridian panel --show-password` unless the user asks for the panel password.
+4. **Ask before destroying.** Get explicit confirmation before `teardown`, `node remove`, `relay remove`, `client remove`, `client reissue`, `restore`, `migrate`, `backup revoke`, or a `fleet import` whose changes include `-` lines. Removal deletes the control service and server state for what disappears, and people relying on it lose access; a reissue cuts off the client's devices until they import the new link.
+5. **Treat links as secrets.** Connection pages and subscription URLs grant access. They appear in full only in the output of the command that produced them (`deploy`, `client add`, `client show`, `client reissue`). Hand each one only to the person it belongs to, and don't log it. The same goes for the console address and setup link `meridian panel` prints; never run `meridian panel --setup-link` unless the user asks to reset the console owner, since it signs out every device.
 6. **Test from the right place.** `meridian check` inspects servers over SSH. `meridian test` sends real traffic from the machine it runs on, and `meridian test --probe` (short form: `meridian probe`) checks what a censor sees. Results about blocking only mean something when run from inside the censored network.
-7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report. `meridian logs SERVER` shows recent node, panel, nginx, and relay logs with the same redaction; narrow it with `--grep TEXT` and `--component NAME`.
+7. **Report with doctor.** `meridian doctor` collects a redacted diagnostic report that is safe to attach to a bug report. `meridian logs SERVER` shows recent agent, control service, nginx, and relay logs with the same redaction; narrow it with `--grep TEXT` and `--component NAME`.
 
 ## Exit codes
 
@@ -39,7 +39,7 @@ You are probably helping one of two people:
 | `0` | Success, or every check passed |
 | `1` | Internal error (a Meridian bug) |
 | `2` | Invalid input or a user-fixable problem; for `plan`, changes are pending |
-| `3` | Required evidence was unavailable (SSH, panel, or local state); retry or fix access |
+| `3` | Required evidence was unavailable (SSH, control service, or local state); retry or fix access |
 | `4` | A check or test completed and found problems |
 | `5` | The operation was cancelled at a safe point; rerunning resumes it |
 | `130` | Interrupted with Ctrl-C; no JSON envelope is printed |

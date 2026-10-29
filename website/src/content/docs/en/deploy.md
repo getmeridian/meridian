@@ -11,7 +11,7 @@ This guide covers every option of `meridian deploy`. If this is your first deplo
 meridian deploy 198.51.100.10
 ```
 
-One server becomes both the control server (running the Remnawave panel) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
+One server becomes both the control server (running Meridian's control service) and the exit that carries traffic. Meridian builds the same reviewed topology that [`meridian setup`](/en/cli-reference/#meridian-setup) produces and applies it with checkpoints. Before it prints "Done", it pushes real traffic through the delivered subscription.
 
 Run `meridian deploy` without an IP and it asks for one. Add `--yes` to skip confirmations:
 
@@ -54,7 +54,6 @@ Hardening turns password login off after deploy, so keep the key: later commands
 | `--harden / --no-harden` | on | SSH key-only login, fail2ban, and UFW firewall. Use `--no-harden` on a server shared with other services |
 | `--warp / --no-warp` | off | Send outgoing traffic through Cloudflare WARP |
 | `--geo-block / --no-geo-block` | on | Block Russian domains and IPs on the server |
-| `--client-ips / --no-client-ips` | off | Let the panel see each client's real IP (see [Client IPs](#client-ips)) |
 | `--country CC` | looked up | Country shown in connection names, such as `DE`. Meridian looks it up from the address registry; set it if that is wrong |
 | `--yes` | | Skip confirmation prompts |
 
@@ -137,7 +136,7 @@ To redeploy, run the same command again. Meridian keeps the saved paths, keys, a
 
 At the end of every deploy, Meridian prints the exact redeploy command with your current settings. Running it again with different flags changes the server to match: adding or dropping `--domain` or `--no-hysteria2` adds or removes those paths.
 
-`meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`.
+`meridian deploy` only redeploys a server that is already an exit in your fleet. To add another server, use `meridian node add NEW_IP`. On a fleet that still runs the Remnawave panel, deploy offers to move it to the control service first (see [Moving from Remnawave](#moving-from-remnawave)).
 
 ## Edit the fleet as a file
 
@@ -236,17 +235,9 @@ meridian deploy 198.51.100.10 --no-geo-block
 
 For a way to open Russian sites directly while keeping the block, see [Split routing](/en/split-routing/).
 
-## Client IPs
+## Client addresses
 
-By default the panel never learns where your users connect from: every TCP connection reaches Xray through nginx on the server, so Remnawave records the server's own address. That is the private choice, and nothing about users' locations is stored.
-
-Remnawave's per-user IP limits and connection logs need the real addresses. Turn them on with:
-
-```
-meridian deploy 198.51.100.10 --client-ips
-```
-
-nginx then passes each client's address to Xray and the panel. Hysteria2 is direct UDP and always shows the real address. Connections through a relay show the relay's address, and WebSocket or XHTTP through the Cloudflare CDN show Cloudflare's. The setting applies to the whole fleet; redeploy without the flag to turn it off.
+The control service never records where your users connect from. Every TCP connection reaches Xray through nginx on the server, and the service keeps only each person's traffic totals, never an address or a connection log.
 
 ## Adding a relay
 
@@ -256,10 +247,45 @@ After the exit is running, add a relay on a domestic server so users keep a way 
 meridian relay add 203.0.113.10 --exit 198.51.100.10
 ```
 
-## Management panel
+## Web console
 
-Meridian installs [Remnawave](https://remna.st/) as its panel. The panel is reverse-proxied by nginx on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints the URL and admin login (`--show-password` for the password).
+The control service comes with a web console for one owner: you. It sits on a random secret path, separate from the connection-page path, so links you share never reveal it. `meridian panel` prints its address, and until the console has an owner, a one-time setup link:
 
-Treat the panel path like a password. The CLI uses the same panel API, so CLI changes show up in the panel. Meridian owns the hosts, profiles, and templates it creates: if you edit those in the panel, `meridian plan` reports the difference and the next apply restores Meridian's version. Client status, limits, expiry, and users you add yourself are yours; see [Web panel](/en/client-management/#web-panel).
+```
+  Meridian console
+  URL         https://198.51.100.10/<secret-path>/
+  Setup link  https://198.51.100.10/<secret-path>/#setup=…
+              Works once, for 15 minutes. Open it to choose the owner's password.
+```
 
-Meridian pins the Remnawave versions it has tested. `meridian fleet upgrade` moves your servers to the newest Remnawave release in the same major, without waiting for a Meridian update. If you upgrade Remnawave yourself, Meridian does not downgrade it.
+After choosing a password you can turn on a sign-in code from an authenticator app. In the console you add people, share their links and QR codes, set limits and expiry, and create API tokens; servers, revisions, and the subscription title are shown read-only, with the `meridian` command that changes them. See [Web console](/en/client-management/#web-console).
+
+Treat the console address like a password. If you lose the password or the authenticator, `meridian panel --setup-link` prints a reset link: it sets a new password, turns the sign-in code off, and signs out every device.
+
+## Backups
+
+At the end of your first deploy, Meridian prints a recovery key, once:
+
+```
+  Recovery key (shown once; Meridian keeps no copy)
+
+    AGE-SECRET-KEY-1…
+
+  Write it down or print it, and keep it offline, away from this computer.
+```
+
+Store it somewhere offline, away from the machines that manage the fleet. After every change, Meridian saves an encrypted snapshot of the control service on your machine, readable with your machine's own key or the recovery key. If the control server is ever lost, [`meridian restore`](/en/recovery/#control-server-lost) rebuilds it on a new server from the newest snapshot.
+
+## Upgrades
+
+The control service and the node agent ship with Meridian. After `meridian update`, run `meridian fleet upgrade`: it shows what will change, then moves the control service to the new version and upgrades each agent in place, keeping every node's identity. It also moves relays to the newest Realm release without waiting for a Meridian update. Any `meridian apply` brings the control service and agents up to the installed Meridian too.
+
+## Moving from Remnawave
+
+A fleet deployed by an earlier Meridian 4 release runs the Remnawave panel. `meridian migrate` moves it to the control service in place, on the same servers:
+
+```
+meridian migrate
+```
+
+It backs up the panel's database (to your machine and to the control server), carries every client over with their keys, status, limits, expiry, and traffic, replaces each node's container with the agent, and checks that every subscription link is unchanged before it removes Remnawave. Clients keep their links and notice nothing. Panel-only data such as HWID device lists, per-day usage history, and plugin settings is not carried over, and client IP forwarding (which served the panel's per-user IP limits) is turned off; the review lists it. The move is resumable: if it stops, run `meridian migrate` again. See [`meridian migrate`](/en/cli-reference/#meridian-migrate).

@@ -36,8 +36,8 @@ export const fa: LandingStrings = {
     'اجرای دوباره بی‌خطر است. اجرای دوم اعتبارنامه‌ها و کلیدها را نگه می‌دارد و استقرار را ادامه می‌دهد یا در همان‌جا به‌روز می‌کند.',
 
   // Behind-the-scenes timeline (title, then the text that follows it)
-  'step.1.title': 'نصب Docker',
-  'step.1.text': ' و استقرار <strong>Xray</strong> با مدیریت پنل <strong>Remnawave</strong>',
+  'step.1.title': 'نصب سرویس کنترل',
+  'step.1.text': ' و agent گره که <strong>Xray</strong> را اجرا می‌کند، بدون Docker و بدون پنل شخص ثالث',
   'step.2.title': 'ساخت جفت‌کلید x25519',
   'step.2.text': ' — کلیدهای رمزنگاری یکتا برای احراز هویت Reality',
   'step.3.title': 'مقاوم‌سازی سرور',
@@ -64,7 +64,7 @@ export const fa: LandingStrings = {
   'builder.tab.doctor': 'عیب‌یابی',
   'builder.tab.teardown': 'حذف',
   'builder.desc.deploy':
-    'استقرار Reality، XHTTP و Hysteria2 روی یک سرور. Docker، پنل Remnawave، nginx، فایروال و TLS را راه‌اندازی می‌کند.',
+    'استقرار Reality، XHTTP و Hysteria2 روی یک سرور. سرویس کنترل، nginx، فایروال و TLS را راه‌اندازی می‌کند.',
   'builder.desc.relay':
     'یک رله TCP روی سروری داخل کشور اضافه می‌کند که ترافیک را به سرور خروجی در خارج از کشور هدایت می‌کند. سرور خروجی باید از قبل مستقر شده باشد.',
   'builder.desc.check':
@@ -175,10 +175,10 @@ export const fa: LandingStrings = {
     'معماری Meridian: nginx اتصال‌های TCP 443 را بر اساس SNI به Xray Reality، XHTTP و صفحه‌های اتصال هدایت می‌کند؛ Hysteria2 روی UDP 443 گوش می‌دهد',
   'arch.standalone': 'حالت مستقل (بدون دامنه)',
   'arch.standalone.body':
-    "<p><strong>nginx</strong> مالک پورت TCP 443 است و اتصال‌ها را با ماژول stream خود بر اساس SNI در TLS هدایت می‌کند. اتصال‌های Reality به <strong>Xray</strong> می‌روند. بقیه به ماژول http در nginx می‌رسند که صفحه‌های اتصال، اشتراک‌ها و XHTTP را روی HTTPS ارائه می‌دهد، با یک گواهی کوتاه‌مدت Let's Encrypt برای IP سرور (صادرشده با acme.sh). <strong>Hysteria2</strong> روی UDP 443 با مبهم‌سازی salamander گوش می‌دهد.</p><p>پنل مدیریت Remnawave را nginx روی یک مسیر مخفی به‌صورت پراکسی معکوس ارائه می‌کند — از طریق HTTPS در دسترس است و به تونل SSH نیازی نیست.</p>",
+    "<p><strong>nginx</strong> مالک پورت TCP 443 است و اتصال‌ها را با ماژول stream خود بر اساس SNI در TLS هدایت می‌کند. اتصال‌های Reality به <strong>Xray</strong> می‌روند. بقیه به ماژول http در nginx می‌رسند که صفحه‌های اتصال، اشتراک‌ها و XHTTP را روی HTTPS ارائه می‌دهد، با یک گواهی کوتاه‌مدت Let's Encrypt برای IP سرور (صادرشده با acme.sh). <strong>Hysteria2</strong> روی UDP 443 با مبهم‌سازی salamander گوش می‌دهد.</p><p><strong>سرویس کنترل</strong> Meridian پشت nginx روی یک مسیر مخفی قرار دارد: کاربران شما را نگه می‌دارد، اشتراک‌هایشان را ارائه می‌کند و یک کنسول وب دارد که از طریق HTTPS در دسترس است و به تونل SSH نیازی ندارد. یک agent کوچک روی هر سرور خودش به آن وصل می‌شود، پس گره‌ها پورت اضافه‌ای باز نمی‌کنند.</p>",
   'arch.domain': 'حالت دامنه (جایگزین CDN)',
   'arch.domain.body':
-    "<p>با <code>--domain</code>، nginx برای دامنهٔ شما گواهی Let's Encrypt می‌گیرد و آن SNI را به مسیرهای دامنه هدایت می‌کند. XHTTP به دامنه منتقل می‌شود و <strong>VLESS+WSS</strong> اضافه می‌شود. وقتی Cloudflare دامنه را پراکسی کند، هر دو از CDN عبور می‌کنند و حتی اگر IP سرور شما مسدود شود کار می‌کنند. پنل و صفحه‌های اتصال روی گواهی IP می‌مانند.</p>",
+    "<p>با <code>--domain</code>، nginx برای دامنهٔ شما گواهی Let's Encrypt می‌گیرد و آن SNI را به مسیرهای دامنه هدایت می‌کند. XHTTP به دامنه منتقل می‌شود و <strong>VLESS+WSS</strong> اضافه می‌شود. وقتی Cloudflare دامنه را پراکسی کند، هر دو از CDN عبور می‌کنند و حتی اگر IP سرور شما مسدود شود کار می‌کنند. سرویس کنترل و صفحه‌های اتصال روی گواهی IP می‌مانند.</p>",
   'arch.relay': 'حالت رله (نقطهٔ ورود داخلی)',
   'arch.relay.body':
     '<p>یک فورواردر TCP از نوع <strong>Realm</strong> روی سروری داخل کشور شما، اتصال‌ها را به سرور خروجی شما در خارج منتقل می‌کند. رله‌ها فقط Reality را حمل می‌کنند؛ XHTTP، WSS و Hysteria2 همچنان مستقیم به سرور خروجی وصل می‌شوند. رمزنگاری سرتاسری بین برنامه و سرور خروجی برقرار است، پس رله هرگز متن آشکار را نمی‌بیند.</p><p>با <code>meridian relay add RELAY_IP --exit EXIT</code> یکی اضافه کنید. اشتراک‌ها و صفحه‌های اتصال ورودی‌های رله را خودکار برمی‌دارند.</p>',

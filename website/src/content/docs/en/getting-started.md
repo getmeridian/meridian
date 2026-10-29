@@ -36,11 +36,12 @@ Run `meridian deploy` without an IP and it asks for one. If you are logged into 
 ## What happens
 
 1. **Hardens the server** — SSH key-only login, fail2ban, a UFW firewall that opens only what the deployment needs, BBR congestion control
-2. **Installs the control plane** — the [Remnawave](https://remna.st/) panel, plus a node running Xray, all in Docker
+2. **Installs the control plane** — Meridian's control service, which keeps your users and serves their subscriptions, and a node agent that runs Xray. No Docker
 3. **Picks a camouflage target** — it looks for a suitable TLS 1.3 site on the server's own network, then falls back to `www.google.com`, `dl.google.com`, and `www.cloudflare.com` (pass `--sni` to choose your own)
 4. **Configures the connection methods** — VLESS+Reality and XHTTP on TCP 443 behind nginx, with a Let's Encrypt certificate for the server's IP, and Hysteria2 on UDP 443
 5. **Verifies real traffic** — Meridian pushes traffic through the delivered subscription before saying "Done", and moves to the next camouflage target if traffic doesn't pass
 6. **Publishes a connection page** for the first client
+7. **Shows a recovery key once** — keep it offline; with it, a lost control server can be rebuilt (see [Backups](/en/deploy/#backups))
 
 The deploy is checkpointed. If it is interrupted, run the same command again and it finishes where it stopped.
 
@@ -80,11 +81,13 @@ Each person gets their own key, connection page, and subscription URL. `meridian
 
 | What | Where |
 |------|-------|
-| Topology, panel access, and keys | `~/.config/meridian/cluster.yml` on your machine |
+| Topology, control service access, and keys | `~/.config/meridian/cluster.yml` on your machine |
 | Saved SSH servers | `~/.config/meridian/servers.json` on your machine |
-| Proxy services | Docker, Xray, nginx on the VPS |
+| Encrypted snapshots of the control service | `~/.config/meridian/snapshots/` on your machine |
+| Users, limits, and traffic | The control service on the VPS |
+| Proxy services | Xray, nginx, and the node agent on the VPS |
 
-Client commands talk to the Remnawave panel API recorded in `cluster.yml`; they don't need SSH. Back up `~/.config/meridian/` — it is how Meridian manages your servers.
+Client commands talk to the control service's API recorded in `cluster.yml`; they don't need SSH. `meridian panel` opens the same people in a web console. Back up `~/.config/meridian/` — it is how Meridian manages your servers.
 
 ## More than one server
 

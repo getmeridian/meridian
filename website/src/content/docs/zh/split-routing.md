@@ -34,9 +34,9 @@ Meridian 在其下发的 **Xray JSON** 和 **Mihomo** 订阅中内置了分流�
 
 仅导入纯链接列表（Base64）的应用不会收到路由规则。在这些应用中，请在路由设置里为 `geosite:category-ru` 和 `geoip:ru` 添加**直连（direct）**规则，或换用支持 Xray JSON 或 Mihomo 订阅的应用。Hiddify 用户也可以直接将地区设为**俄罗斯（Russia）**。
 
-### 为什么不要在面板中直接修改模板？
+### 规则从哪里来
 
-Meridian 在 Remnawave 中维护着自己的 Xray JSON 和 Mihomo 订阅模板，其中包含多个出口与中继之间的自动回退配置以及上述分流规则。每次执行 `apply`（包括重新部署以及 `client add`、`node add`、`relay add`）时，Meridian 都会恢复这些模板，因此在面板中手动添加的规则不会保留。
+控制服务根据你已审核的拓扑生成每一份 Xray JSON、Mihomo 和 sing-box 订阅：其中包含多个出口与中继之间的自动回退配置以及上述分流规则。没有需要手动编辑的模板。要改变流量走向，请在出口上使用 [`meridian route`](/zh/cli-reference/#meridian-route)，或使用[路由网关](#通过路由网关)的路由规则。
 
 ## 两层机制如何配合
 
