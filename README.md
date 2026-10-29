@@ -56,7 +56,7 @@ Re-run `deploy` at any time: keys, paths, and clients are kept. `meridian setup`
 
 - **Methods:** VLESS+Reality and XHTTP on TCP 443, Hysteria2 on UDP 443 with salamander. Every subscription lists all of them, and capable apps switch on their own.
 - **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Deploy picks the target from the server's own network.
-- **Hardening:** key-only SSH, fail2ban, UFW opening only SSH and 443, no public container ports, a Let's Encrypt certificate for the IP. No domain needed.
+- **Hardening:** key-only SSH, fail2ban, UFW opening only SSH and 443, a Let's Encrypt certificate for the IP. No domain needed.
 - **Control service:** Meridian's own, on a secret HTTPS path: users, subscriptions, and a web console. Shared links never reveal it, and each server's agent dials out to it, so nodes open no extra ports. No Docker, no third-party panel.
 - **Backups:** after every change your machine pulls an encrypted snapshot of the control service. If the control server is lost or seized, `meridian restore` rebuilds it on another server.
 

@@ -78,6 +78,7 @@ flowchart LR
 ترافیک در هر گزارش فقط یک بار شمرده می‌شود، حتی اگر گزارش دوباره ارسال شود. سرویس فقط مجموع ترافیک هر نفر را نگه می‌دارد و هرگز ثبت نمی‌کند که چه کسی از کجا وصل می‌شود.
 
 ## نحوه کار Reality
+
 1. هر exit یک **x25519 keypair** دارد. کلاینت‌ها کلید عمومی را دریافت می‌کنند؛ کلید خصوصی روی سرور می‌ماند.
 2. کلاینت روی پورت 443 با TLS Client Hello که نام هدف camouflage را شامل است (به مثال `www.google.com`) اتصال برقرار می‌کند.
 3. برای ناظر، این اتصال عادی HTTPS به آن سایت است.
@@ -156,7 +157,7 @@ agent یک برنامهٔ ایستا برای سرورهای x86-64 و ARM64 ا�
 ### روی هر relay
 - `/etc/netfwd/` — پیکربندی Realm، اجرا شده از `/usr/local/bin/netfwd` توسط سرویس‌های systemd `netfwd-*`. میزبان‌های relay هیچ واحد مریدیان‌نام‌شده، مسیر یا نظر firewall (`fw-*`) ندارند.
 
-### روی ماشین شما### روی ماشین شما
+### روی ماشین شما
 - `~/.config/meridian/cluster.yml` — topology، دسترسی سرویس کنترل، کلیدها
 - `~/.config/meridian/cluster.yml.bak` — backup گرفته‌شده پیش از عملیات تخریبی
 - `~/.config/meridian/servers.json` — سرورهای SSH ذخیره شده
@@ -166,6 +167,6 @@ agent یک برنامهٔ ایستا برای سرورهای x86-64 و ARM64 ا�
 - `~/.config/meridian/ssh/meridian_ed25519` — کلید SSH مدیریت‌شده، وقتی تولید شود
 - `~/.config/meridian/cache/` — update-check cache
 
-این دایرکتوری در صورت تنظیم بودن `$XDG_CONFIG_HOME` از آن پیروی می‌کند و `MERIDIAN_HOME` آن را بازنویسی می‌کند. تا زمانی که `~/.config/meridian/` وجود ندارد، Meridian اگر `~/.meridian-v4/` یا `~/.meridian/` یک fleet داشته باشد (فایل `servers.json` دارد) از آن‌ها هم استفاده می‌کند. وضعیت Meridian 3.x در `~/.meridian/` هرگز دست نمی‌خورد.
+این دایرکتوری در صورت تنظیم بودن `$XDG_CONFIG_HOME` از آن پیروی می‌کند و `MERIDIAN_HOME` آن را بازنویسی می‌کند. تا زمانی که `~/.config/meridian/` وجود ندارد، Meridian اگر `~/.meridian-v4/` یا `~/.meridian/` یک ناوگان داشته باشد (فایل `servers.json` دارد) از آن‌ها هم استفاده می‌کند. وضعیت Meridian 3.x در `~/.meridian/` هرگز دست نمی‌خورد.
 
 چند ناوگان می‌توانند به‌صورت زمینه (`meridian context`) روی یک دستگاه باشند. این دایرکتوری زمینهٔ `default` است؛ هر زمینهٔ دیگر `cluster.yml`، نسخهٔ پشتیبان آن، `servers.json`، `setup.json`، snapshotها و کلید دستگاه خودش را در `contexts/NAME/` نگه می‌دارد، و کلید SSH، کش بررسی به‌روزرسانی، انتخاب زبان و Xray محلی مشترک می‌مانند. انتخاب با `--context`، سپس `MERIDIAN_CONTEXT`، سپس `current-context` ذخیره‌شده است؛ `MERIDIAN_HOME` یک ناوگان را ثابت می‌کند.

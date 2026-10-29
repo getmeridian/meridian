@@ -9,7 +9,7 @@ description: 系统架构、流量流向和服务拓扑。
 - **XHTTP**（Xray-core）— 你域名上的 TLS 路径；没有域名时，则使用服务器 IP 和 Let's Encrypt IP 证书。
 - **WSS**（Xray-core）— 域名模式下添加的、你自己域名上的 TLS 路径。通过 Cloudflare 代理域名后，它和 XHTTP 都经过 CDN，即使 IP 被封锁也仍然可用。
 - **Hysteria2**（Xray-core）— 用于丢包网络的 UDP/443 最后手段，用 salamander 混淆包装，看起来不像 QUIC。默认开启（`--no-hysteria2` 可关闭）。
-- **控制服务** — Meridian 自己的服务（`meridian serve`），运行在控制服务器上。它把用户、流量、修订记录和备份保存在一个 SQLite 文件中，提供所有格式的订阅，并承载所有者的网页控制台。它以 systemd 单元运行，不需要 Docker，也不需要数据库服务器。
+- **控制服务** — Meridian 自己的服务（`meridian serve`），运行在控制服务器上。它把用户、流量、修订和备份保存在一个 SQLite 文件中，提供所有格式的订阅，并承载所有者的网页控制台。它以 systemd 单元运行，不需要 Docker，也不需要数据库服务器。
 - **节点 agent** — 每个出口和路由网关上的一个小型静态 Rust 程序。它主动通过 443 端口的 HTTPS 连接控制服务，校验收到的签名文档，并以独立服务运行 Xray。节点不开放任何管理端口。
 - **nginx** — 拥有公开 TCP/443。其 stream 模块按 SNI 路由连接而不终止 TLS；其 http 模块为控制服务、连接页面、订阅和域名路径终止 TLS。证书来自通过 [acme.sh](https://github.com/acmesh-official/acme.sh) 的 Let's Encrypt。
 - **Realm** — 中继服务器上的 TCP 转发器。
@@ -32,7 +32,7 @@ flowchart TD
 
 nginx stream **不**终止 TLS。它从 Client Hello 中读取 SNI 并转发原始 TCP 流。控制服务、连接页面和订阅使用服务器 IP 的 Let's Encrypt 证书提供（短期有效，自动续期）。
 
-共享链接位于连接页面路径下：页面在 `/<page-path>/<id>/`，订阅在 `/<page-path>/sub/<id>`。控制服务的控制台、API 和 agent 接入点位于共享链接永远不会暴露的单独密钥路径上。
+共享链接位于连接页面路径下：页面在 `/<page-path>/<id>/`，订阅在 `/<page-path>/sub/<id>`。控制服务的控制台、API 和 agent 接入点位于共享链接永远不会暴露的单独秘密路径上。
 
 ### 域名模式
 
@@ -73,11 +73,12 @@ flowchart LR
     Apps(["Client apps"]) -->|"subscription"| Service
 ```
 
-所有连接都指向控制服务；没有任何东西会连接到节点。每个 agent 主动通过 443 端口的 HTTPS 连出，等待新文档，并报告它应用了什么以及统计到的流量。控制服务用你的服务器组自己的密钥为每份节点文档签名，agent 会拒绝签名无法验证的文档，因此伪造或重放的文档不会产生任何改变。新节点使用 Meridian 通过 SSH 交给它的一次性注册令牌加入，之后持有由服务器组自己的证书颁发机构签发的证书。
+所有连接都指向控制服务；没有任何东西会连接到节点。每个 agent 主动通过 443 端口的 HTTPS 连出，等待新文档，并报告它应用了什么以及统计到的流量。控制服务用你的集群自己的密钥为每份节点文档签名，agent 会拒绝签名无法验证的文档，因此伪造或重放的文档不会产生任何改变。新节点使用 Meridian 通过 SSH 交给它的一次性注册令牌加入，之后持有由集群自己的证书颁发机构签发的证书。
 
 流量按每次报告只统计一次，即使报告被重发。服务只保存每个人的流量总量，从不记录任何人从哪里连接。
 
 ## Reality 协议如何工作
+
 1. 每个出口有一个 **x25519 密钥对**。客户端获得公钥；私钥留在服务器上。
 2. 客户端在端口 443 上连接，发送命名伪装目标（例如 `www.google.com`）的 TLS Client Hello。
 3. 对观察者来说，这是对该网站的普通 HTTPS 连接。
@@ -89,8 +90,8 @@ flowchart LR
 
 - **拓扑** — `~/.config/meridian/cluster.yml` 在你的机器上保存已审核的拓扑（控制服务器、出口、中继、网关、协议路径和用户列表）、控制服务的地址和 API 令牌，以及 Meridian 生成的密钥。`meridian setup`、`deploy`、`client add`、`node add` 和 `relay add` 会修改它；请勿手动编辑。
 - **客户端** — 账户、密钥、状态、限额和流量位于控制服务器上控制服务的数据库中。
-- **修订记录** — 控制服务记录每一次经过审核的应用：谁发起的、它的计划，以及是否应用成功。`meridian fleet history` 会列出它们。
-- **快照** — 每次变更后，每台管理这些服务器的机器都会在 `snapshots/` 中保存一份控制服务状态的加密副本，可用该机器的密钥或恢复密钥读取。参见[恢复](/zh/recovery/#控制服务器丢失)。
+- **修订** — 控制服务记录每一次经过审核的应用：谁发起的、它的计划，以及是否应用成功。`meridian fleet history` 会列出它们。
+- **快照** — 每次变更后，每台管理集群的机器都会在 `snapshots/` 中保存一份控制服务状态的加密副本，可用该机器的密钥或恢复密钥读取。参见[恢复](/zh/recovery/#控制服务器丢失)。
 - **已保存的服务器** — `~/.config/meridian/servers.json` 保存 SSH 连接详情。
 
 ## 计划与应用
@@ -142,7 +143,7 @@ agent 是适用于 x86-64 和 ARM64 服务器的静态程序。新版本带来�
 ### 在控制服务器上
 - `/opt/ctld/` — 控制服务的固定版本安装
 - `/etc/ctld/config.json` — 它的配置
-- `/var/lib/ctld/` — 它的数据库（用户、流量、修订记录、备份密钥）
+- `/var/lib/ctld/` — 它的数据库（用户、流量、修订、备份密钥）
 - `/etc/nginx/stream.d/meridian-v4-*.conf` — SNI 路由
 - `/etc/nginx/sites-available/meridian-v4-*.conf` — TLS 网站和反向代理
 - `/etc/ssl/meridian/` — 证书
@@ -156,7 +157,7 @@ agent 是适用于 x86-64 和 ARM64 服务器的静态程序。新版本带来�
 ### 在每个中继上
 - `/etc/netfwd/` — Realm 配置，从 `/usr/local/bin/netfwd` 由 `netfwd-*` systemd 服务运行。中继主机不带任何 Meridian 命名的单位、路径或防火墙注释（`fw-*`）。
 
-### 在你的机器上### 在你的机器上
+### 在你的机器上
 - `~/.config/meridian/cluster.yml` — 拓扑、控制服务访问、密钥
 - `~/.config/meridian/cluster.yml.bak` — 破坏性操作前的备份
 - `~/.config/meridian/servers.json` — 保存的 SSH 服务器

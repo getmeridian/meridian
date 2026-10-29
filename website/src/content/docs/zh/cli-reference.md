@@ -36,7 +36,7 @@ meridian deploy [SERVER] [flags]
 | `--request FILE` | | 从文件读取 `deploy-request` JSON 有效负载；用 `-` 表示 stdin |
 | `--dry-run` | | 编译和预览部署无需 SSH 或本地变更 |
 
-不指定 IP 时，`deploy` 会提示输入。`local` 在当前运行的机器上直接部署。`deploy` 仅重新部署已经是集群中出口的服务器；其他服务器请用 `meridian node add` 添加。使用不同标志重新运行会更新该出口以匹配新设置（例如添加或移除 `--domain` 或 `--no-hysteria2`），同时保留其他出口、中继、网关和客户端。
+不指定 IP 时，`deploy` 会提示输入。`local` 在当前运行的机器上直接部署。`deploy` 仅重新部署已经是集群中出口的服务器；其他服务器请用 `meridian node add` 添加。如果集群仍在运行 Remnawave 面板，`deploy` 会先提议运行 [`meridian migrate`](#meridian-migrate)。使用不同标志重新运行会更新该出口以匹配新设置（例如添加或移除 `--domain` 或 `--no-hysteria2`），同时保留其他出口、中继、网关和客户端。
 
 **机器/UI 流程**：`meridian api workflow deploy --json` 返回可渲染的向导契约。UI 收集这些字段，针对 `deploy-request` 验证它们，然后运行 `meridian deploy --request deploy.json --json --events=jsonl`。机器部署非交互式：请求必须在用户确认后包含 `yes: true`。`--dry-run --json` 返回 `data` 下的 `deploy-plan`，所以 UI 可以在打开 SSH 之前预览模式、端口和生成的路径。
 
@@ -123,7 +123,7 @@ meridian client remove NAME [--yes] [--json]
 | `--expires DATE` | never | 访问何时结束：`YYYY-MM-DD`（当天结束时，UTC）、ISO 时间如 `2026-12-31T18:00:00+03:00`（不带时区偏移的时间按 UTC 计），或 `never`。必须是将来的时间 |
 | `--yes`, `-y` | | 确认 `client reissue` 或 `client remove`；`--json` 需要 |
 
-**`client add`** — 添加一个或多个人到拓扑，应用它，并为每个人打印连接页面和订阅 URL。页面从他们的真实订阅构建，所以中继和 Hysteria2 在存在时显示。拓扑中已有的或控制服务中已存在的名称被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果客户端的订阅链接无法构建，客户端仍被添加命令退出 `3`；仅缺失连接页面是警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限制；如果设置失败，客户端仍会被添加，命令给出警告并以 `3` 退出。
+**`client add`** — 把一个或多个人添加到拓扑并应用，然后为每个人打印连接页面和订阅 URL。页面根据他们真实的订阅生成，因此中继和 Hysteria2 存在时都会显示。拓扑中已有或控制服务中已存在的名称会被拒绝。名称可以使用任何文字（`client add Биба 王小明`）：页面和输出按输入原样显示名称，而控制服务只接受拉丁字母、数字、`.`、`-` 和 `_`，会得到音译后的用户名（`biba`、`wangxiaoming`）。其他 client 命令接受任一形式。如果无法生成客户端的订阅链接，客户端仍会被添加，命令以退出码 `3` 结束；仅缺少连接页面时只给出警告（用 `client show --repair-page` 修复）。`--limit`、`--reset` 和 `--expires` 会在客户端创建后，为每个添加的名称设置与 `client set` 相同的限额；如果设置失败，客户端仍已添加，命令给出警告并以 `3` 退出。
 
 **`client show`** — 打印连接页面、订阅 URL、状态、相对限额的流量及其重置周期、到期时间和最后在线时间。`--repair-page` 重新发布缺失的页面；如果失败，链接仍显示带警告和退出 `3`。
 
@@ -420,7 +420,7 @@ meridian panel [--setup-link]
 |------|---------|-------------|
 | `--setup-link` | | 即使控制台已有所有者，也打印一个重置链接：它会设置新密码、关闭登录验证码，并让所有设备退出登录 |
 
-设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。控制台有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在控制台中你可以管理用户和 API 令牌；服务器、修订记录和订阅标题在那里是只读的。详见[网页控制台](/zh/client-management/#网页控制台)。
+设置链接只能使用一次，有效期 15 分钟；打开它来设置所有者的密码。控制台有所有者之后，`panel` 会打印地址以及是否已开启登录验证码。请像保护密码一样保护地址和设置链接。在控制台中你可以管理用户和 API 令牌；服务器、修订和订阅标题在那里是只读的。详见[网页控制台](/zh/client-management/#网页控制台)。
 
 ### meridian teardown
 
@@ -450,7 +450,7 @@ meridian backup revoke ID
 | `--name NAME` | 这台电脑的主机名 | `backup pull`：这台机器的密钥首次注册时使用的名称 |
 | `--yes`, `-y` | | `backup recovery-key`：不询问直接替换已有的恢复密钥 |
 
-每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订记录、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或控制台密码。保存失败只会给出警告，绝不会让触发它的命令失败。
+每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或控制台密码。保存失败只会给出警告，绝不会让触发它的命令失败。
 
 **`backup pull`** — 立即保存一份快照。机器上的首次 pull 会创建它的密钥（`device.key`，只有你能读取）并向控制服务注册。
 
