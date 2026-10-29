@@ -61,13 +61,15 @@ def panel_bindings(cluster: ClusterConfig, plan: ResourcePlan) -> list[ManagedRe
 
 
 def node_runtime_bindings(cluster: ClusterConfig) -> list[ManagedResourceBinding]:
+    """Panel node containers: committed ones, and any an uncommitted apply installed (still inactive)."""
     return sorted(
         (
             binding
             for binding in cluster.managed_bindings.values()
-            if binding.active and binding.resource_kind == "node_runtime"
+            if binding.resource_kind == "node_runtime"
+            and (binding.active or binding.generation > cluster.active_generation)
         ),
-        key=lambda binding: binding.server_ref,
+        key=lambda binding: (binding.server_ref, binding.generation),
     )
 
 
@@ -109,7 +111,8 @@ def remove_node_runtimes(
 ) -> None:
     """Remove each exit's panel-managed node container (and its node API rule) through node retirement."""
     removal = _NodeRemoval(_RetirementContext(plan=plan, connection_for=connections.__getitem__))
-    for binding in bindings:
+    # One removal per server: every node binding there names the same container and directory.
+    for binding in {binding.server_ref: binding for binding in bindings}.values():
         try:
             removal.retire(binding)
         except Exception as exc:  # noqa: BLE001 - reported with the server it failed on

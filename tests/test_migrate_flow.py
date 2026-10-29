@@ -251,6 +251,28 @@ def test_the_order_is_dump_then_stop_then_node_removal_then_apply_then_panel_rem
     assert not any("docker" in call for call in fleet.relay.calls), "a relay runs no panel containers"
 
 
+def test_a_node_an_unfinished_apply_installed_is_removed_too(fleet: Fleet) -> None:
+    cluster = ClusterConfig.load()
+    cluster.pending_generation = 2
+    cluster.managed_bindings["node-runtime:relay@2"] = ManagedResourceBinding(
+        logical_id="node-runtime:relay",
+        resource_kind="node_runtime",
+        generation=2,
+        remote_id=NODE_DIR,
+        active=False,
+        server_ref="srv-relay",
+    )
+    cluster.save()
+
+    review = fleet.migrator().review()
+
+    assert review.node_servers == ["srv-a", "srv-relay"]
+    fleet.migrator().run(review, fleet.apply)
+    assert any(f"{NODE_DIR}/docker-compose.yml" in call for call in fleet.relay.calls)
+    assert sum(f"{NODE_DIR}/docker-compose.yml" in call for call in fleet.control.calls) >= 1
+    assert "node-runtime:relay@2" not in ClusterConfig.load().managed_bindings
+
+
 def test_cut_over_forgets_panel_objects_and_the_end_drops_panel_only_state(fleet: Fleet) -> None:
     _run(fleet)
 
