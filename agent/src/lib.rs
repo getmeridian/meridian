@@ -18,6 +18,7 @@ pub mod jcs;
 pub mod log;
 pub mod model;
 pub mod report;
+pub mod selfcheck;
 pub mod session;
 pub mod state;
 pub mod stats;
@@ -26,5 +27,5 @@ pub mod timeutil;
 pub mod verify;
 pub mod xray;
 
-/// The crate version, reported as `versions.agent`.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The build version (`build.rs`), reported as `agent_version` and `versions.agent`.
+pub const VERSION: &str = env!("NETAGENT_VERSION");

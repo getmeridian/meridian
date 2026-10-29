@@ -42,7 +42,7 @@ from meridian.host_runtime import (
     AGENT_STATE_DIR,
     CORE_UNIT,
 )
-from meridian.reconciler import meridian_drivers
+from meridian.reconciler import agent_upgrade, meridian_drivers
 from meridian.reconciler.meridian_drivers import MeridianDriverContext, build_meridian_drivers
 from meridian.reconciler.resources import (
     ResourceAction,
@@ -126,7 +126,7 @@ class FakeControl:
             spec_sha256=canonical_sha256(spec.model_dump(mode="json")) if spec else None,
             applied=NodeStateRef(fleet_epoch=1, revision=1, sha256=sha) if applied else None,
             last_seen_at=fields.pop("last_seen_at", None),
-            agent_version=None,
+            agent_version=fields.pop("agent_version", None),
             **fields,
         )
 
@@ -500,3 +500,136 @@ def test_an_agent_the_plan_still_runs_on_that_server_is_only_forgotten(plan: Res
     drivers["agent_runtime"].retire(_agent_binding("srv-a"))  # type: ignore[union-attr]
 
     assert conn.calls == []
+
+
+# --- agent upgrades: a new build keeps the node's identity -------------------------------
+
+OLD_SHA = "0" * 64
+OLD_VERSION, NEW_VERSION = "0.1.0+0123456789ab", "0.2.0+ba9876543210"
+
+
+class AgentHost(MockConnection):
+    """A node whose agent binary, staged copy, previous copy, and running image follow the commands."""
+
+    def __init__(self, *, check_rc: int = 0, enrolled: bool = True, active: bool = True) -> None:
+        super().__init__()
+        self.binary, self.staged, self.previous, self.running = OLD_SHA, "", "", OLD_SHA
+        self.check_rc, self.enrolled = check_rc, enrolled
+        self.when("uname -m", stdout="x86_64\n")
+        self.when("systemctl is-active", stdout="active\n" if active else "failed\n", rc=0 if active else 3)
+        self.when(f"cat {AGENT_BOOTSTRAP}", stdout=_enrolled_bootstrap())
+
+    def put_bytes(self, path: str, data: bytes, timeout: int = 30, **kwargs: object) -> Any:
+        if path == agent_upgrade.STAGED_BINARY:
+            self.staged = hashlib.sha256(data).hexdigest()
+        if path == AGENT_BINARY:
+            self.binary = hashlib.sha256(data).hexdigest()
+        return super().put_bytes(path, data, timeout=timeout, **kwargs)
+
+    def run(self, command: str, timeout: int = 30, **kwargs: object) -> Any:
+        result = super().run(command, timeout=timeout, **kwargs)
+        staged, previous = agent_upgrade.STAGED_BINARY, agent_upgrade.PREVIOUS_BINARY
+        if "MainPID" in command:
+            return subprocess.CompletedProcess([], 0, f"{self.running}  /proc/4242/exe\n", "")
+        if command.startswith(f"sha256sum {staged}"):
+            return subprocess.CompletedProcess([], 0, f"{self.staged}  {staged}\n", "")
+        if command.startswith(f"{staged} check"):
+            report = {"version": NEW_VERSION, "node_id": "main", "enrolled": self.enrolled, "held_verifies": True}
+            if self.check_rc:
+                return subprocess.CompletedProcess([], 1, "", "netagent: state.json is malformed")
+            return subprocess.CompletedProcess([], 0, json.dumps(report) + "\n", "")
+        if command.startswith(f"cp -p {AGENT_BINARY} {previous} && mv -f {staged}"):
+            self.previous, self.binary, self.staged = self.binary, self.staged, ""
+            self.running = self.binary
+        elif command.startswith(f"mv -f {previous} {AGENT_BINARY}"):
+            self.binary, self.previous = self.previous, ""
+            self.running = self.binary
+        elif command == f"rm -f {previous}":
+            self.previous = ""
+        elif command == f"rm -f {staged}":
+            self.staged = ""
+        return result
+
+
+def _upgrade_setup(plan: ResourcePlan, host: AgentHost, reports: list[dict[str, Any]]) -> tuple[Any, FakeControl]:
+    drivers, control, _cluster = _setup(plan, host)
+    control.reports = reports
+    return drivers, control
+
+
+_SEEN = "2999-01-01T00:00:00Z"
+_LATER = "2999-01-01T00:00:09Z"
+
+
+def test_a_new_agent_build_is_swapped_in_keeping_the_nodes_identity(plan: ResourcePlan) -> None:
+    host = AgentHost()
+    old = {"last_seen_at": _SEEN, "agent_version": OLD_VERSION}
+    new = {"last_seen_at": _LATER, "agent_version": NEW_VERSION}
+    drivers, control = _upgrade_setup(plan, host, [old, old, old, new])
+
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert (host.binary, host.running, host.previous, host.staged) == (BINARY.sha256, BINARY.sha256, "", "")
+    assert control.tokens == [], "no enrollment token: the node key and certificate stay"
+    assert AGENT_BOOTSTRAP not in host.write_map
+    calls = host.calls
+    check = next(i for i, call in enumerate(calls) if " check --bootstrap" in call)
+    swap = next(i for i, call in enumerate(calls) if call.startswith(f"cp -p {AGENT_BINARY}"))
+    assert check < swap, "the staged build checks the node's files before it replaces anything"
+    action = _action(plan, "agent:main")
+    assert observation_converges(action, drivers["agent_runtime"].observe(action, None))
+
+
+def test_an_upgraded_agent_that_never_reports_is_rolled_back(
+    plan: ResourcePlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(agent_upgrade, "UPGRADE_REPORT_TIMEOUT", 0.0)
+    host = AgentHost()
+    old = {"last_seen_at": _SEEN, "agent_version": OLD_VERSION}
+    drivers, control = _upgrade_setup(plan, host, [old])
+
+    with pytest.raises(ResourceReconcileError, match="the previous agent is back"):
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert (host.binary, host.running, host.previous) == (OLD_SHA, OLD_SHA, "")
+    assert control.tokens == []
+    assert AGENT_BOOTSTRAP not in host.write_map
+
+
+@pytest.mark.parametrize(
+    ("check_rc", "enrolled", "message"),
+    [(1, True, "state.json is malformed"), (0, False, "cannot take over")],
+    ids=["unreadable-state", "not-enrolled"],
+)
+def test_a_staged_build_that_cannot_take_over_replaces_nothing(
+    plan: ResourcePlan, check_rc: int, enrolled: bool, message: str
+) -> None:
+    host = AgentHost(check_rc=check_rc, enrolled=enrolled)
+    drivers, control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN, "agent_version": OLD_VERSION}])
+
+    with pytest.raises(ResourceReconcileError, match=message):
+        drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert (host.binary, host.running, host.staged) == (OLD_SHA, OLD_SHA, "")
+    host.assert_not_called_with_pattern("systemctl restart")
+    assert control.tokens == []
+
+
+def test_a_swap_whose_restart_was_lost_still_reads_as_the_old_build(plan: ResourcePlan) -> None:
+    host = AgentHost()
+    host.binary = BINARY.sha256  # the file was renamed in, but the old process still runs
+    drivers, control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN, "agent_version": OLD_VERSION}])
+    action = _action(plan, "agent:main")
+
+    assert not drivers["agent_runtime"].observe(action, None).exists
+
+
+def test_a_dead_agent_of_an_old_build_is_enrolled_again_not_upgraded(plan: ResourcePlan) -> None:
+    host = AgentHost(active=False)
+    drivers, control = _upgrade_setup(plan, host, [{"last_seen_at": _SEEN}])
+
+    drivers["agent_runtime"].apply(_action(plan, "agent:main"), None)
+
+    assert len(control.tokens) == 1
+    assert AGENT_BOOTSTRAP in host.write_map
+    host.assert_not_called_with_pattern(" check --bootstrap")
