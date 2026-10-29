@@ -4,6 +4,67 @@ All notable changes to Meridian are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+Changes since 4.0.0b8. Meridian now runs its own control service in place of
+Remnawave: no Docker, no third-party panel, and every server runs a small agent
+that dials out to it.
+
+### Read first: moving a Remnawave fleet
+- **`meridian migrate`** moves a fleet deployed by an earlier 4.0 beta onto the
+  control service in place, keeping every link. It backs up the panel's
+  database to your machine and to the control server, carries each client over
+  with their keys, subscription ID, status, limits, expiry, and traffic,
+  replaces each node's container with the agent, checks that every
+  subscription link is unchanged, and only then removes Remnawave. It is
+  resumable and has no rollback; the backup is the way back. `meridian deploy`
+  offers it when it finds a Remnawave fleet.
+- Panel-only data is not carried over, and the review lists it: the panel's
+  admin account and API tokens, per-day usage history, HWID device lists,
+  panel plugins, response rules Meridian didn't set, the Remnawave
+  subscription page, and client IP forwarding (it served the panel's per-user
+  IP limits).
+
+### Control service
+- **One service on the control server** (`ctld`, running `meridian serve`)
+  keeps users, traffic, and applied revisions in one SQLite file, serves every
+  subscription format, and logs no requests. It sits behind nginx on a
+  secret path.
+- **Node agents** (`netagent`, static builds for x86-64 and ARM64) enroll over
+  SSH with a single-use token, verify every document the service signs, and
+  run Xray. Nodes open no ports for management. `meridian apply` upgrades an
+  agent in place when Meridian ships a new build.
+- **Web console** — `meridian panel` prints its address and, while it has no
+  owner, a one-time setup link (`--setup-link` resets the owner: new password,
+  login code off, every device signed out). The console edits people and API
+  tokens; servers, revisions, and the subscription title are read-only.
+- **API tokens** with read, propose, and approve scopes, minted in the console,
+  for scripts and community bots.
+- **`meridian fleet history`** lists every reviewed apply the service recorded:
+  author, status, and plan hash. The apply lease now lives in the service.
+
+### Backups and restore
+- **Encrypted snapshots after every change** — each machine that manages the
+  fleet pulls a snapshot of the control service into `snapshots/`, sealed to
+  its own key and to a recovery key deploy shows once. `meridian backup pull`,
+  `recovery-key`, `devices`, and `revoke` manage them.
+- **`meridian restore --to SERVER`** rebuilds a lost or seized control server
+  from a snapshot, with a new certificate authority and signing keys, so the
+  old server can sign nothing your nodes accept. Domain links survive once DNS
+  moves; bare-IP links change and are printed. On a machine with nothing but
+  the snapshot and the recovery key, restore brings the fleet files back too.
+
+### Changed
+- **`meridian fleet upgrade`** now upgrades only Realm on relays. The control
+  service and agents ship with Meridian: `meridian update`, then
+  `meridian apply`.
+
+### Removed
+- Remnawave, its database, Valkey, the subscription page container, and Docker
+  on new fleets.
+- `meridian panel --show-password` (there is no panel password) and
+  `deploy --client-ips` (the control service doesn't forward client IPs yet).
+
 ## [4.0.0] - Unreleased
 
 Meridian 4 is a new foundation: the Remnawave panel replaces 3x-ui, and one
