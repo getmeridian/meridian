@@ -11,6 +11,7 @@ from meridian.compiler.models import (
     IP_CERTIFICATE_DIRECTORY,
     CertificatePayload,
     ControlPlaneRuntimePayload,
+    ControlServicePayload,
     NodeRuntimePayload,
     certificate_directory,
 )
@@ -100,8 +101,8 @@ class CertificateRetirement:
 
     acme.sh records where it installs each certificate, so the renewal entry is found
     from the binding's ``fullchain.pem`` path, even for a hashed domain directory. The
-    panel shares the server's IP certificate, so nothing is touched while a control
-    plane runs there or another certificate in the plan has the same files. The ACME
+    panel or control service shares the server's IP certificate, so nothing is touched
+    while either runs there or another certificate in the plan has the same files. The ACME
     challenge listener goes once no certificate is left on the server.
     """
 
@@ -115,10 +116,10 @@ class CertificateRetirement:
         kept = [
             resource.payload
             for resource in self.context.plan.resources
-            if isinstance(resource.payload, CertificatePayload | ControlPlaneRuntimePayload)
+            if isinstance(resource.payload, CertificatePayload | ControlPlaneRuntimePayload | ControlServicePayload)
             and resource.payload.server_ref == binding.server_ref
         ]
-        if any(isinstance(payload, ControlPlaneRuntimePayload) for payload in kept):
+        if any(isinstance(payload, ControlPlaneRuntimePayload | ControlServicePayload) for payload in kept):
             return
         directory = fullchain.rsplit("/", 1)[0]
         if any(

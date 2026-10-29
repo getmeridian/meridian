@@ -40,6 +40,6 @@
 - **A renamed Host keeps its UUID** — remarks change with fleet shape, so adopt the committed binding's Host before looking up by remark; name-only lookup created twins.
 - **A moved exit keeps its Node** — `SERVER_PLACED` kinds retire their old placement, but the panel Node is PATCHed to the new address, never recreated.
 - **Remnawave deletes Nodes asynchronously** — `NodeRetirement` polls until the Node is gone before its Profile is deleted.
-- **Certificates retire through acme.sh's record** — match `Le_RealFullChainPath`, not the hostname; skip while the panel or a Host still uses the file; drop the ACME listener with the last one.
+- **Certificates retire through acme.sh's record** — match `Le_RealFullChainPath`, not the hostname; skip while the panel, the control service, or a Host still uses the file (missing the service once deleted a control server's own IP certificate when its exit left); drop the ACME listener with the last one.
 - **Node runtimes share `host_runtime.NODE_DIR`** — when the plan still runs a node there, only forget the old binding; retirement removes both the neutral and the `remnawave-node` names.
 - **Renames migrate, never orphan** — a surviving pre-rename unit, `meridian-v4-*` UFW comment, or `remnawave*` container/directory is drift; stop the old unit before the new one binds, and re-add rules after deleting the old comment.

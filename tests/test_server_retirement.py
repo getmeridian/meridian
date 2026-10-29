@@ -12,6 +12,7 @@ from meridian.cluster import ManagedResourceBinding
 from meridian.compiler.models import (
     CertificatePayload,
     ControlPlaneRuntimePayload,
+    ControlServicePayload,
     NodeRuntimePayload,
     certificate_directory,
 )
@@ -282,11 +283,16 @@ def test_certificate_on_a_server_that_keeps_another_keeps_the_challenge_listener
     assert "meridian-v4-acme.conf" not in command
 
 
-def test_the_panel_servers_shared_ip_certificate_is_never_removed() -> None:
+@pytest.mark.parametrize(
+    "control",
+    [ControlPlaneRuntimePayload, ControlServicePayload],
+    ids=["remnawave-panel", "control-service"],
+)
+def test_the_control_servers_shared_ip_certificate_is_never_removed(control: type) -> None:
     conn = MockConnection()
-    panel = ControlPlaneRuntimePayload.model_construct(server_ref="srv-a")
+    runtime = control.model_construct(server_ref="srv-a")
 
-    _certificate_driver(conn, panel).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
+    _certificate_driver(conn, runtime).retire(_binding("/etc/ssl/meridian/fullchain.pem"))
 
     assert conn.calls == []
 
